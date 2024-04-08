@@ -140,6 +140,8 @@ INST(Nop, nop, 0, 0)
     INST(Std430BufferLayoutType, Std430Layout, 0, HOISTABLE)
     INST(ScalarBufferLayoutType, ScalarLayout, 0, HOISTABLE)
 
+    INST(SubpassInputType, SubpassInputType, 2, HOISTABLE)
+
     INST(TextureFootprintType, TextureFootprintType, 1, HOISTABLE)
 
     INST(TextureShape1DType, TextureShape1DType, 0, HOISTABLE)
@@ -662,6 +664,8 @@ INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 
 
 INST(GetLegalizedSPIRVGlobalParamAddr, kIROp_GetLegalizedSPIRVGlobalParamAddr, 1, 0)
 
+INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
+
 INST(MakeArrayList, makeArrayList, 0, 0)
 INST(MakeTensorView, makeTensorView, 0, 0)
 INST(AllocateTorchTensor, allocTorchTensor, 0, 0)
@@ -691,7 +695,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     /* TargetSpecificDecoration */
         INST(TargetDecoration,              target,                 1, 0)
         INST(TargetIntrinsicDecoration,     targetIntrinsic,        2, 0)
-    INST_RANGE(TargetSpecificDecoration, TargetDecoration, TargetIntrinsicDecoration)
+        INST_RANGE(TargetSpecificDefinitionDecoration, TargetDecoration, TargetIntrinsicDecoration)
+        INST(RequirePreludeDecoration, requirePrelude, 2, 0)
+    INST_RANGE(TargetSpecificDecoration, TargetDecoration, RequirePreludeDecoration)
     INST(GLSLOuterArrayDecoration,          glslOuterArray,         1, 0)
     
     INST(InterpolationModeDecoration,       interpolationMode,      1, 0)
@@ -711,6 +717,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(VulkanHitAttributesDecoration,     vulkanHitAttributes,    0, 0)
     INST(VulkanHitObjectAttributesDecoration, vulkanHitObjectAttributes, 0, 0)
 
+    INST(GlobalVariableShadowingGlobalParameterDecoration, GlobalVariableShadowingGlobalParameterDecoration, 2, 0)
+
     INST(RequireSPIRVVersionDecoration,     requireSPIRVVersion,    1, 0)
     INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
@@ -722,7 +730,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(VulkanCallablePayloadDecoration,   vulkanCallablePayload,  0, 0)
     INST(VulkanCallablePayloadInDecoration, vulkanCallablePayloadIn,  0, 0)
     INST(EarlyDepthStencilDecoration,       earlyDepthStencil,      0, 0)
-    INST(GloballyCoherentDecoration,        globallyCoherent,       0, 0)
     INST(PreciseDecoration,                 precise,                0, 0)
     INST(PublicDecoration,                  public,                 0, 0)
     INST(HLSLExportDecoration,              hlslExport,             0, 0)
@@ -734,6 +741,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(MaxVertexCountDecoration,          maxVertexCount,         1, 0)
     INST(InstanceDecoration,                instance,               1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
+    INST(WaveSizeDecoration,                waveSize,               1, 0)
 
         // Added to IRParam parameters to an entry point
     /* GeometryInputPrimitiveTypeDecoration */
@@ -857,11 +865,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GlobalOutputDecoration, output, 0, 0)
     INST(GlobalInputDecoration, output, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
+    INST(GLSLInputAttachmentIndexDecoration, glslInputAttachmentIndex, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
-    INST(GLSLVolatileDecoration, glslVolatile, 1, 0)
-    INST(GLSLRestrictDecoration, glslRestrict, 1, 0)
-    INST(GLSLReadOnlyDecoration, glslReadonly, 1, 0)
-    INST(GLSLWriteOnlyDecoration, glslWriteonly, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */
@@ -993,6 +998,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
     INST(SPIRVBlockDecoration, spvBlock, 0, 0)
+
+        // Stores flag bits of which memory qualifiers an object has
+    INST(MemoryQualifierSetDecoration, MemoryQualifierSetDecoration, 1, 0)
 
         /// Marks a function as one which access a bitfield with the specified
         /// backing value key, width and offset

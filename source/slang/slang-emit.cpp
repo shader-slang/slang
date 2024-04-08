@@ -28,6 +28,7 @@
 #include "slang-ir-explicit-global-init.h"
 #include "slang-ir-fuse-satcoop.h"
 #include "slang-ir-glsl-legalize.h"
+#include "slang-ir-hlsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-legalize-array-return-type.h"
@@ -838,6 +839,10 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
+
+    // Legalize non struct parameters that are expected to be structs for HLSL. 
+    if(isD3DTarget(targetRequest))
+        legalizeNonStructParameterToStructForHLSL(irModule);
 
     // Legalize `ImageSubscript` and constant buffer loads for GLSL.
     switch (target)

@@ -1415,12 +1415,21 @@ struct SPIRVEmitContext
                     if (m_decoratedSpvInsts.add(getID(resultSpvType)))
                     {
                         IRSizeAndAlignment sizeAndAlignment;
-                        getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), ptrType->getValueType(), &sizeAndAlignment);
+                        uint32_t stride;
+
+                        getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), valueType, &sizeAndAlignment);
+                        uint64_t valueSize = sizeAndAlignment.size;
+
+                        // Any unsized data type (e.g. struct or array) will have size of kIndeterminateSize,
+                        // in such case the stride is invalid, so we have to provide a non-zero value to pass the
+                        // spirv validator.
+                        stride = (valueSize >= (uint64_t)sizeAndAlignment.kIndeterminateSize) ?
+                                    0xFFFF : (uint32_t)sizeAndAlignment.getStride();
                         emitOpDecorateArrayStride(
                             getSection(SpvLogicalSectionID::Annotations),
                             nullptr,
                             resultSpvType,
-                            SpvLiteralInteger::from32((uint32_t)sizeAndAlignment.getStride()));
+                            SpvLiteralInteger::from32(stride));
                     }
                 }
                 return resultSpvType;
@@ -1431,12 +1440,28 @@ struct SPIRVEmitContext
             {
                 List<IRType*> types;
                 for (auto field : static_cast<IRStructType*>(inst)->getFields())
+                {
                     types.add(field->getFieldType());
+                }
                 auto spvStructType = emitOpTypeStruct(
                     inst,
                     types
                 );
                 emitDecorations(inst, getID(spvStructType));
+
+                auto structType = as<IRStructType>(inst);
+                uint64_t structSize = 0;
+                if (auto layoutDecor = structType->findDecoration<IRSizeAndAlignmentDecoration>())
+                {
+                    structSize = layoutDecor->getSize();
+                }
+
+                if (structSize >= (uint64_t)IRSizeAndAlignment::kIndeterminateSize)
+                {
+                    IRBuilder builder(inst);
+                    auto decoration = builder.addDecoration(inst, kIROp_SPIRVBlockDecoration);
+                    emitDecoration(getID(spvStructType), decoration);
+                }
                 emitLayoutDecorations(as<IRStructType>(inst), getID(spvStructType));
                 return spvStructType;
             }
@@ -1489,6 +1514,8 @@ struct SPIRVEmitContext
                     SpvLiteralInteger::from32(stride));
                 return arrayType;
             }
+        case kIROp_SubpassInputType:
+            return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
         case kIROp_TextureType:
             return ensureTextureType(inst, cast<IRTextureType>(inst));
         case kIROp_SamplerStateType:
@@ -1799,39 +1826,62 @@ struct SPIRVEmitContext
         }
     }
 
+    struct ImageOpConstants
+    {
+        enum : SpvWord
+        {
+            // Some untyped constants from OpTypeImage
+            // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeImage
+
+            // indicates not a depth image
+            notDepthImage = 0,
+            // indicates a depth image
+            isDepthImage = 1,
+            // means no indication as to whether this is a depth or non-depth image
+            unknownDepthImage = 2,
+
+            // indicates non-arrayed content
+            notArrayed = 0,
+            // indicates arrayed content
+            isArrayed = 1,
+
+            // indicates this is only known at run time, not at compile time
+            sampledUnknown = 0,
+            // indicates an image compatible with sampling operations
+            sampledImage = 1,
+            // indicates an image compatible with read/write operations (a storage or subpass data image).
+            readWriteImage = 2,
+
+            // indicates single-sampled content
+            notMultisampled = 0,
+            // indicates multisampled content
+            isMultisampled = 1,
+        };
+    };
+
+    SpvInst* ensureSubpassInputType(IRInst* assignee, IRSubpassInputType* inst)
+    {
+        IRInst* sampledType = inst->getElementType();
+        SpvDim dim = SpvDimSubpassData;
+        SpvWord ms = inst->isMultisample() ? ImageOpConstants::isMultisampled : ImageOpConstants::notMultisampled;
+        SpvWord sampled = 2; 
+        requireSPIRVCapability(SpvCapabilityInputAttachment);
+        requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
+        setImageFormatCapabilityAndExtension(SpvImageFormatUnknown, SpvCapabilityShader);
+        return emitOpTypeImage(
+            assignee,
+            dropVector((IRType*)sampledType),
+            dim,
+            SpvLiteralInteger::from32(ImageOpConstants::unknownDepthImage),
+            SpvLiteralInteger::from32(0),
+            SpvLiteralInteger::from32(ms),
+            SpvLiteralInteger::from32(sampled),
+            SpvImageFormatUnknown
+        );
+    }
+
     SpvInst* ensureTextureType(IRInst* assignee, IRTextureTypeBase* inst)
     {
-        // Some untyped constants from OpTypeImage
-        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeImage
-
-        // indicates not a depth image
-        [[maybe_unused]]
-        const SpvWord notDepthImage = 0;
-        // indicates a depth image
-        [[maybe_unused]]
-        const SpvWord isDepthImage = 1;
-        // means no indication as to whether this is a depth or non-depth image
-        const SpvWord unknownDepthImage = 2;
-
-        // indicates non-arrayed content
-        const SpvWord notArrayed = 0;
-        // indicates arrayed content
-        const SpvWord isArrayed = 1;
-
-        // indicates single-sampled content
-        const SpvWord notMultisampled = 0;
-        // indicates multisampled content
-        const SpvWord isMultisampled = 1;
-
-        // indicates this is only known at run time, not at compile time
-        const SpvWord sampledUnknown = 0;
-        // indicates an image compatible with sampling operations
-        const SpvWord sampledImage = 1;
-        // indicates an image compatible with read/write operations (a storage or subpass data image).
-        const SpvWord readWriteImage = 2;
-
-        //
-
         IRInst* sampledType = inst->getElementType();
         SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
         switch(inst->GetBaseShape())
@@ -1852,22 +1902,22 @@ struct SPIRVEmitContext
                 dim = SpvDimBuffer;
                 break;
         }
-        SpvWord arrayed = inst->isArray() ? isArrayed : notArrayed;
+        SpvWord arrayed = inst->isArray() ? ImageOpConstants::isArrayed : ImageOpConstants::notArrayed;
 
         // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
-        SpvWord depth = unknownDepthImage; // No knowledge of if this is a depth image
-        SpvWord ms = inst->isMultisample() ? isMultisampled : notMultisampled;
+        SpvWord depth = ImageOpConstants::unknownDepthImage; // No knowledge of if this is a depth image
+        SpvWord ms = inst->isMultisample() ? ImageOpConstants::isMultisampled : ImageOpConstants::notMultisampled;
 
-        SpvWord sampled = sampledUnknown;
+        SpvWord sampled = ImageOpConstants::sampledUnknown;
         switch(inst->getAccess())
         {
             case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ_WRITE:
             case SlangResourceAccess::SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-                sampled = readWriteImage;
+                sampled = ImageOpConstants::readWriteImage;
                 break;
             case SlangResourceAccess::SLANG_RESOURCE_ACCESS_NONE:
             case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ:
-                sampled = sampledImage;
+                sampled = ImageOpConstants::sampledImage;
                 break;
         }
 
@@ -1928,40 +1978,37 @@ struct SPIRVEmitContext
         // Capabilities, according to section 3.8
         //
         // SPIR-V requires that the sampled/rw info on the image isn't unknown
-        SLANG_ASSERT(sampled == sampledImage || sampled == readWriteImage);
-        if(isMultisampled) 
+        SLANG_ASSERT(sampled == ImageOpConstants::sampledImage || sampled == ImageOpConstants::readWriteImage);
+        if(ms == ImageOpConstants::isMultisampled) 
             requireSPIRVCapability(SpvCapabilityStorageImageMultisample);
         switch(dim)
         {
         case SpvDim1D:
-            requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampled1D : SpvCapabilityImage1D);
+            requireSPIRVCapability(sampled == ImageOpConstants::sampledImage ? SpvCapabilitySampled1D : SpvCapabilityImage1D);
             break;
         case SpvDim2D:
             // Also requires Shader or Kernel, but these are a given (?)
-            if(sampled == readWriteImage && ms == isMultisampled && arrayed == isArrayed)
+            if(sampled == ImageOpConstants::readWriteImage && ms == ImageOpConstants::isMultisampled && arrayed == ImageOpConstants::isArrayed)
                 requireSPIRVCapability(SpvCapabilityImageMSArray);
             break;
         case SpvDim3D:
             break;
         case SpvDimCube:
             // Requires shader also
-            if(sampled == readWriteImage && arrayed == isArrayed)
+            if(sampled == ImageOpConstants::readWriteImage && arrayed == ImageOpConstants::isArrayed)
                 requireSPIRVCapability(SpvCapabilityImageCubeArray);
             break;
         case SpvDimRect:
-            requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
+            requireSPIRVCapability(sampled == ImageOpConstants::sampledImage ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
             break;
         case SpvDimBuffer:
-            requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
-            break;
-        case SpvDimSubpassData:
-            requireSPIRVCapability(SpvCapabilityInputAttachment);
+            requireSPIRVCapability(sampled == ImageOpConstants::sampledImage ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
             break;
         case SpvDimTileImageDataEXT:
             SLANG_UNIMPLEMENTED_X("OpTypeImage Capabilities for SpvDimTileImageDataEXT");
             break;
         }
-        if(format == SpvImageFormatUnknown && sampled == readWriteImage)
+        if(format == SpvImageFormatUnknown && sampled == ImageOpConstants::readWriteImage)
         {
             // TODO: It may not be necessary to have both of these
             // depending on if we read or write
@@ -2045,6 +2092,18 @@ struct SPIRVEmitContext
             return true;
         default:
             return false;
+        }
+    }
+    void emitSystemVarDecoration(IRInst* var, SpvInst* varInst)
+    {
+        for (auto decor : var->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_GLSLPrimitivesRateDecoration:
+                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), decor, varInst, SpvDecorationPerPrimitiveEXT);
+                break;
+            }
         }
     }
 
@@ -2209,6 +2268,7 @@ struct SPIRVEmitContext
         }
         if (auto systemValInst = maybeEmitSystemVal(param))
         {
+            emitSystemVarDecoration(param, systemValInst);
             registerInst(param, systemValInst);
             return systemValInst;
         }
@@ -2869,10 +2929,15 @@ struct SPIRVEmitContext
     }
 
 
-    SpvExecutionMode isDepthOutput(IRInst* builtinVar)
+    SpvExecutionMode getDepthOutputExecutionMode(IRInst* builtinVar)
     {
         SpvExecutionMode result = SpvExecutionModeMax;
         bool isDepthVar = false;
+
+        // If the builtin is an output, we need to emit the DepthReplacing execution mode
+        // required by the SPIRV spec even if we are not writing to it.
+        bool isOutputVar = false;
+
         if (auto layout = getVarLayout(builtinVar))
         {
             if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
@@ -2884,6 +2949,9 @@ struct SPIRVEmitContext
                     auto importDecor = builtinVar->findDecoration<IRImportDecoration>();
                     if (importDecor->getMangledName() == "gl_FragCoord")
                     {
+                        // SV_POSITION is not necessarily a depth output,
+                        // if it is not written to, we don't need to emit
+                        // the DepthReplacing execution mode.
                         isDepthVar = true;
                         result = SpvExecutionModeDepthReplacing;
                     }
@@ -2891,22 +2959,30 @@ struct SPIRVEmitContext
                 else if (semanticName == "sv_depth")
                 {
                     isDepthVar = true;
+                    isOutputVar = true;
                     result = SpvExecutionModeDepthReplacing;
                 }
                 else if (semanticName == "sv_depthgreaterequal")
                 {
                     isDepthVar = true;
+                    isOutputVar = true;
                     result = SpvExecutionModeDepthGreater;
                 }
                 else if (semanticName == "sv_depthlessequal")
                 {
                     isDepthVar = true;
+                    isOutputVar = true;
                     result = SpvExecutionModeDepthLess;
                 }
             }
         }
         if (!isDepthVar)
+            return SpvExecutionModeMax;
+        if (isOutputVar)
             return result;
+
+        // If the builtin can be both input and output,
+        // we need to check if we actually write to it.
         for (auto use = builtinVar->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
@@ -2918,10 +2994,11 @@ struct SPIRVEmitContext
             {
             case kIROp_SwizzledStore:
             case kIROp_Store:
+            case kIROp_Call:
                 return result;
             }
         }
-        return result;
+        return SpvExecutionModeMax;
     }
 
     void maybeEmitEntryPointDepthReplacingExecutionMode(
@@ -2931,34 +3008,25 @@ struct SPIRVEmitContext
         // Check if the entrypoint uses any depth output builtin variables,
         // if so, we need to emit a DepthReplacing execution mode for the
         // fragment entrypoint.
-        bool needDepthReplacingMode = false;
         SpvExecutionMode mode = SpvExecutionModeMax;
         for (auto globalInst : referencedBuiltinIRVars)
         {
-            if (auto thisMode = isDepthOutput(globalInst))
+            auto thisMode = getDepthOutputExecutionMode(globalInst);
+            if (mode == SpvExecutionModeMax)
+                mode = thisMode;
+            else if (mode != thisMode)
             {
-                needDepthReplacingMode = true;
-                if (mode == SpvExecutionModeMax)
-                    mode = thisMode;
-                else if (mode != thisMode)
-                    mode = SpvExecutionModeDepthReplacing;
+                mode = SpvExecutionModeDepthReplacing;
                 break;
             }
         }
-        if (!needDepthReplacingMode)
+        if (mode == SpvExecutionModeMax)
             return;
+
         emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
             nullptr,
             entryPoint,
-            SpvExecutionModeDepthReplacing);
-        if (mode != SpvExecutionModeDepthReplacing &&
-            mode != SpvExecutionModeMax)
-        {
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
-                nullptr,
-                entryPoint,
-                mode);
-        }
+            mode);
     }
 
     // Make user type name conform to `SPV_GOOGLE_user_type` spec.
@@ -3273,6 +3341,17 @@ struct SPIRVEmitContext
                 );
             }
             break;
+        case kIROp_GLSLInputAttachmentIndexDecoration:
+            {
+                const auto c = cast<IRGLSLInputAttachmentIndexDecoration>(decoration);
+                emitOpDecorateInputAttachmentIndex(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    decoration,
+                    dstID,
+                    SpvLiteralInteger::from32(int32_t(c->getIndex()->getValue()))
+                );
+            }
+            break;
 
         case kIROp_VulkanHitAttributesDecoration:
         case kIROp_VulkanCallablePayloadDecoration:
@@ -3294,36 +3373,47 @@ struct SPIRVEmitContext
             requireSPIRVCapability(SpvCapabilityRayQueryKHR);
             isRayTracingObject = true;
             break;
-        case kIROp_GloballyCoherentDecoration:
-            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
-                               decoration,
-                               dstID,
-                               SpvDecorationCoherent);
+        case kIROp_MemoryQualifierSetDecoration:
+        {
+            auto collection = as<IRMemoryQualifierSetDecoration>(decoration);
+            IRIntegerValue flags = collection->getMemoryQualifierBit();
+            if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+            {
+                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    dstID,
+                    SpvDecorationCoherent);
+            }
+            if (flags & MemoryQualifierSetModifier::Flags::kVolatile)
+            {
+                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    dstID,
+                    SpvDecorationVolatile);
+            }
+            if (flags & MemoryQualifierSetModifier::Flags::kRestrict)
+            {
+                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    dstID,
+                    SpvDecorationRestrict);
+            }
+            if (flags & MemoryQualifierSetModifier::Flags::kReadOnly)
+            {
+                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    dstID,
+                    SpvDecorationNonWritable);
+            }
+            if (flags & MemoryQualifierSetModifier::Flags::kWriteOnly)
+            {
+                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    dstID,
+                    SpvDecorationNonReadable);
+            }
             break;
-        case kIROp_GLSLVolatileDecoration:
-            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
-                decoration,
-                dstID,
-                SpvDecorationVolatile);
-            break;
-        case kIROp_GLSLRestrictDecoration:
-            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
-                decoration,
-                dstID,
-                SpvDecorationRestrict);
-            break;
-        case kIROp_GLSLReadOnlyDecoration:
-            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
-                decoration,
-                dstID,
-                SpvDecorationNonWritable);
-            break;
-        case kIROp_GLSLWriteOnlyDecoration:
-            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
-                decoration,
-                dstID,
-                SpvDecorationNonReadable);
-            break;
+        }
         // ...
         }
 
@@ -3416,15 +3506,59 @@ struct SPIRVEmitContext
                         id,
                         fieldNameDecor->getName());
                 }
-                else if (as<IRGloballyCoherentDecoration>(decor))
+                else if (auto collection = as<IRMemoryQualifierSetDecoration>(decor))
                 {
-                    emitOpMemberDecorate(
-                        getSection(SpvLogicalSectionID::Annotations),
-                        decor,
-                        spvStructID,
-                        SpvLiteralInteger::from32(id),
-                        SpvDecorationCoherent
-                    );
+                    IRIntegerValue flags = collection->getMemoryQualifierBit();
+                    if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                    {
+                        emitOpMemberDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            spvStructID,
+                            SpvLiteralInteger::from32(id),
+                            SpvDecorationCoherent
+                        );
+                    }
+                    if (flags & MemoryQualifierSetModifier::Flags::kVolatile)
+                    {
+                        emitOpMemberDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            spvStructID,
+                            SpvLiteralInteger::from32(id),
+                            SpvDecorationVolatile
+                        );
+                    }
+                    if (flags & MemoryQualifierSetModifier::Flags::kRestrict)
+                    {
+                        emitOpMemberDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            spvStructID,
+                            SpvLiteralInteger::from32(id),
+                            SpvDecorationRestrict
+                        );
+                    }
+                    if (flags & MemoryQualifierSetModifier::Flags::kReadOnly)
+                    {
+                        emitOpMemberDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            spvStructID,
+                            SpvLiteralInteger::from32(id),
+                            SpvDecorationNonWritable
+                        );
+                    }
+                    if (flags & MemoryQualifierSetModifier::Flags::kWriteOnly)
+                    {
+                        emitOpMemberDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            spvStructID,
+                            SpvLiteralInteger::from32(id),
+                            SpvDecorationNonReadable
+                        );
+                    }
                 }
                 else if (auto semanticDecor = field->getKey()->findDecoration<IRSemanticDecoration>())
                 {
@@ -3714,9 +3848,9 @@ struct SPIRVEmitContext
                             {
                                 switch (entryPointDecor->getProfile().getStage())
                                 {
+                                case Stage::Mesh:
                                 case Stage::Geometry:
                                 case Stage::Intersection:
-                                case Stage::Mesh:
                                 case Stage::Amplification:
                                 case Stage::AnyHit:
                                 case Stage::ClosestHit:
@@ -3790,7 +3924,7 @@ struct SPIRVEmitContext
                 else if (semanticName == "sv_cullprimitive")
                 {
                     requireSPIRVCapability(SpvCapabilityMeshShadingEXT);
-                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_mesh_shader"));
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_mesh_shader"));
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInCullPrimitiveEXT);
                 }
                 else if (semanticName == "sv_shadingrate")

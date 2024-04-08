@@ -1459,6 +1459,15 @@ struct IRGLSLImageType : IRTextureTypeBase
     IR_LEAF_ISA(GLSLImageType)
 };
 
+struct IRSubpassInputType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+    IRInst* getIsMultisampleInst() { return getOperand(1); }
+    bool isMultisample() { return getIntVal(getIsMultisampleInst()) == 1; }
+
+    IR_LEAF_ISA(SubpassInputType)
+};
+
 struct IRSamplerStateTypeBase : IRType
 {
     IR_PARENT_ISA(SamplerStateTypeBase)

@@ -140,11 +140,14 @@ namespace Slang
         // Cost of converting a pointer to bool
         kConversionCost_PtrToBool = 400,
 
+        // Cost of converting an integer to int16_t
+        kConversionCost_IntegerTruncate = 450,
+
+        // Cost of converting an integer to a half type
+        kConversionCost_IntegerToHalfConversion = 500,
+
         // Default case (usable for user-defined conversions)
         kConversionCost_Default = 500,
-
-        // Cost of converting an integer to int16_t
-        kConversionCost_IntegerTruncate = 700,
 
         // Catch-all for conversions that should be discouraged
         // (i.e., that really shouldn't be made implicitly)
@@ -1421,6 +1424,9 @@ namespace Slang
         Scope*              scope       = nullptr;
         Scope*              endScope    = nullptr;
 
+        // A decl to exclude from the lookup, used to exclude the current decl being checked, such as in typedef Foo Foo;
+        // to avoid finding itself.
+        Decl* declToExclude = nullptr;
         LookupMask          mask        = LookupMask::Default;
         LookupOptions       options     = LookupOptions::None;
 
@@ -1600,6 +1606,20 @@ namespace Slang
         DZeroFunc, ///< The `IDifferentiable.dzero` function requirement 
         DAddFunc, ///< The `IDifferentiable.dadd` function requirement 
         DMulFunc, ///< The `IDifferentiable.dmul` function requirement 
+
+        InitLogicalFromInt, ///< The `ILogical.__init` mtehod.
+        Equals, ///< The `ILogical.equals` mtehod.
+        LessThan, ///< The `ILogical.lessThan` mtehod.
+        LessThanOrEquals, ///< The `ILogical.lessThanOrEquals` mtehod.
+        Shl, ///< The `ILogical.shl` mtehod.
+        Shr, ///< The `ILogical.shr` mtehod.
+        BitAnd, ///< The `ILogical.bitAnd` mtehod.
+        BitOr, ///< The `ILogical.bitOr` mtehod.
+        BitXor, ///< The `ILogical.bitXor` mtehod.
+        BitNot, ///< The `ILogical.bitNot` mtehod.
+        And, ///< The `ILogical.and` mtehod.
+        Or, ///< The `ILogical.or` mtehod.
+        Not, ///< The `ILogical.not` mtehod.
     };
 
     enum class FunctionDifferentiableLevel

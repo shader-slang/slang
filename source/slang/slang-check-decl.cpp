@@ -946,21 +946,15 @@ namespace Slang
 
             // Ensures child of struct is set read-only or not
             bool isWriteOnly = false;
+            if(auto collection = varDeclRef.getDecl()->findModifier<MemoryQualifierSetModifier>())
             {
-                for (auto mod : varDeclRef.getDecl()->modifiers)
+                if(collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kReadOnly)
                 {
-                    if (as<GLSLReadOnlyModifier>(mod))
-                    {
-                        isLValue = false;
-                        qualType.hasReadOnlyOnTarget = true;
-                        if (isLValue == false && isWriteOnly) break;
-                    }
-                    if (as<GLSLWriteOnlyModifier>(mod))
-                    {
-                        isWriteOnly = true;
-                        if (isLValue == false && isWriteOnly) break;
-                    }
+                    isLValue = false;
+                    qualType.hasReadOnlyOnTarget = true;
                 }
+                if(collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kWriteOnly)
+                    isWriteOnly = true;
             }
 
             qualType.isLeftValue = isLValue;
@@ -1335,6 +1329,15 @@ namespace Slang
         return arrayType->isUnsized();
     }
 
+    EnumDecl* isEnumType(Type* type)
+    {
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            return as<EnumDecl>(declRefType->getDeclRef().getDecl());
+        }
+        return nullptr;
+    }
+
     bool SemanticsVisitor::shouldSkipChecking(Decl* decl, DeclCheckState state)
     {
         if (state < DeclCheckState::DefinitionChecked)
@@ -1547,7 +1550,8 @@ namespace Slang
             }
             else
             {
-                initExpr = CheckExpr(initExpr);
+                SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
+                initExpr = subVisitor.CheckExpr(initExpr);
 
                 // TODO: We might need some additional steps here to ensure
                 // that the type of the expression is one we are okay with
@@ -1568,7 +1572,8 @@ namespace Slang
         {
             // A variable with an explicit type is simpler, for the
             // most part.
-            TypeExp typeExp = CheckUsableType(varDecl->type);
+            SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
+            TypeExp typeExp = subVisitor.CheckUsableType(varDecl->type);
             varDecl->type = typeExp;
             if (varDecl->type.equals(m_astBuilder->getVoidType()))
             {
@@ -3589,13 +3594,14 @@ namespace Slang
         }
     }
 
-    FuncDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitness(
+    FunctionDeclBase* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitness(
         ConformanceCheckingContext* context,
-        DeclRef<FuncDecl> requiredMemberDeclRef,
+        DeclRef<FunctionDeclBase> requiredMemberDeclRef,
         List<Expr*>& synArgs,
         ThisExpr*& synThis)
     {
-        auto synFuncDecl = m_astBuilder->create<FuncDecl>();
+        FunctionDeclBase* synFuncDecl = as<FunctionDeclBase>(m_astBuilder->createByNodeType(requiredMemberDeclRef.getDecl()->astNodeType));
+        SLANG_ASSERT(synFuncDecl);
         synFuncDecl->ownedScope = m_astBuilder->create<Scope>();
         synFuncDecl->ownedScope->containerDecl = synFuncDecl;
         synFuncDecl->ownedScope->parent = getScope(context->parentDecl);
@@ -3910,6 +3916,14 @@ namespace Slang
         RefPtr<WitnessTable>        witnessTable)
     {
         SLANG_UNUSED(satisfyingMemberLookupResult);
+
+        if (as<EnumDecl>(context->parentDecl))
+        {
+            if (auto builtinRequirement = requiredMemberDeclRef.getDecl()->findModifier<BuiltinRequirementModifier>())
+            {
+                return trySynthesizeEnumTypeMethodRequirementWitness(context, requiredMemberDeclRef, witnessTable, builtinRequirement->kind);
+            }
+        }
 
         bool isInWrapperType = isWrapperTypeDecl(context->parentDecl);
         if (!isInWrapperType)
@@ -4591,6 +4605,21 @@ namespace Slang
                         requiredFuncDeclRef,
                         witnessTable,
                         SynthesisPattern::AllInductive);
+                case BuiltinRequirementKind::And:
+                case BuiltinRequirementKind::Or:
+                case BuiltinRequirementKind::Not:
+                case BuiltinRequirementKind::BitAnd:
+                case BuiltinRequirementKind::BitNot:
+                case BuiltinRequirementKind::BitOr:
+                case BuiltinRequirementKind::BitXor:
+                case BuiltinRequirementKind::Shl:
+                case BuiltinRequirementKind::Shr:
+                case BuiltinRequirementKind::Equals:
+                case BuiltinRequirementKind::LessThan:
+                case BuiltinRequirementKind::LessThanOrEquals:
+                    if (isEnumType(context->conformingType))
+                        return trySynthesizeEnumTypeMethodRequirementWitness(context, requiredFuncDeclRef, witnessTable, builtinAttr->kind);
+                    break;
                 }
             }
             return false;
@@ -4737,6 +4766,70 @@ namespace Slang
         return synth.emitAssignStmt(leftValue, synth.emitInvokeExpr(callee, _Move(args)));
     }
 
+    bool SemanticsVisitor::trySynthesizeEnumTypeMethodRequirementWitness(ConformanceCheckingContext* context,
+        DeclRef<FunctionDeclBase> funcDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        BuiltinRequirementKind requirementKind)
+    {
+        List<Expr*> synArgs;
+        ThisExpr* synThis = nullptr;
+        auto synFunc = synthesizeMethodSignatureForRequirementWitness(
+            context, funcDeclRef, synArgs, synThis);
+        auto intrinsicOpModifier = getASTBuilder()->create<IntrinsicOpModifier>();
+        switch (requirementKind)
+        {
+        case BuiltinRequirementKind::And:
+            intrinsicOpModifier->op = kIROp_And;
+            break;
+        case BuiltinRequirementKind::Or:
+            intrinsicOpModifier->op = kIROp_Or;
+            break;
+        case BuiltinRequirementKind::Not:
+            intrinsicOpModifier->op = kIROp_Not;
+            break;
+        case BuiltinRequirementKind::BitAnd:
+            intrinsicOpModifier->op = kIROp_BitAnd;
+            break;
+        case BuiltinRequirementKind::BitNot:
+            intrinsicOpModifier->op = kIROp_BitNot;
+            break;
+        case BuiltinRequirementKind::BitOr:
+            intrinsicOpModifier->op = kIROp_BitOr;
+            break;
+        case BuiltinRequirementKind::BitXor:
+            intrinsicOpModifier->op = kIROp_BitXor;
+            break;
+        case BuiltinRequirementKind::Shl:
+            intrinsicOpModifier->op = kIROp_Lsh;
+            break;
+        case BuiltinRequirementKind::Shr:
+            intrinsicOpModifier->op = kIROp_Rsh;
+            break;
+        case BuiltinRequirementKind::Equals:
+            intrinsicOpModifier->op = kIROp_Eql;
+            break;
+        case BuiltinRequirementKind::LessThan:
+            intrinsicOpModifier->op = kIROp_Less;
+            break;
+        case BuiltinRequirementKind::LessThanOrEquals:
+            intrinsicOpModifier->op = kIROp_Leq;
+            break;
+        case BuiltinRequirementKind::InitLogicalFromInt:
+            intrinsicOpModifier->op = kIROp_IntCast;
+            break;
+        default:
+            SLANG_ASSERT("unknown builtin requirement kind.");
+        }
+        synFunc->parentDecl = context->parentDecl;
+        synFunc->loc = context->parentDecl->closingSourceLoc;
+        synFunc->nameAndLoc.loc = synFunc->loc;
+        context->parentDecl->members.add(synFunc);
+        context->parentDecl->invalidateMemberDictionary();
+        addModifier(synFunc, intrinsicOpModifier);
+        witnessTable->add(funcDeclRef.getDecl(), RequirementWitness(m_astBuilder->getDirectDeclRef(synFunc)));
+        return true;
+    }
+
     bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<Decl> requirementDeclRef,
@@ -4799,8 +4892,8 @@ namespace Slang
         }
         else if (auto funcDeclRef = requirementDeclRef.as<FuncDecl>())
         {
-            synFunc = synthesizeMethodSignatureForRequirementWitness( 
-               context, funcDeclRef, synArgs, synThis);
+            synFunc = as<FuncDecl>(synthesizeMethodSignatureForRequirementWitness( 
+               context, funcDeclRef, synArgs, synThis));
         }
         
         SLANG_ASSERT(synFunc);
@@ -5847,6 +5940,11 @@ namespace Slang
         return isIntegerBaseType(baseType) || baseType == BaseType::Bool;
     }
 
+    bool SemanticsVisitor::isValidCompileTimeConstantType(Type* type)
+    {
+        return isScalarIntegerType(type) || isEnumType(type);
+    }
+
     bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* type)
     {
         auto basicType = as<BasicExpressionType>(type);
@@ -6081,6 +6179,8 @@ namespace Slang
 
         auto tagType = decl->tagType;
 
+        auto isEnumFlags = decl->hasModifier<FlagsAttribute>();
+
         // Check the enum cases in order.
         for(auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
         {
@@ -6100,7 +6200,7 @@ namespace Slang
 
         // For any enum case that didn't provide an explicit
         // tag value, derived an appropriate tag value.
-        IntegerLiteralValue defaultTag = 0;
+        IntegerLiteralValue defaultTag = isEnumFlags ? 1 : 0;
         for(auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
         {
             if(auto explicitTagValExpr = caseDecl->tagExpr)
@@ -6144,10 +6244,15 @@ namespace Slang
             // Default tag for the next case will be one more than
             // for the most recent case.
             //
-            // TODO: We might consider adding a `[flags]` attribute
-            // that modifies this behavior to be `defaultTagForCase <<= 1`.
-            //
-            defaultTag++;
+            if (!isEnumFlags)
+                defaultTag++;
+            else
+            {
+                if (defaultTag == 0)
+                    defaultTag = 1;
+                else
+                    defaultTag <<= 1;
+            }
         }
     }
 
@@ -6203,7 +6308,8 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
     {
-        decl->type = CheckProperType(decl->type);
+        SemanticsVisitor visitor(withDeclToExcludeFromLookup(decl));
+        decl->type = visitor.CheckProperType(decl->type);
         checkVisibility(decl);
     }
 
@@ -6997,7 +7103,8 @@ namespace Slang
         auto typeExpr = paramDecl->type;
         if(typeExpr.exp)
         {
-            typeExpr = CheckUsableType(typeExpr);
+            SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(paramDecl));
+            typeExpr = subVisitor.CheckUsableType(typeExpr);
             paramDecl->type = typeExpr;
             checkMeshOutputDecl(paramDecl);
         }
@@ -7049,10 +7156,10 @@ namespace Slang
         // Only texture types are allowed to have memory qualifiers on parameters
         if(!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
         {
-            auto memoryQualifierCollection = paramDecl->findModifier<MemoryQualifierCollectionModifier>();
-            if(!memoryQualifierCollection) 
+            auto MemoryQualifierSet = paramDecl->findModifier<MemoryQualifierSetModifier>();
+            if(!MemoryQualifierSet) 
                 return;
-            for(auto mod : memoryQualifierCollection->getModifiers())
+            for(auto mod : MemoryQualifierSet->getModifiers())
                 getSink()->diagnose(paramDecl, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter, mod);
         }
     }
@@ -7639,7 +7746,8 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
     {
-        decl->type = CheckUsableType(decl->type);
+        SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
+        decl->type = subVisitor.CheckUsableType(decl->type);
         visitAbstractStorageDeclCommon(decl);
         checkVisibility(decl);
     }

@@ -19,7 +19,8 @@ LookupResult lookUp(
     Name*               name,
     Scope*              scope,
     LookupMask          mask = LookupMask::Default,
-    bool                considerAllLocalNamesInScope = false);
+    bool                considerAllLocalNamesInScope = false,
+    Decl*               declToExclude = nullptr);
 
 // Perform member lookup in the context of a type
 LookupResult lookUpMember(
@@ -38,7 +39,8 @@ LookupResult lookUpDirectAndTransparentMembers(
     Name*                   name,
     ContainerDecl*          containerDecl,
     DeclRef<Decl>           parentDeclRef,       // The parent of the resulting declref.
-    LookupMask              mask = LookupMask::Default);
+    LookupMask              mask = LookupMask::Default,
+    Decl*                   declToExclude = nullptr);
 
 // TODO: this belongs somewhere else
 

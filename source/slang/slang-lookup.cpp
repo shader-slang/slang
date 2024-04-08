@@ -213,6 +213,8 @@ static void _lookUpDirectAndTransparentMembers(
             // it's unchecked or being checked then it isn't declared yet.
             if(!request.shouldConsiderAllLocalNames() && request.semantics && _isUncheckedLocalVar(m))
                 continue;
+            if (m == request.declToExclude)
+                continue;
 
             if (!DeclPassesLookupMask(m, request.mask))
                 continue;
@@ -253,13 +255,15 @@ LookupRequest initLookupRequest(
     Name* name,
     LookupMask mask,
     LookupOptions options,
-    Scope* scope)
+    Scope* scope,
+    Decl* declToExclude)
 {
     LookupRequest request;
     request.semantics = semantics;
     request.mask = mask;
     request.options = options;
     request.scope = scope;
+    request.declToExclude = declToExclude;
 
     if (semantics && semantics->getSession() &&
         name == semantics->getSession()->getCompletionRequestTokenName())
@@ -275,9 +279,10 @@ LookupResult lookUpDirectAndTransparentMembers(
     Name*                   name,
     ContainerDecl*          containerDecl,
     DeclRef<Decl>           parentDeclRef,
-    LookupMask              mask)
+    LookupMask              mask,
+    Decl*                   declToExclude)
 {
-    LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, nullptr);
+    LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, nullptr, declToExclude);
     LookupResult result;
     _lookUpDirectAndTransparentMembers(
         astBuilder,
@@ -892,13 +897,14 @@ LookupResult lookUp(
     Name*               name,
     Scope*              scope,
     LookupMask          mask,
-    bool                considerAllLocalNamesInScope)
+    bool                considerAllLocalNamesInScope,
+    Decl*               declToExclude)
 {
     LookupResult result;
     const auto options = considerAllLocalNamesInScope
         ? LookupOptions::ConsiderAllLocalNamesInScope
         : LookupOptions::None;
-    LookupRequest request = initLookupRequest(semantics, name, mask, options, scope);
+    LookupRequest request = initLookupRequest(semantics, name, mask, options, scope, declToExclude);
     _lookUpInScopes(astBuilder, name, request, result);
     return result;
 }
@@ -913,7 +919,7 @@ LookupResult lookUpMember(
     LookupOptions       options)
 {
     LookupResult result;
-    LookupRequest request = initLookupRequest(semantics, name, mask, options, sourceScope);
+    LookupRequest request = initLookupRequest(semantics, name, mask, options, sourceScope, nullptr);
     _lookUpMembersInType(astBuilder, name, type, request, result, nullptr);
     return result;
 }

@@ -3,6 +3,7 @@ Slang
 ![Linux Build Status](https://github.com/shader-slang/slang/actions/workflows/linux.yml/badge.svg)
 ![Windows Build Status](https://github.com/shader-slang/slang/actions/workflows/windows.yml/badge.svg)
 ![macOS Build Status](https://github.com/shader-slang/slang/actions/workflows/macos.yml/badge.svg)
+![CTS Status](https://github.com/shader-slang/slang/actions/workflows/vk-gl-cts-nightly.yml/badge.svg)
 
 Slang is a shading language that makes it easier to build and maintain large shader codebases in a modular and extensible fashion, while also maintaining the highest possible performance on modern GPUs and graphics APIs.
 Slang is based on years of collaboration between researchers at NVIDIA, Carnegie Mellon University, Stanford, MIT, UCSD and the University of Washington.
@@ -68,8 +69,20 @@ The following guidelines should be observed by contributors:
 
 [Contribution guide](CONTRIBUTION.md) describes the workflow for contributors at more detail.
 
-Limitations
------------
+Limitations and Support
+-----------------------
+
+### Platform support
+|   Windows       |     Linux      |    MacOS     |
+|:---------------:|:--------------:|:------------:|
+|   supported     |   supported    | unofficial   |
+
+### Target support
+|   Direct3D 11   |  Direct3D 12   |     Vulkan      |         CUDA        |    OptiX    |      CPU Compute      |
+|:---------------:|:--------------:|:---------------:|:-------------------:|:-----------:|:---------------------:|
+|     HLSL        |    HLSL        |  GLSL & SPIR-V  |  C++ (compute-only) |  C++ (WIP)  |  C++ (compute-only)   |
+
+*for greater detail, see the [Supported Compilation Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the [User Guide](https://shader-slang.github.io/slang/user-guide/)
 
 The Slang project has been used for production applications and large shader codebases, but it is still under active development.
 Support is currently focused on the platforms (Windows, Linux) and target APIs (Direct3D 12, Vulkan) where Slang is used most heavily.

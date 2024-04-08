@@ -2576,11 +2576,20 @@ namespace Slang
             typeSpec.expr = parseFuncTypeExpr(parser);
             return typeSpec;
         }
+        
+        bool inGlobalScope = false;
+        if (AdvanceIf(parser, TokenType::Scope))
+        {
+            inGlobalScope = true;
+        }
 
         Token typeName = parser->ReadToken(TokenType::Identifier);
 
         auto basicType = parser->astBuilder->create<VarExpr>();
-        basicType->scope = parser->currentLookupScope;
+        if (inGlobalScope)
+            basicType->scope = parser->currentModule->ownedScope;
+        else
+            basicType->scope = parser->currentLookupScope;
         basicType->loc = typeName.loc;
         basicType->name = typeName.getNameOrNull();
 
@@ -8009,6 +8018,7 @@ namespace Slang
                 CASE(scalar, GLSLScalarModifier)
                 CASE(offset, GLSLOffsetLayoutAttribute)
                 CASE(location, GLSLLocationLayoutModifier) 
+                CASE(input_attachment_index, GLSLInputAttachmentIndexLayoutModifier)
                 {
                     modifier = parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
                 }

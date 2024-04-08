@@ -143,6 +143,8 @@ class CaseStmt : public CaseStmtBase
     SLANG_AST_CLASS(CaseStmt)
 
     Expr* expr = nullptr;
+
+    Val* exprVal = nullptr;
 };
 
 // a `default` statement inside a `switch`

@@ -407,6 +407,7 @@ DIAGNOSTIC(31100, Error, unknownStageName, "unknown stage name '$0'")
 DIAGNOSTIC(31101, Error, unknownImageFormatName, "unknown image format '$0'")
 DIAGNOSTIC(31101, Error, unknownDiagnosticName, "unknown diagnostic '$0'")
 DIAGNOSTIC(31102, Error, nonPositiveNumThreads, "expected a positive integer in 'numthreads' attribute, got '$0'")
+DIAGNOSTIC(31103, Error, invalidWaveSize, "expected a power of 2 between 4 and 128, inclusive, in 'WaveSize' attribute, got '$0'")
 
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
 
@@ -448,6 +449,8 @@ DIAGNOSTIC(31203, Error, cannotExportIncompleteType, "cannot export incomplete t
 DIAGNOSTIC(31204, Error, incompleteTypeCannotBeUsedInBuffer, "incomplete type '$0' cannot be used in a buffer")
 DIAGNOSTIC(31205, Error, incompleteTypeCannotBeUsedInUniformParameter, "incomplete type '$0' cannot be used in a uniform parameter")
 DIAGNOSTIC(31206, Error, memoryQualifierNotAllowedOnANonImageTypeParameter, "modifier $0 is not allowed on a non image type parameter.")
+DIAGNOSTIC(31207, Error, InputAttachmentIndexOnlyAllowedOnSubpass, "input_attachment_index is only allowed on subpass images.")
+DIAGNOSTIC(31208, Error, requireInputDecoratedVarForParameter, "$0 expects for argument $1 a type which is a shader input (`in`) variable.")
 
 // Enums
 
@@ -472,6 +475,10 @@ DIAGNOSTIC(30503, Warning, forLoopNotModifyingIterationVariable, "the for loop i
 DIAGNOSTIC(30504, Warning, forLoopTerminatesInFewerIterationsThanMaxIters, "the for loop is statically determined to terminate within $0 iterations, which is less than what [MaxIters] specifies.")
 DIAGNOSTIC(30505, Warning, loopRunsForZeroIterations, "the loop runs for 0 iterations and will be removed.")
 DIAGNOSTIC(30510, Error, loopInDiffFuncRequireUnrollOrMaxIters, "loops inside a differentiable function need to provide either '[MaxIters(n)]' or '[ForceUnroll]' attribute.")
+
+// Switch
+DIAGNOSTIC(30600, Error, switchMultipleDefault, "multiple 'default' cases not allowed within a 'switch' statement")
+DIAGNOSTIC(30601, Error, switchDuplicateCases, "duplicate cases not allowed within a 'switch' statement")
 
 // TODO: need to assign numbers to all these extra diagnostics...
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
