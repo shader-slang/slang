@@ -65,4 +65,4 @@ jobs:
         #.\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\all-tests.txt > vk-gl-cts-results.txt
         .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\extras\temp-list.txt > vk-gl-cts-results.txt
 
-        python ${{ github.workspace }}\extra\process_vk_cts_nightly_results.py --passing_list=${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt --vk_cts_results=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\vk-gl-cts-results.txt
+        python ${{ github.workspace }}\extras\process_vk_cts_nightly_results.py --passing_list=${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt --vk_cts_results=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\vk-gl-cts-results.txt
