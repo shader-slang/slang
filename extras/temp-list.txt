@@ -1,0 +1,16 @@
+dEQP-VK.descriptor_indexing.combined_image_sampler_minNonUniform
+dEQP-VK.descriptor_indexing.combined_image_sampler_with_lod_minNonUniform
+dEQP-VK.descriptor_indexing.storage_buffer_minNonUniform
+dEQP-VK.glsl.arrays.constructor.float4_vertex
+dEQP-VK.glsl.arrays.constructor.int3_fragment
+dEQP-VK.glsl.arrays.constructor.int4_vertex
+dEQP-VK.glsl.arrays.constructor.int4_fragment
+dEQP-VK.glsl.arrays.constructor.bool3_vertex
+dEQP-VK.glsl.arrays.constructor.bool3_fragment
+dEQP-VK.glsl.arrays.constructor.bool4_vertex
+dEQP-VK.glsl.arrays.constructor.bool4_fragment
+dEQP-VK.glsl.arrays.constructor.struct3_vertex
+dEQP-VK.glsl.arrays.constructor.struct3_fragment
+dEQP-VK.glsl.arrays.constructor.struct4_vertex
+dEQP-VK.glsl.limits.near_max.fragment_input.components_125
+dEQP-VK.glsl.matrix.add.const.mediump_mat2x4_mat2x4_vertex
