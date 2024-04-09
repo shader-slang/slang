@@ -149,7 +149,7 @@ static const NamesDescriptionValue s_debugLevels[] =
 
 static const NamesDescriptionValue s_fileSystemTypes[] =
 {
-    { ValueInt(TypeTextUtil::FileSystemType::Default),     "default",      "Default fike system." },
+    { ValueInt(TypeTextUtil::FileSystemType::Default),     "default",      "Default file system." },
     { ValueInt(TypeTextUtil::FileSystemType::LoadFile),    "load-file",    "Just implements loadFile interface, so will be wrapped with CacheFileSystem internally." },
     { ValueInt(TypeTextUtil::FileSystemType::Os),          "os",           "Use the OS based file system directly (without file system caching)" },
 };
