@@ -77,7 +77,7 @@ runs:
       with:
         path: ${{ github.workspace }}/build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
-        key: ${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+        key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
     - name: Build LLVM
       if: steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
