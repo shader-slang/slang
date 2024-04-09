@@ -4004,9 +4004,14 @@ RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
 {
     // If there is already an entrypoint marked with the [shader] attribute,
     // we should just return that.
+    //
     if (auto existingEntryPoint = findEntryPointByName(name))
         return existingEntryPoint;
 
+    // If the function hasn't been marked as [shader], then it won't be discovered
+    // by findEntryPointByName. We need to route this to the `findAndValidateEntryPoint`
+    // function. To do that we need to setup a FrontEndCompileRequest and a FrontEndEntryPointRequest.
+    //
     DiagnosticSink sink(getLinkage()->getSourceManager(), DiagnosticSink::SourceLocationLexer());
     FrontEndCompileRequest frontEndRequest(getLinkage(), StdWriters::getSingleton(), &sink);
     RefPtr<TranslationUnitRequest> tuRequest = new TranslationUnitRequest(&frontEndRequest);
