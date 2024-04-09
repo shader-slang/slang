@@ -3987,13 +3987,6 @@ void Module::setName(String name)
 
 RefPtr<EntryPoint> Module::findEntryPointByName(UnownedStringSlice const& name)
 {
-    // TODO: We should consider having this function be expanded to be able
-    // to look up and validate possible entry-point functions in teh module
-    // even if they were not marked with `[shader(...)]` in the source code.
-    //
-    // With such a change the function would probably need to accept a stage
-    // to use and a sink to write validation errors to.
-
     for(auto entryPoint : m_entryPoints)
     {
         if(entryPoint->getName()->text.getUnownedSlice() == name)
@@ -4001,6 +3994,36 @@ RefPtr<EntryPoint> Module::findEntryPointByName(UnownedStringSlice const& name)
     }
 
     return nullptr;
+}
+
+
+RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
+    UnownedStringSlice const& name,
+    SlangStage stage,
+    ISlangBlob** outDiagnostics)
+{
+    // If there is already an entrypoint marked with the [shader] attribute,
+    // we should just return that.
+    if (auto existingEntryPoint = findEntryPointByName(name))
+        return existingEntryPoint;
+
+    DiagnosticSink sink(getLinkage()->getSourceManager(), DiagnosticSink::SourceLocationLexer());
+    FrontEndCompileRequest frontEndRequest(getLinkage(), StdWriters::getSingleton(), &sink);
+    RefPtr<TranslationUnitRequest> tuRequest = new TranslationUnitRequest(&frontEndRequest);
+    tuRequest->module = this;
+    tuRequest->moduleName = m_name;
+    frontEndRequest.translationUnits.add(tuRequest);
+    FrontEndEntryPointRequest entryPointRequest(
+        &frontEndRequest,
+        0,
+        getLinkage()->getNamePool()->getName(name),
+        Profile((Stage)stage));
+    auto result = findAndValidateEntryPoint(&entryPointRequest);
+    if (outDiagnostics)
+    {
+        sink.getBlobIfNeeded(outDiagnostics);
+    }
+    return result;
 }
 
 void Module::_addEntryPoint(EntryPoint* entryPoint)
