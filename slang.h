@@ -4949,6 +4949,13 @@ namespace slang
         /// Get the unique identity of the module.
         virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() = 0;
 
+        /// Find and validate an entry point by name, even if the function is
+        /// not marked with the `[shader("...")]` attribute.
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL findAndCheckEntryPoint(
+            char const* name,
+            SlangStage stage,
+            IEntryPoint** outEntryPoint,
+            ISlangBlob** outDiagnostics) = 0;
     };
     
     #define SLANG_UUID_IModule IModule::getTypeGuid()
