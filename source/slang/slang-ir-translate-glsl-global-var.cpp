@@ -244,7 +244,8 @@ namespace Slang
                     if (auto parentFunc = getParentFunc(use->getUser()))
                     {
                         auto referenceSet = referenceGraph.tryGetValue(parentFunc);
-                        if (!referenceSet) return;
+                        if (!referenceSet) 
+                        	return;
                         if (referenceSet->getCount() == 1)
                         {
                             // If the function that uses the workgroup size is only used by one entry point,
