@@ -1606,6 +1606,20 @@ namespace Slang
         DZeroFunc, ///< The `IDifferentiable.dzero` function requirement 
         DAddFunc, ///< The `IDifferentiable.dadd` function requirement 
         DMulFunc, ///< The `IDifferentiable.dmul` function requirement 
+
+        InitLogicalFromInt, ///< The `ILogical.__init` mtehod.
+        Equals, ///< The `ILogical.equals` mtehod.
+        LessThan, ///< The `ILogical.lessThan` mtehod.
+        LessThanOrEquals, ///< The `ILogical.lessThanOrEquals` mtehod.
+        Shl, ///< The `ILogical.shl` mtehod.
+        Shr, ///< The `ILogical.shr` mtehod.
+        BitAnd, ///< The `ILogical.bitAnd` mtehod.
+        BitOr, ///< The `ILogical.bitOr` mtehod.
+        BitXor, ///< The `ILogical.bitXor` mtehod.
+        BitNot, ///< The `ILogical.bitNot` mtehod.
+        And, ///< The `ILogical.and` mtehod.
+        Or, ///< The `ILogical.or` mtehod.
+        Not, ///< The `ILogical.not` mtehod.
     };
 
     enum class FunctionDifferentiableLevel

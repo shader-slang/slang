@@ -240,6 +240,7 @@ public:
     // Types
     //
 
+    void ensureTypePrelude(IRType* type);
     void emitDeclarator(DeclaratorInfo* declarator);
 
     void emitType(IRType* type, const StringSliceLoc* nameLoc) { emitTypeImpl(type, nameLoc); }
@@ -309,6 +310,7 @@ public:
 
     void emitInstResultDecl(IRInst* inst);
 
+    template<typename T>
     IRTargetSpecificDecoration* findBestTargetDecoration(IRInst* inst);
     IRTargetIntrinsicDecoration* _findBestTargetIntrinsicDecoration(IRInst* inst);
 
@@ -437,6 +439,8 @@ public:
 
     void emitTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName) { emitTextureOrTextureSamplerTypeImpl(type, baseName); }
 
+    void emitSubpassInputType(IRSubpassInputType* type) { emitSubpassInputTypeImpl(type); }
+
     virtual RefObject* getExtensionTracker() { return nullptr; }
 
         /// Gets a source language for a target for a target. Returns Unknown if not a known target
@@ -448,6 +452,9 @@ public:
 
         /// Finds the IRNumThreadsDecoration and gets the size from that or sets all dimensions to 1
     static IRNumThreadsDecoration* getComputeThreadGroupSize(IRFunc* func, Int outNumThreads[kThreadGroupAxisCount]);
+
+        /// Finds the IRWaveSizeDecoration and gets the size from that.
+    static IRWaveSizeDecoration* getComputeWaveSize(IRFunc* func, Int *outWaveSize);
 
     protected:
 
@@ -498,6 +505,9 @@ public:
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
+
+    virtual void emitSubpassInputTypeImpl(IRSubpassInputType* type) { SLANG_UNUSED(type); }
+
         // Again necessary for & prefix intrinsics. May be removable in the future
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
 

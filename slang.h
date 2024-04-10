@@ -2149,6 +2149,7 @@ extern "C"
         SLANG_BYTE_ADDRESS_BUFFER           = 0x07,
         SLANG_RESOURCE_UNKNOWN              = 0x08,
         SLANG_ACCELERATION_STRUCTURE        = 0x09,
+        SLANG_TEXTURE_SUBPASS               = 0x0A,
 
         SLANG_RESOURCE_EXT_SHAPE_MASK       = 0xF0,
 
@@ -2163,6 +2164,7 @@ extern "C"
 
         SLANG_TEXTURE_2D_MULTISAMPLE        = SLANG_TEXTURE_2D | SLANG_TEXTURE_MULTISAMPLE_FLAG,
         SLANG_TEXTURE_2D_MULTISAMPLE_ARRAY  = SLANG_TEXTURE_2D | SLANG_TEXTURE_MULTISAMPLE_FLAG | SLANG_TEXTURE_ARRAY_FLAG,
+        SLANG_TEXTURE_SUBPASS_MULTISAMPLE   = SLANG_TEXTURE_SUBPASS | SLANG_TEXTURE_MULTISAMPLE_FLAG,
     };
 #endif
     typedef unsigned int SlangResourceAccessIntegral;
@@ -2251,6 +2253,9 @@ extern "C"
         // The register space offset for the sub-elements that occupies register spaces.
         SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE,
 
+        // The input_attachment_index subpass occupancy tracker
+        SLANG_PARAMETER_CATEGORY_SUBPASS,
+
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
 
@@ -2258,6 +2263,7 @@ extern "C"
         // DEPRECATED:
         SLANG_PARAMETER_CATEGORY_VERTEX_INPUT = SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
         SLANG_PARAMETER_CATEGORY_FRAGMENT_OUTPUT = SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT,
+        SLANG_PARAMETER_CATEGORY_COUNT_V1 = SLANG_PARAMETER_CATEGORY_SUBPASS,
     };
 
     /** Types of API-managed bindings that a parameter might use.
@@ -2520,6 +2526,10 @@ extern "C"
         SlangReflectionEntryPoint*  entryPoint,
         SlangUInt                   axisCount,
         SlangUInt*                  outSizeAlongAxis);
+
+    SLANG_API void spReflectionEntryPoint_getComputeWaveSize(
+        SlangReflectionEntryPoint* entryPoint,
+        SlangUInt* outWaveSize);
 
     SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
         SlangReflectionEntryPoint* entryPoint);
@@ -2808,6 +2818,8 @@ namespace slang
         ExistentialObjectParam = SLANG_PARAMETER_CATEGORY_EXISTENTIAL_OBJECT_PARAM,
 
         SubElementRegisterSpace = SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE,
+
+        InputAttachmentIndex = SLANG_PARAMETER_CATEGORY_SUBPASS,
 
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,
@@ -3333,6 +3345,12 @@ namespace slang
             SlangUInt*  outSizeAlongAxis)
         {
             return spReflectionEntryPoint_getComputeThreadGroupSize((SlangReflectionEntryPoint*) this, axisCount, outSizeAlongAxis);
+        }
+
+        void getComputeWaveSize(
+            SlangUInt* outWaveSize)
+        {
+            return spReflectionEntryPoint_getComputeWaveSize((SlangReflectionEntryPoint*)this, outWaveSize);
         }
 
         bool usesAnySampleRateInput()
@@ -4931,6 +4949,13 @@ namespace slang
         /// Get the unique identity of the module.
         virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() = 0;
 
+        /// Find and validate an entry point by name, even if the function is
+        /// not marked with the `[shader("...")]` attribute.
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL findAndCheckEntryPoint(
+            char const* name,
+            SlangStage stage,
+            IEntryPoint** outEntryPoint,
+            ISlangBlob** outDiagnostics) = 0;
     };
     
     #define SLANG_UUID_IModule IModule::getTypeGuid()

@@ -1229,9 +1229,22 @@ namespace Slang
                 DeclRef<GenericTypeConstraintDecl> constraintDeclRef = astBuilder->getDirectDeclRef(constraintDecl.getDecl());
                 int argIndex = -1;
                 int ii = 0;
+
+                // Find the generic parameter type (T) that this constraint (T:IFoo) is applying to.
+                auto genericParamType = getSub(astBuilder, constraintDeclRef);
+                auto genParamDeclRefType = as<DeclRefType>(genericParamType);
+                if (!genParamDeclRefType)
+                {
+                    continue;
+                }
+                auto genParamDeclRef = genParamDeclRefType->getDeclRef();
+
+                // Find the generic argument index of the corresponding generic parameter type in the
+                // generic parameter set.
+                //
                 for (auto member : genericDeclRef.getDecl()->members)
                 {
-                    if (member == constraintDeclRef.getDecl())
+                    if (member == genParamDeclRef.getDecl())
                     {
                         argIndex = ii;
                         break;
@@ -1243,7 +1256,6 @@ namespace Slang
                     SLANG_ASSERT(!"generic parameter not found in generic decl");
                     continue;
                 }
-
                 auto sub = as<Type>(args[argIndex].val);
                 if (!sub)
                 {

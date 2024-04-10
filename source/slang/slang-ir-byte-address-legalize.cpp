@@ -724,8 +724,9 @@ struct ByteAddressBufferLegalizationContext
         {
             switch (decoration->getOp())
             {
-            case kIROp_GloballyCoherentDecoration:
-                builder.addDecoration(dest, decoration->getOp());
+            case kIROp_MemoryQualifierSetDecoration:
+                builder.addMemoryQualifierSetDecoration(dest,
+                    as<IRMemoryQualifierSetDecoration>(decoration)->getMemoryQualifierBit());
                 break;
             default:
                 break;

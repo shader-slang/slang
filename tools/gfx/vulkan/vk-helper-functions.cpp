@@ -301,6 +301,7 @@ VkImageUsageFlagBits _calcImageUsageFlags(ResourceState state)
         return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     case ResourceState::Present:
         return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    case ResourceState::Undefined:
     case ResourceState::General:
         return (VkImageUsageFlagBits)0;
     default:

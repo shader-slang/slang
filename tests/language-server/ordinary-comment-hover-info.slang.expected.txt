@@ -25,7 +25,7 @@ func main() -> void
 range: 19,3 - 19,8
 content:
 ```
-E E.Green
+E E.Green = 1
 ```
 
 #5 green color  

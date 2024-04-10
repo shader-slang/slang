@@ -18,10 +18,15 @@ namespace Slang
             buildEntryPointReferenceGraph(referencingEntryPoints, module);
 
             List<IRInst*> entryPoints;
+            // Traverse the module to find all entry points.
+            // If we see a `GetWorkGroupSize` instruction, we will materialize it.
+            // 
             for (auto inst : module->getGlobalInsts())
             {
                 if (inst->getOp() == kIROp_Func && inst->findDecoration<IREntryPointDecoration>())
                     entryPoints.add(inst);
+                else if (inst->getOp() == kIROp_GetWorkGroupSize)
+                    materializeGetWorkGroupSize(module, referencingEntryPoints, inst);
             }
 
             IRBuilder builder(module);
@@ -125,6 +130,9 @@ namespace Slang
                     auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
                     builder.emitStore(input,
                         builder.emitFieldExtract(inputType, inputParam, inputKeys[i]));
+                    // Relate "global variable" to a "global parameter" for use later in compilation 
+                    // to resolve a "global variable" shadowing a "global parameter" relationship.
+                    builder.addGlobalVariableShadowingGlobalParameterDecoration(inputParam, input, inputKeys[i]);
                 }
 
                 // For each entry point, introduce a new parameter to represent each input parameter,
@@ -219,6 +227,84 @@ namespace Slang
                 IRType* newFuncType = builder.getFuncType(paramTypes, resultType);
                 entryPointFunc->setFullType(newFuncType);
             }
+        }
+
+        // If we see a `GetWorkGroupSize` instruction, we should materialize it by replacing its uses with a constant
+        // that represent the workgroup size of the calling entrypoint.
+        // This is trivial if the `GetWorkGroupSize` instruction is used from a function called by one entry point.
+        // If it is used in a place reachable from multiple entry points, we will introduce a global variable to represent
+        // the workgroup size, and replace the uses with a load from the global variable.
+        // We will assign the value of the global variable at the start of each entry point.
+        //
+        void materializeGetWorkGroupSize(IRModule* module, Dictionary<IRInst*, HashSet<IRFunc*>>& referenceGraph, IRInst* workgroupSizeInst)
+        {
+            IRBuilder builder(workgroupSizeInst);
+            traverseUses(workgroupSizeInst, [&](IRUse* use)
+                {
+                    if (auto parentFunc = getParentFunc(use->getUser()))
+                    {
+                        auto referenceSet = referenceGraph.tryGetValue(parentFunc);
+                        if (!referenceSet) 
+                        	return;
+                        if (referenceSet->getCount() == 1)
+                        {
+                            // If the function that uses the workgroup size is only used by one entry point,
+                            // we can materialize the workgroup size by substituting the use with a constant.
+                            auto entryPoint = *referenceSet->begin();
+                            auto numthreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
+                            if (!numthreadsDecor)
+                                return;
+                            builder.setInsertBefore(use->getUser());
+                            IRInst* values[] = {
+                                numthreadsDecor->getExtentAlongAxis(0),
+                                numthreadsDecor->getExtentAlongAxis(1),
+                                numthreadsDecor->getExtentAlongAxis(2) };
+                            auto workgroupSize = builder.emitMakeVector(builder.getVectorType(builder.getIntType(), 3),
+                                3, values);
+                            builder.replaceOperand(use, workgroupSize);
+                        }
+                    }
+                });
+            
+            // If workgroupSizeInst still has uses, it means it is used by multiple entry points.
+            // We need to introduce a global variable and assign value to it in each entry point.
+
+            if (!workgroupSizeInst->hasUses())
+                return;
+            builder.setInsertBefore(workgroupSizeInst);
+            auto globalVar = builder.createGlobalVar(workgroupSizeInst->getFullType());
+
+            // Replace all remaining uses of the workgroupSize inst of a load from globalVar.
+            traverseUses(workgroupSizeInst, [&](IRUse* use)
+                {
+                    builder.setInsertBefore(use->getUser());
+                    auto load = builder.emitLoad(globalVar);
+                    builder.replaceOperand(use, load);
+                });
+
+            // Now insert assignments from each entry point.
+            for (auto globalInst : module->getGlobalInsts())
+            {
+                auto func = as<IRFunc>(getResolvedInstForDecorations(globalInst));
+                if (!func)
+                    continue;
+                if (auto numthreadsDecor = func->findDecoration<IRNumThreadsDecoration>())
+                {
+                    auto firstBlock = func->getFirstBlock();
+                    if (!firstBlock)
+                        continue;
+                    builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+                    IRInst* args[] = {
+                        numthreadsDecor->getExtentAlongAxis(0),
+                        numthreadsDecor->getExtentAlongAxis(1),
+                        numthreadsDecor->getExtentAlongAxis(2) };
+                    auto workgroupSize = builder.emitMakeVector(
+                        workgroupSizeInst->getFullType(), 3, args);
+                    builder.emitStore(globalVar, workgroupSize);
+                }
+            }
+
+            workgroupSizeInst->removeAndDeallocate();
         }
     };
 

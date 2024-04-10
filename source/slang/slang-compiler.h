@@ -1338,6 +1338,20 @@ namespace Slang
             return SLANG_OK;
         }
 
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL findAndCheckEntryPoint(
+            char const* name,
+            SlangStage stage,
+            slang::IEntryPoint** outEntryPoint,
+            ISlangBlob** outDiagnostics)
+        {
+            ComPtr<slang::IEntryPoint> entryPoint(findAndCheckEntryPoint(UnownedStringSlice(name), stage, outDiagnostics));
+            if ((!entryPoint))
+                return SLANG_FAIL;
+
+            *outEntryPoint = entryPoint.detach();
+            return SLANG_OK;
+        }
+
         virtual SlangInt32 SLANG_MCALL getDefinedEntryPointCount() override
         {
             return (SlangInt32)m_entryPoints.getCount();
@@ -1481,6 +1495,7 @@ namespace Slang
         };
 
         RefPtr<EntryPoint> findEntryPointByName(UnownedStringSlice const& name);
+        RefPtr<EntryPoint> findAndCheckEntryPoint(UnownedStringSlice const& name, SlangStage stage, ISlangBlob** outDiagnostics);
 
         List<RefPtr<EntryPoint>>& getEntryPoints() { return m_entryPoints; }
         void _addEntryPoint(EntryPoint* entryPoint);

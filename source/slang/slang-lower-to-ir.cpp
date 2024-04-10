@@ -586,6 +586,10 @@ struct IRGenContext
     // (For use by functions that returns non-copyable types)
     LoweredValInfo returnDestination;
 
+    // A reference to the Function decl to identify the parent function
+    // that contains the Inst.
+    FunctionDeclBase* funcDecl;
+
     bool includeDebugInfo = false;
 
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
@@ -2175,10 +2179,6 @@ void addVarDecorations(
             // may not be referenced; adding HLSL export modifier force emits
             builder->addHLSLExportDecoration(inst);
         }
-        else if(as<GloballyCoherentModifier>(mod))
-        {
-            builder->addSimpleDecoration<IRGloballyCoherentDecoration>(inst);
-        }
         else if(as<PreciseModifier>(mod))
         {
             builder->addSimpleDecoration<IRPreciseDecoration>(inst);
@@ -2204,6 +2204,16 @@ void addVarDecorations(
             builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
                 builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
         }
+        else if (auto glslInputAttachmentMod = as<GLSLInputAttachmentIndexLayoutModifier>(mod))
+        {
+            auto subpassType = as<IRSubpassInputType>(inst->getDataType());
+
+            if (!subpassType)
+                context->getSink()->diagnose(inst, Diagnostics::InputAttachmentIndexOnlyAllowedOnSubpass);
+
+            builder->addDecoration(inst, kIROp_GLSLInputAttachmentIndexDecoration,
+                builder->getIntValue(builder->getIntType(), stringToInt(glslInputAttachmentMod->valToken.getContent())));
+        }
         else if (auto glslOffsetMod = as<GLSLOffsetLayoutAttribute>(mod))
         {
             builder->addDecoration(inst, kIROp_GLSLOffsetDecoration,
@@ -2217,21 +2227,9 @@ void addVarDecorations(
         {
             builder->addDynamicUniformDecoration(inst);
         }
-        else if (as<GLSLVolatileModifier>(mod))
+        else if (auto collection = as<MemoryQualifierSetModifier>(mod))
         {
-            builder->addSimpleDecoration<IRGLSLVolatileDecoration>(inst);
-        }
-        else if (as<GLSLRestrictModifier>(mod))
-        {
-            builder->addSimpleDecoration<IRGLSLRestrictDecoration>(inst);
-        }
-        else if (as<GLSLReadOnlyModifier>(mod))
-        {
-            builder->addSimpleDecoration<IRGLSLReadOnlyDecoration>(inst);
-        }
-        else if (as<GLSLWriteOnlyModifier>(mod))
-        {
-            builder->addSimpleDecoration<IRGLSLWriteOnlyDecoration>(inst);
+            builder->addMemoryQualifierSetDecoration(inst, IRIntegerValue(collection->getMemoryQualifierBit()));
         }
         // TODO: what are other modifiers we need to propagate through?
     }
@@ -3546,6 +3544,21 @@ struct ExprLoweringContext
         // TODO: also need to handle this-type substitution here?
     }
 
+    void validateInvokeExprArgsWithFunctionModifiers(
+        InvokeExpr* expr,
+        FunctionDeclBase* decl,
+        List<IRInst*>& irArgs)
+    {
+        if (auto glslRequireShaderInputParameter = decl->findModifier<GLSLRequireShaderInputParameterAttribute>())
+        {
+            if (!irArgs[glslRequireShaderInputParameter->parameterNumber]->findDecoration<IRGlobalInputDecoration>())
+            {
+                this->context->getSink()->diagnose(expr, Diagnostics::requireInputDecoratedVarForParameter, decl, glslRequireShaderInputParameter->parameterNumber);
+            }
+            return;
+        }
+    }
+
     /// Lower an invoke expr, and attempt to fuse a store of the expr's result into destination.
     /// If the store is fused, returns LoweredValInfo::None. Otherwise, returns the IR val representing the RValue.
     LoweredValInfo visitInvokeExprImpl(InvokeExpr* expr, LoweredValInfo destination, const TryClauseEnvironment& tryEnv)
@@ -3662,6 +3675,8 @@ struct ExprLoweringContext
 
             auto funcType = funcTypeInfo.type;
             addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
+
+            validateInvokeExprArgsWithFunctionModifiers(expr, as<FunctionDeclBase>(funcDeclRef.getDecl()), irArgs);
 
             LoweredValInfo result;
             if (funcTypeInfo.returnViaLastRefParam)
@@ -6001,18 +6016,31 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         startBlockIfNeeded(stmt);
 
+        // Check if this return is within a constructor.
+        auto constructorDecl = as<ConstructorDecl>(context->funcDecl);
+
         // A `return` statement turns into a `return` instruction,
         // but we have two kinds of `return`: one for returning
         // a (non-`void`) value, and one for returning "no value"
         // (which effectively returns a value of type `void`).
         //
-        if( auto expr = stmt->expression )
+        if (auto expr = stmt->expression)
         {
             if (context->returnDestination.flavor != LoweredValInfo::Flavor::None)
             {
                 // If this function should return via a __ref parameter, do that and return void.
                 lowerRValueExprWithDestination(context, context->returnDestination, expr);
                 getBuilder()->emitReturn();
+                return;
+            }
+
+            if (constructorDecl)
+            {
+                // If this function is a constructor, but returns a value, rewrite it as
+                // this = val;
+                // return this;
+                lowerRValueExprWithDestination(context, context->thisVal, expr);
+                getBuilder()->emitReturn(getSimpleVal(context, context->thisVal));
                 return;
             }
 
@@ -6050,6 +6078,24 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // with no value, which can only occur in a function with
             // a `void` result type.
             //
+            if (constructorDecl)
+            {
+                // If this `return` is within a NonCopyableType or an ordinary constructor,
+                // then we must either simply return or `return` the instance respectively.
+                if (context->returnDestination.flavor != LoweredValInfo::Flavor::None)
+                {
+                    // If we have a NonCopyableType constructor of the form
+                    //   void ctor(inout this) { return; }
+                    getBuilder()->emitReturn();
+                }
+                else
+                {
+                    // If we have an ordinary constructor of the form
+                    //   Type ctor() { return; }
+                    getBuilder()->emitReturn(getSimpleVal(context, context->thisVal));
+                }
+                return;
+            }
             getBuilder()->emitReturn();
         }
     }
@@ -9088,6 +9134,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             builder->addNVAPIMagicDecoration(irInst, decl->getName()->text.getUnownedSlice());
         }
+        if (const auto requirePrelude = decl->findModifier<RequirePreludeAttribute>())
+        {
+            builder->addRequirePreludeDecoration(irInst, requirePrelude->capabilitySet, requirePrelude->prelude.getUnownedSlice());
+        }
     }
 
     void addBitFieldAccessorDecorations(IRInst* irFunc, Decl* decl)
@@ -9283,7 +9333,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
 
         IRGeneric* outerGeneric = nullptr;
-        
+        subContext->funcDecl = decl;
+
         if (auto derivativeRequirement = as<DerivativeRequirementDecl>(decl))
             outerGeneric = emitOuterGenerics(subContext, derivativeRequirement->originalRequirementDecl, derivativeRequirement->originalRequirementDecl);
         else
@@ -9619,6 +9670,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
                     getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
                     getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
+                );
+            }
+            else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
+            {
+                getBuilder()->addWaveSizeDecoration(
+                    irFunc,
+                    getSimpleVal(context, lowerVal(context, waveSizeAttr->numLanes))
                 );
             }
             else if (as<ReadNoneAttribute>(modifier))

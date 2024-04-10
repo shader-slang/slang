@@ -107,13 +107,18 @@ struct IRTargetSpecificDecoration : IRDecoration
     }
 };
 
-struct IRTargetDecoration : IRTargetSpecificDecoration
+struct IRTargetSpecificDefinitionDecoration : IRTargetSpecificDecoration
+{
+    IR_PARENT_ISA(TargetSpecificDefinitionDecoration)
+};
+
+struct IRTargetDecoration : IRTargetSpecificDefinitionDecoration
 {
     enum { kOp = kIROp_TargetDecoration };
     IR_LEAF_ISA(TargetDecoration)
 };
 
-struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
+struct IRTargetIntrinsicDecoration : IRTargetSpecificDefinitionDecoration
 {
     enum { kOp = kIROp_TargetIntrinsicDecoration };
     IR_LEAF_ISA(TargetIntrinsicDecoration)
@@ -123,6 +128,16 @@ struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
     UnownedStringSlice getDefinition()
     {
         return getDefinitionOperand()->getStringSlice();
+    }
+};
+
+struct IRRequirePreludeDecoration : IRTargetSpecificDecoration
+{
+    IR_LEAF_ISA(RequirePreludeDecoration)
+
+    UnownedStringSlice getPrelude()
+    {
+        return as<IRStringLit>(getOperand(1))->getStringSlice();
     }
 };
 
@@ -349,15 +364,17 @@ struct IRRequireGLSLExtensionDecoration : IRDecoration
     }
 };
 
+struct IRMemoryQualifierSetDecoration : IRDecoration
+{
+    enum { kOp = kIROp_MemoryQualifierSetDecoration };
+    IR_LEAF_ISA(MemoryQualifierSetDecoration)
+    IRIntegerValue getMemoryQualifierBit() { return cast<IRIntLit>(getOperand(0))->getValue(); }
+};
+
 IR_SIMPLE_DECORATION(HasExplicitHLSLBindingDecoration)
 IR_SIMPLE_DECORATION(ReadNoneDecoration)
 IR_SIMPLE_DECORATION(NoSideEffectDecoration)
 IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
-IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
-IR_SIMPLE_DECORATION(GLSLVolatileDecoration)
-IR_SIMPLE_DECORATION(GLSLRestrictDecoration)
-IR_SIMPLE_DECORATION(GLSLReadOnlyDecoration)
-IR_SIMPLE_DECORATION(GLSLWriteOnlyDecoration)
 IR_SIMPLE_DECORATION(PreciseDecoration)
 IR_SIMPLE_DECORATION(PublicDecoration)
 IR_SIMPLE_DECORATION(HLSLExportDecoration)
@@ -375,6 +392,12 @@ struct IRGLSLLocationDecoration : IRDecoration
 {
     IR_LEAF_ISA(GLSLLocationDecoration)
     IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+struct IRGLSLInputAttachmentIndexDecoration : IRDecoration
+{
+    IR_LEAF_ISA(GLSLInputAttachmentIndexDecoration)
+    IRIntLit* getIndex() { return cast<IRIntLit>(getOperand(0)); }
 };
 
 struct IRGLSLOffsetDecoration : IRDecoration
@@ -463,6 +486,14 @@ struct IRNumThreadsDecoration : IRDecoration
     IRIntLit* getZ() { return cast<IRIntLit>(getOperand(2)); }
 
     IRIntLit* getExtentAlongAxis(int axis) { return cast<IRIntLit>(getOperand(axis)); }
+};
+
+struct IRWaveSizeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_WaveSizeDecoration };
+    IR_LEAF_ISA(WaveSizeDecoration)
+
+    IRIntLit* getNumLanes() { return cast<IRIntLit>(getOperand(0)); }
 };
 
 struct IREntryPointDecoration : IRDecoration
@@ -3384,6 +3415,7 @@ public:
         IRInst* isShadow,
         IRInst* isCombined,
         IRInst* format);
+
     IRComPtrType* getComPtrType(IRType* valueType);
 
         /// Get a 'SPIRV literal' 
@@ -3566,6 +3598,7 @@ public:
     IRInst* addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode);
 
     IRInst* addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, IRInst* z);
+    IRInst* addWaveSizeDecoration(IRInst* inst, IRInst* numLanes);
 
     IRInst* emitSpecializeInst(
         IRType*         type,
@@ -4411,6 +4444,11 @@ public:
         addDecoration(value, kIROp_RequireGLSLVersionDecoration, getIntValue(getIntType(), IRIntegerValue(version)));
     }
 
+    void addRequirePreludeDecoration(IRInst* value, const CapabilitySet& caps, UnownedStringSlice prelude)
+    {
+        addDecoration(value, kIROp_RequirePreludeDecoration, getCapabilityValue(caps), getStringValue(prelude));
+    }
+
     void addRequireSPIRVVersionDecoration(IRInst* value, const SemanticVersion& version)
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
@@ -4778,6 +4816,11 @@ public:
         addDecoration(inst, kIROp_VulkanHitObjectAttributesDecoration, getIntValue(getIntType(), location));
     }
 
+    void addGlobalVariableShadowingGlobalParameterDecoration(IRInst* inst, IRInst* globalVar, IRInst* key)
+    {
+        addDecoration(inst, kIROp_GlobalVariableShadowingGlobalParameterDecoration, globalVar, key);
+    }
+
     void addMeshOutputDecoration(IROp d, IRInst* value, IRInst* maxCount)
     {
         SLANG_ASSERT(IRMeshOutputDecoration::isaImpl(d));
@@ -4788,6 +4831,11 @@ public:
     void addKnownBuiltinDecoration(IRInst* value, UnownedStringSlice const& name)
     {
         addDecoration(value, kIROp_KnownBuiltinDecoration, getStringValue(name));
+    }
+
+    void addMemoryQualifierSetDecoration(IRInst* inst, IRIntegerValue flags)
+    {
+        addDecoration(inst, kIROp_MemoryQualifierSetDecoration, getIntValue(getIntType(), flags));
     }
 };
 
@@ -4842,10 +4890,12 @@ void markConstExpr(
 IRTargetIntrinsicDecoration* findAnyTargetIntrinsicDecoration(
         IRInst*                 val);
 
+template<typename T>
 IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*                 val,
         CapabilitySet const&    targetCaps);
 
+template<typename T>
 IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*         val,
         CapabilityName  targetCapabilityAtom);
@@ -4856,7 +4906,7 @@ inline IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(
     IRInst* inInst,
     CapabilitySet const& targetCaps)
 {
-    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst, targetCaps));
+    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration<IRTargetSpecificDefinitionDecoration>(inInst, targetCaps));
 }
 
 

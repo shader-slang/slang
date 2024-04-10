@@ -145,6 +145,25 @@ struct MyData
 > #### Note ####
 > Slang allows for a trailing semicolon (`;`) on `struct` declarations, but does not require it.
 
+Structure types can have constructors. Constructors are defined with the `__init` keyword:
+
+```hlsl
+struct MyData
+{
+     int a;
+     __init() { a = 5; }
+     __init(int t) { a = t; }
+}
+void test()
+{
+     MyData d;  // invokes default constructor, d.a = 5
+     MyData h = MyData(4); // invokes overloaded constructor, h.a = 4
+}
+```
+
+> #### Note ####
+> Slang currently does not allow default values on struct members, but we intend to support them in the future.
+
 ### Enumeration Types
 
 Enumeration types can be introduced with the `enum` keyword to provide type-safe constants for a range of values:
@@ -160,7 +179,7 @@ enum Channel
 
 Unlike C/C++, `enum` types in Slang are always scoped by default (like `enum class` in C++). You can write `enum class` in Slang if it makes you happy, but it isn't required. If you want a `enum` type to be unscoped, you can use the `[UnscopedEnum]` attribute:
 ```csharp
-[[UnscopedEnum]
+[UnscopedEnum]
 enum Channel
 {
     Red, Green, Blue
@@ -168,6 +187,47 @@ enum Channel
 void test(Channel c)
 {
     if (c == Red) { /*...*/ }
+}
+```
+
+You can specify an explicit underlying integer type for `enum` types:
+```csharp
+enum Channel : uint16_t
+{
+    Red, Green, Blue
+}
+```
+
+By default, the underlying type of an enumeration type is `int`. Enumeration types are implicitly convertible to its underlying type. All enumeration types conform to the builtin `ILogical` interface, which provides operator overloads for bit operations. The following code is allowed:
+
+```csharp
+void test()
+{
+    Channel c = Channel.Red | Channel.Green;
+}
+```
+
+You can explicitly assign values to each enum case:
+```csharp
+enum Channel
+{
+    Red = 5,
+    Green,   // = 6
+    Blue     // = 7
+}
+```
+Slang automatically assigns integer values to enum cases without an explicit value. By default, the value starts from 0 and is increment by 1 for each
+enum case.
+
+You can override the implicit value assignment behavior with the `[Flags]` attribute, which will make value assignment start from 1 and increment by power of 2, making it suitable for enums that represent bit flags. For example:
+```csharp
+[Flags]
+enum Channel
+{
+    Red,   //  = 1
+    Green, //  = 2
+    Blue,  //  = 4
+    Alpha, //  = 8
 }
 ```
 
@@ -347,6 +407,14 @@ Slang supports function definitions with traditional C syntax:
 
 ```hlsl
 float addSomeThings(int x, float y)
+{
+    return x + y;
+}
+```
+
+In addition to the traditional C syntax, you can use the modern syntax to define functions with the `func` keyword:
+```swift
+func addSomeThings(x : int, y : float) -> float
 {
     return x + y;
 }

@@ -10,24 +10,24 @@ One of the primary advantages of a per-thread programming model in kernel progra
 
 In addition, using a per-thread programming model also results in more optimized memory usage. When writing a kernel in Slang, most intermediate results do not need to be written out to global memory and then read back, reducing global memory bandwidth consumption and the delay caused by these memory operations. As a result, a Slang kernel can typically run at higher efficiency compared to the traditional bulk-synchronous programming model.
 
-## Getting Started with slangpy
+## Getting Started with SlangTorch
 
 In this tutorial, we will use a simple example to walk through the steps to use Slang in your PyTorch project.
 
 ### Installation
-`slangpy` is available via PyPI, so you can install it simply through
+`slangtorch` is available via PyPI, so you can install it simply through
 ```sh
-pip install slangpy
+pip install slangtorch
 ```
 
-Note that `slangpy` requires `torch` with CUDA support. See the [pytorch](https://pytorch.org/) installation page to find the right version for your platform.
+Note that `slangtorch` requires `torch` with CUDA support. See the [pytorch](https://pytorch.org/) installation page to find the right version for your platform.
 
 You can check that you have the right installation by running: 
 ```sh
 python -c "import torch; print(f'cuda: {torch.cuda.is_available()}')"
 ```
 
-### Writing Slang kernels for `slangpy` >= **v1.1.5**
+### Writing Slang kernels for `slangtorch` >= **v1.1.5**
 
 From **v2023.4.0**, Slang supports auto-binding features that make it easier than ever to invoke Slang kernels from python, and interoperate seamlessly with `pytorch` tensors.
 
@@ -57,16 +57,16 @@ of the bounds of input and output tensors, and then calls `square()` to compute 
 store it at the corresponding location in `output` tensor.
 
 
-`slangpy` works by compiling kernels to CUDA and it identifies the functions to compile by checking for the `[CUDAKernel]` attribute.
+`slangtorch` works by compiling kernels to CUDA and it identifies the functions to compile by checking for the `[CUDAKernel]` attribute.
 The second attribute `[AutoPyBindCUDA]` allows us to call `square` directly from python without having to write any host code. If you would like to write the host code yourself for finer control, see the other version of this example [here](#manually-binding-kernels).
 
 You can now simply invoke this kernel from python:
 
 ``` Python
 import torch
-import slangpy
+import slangtorch
 
-m = slangpy.loadModule('square.slang')
+m = slangtorch.loadModule('square.slang')
 
 A = torch.randn((1024,), dtype=torch.float).cuda()
 
@@ -78,7 +78,7 @@ m.square(input=A, output=output).launchRaw(blockSize=(32, 1, 1), gridSize=(64, 1
 print(output)
 ```
 
-The python script `slangpy.loadModule("square.slang")` returns a scope that contains a handle to the `square` kernel.
+The python script `slangtorch.loadModule("square.slang")` returns a scope that contains a handle to the `square` kernel.
 
 The kernel can be invoked by 
 1. calling `square` and binding `torch` tensors as arguments for the kernel, and then
@@ -86,7 +86,7 @@ The kernel can be invoked by
 
 Note that for semantic clarity reasons, calling a kernel requires the use of keyword arguments with names that are lifted from the `.slang` implementation.
 
-### Invoking derivatives of kernels using slangpy
+### Invoking derivatives of kernels using slangtorch
 
 The `[AutoPyBindCUDA]` attribute can also be used on differentiable functions defined in Slang, and will automatically bind the derivatives. To do this, simply add the `[Differentiable]` attribute.
 
@@ -111,16 +111,16 @@ void square(DiffTensorView input, DiffTensorView output)
 }
 ```
 
-Now, `slangpy.loadModule("square.slang")` returns a scope with three callable handles `square`, `square.fwd` for the forward-mode derivative & `square.bwd` for the reverse-mode derivative.
+Now, `slangtorch.loadModule("square.slang")` returns a scope with three callable handles `square`, `square.fwd` for the forward-mode derivative & `square.bwd` for the reverse-mode derivative.
 
 You can invoke `square()` normally to get the same effect as the previous example, or invoke `square.fwd()` / `square.bwd()` by binding pairs of tensors to compute the derivatives.
 
 
 ```python
 import torch
-import slangpy
+import slangtorch
 
-m = slangpy.loadModule('square.slang')
+m = slangtorch.loadModule('square.slang')
 
 input = torch.tensor((0, 1, 2, 3, 4, 5), dtype=torch.float).cuda()
 output = torch.zeros_like(input).cuda()
@@ -151,7 +151,7 @@ print(input_grad)
 print(output_grad)
 ```
 
-`slangpy` also binds the forward-mode version of your kernel (propagate derivatives of inputs to the output) which can be invoked the same way using `module.square.fwd()`
+`slangtorch` also binds the forward-mode version of your kernel (propagate derivatives of inputs to the output) which can be invoked the same way using `module.square.fwd()`
 
 You can refer to [this documentation](autodiff) for a detailed reference of Slang's automatic differentiation feature.
 
@@ -163,9 +163,9 @@ This can be a very helpful way to wrap your Slang kernels as pytorch-compatible 
 
 ```python
 import torch
-import slangpy
+import slangtorch
 
-m = slangpy.loadModule("square.slang")
+m = slangtorch.loadModule("square.slang")
 
 class MySquareFunc(torch.autograd.Function):
     @staticmethod
@@ -216,16 +216,16 @@ X = tensor([3., 4.],
 dX = tensor([6., 8.])
 ```
 
-And that's it! `slangpy.loadModule` uses JIT compilation to compile your Slang source into CUDA binary.
+And that's it! `slangtorch.loadModule` uses JIT compilation to compile your Slang source into CUDA binary.
 It may take a little longer the first time you execute the script, but the compiled binaries will be cached and as long as the kernel code is not changed, future runs will not rebuild the CUDA kernel.
 
 Because the PyTorch JIT system requires `ninja`, you need to make sure `ninja` is installed on your system
 and is discoverable from the current environment, you also need to have a C++ compiler available on the system.
 On Windows, this means that Visual Studio need to be installed.
 
-## Specializing shaders using slangpy
+## Specializing shaders using slangtorch
 
-`slangpy.loadModule` allows specialization parameters to be specified since it might be easier to write shaders with placeholder definitions that can be substituted at load-time.
+`slangtorch.loadModule` allows specialization parameters to be specified since it might be easier to write shaders with placeholder definitions that can be substituted at load-time.
 For instance, here's a sphere tracer that uses a _compile-time_ specialization parameter for its maximum number of steps (`N`):
 
 ```csharp
@@ -263,10 +263,10 @@ float render(Ray ray)
 
 Then multiple versions of this shader can be compiled from Python using the `defines` argument:
 ```python
-import slangpy
+import slangtorch
 
-sdfRenderer20Steps = slangpy.loadModule('sdf.slang', defines={"MAX_STEPS": 20})
-sdfRenderer50Steps = slangpy.loadModule('sdf.slang', defines={"MAX_STEPS": 50})
+sdfRenderer20Steps = slangtorch.loadModule('sdf.slang', defines={"MAX_STEPS": 20})
+sdfRenderer50Steps = slangtorch.loadModule('sdf.slang', defines={"MAX_STEPS": 50})
 ...
 ```
 
@@ -454,7 +454,7 @@ Again, to understand all the details of the automatic differentiation system, pl
 [Automatic Differentiation](autodiff) chapter for a detailed explanation.
 
 ## Manually binding kernels
-`[AutoPyBindCUDA]` works for most use cases, but in certain situations, it may be necessary to write the *host* function by hand. The host function can also be written in Slang, and `slangpy` handles its compilation to C++.
+`[AutoPyBindCUDA]` works for most use cases, but in certain situations, it may be necessary to write the *host* function by hand. The host function can also be written in Slang, and `slangtorch` handles its compilation to C++.
 
 Here's the same `square` example from before:
 
@@ -506,9 +506,9 @@ You can use the following code to call `square` from Python:
 
 ```python
 import torch
-import slangpy
+import slangtorch
 
-m = slangpy.loadModule("square.slang")
+m = slangtorch.loadModule("square.slang")
 
 x = torch.randn(2,2)
 print(f"X = {x}")
@@ -723,7 +723,7 @@ Waits for all pending CUDA kernel executions to complete on host.
 Marks a function as a CUDA kernel (maps to a `__global__` function)
 
 #### `[TorchEntryPoint]` attribute
-Marks a function for export to Python. Functions marked with `[TorchEntryPoint]` will be accessible from a loaded module returned by `slangpy.loadModule`.
+Marks a function for export to Python. Functions marked with `[TorchEntryPoint]` will be accessible from a loaded module returned by `slangtorch.loadModule`.
 
 #### `[CudaDeviceExport]` attribute
 Marks a function as a CUDA device function, and ensures the compiler to include it in the generated CUDA source.
@@ -738,7 +738,7 @@ Restriction: methods marked with `[AutoPyBindCUDA]` will not operate
 
 ### Python-CUDA type marshalling for functions using `[AutoPyBindCUDA]` 
 
-When using auto-binding, aggregate types like structs are converted to Python `namedtuples` and are made available when using `slangpy.loadModule`. 
+When using auto-binding, aggregate types like structs are converted to Python `namedtuples` and are made available when using `slangtorch.loadModule`. 
 
 ```csharp
 // mesh.slang
@@ -760,7 +760,7 @@ Here, since `Mesh` is being used by `renderMesh`, the loaded module will provide
 While using the `namedtuple` is the best way to use structured arguments, they can also be passed as a python `dict` or `tuple`
 
 ```python
-m = slangpy.loadModule('mesh.slang')
+m = slangtorch.loadModule('mesh.slang')
 
 vertices = torch.tensor()
 indices = torch.tensor()

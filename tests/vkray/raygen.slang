@@ -1,5 +1,6 @@
-//TEST:CROSS_COMPILE: -profile glsl_460+GL_EXT_ray_tracing -stage raygeneration -entry main -target spirv-assembly
-//TEST:SIMPLE(filecheck=CHECK): -emit-spirv-directly -stage raygeneration -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK_SPV): -emit-spirv-directly -stage raygeneration -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK_HLSL): -stage raygeneration -entry main -target hlsl
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage raygeneration -entry main -target glsl
 
 #define TRACING_EPSILON 1e-6
 
@@ -116,5 +117,12 @@ void main()
     outputImage[int2(gl_LaunchIDNV.xy)] = float4(color, 1.0);
 }
 
-// CHECK: %{{.*}} = OpVariable %_ptr_RayPayload{{(NV)?}}_ReflectionRay{{.*}} RayPayload
-// CHECK: OpTraceRayKHR
+// CHECK_SPV: %{{.*}} = OpVariable %_ptr_RayPayload{{(NV)?}}_ReflectionRay{{.*}} RayPayload
+// CHECK_SPV: OpTraceRayKHR
+// CHECK_SPV: OpTraceRayKHR
+
+// CHECK_HLSL: TraceRay
+// CHECK_HLSL: TraceRay
+
+// CHECK_GLSL: traceRayEXT(
+// CHECK_GLSL: traceRayEXT(

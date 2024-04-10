@@ -823,6 +823,9 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::SamplerState:
             return SimpleLayoutInfo(LayoutResourceKind::SamplerState, 1);
 
+        case ShaderParameterKind::SubpassInput:
+            return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, 1);
+
         case ShaderParameterKind::TextureSampler:
         case ShaderParameterKind::MutableTextureSampler:
         case ShaderParameterKind::InputRenderTarget:
@@ -2840,14 +2843,10 @@ createStructuredBufferWithCounterTypeLayout(
 
     for(auto& typeResourceInfo : typeLayout->resourceInfos)
     {
-        const auto counterResourceInfo
+        auto counterResourceInfo
             = counterVarLayout->findOrAddResourceInfo(typeResourceInfo.kind);
-        const auto counterTypeResourceInfo
-            = counterVarLayout->getTypeLayout()->FindResourceInfo(typeResourceInfo.kind);
         // We expect this index to be 1
         counterResourceInfo->index = typeResourceInfo.count.getFiniteValue();
-        // likewise
-        typeResourceInfo.count += counterTypeResourceInfo->count;
     }
 
     typeLayout->counterVarLayout = counterVarLayout;
@@ -3853,6 +3852,14 @@ static TypeLayoutResult _createTypeLayout(
             break;
         }
 
+        return createSimpleTypeLayout(
+            rules->GetObjectLayout(kind, context.objectLayoutOptions),
+            type,
+            rules);
+    }
+    else if (auto subpassType = as<SubpassInputType>(type))
+    {
+        ShaderParameterKind kind = ShaderParameterKind::SubpassInput;
         return createSimpleTypeLayout(
             rules->GetObjectLayout(kind, context.objectLayoutOptions),
             type,

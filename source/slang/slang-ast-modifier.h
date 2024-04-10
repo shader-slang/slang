@@ -242,6 +242,11 @@ class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier
     SLANG_AST_CLASS(GLSLLocationLayoutModifier)
 };
 
+class GLSLInputAttachmentIndexLayoutModifier : public GLSLParsedLayoutModifier
+{
+    SLANG_AST_CLASS(GLSLInputAttachmentIndexLayoutModifier)
+};
+
 class GLSLBufferDataLayoutModifier : public GLSLParsedLayoutModifier
 {
     SLANG_AST_CLASS(GLSLBufferDataLayoutModifier)
@@ -717,6 +722,12 @@ class UnscopedEnumAttribute : public Attribute
     SLANG_AST_CLASS(UnscopedEnumAttribute)
 };
 
+    // Marks a enum to have `flags` semantics, where each enum case is a bitfield.
+class FlagsAttribute : public Attribute
+{
+    SLANG_AST_CLASS(FlagsAttribute);
+};
+
 // [[vk_push_constant]] [[push_constant]]
 class PushConstantAttribute : public Attribute 
 {
@@ -864,6 +875,17 @@ class NumThreadsAttribute : public Attribute
     IntVal* z;
 };
 
+class WaveSizeAttribute : public Attribute
+{
+    SLANG_AST_CLASS(WaveSizeAttribute)
+
+    // "numLanes" must be a compile time constant integer
+    // value of an allowed wave size, which is one of the
+    // followings: 4, 8, 16, 32, 64 or 128.
+    //
+    IntVal* numLanes;
+};
+
 class MaxVertexCountAttribute : public Attribute 
 {
     SLANG_AST_CLASS(MaxVertexCountAttribute)
@@ -991,6 +1013,15 @@ class ReadNoneAttribute : public Attribute
 };
 
 
+// A `[__GLSLRequireShaderInputParameter]` attribute to annotate
+// functions that require a shader input as parameter
+//
+class GLSLRequireShaderInputParameterAttribute : public Attribute
+{
+    SLANG_AST_CLASS(GLSLRequireShaderInputParameterAttribute)
+
+    uint32_t parameterNumber;
+};
 
 // HLSL modifiers for geometry shader input topology
 class HLSLGeometryShaderInputPrimitiveTypeModifier : public Modifier 
@@ -1250,6 +1281,15 @@ class RequiresNVAPIAttribute : public Attribute
     SLANG_AST_CLASS(RequiresNVAPIAttribute)
 };
 
+    /// A `[RequirePrelude(target, "string")]` attribute indicates that the declaration being modifed
+    /// requires a textual prelude to be injected in the resulting target code.
+class RequirePreludeAttribute : public Attribute
+{
+    SLANG_AST_CLASS(RequirePreludeAttribute)
+
+    CapabilitySet capabilitySet;
+    String prelude;
+};
 
     /// A `[__AlwaysFoldIntoUseSite]` attribute indicates that the calls into the modified
     /// function should always be folded into use sites during source emit.
@@ -1545,9 +1585,9 @@ class DynamicUniformModifier : public Modifier
     SLANG_AST_CLASS(DynamicUniformModifier)
 };
 
-class MemoryQualifierCollectionModifier : public Modifier
+class MemoryQualifierSetModifier : public Modifier
 {
-    SLANG_AST_CLASS(MemoryQualifierCollectionModifier);
+    SLANG_AST_CLASS(MemoryQualifierSetModifier);
 
     List<Modifier*> memoryModifiers;
 

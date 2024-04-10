@@ -68,32 +68,20 @@ int b = myGenericMethod(obj); // OK, automatic type deduction
 
 You may explicitly specify the concrete type to used for the generic type argument, by providing the types in angular brackets after the method name, or leave it to the compiler to automatically deduce the type from the argument list.
 
-> #### Note ####
-> Slang currently does not support partial type argument list deduction.
-> For example if you have a generic method that accepts two type arguments:
-> ```
-> void g<T:IFoo, U:IBar>(T a, U b) {...}
-> ```
-> You may either call this method with no explicit type arguments:
-> ```
-> MyType a, b;
-> g(a, b);
-> ```
-> Or with explicit arguments for both generic type parameters:
-> ```
-> g<MyType, MyType>(a,b);
-> ```
-> If you only provide first type argument, Slang will generate an error:
-> ```
-> g<MyType>(a,b); // error, does not work today.
-> ```
-> We plan to support such use in a future version.
-
-
 Note that it is important to associate a generic type parameter with a type constraint. In the above example, although the definition of `myGenericMethod` is agnostic of the concrete type `T` will stand for, knowing that `T` conforms to `IFoo` allows the compiler to type-check and pre-compile `myGenericMethod` without needing to substitute `T` with any concrete types first. Similar to languages like C#, Rust, Swift and Java, leaving out the type constraint declaration on type parameter `T` will result in a compile error at the line calling `arg.myMethod` since the compiler cannot verify that `arg` has a member named `myMethod` without any knowledge on `T`. This is a major difference of Slang's generics compared to _templates_ in C++. 
 
 While C++ templates are a powerful language mechanism, Slang has followed the path of many other modern programming languages to adopt the more structural and restricted generics feature instead. This enables the Slang compiler to perform type checking early to give more readable error messages, and to speed-up compilation by reusing a lot of work for different instantiations of `myGenericMethod`.
 
+A generic parameter can also be a value. Currently, integer, bool and enum types are allowed as the type for a generic value parameter. Generic value parameters are declared with the `let` keyword. For example:
+
+```csharp
+void g1<let n : int>() { ... }
+
+enum MyEnum { A, B, C }
+void g2<let e : MyEnum>() { ... }
+
+void g3<let b : bool>() { ... }
+```
 
 Supported Constructs in Interface Definitions
 -----------------------------------------------------
@@ -752,3 +740,39 @@ void test()
 }
 ```
 This feature is similar to extension traits in Rust.
+
+
+Builtin Interfaces
+-----------------------------
+
+Slang supports the following builtin interfaces:
+
+- `IComparable`, provides methods for comparing two values of the conforming type. Supported by all basic data types, vector types and matrix types.
+- `IRangedValue`, proivides methods for retrieving the minimum and maxinum value expressed by the range of the type. Supported by all integer and floating-point scalar types.
+- `IArithmetic`, provides methods for the `+`, '-`, '*`, `/`, `%` and negating operations. Also provide a method for explicit conversion from `int`. Implemented by all builtin integer and floating-point scalar, vector and matrix types.
+- `ILogical`, provides methods for all bit operations and logical `and`, `or`, `not` oeprations. Also provide a method for explicit conversion from `int`. Implemented by all builtin integer scalar, vector and matrix types.
+- `IInteger`, represents a logical integer that supports both `IArithmetic` and `ILogical` operations. Implemented by all builtin integer scalar types.
+- `IDifferentiable`, represents a value that is differentiable.
+- `IFloat`, represents a logical float that supports both `IArithmetic`, `ILogical` and `IDifferentiable` operations. Also provides methods to convert to and from `float`. Implemented by all builtin floating-point scalar, vector and matrix types.
+- `IArray<T>`, represents a logical array that supports retrieving an element of type `T` from an index. Implemented by array types, vectors and matrices.
+- `__EnumType`, implemented by all enum types.
+- `__BuiltinIntegerType`, implemented by all integer scalar types.
+- `__BuiltinFloatingPointType`, implemented by all floating-point scalar types.
+- `__BuiltinArithmeticType`, implemented by all integer and floating-point scalar types.
+- `__BuiltinLogicalType`, implemmented by all integer types and the `bool` type.
+
+Operator overloads are defined for `IArithmetic`, `ILogical`, `IInteger`, `IFloat`, `__BuiltinIntegerType`, `__BuiltinFloatingPointType`,  `__BuiltinArithmeticType` and `__BuiltinLogicalType` types, so the following code is valid:
+
+```csharp
+T f<T:IFloat>(T x, T y)
+{
+    if (x > T(0))
+        return x + y;
+    else
+        return x - y;
+}
+void test()
+{
+    let rs = f(float3(4), float3(5)); // rs = float3(9,9,9)
+}
+```

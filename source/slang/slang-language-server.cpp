@@ -291,51 +291,62 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
                 ASTPrinter::OptionFlag::SimplifiedBuiltinType);
         printer.getStringBuilder() << getDeclKindString(declRef);
         printer.addDeclSignature(declRef);
-        if (auto varDecl = as<VarDeclBase>(declRef.getDecl()))
-        {
-            auto& sb = printer.getStringBuilder();
-            if (!varDecl->findModifier<ConstModifier>() && !as<LetDecl>(declRef.getDecl()))
-                return printer.getString();
+        auto printInitExpr = [&](Module* module, Type* declType, Expr* initExpr)
+            {
+                auto& sb = printer.getStringBuilder();
 
-            if (auto litExpr = as<LiteralExpr>(varDecl->initExpr))
-            {
-                sb << " = " << litExpr->token.getContent();
-            }
-            else if (auto isTypeDecl = as<IsTypeExpr>(varDecl->initExpr))
-            {
-                if (isTypeDecl->constantVal)
+                if (auto litExpr = as<LiteralExpr>(initExpr))
                 {
-                    sb << " = " << (isTypeDecl->constantVal->value ? "true" : "false");
+                    if (litExpr->token.type != TokenType::Unknown)
+                        sb << " = " << litExpr->token.getContent();
+                    else if (auto intLit = as<IntegerLiteralExpr>(litExpr))
+                        sb << " = " << intLit->value;
                 }
-            }
-            else if (varDecl->initExpr)
-            {
-                DiagnosticSink sink;
-                SharedSemanticsContext semanticContext(version->linkage, getModule(varDecl), &sink);
-                SemanticsVisitor semanticsVisitor(&semanticContext);
-                if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(
-                        declRef.substitute(version->linkage->getASTBuilder(), varDecl->initExpr),
-                        SemanticsVisitor::ConstantFoldingKind::LinkTime, nullptr))
+                else if (auto isTypeDecl = as<IsTypeExpr>(initExpr))
                 {
-                    if (auto constantInt = as<ConstantIntVal>(intVal))
+                    if (isTypeDecl->constantVal)
                     {
-                        sb << " = ";
-                        if (isBoolType(varDecl->getType()))
+                        sb << " = " << (isTypeDecl->constantVal->value ? "true" : "false");
+                    }
+                }
+                else if (initExpr)
+                {
+                    DiagnosticSink sink;
+                    SharedSemanticsContext semanticContext(version->linkage, module, &sink);
+                    SemanticsVisitor semanticsVisitor(&semanticContext);
+                    if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(
+                        declRef.substitute(version->linkage->getASTBuilder(), initExpr),
+                        SemanticsVisitor::ConstantFoldingKind::LinkTime, nullptr))
+                    {
+                        if (auto constantInt = as<ConstantIntVal>(intVal))
                         {
-                            sb << (constantInt->getValue() ? "true" : "false");
+                            sb << " = ";
+                            if (isBoolType(declType))
+                            {
+                                sb << (constantInt->getValue() ? "true" : "false");
+                            }
+                            else
+                            {
+                                sb << constantInt->getValue();
+                            }
                         }
                         else
                         {
-                            sb << constantInt->getValue();
+                            sb << " = ";
+                            intVal->toText(sb);
                         }
                     }
-                    else
-                    {
-                        sb << " = ";
-                        intVal->toText(sb);
-                    }
                 }
-            }
+            };
+        if (auto varDecl = as<VarDeclBase>(declRef.getDecl()))
+        {
+            if (!varDecl->findModifier<ConstModifier>() && !as<LetDecl>(declRef.getDecl()))
+                return printer.getString();
+            printInitExpr(getModule(varDecl), varDecl->type, varDecl->initExpr);
+        }
+        else if (auto enumCase = as<EnumCaseDecl>(declRef.getDecl()))
+        {
+            printInitExpr(getModule(enumCase), nullptr, enumCase->tagExpr);
         }
         return printer.getString();
     }
