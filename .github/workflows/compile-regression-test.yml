@@ -53,4 +53,6 @@ jobs:
         cp -r /c/slang_compile_test_suite_a .
         cd slang_compile_test_suite_a
         export SLANGC_PATH="$bin_dir/slangc.exe"
+        which spirv-val || echo "no spirv-val"
+        which spirv-val.exe || echo "no spirv-val.exe"
         bash ./compile_all_slang.sh
