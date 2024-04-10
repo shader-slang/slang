@@ -52,4 +52,5 @@ jobs:
       run: |
         cp -r /c/slang_compile_test_suite_a .
         cd slang_compile_test_suite_a
+        export SLANGC_PATH="$bin_dir/slangc.exe"
         bash ./compile_all_slang.sh
