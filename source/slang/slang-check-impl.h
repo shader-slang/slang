@@ -2773,4 +2773,7 @@ namespace Slang
         SemanticsDeclVisitorBase* visitor,
         Decl* decl,
         DeclCheckState              state);
+
+    RefPtr<EntryPoint> findAndValidateEntryPoint(
+        FrontEndEntryPointRequest* entryPointReq);
 }
