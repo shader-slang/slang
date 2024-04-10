@@ -9575,7 +9575,7 @@ namespace Slang
                 // without complex logic. We must shift all case statments when doing this logic instead of 
                 // swapping with the final element since some capabilities have overlapping targets.
                 // As a result order matters when resolving `case` statments
-                if (stmt->targetCases[targetCaseIndex]->capability == 0)
+                if (stmt->targetCases[targetCaseIndex]->capability == CapabilityName::Invalid)
                 {
                     if (targetCaseCount - 1 != targetCaseIndex)
                     {
