@@ -9563,7 +9563,7 @@ namespace Slang
         {
             CapabilitySet set;
             auto targetCaseCount = stmt->targetCases.getCount();
-            for (std::size_t targetCaseIndex = 0; targetCaseIndex < targetCaseCount; targetCaseIndex++)
+            for (Index targetCaseIndex = 0; targetCaseIndex < targetCaseCount; targetCaseIndex++)
             {
                 // We may revieve a `default:` case for a `__target_switch`. If this is the case,
                 // we must resolve the target capability as `any_target` to hint to the capability 
@@ -9579,7 +9579,7 @@ namespace Slang
                 {
                     if (targetCaseCount - 1 != targetCaseIndex)
                     {
-                        for (std::size_t i = targetCaseIndex; i < targetCaseCount - 1; i++)
+                        for (Index i = targetCaseIndex; i < targetCaseCount - 1; i++)
                             std::swap(stmt->targetCases[i], stmt->targetCases[i + 1]);
                         continue;
                     }
