@@ -449,6 +449,12 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             if (int(request.options) & int(LookupOptions::IgnoreBaseInterfaces))
                 continue;
         }
+        // If we are looking up only immediate members, ignore non "Self" facets
+        else if (int(request.options) & int(LookupOptions::IgnoreInheritance) 
+            && facet.getImpl()->directness != Facet::Directness::Self)
+        {
+                continue;
+        }
 
         // Some things that are syntactically `InheritanceDecl`s don't actually
         // represent a subtype/supertype relationship, and thus we shouldn't

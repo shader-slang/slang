@@ -9,58 +9,45 @@ RWStructuredBuffer<int> outputBuffer;
 static int myTwo = 2;
 static int myThree = 1+2;
 
-struct DefaultStruct_base
+struct DefaultStruct_bottom
 {
     int data0 = 1;
-    int data1;
+};
+struct DefaultStruct_middle1 : DefaultStruct_bottom
+{
+    int data1 = 1;
+};
+struct DefaultStruct_middle2 : DefaultStruct_middle1
+{
+    int data2 = 1;
+};
+struct DefaultStruct_top : DefaultStruct_middle2
+{
+    int data3 = 1;
+};
 
-    __init()
-    {
-        data1 = 1;
-    }
-};
-struct DefaultStruct1 : DefaultStruct_base
-{
-    int data2 = 1;
-};
-struct DefaultStruct2 : DefaultStruct_base
-{
-    int data2 = 1;
-    __init()
-    {
-        if (data0 != 1)
-        {
-            data2 = 0;
-        }
-    }
-};
-struct DefaultStruct3 : DefaultStruct_base
-{
-    __init()
-    {
-    }
-};
-struct DefaultStruct4 : DefaultStruct_base
-{
-};
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    DefaultStruct1 s1;
-    DefaultStruct2 s2;
-    DefaultStruct3 s3;
-    DefaultStruct4 s4;
+    DefaultStruct_bottom s1;
+    DefaultStruct_middle1 s2;
+    DefaultStruct_middle2 s3;
+    DefaultStruct_top s4;
+
     // BUF: 1
     outputBuffer[0] = true
         && s1.data0 == 1
-        && s1.data1 == 1
-        && s1.data2 == 1
+
         && s2.data0 == 1
         && s2.data1 == 1
-        && s2.data2 == 1
+
         && s3.data0 == 1
         && s3.data1 == 1
+        && s3.data2 == 1
+
         && s4.data0 == 1
         && s4.data1 == 1
+        && s4.data2 == 1
+        && s4.data3 == 1
         ;
 }

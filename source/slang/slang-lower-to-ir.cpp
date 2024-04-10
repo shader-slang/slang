@@ -4744,6 +4744,28 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // sense to specialize a key.
             return extractField(superType, value, declaredSubtypeWitness->getDeclRef().getDecl());
         }
+        if (auto transitiveSubtypeWitness = as<TransitiveSubtypeWitness>(subTypeWitness))
+        {
+            // Try to resolve the inheritance situation which may show-up with 2+ levels of inheritance.
+            // We will recursivly follow through the subType->midType & midType->superType witnesses until 
+            // we resolve DeclaredSubtypeWitness's
+            LoweredValInfo subToMid;
+            if (auto witness = as<SubtypeWitness>(transitiveSubtypeWitness->getSubToMid()))
+                subToMid = emitCastToConcreteSuperTypeRec(value, lowerType(context, witness->getSup()), witness);
+            else
+            {
+                SLANG_ASSERT(!"unhandled");
+                return nullptr;
+            }
+
+            if (auto witness = as<SubtypeWitness>(transitiveSubtypeWitness->getMidToSup()))
+                return emitCastToConcreteSuperTypeRec(subToMid, superType, witness);
+            else
+            {
+                SLANG_ASSERT(!"unhandled");
+                return nullptr;
+            }
+        }
         else
         {
             SLANG_ASSERT(!"unhandled");
