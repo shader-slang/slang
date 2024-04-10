@@ -2843,14 +2843,10 @@ createStructuredBufferWithCounterTypeLayout(
 
     for(auto& typeResourceInfo : typeLayout->resourceInfos)
     {
-        const auto counterResourceInfo
+        auto counterResourceInfo
             = counterVarLayout->findOrAddResourceInfo(typeResourceInfo.kind);
-        const auto counterTypeResourceInfo
-            = counterVarLayout->getTypeLayout()->FindResourceInfo(typeResourceInfo.kind);
         // We expect this index to be 1
         counterResourceInfo->index = typeResourceInfo.count.getFiniteValue();
-        // likewise
-        typeResourceInfo.count += counterTypeResourceInfo->count;
     }
 
     typeLayout->counterVarLayout = counterVarLayout;
