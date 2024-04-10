@@ -107,7 +107,7 @@ public in uvec3 gl_LocalInvocationID : SV_GroupThreadID;
 
 public property uint3 gl_NumWorkGroups {
 
-    [require(glsl_spirv, GLSL_430_SPIRV_1_0_com)]
+    [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
     get {
         __target_switch
         {
@@ -123,7 +123,7 @@ public property uint3 gl_NumWorkGroups {
 
 public property uint3 gl_WorkGroupSize {
 
-    [require(glsl_spirv, GLSL_430_SPIRV_1_0_com)]
+    [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
     get {
         __target_switch
         {
@@ -3616,7 +3616,7 @@ public property uint3 gl_LaunchSizeEXT
 
 public property int gl_PrimitiveID 
 {
-    [require(glsl_spirv, raytracing_any_clo_int)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get 
     {
         setupExtForRayTracingBuiltIn();
@@ -3626,7 +3626,7 @@ public property int gl_PrimitiveID
 
 public property int gl_InstanceID 
 {
-    [require(glsl_spirv, raytracing_any_clo_int)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get 
     {
         setupExtForRayTracingBuiltIn();
@@ -3636,7 +3636,7 @@ public property int gl_InstanceID
 
 public property int gl_InstanceCustomIndexEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get 
     {
         setupExtForRayTracingBuiltIn();
@@ -3646,7 +3646,7 @@ public property int gl_InstanceCustomIndexEXT
 
 public property int gl_GeometryIndexEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3656,7 +3656,7 @@ public property int gl_GeometryIndexEXT
 
 public property vec3 gl_WorldRayOriginEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int_mis)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3666,7 +3666,7 @@ public property vec3 gl_WorldRayOriginEXT
 
 public property vec3 gl_WorldRayDirectionEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int_mis)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3676,7 +3676,7 @@ public property vec3 gl_WorldRayDirectionEXT
 
 public property vec3 gl_ObjectRayOriginEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3686,7 +3686,7 @@ public property vec3 gl_ObjectRayOriginEXT
 
 public property vec3 gl_ObjectRayDirectionEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3696,7 +3696,7 @@ public property vec3 gl_ObjectRayDirectionEXT
 
 public property float gl_RayTminEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int_mis)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3706,7 +3706,7 @@ public property float gl_RayTminEXT
 
 public property float gl_RayTmaxEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int_mis)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3716,7 +3716,7 @@ public property float gl_RayTmaxEXT
 
 public property uint gl_IncomingRayFlagsEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int_mis)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3726,7 +3726,7 @@ public property uint gl_IncomingRayFlagsEXT
 
 public property float gl_HitTEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3750,7 +3750,7 @@ public property float gl_HitTEXT
 public property uint gl_HitKindEXT 
 {
 
-    [require(glsl_spirv, raytracing_any_clo)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3760,7 +3760,7 @@ public property uint gl_HitKindEXT
 
 public property mat4x3 gl_ObjectToWorldEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3784,7 +3784,7 @@ public property mat4x3 gl_ObjectToWorldEXT
 
 public property mat3x4 gl_ObjectToWorld3x4EXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3807,7 +3807,7 @@ public property mat3x4 gl_ObjectToWorld3x4EXT
 
 public property mat4x3 gl_WorldToObjectEXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3831,7 +3831,7 @@ public property mat4x3 gl_WorldToObjectEXT
 
 public property mat3x4 gl_WorldToObject3x4EXT 
 {
-    [require(glsl_spirv, raytracing_any_clo_int)]
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3855,7 +3855,7 @@ public property mat3x4 gl_WorldToObject3x4EXT
 // GL_EXT_ray_tracing functions
 
 __glsl_extension(GL_EXT_ray_tracing)
-[require(glsl_spirv, raytracing_ray_clo_mis)]
+[require(glsl_spirv, raytracing_raygen_closesthit_miss)]
 public void traceRayEXT(
     accelerationStructureEXT topLevel,
     uint rayFlags,
@@ -3915,7 +3915,7 @@ public bool reportIntersectionEXT(float hitT, uint hitKind)
 }
 
 __glsl_extension(GL_EXT_ray_tracing)
-[require(glsl_spirv, raytracing_ray_clo_mis_cal)]
+[require(glsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 public void executeCallableEXT(
     uint sbtRecordIndex, 
     int callable /*callableDataEXT and callableDataInEXT*/)
@@ -4253,7 +4253,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectTraceRayNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -4313,7 +4313,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_ray_clo_mis)]
+[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectTraceRayMotionNV(
     inout hitObjectNV hitObject, 
     accelerationStructureEXT topLevel,
@@ -4377,7 +4377,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectRecordHitNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -4440,7 +4440,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_ray_clo_mis)]
+[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectRecordHitMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -4505,7 +4505,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectRecordHitWithIndexNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -4565,7 +4565,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_ray_clo_mis)]
+[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectRecordHitWithIndexMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -4629,7 +4629,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectRecordMissNV(
     inout hitObjectNV hitObject, 
     uint sbtRecordIndex, 
@@ -4649,7 +4649,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_ray_clo_mis)]
+[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectRecordMissMotionNV(
     inout hitObjectNV hitObject, 
     uint sbtRecordIndex, 
@@ -4670,7 +4670,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectRecordEmptyNV(hitObjectNV hitObject)
 {
     hitObject = HitObject::MakeNop();
@@ -4680,7 +4680,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectExecuteShaderNV(
     inout hitObjectNV hitObject, 
     constexpr int payload)
@@ -4705,7 +4705,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public bool hitObjectIsEmptyNV(hitObjectNV hitObject)
 {
     return hitObject.IsNop();
@@ -4715,7 +4715,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public bool hitObjectIsMissNV(hitObjectNV hitObject)
 {
     return hitObject.IsMiss();
@@ -4725,7 +4725,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public bool hitObjectIsHitNV(hitObjectNV hitObject)
 {
     return hitObject.IsHit();
@@ -4735,7 +4735,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public float hitObjectGetRayTMinNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().TMin;  
@@ -4745,7 +4745,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public float hitObjectGetRayTMaxNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().TMax; 
@@ -4755,7 +4755,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public vec3 hitObjectGetWorldRayOriginNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().Origin;
@@ -4765,7 +4765,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public vec3 hitObjectGetWorldRayDirectionNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().Direction; 
@@ -4775,7 +4775,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public vec3 hitObjectGetObjectRayOriginNV(hitObjectNV hitObject)
 {
     return hitObject.GetObjectRayOrigin();
@@ -4785,7 +4785,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public vec3 hitObjectGetObjectRayDirectionNV(hitObjectNV hitObject)
 {
     return hitObject.GetObjectRayDirection();
@@ -4795,7 +4795,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public mat4x3 hitObjectGetObjectToWorldNV(hitObjectNV hitObject)
 {
     return transpose(hitObject.GetObjectToWorld());
@@ -4805,7 +4805,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public mat4x3 hitObjectGetWorldToObjectNV(hitObjectNV hitObject)
 {
     return transpose(hitObject.GetWorldToObject()); 
@@ -4815,7 +4815,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public int hitObjectGetInstanceCustomIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetInstanceID();
@@ -4825,7 +4825,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public int hitObjectGetInstanceIdNV(hitObjectNV hitObject)
 {
     return hitObject.GetInstanceIndex();
@@ -4835,7 +4835,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public int hitObjectGetGeometryIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetGeometryIndex();
@@ -4845,7 +4845,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public int hitObjectGetPrimitiveIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetPrimitiveIndex();
@@ -4855,7 +4855,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public uint hitObjectGetHitKindNV(hitObjectNV hitObject)
 {
     return hitObject.GetHitKind();
@@ -4865,7 +4865,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectGetAttributesNV(
     inout hitObjectNV hitObject, 
     constexpr int attributeLocation)
@@ -4891,7 +4891,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public uvec2 hitObjectGetShaderRecordBufferHandleNV(hitObjectNV hitObject)
 {
     return hitObject.GetShaderRecordBufferHandle();
@@ -4901,7 +4901,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public uint hitObjectGetShaderBindingTableRecordIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetShaderTableIndex();
@@ -4911,7 +4911,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray_clo_mis)]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public float hitObjectGetCurrentTimeNV(hitObjectNV hitObject)
 {
     return hitObject.GetCurrentTime();
@@ -4921,7 +4921,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray)]
+[require(glsl_spirv, ser_raygen)]
 public void reorderThreadNV(uint hint, uint bits)
 {
     ReorderThread(hint, bits);
@@ -4931,7 +4931,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray)]
+[require(glsl_spirv, ser_raygen)]
 public void reorderThreadNV(hitObjectNV hitObject)
 {
     ReorderThread(hitObject);
@@ -4941,7 +4941,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_ray)]
+[require(glsl_spirv, ser_raygen)]
 public void reorderThreadNV(hitObjectNV hitObject, uint hint, uint bits)
 {
     ReorderThread(hitObject, hint, bits);
@@ -4951,7 +4951,7 @@ public void reorderThreadNV(hitObjectNV hitObject, uint hint, uint bits)
 
 public property float gl_CurrentRayTimeNV
 {
-    [require(glsl_spirv, raytracing_motionblur_any_clo_int_mis)]
+    [require(glsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
     get
     {
         __target_switch
@@ -4972,7 +4972,7 @@ public property float gl_CurrentRayTimeNV
 __glsl_extension(GL_EXT_ray_tracing) 
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, raytracing_motionblur_ray_clo_mis)]
+[require(glsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
 public void traceRayMotionNV(
     accelerationStructureEXT topLevel,
     uint rayFlags,

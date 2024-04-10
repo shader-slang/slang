@@ -226,7 +226,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [ForceInline]
     [__readNone]
-    [require(hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     float CalculateLevelOfDetail(TextureCoord location)
     {
         __target_switch
@@ -245,7 +245,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [ForceInline]
     [__readNone]
-    [require(hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     float CalculateLevelOfDetailUnclamped(TextureCoord location)
     {
         __target_switch
@@ -305,7 +305,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     float __glsl_texture_offset_level_zero_1d_shadow(vector<float, Shape.dimensions+isArray+2> value, constexpr vector<int, Shape.planeDimensions> offset);
 
     [__readNone]
-    [require(cpp_hlsl_glsl_cuda_spirv, texture_sm_4_1_fra)]
+    [require(cpp_hlsl_glsl_cuda_spirv, texture_sm_4_1_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location)
     {
         __target_switch
@@ -355,7 +355,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __target_switch
@@ -377,7 +377,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     __target_intrinsic(hlsl)
-    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         status = 0;
@@ -385,7 +385,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
-    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __target_switch
@@ -406,7 +406,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
-    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -427,7 +427,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -484,7 +484,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone] 
     [ForceInline]
-    [require(hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -677,7 +677,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     float CalculateLevelOfDetail(SamplerState s, TextureCoord location)
     {
         __target_switch
@@ -696,7 +696,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     float CalculateLevelOfDetailUnclamped(SamplerState s, TextureCoord location)
     {
         __target_switch
@@ -761,7 +761,7 @@ __generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let s
 extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     [__readNone]
-    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
     {
         __target_switch
@@ -813,7 +813,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
-    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -835,7 +835,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __target_switch
@@ -865,7 +865,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
-    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __target_switch
@@ -886,7 +886,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
-    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(cpp_hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -907,7 +907,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone] [ForceInline]
-    [require(hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -964,7 +964,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone] [ForceInline]
-    [require(hlsl_glsl_spirv, texture_sm_4_1_fra)]
+    [require(hlsl_glsl_spirv, texture_sm_4_1_fragment)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1193,7 +1193,7 @@ ${{{{
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 extension __TextureImpl<T,Shape,isArray,1,sampleCount,access,isShadow,isCombined,format>
 {
-    [require(cpp_hlsl_glsl_cuda_spirv, texture_sm_4_1_ver_fra_geo)]
+    [require(cpp_hlsl_glsl_cuda_spirv, texture_sm_4_1_vertex_fragment_geometry)]
     float2 GetSamplePosition(int s);
 }
 
@@ -1445,7 +1445,7 @@ ${{{{
             auto glslComponent = (isCmp ? "" :glslComponentNames[componentId == 0 ? 0 : componentId - 1]);
     }}}}
     [ForceInline]
-    [require(hlsl_glsl_spirv, texture_sm_4_1_ver_fra_geo)]
+    [require(hlsl_glsl_spirv, texture_sm_4_1_vertex_fragment_geometry)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam))
     {
         __target_switch
@@ -1457,7 +1457,7 @@ ${{{{
         }
     }
     [ForceInline]
-    [require(hlsl_glsl_spirv, texture_sm_4_1_ver_fra_geo)]
+    [require(hlsl_glsl_spirv, texture_sm_4_1_vertex_fragment_geometry)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam), constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1469,7 +1469,7 @@ ${{{{
         }
     }
     [ForceInline]
-    [require(hlsl_glsl_spirv, texture_sm_4_1_ver_fra_geo)]
+    [require(hlsl_glsl_spirv, texture_sm_4_1_vertex_fragment_geometry)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam),
         constexpr vector<int, Shape.planeDimensions> offset1,
         constexpr vector<int, Shape.planeDimensions> offset2,
@@ -2577,7 +2577,7 @@ struct InputPatch
 };
 
 __generic<T, let N : int>
-[require(hlsl_glsl_spirv, shader_stages_hul_dom)]
+[require(hlsl_glsl_spirv, shader_stages_hull_domain)]
 __magic_type(HLSLOutputPatchType)
 __intrinsic_type($(kIROp_HLSLOutputPatchType))
 struct OutputPatch
@@ -3638,7 +3638,7 @@ bool all(matrix<T,N,M> x)
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(hlsl_glsl_cuda_spirv, memorybarrier_com)]
+[require(hlsl_glsl_cuda_spirv, memorybarrier_compute)]
 void AllMemoryBarrier()
 {
     __target_switch
@@ -3655,7 +3655,7 @@ void AllMemoryBarrier()
 
 // Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(hlsl_glsl_cuda_spirv, memorybarrier_com)]
+[require(hlsl_glsl_cuda_spirv, memorybarrier_compute)]
 void AllMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -4641,7 +4641,7 @@ T determinant(matrix<T,N,N> m);
 
 // Barrier for device memory
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(hlsl_glsl_cuda_spirv, memorybarrier_com)]
+[require(hlsl_glsl_cuda_spirv, memorybarrier_compute)]
 void DeviceMemoryBarrier()
 {
     __target_switch
@@ -4657,7 +4657,7 @@ void DeviceMemoryBarrier()
 }
 
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(hlsl_glsl_cuda_spirv, memorybarrier_com)]
+[require(hlsl_glsl_cuda_spirv, memorybarrier_compute)]
 void DeviceMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -5425,7 +5425,7 @@ float2 GetRenderTargetSamplePosition(int Index);
 
 // Group memory barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(hlsl_glsl_cuda_spirv, memorybarrier_com)]
+[require(hlsl_glsl_cuda_spirv, memorybarrier_compute)]
 void GroupMemoryBarrier()
 {
     __target_switch
@@ -5441,7 +5441,7 @@ void GroupMemoryBarrier()
     }
 }
 
-[require(hlsl_glsl_cuda_spirv, memorybarrier_com)]
+[require(hlsl_glsl_cuda_spirv, memorybarrier_compute)]
 void __subgroupBarrier()
 {
     __target_switch
@@ -5458,7 +5458,7 @@ void __subgroupBarrier()
 }
 
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(hlsl_glsl_cuda_spirv, memorybarrier_com)]
+[require(hlsl_glsl_cuda_spirv, memorybarrier_compute)]
 void GroupMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -7905,7 +7905,7 @@ uint WaveMaskCountBits(WaveMask mask, bool value)
 // It seems this can only mean the active threads are the "threads the program flow would lead to". This implies a lockstep
 // "straight SIMD" style interpretation. That being the case this op on HLSL is just a memory barrier without any Sync.
 
-[require(hlsl_glsl_cuda_spirv, memorybarrier_com)]
+[require(hlsl_glsl_cuda_spirv, memorybarrier_compute)]
 void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
     __target_switch
@@ -7937,7 +7937,7 @@ void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 // aspect of HLSL seems to make everything in lock step - but that's not quite so, it only has to apparently be that way as far as the programmers
 // model appears - divergence could perhaps potentially still happen.
 
-[require(hlsl_glsl_cuda_spirv, memorybarrier_com)]
+[require(hlsl_glsl_cuda_spirv, memorybarrier_compute)]
 void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
     __target_switch
@@ -7953,7 +7953,7 @@ void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
     }
 }
 
-[require(hlsl_glsl_cuda_spirv, memorybarrier_com)]
+[require(hlsl_glsl_cuda_spirv, memorybarrier_compute)]
 void AllMemoryBarrierWithWaveSync()
 {
     __target_switch
@@ -7969,7 +7969,7 @@ void AllMemoryBarrierWithWaveSync()
     }
 }
 
-[require(hlsl_glsl_cuda_spirv, memorybarrier_com)]
+[require(hlsl_glsl_cuda_spirv, memorybarrier_compute)]
 void GroupMemoryBarrierWithWaveSync()
 {
     __target_switch
@@ -10142,7 +10142,7 @@ struct BuiltInTriangleIntersectionAttributes
 // `CallShader()` for GLSL-based targets.
 //
 __target_intrinsic(_GL_EXT_ray_tracing, "executeCallableEXT")
-[require(glsl, raytracing_ray_clo_mis_cal)]
+[require(glsl, raytracing_raygen_closesthit_miss_callable)]
 void __executeCallable(uint shaderIndex, int payloadLocation);
 
 // Next is the custom intrinsic that will compute the payload location
@@ -10158,7 +10158,7 @@ int __callablePayloadLocation(__ref Payload payload);
 // GLSL equivalent.
 //
 __generic<Payload>
-[require(hlsl_glsl_spirv, raytracing_ray_clo_mis_cal)]
+[require(hlsl_glsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 void CallShader(uint shaderIndex, inout Payload payload)
 {
     __target_switch
@@ -10212,7 +10212,7 @@ void __traceRayHLSL(
         inout payload_t Payload);
 
 __target_intrinsic(_GL_EXT_ray_tracing, "traceRayEXT")
-[require(glsl, raytracing_ray_clo_mis)]
+[require(glsl, raytracing_raygen_closesthit_miss)]
 void __traceRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -10239,7 +10239,7 @@ int __rayPayloadLocation(__ref Payload payload);
 
 [ForceInline]
 __generic<payload_t>
-[require(hlsl_glsl_cuda_spirv, raytracing_ray_clo_mis)]
+[require(hlsl_glsl_cuda_spirv, raytracing_raygen_closesthit_miss)]
 void TraceRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -10336,7 +10336,7 @@ void __traceMotionRayHLSL(
 
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __target_intrinsic(glsl, "traceRayMotionNV")
-[require(glsl, raytracing_motionblur_ray_clo_mis)]
+[require(glsl, raytracing_motionblur_raygen_closesthit_miss)]
 void __traceMotionRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -10352,7 +10352,7 @@ void __traceMotionRay(
     int                             PayloadLocation);
 
 [ForceInline]
-[require(hlsl_glsl_spirv, raytracing_motionblur_ray_clo_mis)]
+[require(hlsl_glsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
 __generic<payload_t>
 void TraceMotionRay(
     RaytracingAccelerationStructure AccelerationStructure,
@@ -10467,7 +10467,7 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
 }
 
 // 10.3.4
-[require(hlsl_glsl_cuda_spirv, raytracing_any)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit)]
 void IgnoreHit()
 {
     __target_switch
@@ -10484,7 +10484,7 @@ void IgnoreHit()
 }
 
 // 10.3.5
-[require(hlsl_glsl_cuda_spirv, raytracing_any)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit)]
 void AcceptHitAndEndSearch()
 {
     __target_switch
@@ -10543,7 +10543,7 @@ uint3 DispatchRaysDimensions()
 // 10.4.2 - Ray System Values
 
 [NonUniformReturn]
-[require(hlsl_glsl_cuda_spirv, raytracing_any_clo_int_mis)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float3 WorldRayOrigin()
 {
     __target_switch
@@ -10560,7 +10560,7 @@ float3 WorldRayOrigin()
 }
 
 [NonUniformReturn]
-[require(hlsl_glsl_cuda_spirv, raytracing_any_clo_int_mis)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float3 WorldRayDirection()
 {
     __target_switch
@@ -10577,7 +10577,7 @@ float3 WorldRayDirection()
 }
 
 [NonUniformReturn]
-[require(hlsl_glsl_cuda_spirv, raytracing_any_clo_int_mis)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float RayTMin()
 {
     __target_switch
@@ -10604,7 +10604,7 @@ float RayTMin()
 // to the appropriate Vulkan stages.
 //
 [NonUniformReturn]
-[require(hlsl_glsl_cuda_spirv, raytracing_any_clo_int_mis)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float RayTCurrent()
 {
     __target_switch
@@ -10620,7 +10620,7 @@ float RayTCurrent()
     }
 }
 
-[require(hlsl_glsl_cuda_spirv, raytracing_any_clo_int_mis)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 uint RayFlags()
 {
     __target_switch
@@ -10639,7 +10639,7 @@ uint RayFlags()
 // 10.4.3 - Primitive/Object Space System Values
 
 [NonUniformReturn]
-[require(hlsl_glsl_cuda_spirv, raytracing_any_clo_int)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit_closesthit_intersection)]
 uint InstanceIndex()
 {
     __target_switch
@@ -10656,7 +10656,7 @@ uint InstanceIndex()
 }
 
 [NonUniformReturn]
-[require(hlsl_glsl_cuda_spirv, raytracing_any_clo_int)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit_closesthit_intersection)]
 uint InstanceID()
 {
     __target_switch
@@ -10673,7 +10673,7 @@ uint InstanceID()
 }
 
 [NonUniformReturn]
-[require(hlsl_glsl_cuda_spirv, raytracing_any_clo_int)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit_closesthit_intersection)]
 uint PrimitiveIndex()
 {
     __target_switch
@@ -10690,7 +10690,7 @@ uint PrimitiveIndex()
 }
 
 [NonUniformReturn]
-[require(hlsl_glsl_cuda_spirv, raytracing_any_clo_int)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit_closesthit_intersection)]
 float3 ObjectRayOrigin()
 {
     __target_switch
@@ -10707,7 +10707,7 @@ float3 ObjectRayOrigin()
 }
 
 [NonUniformReturn]
-[require(hlsl_glsl_cuda_spirv, raytracing_any_clo_int)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit_closesthit_intersection)]
 float3 ObjectRayDirection()
 {
     __target_switch
@@ -10726,7 +10726,7 @@ float3 ObjectRayDirection()
 // TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
 // floats by reference.
 [NonUniformReturn]
-[require(hlsl_glsl_spirv, raytracing_any_clo_int)]
+[require(hlsl_glsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 ObjectToWorld3x4()
 {
     __target_switch
@@ -10743,7 +10743,7 @@ float3x4 ObjectToWorld3x4()
 }
 
 [NonUniformReturn]
-[require(hlsl_glsl_spirv, raytracing_any_clo_int)]
+[require(hlsl_glsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 WorldToObject3x4()
 {
     __target_switch
@@ -10760,7 +10760,7 @@ float3x4 WorldToObject3x4()
 }
 
 [NonUniformReturn]
-[require(hlsl_glsl_spirv, raytracing_any_clo_int)]
+[require(hlsl_glsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 ObjectToWorld4x3()
 {
     __target_switch
@@ -10776,7 +10776,7 @@ float4x3 ObjectToWorld4x3()
 }
 
 [NonUniformReturn]
-[require(hlsl_glsl_spirv, raytracing_any_clo_int)]
+[require(hlsl_glsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 WorldToObject4x3()
 {
     __target_switch
@@ -10798,7 +10798,7 @@ float4x3 WorldToObject4x3()
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(hlsl_glsl_spirv, raytracing_motionblur_any_clo_int_mis)]
+[require(hlsl_glsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
 float RayCurrentTime()
 {
     __target_switch
@@ -10827,7 +10827,7 @@ float RayCurrentTime()
 
 // 10.4.4 - Hit Specific System values
 [NonUniformReturn]
-[require(hlsl_glsl_cuda_spirv, raytracing_any_clo)]
+[require(hlsl_glsl_cuda_spirv, raytracing_anyhit_closesthit)]
 uint HitKind()
 {
     __target_switch
@@ -11029,7 +11029,7 @@ extension __TextureImpl<T,__Shape2D, 1, 0, 0, $(kStdlibResourceAccessFeedback), 
 // Get the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(hlsl_glsl_spirv, raytracing_any_clo_int)]
+[require(hlsl_glsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint GeometryIndex()
 {
     __target_switch
@@ -12104,7 +12104,7 @@ struct HitObject
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject TraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -12197,7 +12197,7 @@ struct HitObject
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_motion_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject TraceMotionRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -12296,7 +12296,7 @@ struct HitObject
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -12381,7 +12381,7 @@ struct HitObject
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
     [ForceInline]    
-    [require(hlsl_glsl_spirv, ser_motion_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
@@ -12463,7 +12463,7 @@ struct HitObject
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -12541,7 +12541,7 @@ struct HitObject
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
     [ForceInline]
-    [require(glsl_spirv, ser_motion_ray_clo_mis)]
+    [require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>( 
         uint HitGroupRecordIndex, 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -12612,7 +12612,7 @@ struct HitObject
         /// table.
     [__requiresNVAPI]
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeMiss( 
         uint MissShaderIndex, 
         RayDesc Ray)
@@ -12647,7 +12647,7 @@ struct HitObject
         /// See MakeMiss but handles Motion 
         /// Currently only supported on VK
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_motion_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionMiss( 
         uint MissShaderIndex, 
         RayDesc Ray,
@@ -12690,7 +12690,7 @@ struct HitObject
         /// miss.
     [__requiresNVAPI]
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeNop()
     {
         __target_switch
@@ -12722,7 +12722,7 @@ struct HitObject
         /// shader is invoked.
     [__requiresNVAPI]
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
@@ -12774,7 +12774,7 @@ struct HitObject
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     bool IsMiss()
     {
         __target_switch
@@ -12794,7 +12794,7 @@ struct HitObject
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     bool IsHit()
     {
         __target_switch
@@ -12814,7 +12814,7 @@ struct HitObject
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     bool IsNop()
     {
         __target_switch
@@ -12834,7 +12834,7 @@ struct HitObject
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
     [__requiresNVAPI]
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     RayDesc GetRayDesc()
     {
         __target_switch
@@ -12864,7 +12864,7 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     uint GetShaderTableIndex()
     {
         __target_switch
@@ -12885,7 +12885,7 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceIndex()
     {
         __target_switch
@@ -12906,7 +12906,7 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceID()
     {
         __target_switch
@@ -12927,7 +12927,7 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     uint GetGeometryIndex()
     {
         __target_switch
@@ -12948,7 +12948,7 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     uint GetPrimitiveIndex()
     {
         __target_switch
@@ -12969,7 +12969,7 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     uint GetHitKind()
     {
         __target_switch
@@ -12989,7 +12989,7 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     float4x3 GetWorldToObject()
     {
         __target_switch
@@ -13009,7 +13009,7 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(hlsl_glsl_spirv, ser_ray_clo_mis)]
+    [require(hlsl_glsl_spirv, ser_raygen_closesthit_miss)]
     float4x3 GetObjectToWorld()
     {
         __target_switch
@@ -13027,7 +13027,7 @@ struct HitObject
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_ray_clo_mis)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float GetCurrentTime() {
         __target_switch
         {
@@ -13044,7 +13044,7 @@ struct HitObject
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_ray_clo_mis)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayOrigin() {
         __target_switch
         {
@@ -13061,7 +13061,7 @@ struct HitObject
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_ray_clo_mis)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayDirection() {
         __target_switch
         {
@@ -13078,7 +13078,7 @@ struct HitObject
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_ray_clo_mis)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     uint2 GetShaderRecordBufferHandle() {
         __target_switch
         {
@@ -13096,7 +13096,7 @@ struct HitObject
 
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
-    [require(glsl_spirv, ser_ray_clo_mis)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
     {
         __target_switch
@@ -13144,12 +13144,12 @@ struct HitObject
 
     __target_intrinsic(hlsl, "NvGetAttributesFromHitObject($0, $1)")
     [__requiresNVAPI]
-    [require(hlsl, ser_ray_clo_mis)]
+    [require(hlsl, ser_raygen_closesthit_miss)]
     void __hlslGetAttributesFromHitObject<T>(out T t);
 
     __target_intrinsic(hlsl, "NvMakeHitWithRecordIndex")
     [__requiresNVAPI]
-    [require(hlsl, ser_ray_clo_mis)]
+    [require(hlsl, ser_raygen_closesthit_miss)]
     static void __hlslMakeHitWithRecordIndex<attr_t>(
         uint HitGroupRecordIndex, 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -13163,7 +13163,7 @@ struct HitObject
 
     __target_intrinsic(hlsl, "NvMakeHit")
     [__requiresNVAPI]
-    [require(hlsl, ser_ray_clo_mis)]
+    [require(hlsl, ser_raygen_closesthit_miss)]
     static void __hlslMakeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
         uint GeometryIndex, 
@@ -13177,7 +13177,7 @@ struct HitObject
 
     __target_intrinsic(hlsl, "NvTraceRayHitObject")
     [__requiresNVAPI]
-    [require(hlsl, ser_ray_clo_mis)]
+    [require(hlsl, ser_raygen_closesthit_miss)]
     static void __hlslTraceRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -13196,7 +13196,7 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     __target_intrinsic(glsl, "hitObjectRecordMissNV")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeMiss(
         out HitObject hitObj,
         uint MissShaderIndex,
@@ -13210,7 +13210,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)    
     __target_intrinsic(glsl, "hitObjectRecordMissMotionNV")
-    [require(glsl, ser_motion_ray_clo_mis)]
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionMiss(
         out HitObject hitObj,
         uint MissShaderIndex,
@@ -13223,44 +13223,44 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectRecordEmptyNV")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeNop(out HitObject hitObj);
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetObjectRayDirectionNV($0)")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayDirection();
     
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetWorldRayDirectionNV($0)")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldDirection();
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetWorldRayOriginNV($0)")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldOrigin();
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetRayTMaxNV($0)")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMax();
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetRayTMinNV($0)")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMin();
 
     // "void hitObjectRecordHitWithIndexNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectRecordHitWithIndexNV")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeHitWithIndex(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13280,7 +13280,7 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __target_intrinsic(glsl, "hitObjectRecordHitWithIndexMotionNV")
-    [require(glsl, ser_motion_ray_clo_mis)]
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHitWithIndex(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13300,7 +13300,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectRecordHitNV")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeHit(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13321,7 +13321,7 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __target_intrinsic(glsl, "hitObjectRecordHitMotionNV")
-    [require(glsl, ser_motion_ray_clo_mis)]
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHit(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13342,13 +13342,13 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetAttributesNV($0, $1)")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     void __glslGetAttributes(int attributeLocation);
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectTraceRayNV")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslTraceRay(
         out HitObject hitObject,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13367,7 +13367,7 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __target_intrinsic(glsl, "hitObjectTraceRayMotionNV")
-    [require(glsl, ser_motion_ray_clo_mis)]
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRay(
         out HitObject hitObject,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13386,7 +13386,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectExecuteShaderNV")
-    [require(glsl, ser_ray_clo_mis)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslInvoke(
         HitObject hitObj,
         int payload);
@@ -13403,7 +13403,7 @@ struct HitObject
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(hlsl_glsl_spirv, ser_ray)]
+[require(hlsl_glsl_spirv, ser_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
@@ -13440,7 +13440,7 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(hlsl_glsl_spirv, ser_ray)]
+[require(hlsl_glsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
@@ -13467,7 +13467,7 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(hlsl_glsl_spirv, ser_ray)]
+[require(hlsl_glsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch
