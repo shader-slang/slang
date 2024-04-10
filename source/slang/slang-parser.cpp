@@ -3882,6 +3882,14 @@ namespace Slang
         return decl;
     }
 
+    static NodeBase* parseIfLetDecl(
+        Parser* parser, void* /*userData*/)
+    {
+        LetDecl* decl = parser->astBuilder->create<LetDecl>();
+        parseModernVarDeclBaseCommon(parser, decl);
+        return decl;
+    }
+
     static NodeBase* parseVarDecl(
         Parser* parser, void* /*userData*/)
     {
@@ -5581,11 +5589,23 @@ namespace Slang
 
     IfStmt* Parser::parseIfStatement()
     {
-        IfStmt* ifStatement = astBuilder->create<IfStmt>();
-        FillPosition(ifStatement);
+        IfStmt* ifStatement = nullptr;
+        SourceLoc loc = tokenReader.peekLoc();
         ReadToken("if");
         ReadToken(TokenType::LParent);
-        ifStatement->predicate = ParseExpression();
+        auto expr = ParseExpression();
+        if (auto letExpr = as<LetExpr>(expr))
+        {
+            ifStatement = astBuilder->create<IfLetStmt>();
+            ((IfLetStmt*)ifStatement)->varDecl = letExpr->decl;
+            ((IfLetStmt*)ifStatement)->initExpr = letExpr->body;
+        }
+        else
+        {
+            ifStatement = astBuilder->create<IfStmt>();
+            ifStatement->predicate = expr;
+        }
+        ifStatement->loc = loc;
         ReadToken(TokenType::RParent);
         ifStatement->positiveStatement = ParseStatement(ifStatement);
         if (LookAheadToken("else"))
@@ -7437,6 +7457,42 @@ namespace Slang
         return asmExpr;
     }
 
+    static Expr* parseIfLetExpr(Parser* parser)
+    {
+        Decl* parsedDecl = nullptr;
+        auto identifierToken = peekToken(parser);
+        auto name = identifierToken.getName();
+        auto syntaxDecl = tryLookUpSyntaxDecl(parser, name);
+        if (!syntaxDecl)
+        {
+            parser->diagnose(identifierToken, Diagnostics::syntaxError);
+            return parser->astBuilder->create<IncompleteExpr>();
+        }
+        SyntaxParseCallback callBack = syntaxDecl->parseCallback;
+        syntaxDecl->parseCallback = parseIfLetDecl;
+
+        LetExpr* letExpr = nullptr;
+        if (tryParseUsingSyntaxDeclImpl<Decl>(parser, syntaxDecl, &parsedDecl))
+        {
+            if (auto varDel = as<LetDecl>(parsedDecl))
+            {
+                if (as<AsTypeExpr>(varDel->initExpr))
+                {
+                    letExpr = parser->astBuilder->create<LetExpr>();
+                    letExpr->decl = varDel;
+                    letExpr->body = varDel->initExpr;
+                }
+            }
+        }
+        syntaxDecl->parseCallback = callBack;
+        if (!letExpr)
+        {
+            parser->diagnose(identifierToken, Diagnostics::syntaxError);
+            return parser->astBuilder->create<IncompleteExpr>();
+        }
+        return letExpr;
+    }
+
     static Expr* parsePrefixExpr(Parser* parser)
     {
         auto tokenType = peekTokenType(parser);
@@ -7468,6 +7524,10 @@ namespace Slang
                     newExpr->functionExpr = parser->astBuilder->create<IncompleteExpr>();
                 }
                 return newExpr;
+            }
+            else if (identifierTokenContent == toSlice("let"))
+            {
+                return parseIfLetExpr(parser);
             }
             else if (AdvanceIf(parser, "spirv_asm"))
             {
