@@ -9562,15 +9562,31 @@ namespace Slang
         void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
         {
             CapabilitySet set;
-            for (auto targetCase : stmt->targetCases)
+            auto targetCaseCount = stmt->targetCases.getCount();
+            for (std::size_t targetCaseIndex = 0; targetCaseIndex < targetCaseCount; targetCaseIndex++)
             {
                 // We may revieve a `default:` case for a `__target_switch`. If this is the case,
                 // we must resolve the target capability as `any_target` to hint to the capability 
                 // system that the following function must be defined on all codegen targets. If
                 // we do not handle `default:`, the codegen will fail when trying to find a specific
                 // codegen target not handled explicitly by a `case` statment.
-                if (targetCase->capability == 0)
-                    targetCase->capability = int32_t(CapabilityName::any_target);
+                
+                // We must also ensure the `default` case is last so we have priority to hit `case` statments
+                // without complex logic. We must shift all case statments when doing this logic instead of 
+                // swapping with the final element since some capabilities have overlapping targets.
+                // As a result order matters when resolving `case` statments
+                if (stmt->targetCases[targetCaseIndex]->capability == 0)
+                {
+                    if (targetCaseCount - 1 != targetCaseIndex)
+                    {
+                        for (std::size_t i = targetCaseIndex; i < targetCaseCount - 1; i++)
+                            std::swap(stmt->targetCases[i], stmt->targetCases[i + 1]);
+                        continue;
+                    }
+                    stmt->targetCases[targetCaseIndex]->capability = int32_t(CapabilityName::any_target);
+                }
+
+                auto targetCase = stmt->targetCases[targetCaseIndex];
                 auto targetCap = CapabilitySet(CapabilityName(targetCase->capability));
                 auto oldCap = targetCap;
                 auto bodyCap = getStatementCapabilityUsage(this, targetCase->body);

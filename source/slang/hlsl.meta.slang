@@ -2987,6 +2987,7 @@ ${{{{
             __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
             return;
         case glsl:
+        case spirv:
             let buf = __getEquivalentStructuredBuffer<int64_t>(this);
             outOriginalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
             return;
@@ -3001,6 +3002,7 @@ ${{{{
             __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
             return;
         case glsl:
+        case spirv:
             let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
             outOriginalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
             return;
@@ -3015,6 +3017,7 @@ ${{{{
             __cas(this, byteAddress, compareValue, value, outOriginalValue);
             return;
         case glsl:
+        case spirv:
             let buf = __getEquivalentStructuredBuffer<int64_t>(this);
             outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
             return;
@@ -3029,6 +3032,7 @@ ${{{{
             __cas(this, byteAddress, compareValue, value, outOriginalValue);
             return;
         case glsl:
+        case spirv:
             let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
             outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
             return;
