@@ -124,20 +124,13 @@ public property uint3 gl_NumWorkGroups {
     }
 }
 
-[require(glsl)]
-[require(spirv)]
-public property uint3 gl_WorkGroupSize {
-
-    get {
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_WorkGroupSize)";
-        case spirv:
-            return spirv_asm {
-                    result:$$uint3 = OpLoad builtin(WorkgroupSize:uint3);
-                };
-        }
+[require(compute)]
+public property uint3 gl_WorkGroupSize
+{
+    [__unsafeForceInlineEarly]
+    get
+    {
+        return WorkgroupSize();
     }
 }
 
