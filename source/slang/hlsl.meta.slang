@@ -2819,7 +2819,7 @@ ${{{{
     }
 
     // Cas uint64_t
-    __cuda_sm_version(9.0)
+
     __target_intrinsic(cuda, "(*$4 = atomicCAS($0._getPtrAt<uint64_t>($1), $2, $3))")
     [require(hlsl_glsl_cuda_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue);
@@ -2930,7 +2930,6 @@ ${{{{
 
     // Exchange
 
-    __cuda_sm_version(9.0)
     __target_intrinsic(cuda, "atomicExch($0._getPtrAt<uint64_t>($1), $2)")
     [require(hlsl_glsl_cuda_spirv, atomic_glsl_hlsl_cuda9_int64)]
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value);
