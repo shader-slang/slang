@@ -26,7 +26,7 @@ struct VariableScopeCorrectionContext
     void _processFunction(IRFunc* funcInst);
     void _processInstruction(IRDominatorTree* dominatorTree, IRInst* instAfterParam,
         IRInst* originInst, const List<IRLoop*>& loopHeaderList, List<IRInst*>& workList);
-    void _processStorableInst(IRInst* insertLoc, IRInst* inst, const List<IRUse*>& outOfScopeUser);
+    void _processStorableInst(IRInst* insertLoc, IRInst* inst, const List<IRUse*>& outOfScopeUses);
     void _processUnstorableInst(IRInst* inst, const List<IRUse*>& outOfScopeUser);
 
     bool _isStorableType(IRType* inst);
@@ -108,11 +108,7 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
         }
     }
 
-    auto instAfterParam = funcInst->getFirstBlock()->getFirstChild();
-    while(instAfterParam->getOp() == kIROp_Param)
-    {
-        instAfterParam = instAfterParam->getNextInst();
-    }
+    auto instAfterParam = funcInst->getFirstBlock()->getFirstOrdinaryInst();
 
     for(auto inst = workList.begin(); inst != workList.end(); inst++)
     {
@@ -151,25 +147,25 @@ bool VariableScopeCorrectionContext::_isOutOfScopeUse(IRInst * userInst, IRDomin
 void VariableScopeCorrectionContext::_processInstruction(IRDominatorTree* dominatorTree, IRInst* instAfterParam,
         IRInst* originInst, const List<IRLoop*>& loopHeaderList, List<IRInst*>& workList)
 {
-    List<IRUse*> outOfScopeUsers;
+    List<IRUse*> outOfScopeUses;
     for (auto use = originInst->firstUse; use; use=use->nextUse)
     {
         if(_isOutOfScopeUse(use->getUser(), dominatorTree, loopHeaderList))
         {
-            outOfScopeUsers.add(use);
+            outOfScopeUses.add(use);
         }
     }
 
-    if (outOfScopeUsers.getCount() == 0)
+    if (outOfScopeUses.getCount() == 0)
         return;
 
     if(_isStorableType(originInst->getDataType()))
     {
-        _processStorableInst(instAfterParam, originInst, outOfScopeUsers);
+        _processStorableInst(instAfterParam, originInst, outOfScopeUses);
     }
     else
     {
-        _processUnstorableInst(originInst, outOfScopeUsers);
+        _processUnstorableInst(originInst, outOfScopeUses);
         // After processing the user, we need to add operands of the instruction to the worklist
         // for later processing.
         for(UInt idx = 0; idx < originInst->getOperandCount(); idx++)
@@ -179,7 +175,7 @@ void VariableScopeCorrectionContext::_processInstruction(IRDominatorTree* domina
     }
 }
 
-void VariableScopeCorrectionContext::_processStorableInst(IRInst* insertLoc, IRInst* inst, const List<IRUse*>& outOfScopeUser)
+void VariableScopeCorrectionContext::_processStorableInst(IRInst* insertLoc, IRInst* inst, const List<IRUse*>& outOfScopeUses)
 {
     auto type = inst->getDataType();
     // store instruction must have a result type
@@ -196,11 +192,11 @@ void VariableScopeCorrectionContext::_processStorableInst(IRInst* insertLoc, IRI
     // last, replace operands in the use site instruction with the new variable
     // Note, because "dstPtr" is a pointer type, we have to insert a load(dstPtr) instruction before use it.
     // Simply replace any operand with pointer could generate error code.
-    for (auto user : outOfScopeUser)
+    for (auto use : outOfScopeUses)
     {
-        m_builder.setInsertBefore(user->getUser());
+        m_builder.setInsertBefore(use->getUser());
         auto loadInst = m_builder.emitLoad(type, dstPtr);
-        m_builder.replaceOperand(user, loadInst);
+        m_builder.replaceOperand(use, loadInst);
     }
 }
 
