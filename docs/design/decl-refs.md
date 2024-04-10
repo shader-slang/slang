@@ -1,4 +1,4 @@
-Understanding Declaration References
+Understanding Declaration References (Out of Date)
 ====================================
 
 This document is intended as a reference for developers working on the Slang compiler implementation.

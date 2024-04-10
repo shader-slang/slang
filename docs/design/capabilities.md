@@ -1,4 +1,4 @@
-Capabilities
+Capabilities (Out of Date)
 ============
 
 Slang aims to be a portable language for shader programming, which introduces two complementary problems:
