@@ -2091,6 +2091,7 @@ ${{{{
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_float)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_float1)]
 float __atomicAdd(__ref float value, float amount)
 {
@@ -2109,6 +2110,7 @@ float __atomicAdd(__ref float value, float amount)
 
 __glsl_version(430)
 __glsl_extension(GL_NV_shader_atomic_fp16_vector)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_halfvec)]
 half2 __atomicAdd(__ref half2 value, half2 amount)
 {
@@ -2143,6 +2145,7 @@ void __atomicAdd(RWByteAddressBuffer buf, uint offset, uint64_t value, out uint6
 // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/atomicAdd.xhtml
 
 __glsl_version(430)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl)]
 int __atomicAdd(__ref int value, int amount)
 {
@@ -2158,6 +2161,7 @@ int __atomicAdd(__ref int value, int amount)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl)]
 uint __atomicAdd(__ref uint value, uint amount)
 {
@@ -2174,6 +2178,7 @@ uint __atomicAdd(__ref uint value, uint amount)
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_int64)]
 int64_t __atomicAdd(__ref int64_t value, int64_t amount)
 {
@@ -2192,6 +2197,7 @@ int64_t __atomicAdd(__ref int64_t value, int64_t amount)
 __target_intrinsic(glsl, "atomicAdd($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicAdd(__ref uint64_t value, uint64_t amount)
 {
@@ -2226,6 +2232,7 @@ void __cas(RWByteAddressBuffer buf, uint offset, in uint64_t compare_value, in u
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_int64)]
 int64_t __cas(__ref int64_t ioValue, int64_t compareValue, int64_t newValue)
 {
@@ -2243,6 +2250,7 @@ int64_t __cas(__ref int64_t ioValue, int64_t compareValue, int64_t newValue)
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __cas(__ref uint64_t ioValue, uint64_t compareValue, uint64_t newValue)
 {
@@ -2267,6 +2275,7 @@ uint2 __atomicMax(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicMax(__ref uint64_t ioValue, uint64_t value)
 {
@@ -2284,6 +2293,7 @@ uint64_t __atomicMax(__ref uint64_t ioValue, uint64_t value)
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_float2)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_float2)]
 float __atomicMax(__ref float ioValue, float value)
 {
@@ -2302,6 +2312,7 @@ float __atomicMax(__ref float ioValue, float value)
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_float2)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_float2)]
 half __atomicMax(__ref half ioValue, half value)
 {
@@ -2327,6 +2338,7 @@ uint2 __atomicMin(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicMin(__ref uint64_t ioValue, uint64_t value)
 {
@@ -2344,6 +2356,7 @@ uint64_t __atomicMin(__ref uint64_t ioValue, uint64_t value)
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_float2)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_float2)]
 float __atomicMin(__ref float ioValue, float value)
 {
@@ -2362,6 +2375,7 @@ float __atomicMin(__ref float ioValue, float value)
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_float2)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_float2)]
 half __atomicMin(__ref half ioValue, half value)
 {
@@ -2387,6 +2401,7 @@ uint2 __atomicAnd(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicAnd(__ref uint64_t ioValue, uint64_t value)
 {
@@ -2411,6 +2426,7 @@ uint2 __atomicOr(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicOr(__ref uint64_t ioValue, uint64_t value)
 {
@@ -2435,6 +2451,7 @@ uint2 __atomicXor(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicXor(__ref uint64_t ioValue, uint64_t value)
 {
@@ -2459,6 +2476,7 @@ uint2 __atomicExchange(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
 [require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicExchange(__ref uint64_t ioValue, uint64_t value)
 {
@@ -2693,6 +2711,7 @@ ${{{{
 
     __cuda_sm_version(2.0)
     [__requiresNVAPI]
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, atomic_glsl_hlsl_cuda_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue)
     {
@@ -2712,6 +2731,7 @@ ${{{{
 
     // FP16x2
     [__requiresNVAPI]
+    [ForceInline]
     [require(hlsl, atomic_hlsl_nvapi)]
     uint _NvInterlockedAddFp16x2(uint byteAddress, uint fp16x2Value)
     {
@@ -2762,6 +2782,7 @@ ${{{{
 
     [__requiresNVAPI]
     __cuda_sm_version(2.0)
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, atomic_glsl_hlsl_cuda_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
@@ -2781,6 +2802,7 @@ ${{{{
 
     // Int64 Add
     __cuda_sm_version(6.0)
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, atomic_glsl_hlsl_cuda6_int64)]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue)
     {
@@ -2805,6 +2827,7 @@ ${{{{
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
     {
         __atomicAdd(this, byteAddress, __asuint2(valueToAdd));
@@ -2812,6 +2835,7 @@ ${{{{
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
     {
         let buf = __getEquivalentStructuredBuffer<int64_t>(this);
@@ -2825,6 +2849,7 @@ ${{{{
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
         outOriginalValue = __asuint64(__cas(this, byteAddress, __asuint2(compareValue), __asuint2(value)));
@@ -2832,6 +2857,7 @@ ${{{{
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
@@ -2850,6 +2876,7 @@ ${{{{
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
@@ -2868,6 +2895,7 @@ ${{{{
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
@@ -2886,6 +2914,7 @@ ${{{{
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
@@ -2904,6 +2933,7 @@ ${{{{
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
@@ -2922,6 +2952,7 @@ ${{{{
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
@@ -2939,6 +2970,7 @@ ${{{{
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
@@ -2946,59 +2978,69 @@ ${{{{
     }
 
     // SM6.6 6 64bit atomics.
-    __specialized_for_target(hlsl)
+    [ForceInline]
     void InterlockedAdd64(uint byteAddress, int64_t valueToAdd, out int64_t outOriginalValue)
     {
-        __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
+        __target_switch
+        {
+        case hlsl:
+            __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
+            return;
+        case glsl:
+            let buf = __getEquivalentStructuredBuffer<int64_t>(this);
+            outOriginalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
+            return;
+        }
     }
-    __specialized_for_target(glsl)
-    __specialized_for_target(spirv)
-    void InterlockedAdd64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue)
-    {
-        let buf = __getEquivalentStructuredBuffer<int64_t>(this);
-        originalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
-    }
-    __specialized_for_target(hlsl)
+    [ForceInline]
     void InterlockedAdd64(uint byteAddress, uint64_t valueToAdd, out uint64_t outOriginalValue)
     {
-        __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
+        __target_switch
+        {
+        case hlsl:
+            __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
+            return;
+        case glsl:
+            let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+            outOriginalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
+            return;
+        }
     }
-    __specialized_for_target(glsl)
-    __specialized_for_target(spirv)
-    void InterlockedAdd64(uint byteAddress, uint64_t valueToAdd, out uint64_t originalValue)
-    {
-        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
-        originalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
-    }
-    __specialized_for_target(hlsl)
+    [ForceInline]
     void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
     {
-        __cas(this, byteAddress, compareValue, value, outOriginalValue);
+        __target_switch
+        {
+        case hlsl:
+            __cas(this, byteAddress, compareValue, value, outOriginalValue);
+            return;
+        case glsl:
+            let buf = __getEquivalentStructuredBuffer<int64_t>(this);
+            outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
+            return;
+        }
     }
-    __specialized_for_target(glsl)
-    __specialized_for_target(spirv)
-    void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
-    {
-        let buf = __getEquivalentStructuredBuffer<int64_t>(this);
-        outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
-    }
-    __specialized_for_target(hlsl)
+    [ForceInline]
     void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
-        __cas(this, byteAddress, compareValue, value, outOriginalValue);
+        __target_switch
+        {
+        case hlsl:
+            __cas(this, byteAddress, compareValue, value, outOriginalValue);
+            return;
+        case glsl:
+            let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+            outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
+            return;
+        }
     }
-    __specialized_for_target(glsl)
-    __specialized_for_target(spirv)
-    void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
-    {
-        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
-        outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
-    }
+
 ${{{{
     } // endif (type == RWByteAddressBuffer)
 }}}}
 
     // Added operations:
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedAdd(
         UINT dest,
@@ -3016,6 +3058,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedAdd(
         UINT dest,
@@ -3032,6 +3075,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedAnd(
         UINT dest,
@@ -3049,6 +3093,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedAnd(
         UINT dest,
@@ -3065,6 +3110,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedCompareExchange(
         UINT dest,
@@ -3083,6 +3129,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedCompareStore(
         UINT dest,
@@ -3100,6 +3147,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedExchange(
         UINT dest,
@@ -3117,6 +3165,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedMax(
         UINT dest,
@@ -3134,6 +3183,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedMax(
         UINT dest,
@@ -3150,6 +3200,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedMin(
         UINT dest,
@@ -3167,6 +3218,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedMin(
         UINT dest,
@@ -3183,6 +3235,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedOr(
         UINT dest,
@@ -3200,6 +3253,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedOr(
         UINT dest,
@@ -3216,6 +3270,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedXor(
         UINT dest,
@@ -3233,6 +3288,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     [require(hlsl_glsl_cuda_spirv, byteaddressbuffer_rw)]
     void InterlockedXor(
         UINT dest,
