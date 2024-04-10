@@ -42,25 +42,30 @@ for test_line in stdout.splitlines():
             passing.append(test_name)
 
     if test_line.startswith("  Passed:"):
-        summary += test_line
+        summary += test_line + "\n"
     elif test_line.startswith("  Failed:"):
-        summary += test_line
+        summary += test_line + "\n"
     elif test_line.startswith("  Not supported:"):
-        summary += test_line
+        summary += test_line + "\n"
     elif test_line.startswith("  Warnings:"):
-        summary += test_line
+        summary += test_line + "\n"
     elif test_line.startswith("  Waived:"):
-        summary += test_line
+        summary += test_line + "\n"
 
+print(summary)
 
 with open(options.PASSINGLIST, 'r') as tl_f:
     for test_line in tl_f:
         test_line = test_line.rstrip()
         list_passing.append(test_line)
 
-for thing in passing:
-    if not thing in list_passing:
-        print(thing)
+first = True
+for item in passing:
+    if not item in list_passing:
+        if first:
+            print("\nNew passing test(s)")
+            first = False
+        print(item)
 
-print(summary)
+
 
