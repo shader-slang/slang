@@ -9472,17 +9472,20 @@ namespace Slang
         inheritanceInfo.linearInheritanceGraph.reverse();
         auto& structInheritanceData = *inheritanceInfo.inheritanceDictToData[structDecl];
 
+        std::size_t defaultConstructorsOffset = 0;
+        Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
+        bool usingNewDefaultCtor = false;
+        bool madeNewCtor = false;
         auto structDeclDefaultCtorSetup = [&] {
             if (!structInheritanceData.defCtor)
             {
+                madeNewCtor = true;
                 structInheritanceData.defCtor = _createCtor(this, m_astBuilder, structDecl);
                 structInheritanceData.ctorList.add(structInheritanceData.defCtor);
                 legalizeCtorOverloadRank(m_astBuilder, structInheritanceData.defCtor, levelsOfInheritance);
             }
         };
 
-        std::size_t defaultConstructorsOffset = 0;
-        Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
         for (auto decl : inheritanceInfo.linearInheritanceGraph)
         {
             auto& declInfo = *inheritanceInfo.inheritanceDictToData[decl];
@@ -9526,6 +9529,7 @@ namespace Slang
                     stmt->expression = assign;
 
                     seqStmt->stmts.insert(defaultConstructorsOffset, stmt);
+                    usingNewDefaultCtor = true;
                 }
                 defaultConstructorsOffset += 1;
                 continue;
@@ -9563,9 +9567,18 @@ namespace Slang
                             continue;
 
                         seqStmt->stmts.insert(defaultConstructorsOffset, stmt);
+                        usingNewDefaultCtor = true;
                     }
                 }
             }
+        }
+        // we may not use a default Ctor made if a struct only has a `static const` field with a init expression.
+        // If we do not remove the Init it will cause a compile error.
+        if (madeNewCtor && !usingNewDefaultCtor)
+        {
+            structDecl->members.remove(structInheritanceData.defCtor);
+            structDecl->invalidateMemberDictionary();
+            structDecl->buildMemberDictionary();
         }
 
         int backingWidth = 0;
