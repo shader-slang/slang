@@ -294,6 +294,7 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-crypto.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-default-matrix-layout.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-file-system.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-find-check-entrypoint.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-find-type-by-name.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-free-list.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-io.cpp" />

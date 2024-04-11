@@ -348,8 +348,15 @@ namespace Slang
                             getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, constIntVal->getValue());
                             return false;
                         }
+                        if (intValue->getType() != m_astBuilder->getIntType())
+                        {
+                            intValue = m_astBuilder->getIntVal(m_astBuilder->getIntType(), constIntVal->getValue());
+                        }
                     }
+                    // Make sure we always canonicalize the type to int.
                     value = intValue;
+                    if (value->getType() != m_astBuilder->getIntType())
+                        value = m_astBuilder->getTypeCastIntVal(m_astBuilder->getIntType(), value);
                 }
                 else
                 {
