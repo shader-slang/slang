@@ -9,10 +9,6 @@ RWStructuredBuffer<int> outputBuffer;
 struct DefaultData
 {
     static const int2 val = int2(0, 1);
-    Texture2D texture;
-    SamplerState samplerState;
-    SamplerState samplerStateMin;
-    SamplerState samplerStateMax;
     float2 size;
     float scale;
     float bias;
