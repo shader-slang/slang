@@ -19,7 +19,7 @@ runs:
     - name: Set up sccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
-        key: ${{github.job}}-${{inputs.os}}-${{inputs.compiler}}-${{inputs.platform}}-${{inputs.config}}
+        key: ${{inputs.os}}-${{inputs.compiler}}-${{inputs.platform}}-${{inputs.config}}
         variant: sccache
         append-timestamp: false
       # Opportunistically use sccache, it's not available for example on self
