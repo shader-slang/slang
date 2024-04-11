@@ -9432,7 +9432,7 @@ namespace Slang
         // struct.
         if (auto overloadRank = ctor->findModifier<OverloadRankAttribute>())
         {
-            overloadRank->rank = (rank < overloadRank->rank) ? rank : overloadRank->rank;
+            overloadRank->rank = (int32_t(rank) < overloadRank->rank) ? int32_t(rank) : overloadRank->rank;
             return;
         }
 
