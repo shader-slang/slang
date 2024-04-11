@@ -13,790 +13,799 @@ using QualifiedEnumName = SPIRVCoreGrammarInfo::QualifiedEnumName;
 using QualifiedEnumValue = SPIRVCoreGrammarInfo::QualifiedEnumValue;
 static bool lookupSpvOp(const UnownedStringSlice& str, SpvOp& value)
 {
-    static const unsigned tableSalt[724] = {
-        1, 0, 1, 1, 0, 0, 1, 3, 1, 0, 0, 7, 4, 2, 1, 2,
-        0, 5, 0, 0, 2, 2, 2, 0, 3, 4, 2, 3, 0, 4, 5, 0,
-        1, 1, 0, 0, 0, 1, 0, 3, 3, 0, 1, 4, 3, 0, 8, 3,
-        1, 1, 0, 0, 0, 3, 0, 0, 4, 2, 0, 0, 9, 1, 0, 0,
-        1, 1, 2, 1, 7, 4, 0, 0, 1, 3, 1, 1, 1, 0, 2, 0,
-        0, 1, 3, 1, 3, 1, 0, 3, 3, 2, 0, 0, 0, 2, 0, 4,
-        2, 4, 0, 0, 4, 0, 4, 0, 1, 1, 2, 11, 1, 0, 1, 1,
-        0, 7, 7, 4, 0, 5, 0, 8, 1, 6, 1, 2, 1, 0, 1, 9,
-        0, 0, 2, 7, 2, 2, 3, 1, 0, 0, 2, 3, 0, 0, 0, 0,
-        0, 1, 4, 1, 3, 1, 1, 1, 1, 0, 0, 0, 1, 2, 3, 1,
-        1, 3, 0, 0, 3, 0, 1, 0, 0, 4, 1, 11, 4, 3, 0, 0,
-        0, 0, 2, 2, 7, 2, 0, 0, 3, 0, 3, 1, 1, 0, 0, 0,
-        0, 1, 1, 1, 2, 0, 0, 0, 3, 1, 1, 0, 3, 0, 0, 1,
-        0, 0, 1, 6, 0, 3, 4, 4, 0, 4, 1, 0, 3, 1, 0, 1,
-        2, 0, 2, 0, 2, 5, 0, 0, 0, 1, 7, 0, 4, 0, 1, 0,
-        1, 2, 0, 1, 3, 1, 2, 5, 0, 0, 0, 0, 0, 0, 3, 0,
-        0, 0, 1, 0, 0, 4, 4, 0, 2, 0, 5, 1, 2, 0, 0, 1,
-        0, 1, 7, 0, 6, 1, 3, 0, 1, 7, 2, 9, 3, 0, 1, 1,
-        1, 7, 2, 4, 0, 3, 0, 0, 1, 1, 8, 5, 3, 1, 0, 0,
-        1, 1, 2, 4, 1, 6, 0, 10, 7, 0, 3, 5, 0, 2, 0, 0,
-        0, 4, 4, 5, 0, 2, 1, 1, 4, 1, 2, 0, 0, 0, 5, 0,
-        7, 0, 1, 0, 0, 0, 1, 4, 2, 0, 1, 2, 0, 17, 2, 3,
-        3, 3, 0, 0, 9, 7, 1, 1, 3, 13, 9, 0, 0, 4, 3, 2,
-        0, 0, 7, 1, 0, 0, 0, 1, 6, 1, 2, 0, 2, 9, 1, 1,
-        4, 5, 0, 1, 1, 1, 0, 10, 1, 3, 1, 2, 1, 1, 0, 2,
-        8, 3, 0, 0, 5, 2, 4, 2, 14, 4, 0, 0, 0, 2, 0, 0,
-        8, 1, 1, 0, 0, 0, 6, 7, 7, 1, 0, 0, 12, 3, 0, 0,
-        10, 2, 5, 3, 7, 2, 0, 1, 1, 1, 0, 0, 0, 16, 1, 2,
-        1, 0, 9, 2, 9, 9, 13, 3, 4, 0, 12, 6, 1, 1, 0, 1,
-        3, 0, 1, 10, 13, 1, 0, 4, 5, 5, 22, 0, 3, 0, 5, 10,
-        6, 5, 1, 0, 7, 0, 0, 0, 4, 2, 1, 23, 6, 0, 11, 0,
-        0, 1, 6, 12, 0, 0, 0, 4, 4, 0, 8, 10, 2, 2, 6, 1,
-        1, 0, 1, 17, 4, 0, 0, 9, 0, 2, 0, 1, 2, 1, 0, 0,
-        3, 0, 13, 38, 2, 3, 30, 0, 4, 0, 0, 0, 0, 1, 13, 18,
-        4, 14, 0, 2, 0, 10, 3, 1, 0, 0, 0, 0, 9, 41, 15, 31,
-        0, 2, 0, 8, 1, 0, 1, 0, 4, 4, 0, 5, 48, 10, 0, 5,
-        12, 62, 0, 1, 1, 0, 0, 0, 0, 0, 1, 12, 0, 14, 1, 3,
-        8, 0, 0, 19, 2, 0, 39, 15, 21, 50, 15, 8, 0, 8, 4, 1,
-        0, 0, 1, 0, 6, 0, 0, 7, 11, 14, 5, 0, 0, 1, 0, 14,
-        0, 5, 0, 6, 15, 4, 40, 0, 12, 0, 14, 38, 20, 1, 0, 0,
-        57, 0, 8, 6, 12, 0, 0, 14, 2, 2, 0, 0, 1, 3, 1, 1,
-        26, 0, 8, 38, 0, 12, 0, 0, 4, 22, 6, 4, 0, 1, 46, 56,
-        0, 5, 0, 0, 5, 14, 6, 0, 0, 1, 0, 37, 223, 0, 29, 2,
-        0, 0, 2, 4, 0, 42, 96, 144, 146, 60, 19, 0, 208, 1, 0, 150,
-        141, 1, 4, 1, 0, 0, 0, 2, 0, 5, 52, 7, 0, 1, 195, 31,
-        0, 108, 992, 119
+    static const unsigned tableSalt[733] = {
+        0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 1,
+        0, 5, 2, 2, 1, 0, 0, 1, 1, 0, 2, 0, 0, 0, 0, 0,
+        1, 1, 0, 1, 1, 1, 1, 2, 1, 9, 4, 0, 1, 0, 1, 4,
+        2, 0, 4, 1, 8, 3, 0, 0, 1, 2, 1, 4, 2, 0, 3, 9,
+        3, 2, 1, 1, 0, 2, 0, 0, 1, 0, 0, 2, 0, 0, 1, 1,
+        8, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 6, 4, 1, 4,
+        0, 2, 5, 0, 1, 3, 2, 0, 0, 0, 0, 2, 0, 0, 3, 1,
+        0, 0, 2, 2, 0, 0, 2, 0, 0, 6, 0, 2, 4, 3, 0, 0,
+        3, 1, 3, 3, 1, 0, 2, 4, 2, 4, 0, 0, 0, 1, 3, 1,
+        1, 2, 3, 1, 3, 2, 0, 0, 1, 0, 0, 0, 0, 2, 6, 1,
+        3, 1, 1, 1, 1, 0, 1, 0, 0, 3, 3, 4, 3, 0, 4, 0,
+        2, 2, 4, 2, 0, 0, 2, 1, 3, 1, 1, 0, 1, 4, 0, 0,
+        6, 14, 2, 0, 0, 0, 4, 0, 7, 2, 0, 7, 0, 1, 1, 0,
+        0, 3, 7, 5, 0, 0, 1, 1, 3, 6, 0, 0, 3, 0, 6, 1,
+        0, 0, 0, 5, 0, 9, 0, 2, 2, 0, 0, 2, 0, 0, 0, 1,
+        0, 0, 1, 2, 2, 1, 0, 11, 0, 1, 0, 1, 1, 0, 0, 2,
+        1, 1, 1, 0, 0, 8, 0, 3, 6, 1, 0, 10, 2, 1, 3, 1,
+        1, 0, 1, 9, 0, 0, 0, 1, 1, 1, 1, 0, 6, 0, 0, 1,
+        0, 0, 0, 0, 12, 1, 0, 1, 1, 0, 4, 2, 3, 0, 0, 6,
+        3, 3, 1, 0, 1, 0, 0, 1, 1, 2, 3, 1, 0, 0, 1, 0,
+        0, 1, 1, 2, 7, 1, 0, 1, 1, 1, 4, 9, 1, 5, 1, 0,
+        0, 2, 0, 7, 5, 2, 3, 5, 0, 2, 14, 7, 7, 1, 1, 0,
+        1, 1, 0, 3, 2, 15, 14, 0, 4, 7, 7, 4, 1, 1, 0, 1,
+        0, 0, 0, 0, 10, 1, 1, 3, 2, 14, 7, 0, 7, 0, 0, 2,
+        7, 0, 1, 0, 0, 3, 0, 8, 2, 3, 0, 5, 0, 7, 5, 0,
+        1, 1, 5, 0, 0, 14, 3, 7, 0, 0, 0, 1, 0, 2, 15, 0,
+        0, 0, 8, 1, 0, 9, 20, 2, 4, 12, 3, 2, 23, 0, 4, 0,
+        0, 0, 6, 0, 1, 1, 0, 3, 5, 39, 0, 15, 0, 0, 11, 1,
+        0, 0, 0, 16, 0, 12, 0, 5, 4, 1, 1, 2, 0, 7, 6, 5,
+        0, 0, 3, 4, 9, 0, 5, 5, 0, 0, 0, 8, 0, 1, 0, 3,
+        4, 4, 2, 0, 9, 1, 0, 3, 5, 13, 2, 7, 4, 7, 3, 6,
+        0, 3, 3, 25, 0, 14, 0, 0, 0, 0, 12, 0, 23, 0, 4, 2,
+        22, 2, 0, 1, 15, 0, 10, 5, 1, 4, 2, 0, 3, 2, 9, 1,
+        0, 1, 2, 2, 9, 0, 0, 0, 12, 0, 7, 12, 2, 24, 0, 0,
+        23, 13, 7, 3, 12, 3, 0, 1, 7, 0, 30, 6, 11, 10, 2, 0,
+        0, 0, 1, 6, 6, 0, 0, 7, 4, 0, 12, 7, 10, 41, 0, 0,
+        23, 4, 0, 0, 0, 0, 0, 0, 5, 0, 3, 0, 4, 0, 8, 0,
+        2, 4, 1, 1, 3, 8, 8, 2, 43, 1, 23, 0, 7, 31, 6, 0,
+        1, 6, 0, 0, 14, 6, 0, 0, 0, 0, 5, 36, 0, 0, 18, 10,
+        0, 1, 0, 7, 7, 2, 6, 30, 0, 0, 36, 14, 2, 39, 11, 0,
+        35, 0, 1, 0, 7, 0, 5, 19, 0, 22, 0, 0, 0, 3, 0, 2,
+        12, 0, 2, 0, 4, 1, 0, 2, 27, 9, 11, 10, 15, 15, 0, 0,
+        0, 82, 0, 2, 0, 2, 19, 80, 49, 0, 2, 4, 36, 1, 0, 3,
+        106, 0, 0, 167, 0, 242, 2, 0, 11, 0, 60, 0, 212, 0, 227, 2,
+        11, 11, 0, 4, 158, 0, 10, 0, 0, 26, 1, 0, 106, 0, 84, 8,
+        1, 1, 1, 0, 555, 88, 514, 10, 0, 615, 3, 4, 1
     };
 
     using KV = std::pair<const char*, SpvOp>;
 
-    static const KV words[724] =
+    static const KV words[733] =
     {
-        {"OpGroupNonUniformPartitionNV", static_cast<SpvOp>(5296)},
-        {"OpGroupCommitWritePipe", static_cast<SpvOp>(288)},
-        {"OpImageGather", static_cast<SpvOp>(96)},
-        {"OpFunction", static_cast<SpvOp>(54)},
-        {"OpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL", static_cast<SpvOp>(5807)},
-        {"OpImageSparseDrefGather", static_cast<SpvOp>(315)},
-        {"OpConstantTrue", static_cast<SpvOp>(41)},
-        {"OpSubgroupAvcSicConfigureSkcINTEL", static_cast<SpvOp>(5792)},
-        {"OpGroupSMaxNonUniformAMD", static_cast<SpvOp>(5007)},
-        {"OpTypeQueue", static_cast<SpvOp>(37)},
-        {"OpTypeSampledImage", static_cast<SpvOp>(27)},
-        {"OpFOrdNotEqual", static_cast<SpvOp>(182)},
-        {"OpLabel", static_cast<SpvOp>(248)},
-        {"OpShiftLeftLogical", static_cast<SpvOp>(196)},
-        {"OpTraceRayMotionNV", static_cast<SpvOp>(5339)},
-        {"OpFUnordGreaterThan", static_cast<SpvOp>(187)},
-        {"OpTypeAccelerationStructureKHR", static_cast<SpvOp>(5341)},
-        {"OpArbitraryFloatExpm1INTEL", static_cast<SpvOp>(5867)},
-        {"OpTraceRayKHR", static_cast<SpvOp>(4445)},
-        {"OpBitFieldInsert", static_cast<SpvOp>(201)},
-        {"OpTypeCooperativeMatrixNV", static_cast<SpvOp>(5358)},
-        {"OpBitFieldSExtract", static_cast<SpvOp>(202)},
-        {"OpGroupFMulKHR", static_cast<SpvOp>(6402)},
-        {"OpSubgroupShuffleXorINTEL", static_cast<SpvOp>(5574)},
-        {"OpArbitraryFloatACosPiINTEL", static_cast<SpvOp>(5876)},
-        {"OpConstant", static_cast<SpvOp>(43)},
-        {"OpNoLine", static_cast<SpvOp>(317)},
-        {"OpArbitraryFloatRecipINTEL", static_cast<SpvOp>(5855)},
-        {"OpIAverageINTEL", static_cast<SpvOp>(5591)},
-        {"OpHitObjectGetShaderRecordBufferHandleNV", static_cast<SpvOp>(5257)},
-        {"OpSubgroupBallotKHR", static_cast<SpvOp>(4421)},
-        {"OpGroupFMax", static_cast<SpvOp>(269)},
-        {"OpSourceContinued", static_cast<SpvOp>(2)},
-        {"OpImageBlockMatchSADQCOM", static_cast<SpvOp>(4483)},
-        {"OpULessThan", static_cast<SpvOp>(176)},
-        {"OpMatrixTimesVector", static_cast<SpvOp>(145)},
-        {"OpSConvert", static_cast<SpvOp>(114)},
-        {"OpIAddCarry", static_cast<SpvOp>(149)},
-        {"OpFunctionCall", static_cast<SpvOp>(57)},
-        {"OpArbitraryFloatCastToIntINTEL", static_cast<SpvOp>(5843)},
-        {"OpImageSampleProjDrefExplicitLod", static_cast<SpvOp>(94)},
-        {"OpAny", static_cast<SpvOp>(154)},
-        {"OpImageSparseSampleImplicitLod", static_cast<SpvOp>(305)},
-        {"OpSNegate", static_cast<SpvOp>(126)},
-        {"OpGroupFMaxNonUniformAMD", static_cast<SpvOp>(5005)},
-        {"OpGroupDecorate", static_cast<SpvOp>(74)},
-        {"OpFragmentFetchAMD", static_cast<SpvOp>(5012)},
-        {"OpSubgroupAllKHR", static_cast<SpvOp>(4428)},
-        {"OpGetKernelNDrangeSubGroupCount", static_cast<SpvOp>(293)},
-        {"OpHitObjectGetAttributesNV", static_cast<SpvOp>(5266)},
-        {"OpRayQueryGetIntersectionObjectRayDirectionKHR", static_cast<SpvOp>(6027)},
-        {"OpTypeRuntimeArray", static_cast<SpvOp>(29)},
-        {"OpImageQuerySizeLod", static_cast<SpvOp>(103)},
-        {"OpArbitraryFloatExp2INTEL", static_cast<SpvOp>(5865)},
-        {"OpArbitraryFloatCosPiINTEL", static_cast<SpvOp>(5872)},
-        {"OpArbitraryFloatLEINTEL", static_cast<SpvOp>(5853)},
-        {"OpTypeEvent", static_cast<SpvOp>(34)},
-        {"OpBitFieldUExtract", static_cast<SpvOp>(203)},
-        {"OpHitObjectGetWorldRayDirectionNV", static_cast<SpvOp>(5272)},
-        {"OpGroupFAdd", static_cast<SpvOp>(265)},
-        {"OpSubgroupAvcImeSetUnidirectionalMixDisableINTEL", static_cast<SpvOp>(5754)},
-        {"OpEndStreamPrimitive", static_cast<SpvOp>(221)},
-        {"OpPtrAccessChain", static_cast<SpvOp>(67)},
-        {"OpFixedSinCosPiINTEL", static_cast<SpvOp>(5931)},
-        {"OpImageSampleProjExplicitLod", static_cast<SpvOp>(92)},
-        {"OpConvertFToBF16INTEL", static_cast<SpvOp>(6116)},
+        {"OpSubgroupAvcImeInitializeINTEL", static_cast<SpvOp>(5747)},
+        {"OpRawAccessChainNV", static_cast<SpvOp>(5398)},
+        {"OpTypeNamedBarrier", static_cast<SpvOp>(327)},
+        {"OpHitObjectRecordHitWithIndexMotionNV", static_cast<SpvOp>(5250)},
         {"OpGroupNonUniformLogicalXor", static_cast<SpvOp>(364)},
-        {"OpSubgroupAvcMceGetInterDirectionsINTEL", static_cast<SpvOp>(5743)},
-        {"OpRayQueryGetIntersectionWorldToObjectKHR", static_cast<SpvOp>(6032)},
-        {"OpFOrdLessThanEqual", static_cast<SpvOp>(188)},
-        {"OpAtomicISub", static_cast<SpvOp>(235)},
-        {"OpCooperativeMatrixLoadKHR", static_cast<SpvOp>(4457)},
+        {"OpEnqueueKernel", static_cast<SpvOp>(292)},
+        {"OpFUnordLessThan", static_cast<SpvOp>(185)},
+        {"OpHitObjectRecordHitWithIndexNV", static_cast<SpvOp>(5262)},
+        {"OpMaskedScatterINTEL", static_cast<SpvOp>(6429)},
+        {"OpFixedRecipINTEL", static_cast<SpvOp>(5924)},
+        {"OpUMul32x16INTEL", static_cast<SpvOp>(5598)},
+        {"OpReportIntersectionKHR", static_cast<SpvOp>(5334)},
+        {"OpSubgroupBlockReadINTEL", static_cast<SpvOp>(5575)},
+        {"OpTypeReserveId", static_cast<SpvOp>(36)},
+        {"OpAtomicXor", static_cast<SpvOp>(242)},
+        {"OpSGreaterThan", static_cast<SpvOp>(173)},
+        {"OpSubgroupAvcMceGetMotionVectorsINTEL", static_cast<SpvOp>(5738)},
+        {"OpTypeHitObjectNV", static_cast<SpvOp>(5281)},
+        {"OpImageWrite", static_cast<SpvOp>(99)},
+        {"OpGenericCastToPtrExplicit", static_cast<SpvOp>(123)},
+        {"OpGroupBitwiseAndKHR", static_cast<SpvOp>(6403)},
+        {"OpExtInst", static_cast<SpvOp>(12)},
+        {"OpFunctionEnd", static_cast<SpvOp>(56)},
+        {"OpBeginInvocationInterlockEXT", static_cast<SpvOp>(5364)},
+        {"OpSizeOf", static_cast<SpvOp>(321)},
+        {"OpDemoteToHelperInvocationEXT", static_cast<SpvOp>(5380)},
+        {"OpCopyMemory", static_cast<SpvOp>(63)},
+        {"OpGroupNonUniformFMul", static_cast<SpvOp>(352)},
+        {"OpReadPipe", static_cast<SpvOp>(274)},
+        {"OpTypeRuntimeArray", static_cast<SpvOp>(29)},
+        {"OpName", static_cast<SpvOp>(5)},
+        {"OpTypeAvcImePayloadINTEL", static_cast<SpvOp>(5701)},
+        {"OpGroupReserveWritePipePackets", static_cast<SpvOp>(286)},
+        {"OpTypeSampledImage", static_cast<SpvOp>(27)},
+        {"OpSatConvertSToU", static_cast<SpvOp>(118)},
+        {"OpImageSparseTexelsResident", static_cast<SpvOp>(316)},
+        {"OpConstantPipeStorage", static_cast<SpvOp>(323)},
+        {"OpAliasScopeListDeclINTEL", static_cast<SpvOp>(5913)},
+        {"OpSubgroupAnyKHR", static_cast<SpvOp>(4429)},
+        {"OpIAddCarry", static_cast<SpvOp>(149)},
+        {"OpSUDotKHR", static_cast<SpvOp>(4452)},
+        {"OpRayQueryGetIntersectionBarycentricsKHR", static_cast<SpvOp>(6024)},
+        {"OpArbitraryFloatCastFromIntINTEL", static_cast<SpvOp>(5842)},
+        {"OpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL", static_cast<SpvOp>(5715)},
+        {"OpArbitraryFloatLogINTEL", static_cast<SpvOp>(5860)},
+        {"OpHitObjectGetShaderRecordBufferHandleNV", static_cast<SpvOp>(5257)},
+        {"OpGroupWaitEvents", static_cast<SpvOp>(260)},
+        {"OpSubgroupFirstInvocationKHR", static_cast<SpvOp>(4422)},
+        {"OpSRem", static_cast<SpvOp>(138)},
+        {"OpGetKernelMaxNumSubgroups", static_cast<SpvOp>(326)},
+        {"OpConstantTrue", static_cast<SpvOp>(41)},
         {"OpMatrixTimesScalar", static_cast<SpvOp>(143)},
-        {"OpAsmINTEL", static_cast<SpvOp>(5610)},
-        {"OpFwidth", static_cast<SpvOp>(209)},
-        {"OpAtomicFlagTestAndSet", static_cast<SpvOp>(318)},
-        {"OpReadPipeBlockingINTEL", static_cast<SpvOp>(5946)},
-        {"OpArbitraryFloatPowNINTEL", static_cast<SpvOp>(5882)},
-        {"OpGroupLogicalOrKHR", static_cast<SpvOp>(6407)},
-        {"OpGroupNonUniformBroadcastFirst", static_cast<SpvOp>(338)},
-        {"OpTypeAvcImeResultINTEL", static_cast<SpvOp>(5706)},
+        {"OpImageBlockMatchSADQCOM", static_cast<SpvOp>(4483)},
+        {"OpSubgroupAvcImeRefWindowSizeINTEL", static_cast<SpvOp>(5750)},
+        {"OpArbitraryFloatLog2INTEL", static_cast<SpvOp>(5861)},
+        {"OpImageSampleImplicitLod", static_cast<SpvOp>(87)},
+        {"OpTypeAvcImeResultSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5707)},
+        {"OpConvertSampledImageToUNV", static_cast<SpvOp>(5396)},
+        {"OpSubgroupAvcSicEvaluateIpeINTEL", static_cast<SpvOp>(5803)},
+        {"OpConstantCompositeContinuedINTEL", static_cast<SpvOp>(6091)},
+        {"OpHitObjectGetRayTMaxNV", static_cast<SpvOp>(5274)},
+        {"OpGroupFAdd", static_cast<SpvOp>(265)},
+        {"OpSubgroupAvcSicSetSkcForwardTransformEnableINTEL", static_cast<SpvOp>(5801)},
+        {"OpFixedExpINTEL", static_cast<SpvOp>(5933)},
+        {"OpImageQueryFormat", static_cast<SpvOp>(101)},
+        {"OpUAverageRoundedINTEL", static_cast<SpvOp>(5594)},
+        {"OpFOrdLessThanEqual", static_cast<SpvOp>(188)},
+        {"OpTraceRayMotionNV", static_cast<SpvOp>(5339)},
+        {"OpISubSatINTEL", static_cast<SpvOp>(5595)},
+        {"OpGroupNonUniformQuadSwap", static_cast<SpvOp>(366)},
+        {"OpFMod", static_cast<SpvOp>(141)},
+        {"OpSubgroupAvcImeSetWeightedSadINTEL", static_cast<SpvOp>(5756)},
+        {"OpBranchConditional", static_cast<SpvOp>(250)},
+        {"OpGroupNonUniformQuadAnyKHR", static_cast<SpvOp>(5111)},
+        {"OpRayQueryGetIntersectionGeometryIndexKHR", static_cast<SpvOp>(6022)},
+        {"OpReservedReadPipe", static_cast<SpvOp>(276)},
+        {"OpVectorExtractDynamic", static_cast<SpvOp>(77)},
+        {"OpOuterProduct", static_cast<SpvOp>(147)},
+        {"OpAssumeTrueKHR", static_cast<SpvOp>(5630)},
+        {"OpGroupNonUniformBroadcast", static_cast<SpvOp>(337)},
+        {"OpCreateUserEvent", static_cast<SpvOp>(299)},
+        {"OpArbitraryFloatCosINTEL", static_cast<SpvOp>(5869)},
+        {"OpSLessThan", static_cast<SpvOp>(177)},
+        {"OpSConvert", static_cast<SpvOp>(114)},
+        {"OpArbitraryFloatCosPiINTEL", static_cast<SpvOp>(5872)},
+        {"OpTraceMotionNV", static_cast<SpvOp>(5338)},
+        {"OpArbitraryFloatCastToIntINTEL", static_cast<SpvOp>(5843)},
+        {"OpConstantSampler", static_cast<SpvOp>(45)},
+        {"OpExtension", static_cast<SpvOp>(10)},
+        {"OpEntryPoint", static_cast<SpvOp>(15)},
+        {"OpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL", static_cast<SpvOp>(5778)},
+        {"OpSubgroupAvcImeGetDualReferenceStreaminINTEL", static_cast<SpvOp>(5767)},
+        {"OpGenericCastToPtr", static_cast<SpvOp>(122)},
+        {"OpCapability", static_cast<SpvOp>(17)},
+        {"OpDecorationGroup", static_cast<SpvOp>(73)},
+        {"OpVectorInsertDynamic", static_cast<SpvOp>(78)},
+        {"OpHitObjectRecordHitMotionNV", static_cast<SpvOp>(5249)},
+        {"OpImageQueryLod", static_cast<SpvOp>(105)},
+        {"OpVmeImageINTEL", static_cast<SpvOp>(5699)},
+        {"OpFUnordGreaterThan", static_cast<SpvOp>(187)},
         {"OpFDiv", static_cast<SpvOp>(136)},
-        {"OpTerminateRayKHR", static_cast<SpvOp>(4449)},
-        {"OpGetNumPipePackets", static_cast<SpvOp>(283)},
-        {"OpDPdxFine", static_cast<SpvOp>(210)},
-        {"OpDecorate", static_cast<SpvOp>(71)},
-        {"OpGroupBitwiseXorKHR", static_cast<SpvOp>(6405)},
-        {"OpCompositeConstruct", static_cast<SpvOp>(80)},
-        {"OpSpecConstantComposite", static_cast<SpvOp>(51)},
-        {"OpVectorTimesScalar", static_cast<SpvOp>(142)},
+        {"OpFRem", static_cast<SpvOp>(140)},
+        {"OpRayQueryInitializeKHR", static_cast<SpvOp>(4473)},
+        {"OpArbitraryFloatACosPiINTEL", static_cast<SpvOp>(5876)},
+        {"OpGroupNonUniformBallotFindLSB", static_cast<SpvOp>(343)},
+        {"OpSDotAccSatKHR", static_cast<SpvOp>(4453)},
+        {"OpMatrixTimesVector", static_cast<SpvOp>(145)},
+        {"OpArbitraryFloatLog10INTEL", static_cast<SpvOp>(5862)},
+        {"OpFinalizeNodePayloadsAMDX", static_cast<SpvOp>(5075)},
+        {"OpTraceNV", static_cast<SpvOp>(5337)},
+        {"OpGroupNonUniformInverseBallot", static_cast<SpvOp>(340)},
+        {"OpAliasScopeDeclINTEL", static_cast<SpvOp>(5912)},
+        {"OpGroupIAdd", static_cast<SpvOp>(264)},
+        {"OpSubgroupAvcMceGetInterMinorShapeINTEL", static_cast<SpvOp>(5742)},
+        {"OpReportIntersectionNV", static_cast<SpvOp>(5334)},
+        {"OpArbitraryFloatSinCosPiINTEL", static_cast<SpvOp>(5840)},
+        {"OpSubgroupImageMediaBlockWriteINTEL", static_cast<SpvOp>(5581)},
+        {"OpSubgroupAvcImeGetTruncatedSearchIndicationINTEL", static_cast<SpvOp>(5777)},
+        {"OpGroupFMaxNonUniformAMD", static_cast<SpvOp>(5005)},
+        {"OpTypePointer", static_cast<SpvOp>(32)},
+        {"OpGroupNonUniformBroadcastFirst", static_cast<SpvOp>(338)},
+        {"OpRestoreMemoryINTEL", static_cast<SpvOp>(5820)},
+        {"OpAsmCallINTEL", static_cast<SpvOp>(5611)},
+        {"OpSubgroupAvcRefSetBilinearFilterEnableINTEL", static_cast<SpvOp>(5785)},
+        {"OpAsmINTEL", static_cast<SpvOp>(5610)},
+        {"OpCooperativeMatrixStoreNV", static_cast<SpvOp>(5360)},
+        {"OpGroupNonUniformBallotBitExtract", static_cast<SpvOp>(341)},
+        {"OpReleaseEvent", static_cast<SpvOp>(298)},
+        {"OpImageSparseFetch", static_cast<SpvOp>(313)},
+        {"OpArbitraryFloatLEINTEL", static_cast<SpvOp>(5853)},
+        {"OpWritePipeBlockingINTEL", static_cast<SpvOp>(5947)},
+        {"OpTypePipeStorage", static_cast<SpvOp>(322)},
+        {"OpFixedSinPiINTEL", static_cast<SpvOp>(5929)},
+        {"OpBitcast", static_cast<SpvOp>(124)},
+        {"OpMemberName", static_cast<SpvOp>(6)},
+        {"OpSubgroupAvcImeStripSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5768)},
+        {"OpGroupNonUniformSMin", static_cast<SpvOp>(353)},
+        {"OpLogicalAnd", static_cast<SpvOp>(167)},
+        {"OpFMul", static_cast<SpvOp>(133)},
+        {"OpTypeCooperativeMatrixKHR", static_cast<SpvOp>(4456)},
         {"OpConvertPtrToU", static_cast<SpvOp>(117)},
         {"OpCooperativeMatrixLengthKHR", static_cast<SpvOp>(4460)},
-        {"OpImageSparseSampleDrefExplicitLod", static_cast<SpvOp>(308)},
-        {"OpCaptureEventProfilingInfo", static_cast<SpvOp>(302)},
-        {"OpCooperativeMatrixMulAddKHR", static_cast<SpvOp>(4459)},
-        {"OpLogicalEqual", static_cast<SpvOp>(164)},
-        {"OpSubgroupAvcRefEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5786)},
-        {"OpUCountTrailingZerosINTEL", static_cast<SpvOp>(5586)},
-        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL", static_cast<SpvOp>(5762)},
-        {"OpImageWrite", static_cast<SpvOp>(99)},
-        {"OpFUnordLessThanEqual", static_cast<SpvOp>(189)},
-        {"OpSubgroupAllEqualKHR", static_cast<SpvOp>(4430)},
-        {"OpLessOrGreater", static_cast<SpvOp>(161)},
-        {"OpSLessThanEqual", static_cast<SpvOp>(179)},
-        {"OpFMul", static_cast<SpvOp>(133)},
-        {"OpRayQueryConfirmIntersectionKHR", static_cast<SpvOp>(4476)},
-        {"OpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL", static_cast<SpvOp>(5725)},
-        {"OpTraceNV", static_cast<SpvOp>(5337)},
-        {"OpFixedRecipINTEL", static_cast<SpvOp>(5924)},
-        {"OpTypePointer", static_cast<SpvOp>(32)},
-        {"OpHitObjectGetInstanceCustomIndexNV", static_cast<SpvOp>(5271)},
-        {"OpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL", static_cast<SpvOp>(5729)},
-        {"OpTypeAvcImeSingleReferenceStreaminINTEL", static_cast<SpvOp>(5709)},
-        {"OpGroupNonUniformFMin", static_cast<SpvOp>(355)},
-        {"OpArbitraryFloatACosINTEL", static_cast<SpvOp>(5875)},
-        {"OpRayQueryInitializeKHR", static_cast<SpvOp>(4473)},
-        {"OpSubgroupAvcImeGetDualReferenceStreaminINTEL", static_cast<SpvOp>(5767)},
-        {"OpSubgroupAvcSicGetInterRawSadsINTEL", static_cast<SpvOp>(5816)},
-        {"OpSubgroupReadInvocationKHR", static_cast<SpvOp>(4432)},
-        {"OpISubSatINTEL", static_cast<SpvOp>(5595)},
-        {"OpGroupNonUniformElect", static_cast<SpvOp>(333)},
-        {"OpConvertUToPtr", static_cast<SpvOp>(120)},
-        {"OpUnreachable", static_cast<SpvOp>(255)},
-        {"OpUMul32x16INTEL", static_cast<SpvOp>(5598)},
-        {"OpFixedLogINTEL", static_cast<SpvOp>(5932)},
-        {"OpSubgroupAvcRefEvaluateWithMultiReferenceINTEL", static_cast<SpvOp>(5788)},
-        {"OpIgnoreIntersectionKHR", static_cast<SpvOp>(4448)},
-        {"OpConstantNull", static_cast<SpvOp>(46)},
-        {"OpEnqueueMarker", static_cast<SpvOp>(291)},
-        {"OpConvertFToS", static_cast<SpvOp>(110)},
-        {"OpCooperativeMatrixMulAddNV", static_cast<SpvOp>(5361)},
-        {"OpImageSparseGather", static_cast<SpvOp>(314)},
-        {"OpSubgroupAvcSicConfigureIpeLumaINTEL", static_cast<SpvOp>(5793)},
-        {"OpReservedWritePipe", static_cast<SpvOp>(277)},
-        {"OpVectorTimesMatrix", static_cast<SpvOp>(144)},
-        {"OpGroupAsyncCopy", static_cast<SpvOp>(259)},
-        {"OpNamedBarrierInitialize", static_cast<SpvOp>(328)},
-        {"OpDecorateStringGOOGLE", static_cast<SpvOp>(5632)},
-        {"OpRayQueryGetIntersectionTriangleVertexPositionsKHR", static_cast<SpvOp>(5340)},
-        {"OpFPGARegINTEL", static_cast<SpvOp>(5949)},
-        {"OpRayQueryGetIntersectionObjectToWorldKHR", static_cast<SpvOp>(6031)},
-        {"OpArbitraryFloatLog10INTEL", static_cast<SpvOp>(5862)},
-        {"OpArbitraryFloatATanINTEL", static_cast<SpvOp>(5877)},
-        {"OpRayQueryProceedKHR", static_cast<SpvOp>(4477)},
-        {"OpControlBarrier", static_cast<SpvOp>(224)},
-        {"OpRayQueryGetIntersectionInstanceIdKHR", static_cast<SpvOp>(6020)},
-        {"OpGroupBroadcast", static_cast<SpvOp>(263)},
-        {"OpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL", static_cast<SpvOp>(5730)},
-        {"OpVariableLengthArrayINTEL", static_cast<SpvOp>(5818)},
-        {"OpEmitVertex", static_cast<SpvOp>(218)},
-        {"OpArbitraryFloatSinINTEL", static_cast<SpvOp>(5868)},
-        {"OpSubgroupAvcImeSetDualReferenceINTEL", static_cast<SpvOp>(5749)},
-        {"OpGetKernelLocalSizeForSubgroupCount", static_cast<SpvOp>(325)},
-        {"OpDPdxCoarse", static_cast<SpvOp>(213)},
-        {"OpAssumeTrueKHR", static_cast<SpvOp>(5630)},
-        {"OpIAverageRoundedINTEL", static_cast<SpvOp>(5593)},
-        {"OpFMod", static_cast<SpvOp>(141)},
-        {"OpSubgroupAvcSicConvertToMcePayloadINTEL", static_cast<SpvOp>(5796)},
-        {"OpGroupUMin", static_cast<SpvOp>(267)},
-        {"OpCommitReadPipe", static_cast<SpvOp>(280)},
-        {"OpAtomicSMin", static_cast<SpvOp>(236)},
-        {"OpGroupNonUniformBallotFindMSB", static_cast<SpvOp>(344)},
-        {"OpImageRead", static_cast<SpvOp>(98)},
         {"OpGroupNonUniformBallot", static_cast<SpvOp>(339)},
-        {"OpArbitraryFloatCastFromIntINTEL", static_cast<SpvOp>(5842)},
-        {"OpRestoreMemoryINTEL", static_cast<SpvOp>(5820)},
-        {"OpMemoryBarrier", static_cast<SpvOp>(225)},
-        {"OpTypePipeStorage", static_cast<SpvOp>(322)},
-        {"OpRayQueryGetWorldRayOriginKHR", static_cast<SpvOp>(6030)},
-        {"OpSubgroupBlockReadINTEL", static_cast<SpvOp>(5575)},
-        {"OpIsValidEvent", static_cast<SpvOp>(300)},
-        {"OpImageSparseRead", static_cast<SpvOp>(320)},
-        {"OpSMulExtended", static_cast<SpvOp>(152)},
-        {"OpConstantSampler", static_cast<SpvOp>(45)},
-        {"OpRayQueryGetIntersectionTKHR", static_cast<SpvOp>(6018)},
-        {"OpAliasDomainDeclINTEL", static_cast<SpvOp>(5911)},
-        {"OpISub", static_cast<SpvOp>(130)},
-        {"OpGroupIMulKHR", static_cast<SpvOp>(6401)},
-        {"OpSubgroupAvcImeInitializeINTEL", static_cast<SpvOp>(5747)},
-        {"OpReservedReadPipe", static_cast<SpvOp>(276)},
-        {"OpEmitStreamVertex", static_cast<SpvOp>(220)},
-        {"OpArbitraryFloatLogINTEL", static_cast<SpvOp>(5860)},
-        {"OpCooperativeMatrixStoreNV", static_cast<SpvOp>(5360)},
-        {"OpSubgroupAvcMceGetInterReferenceIdsINTEL", static_cast<SpvOp>(5745)},
-        {"OpHitObjectGetHitKindNV", static_cast<SpvOp>(5267)},
-        {"OpSRem", static_cast<SpvOp>(138)},
-        {"OpDecorateId", static_cast<SpvOp>(332)},
-        {"OpSatConvertUToS", static_cast<SpvOp>(119)},
-        {"OpINotEqual", static_cast<SpvOp>(171)},
-        {"OpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL", static_cast<SpvOp>(5717)},
-        {"OpLogicalOr", static_cast<SpvOp>(166)},
-        {"OpPtrCastToGeneric", static_cast<SpvOp>(121)},
-        {"OpGroupNonUniformBroadcast", static_cast<SpvOp>(337)},
-        {"OpSUDot", static_cast<SpvOp>(4452)},
-        {"OpBitwiseOr", static_cast<SpvOp>(197)},
-        {"OpSubgroupAvcMceConvertToSicPayloadINTEL", static_cast<SpvOp>(5736)},
-        {"OpBranch", static_cast<SpvOp>(249)},
-        {"OpAtomicSMax", static_cast<SpvOp>(238)},
-        {"OpTypeAvcMceResultINTEL", static_cast<SpvOp>(5705)},
-        {"OpAtomicExchange", static_cast<SpvOp>(229)},
-        {"OpSubgroupAvcMceConvertToSicResultINTEL", static_cast<SpvOp>(5737)},
-        {"OpDPdyFine", static_cast<SpvOp>(211)},
-        {"OpCapability", static_cast<SpvOp>(17)},
-        {"OpTypeVoid", static_cast<SpvOp>(19)},
-        {"OpWritePackedPrimitiveIndices4x8NV", static_cast<SpvOp>(5299)},
-        {"OpStencilAttachmentReadEXT", static_cast<SpvOp>(4162)},
-        {"OpSubgroupAvcMceGetInterMajorShapeINTEL", static_cast<SpvOp>(5741)},
-        {"OpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL", static_cast<SpvOp>(5797)},
-        {"OpDemoteToHelperInvocationEXT", static_cast<SpvOp>(5380)},
-        {"OpDemoteToHelperInvocation", static_cast<SpvOp>(5380)},
-        {"OpAtomicAnd", static_cast<SpvOp>(240)},
-        {"OpMemberDecorate", static_cast<SpvOp>(72)},
-        {"OpSubgroupAvcImeRefWindowSizeINTEL", static_cast<SpvOp>(5750)},
-        {"OpArbitraryFloatCastINTEL", static_cast<SpvOp>(5841)},
-        {"OpAtomicUMin", static_cast<SpvOp>(237)},
-        {"OpReleaseEvent", static_cast<SpvOp>(298)},
-        {"OpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL", static_cast<SpvOp>(5799)},
-        {"OpGroupReserveReadPipePackets", static_cast<SpvOp>(285)},
-        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL", static_cast<SpvOp>(5771)},
-        {"OpImageSampleProjDrefImplicitLod", static_cast<SpvOp>(93)},
-        {"OpSubgroupAvcImeGetTruncatedSearchIndicationINTEL", static_cast<SpvOp>(5777)},
-        {"OpAccessChain", static_cast<SpvOp>(65)},
-        {"OpGroupUMinNonUniformAMD", static_cast<SpvOp>(5003)},
-        {"OpArbitraryFloatAddINTEL", static_cast<SpvOp>(5846)},
-        {"OpCooperativeMatrixStoreKHR", static_cast<SpvOp>(4458)},
-        {"OpSLessThan", static_cast<SpvOp>(177)},
-        {"OpFUnordEqual", static_cast<SpvOp>(181)},
-        {"OpNot", static_cast<SpvOp>(200)},
-        {"OpUConvert", static_cast<SpvOp>(113)},
-        {"OpCreatePipeFromPipeStorage", static_cast<SpvOp>(324)},
-        {"OpArbitraryFloatSqrtINTEL", static_cast<SpvOp>(5859)},
-        {"OpImage", static_cast<SpvOp>(100)},
-        {"OpSubgroupAvcMceSetAcOnlyHaarINTEL", static_cast<SpvOp>(5728)},
-        {"OpVmeImageINTEL", static_cast<SpvOp>(5699)},
-        {"OpSUDotKHR", static_cast<SpvOp>(4452)},
-        {"OpFwidthCoarse", static_cast<SpvOp>(215)},
-        {"OpWritePipe", static_cast<SpvOp>(275)},
-        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL", static_cast<SpvOp>(5759)},
-        {"OpAsmTargetINTEL", static_cast<SpvOp>(5609)},
-        {"OpTypeStruct", static_cast<SpvOp>(30)},
-        {"OpRayQueryGetRayTMinKHR", static_cast<SpvOp>(6016)},
-        {"OpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL", static_cast<SpvOp>(5731)},
-        {"OpSUDotAccSatKHR", static_cast<SpvOp>(4455)},
-        {"OpSubgroupAvcFmeInitializeINTEL", static_cast<SpvOp>(5781)},
-        {"OpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL", static_cast<SpvOp>(5722)},
-        {"OpTypeReserveId", static_cast<SpvOp>(36)},
-        {"OpUDot", static_cast<SpvOp>(4451)},
-        {"OpFAdd", static_cast<SpvOp>(129)},
-        {"OpArbitraryFloatRSqrtINTEL", static_cast<SpvOp>(5856)},
-        {"OpImageTexelPointer", static_cast<SpvOp>(60)},
-        {"OpSaveMemoryINTEL", static_cast<SpvOp>(5819)},
-        {"OpLoopControlINTEL", static_cast<SpvOp>(5887)},
-        {"OpLogicalNotEqual", static_cast<SpvOp>(165)},
-        {"OpGroupIAdd", static_cast<SpvOp>(264)},
-        {"OpMemoryModel", static_cast<SpvOp>(14)},
-        {"OpIgnoreIntersectionNV", static_cast<SpvOp>(5335)},
-        {"OpFixedExpINTEL", static_cast<SpvOp>(5933)},
-        {"OpArbitraryFloatSinPiINTEL", static_cast<SpvOp>(5871)},
-        {"OpRayQueryTerminateKHR", static_cast<SpvOp>(4474)},
-        {"OpLogicalAnd", static_cast<SpvOp>(167)},
-        {"OpFNegate", static_cast<SpvOp>(127)},
-        {"OpConstantComposite", static_cast<SpvOp>(44)},
-        {"OpUMulExtended", static_cast<SpvOp>(151)},
-        {"OpSubgroupAvcBmeInitializeINTEL", static_cast<SpvOp>(5782)},
-        {"OpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL", static_cast<SpvOp>(5723)},
-        {"OpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL", static_cast<SpvOp>(5746)},
-        {"OpSubgroupShuffleDownINTEL", static_cast<SpvOp>(5572)},
-        {"OpGroupLogicalAndKHR", static_cast<SpvOp>(6406)},
-        {"OpCrossWorkgroupCastToPtrINTEL", static_cast<SpvOp>(5938)},
-        {"OpSubgroupAvcSicEvaluateIpeINTEL", static_cast<SpvOp>(5803)},
-        {"OpSubgroupAvcMceConvertToImeResultINTEL", static_cast<SpvOp>(5733)},
-        {"OpImageSparseSampleProjExplicitLod", static_cast<SpvOp>(310)},
-        {"OpSubgroupAvcSicGetMotionVectorMaskINTEL", static_cast<SpvOp>(5795)},
-        {"OpFetchMicroTriangleVertexPositionNV", static_cast<SpvOp>(5300)},
-        {"OpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL", static_cast<SpvOp>(5814)},
-        {"OpReadClockKHR", static_cast<SpvOp>(5056)},
-        {"OpSizeOf", static_cast<SpvOp>(321)},
-        {"OpGroupFAddNonUniformAMD", static_cast<SpvOp>(5001)},
-        {"OpSubgroupAvcSicGetIpeLumaShapeINTEL", static_cast<SpvOp>(5809)},
-        {"OpCooperativeMatrixLoadNV", static_cast<SpvOp>(5359)},
+        {"OpAtomicLoad", static_cast<SpvOp>(227)},
+        {"OpRayQueryGetIntersectionObjectToWorldKHR", static_cast<SpvOp>(6031)},
+        {"OpGroupAny", static_cast<SpvOp>(262)},
+        {"OpRayQueryProceedKHR", static_cast<SpvOp>(4477)},
         {"OpFixedSqrtINTEL", static_cast<SpvOp>(5923)},
-        {"OpHitObjectRecordHitWithIndexMotionNV", static_cast<SpvOp>(5250)},
-        {"OpExecutionMode", static_cast<SpvOp>(16)},
-        {"OpIEqual", static_cast<SpvOp>(170)},
-        {"OpFUnordNotEqual", static_cast<SpvOp>(183)},
-        {"OpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL", static_cast<SpvOp>(5720)},
-        {"OpDot", static_cast<SpvOp>(148)},
-        {"OpHitObjectTraceRayNV", static_cast<SpvOp>(5260)},
-        {"OpGenericCastToPtr", static_cast<SpvOp>(122)},
-        {"OpLifetimeStop", static_cast<SpvOp>(257)},
-        {"OpReportIntersectionNV", static_cast<SpvOp>(5334)},
-        {"OpReturnValue", static_cast<SpvOp>(254)},
-        {"OpHitObjectRecordHitNV", static_cast<SpvOp>(5261)},
-        {"OpFinalizeNodePayloadsAMDX", static_cast<SpvOp>(5075)},
-        {"OpGroupAll", static_cast<SpvOp>(261)},
-        {"OpReserveReadPipePackets", static_cast<SpvOp>(278)},
-        {"OpPtrEqual", static_cast<SpvOp>(401)},
-        {"OpHitObjectGetObjectRayOriginNV", static_cast<SpvOp>(5255)},
-        {"OpBuildNDRange", static_cast<SpvOp>(304)},
-        {"OpGroupSMax", static_cast<SpvOp>(271)},
-        {"OpBranchConditional", static_cast<SpvOp>(250)},
-        {"OpMemberDecorateStringGOOGLE", static_cast<SpvOp>(5633)},
-        {"OpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL", static_cast<SpvOp>(5755)},
-        {"OpAtomicUMax", static_cast<SpvOp>(239)},
-        {"OpArbitraryFloatLTINTEL", static_cast<SpvOp>(5852)},
-        {"OpTypeAvcImeResultDualReferenceStreamoutINTEL", static_cast<SpvOp>(5708)},
-        {"OpTypePipe", static_cast<SpvOp>(38)},
-        {"OpConvertSToF", static_cast<SpvOp>(111)},
-        {"OpFRem", static_cast<SpvOp>(140)},
-        {"OpTranspose", static_cast<SpvOp>(84)},
-        {"OpAtomicFlagClear", static_cast<SpvOp>(319)},
-        {"OpSubgroupAvcSicSetSkcForwardTransformEnableINTEL", static_cast<SpvOp>(5801)},
-        {"OpUGreaterThanEqual", static_cast<SpvOp>(174)},
-        {"OpTypeAvcRefPayloadINTEL", static_cast<SpvOp>(5702)},
-        {"OpHitObjectRecordMissNV", static_cast<SpvOp>(5263)},
+        {"OpNot", static_cast<SpvOp>(200)},
         {"OpSubgroupAvcImeAdjustRefOffsetINTEL", static_cast<SpvOp>(5751)},
-        {"OpGroupNonUniformAny", static_cast<SpvOp>(335)},
-        {"OpSubgroupFirstInvocationKHR", static_cast<SpvOp>(4422)},
-        {"OpReserveWritePipePackets", static_cast<SpvOp>(279)},
-        {"OpImageFetch", static_cast<SpvOp>(95)},
-        {"OpGetDefaultQueue", static_cast<SpvOp>(303)},
-        {"OpExecuteCallableNV", static_cast<SpvOp>(5344)},
-        {"OpImageSparseSampleProjImplicitLod", static_cast<SpvOp>(309)},
-        {"OpSpecConstantFalse", static_cast<SpvOp>(49)},
-        {"OpGroupNonUniformLogicalOr", static_cast<SpvOp>(363)},
-        {"OpReorderThreadWithHitObjectNV", static_cast<SpvOp>(5279)},
-        {"OpGroupFMin", static_cast<SpvOp>(266)},
-        {"OpIsNan", static_cast<SpvOp>(156)},
-        {"OpAsmCallINTEL", static_cast<SpvOp>(5611)},
-        {"OpTypeBool", static_cast<SpvOp>(20)},
-        {"OpArbitraryFloatEQINTEL", static_cast<SpvOp>(5854)},
-        {"OpExtInst", static_cast<SpvOp>(12)},
-        {"OpHitObjectRecordEmptyNV", static_cast<SpvOp>(5259)},
-        {"OpImageSparseFetch", static_cast<SpvOp>(313)},
-        {"OpMatrixTimesMatrix", static_cast<SpvOp>(146)},
-        {"OpControlBarrierArriveINTEL", static_cast<SpvOp>(6142)},
-        {"OpArbitraryFloatGEINTEL", static_cast<SpvOp>(5851)},
-        {"OpRayQueryGetRayFlagsKHR", static_cast<SpvOp>(6017)},
-        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL", static_cast<SpvOp>(5763)},
-        {"OpSpecConstantCompositeContinuedINTEL", static_cast<SpvOp>(6092)},
-        {"OpSubgroupAvcSicConvertToMceResultINTEL", static_cast<SpvOp>(5808)},
-        {"OpSpecConstantOp", static_cast<SpvOp>(52)},
-        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL", static_cast<SpvOp>(5772)},
-        {"OpImageQueryFormat", static_cast<SpvOp>(101)},
-        {"OpGroupNonUniformBallotBitExtract", static_cast<SpvOp>(341)},
-        {"OpGetKernelPreferredWorkGroupSizeMultiple", static_cast<SpvOp>(296)},
-        {"OpSubgroupAvcImeEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5758)},
-        {"OpUDotAccSat", static_cast<SpvOp>(4454)},
-        {"OpImageSparseSampleExplicitLod", static_cast<SpvOp>(306)},
-        {"OpSubgroupAvcImeConvertToMcePayloadINTEL", static_cast<SpvOp>(5752)},
-        {"OpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL", static_cast<SpvOp>(5727)},
-        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL", static_cast<SpvOp>(5760)},
-        {"OpRayQueryGetIntersectionFrontFaceKHR", static_cast<SpvOp>(6025)},
-        {"OpIAdd", static_cast<SpvOp>(128)},
-        {"OpEndPrimitive", static_cast<SpvOp>(219)},
+        {"OpRayQueryGetIntersectionPrimitiveIndexKHR", static_cast<SpvOp>(6023)},
+        {"OpGroupNonUniformShuffleXor", static_cast<SpvOp>(346)},
+        {"OpCommitWritePipe", static_cast<SpvOp>(281)},
+        {"OpHitObjectGetInstanceIdNV", static_cast<SpvOp>(5270)},
+        {"OpSubgroupAvcSicConfigureIpeLumaINTEL", static_cast<SpvOp>(5793)},
+        {"OpGroupSMin", static_cast<SpvOp>(268)},
+        {"OpCompositeConstructContinuedINTEL", static_cast<SpvOp>(6096)},
+        {"OpArbitraryFloatSinINTEL", static_cast<SpvOp>(5868)},
+        {"OpImageSampleExplicitLod", static_cast<SpvOp>(88)},
+        {"OpTypeFloat", static_cast<SpvOp>(22)},
+        {"OpUCountTrailingZerosINTEL", static_cast<SpvOp>(5586)},
         {"OpSubgroupAvcMceSetInterShapePenaltyINTEL", static_cast<SpvOp>(5716)},
-        {"OpGroupNonUniformFAdd", static_cast<SpvOp>(350)},
-        {"OpRetainEvent", static_cast<SpvOp>(297)},
-        {"OpHitObjectRecordHitWithIndexNV", static_cast<SpvOp>(5262)},
-        {"OpSubgroupAnyKHR", static_cast<SpvOp>(4429)},
-        {"OpUDotAccSatKHR", static_cast<SpvOp>(4454)},
-        {"OpFUnordLessThan", static_cast<SpvOp>(185)},
-        {"OpTypeCooperativeMatrixKHR", static_cast<SpvOp>(4456)},
-        {"OpFixedSinCosINTEL", static_cast<SpvOp>(5928)},
-        {"OpHitObjectGetObjectToWorldNV", static_cast<SpvOp>(5253)},
-        {"OpFOrdLessThan", static_cast<SpvOp>(184)},
-        {"OpTypeVmeImageINTEL", static_cast<SpvOp>(5700)},
-        {"OpCreateUserEvent", static_cast<SpvOp>(299)},
-        {"OpDPdx", static_cast<SpvOp>(207)},
-        {"OpGroupBitwiseAndKHR", static_cast<SpvOp>(6403)},
+        {"OpIAverageRoundedINTEL", static_cast<SpvOp>(5593)},
+        {"OpLoad", static_cast<SpvOp>(61)},
+        {"OpImageRead", static_cast<SpvOp>(98)},
+        {"OpSampledImage", static_cast<SpvOp>(86)},
+        {"OpDecorateStringGOOGLE", static_cast<SpvOp>(5632)},
+        {"OpFwidth", static_cast<SpvOp>(209)},
+        {"OpPtrAccessChain", static_cast<SpvOp>(67)},
+        {"OpSUDotAccSatKHR", static_cast<SpvOp>(4455)},
         {"OpGroupNonUniformBitwiseXor", static_cast<SpvOp>(361)},
         {"OpUCountLeadingZerosINTEL", static_cast<SpvOp>(5585)},
-        {"OpCopyLogical", static_cast<SpvOp>(400)},
-        {"OpFunctionParameter", static_cast<SpvOp>(55)},
-        {"OpRayQueryGetIntersectionGeometryIndexKHR", static_cast<SpvOp>(6022)},
-        {"OpSubgroupAvcMceGetMotionVectorsINTEL", static_cast<SpvOp>(5738)},
-        {"OpControlBarrierWaitINTEL", static_cast<SpvOp>(6143)},
-        {"OpGroupNonUniformShuffleDown", static_cast<SpvOp>(348)},
-        {"OpFixedRsqrtINTEL", static_cast<SpvOp>(5925)},
-        {"OpGroupNonUniformBitwiseOr", static_cast<SpvOp>(360)},
-        {"OpGroupSMinNonUniformAMD", static_cast<SpvOp>(5004)},
-        {"OpTypeRayQueryKHR", static_cast<SpvOp>(4472)},
-        {"OpLine", static_cast<SpvOp>(8)},
-        {"OpSubgroupImageMediaBlockReadINTEL", static_cast<SpvOp>(5580)},
-        {"OpTypeAvcRefResultINTEL", static_cast<SpvOp>(5711)},
-        {"OpImageQuerySize", static_cast<SpvOp>(104)},
-        {"OpCommitWritePipe", static_cast<SpvOp>(281)},
-        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5761)},
-        {"OpHitObjectIsEmptyNV", static_cast<SpvOp>(5276)},
-        {"OpHitObjectGetShaderBindingTableRecordIndexNV", static_cast<SpvOp>(5258)},
-        {"OpSUDotAccSat", static_cast<SpvOp>(4455)},
-        {"OpConvertSamplerToUNV", static_cast<SpvOp>(5394)},
-        {"OpWritePipeBlockingINTEL", static_cast<SpvOp>(5947)},
-        {"OpTraceMotionNV", static_cast<SpvOp>(5338)},
-        {"OpShiftRightArithmetic", static_cast<SpvOp>(195)},
-        {"OpTypeInt", static_cast<SpvOp>(21)},
-        {"OpTypeAvcImeDualReferenceStreaminINTEL", static_cast<SpvOp>(5710)},
-        {"OpSubgroupImageBlockWriteINTEL", static_cast<SpvOp>(5578)},
-        {"OpImageQuerySamples", static_cast<SpvOp>(107)},
-        {"OpAliasScopeDeclINTEL", static_cast<SpvOp>(5912)},
-        {"OpFUnordGreaterThanEqual", static_cast<SpvOp>(191)},
-        {"OpVectorInsertDynamic", static_cast<SpvOp>(78)},
-        {"OpTypeAvcMcePayloadINTEL", static_cast<SpvOp>(5704)},
-        {"OpUMod", static_cast<SpvOp>(137)},
-        {"OpImageSparseSampleDrefImplicitLod", static_cast<SpvOp>(307)},
-        {"OpTypeSampler", static_cast<SpvOp>(26)},
-        {"OpConstantCompositeContinuedINTEL", static_cast<SpvOp>(6091)},
-        {"OpSignBitSet", static_cast<SpvOp>(160)},
-        {"OpGroupNonUniformShuffleXor", static_cast<SpvOp>(346)},
-        {"OpSubgroupAvcRefSetBidirectionalMixDisableINTEL", static_cast<SpvOp>(5784)},
-        {"OpSubgroupAvcSicGetBestIpeChromaDistortionINTEL", static_cast<SpvOp>(5811)},
-        {"OpDPdy", static_cast<SpvOp>(208)},
-        {"OpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL", static_cast<SpvOp>(5726)},
-        {"OpEndInvocationInterlockEXT", static_cast<SpvOp>(5365)},
-        {"OpGroupNonUniformQuadSwap", static_cast<SpvOp>(366)},
-        {"OpRayQueryGetIntersectionInstanceCustomIndexKHR", static_cast<SpvOp>(6019)},
-        {"OpSourceExtension", static_cast<SpvOp>(4)},
-        {"OpSelectionMerge", static_cast<SpvOp>(247)},
-        {"OpIAddSatINTEL", static_cast<SpvOp>(5589)},
-        {"OpColorAttachmentReadEXT", static_cast<SpvOp>(4160)},
-        {"OpConvertSampledImageToUNV", static_cast<SpvOp>(5396)},
-        {"OpIsFinite", static_cast<SpvOp>(158)},
-        {"OpHitObjectGetCurrentTimeNV", static_cast<SpvOp>(5265)},
-        {"OpSubgroupAvcRefConvertToMceResultINTEL", static_cast<SpvOp>(5790)},
-        {"OpHitObjectGetRayTMaxNV", static_cast<SpvOp>(5274)},
-        {"OpSetUserEventStatus", static_cast<SpvOp>(301)},
-        {"OpKill", static_cast<SpvOp>(252)},
-        {"OpPhi", static_cast<SpvOp>(245)},
-        {"OpHitObjectRecordHitMotionNV", static_cast<SpvOp>(5249)},
-        {"OpFragmentMaskFetchAMD", static_cast<SpvOp>(5011)},
-        {"OpImageSampleExplicitLod", static_cast<SpvOp>(88)},
-        {"OpGroupIAddNonUniformAMD", static_cast<SpvOp>(5000)},
-        {"OpMemberDecorateString", static_cast<SpvOp>(5633)},
-        {"OpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL", static_cast<SpvOp>(5721)},
-        {"OpArbitraryFloatPowINTEL", static_cast<SpvOp>(5880)},
-        {"OpLifetimeStart", static_cast<SpvOp>(256)},
-        {"OpImageSampleDrefImplicitLod", static_cast<SpvOp>(89)},
-        {"OpShiftRightLogical", static_cast<SpvOp>(194)},
-        {"OpSMod", static_cast<SpvOp>(139)},
-        {"OpTypeDeviceEvent", static_cast<SpvOp>(35)},
-        {"OpModuleProcessed", static_cast<SpvOp>(330)},
-        {"OpConstantFunctionPointerINTEL", static_cast<SpvOp>(5600)},
-        {"OpHitObjectExecuteShaderNV", static_cast<SpvOp>(5264)},
-        {"OpSubgroupAvcSicInitializeINTEL", static_cast<SpvOp>(5791)},
-        {"OpIsValidReserveId", static_cast<SpvOp>(282)},
-        {"OpTypeBufferSurfaceINTEL", static_cast<SpvOp>(6086)},
-        {"OpUAddSatINTEL", static_cast<SpvOp>(5590)},
-        {"OpCopyMemory", static_cast<SpvOp>(63)},
-        {"OpSubgroupAvcSicEvaluateWithMultiReferenceINTEL", static_cast<SpvOp>(5806)},
-        {"OpUDiv", static_cast<SpvOp>(134)},
-        {"OpImageSampleWeightedQCOM", static_cast<SpvOp>(4480)},
-        {"OpGetMaxPipePackets", static_cast<SpvOp>(284)},
-        {"OpHitObjectGetInstanceIdNV", static_cast<SpvOp>(5270)},
-        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL", static_cast<SpvOp>(5773)},
-        {"OpArbitraryFloatASinINTEL", static_cast<SpvOp>(5873)},
-        {"OpAtomicIDecrement", static_cast<SpvOp>(233)},
-        {"OpDecorationGroup", static_cast<SpvOp>(73)},
-        {"OpSubgroupAvcMceGetInterMotionVectorCountINTEL", static_cast<SpvOp>(5744)},
-        {"OpTypeMatrix", static_cast<SpvOp>(24)},
-        {"OpTypeFloat", static_cast<SpvOp>(22)},
-        {"OpExecutionModeId", static_cast<SpvOp>(331)},
-        {"OpSubgroupAvcImeGetBorderReachedINTEL", static_cast<SpvOp>(5776)},
-        {"OpGroupNonUniformUMax", static_cast<SpvOp>(357)},
-        {"OpGroupSMin", static_cast<SpvOp>(268)},
-        {"OpSubgroupAvcSicConfigureIpeLumaChromaINTEL", static_cast<SpvOp>(5794)},
-        {"OpGroupUMax", static_cast<SpvOp>(270)},
-        {"OpAbsUSubINTEL", static_cast<SpvOp>(5588)},
-        {"OpArbitraryFloatCbrtINTEL", static_cast<SpvOp>(5857)},
-        {"OpGroupFMinNonUniformAMD", static_cast<SpvOp>(5002)},
-        {"OpFinishWritingNodePayloadAMDX", static_cast<SpvOp>(5078)},
-        {"OpTypeVector", static_cast<SpvOp>(23)},
-        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL", static_cast<SpvOp>(5770)},
-        {"OpRayQueryGetWorldRayDirectionKHR", static_cast<SpvOp>(6029)},
-        {"OpBitCount", static_cast<SpvOp>(205)},
-        {"OpGroupNonUniformAll", static_cast<SpvOp>(334)},
-        {"OpImageSampleDrefExplicitLod", static_cast<SpvOp>(90)},
-        {"OpHitObjectGetWorldToObjectNV", static_cast<SpvOp>(5252)},
-        {"OpRayQueryGetIntersectionBarycentricsKHR", static_cast<SpvOp>(6024)},
-        {"OpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL", static_cast<SpvOp>(5719)},
-        {"OpHitObjectIsMissNV", static_cast<SpvOp>(5278)},
-        {"OpSubgroupAvcImeStripDualReferenceStreamoutINTEL", static_cast<SpvOp>(5769)},
-        {"OpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL", static_cast<SpvOp>(5779)},
-        {"OpSubgroupShuffleUpINTEL", static_cast<SpvOp>(5573)},
-        {"OpAtomicXor", static_cast<SpvOp>(242)},
-        {"OpTypeArray", static_cast<SpvOp>(28)},
-        {"OpSpecConstantTrue", static_cast<SpvOp>(48)},
-        {"OpArbitraryFloatATan2INTEL", static_cast<SpvOp>(5879)},
-        {"OpTerminateRayNV", static_cast<SpvOp>(5336)},
-        {"OpAtomicFAddEXT", static_cast<SpvOp>(6035)},
-        {"OpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL", static_cast<SpvOp>(5713)},
-        {"OpHitObjectRecordMissMotionNV", static_cast<SpvOp>(5251)},
-        {"OpBitwiseXor", static_cast<SpvOp>(198)},
-        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL", static_cast<SpvOp>(5775)},
-        {"OpSubgroupImageMediaBlockWriteINTEL", static_cast<SpvOp>(5581)},
-        {"OpInitializeNodePayloadsAMDX", static_cast<SpvOp>(5090)},
-        {"OpSubgroupAvcImeSetMaxMotionVectorCountINTEL", static_cast<SpvOp>(5753)},
-        {"OpArbitraryFloatCosINTEL", static_cast<SpvOp>(5869)},
-        {"OpSGreaterThanEqual", static_cast<SpvOp>(175)},
-        {"OpAbsISubINTEL", static_cast<SpvOp>(5587)},
-        {"OpIsInf", static_cast<SpvOp>(157)},
-        {"OpCompositeExtract", static_cast<SpvOp>(81)},
-        {"OpConvertUToF", static_cast<SpvOp>(112)},
-        {"OpIMul", static_cast<SpvOp>(132)},
-        {"OpImageSparseSampleProjDrefImplicitLod", static_cast<SpvOp>(311)},
-        {"OpTypeNamedBarrier", static_cast<SpvOp>(327)},
-        {"OpFunctionEnd", static_cast<SpvOp>(56)},
-        {"OpArbitraryFloatMulINTEL", static_cast<SpvOp>(5848)},
-        {"OpTerminateInvocation", static_cast<SpvOp>(4416)},
-        {"OpEmitMeshTasksEXT", static_cast<SpvOp>(5294)},
-        {"OpSubgroupAvcSicEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5804)},
-        {"OpSamplerImageAddressingModeNV", static_cast<SpvOp>(5397)},
-        {"OpUDotKHR", static_cast<SpvOp>(4451)},
-        {"OpSubgroupAvcMceGetInterDistortionsINTEL", static_cast<SpvOp>(5739)},
-        {"OpImageSampleImplicitLod", static_cast<SpvOp>(87)},
-        {"OpULessThanEqual", static_cast<SpvOp>(178)},
-        {"OpStore", static_cast<SpvOp>(62)},
-        {"OpImageSampleFootprintNV", static_cast<SpvOp>(5283)},
-        {"OpGetKernelWorkGroupSize", static_cast<SpvOp>(295)},
-        {"OpReorderThreadWithHintNV", static_cast<SpvOp>(5280)},
-        {"OpFunctionPointerCallINTEL", static_cast<SpvOp>(5601)},
-        {"OpHitObjectTraceRayMotionNV", static_cast<SpvOp>(5256)},
-        {"OpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL", static_cast<SpvOp>(5778)},
-        {"OpOuterProduct", static_cast<SpvOp>(147)},
-        {"OpAtomicLoad", static_cast<SpvOp>(227)},
-        {"OpConvertUToSampledImageNV", static_cast<SpvOp>(5395)},
-        {"OpGroupWaitEvents", static_cast<SpvOp>(260)},
-        {"OpSubgroupAvcMceGetInterMinorShapeINTEL", static_cast<SpvOp>(5742)},
-        {"OpExtension", static_cast<SpvOp>(10)},
-        {"OpSGreaterThan", static_cast<SpvOp>(173)},
-        {"OpTypeOpaque", static_cast<SpvOp>(31)},
-        {"OpExtInstImport", static_cast<SpvOp>(11)},
-        {"OpUAverageINTEL", static_cast<SpvOp>(5592)},
-        {"OpFConvert", static_cast<SpvOp>(115)},
-        {"OpSubgroupAvcSicGetIpeChromaModeINTEL", static_cast<SpvOp>(5813)},
-        {"OpArbitraryFloatGTINTEL", static_cast<SpvOp>(5850)},
-        {"OpSubgroupAvcMceConvertToRefPayloadINTEL", static_cast<SpvOp>(5734)},
-        {"OpLoad", static_cast<SpvOp>(61)},
-        {"OpArbitraryFloatSubINTEL", static_cast<SpvOp>(5847)},
-        {"OpLoopMerge", static_cast<SpvOp>(246)},
-        {"OpTypeStructContinuedINTEL", static_cast<SpvOp>(6090)},
-        {"OpConvertUToImageNV", static_cast<SpvOp>(5391)},
-        {"OpSDotAccSat", static_cast<SpvOp>(4453)},
-        {"OpBitwiseAnd", static_cast<SpvOp>(199)},
-        {"OpArbitraryFloatDivINTEL", static_cast<SpvOp>(5849)},
-        {"OpHitObjectGetPrimitiveIndexNV", static_cast<SpvOp>(5268)},
-        {"OpGroupNonUniformIMul", static_cast<SpvOp>(351)},
-        {"OpArrayLength", static_cast<SpvOp>(68)},
-        {"OpSetMeshOutputsEXT", static_cast<SpvOp>(5295)},
-        {"OpFwidthFine", static_cast<SpvOp>(212)},
-        {"OpAtomicOr", static_cast<SpvOp>(241)},
-        {"OpDPdyCoarse", static_cast<SpvOp>(214)},
-        {"OpSelect", static_cast<SpvOp>(169)},
-        {"OpImageQueryLevels", static_cast<SpvOp>(106)},
-        {"OpGroupNonUniformSMax", static_cast<SpvOp>(356)},
-        {"OpImageDrefGather", static_cast<SpvOp>(97)},
-        {"OpRayQueryGenerateIntersectionKHR", static_cast<SpvOp>(4475)},
-        {"OpGroupNonUniformIAdd", static_cast<SpvOp>(349)},
-        {"OpTypeAvcSicResultINTEL", static_cast<SpvOp>(5712)},
-        {"OpISubBorrow", static_cast<SpvOp>(150)},
-        {"OpHitObjectGetRayTMinNV", static_cast<SpvOp>(5275)},
-        {"OpUGreaterThan", static_cast<SpvOp>(172)},
-        {"OpConvertUToSamplerNV", static_cast<SpvOp>(5392)},
-        {"OpGroupNonUniformInverseBallot", static_cast<SpvOp>(340)},
-        {"OpHitObjectIsHitNV", static_cast<SpvOp>(5277)},
-        {"OpExpectKHR", static_cast<SpvOp>(5631)},
-        {"OpFOrdGreaterThanEqual", static_cast<SpvOp>(190)},
-        {"OpAtomicCompareExchangeWeak", static_cast<SpvOp>(231)},
-        {"OpGroupNonUniformSMin", static_cast<SpvOp>(353)},
-        {"OpRayQueryGetIntersectionObjectRayOriginKHR", static_cast<SpvOp>(6028)},
-        {"OpGroupNonUniformUMin", static_cast<SpvOp>(354)},
-        {"OpQuantizeToF16", static_cast<SpvOp>(116)},
-        {"OpImageSparseTexelsResident", static_cast<SpvOp>(316)},
-        {"OpImageQueryLod", static_cast<SpvOp>(105)},
-        {"OpCopyObject", static_cast<SpvOp>(83)},
-        {"OpGroupNonUniformAllEqual", static_cast<SpvOp>(336)},
-        {"OpGroupNonUniformQuadBroadcast", static_cast<SpvOp>(365)},
-        {"OpUnordered", static_cast<SpvOp>(163)},
-        {"OpOrdered", static_cast<SpvOp>(162)},
-        {"OpArbitraryFloatExpINTEL", static_cast<SpvOp>(5864)},
-        {"OpFixedCosPiINTEL", static_cast<SpvOp>(5930)},
-        {"OpSubgroupAvcMceConvertToRefResultINTEL", static_cast<SpvOp>(5735)},
-        {"OpVectorExtractDynamic", static_cast<SpvOp>(77)},
-        {"OpRayQueryGetIntersectionCandidateAABBOpaqueKHR", static_cast<SpvOp>(6026)},
+        {"OpSubgroupShuffleDownINTEL", static_cast<SpvOp>(5572)},
+        {"OpHitObjectGetAttributesNV", static_cast<SpvOp>(5266)},
         {"OpAtomicIAdd", static_cast<SpvOp>(234)},
-        {"OpVectorShuffle", static_cast<SpvOp>(79)},
-        {"OpSubgroupAvcRefSetBilinearFilterEnableINTEL", static_cast<SpvOp>(5785)},
-        {"OpDepthAttachmentReadEXT", static_cast<SpvOp>(4161)},
-        {"OpGenericPtrMemSemantics", static_cast<SpvOp>(69)},
-        {"OpImageBoxFilterQCOM", static_cast<SpvOp>(4481)},
-        {"OpSubgroupAvcImeSetSingleReferenceINTEL", static_cast<SpvOp>(5748)},
-        {"OpTypeHitObjectNV", static_cast<SpvOp>(5281)},
-        {"OpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL", static_cast<SpvOp>(5715)},
-        {"OpConvertFToU", static_cast<SpvOp>(109)},
-        {"OpCompositeInsert", static_cast<SpvOp>(82)},
-        {"OpImageSampleProjImplicitLod", static_cast<SpvOp>(91)},
-        {"OpMemberName", static_cast<SpvOp>(6)},
-        {"OpUAverageRoundedINTEL", static_cast<SpvOp>(5594)},
-        {"OpSubgroupShuffleINTEL", static_cast<SpvOp>(5571)},
-        {"OpSampledImage", static_cast<SpvOp>(86)},
-        {"OpTypeForwardPointer", static_cast<SpvOp>(39)},
-        {"OpHitObjectGetObjectRayDirectionNV", static_cast<SpvOp>(5254)},
-        {"OpSubgroupAvcImeGetSingleReferenceStreaminINTEL", static_cast<SpvOp>(5766)},
-        {"OpFixedCosINTEL", static_cast<SpvOp>(5927)},
-        {"OpSubgroupImageBlockReadINTEL", static_cast<SpvOp>(5577)},
-        {"OpImageSparseSampleProjDrefExplicitLod", static_cast<SpvOp>(312)},
-        {"OpArbitraryFloatASinPiINTEL", static_cast<SpvOp>(5874)},
-        {"OpGroupLogicalXorKHR", static_cast<SpvOp>(6408)},
-        {"OpCompositeConstructContinuedINTEL", static_cast<SpvOp>(6096)},
-        {"OpDecorateString", static_cast<SpvOp>(5632)},
-        {"OpSpecConstant", static_cast<SpvOp>(50)},
-        {"OpConvertBF16ToFINTEL", static_cast<SpvOp>(6117)},
-        {"OpSatConvertSToU", static_cast<SpvOp>(118)},
-        {"OpSwitch", static_cast<SpvOp>(251)},
-        {"OpAtomicIIncrement", static_cast<SpvOp>(232)},
-        {"OpInBoundsAccessChain", static_cast<SpvOp>(66)},
-        {"OpConvertImageToUNV", static_cast<SpvOp>(5393)},
-        {"OpArbitraryFloatLog2INTEL", static_cast<SpvOp>(5861)},
-        {"OpTypeAvcImeResultSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5707)},
-        {"OpTypeFunction", static_cast<SpvOp>(33)},
-        {"OpGroupNonUniformFMul", static_cast<SpvOp>(352)},
-        {"OpIsNormal", static_cast<SpvOp>(159)},
-        {"OpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL", static_cast<SpvOp>(5780)},
-        {"OpGroupNonUniformBitwiseAnd", static_cast<SpvOp>(359)},
-        {"OpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL", static_cast<SpvOp>(5802)},
-        {"OpAtomicStore", static_cast<SpvOp>(228)},
-        {"OpAll", static_cast<SpvOp>(155)},
-        {"OpExecuteCallableKHR", static_cast<SpvOp>(4446)},
-        {"OpEntryPoint", static_cast<SpvOp>(15)},
-        {"OpArbitraryFloatSinCosINTEL", static_cast<SpvOp>(5870)},
-        {"OpFOrdEqual", static_cast<SpvOp>(180)},
-        {"OpGroupAny", static_cast<SpvOp>(262)},
-        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL", static_cast<SpvOp>(5764)},
-        {"OpGroupNonUniformRotateKHR", static_cast<SpvOp>(4431)},
-        {"OpSubgroupAvcImeStripSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5768)},
-        {"OpMemoryNamedBarrier", static_cast<SpvOp>(329)},
-        {"OpConvertUToAccelerationStructureKHR", static_cast<SpvOp>(4447)},
-        {"OpIMul32x16INTEL", static_cast<SpvOp>(5597)},
-        {"OpRayQueryGetIntersectionTypeKHR", static_cast<SpvOp>(4479)},
-        {"OpEnqueueKernel", static_cast<SpvOp>(292)},
-        {"OpImageBlockMatchSSDQCOM", static_cast<SpvOp>(4482)},
-        {"OpReadPipe", static_cast<SpvOp>(274)},
-        {"OpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL", static_cast<SpvOp>(5815)},
-        {"OpTypeAvcSicPayloadINTEL", static_cast<SpvOp>(5703)},
-        {"OpSubgroupAvcMceSetMotionVectorCostFunctionINTEL", static_cast<SpvOp>(5724)},
-        {"OpGroupNonUniformBallotFindLSB", static_cast<SpvOp>(343)},
-        {"OpGroupReserveWritePipePackets", static_cast<SpvOp>(286)},
-        {"OpAtomicCompareExchange", static_cast<SpvOp>(230)},
-        {"OpGetKernelNDrangeMaxSubGroupSize", static_cast<SpvOp>(294)},
-        {"OpSubgroupAvcSicSetBilinearFilterEnableINTEL", static_cast<SpvOp>(5800)},
-        {"OpSubgroupAvcMceGetBestInterDistortionsINTEL", static_cast<SpvOp>(5740)},
-        {"OpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL", static_cast<SpvOp>(5789)},
-        {"OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR", static_cast<SpvOp>(6021)},
-        {"OpPtrDiff", static_cast<SpvOp>(403)},
-        {"OpSDotKHR", static_cast<SpvOp>(4450)},
-        {"OpArbitraryFloatSinCosPiINTEL", static_cast<SpvOp>(5840)},
-        {"OpImageQueryOrder", static_cast<SpvOp>(102)},
-        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL", static_cast<SpvOp>(5774)},
-        {"OpTypeAccelerationStructureNV", static_cast<SpvOp>(5341)},
-        {"OpReturn", static_cast<SpvOp>(253)},
-        {"OpInBoundsPtrAccessChain", static_cast<SpvOp>(70)},
-        {"OpConstantFalse", static_cast<SpvOp>(42)},
-        {"OpBitReverse", static_cast<SpvOp>(204)},
-        {"OpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL", static_cast<SpvOp>(5798)},
-        {"OpArbitraryFloatPowRINTEL", static_cast<SpvOp>(5881)},
-        {"OpSDot", static_cast<SpvOp>(4450)},
-        {"OpFixedSinINTEL", static_cast<SpvOp>(5926)},
-        {"OpReportIntersectionKHR", static_cast<SpvOp>(5334)},
-        {"OpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL", static_cast<SpvOp>(5714)},
-        {"OpGetKernelMaxNumSubgroups", static_cast<SpvOp>(326)},
-        {"OpUSubSatINTEL", static_cast<SpvOp>(5596)},
-        {"OpHitObjectGetGeometryIndexNV", static_cast<SpvOp>(5269)},
-        {"OpGroupNonUniformBallotBitCount", static_cast<SpvOp>(342)},
-        {"OpArbitraryFloatHypotINTEL", static_cast<SpvOp>(5858)},
-        {"OpSubgroupAvcMceConvertToImePayloadINTEL", static_cast<SpvOp>(5732)},
-        {"OpPtrNotEqual", static_cast<SpvOp>(402)},
-        {"OpString", static_cast<SpvOp>(7)},
-        {"OpGroupNonUniformShuffle", static_cast<SpvOp>(345)},
-        {"OpGroupNonUniformLogicalAnd", static_cast<SpvOp>(362)},
-        {"OpSDotAccSatKHR", static_cast<SpvOp>(4453)},
-        {"OpFixedSinPiINTEL", static_cast<SpvOp>(5929)},
-        {"OpSDiv", static_cast<SpvOp>(135)},
-        {"OpHitObjectGetWorldRayOriginNV", static_cast<SpvOp>(5273)},
-        {"OpSubgroupAvcMceSetInterDirectionPenaltyINTEL", static_cast<SpvOp>(5718)},
-        {"OpGroupCommitReadPipe", static_cast<SpvOp>(287)},
-        {"OpCopyMemorySized", static_cast<SpvOp>(64)},
-        {"OpArbitraryFloatATanPiINTEL", static_cast<SpvOp>(5878)},
-        {"OpGroupNonUniformFMax", static_cast<SpvOp>(358)},
-        {"OpName", static_cast<SpvOp>(5)},
-        {"OpSubgroupAvcImeSetWeightedSadINTEL", static_cast<SpvOp>(5756)},
-        {"OpAtomicFMaxEXT", static_cast<SpvOp>(5615)},
-        {"OpUndef", static_cast<SpvOp>(1)},
-        {"OpSubgroupAvcSicGetBestIpeLumaDistortionINTEL", static_cast<SpvOp>(5810)},
-        {"OpPtrCastToCrossWorkgroupINTEL", static_cast<SpvOp>(5934)},
-        {"OpGroupNonUniformShuffleUp", static_cast<SpvOp>(347)},
-        {"OpSubgroupAvcSicEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5805)},
-        {"OpGroupBitwiseOrKHR", static_cast<SpvOp>(6404)},
-        {"OpLogicalNot", static_cast<SpvOp>(168)},
-        {"OpAliasScopeListDeclINTEL", static_cast<SpvOp>(5913)},
-        {"OpTypeAvcImePayloadINTEL", static_cast<SpvOp>(5701)},
-        {"OpSubgroupAvcImeEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5757)},
-        {"OpSubgroupBlockWriteINTEL", static_cast<SpvOp>(5576)},
-        {"OpVariable", static_cast<SpvOp>(59)},
+        {"OpAccessChain", static_cast<SpvOp>(65)},
+        {"OpRayQueryGenerateIntersectionKHR", static_cast<SpvOp>(4475)},
+        {"OpFunctionCall", static_cast<SpvOp>(57)},
+        {"OpGroupFMulKHR", static_cast<SpvOp>(6402)},
+        {"OpIgnoreIntersectionKHR", static_cast<SpvOp>(4448)},
+        {"OpConvertUToF", static_cast<SpvOp>(112)},
+        {"OpTypeAvcRefPayloadINTEL", static_cast<SpvOp>(5702)},
+        {"OpSubgroupAvcImeSetDualReferenceINTEL", static_cast<SpvOp>(5749)},
+        {"OpTypeQueue", static_cast<SpvOp>(37)},
+        {"OpSubgroupBallotKHR", static_cast<SpvOp>(4421)},
+        {"OpGroupUMin", static_cast<SpvOp>(267)},
+        {"OpTypeRayQueryKHR", static_cast<SpvOp>(4472)},
+        {"OpGetKernelWorkGroupSize", static_cast<SpvOp>(295)},
+        {"OpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL", static_cast<SpvOp>(5725)},
         {"OpSubgroupAvcRefConvertToMcePayloadINTEL", static_cast<SpvOp>(5783)},
-        {"OpArbitraryFloatLog1pINTEL", static_cast<SpvOp>(5863)},
-        {"OpSubgroupAvcRefEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5787)},
-        {"OpNop", static_cast<SpvOp>(0)},
-        {"OpArbitraryFloatExp10INTEL", static_cast<SpvOp>(5866)},
-        {"OpIsHelperInvocationEXT", static_cast<SpvOp>(5381)},
-        {"OpBeginInvocationInterlockEXT", static_cast<SpvOp>(5364)},
-        {"OpSource", static_cast<SpvOp>(3)},
-        {"OpAtomicFMinEXT", static_cast<SpvOp>(5614)},
-        {"OpConstantPipeStorage", static_cast<SpvOp>(323)},
-        {"OpFOrdGreaterThan", static_cast<SpvOp>(186)},
-        {"OpGenericCastToPtrExplicit", static_cast<SpvOp>(123)},
-        {"OpGroupMemberDecorate", static_cast<SpvOp>(75)},
-        {"OpSubgroupAvcSicGetPackedIpeLumaModesINTEL", static_cast<SpvOp>(5812)},
-        {"OpGroupUMaxNonUniformAMD", static_cast<SpvOp>(5006)},
-        {"OpBitcast", static_cast<SpvOp>(124)},
-        {"OpRayQueryGetIntersectionPrimitiveIndexKHR", static_cast<SpvOp>(6023)},
+        {"OpImageQuerySize", static_cast<SpvOp>(104)},
+        {"OpLine", static_cast<SpvOp>(8)},
+        {"OpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL", static_cast<SpvOp>(5729)},
+        {"OpSubgroupAvcMceGetInterDistortionsINTEL", static_cast<SpvOp>(5739)},
         {"OpFSub", static_cast<SpvOp>(131)},
-        {"OpSubgroupAvcImeConvertToMceResultINTEL", static_cast<SpvOp>(5765)},
-        {"OpTypeImage", static_cast<SpvOp>(25)},
-        {"OpFetchMicroTriangleVertexBarycentricNV", static_cast<SpvOp>(5301)},
+        {"OpPhi", static_cast<SpvOp>(245)},
+        {"OpDPdxCoarse", static_cast<SpvOp>(213)},
+        {"OpImageTexelPointer", static_cast<SpvOp>(60)},
+        {"OpLoopControlINTEL", static_cast<SpvOp>(5887)},
+        {"OpInitializeNodePayloadsAMDX", static_cast<SpvOp>(5090)},
+        {"OpUGreaterThanEqual", static_cast<SpvOp>(174)},
+        {"OpIsInf", static_cast<SpvOp>(157)},
+        {"OpUDotAccSatKHR", static_cast<SpvOp>(4454)},
+        {"OpSubgroupAvcMceSetInterDirectionPenaltyINTEL", static_cast<SpvOp>(5718)},
+        {"OpConstantFunctionPointerINTEL", static_cast<SpvOp>(5600)},
+        {"OpGroupNonUniformBallotBitCount", static_cast<SpvOp>(342)},
+        {"OpSUDotAccSat", static_cast<SpvOp>(4455)},
+        {"OpSubgroupAvcMceGetInterReferenceIdsINTEL", static_cast<SpvOp>(5745)},
+        {"OpFragmentMaskFetchAMD", static_cast<SpvOp>(5011)},
+        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL", static_cast<SpvOp>(5762)},
+        {"OpImage", static_cast<SpvOp>(100)},
+        {"OpSubgroupAvcSicConfigureIpeLumaChromaINTEL", static_cast<SpvOp>(5794)},
+        {"OpImageSparseSampleProjExplicitLod", static_cast<SpvOp>(310)},
+        {"OpArbitraryFloatASinINTEL", static_cast<SpvOp>(5873)},
+        {"OpMemberDecorateString", static_cast<SpvOp>(5633)},
+        {"OpGroupFMinNonUniformAMD", static_cast<SpvOp>(5002)},
+        {"OpInBoundsPtrAccessChain", static_cast<SpvOp>(70)},
+        {"OpUDiv", static_cast<SpvOp>(134)},
+        {"OpHitObjectIsHitNV", static_cast<SpvOp>(5277)},
+        {"OpTypeAvcMceResultINTEL", static_cast<SpvOp>(5705)},
+        {"OpGroupNonUniformAny", static_cast<SpvOp>(335)},
+        {"OpAtomicAnd", static_cast<SpvOp>(240)},
+        {"OpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL", static_cast<SpvOp>(5713)},
+        {"OpSelectionMerge", static_cast<SpvOp>(247)},
+        {"OpSubgroupAvcBmeInitializeINTEL", static_cast<SpvOp>(5782)},
+        {"OpImageFetch", static_cast<SpvOp>(95)},
+        {"OpSDotKHR", static_cast<SpvOp>(4450)},
+        {"OpAtomicSMax", static_cast<SpvOp>(238)},
+        {"OpImageSampleProjExplicitLod", static_cast<SpvOp>(92)},
+        {"OpIsValidEvent", static_cast<SpvOp>(300)},
+        {"OpMaskedGatherINTEL", static_cast<SpvOp>(6428)},
+        {"OpTypeAvcImeSingleReferenceStreaminINTEL", static_cast<SpvOp>(5709)},
+        {"OpExtInstImport", static_cast<SpvOp>(11)},
+        {"OpRayQueryGetRayTMinKHR", static_cast<SpvOp>(6016)},
+        {"OpArbitraryFloatMulINTEL", static_cast<SpvOp>(5848)},
+        {"OpGroupAsyncCopy", static_cast<SpvOp>(259)},
+        {"OpGroupNonUniformLogicalAnd", static_cast<SpvOp>(362)},
+        {"OpSubgroupAvcSicConfigureSkcINTEL", static_cast<SpvOp>(5792)},
+        {"OpSubgroupAvcMceGetInterDirectionsINTEL", static_cast<SpvOp>(5743)},
+        {"OpAtomicSMin", static_cast<SpvOp>(236)},
+        {"OpGroupFMin", static_cast<SpvOp>(266)},
+        {"OpFUnordNotEqual", static_cast<SpvOp>(183)},
+        {"OpStore", static_cast<SpvOp>(62)},
+        {"OpRetainEvent", static_cast<SpvOp>(297)},
+        {"OpConvertFToBF16INTEL", static_cast<SpvOp>(6116)},
+        {"OpHitObjectGetObjectRayOriginNV", static_cast<SpvOp>(5255)},
+        {"OpRayQueryGetIntersectionWorldToObjectKHR", static_cast<SpvOp>(6032)},
+        {"OpGroupCommitWritePipe", static_cast<SpvOp>(288)},
+        {"OpSubgroupAvcSicSetBilinearFilterEnableINTEL", static_cast<SpvOp>(5800)},
+        {"OpImageQueryOrder", static_cast<SpvOp>(102)},
+        {"OpExecutionMode", static_cast<SpvOp>(16)},
+        {"OpArbitraryFloatEQINTEL", static_cast<SpvOp>(5854)},
+        {"OpGetMaxPipePackets", static_cast<SpvOp>(284)},
+        {"OpTypeAvcImeResultINTEL", static_cast<SpvOp>(5706)},
+        {"OpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL", static_cast<SpvOp>(5746)},
+        {"OpDot", static_cast<SpvOp>(148)},
+        {"OpShiftRightLogical", static_cast<SpvOp>(194)},
+        {"OpIsNormal", static_cast<SpvOp>(159)},
+        {"OpUConvert", static_cast<SpvOp>(113)},
+        {"OpImageSampleProjDrefImplicitLod", static_cast<SpvOp>(93)},
+        {"OpReorderThreadWithHitObjectNV", static_cast<SpvOp>(5279)},
+        {"OpNoLine", static_cast<SpvOp>(317)},
+        {"OpGroupNonUniformIMul", static_cast<SpvOp>(351)},
+        {"OpGroupNonUniformUMax", static_cast<SpvOp>(357)},
+        {"OpMemoryBarrier", static_cast<SpvOp>(225)},
+        {"OpTypeAccelerationStructureKHR", static_cast<SpvOp>(5341)},
+        {"OpExecuteCallableKHR", static_cast<SpvOp>(4446)},
+        {"OpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL", static_cast<SpvOp>(5798)},
+        {"OpSpecConstantCompositeContinuedINTEL", static_cast<SpvOp>(6092)},
+        {"OpUMod", static_cast<SpvOp>(137)},
+        {"OpHitObjectGetWorldRayDirectionNV", static_cast<SpvOp>(5272)},
+        {"OpEmitMeshTasksEXT", static_cast<SpvOp>(5294)},
+        {"OpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL", static_cast<SpvOp>(5780)},
+        {"OpBitCount", static_cast<SpvOp>(205)},
+        {"OpISub", static_cast<SpvOp>(130)},
+        {"OpUAverageINTEL", static_cast<SpvOp>(5592)},
+        {"OpArbitraryFloatGTINTEL", static_cast<SpvOp>(5850)},
+        {"OpFOrdGreaterThan", static_cast<SpvOp>(186)},
+        {"OpTypeForwardPointer", static_cast<SpvOp>(39)},
+        {"OpBitReverse", static_cast<SpvOp>(204)},
+        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL", static_cast<SpvOp>(5771)},
+        {"OpSignBitSet", static_cast<SpvOp>(160)},
+        {"OpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL", static_cast<SpvOp>(5802)},
+        {"OpEmitStreamVertex", static_cast<SpvOp>(220)},
+        {"OpMemberDecorateStringGOOGLE", static_cast<SpvOp>(5633)},
+        {"OpImageSampleDrefExplicitLod", static_cast<SpvOp>(90)},
+        {"OpPtrCastToCrossWorkgroupINTEL", static_cast<SpvOp>(5934)},
+        {"OpReorderThreadWithHintNV", static_cast<SpvOp>(5280)},
+        {"OpRayQueryGetWorldRayDirectionKHR", static_cast<SpvOp>(6029)},
+        {"OpGroupCommitReadPipe", static_cast<SpvOp>(287)},
+        {"OpLogicalNot", static_cast<SpvOp>(168)},
+        {"OpArbitraryFloatPowINTEL", static_cast<SpvOp>(5880)},
         {"OpCooperativeMatrixLengthNV", static_cast<SpvOp>(5362)},
+        {"OpImageDrefGather", static_cast<SpvOp>(97)},
+        {"OpGroupSMax", static_cast<SpvOp>(271)},
+        {"OpGroupNonUniformBitwiseAnd", static_cast<SpvOp>(359)},
+        {"OpAtomicFMaxEXT", static_cast<SpvOp>(5615)},
+        {"OpSubgroupAvcImeSetSingleReferenceINTEL", static_cast<SpvOp>(5748)},
+        {"OpGroupAll", static_cast<SpvOp>(261)},
+        {"OpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL", static_cast<SpvOp>(5814)},
+        {"OpIAverageINTEL", static_cast<SpvOp>(5591)},
+        {"OpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL", static_cast<SpvOp>(5720)},
+        {"OpIAddSatINTEL", static_cast<SpvOp>(5589)},
+        {"OpRayQueryGetIntersectionObjectRayOriginKHR", static_cast<SpvOp>(6028)},
+        {"OpUnreachable", static_cast<SpvOp>(255)},
+        {"OpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL", static_cast<SpvOp>(5721)},
+        {"OpGroupNonUniformSMax", static_cast<SpvOp>(356)},
+        {"OpArbitraryFloatCastINTEL", static_cast<SpvOp>(5841)},
+        {"OpGenericPtrMemSemantics", static_cast<SpvOp>(69)},
+        {"OpFUnordLessThanEqual", static_cast<SpvOp>(189)},
+        {"OpShiftLeftLogical", static_cast<SpvOp>(196)},
+        {"OpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL", static_cast<SpvOp>(5815)},
+        {"OpAtomicFMinEXT", static_cast<SpvOp>(5614)},
+        {"OpGroupNonUniformShuffleDown", static_cast<SpvOp>(348)},
+        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL", static_cast<SpvOp>(5772)},
+        {"OpConvertBF16ToFINTEL", static_cast<SpvOp>(6117)},
+        {"OpControlBarrier", static_cast<SpvOp>(224)},
+        {"OpTranspose", static_cast<SpvOp>(84)},
+        {"OpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL", static_cast<SpvOp>(5731)},
+        {"OpWritePackedPrimitiveIndices4x8NV", static_cast<SpvOp>(5299)},
+        {"OpReserveReadPipePackets", static_cast<SpvOp>(278)},
+        {"OpImageBlockMatchWindowSADQCOM", static_cast<SpvOp>(4501)},
+        {"OpControlBarrierArriveINTEL", static_cast<SpvOp>(6142)},
+        {"OpTypeArray", static_cast<SpvOp>(28)},
+        {"OpHitObjectTraceRayMotionNV", static_cast<SpvOp>(5256)},
+        {"OpCompositeInsert", static_cast<SpvOp>(82)},
+        {"OpULessThan", static_cast<SpvOp>(176)},
+        {"OpHitObjectTraceRayNV", static_cast<SpvOp>(5260)},
+        {"OpSDiv", static_cast<SpvOp>(135)},
+        {"OpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL", static_cast<SpvOp>(5755)},
+        {"OpLifetimeStop", static_cast<SpvOp>(257)},
+        {"OpSubgroupAvcSicGetMotionVectorMaskINTEL", static_cast<SpvOp>(5795)},
+        {"OpUDotKHR", static_cast<SpvOp>(4451)},
+        {"OpHitObjectIsEmptyNV", static_cast<SpvOp>(5276)},
+        {"OpGroupDecorate", static_cast<SpvOp>(74)},
+        {"OpFixedSinCosINTEL", static_cast<SpvOp>(5928)},
+        {"OpEndPrimitive", static_cast<SpvOp>(219)},
+        {"OpSubgroupAvcRefConvertToMceResultINTEL", static_cast<SpvOp>(5790)},
+        {"OpGroupNonUniformBallotFindMSB", static_cast<SpvOp>(344)},
+        {"OpTypeVmeImageINTEL", static_cast<SpvOp>(5700)},
+        {"OpTypeBool", static_cast<SpvOp>(20)},
+        {"OpSpecConstantOp", static_cast<SpvOp>(52)},
+        {"OpSubgroupAvcMceGetBestInterDistortionsINTEL", static_cast<SpvOp>(5740)},
+        {"OpSubgroupShuffleXorINTEL", static_cast<SpvOp>(5574)},
+        {"OpImageBlockMatchSSDQCOM", static_cast<SpvOp>(4482)},
+        {"OpRayQueryGetIntersectionCandidateAABBOpaqueKHR", static_cast<SpvOp>(6026)},
+        {"OpSetUserEventStatus", static_cast<SpvOp>(301)},
+        {"OpGroupNonUniformRotateKHR", static_cast<SpvOp>(4431)},
+        {"OpFixedCosPiINTEL", static_cast<SpvOp>(5930)},
+        {"OpImageSampleDrefImplicitLod", static_cast<SpvOp>(89)},
+        {"OpDemoteToHelperInvocation", static_cast<SpvOp>(5380)},
+        {"OpSourceContinued", static_cast<SpvOp>(2)},
+        {"OpIsHelperInvocationEXT", static_cast<SpvOp>(5381)},
+        {"OpRayQueryConfirmIntersectionKHR", static_cast<SpvOp>(4476)},
+        {"OpArbitraryFloatSinPiINTEL", static_cast<SpvOp>(5871)},
+        {"OpSubgroupAvcMceSetMotionVectorCostFunctionINTEL", static_cast<SpvOp>(5724)},
+        {"OpConstantNull", static_cast<SpvOp>(46)},
+        {"OpCopyMemorySized", static_cast<SpvOp>(64)},
+        {"OpImageQuerySizeLod", static_cast<SpvOp>(103)},
+        {"OpArbitraryFloatAddINTEL", static_cast<SpvOp>(5846)},
+        {"OpGroupLogicalAndKHR", static_cast<SpvOp>(6406)},
+        {"OpFixedSinCosPiINTEL", static_cast<SpvOp>(5931)},
+        {"OpGroupSMaxNonUniformAMD", static_cast<SpvOp>(5007)},
+        {"OpKill", static_cast<SpvOp>(252)},
+        {"OpModuleProcessed", static_cast<SpvOp>(330)},
+        {"OpConvertSamplerToUNV", static_cast<SpvOp>(5394)},
+        {"OpGroupIAddNonUniformAMD", static_cast<SpvOp>(5000)},
+        {"OpSNegate", static_cast<SpvOp>(126)},
+        {"OpTypeEvent", static_cast<SpvOp>(34)},
+        {"OpVariable", static_cast<SpvOp>(59)},
+        {"OpHitObjectGetCurrentTimeNV", static_cast<SpvOp>(5265)},
+        {"OpSubgroupAvcImeSetMaxMotionVectorCountINTEL", static_cast<SpvOp>(5753)},
+        {"OpAny", static_cast<SpvOp>(154)},
+        {"OpTerminateRayNV", static_cast<SpvOp>(5336)},
+        {"OpSubgroupAvcSicEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5805)},
+        {"OpGroupNonUniformFAdd", static_cast<SpvOp>(350)},
+        {"OpSGreaterThanEqual", static_cast<SpvOp>(175)},
+        {"OpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL", static_cast<SpvOp>(5727)},
+        {"OpIsValidReserveId", static_cast<SpvOp>(282)},
+        {"OpAtomicExchange", static_cast<SpvOp>(229)},
+        {"OpConstant", static_cast<SpvOp>(43)},
+        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL", static_cast<SpvOp>(5759)},
+        {"OpUndef", static_cast<SpvOp>(1)},
+        {"OpGroupNonUniformFMin", static_cast<SpvOp>(355)},
+        {"OpSubgroupShuffleINTEL", static_cast<SpvOp>(5571)},
+        {"OpCooperativeMatrixLoadNV", static_cast<SpvOp>(5359)},
+        {"OpTypeMatrix", static_cast<SpvOp>(24)},
+        {"OpGroupUMax", static_cast<SpvOp>(270)},
+        {"OpImageBlockMatchGatherSSDQCOM", static_cast<SpvOp>(4502)},
+        {"OpBitFieldInsert", static_cast<SpvOp>(201)},
+        {"OpSubgroupBlockWriteINTEL", static_cast<SpvOp>(5576)},
+        {"OpImageSparseDrefGather", static_cast<SpvOp>(315)},
+        {"OpImageSparseRead", static_cast<SpvOp>(320)},
+        {"OpSubgroupAvcSicGetIpeLumaShapeINTEL", static_cast<SpvOp>(5809)},
+        {"OpUDot", static_cast<SpvOp>(4451)},
+        {"OpSubgroupAvcImeGetSingleReferenceStreaminINTEL", static_cast<SpvOp>(5766)},
+        {"OpAtomicFlagTestAndSet", static_cast<SpvOp>(318)},
+        {"OpImageSampleProjImplicitLod", static_cast<SpvOp>(91)},
+        {"OpBitwiseOr", static_cast<SpvOp>(197)},
+        {"OpHitObjectGetHitKindNV", static_cast<SpvOp>(5267)},
+        {"OpSubgroupAvcRefSetBidirectionalMixDisableINTEL", static_cast<SpvOp>(5784)},
+        {"OpGetDefaultQueue", static_cast<SpvOp>(303)},
+        {"OpExecuteCallableNV", static_cast<SpvOp>(5344)},
+        {"OpRayQueryGetIntersectionTKHR", static_cast<SpvOp>(6018)},
+        {"OpDPdyFine", static_cast<SpvOp>(211)},
+        {"OpFPGARegINTEL", static_cast<SpvOp>(5949)},
+        {"OpTypeImage", static_cast<SpvOp>(25)},
+        {"OpSourceExtension", static_cast<SpvOp>(4)},
+        {"OpCopyLogical", static_cast<SpvOp>(400)},
+        {"OpGroupNonUniformShuffleUp", static_cast<SpvOp>(347)},
+        {"OpGroupReserveReadPipePackets", static_cast<SpvOp>(285)},
+        {"OpAtomicISub", static_cast<SpvOp>(235)},
+        {"OpTypeFunction", static_cast<SpvOp>(33)},
+        {"OpHitObjectExecuteShaderNV", static_cast<SpvOp>(5264)},
+        {"OpTypeStructContinuedINTEL", static_cast<SpvOp>(6090)},
+        {"OpImageSparseGather", static_cast<SpvOp>(314)},
+        {"OpFOrdNotEqual", static_cast<SpvOp>(182)},
+        {"OpString", static_cast<SpvOp>(7)},
+        {"OpArbitraryFloatLTINTEL", static_cast<SpvOp>(5852)},
+        {"OpGroupNonUniformQuadAllKHR", static_cast<SpvOp>(5110)},
+        {"OpConvertImageToUNV", static_cast<SpvOp>(5393)},
+        {"OpSpecConstantTrue", static_cast<SpvOp>(48)},
+        {"OpGroupMemberDecorate", static_cast<SpvOp>(75)},
+        {"OpULessThanEqual", static_cast<SpvOp>(178)},
+        {"OpFunctionParameter", static_cast<SpvOp>(55)},
+        {"OpFUnordGreaterThanEqual", static_cast<SpvOp>(191)},
+        {"OpVectorTimesMatrix", static_cast<SpvOp>(144)},
+        {"OpLogicalOr", static_cast<SpvOp>(166)},
+        {"OpSubgroupAvcMceConvertToSicPayloadINTEL", static_cast<SpvOp>(5736)},
+        {"OpRayQueryGetIntersectionTypeKHR", static_cast<SpvOp>(4479)},
+        {"OpArbitraryFloatSinCosINTEL", static_cast<SpvOp>(5870)},
+        {"OpSubgroupImageBlockWriteINTEL", static_cast<SpvOp>(5578)},
+        {"OpMatrixTimesMatrix", static_cast<SpvOp>(146)},
+        {"OpBitFieldSExtract", static_cast<SpvOp>(202)},
+        {"OpHitObjectRecordMissMotionNV", static_cast<SpvOp>(5251)},
+        {"OpConvertUToSampledImageNV", static_cast<SpvOp>(5395)},
+        {"OpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL", static_cast<SpvOp>(5723)},
+        {"OpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL", static_cast<SpvOp>(5722)},
+        {"OpGroupNonUniformBitwiseOr", static_cast<SpvOp>(360)},
+        {"OpExecutionModeId", static_cast<SpvOp>(331)},
+        {"OpTerminateInvocation", static_cast<SpvOp>(4416)},
+        {"OpTypeAvcImeDualReferenceStreaminINTEL", static_cast<SpvOp>(5710)},
+        {"OpArbitraryFloatExp2INTEL", static_cast<SpvOp>(5865)},
+        {"OpDPdyCoarse", static_cast<SpvOp>(214)},
+        {"OpGroupNonUniformShuffle", static_cast<SpvOp>(345)},
+        {"OpIgnoreIntersectionNV", static_cast<SpvOp>(5335)},
+        {"OpSubgroupAvcSicGetBestIpeChromaDistortionINTEL", static_cast<SpvOp>(5811)},
+        {"OpSubgroupAvcImeSetUnidirectionalMixDisableINTEL", static_cast<SpvOp>(5754)},
+        {"OpTypeAvcSicPayloadINTEL", static_cast<SpvOp>(5703)},
+        {"OpAtomicCompareExchangeWeak", static_cast<SpvOp>(231)},
+        {"OpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL", static_cast<SpvOp>(5779)},
+        {"OpFOrdGreaterThanEqual", static_cast<SpvOp>(190)},
+        {"OpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL", static_cast<SpvOp>(5797)},
+        {"OpSLessThanEqual", static_cast<SpvOp>(179)},
+        {"OpSubgroupAvcSicConvertToMcePayloadINTEL", static_cast<SpvOp>(5796)},
+        {"OpUAddSatINTEL", static_cast<SpvOp>(5590)},
+        {"OpConvertUToSamplerNV", static_cast<SpvOp>(5392)},
+        {"OpArbitraryFloatSubINTEL", static_cast<SpvOp>(5847)},
+        {"OpGroupNonUniformUMin", static_cast<SpvOp>(354)},
+        {"OpCaptureEventProfilingInfo", static_cast<SpvOp>(302)},
+        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL", static_cast<SpvOp>(5774)},
+        {"OpGroupUMinNonUniformAMD", static_cast<SpvOp>(5003)},
+        {"OpImageQueryLevels", static_cast<SpvOp>(106)},
+        {"OpSubgroupAvcSicGetBestIpeLumaDistortionINTEL", static_cast<SpvOp>(5810)},
+        {"OpINotEqual", static_cast<SpvOp>(171)},
+        {"OpGroupNonUniformQuadBroadcast", static_cast<SpvOp>(365)},
+        {"OpGroupNonUniformAllEqual", static_cast<SpvOp>(336)},
+        {"OpSetMeshOutputsEXT", static_cast<SpvOp>(5295)},
+        {"OpArbitraryFloatExpINTEL", static_cast<SpvOp>(5864)},
+        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL", static_cast<SpvOp>(5770)},
+        {"OpUnordered", static_cast<SpvOp>(163)},
+        {"OpTraceRayKHR", static_cast<SpvOp>(4445)},
+        {"OpConvertUToAccelerationStructureKHR", static_cast<SpvOp>(4447)},
+        {"OpHitObjectGetPrimitiveIndexNV", static_cast<SpvOp>(5268)},
+        {"OpHitObjectGetGeometryIndexNV", static_cast<SpvOp>(5269)},
+        {"OpArbitraryFloatATan2INTEL", static_cast<SpvOp>(5879)},
+        {"OpTypeAvcMcePayloadINTEL", static_cast<SpvOp>(5704)},
+        {"OpUMulExtended", static_cast<SpvOp>(151)},
+        {"OpMemoryNamedBarrier", static_cast<SpvOp>(329)},
+        {"OpGroupLogicalOrKHR", static_cast<SpvOp>(6407)},
+        {"OpArbitraryFloatRSqrtINTEL", static_cast<SpvOp>(5856)},
+        {"OpLoopMerge", static_cast<SpvOp>(246)},
+        {"OpEnqueueMarker", static_cast<SpvOp>(291)},
+        {"OpImageSparseSampleDrefImplicitLod", static_cast<SpvOp>(307)},
+        {"OpGroupNonUniformElect", static_cast<SpvOp>(333)},
+        {"OpImageSampleProjDrefExplicitLod", static_cast<SpvOp>(94)},
+        {"OpRayQueryGetIntersectionInstanceCustomIndexKHR", static_cast<SpvOp>(6019)},
+        {"OpStencilAttachmentReadEXT", static_cast<SpvOp>(4162)},
+        {"OpImageGather", static_cast<SpvOp>(96)},
+        {"OpGroupLogicalXorKHR", static_cast<SpvOp>(6408)},
+        {"OpConvertUToImageNV", static_cast<SpvOp>(5391)},
+        {"OpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL", static_cast<SpvOp>(5807)},
+        {"OpSDotAccSat", static_cast<SpvOp>(4453)},
+        {"OpFixedRsqrtINTEL", static_cast<SpvOp>(5925)},
+        {"OpRayQueryGetIntersectionObjectRayDirectionKHR", static_cast<SpvOp>(6027)},
+        {"OpIMul", static_cast<SpvOp>(132)},
+        {"OpAtomicIDecrement", static_cast<SpvOp>(233)},
+        {"OpReadClockKHR", static_cast<SpvOp>(5056)},
+        {"OpIMul32x16INTEL", static_cast<SpvOp>(5597)},
+        {"OpSatConvertUToS", static_cast<SpvOp>(119)},
+        {"OpAtomicFlagClear", static_cast<SpvOp>(319)},
+        {"OpAll", static_cast<SpvOp>(155)},
+        {"OpHitObjectIsMissNV", static_cast<SpvOp>(5278)},
+        {"OpCompositeExtract", static_cast<SpvOp>(81)},
+        {"OpReturn", static_cast<SpvOp>(253)},
+        {"OpDPdxFine", static_cast<SpvOp>(210)},
+        {"OpSubgroupAvcImeGetBorderReachedINTEL", static_cast<SpvOp>(5776)},
+        {"OpTerminateRayKHR", static_cast<SpvOp>(4449)},
+        {"OpImageBlockMatchWindowSSDQCOM", static_cast<SpvOp>(4500)},
+        {"OpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL", static_cast<SpvOp>(5717)},
+        {"OpArbitraryFloatDivINTEL", static_cast<SpvOp>(5849)},
+        {"OpArbitraryFloatExpm1INTEL", static_cast<SpvOp>(5867)},
+        {"OpAtomicFAddEXT", static_cast<SpvOp>(6035)},
+        {"OpSMulExtended", static_cast<SpvOp>(152)},
+        {"OpFNegate", static_cast<SpvOp>(127)},
+        {"OpGroupNonUniformLogicalOr", static_cast<SpvOp>(363)},
+        {"OpSubgroupAvcRefEvaluateWithMultiReferenceINTEL", static_cast<SpvOp>(5788)},
+        {"OpAsmTargetINTEL", static_cast<SpvOp>(5609)},
+        {"OpBitFieldUExtract", static_cast<SpvOp>(203)},
+        {"OpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL", static_cast<SpvOp>(5714)},
+        {"OpFwidthCoarse", static_cast<SpvOp>(215)},
+        {"OpSubgroupAvcMceGetInterMotionVectorCountINTEL", static_cast<SpvOp>(5744)},
+        {"OpNop", static_cast<SpvOp>(0)},
+        {"OpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL", static_cast<SpvOp>(5726)},
+        {"OpTypeVoid", static_cast<SpvOp>(19)},
+        {"OpSubgroupAvcFmeInitializeINTEL", static_cast<SpvOp>(5781)},
+        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL", static_cast<SpvOp>(5773)},
+        {"OpISubBorrow", static_cast<SpvOp>(150)},
+        {"OpImageBoxFilterQCOM", static_cast<SpvOp>(4481)},
+        {"OpGroupNonUniformAll", static_cast<SpvOp>(334)},
+        {"OpEndInvocationInterlockEXT", static_cast<SpvOp>(5365)},
+        {"OpTypeCooperativeMatrixNV", static_cast<SpvOp>(5358)},
+        {"OpLessOrGreater", static_cast<SpvOp>(161)},
+        {"OpImageBlockMatchGatherSADQCOM", static_cast<SpvOp>(4503)},
+        {"OpArbitraryFloatCbrtINTEL", static_cast<SpvOp>(5857)},
+        {"OpDecorate", static_cast<SpvOp>(71)},
+        {"OpNamedBarrierInitialize", static_cast<SpvOp>(328)},
+        {"OpHitObjectGetShaderBindingTableRecordIndexNV", static_cast<SpvOp>(5258)},
+        {"OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR", static_cast<SpvOp>(6021)},
+        {"OpDecorateString", static_cast<SpvOp>(5632)},
+        {"OpBranch", static_cast<SpvOp>(249)},
+        {"OpIsNan", static_cast<SpvOp>(156)},
+        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL", static_cast<SpvOp>(5760)},
+        {"OpTypeAvcImeResultDualReferenceStreamoutINTEL", static_cast<SpvOp>(5708)},
+        {"OpExpectKHR", static_cast<SpvOp>(5631)},
+        {"OpFunction", static_cast<SpvOp>(54)},
+        {"OpArbitraryFloatGEINTEL", static_cast<SpvOp>(5851)},
+        {"OpTypeStruct", static_cast<SpvOp>(30)},
+        {"OpImageSampleWeightedQCOM", static_cast<SpvOp>(4480)},
+        {"OpCooperativeMatrixStoreKHR", static_cast<SpvOp>(4458)},
+        {"OpSubgroupAvcSicInitializeINTEL", static_cast<SpvOp>(5791)},
+        {"OpFixedCosINTEL", static_cast<SpvOp>(5927)},
+        {"OpAtomicIIncrement", static_cast<SpvOp>(232)},
+        {"OpConvertSToF", static_cast<SpvOp>(111)},
+        {"OpSpecConstant", static_cast<SpvOp>(50)},
+        {"OpGroupBroadcast", static_cast<SpvOp>(263)},
+        {"OpConstantComposite", static_cast<SpvOp>(44)},
+        {"OpUDotAccSat", static_cast<SpvOp>(4454)},
+        {"OpTypeAvcRefResultINTEL", static_cast<SpvOp>(5711)},
+        {"OpHitObjectRecordHitNV", static_cast<SpvOp>(5261)},
+        {"OpLogicalEqual", static_cast<SpvOp>(164)},
+        {"OpFOrdEqual", static_cast<SpvOp>(180)},
+        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL", static_cast<SpvOp>(5764)},
+        {"OpTypeBufferSurfaceINTEL", static_cast<SpvOp>(6086)},
+        {"OpCopyObject", static_cast<SpvOp>(83)},
+        {"OpSelect", static_cast<SpvOp>(169)},
+        {"OpIEqual", static_cast<SpvOp>(170)},
+        {"OpControlBarrierWaitINTEL", static_cast<SpvOp>(6143)},
+        {"OpArbitraryFloatASinPiINTEL", static_cast<SpvOp>(5874)},
+        {"OpArbitraryFloatSqrtINTEL", static_cast<SpvOp>(5859)},
+        {"OpFinishWritingNodePayloadAMDX", static_cast<SpvOp>(5078)},
+        {"OpGroupFAddNonUniformAMD", static_cast<SpvOp>(5001)},
+        {"OpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL", static_cast<SpvOp>(5799)},
+        {"OpGetKernelLocalSizeForSubgroupCount", static_cast<SpvOp>(325)},
+        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5761)},
+        {"OpFAdd", static_cast<SpvOp>(129)},
+        {"OpTypeAccelerationStructureNV", static_cast<SpvOp>(5341)},
+        {"OpSubgroupAvcRefEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5787)},
+        {"OpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL", static_cast<SpvOp>(5789)},
+        {"OpArbitraryFloatHypotINTEL", static_cast<SpvOp>(5858)},
+        {"OpTypeInt", static_cast<SpvOp>(21)},
+        {"OpSubgroupAvcImeEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5757)},
+        {"OpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL", static_cast<SpvOp>(5730)},
+        {"OpPtrDiff", static_cast<SpvOp>(403)},
+        {"OpSubgroupAvcRefEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5786)},
+        {"OpColorAttachmentReadEXT", static_cast<SpvOp>(4160)},
+        {"OpWritePipe", static_cast<SpvOp>(275)},
+        {"OpRayQueryGetIntersectionFrontFaceKHR", static_cast<SpvOp>(6025)},
+        {"OpGroupUMaxNonUniformAMD", static_cast<SpvOp>(5006)},
+        {"OpMemberDecorate", static_cast<SpvOp>(72)},
+        {"OpCommitReadPipe", static_cast<SpvOp>(280)},
+        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL", static_cast<SpvOp>(5763)},
+        {"OpCrossWorkgroupCastToPtrINTEL", static_cast<SpvOp>(5938)},
+        {"OpFetchMicroTriangleVertexBarycentricNV", static_cast<SpvOp>(5301)},
+        {"OpImageSparseSampleProjImplicitLod", static_cast<SpvOp>(309)},
+        {"OpSubgroupAvcMceGetInterMajorShapeINTEL", static_cast<SpvOp>(5741)},
+        {"OpBitwiseXor", static_cast<SpvOp>(198)},
+        {"OpArbitraryFloatPowRINTEL", static_cast<SpvOp>(5881)},
+        {"OpQuantizeToF16", static_cast<SpvOp>(116)},
+        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL", static_cast<SpvOp>(5775)},
+        {"OpGroupSMinNonUniformAMD", static_cast<SpvOp>(5004)},
+        {"OpSubgroupImageBlockReadINTEL", static_cast<SpvOp>(5577)},
+        {"OpFragmentFetchAMD", static_cast<SpvOp>(5012)},
+        {"OpLabel", static_cast<SpvOp>(248)},
+        {"OpDepthAttachmentReadEXT", static_cast<SpvOp>(4161)},
+        {"OpFixedLogINTEL", static_cast<SpvOp>(5932)},
+        {"OpCompositeConstruct", static_cast<SpvOp>(80)},
+        {"OpEndStreamPrimitive", static_cast<SpvOp>(221)},
+        {"OpEmitVertex", static_cast<SpvOp>(218)},
+        {"OpHitObjectGetInstanceCustomIndexNV", static_cast<SpvOp>(5271)},
+        {"OpRayQueryGetIntersectionTriangleVertexPositionsKHR", static_cast<SpvOp>(5340)},
+        {"OpBitwiseAnd", static_cast<SpvOp>(199)},
+        {"OpGroupBitwiseXorKHR", static_cast<SpvOp>(6405)},
+        {"OpSubgroupAvcSicEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5804)},
+        {"OpImageSampleFootprintNV", static_cast<SpvOp>(5283)},
+        {"OpSubgroupAvcMceConvertToImeResultINTEL", static_cast<SpvOp>(5733)},
+        {"OpUGreaterThan", static_cast<SpvOp>(172)},
+        {"OpVectorTimesScalar", static_cast<SpvOp>(142)},
+        {"OpGetKernelPreferredWorkGroupSizeMultiple", static_cast<SpvOp>(296)},
+        {"OpCooperativeMatrixMulAddKHR", static_cast<SpvOp>(4459)},
+        {"OpRayQueryGetIntersectionInstanceIdKHR", static_cast<SpvOp>(6020)},
+        {"OpCooperativeMatrixLoadKHR", static_cast<SpvOp>(4457)},
+        {"OpLogicalNotEqual", static_cast<SpvOp>(165)},
+        {"OpHitObjectGetRayTMinNV", static_cast<SpvOp>(5275)},
+        {"OpSubgroupAvcMceConvertToRefResultINTEL", static_cast<SpvOp>(5735)},
+        {"OpReturnValue", static_cast<SpvOp>(254)},
+        {"OpSubgroupAllKHR", static_cast<SpvOp>(4428)},
+        {"OpInBoundsAccessChain", static_cast<SpvOp>(66)},
+        {"OpPtrCastToGeneric", static_cast<SpvOp>(121)},
+        {"OpIsFinite", static_cast<SpvOp>(158)},
+        {"OpShiftRightArithmetic", static_cast<SpvOp>(195)},
+        {"OpIAdd", static_cast<SpvOp>(128)},
+        {"OpImageSparseSampleExplicitLod", static_cast<SpvOp>(306)},
+        {"OpSubgroupShuffleUpINTEL", static_cast<SpvOp>(5573)},
+        {"OpAtomicUMax", static_cast<SpvOp>(239)},
+        {"OpSubgroupAvcSicConvertToMceResultINTEL", static_cast<SpvOp>(5808)},
+        {"OpGroupIMulKHR", static_cast<SpvOp>(6401)},
+        {"OpGetKernelNDrangeSubGroupCount", static_cast<SpvOp>(293)},
+        {"OpSamplerImageAddressingModeNV", static_cast<SpvOp>(5397)},
+        {"OpSubgroupAvcSicGetIpeChromaModeINTEL", static_cast<SpvOp>(5813)},
+        {"OpCreatePipeFromPipeStorage", static_cast<SpvOp>(324)},
+        {"OpImageSparseSampleProjDrefExplicitLod", static_cast<SpvOp>(312)},
+        {"OpMemoryModel", static_cast<SpvOp>(14)},
+        {"OpAtomicOr", static_cast<SpvOp>(241)},
+        {"OpDecorateId", static_cast<SpvOp>(332)},
+        {"OpDPdx", static_cast<SpvOp>(207)},
+        {"OpSubgroupAvcSicGetInterRawSadsINTEL", static_cast<SpvOp>(5816)},
+        {"OpFwidthFine", static_cast<SpvOp>(212)},
+        {"OpSubgroupAvcMceSetAcOnlyHaarINTEL", static_cast<SpvOp>(5728)},
+        {"OpRayQueryGetRayFlagsKHR", static_cast<SpvOp>(6017)},
+        {"OpTypeOpaque", static_cast<SpvOp>(31)},
+        {"OpArbitraryFloatPowNINTEL", static_cast<SpvOp>(5882)},
+        {"OpSubgroupAvcSicEvaluateWithMultiReferenceINTEL", static_cast<SpvOp>(5806)},
+        {"OpHitObjectGetWorldRayOriginNV", static_cast<SpvOp>(5273)},
+        {"OpSubgroupAvcImeConvertToMceResultINTEL", static_cast<SpvOp>(5765)},
+        {"OpGroupFMax", static_cast<SpvOp>(269)},
+        {"OpSDot", static_cast<SpvOp>(4450)},
+        {"OpSubgroupAvcImeEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5758)},
+        {"OpAtomicUMin", static_cast<SpvOp>(237)},
+        {"OpAliasDomainDeclINTEL", static_cast<SpvOp>(5911)},
+        {"OpGroupNonUniformIAdd", static_cast<SpvOp>(349)},
+        {"OpImageSparseSampleImplicitLod", static_cast<SpvOp>(305)},
+        {"OpPtrNotEqual", static_cast<SpvOp>(402)},
+        {"OpConstantFalse", static_cast<SpvOp>(42)},
+        {"OpConvertFToS", static_cast<SpvOp>(110)},
+        {"OpSwitch", static_cast<SpvOp>(251)},
+        {"OpAtomicStore", static_cast<SpvOp>(228)},
+        {"OpHitObjectGetObjectRayDirectionNV", static_cast<SpvOp>(5254)},
+        {"OpSource", static_cast<SpvOp>(3)},
+        {"OpHitObjectGetWorldToObjectNV", static_cast<SpvOp>(5252)},
+        {"OpConvertFToU", static_cast<SpvOp>(109)},
+        {"OpImageQuerySamples", static_cast<SpvOp>(107)},
+        {"OpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL", static_cast<SpvOp>(5719)},
+        {"OpPtrEqual", static_cast<SpvOp>(401)},
+        {"OpFUnordEqual", static_cast<SpvOp>(181)},
+        {"OpRayQueryGetWorldRayOriginKHR", static_cast<SpvOp>(6030)},
+        {"OpSubgroupAvcMceConvertToSicResultINTEL", static_cast<SpvOp>(5737)},
+        {"OpOrdered", static_cast<SpvOp>(162)},
+        {"OpTypeAvcSicResultINTEL", static_cast<SpvOp>(5712)},
+        {"OpHitObjectGetObjectToWorldNV", static_cast<SpvOp>(5253)},
+        {"OpRayQueryTerminateKHR", static_cast<SpvOp>(4474)},
+        {"OpGroupBitwiseOrKHR", static_cast<SpvOp>(6404)},
+        {"OpFixedSinINTEL", static_cast<SpvOp>(5926)},
+        {"OpConvertUToPtr", static_cast<SpvOp>(120)},
+        {"OpSubgroupImageMediaBlockReadINTEL", static_cast<SpvOp>(5580)},
+        {"OpFConvert", static_cast<SpvOp>(115)},
+        {"OpArbitraryFloatATanINTEL", static_cast<SpvOp>(5877)},
+        {"OpArbitraryFloatLog1pINTEL", static_cast<SpvOp>(5863)},
+        {"OpSubgroupAllEqualKHR", static_cast<SpvOp>(4430)},
+        {"OpFetchMicroTriangleVertexPositionNV", static_cast<SpvOp>(5300)},
+        {"OpGroupNonUniformPartitionNV", static_cast<SpvOp>(5296)},
+        {"OpSubgroupAvcMceConvertToRefPayloadINTEL", static_cast<SpvOp>(5734)},
+        {"OpTypeDeviceEvent", static_cast<SpvOp>(35)},
+        {"OpGetNumPipePackets", static_cast<SpvOp>(283)},
+        {"OpFunctionPointerCallINTEL", static_cast<SpvOp>(5601)},
+        {"OpReadPipeBlockingINTEL", static_cast<SpvOp>(5946)},
+        {"OpArbitraryFloatExp10INTEL", static_cast<SpvOp>(5866)},
+        {"OpDPdy", static_cast<SpvOp>(208)},
+        {"OpSpecConstantComposite", static_cast<SpvOp>(51)},
+        {"OpArbitraryFloatRecipINTEL", static_cast<SpvOp>(5855)},
+        {"OpAbsISubINTEL", static_cast<SpvOp>(5587)},
+        {"OpSubgroupAvcImeConvertToMcePayloadINTEL", static_cast<SpvOp>(5752)},
+        {"OpReservedWritePipe", static_cast<SpvOp>(277)},
+        {"OpBuildNDRange", static_cast<SpvOp>(304)},
+        {"OpImageSparseSampleDrefExplicitLod", static_cast<SpvOp>(308)},
+        {"OpUSubSatINTEL", static_cast<SpvOp>(5596)},
+        {"OpVectorShuffle", static_cast<SpvOp>(79)},
+        {"OpArbitraryFloatATanPiINTEL", static_cast<SpvOp>(5878)},
+        {"OpSUDot", static_cast<SpvOp>(4452)},
+        {"OpTypeVector", static_cast<SpvOp>(23)},
+        {"OpSubgroupAvcSicGetPackedIpeLumaModesINTEL", static_cast<SpvOp>(5812)},
+        {"OpSaveMemoryINTEL", static_cast<SpvOp>(5819)},
+        {"OpSubgroupAvcMceConvertToImePayloadINTEL", static_cast<SpvOp>(5732)},
+        {"OpTypePipe", static_cast<SpvOp>(38)},
+        {"OpSpecConstantFalse", static_cast<SpvOp>(49)},
+        {"OpAbsUSubINTEL", static_cast<SpvOp>(5588)},
+        {"OpHitObjectRecordEmptyNV", static_cast<SpvOp>(5259)},
+        {"OpTypeSampler", static_cast<SpvOp>(26)},
+        {"OpHitObjectRecordMissNV", static_cast<SpvOp>(5263)},
+        {"OpSMod", static_cast<SpvOp>(139)},
+        {"OpFOrdLessThan", static_cast<SpvOp>(184)},
+        {"OpArbitraryFloatACosINTEL", static_cast<SpvOp>(5875)},
+        {"OpReserveWritePipePackets", static_cast<SpvOp>(279)},
+        {"OpLifetimeStart", static_cast<SpvOp>(256)},
+        {"OpImageSparseSampleProjDrefImplicitLod", static_cast<SpvOp>(311)},
+        {"OpAtomicCompareExchange", static_cast<SpvOp>(230)},
+        {"OpArrayLength", static_cast<SpvOp>(68)},
+        {"OpSubgroupAvcImeStripDualReferenceStreamoutINTEL", static_cast<SpvOp>(5769)},
+        {"OpCooperativeMatrixMulAddNV", static_cast<SpvOp>(5361)},
+        {"OpGroupNonUniformFMax", static_cast<SpvOp>(358)},
+        {"OpSubgroupReadInvocationKHR", static_cast<SpvOp>(4432)},
+        {"OpVariableLengthArrayINTEL", static_cast<SpvOp>(5818)},
+        {"OpGetKernelNDrangeMaxSubGroupSize", static_cast<SpvOp>(294)},
     };
 
     static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
         UInt32 h = salt;
         for (const char c : str)
             h = (h * 0x01000193) ^ c;
-        return h % 724;
+        return h % 733;
     };
 
     const auto i = hash(str, tableSalt[hash(str, 0)]);
@@ -813,288 +822,296 @@ static bool lookupSpvOp(const UnownedStringSlice& str, SpvOp& value)
 
 static bool lookupSpvCapability(const UnownedStringSlice& str, SpvCapability& value)
 {
-    static const unsigned tableSalt[252] = {
-        2, 1, 2, 1, 2, 0, 2, 0, 3, 1, 5, 1, 10, 0, 7, 0,
-        3, 0, 0, 7, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 5,
-        1, 0, 0, 0, 1, 10, 1, 2, 2, 0, 2, 0, 0, 5, 1, 1,
-        0, 3, 1, 1, 2, 1, 0, 1, 1, 1, 0, 2, 0, 5, 0, 3,
-        12, 1, 0, 0, 1, 5, 0, 0, 5, 0, 1, 1, 0, 3, 3, 2,
-        8, 2, 1, 5, 2, 0, 3, 1, 1, 0, 5, 1, 2, 5, 0, 2,
-        5, 1, 0, 2, 0, 2, 9, 8, 0, 0, 6, 1, 1, 7, 0, 0,
-        4, 0, 7, 0, 4, 6, 0, 9, 0, 0, 3, 0, 0, 3, 20, 0,
-        0, 1, 2, 0, 1, 2, 1, 4, 1, 0, 7, 2, 0, 1, 1, 0,
-        7, 2, 8, 3, 8, 0, 30, 4, 1, 0, 0, 15, 0, 0, 4, 6,
-        3, 0, 0, 8, 0, 2, 2, 4, 5, 7, 1, 2, 0, 0, 10, 24,
-        0, 0, 0, 6, 0, 1, 5, 16, 0, 0, 10, 4, 1, 2, 0, 5,
-        13, 3, 0, 1, 0, 7, 8, 1, 2, 0, 4, 13, 2, 0, 6, 0,
-        1, 26, 0, 30, 0, 0, 0, 19, 1, 0, 25, 11, 0, 2, 12, 0,
-        0, 14, 3, 60, 6, 0, 3, 8, 3, 93, 105, 4, 32, 3, 0, 85,
-        12, 3, 0, 0, 0, 8, 0, 2, 0, 413, 2, 0
+    static const unsigned tableSalt[259] = {
+        4, 3, 0, 13, 1, 0, 0, 1, 1, 7, 4, 0, 0, 3, 2, 1,
+        1, 0, 3, 1, 2, 0, 3, 0, 5, 0, 1, 1, 1, 2, 1, 0,
+        1, 4, 2, 4, 0, 1, 3, 1, 2, 2, 2, 3, 1, 2, 2, 0,
+        0, 0, 2, 0, 0, 1, 0, 5, 0, 0, 0, 1, 1, 2, 0, 2,
+        2, 6, 7, 1, 3, 3, 0, 0, 0, 0, 2, 0, 11, 3, 0, 2,
+        1, 5, 0, 1, 0, 0, 1, 0, 4, 0, 0, 3, 2, 12, 3, 0,
+        1, 1, 0, 7, 0, 6, 12, 0, 8, 3, 0, 1, 0, 6, 2, 3,
+        0, 1, 14, 2, 0, 4, 2, 0, 1, 4, 0, 0, 3, 0, 0, 2,
+        1, 6, 6, 0, 0, 1, 1, 8, 1, 0, 0, 18, 6, 1, 2, 0,
+        0, 0, 2, 0, 2, 2, 1, 0, 4, 0, 0, 0, 0, 0, 13, 0,
+        1, 5, 0, 5, 0, 2, 4, 8, 0, 1, 0, 16, 1, 0, 14, 3,
+        0, 1, 0, 5, 6, 1, 8, 1, 12, 14, 0, 1, 16, 0, 3, 0,
+        30, 2, 0, 2, 0, 0, 3, 6, 24, 1, 4, 0, 22, 1, 6, 1,
+        8, 48, 0, 6, 0, 0, 5, 2, 0, 46, 0, 4, 1, 0, 0, 6,
+        3, 0, 21, 6, 30, 0, 2, 0, 0, 0, 8, 2, 17, 6, 40, 0,
+        49, 52, 1, 0, 3, 0, 0, 0, 93, 143, 68, 8, 5, 0, 0, 45,
+        1, 22, 858
     };
 
     using KV = std::pair<const char*, SpvCapability>;
 
-    static const KV words[252] =
+    static const KV words[259] =
     {
-        {"ShaderEnqueueAMDX", static_cast<SpvCapability>(5067)},
-        {"StorageImageArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5309)},
-        {"FPFastMathModeINTEL", static_cast<SpvCapability>(5837)},
-        {"GroupUniformArithmeticKHR", static_cast<SpvCapability>(6400)},
-        {"Int16", static_cast<SpvCapability>(22)},
-        {"DrawParameters", static_cast<SpvCapability>(4427)},
-        {"Geometry", static_cast<SpvCapability>(2)},
-        {"Pipes", static_cast<SpvCapability>(17)},
-        {"ImageGatherBiasLodAMD", static_cast<SpvCapability>(5009)},
-        {"SubgroupAvcMotionEstimationINTEL", static_cast<SpvCapability>(5696)},
-        {"SampledImageArrayDynamicIndexing", static_cast<SpvCapability>(29)},
-        {"SampleRateShading", static_cast<SpvCapability>(35)},
-        {"RayTraversalPrimitiveCullingKHR", static_cast<SpvCapability>(4478)},
-        {"CacheControlsINTEL", static_cast<SpvCapability>(6441)},
-        {"ImageBasic", static_cast<SpvCapability>(13)},
-        {"FPGAKernelAttributesINTEL", static_cast<SpvCapability>(5897)},
-        {"StorageImageExtendedFormats", static_cast<SpvCapability>(49)},
-        {"MeshShadingNV", static_cast<SpvCapability>(5266)},
-        {"AsmINTEL", static_cast<SpvCapability>(5606)},
-        {"WorkgroupMemoryExplicitLayout16BitAccessKHR", static_cast<SpvCapability>(4430)},
-        {"ShaderViewportIndex", static_cast<SpvCapability>(70)},
-        {"StorageImageArrayDynamicIndexing", static_cast<SpvCapability>(31)},
-        {"WorkgroupMemoryExplicitLayout8BitAccessKHR", static_cast<SpvCapability>(4429)},
-        {"InterpolationFunction", static_cast<SpvCapability>(52)},
-        {"Tessellation", static_cast<SpvCapability>(3)},
-        {"UniformTexelBufferArrayDynamicIndexing", static_cast<SpvCapability>(5304)},
-        {"UniformBufferArrayDynamicIndexing", static_cast<SpvCapability>(28)},
-        {"Image1D", static_cast<SpvCapability>(44)},
-        {"ClipDistance", static_cast<SpvCapability>(32)},
-        {"CooperativeMatrixNV", static_cast<SpvCapability>(5357)},
-        {"DotProductInput4x8BitPackedKHR", static_cast<SpvCapability>(6018)},
-        {"GroupNonUniformQuad", static_cast<SpvCapability>(68)},
-        {"FPGAKernelAttributesv2INTEL", static_cast<SpvCapability>(6161)},
-        {"ShaderViewportIndexLayerEXT", static_cast<SpvCapability>(5254)},
-        {"Int64ImageEXT", static_cast<SpvCapability>(5016)},
-        {"DemoteToHelperInvocationEXT", static_cast<SpvCapability>(5379)},
-        {"TextureBlockMatchQCOM", static_cast<SpvCapability>(4486)},
-        {"MeshShadingEXT", static_cast<SpvCapability>(5283)},
-        {"RayTracingProvisionalKHR", static_cast<SpvCapability>(5353)},
-        {"ShaderNonUniformEXT", static_cast<SpvCapability>(5301)},
-        {"ImageRect", static_cast<SpvCapability>(36)},
-        {"FunctionFloatControlINTEL", static_cast<SpvCapability>(5821)},
-        {"ShaderNonUniform", static_cast<SpvCapability>(5301)},
-        {"FragmentDensityEXT", static_cast<SpvCapability>(5291)},
-        {"FragmentBarycentricNV", static_cast<SpvCapability>(5284)},
-        {"BitInstructions", static_cast<SpvCapability>(6025)},
-        {"Matrix", static_cast<SpvCapability>(0)},
-        {"FPGAInvocationPipeliningAttributesINTEL", static_cast<SpvCapability>(5916)},
-        {"GeometryStreams", static_cast<SpvCapability>(54)},
-        {"DotProductInput4x8BitKHR", static_cast<SpvCapability>(6017)},
-        {"ImageGatherExtended", static_cast<SpvCapability>(25)},
-        {"SparseResidency", static_cast<SpvCapability>(41)},
-        {"InputAttachmentArrayDynamicIndexingEXT", static_cast<SpvCapability>(5303)},
-        {"ImageFootprintNV", static_cast<SpvCapability>(5282)},
-        {"Linkage", static_cast<SpvCapability>(5)},
-        {"USMStorageClassesINTEL", static_cast<SpvCapability>(5935)},
-        {"StorageBuffer8BitAccess", static_cast<SpvCapability>(4448)},
-        {"SubgroupBallotKHR", static_cast<SpvCapability>(4423)},
-        {"StorageBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5308)},
-        {"StorageImageReadWithoutFormat", static_cast<SpvCapability>(55)},
-        {"RuntimeAlignedAttributeINTEL", static_cast<SpvCapability>(5939)},
-        {"FloatingPointModeINTEL", static_cast<SpvCapability>(5583)},
-        {"Float16Buffer", static_cast<SpvCapability>(8)},
-        {"StorageBufferArrayDynamicIndexing", static_cast<SpvCapability>(30)},
-        {"StorageTexelBufferArrayDynamicIndexing", static_cast<SpvCapability>(5305)},
-        {"VulkanMemoryModelKHR", static_cast<SpvCapability>(5345)},
-        {"GroupNonUniformClustered", static_cast<SpvCapability>(67)},
-        {"GroupNonUniformShuffleRelative", static_cast<SpvCapability>(66)},
-        {"Shader", static_cast<SpvCapability>(1)},
-        {"GroupNonUniform", static_cast<SpvCapability>(61)},
-        {"GeometryPointSize", static_cast<SpvCapability>(24)},
-        {"Float16ImageAMD", static_cast<SpvCapability>(5008)},
         {"RuntimeDescriptorArray", static_cast<SpvCapability>(5302)},
-        {"RayQueryKHR", static_cast<SpvCapability>(4472)},
-        {"GroupNonUniformShuffle", static_cast<SpvCapability>(65)},
-        {"ShaderViewportMaskNV", static_cast<SpvCapability>(5255)},
-        {"StorageInputOutput16", static_cast<SpvCapability>(4436)},
-        {"FragmentMaskAMD", static_cast<SpvCapability>(5010)},
-        {"GeometryShaderPassthroughNV", static_cast<SpvCapability>(5251)},
-        {"BindlessTextureNV", static_cast<SpvCapability>(5390)},
-        {"UniformBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5306)},
-        {"OptNoneINTEL", static_cast<SpvCapability>(6094)},
-        {"RayTracingMotionBlurNV", static_cast<SpvCapability>(5341)},
-        {"SignedZeroInfNanPreserve", static_cast<SpvCapability>(4466)},
-        {"DotProductInput4x8BitPacked", static_cast<SpvCapability>(6018)},
-        {"FPGALoopControlsINTEL", static_cast<SpvCapability>(5888)},
-        {"DisplacementMicromapNV", static_cast<SpvCapability>(5380)},
-        {"ImageBuffer", static_cast<SpvCapability>(47)},
-        {"UniformAndStorageBuffer8BitAccess", static_cast<SpvCapability>(4449)},
-        {"ArbitraryPrecisionFixedPointINTEL", static_cast<SpvCapability>(5922)},
-        {"DenormPreserve", static_cast<SpvCapability>(4464)},
-        {"VulkanMemoryModelDeviceScopeKHR", static_cast<SpvCapability>(5346)},
-        {"FragmentShadingRateKHR", static_cast<SpvCapability>(4422)},
-        {"AtomicFloat64MinMaxEXT", static_cast<SpvCapability>(5613)},
-        {"FragmentShaderSampleInterlockEXT", static_cast<SpvCapability>(5363)},
-        {"FPGAClusterAttributesINTEL", static_cast<SpvCapability>(5904)},
-        {"StorageUniformBufferBlock16", static_cast<SpvCapability>(4433)},
-        {"SubgroupAvcMotionEstimationChromaINTEL", static_cast<SpvCapability>(5698)},
-        {"RoundToInfinityINTEL", static_cast<SpvCapability>(5582)},
-        {"FragmentFullyCoveredEXT", static_cast<SpvCapability>(5265)},
-        {"DotProductInput4x8Bit", static_cast<SpvCapability>(6017)},
-        {"StoragePushConstant16", static_cast<SpvCapability>(4435)},
-        {"BlockingPipesINTEL", static_cast<SpvCapability>(5945)},
-        {"SubgroupDispatch", static_cast<SpvCapability>(58)},
-        {"DenormFlushToZero", static_cast<SpvCapability>(4465)},
-        {"FPMaxErrorINTEL", static_cast<SpvCapability>(6169)},
-        {"RayQueryProvisionalKHR", static_cast<SpvCapability>(4471)},
-        {"DotProductInputAll", static_cast<SpvCapability>(6016)},
-        {"RuntimeDescriptorArrayEXT", static_cast<SpvCapability>(5302)},
-        {"RayTracingKHR", static_cast<SpvCapability>(4479)},
-        {"FPGABufferLocationINTEL", static_cast<SpvCapability>(5920)},
-        {"AtomicFloat16AddEXT", static_cast<SpvCapability>(6095)},
-        {"UnstructuredLoopControlsINTEL", static_cast<SpvCapability>(5886)},
-        {"StorageUniform16", static_cast<SpvCapability>(4434)},
-        {"PhysicalStorageBufferAddresses", static_cast<SpvCapability>(5347)},
-        {"VariablePointers", static_cast<SpvCapability>(4442)},
-        {"InputAttachmentArrayDynamicIndexing", static_cast<SpvCapability>(5303)},
-        {"InputAttachmentArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5310)},
-        {"DeviceEnqueue", static_cast<SpvCapability>(19)},
-        {"ArbitraryPrecisionIntegersINTEL", static_cast<SpvCapability>(5844)},
         {"TextureSampleWeightedQCOM", static_cast<SpvCapability>(4484)},
-        {"PipeStorage", static_cast<SpvCapability>(60)},
-        {"KernelAttributesINTEL", static_cast<SpvCapability>(5892)},
-        {"VulkanMemoryModelDeviceScope", static_cast<SpvCapability>(5346)},
-        {"ShaderInvocationReorderNV", static_cast<SpvCapability>(5383)},
-        {"VariablePointersStorageBuffer", static_cast<SpvCapability>(4441)},
-        {"ExpectAssumeKHR", static_cast<SpvCapability>(5629)},
-        {"ShaderStereoViewNV", static_cast<SpvCapability>(5259)},
-        {"ImageMipmap", static_cast<SpvCapability>(15)},
-        {"SampledCubeArray", static_cast<SpvCapability>(45)},
-        {"CoreBuiltinsARM", static_cast<SpvCapability>(4165)},
-        {"MemoryAccessAliasingINTEL", static_cast<SpvCapability>(5910)},
-        {"SampledRect", static_cast<SpvCapability>(37)},
-        {"SampledImageArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5307)},
-        {"SubgroupAvcMotionEstimationIntraINTEL", static_cast<SpvCapability>(5697)},
-        {"MultiViewport", static_cast<SpvCapability>(57)},
-        {"ShaderLayer", static_cast<SpvCapability>(69)},
-        {"NamedBarrier", static_cast<SpvCapability>(59)},
-        {"ArbitraryPrecisionFloatingPointINTEL", static_cast<SpvCapability>(5845)},
-        {"StorageBuffer16BitAccess", static_cast<SpvCapability>(4433)},
-        {"DerivativeControl", static_cast<SpvCapability>(51)},
-        {"ShaderSMBuiltinsNV", static_cast<SpvCapability>(5373)},
-        {"GlobalVariableFPGADecorationsINTEL", static_cast<SpvCapability>(6189)},
-        {"StoragePushConstant8", static_cast<SpvCapability>(4450)},
-        {"Int64", static_cast<SpvCapability>(11)},
-        {"ShaderViewportIndexLayerNV", static_cast<SpvCapability>(5254)},
-        {"GroupNonUniformArithmetic", static_cast<SpvCapability>(63)},
+        {"DotProductInput4x8BitPackedKHR", static_cast<SpvCapability>(6018)},
         {"Int64Atomics", static_cast<SpvCapability>(12)},
-        {"PerViewAttributesNV", static_cast<SpvCapability>(5260)},
-        {"RayQueryPositionFetchKHR", static_cast<SpvCapability>(5391)},
-        {"SampleMaskPostDepthCoverage", static_cast<SpvCapability>(4447)},
-        {"StorageBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5308)},
-        {"InputAttachment", static_cast<SpvCapability>(40)},
-        {"StorageImageWriteWithoutFormat", static_cast<SpvCapability>(56)},
-        {"PhysicalStorageBufferAddressesEXT", static_cast<SpvCapability>(5347)},
-        {"ImageMSArray", static_cast<SpvCapability>(48)},
-        {"RayTracingPositionFetchKHR", static_cast<SpvCapability>(5336)},
-        {"Vector16", static_cast<SpvCapability>(7)},
-        {"CullDistance", static_cast<SpvCapability>(33)},
-        {"SampleMaskOverrideCoverageNV", static_cast<SpvCapability>(5249)},
-        {"VariableLengthArrayINTEL", static_cast<SpvCapability>(5817)},
-        {"LongCompositesINTEL", static_cast<SpvCapability>(6089)},
-        {"LiteralSampler", static_cast<SpvCapability>(20)},
-        {"SubgroupVoteKHR", static_cast<SpvCapability>(4431)},
-        {"InputAttachmentArrayNonUniformIndexing", static_cast<SpvCapability>(5310)},
-        {"VectorComputeINTEL", static_cast<SpvCapability>(5617)},
-        {"UniformTexelBufferArrayDynamicIndexingEXT", static_cast<SpvCapability>(5304)},
-        {"Sampled1D", static_cast<SpvCapability>(43)},
-        {"Int8", static_cast<SpvCapability>(39)},
-        {"Kernel", static_cast<SpvCapability>(6)},
-        {"DemoteToHelperInvocation", static_cast<SpvCapability>(5379)},
-        {"IndirectReferencesINTEL", static_cast<SpvCapability>(5604)},
-        {"AtomicFloat32AddEXT", static_cast<SpvCapability>(6033)},
-        {"GroupNonUniformVote", static_cast<SpvCapability>(62)},
-        {"MultiView", static_cast<SpvCapability>(4439)},
-        {"FPGAClusterAttributesV2INTEL", static_cast<SpvCapability>(6150)},
-        {"UniformTexelBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5311)},
-        {"GlobalVariableHostAccessINTEL", static_cast<SpvCapability>(6187)},
-        {"VectorAnyINTEL", static_cast<SpvCapability>(5619)},
-        {"SampledBuffer", static_cast<SpvCapability>(46)},
-        {"MinLod", static_cast<SpvCapability>(42)},
-        {"FPGAArgumentInterfacesINTEL", static_cast<SpvCapability>(6174)},
-        {"StorageTexelBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5312)},
-        {"FPGADSPControlINTEL", static_cast<SpvCapability>(5908)},
-        {"AtomicStorageOps", static_cast<SpvCapability>(4445)},
-        {"TileImageColorReadAccessEXT", static_cast<SpvCapability>(4166)},
-        {"FragmentShaderShadingRateInterlockEXT", static_cast<SpvCapability>(5372)},
-        {"BFloat16ConversionINTEL", static_cast<SpvCapability>(6115)},
-        {"VulkanMemoryModel", static_cast<SpvCapability>(5345)},
-        {"AtomicFloat64AddEXT", static_cast<SpvCapability>(6034)},
-        {"RoundingModeRTE", static_cast<SpvCapability>(4467)},
-        {"UniformAndStorageBuffer16BitAccess", static_cast<SpvCapability>(4434)},
-        {"RayTracingDisplacementMicromapNV", static_cast<SpvCapability>(5409)},
-        {"StencilExportEXT", static_cast<SpvCapability>(5013)},
-        {"CooperativeMatrixKHR", static_cast<SpvCapability>(6022)},
-        {"UniformTexelBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5311)},
-        {"FPGAMemoryAccessesINTEL", static_cast<SpvCapability>(5898)},
-        {"SubgroupImageBlockIOINTEL", static_cast<SpvCapability>(5570)},
-        {"WorkgroupMemoryExplicitLayoutKHR", static_cast<SpvCapability>(4428)},
-        {"ImageReadWriteLodAMD", static_cast<SpvCapability>(5015)},
         {"DeviceGroup", static_cast<SpvCapability>(4437)},
-        {"SampledImageArrayNonUniformIndexing", static_cast<SpvCapability>(5307)},
-        {"AtomicStorage", static_cast<SpvCapability>(21)},
-        {"AtomicFloat16MinMaxEXT", static_cast<SpvCapability>(5616)},
-        {"FragmentBarycentricKHR", static_cast<SpvCapability>(5284)},
-        {"ComputeDerivativeGroupLinearNV", static_cast<SpvCapability>(5350)},
-        {"Float64", static_cast<SpvCapability>(10)},
-        {"FPGAMemoryAttributesINTEL", static_cast<SpvCapability>(5824)},
-        {"GenericPointer", static_cast<SpvCapability>(38)},
-        {"SubgroupBufferBlockIOINTEL", static_cast<SpvCapability>(5569)},
+        {"DotProductInputAll", static_cast<SpvCapability>(6016)},
+        {"AtomicFloat64AddEXT", static_cast<SpvCapability>(6034)},
+        {"DotProduct", static_cast<SpvCapability>(6019)},
+        {"ImageMSArray", static_cast<SpvCapability>(48)},
+        {"GlobalVariableFPGADecorationsINTEL", static_cast<SpvCapability>(6189)},
+        {"FPGADSPControlINTEL", static_cast<SpvCapability>(5908)},
+        {"GroupNonUniformClustered", static_cast<SpvCapability>(67)},
+        {"AtomicStorageOps", static_cast<SpvCapability>(4445)},
+        {"LongCompositesINTEL", static_cast<SpvCapability>(6089)},
+        {"SampleRateShading", static_cast<SpvCapability>(35)},
+        {"Int64ImageEXT", static_cast<SpvCapability>(5016)},
+        {"UniformAndStorageBuffer8BitAccess", static_cast<SpvCapability>(4449)},
+        {"SampledImageArrayDynamicIndexing", static_cast<SpvCapability>(29)},
+        {"CoreBuiltinsARM", static_cast<SpvCapability>(4165)},
+        {"FPGAKernelAttributesv2INTEL", static_cast<SpvCapability>(6161)},
+        {"DrawParameters", static_cast<SpvCapability>(4427)},
+        {"FPMaxErrorINTEL", static_cast<SpvCapability>(6169)},
+        {"RoundingModeRTZ", static_cast<SpvCapability>(4468)},
         {"TransformFeedback", static_cast<SpvCapability>(53)},
-        {"UniformDecoration", static_cast<SpvCapability>(71)},
-        {"ImageQuery", static_cast<SpvCapability>(50)},
+        {"DenormPreserve", static_cast<SpvCapability>(4464)},
+        {"DemoteToHelperInvocationEXT", static_cast<SpvCapability>(5379)},
+        {"ArbitraryPrecisionFixedPointINTEL", static_cast<SpvCapability>(5922)},
+        {"SubgroupShuffleINTEL", static_cast<SpvCapability>(5568)},
+        {"BlockingPipesINTEL", static_cast<SpvCapability>(5945)},
+        {"AtomicFloat64MinMaxEXT", static_cast<SpvCapability>(5613)},
+        {"FPGABufferLocationINTEL", static_cast<SpvCapability>(5920)},
+        {"GroupUniformArithmeticKHR", static_cast<SpvCapability>(6400)},
+        {"StencilExportEXT", static_cast<SpvCapability>(5013)},
+        {"InputAttachmentArrayDynamicIndexing", static_cast<SpvCapability>(5303)},
+        {"AtomicFloat16AddEXT", static_cast<SpvCapability>(6095)},
+        {"StorageBuffer8BitAccess", static_cast<SpvCapability>(4448)},
+        {"FragmentShadingRateKHR", static_cast<SpvCapability>(4422)},
+        {"Float16", static_cast<SpvCapability>(9)},
         {"DotProductInputAllKHR", static_cast<SpvCapability>(6016)},
+        {"PipeStorage", static_cast<SpvCapability>(60)},
+        {"DeviceEnqueue", static_cast<SpvCapability>(19)},
+        {"GroupNonUniform", static_cast<SpvCapability>(61)},
+        {"SubgroupImageBlockIOINTEL", static_cast<SpvCapability>(5570)},
+        {"StorageBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5308)},
+        {"ShaderStereoViewNV", static_cast<SpvCapability>(5259)},
+        {"AtomicFloat32MinMaxEXT", static_cast<SpvCapability>(5612)},
+        {"RayTracingKHR", static_cast<SpvCapability>(4479)},
+        {"BFloat16ConversionINTEL", static_cast<SpvCapability>(6115)},
+        {"UniformBufferArrayDynamicIndexing", static_cast<SpvCapability>(28)},
+        {"ShaderViewportMaskNV", static_cast<SpvCapability>(5255)},
+        {"FragmentBarycentricKHR", static_cast<SpvCapability>(5284)},
+        {"GlobalVariableHostAccessINTEL", static_cast<SpvCapability>(6187)},
+        {"MultiViewport", static_cast<SpvCapability>(57)},
+        {"StorageImageArrayDynamicIndexing", static_cast<SpvCapability>(31)},
+        {"SubgroupImageMediaBlockIOINTEL", static_cast<SpvCapability>(5579)},
+        {"SampledCubeArray", static_cast<SpvCapability>(45)},
+        {"StorageUniformBufferBlock16", static_cast<SpvCapability>(4433)},
+        {"DotProductKHR", static_cast<SpvCapability>(6019)},
+        {"InterpolationFunction", static_cast<SpvCapability>(52)},
+        {"SignedZeroInfNanPreserve", static_cast<SpvCapability>(4466)},
+        {"UniformAndStorageBuffer16BitAccess", static_cast<SpvCapability>(4434)},
+        {"Int8", static_cast<SpvCapability>(39)},
+        {"ImageReadWrite", static_cast<SpvCapability>(14)},
+        {"TileImageColorReadAccessEXT", static_cast<SpvCapability>(4166)},
+        {"VariablePointersStorageBuffer", static_cast<SpvCapability>(4441)},
+        {"Float16Buffer", static_cast<SpvCapability>(8)},
+        {"DerivativeControl", static_cast<SpvCapability>(51)},
+        {"ImageFootprintNV", static_cast<SpvCapability>(5282)},
+        {"InputAttachmentArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5310)},
+        {"GroupNonUniformArithmetic", static_cast<SpvCapability>(63)},
+        {"WorkgroupMemoryExplicitLayout16BitAccessKHR", static_cast<SpvCapability>(4430)},
+        {"GroupNonUniformQuad", static_cast<SpvCapability>(68)},
+        {"MeshShadingEXT", static_cast<SpvCapability>(5283)},
+        {"SparseResidency", static_cast<SpvCapability>(41)},
+        {"ShaderViewportIndexLayerEXT", static_cast<SpvCapability>(5254)},
+        {"ClipDistance", static_cast<SpvCapability>(32)},
+        {"GeometryStreams", static_cast<SpvCapability>(54)},
+        {"StorageImageReadWithoutFormat", static_cast<SpvCapability>(55)},
+        {"SampledBuffer", static_cast<SpvCapability>(46)},
+        {"UniformTexelBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5311)},
+        {"StorageTexelBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5312)},
+        {"LoopFuseINTEL", static_cast<SpvCapability>(5906)},
         {"IOPipesINTEL", static_cast<SpvCapability>(5943)},
         {"ImageCubeArray", static_cast<SpvCapability>(34)},
-        {"RoundingModeRTZ", static_cast<SpvCapability>(4468)},
-        {"GroupNonUniformBallot", static_cast<SpvCapability>(64)},
-        {"AtomicFloat32MinMaxEXT", static_cast<SpvCapability>(5612)},
-        {"IntegerFunctions2INTEL", static_cast<SpvCapability>(5584)},
-        {"FPGALatencyControlINTEL", static_cast<SpvCapability>(6171)},
-        {"StorageImageArrayNonUniformIndexing", static_cast<SpvCapability>(5309)},
-        {"ShadingRateNV", static_cast<SpvCapability>(5291)},
-        {"Float16", static_cast<SpvCapability>(9)},
-        {"TileImageStencilReadAccessEXT", static_cast<SpvCapability>(4168)},
-        {"ShaderClockKHR", static_cast<SpvCapability>(5055)},
-        {"UniformBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5306)},
-        {"ImageReadWrite", static_cast<SpvCapability>(14)},
-        {"RayCullMaskKHR", static_cast<SpvCapability>(6020)},
+        {"PhysicalStorageBufferAddresses", static_cast<SpvCapability>(5347)},
+        {"Vector16", static_cast<SpvCapability>(7)},
+        {"InputAttachment", static_cast<SpvCapability>(40)},
+        {"VulkanMemoryModelDeviceScopeKHR", static_cast<SpvCapability>(5346)},
+        {"StorageImageExtendedFormats", static_cast<SpvCapability>(49)},
+        {"ImageRect", static_cast<SpvCapability>(36)},
+        {"VariableLengthArrayINTEL", static_cast<SpvCapability>(5817)},
         {"RayTracingOpacityMicromapEXT", static_cast<SpvCapability>(5381)},
-        {"GroupNonUniformPartitionedNV", static_cast<SpvCapability>(5297)},
-        {"Groups", static_cast<SpvCapability>(18)},
-        {"LoopFuseINTEL", static_cast<SpvCapability>(5906)},
-        {"TextureBoxFilterQCOM", static_cast<SpvCapability>(4485)},
-        {"GroupNonUniformRotateKHR", static_cast<SpvCapability>(6026)},
-        {"DotProduct", static_cast<SpvCapability>(6019)},
-        {"ComputeDerivativeGroupQuadsNV", static_cast<SpvCapability>(5288)},
-        {"SubgroupShuffleINTEL", static_cast<SpvCapability>(5568)},
-        {"SubgroupImageMediaBlockIOINTEL", static_cast<SpvCapability>(5579)},
-        {"RayTracingNV", static_cast<SpvCapability>(5340)},
+        {"GroupNonUniformVote", static_cast<SpvCapability>(62)},
+        {"AtomicFloat16VectorNV", static_cast<SpvCapability>(5404)},
+        {"SubgroupAvcMotionEstimationIntraINTEL", static_cast<SpvCapability>(5697)},
+        {"AtomicFloat16MinMaxEXT", static_cast<SpvCapability>(5616)},
+        {"DenormFlushToZero", static_cast<SpvCapability>(4465)},
+        {"FloatingPointModeINTEL", static_cast<SpvCapability>(5583)},
+        {"DotProductInput4x8BitPacked", static_cast<SpvCapability>(6018)},
+        {"FPGAClusterAttributesINTEL", static_cast<SpvCapability>(5904)},
+        {"RayTracingPositionFetchKHR", static_cast<SpvCapability>(5336)},
+        {"Float16ImageAMD", static_cast<SpvCapability>(5008)},
+        {"FunctionFloatControlINTEL", static_cast<SpvCapability>(5821)},
+        {"RayTracingMotionBlurNV", static_cast<SpvCapability>(5341)},
         {"TessellationPointSize", static_cast<SpvCapability>(23)},
-        {"StorageTexelBufferArrayDynamicIndexingEXT", static_cast<SpvCapability>(5305)},
-        {"DebugInfoModuleINTEL", static_cast<SpvCapability>(6114)},
-        {"Addresses", static_cast<SpvCapability>(4)},
-        {"SplitBarrierINTEL", static_cast<SpvCapability>(6141)},
-        {"DotProductKHR", static_cast<SpvCapability>(6019)},
-        {"FragmentShaderPixelInterlockEXT", static_cast<SpvCapability>(5378)},
-        {"TileImageDepthReadAccessEXT", static_cast<SpvCapability>(4167)},
-        {"FunctionPointersINTEL", static_cast<SpvCapability>(5603)},
-        {"StorageImageMultisample", static_cast<SpvCapability>(27)},
-        {"FPGARegINTEL", static_cast<SpvCapability>(5948)},
+        {"VectorComputeINTEL", static_cast<SpvCapability>(5617)},
+        {"FPGAMemoryAttributesINTEL", static_cast<SpvCapability>(5824)},
+        {"USMStorageClassesINTEL", static_cast<SpvCapability>(5935)},
+        {"FPFastMathModeINTEL", static_cast<SpvCapability>(5837)},
+        {"GroupNonUniformShuffleRelative", static_cast<SpvCapability>(66)},
+        {"CooperativeMatrixKHR", static_cast<SpvCapability>(6022)},
         {"StorageTexelBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5312)},
+        {"BitInstructions", static_cast<SpvCapability>(6025)},
+        {"FragmentBarycentricNV", static_cast<SpvCapability>(5284)},
+        {"IntegerFunctions2INTEL", static_cast<SpvCapability>(5584)},
+        {"RuntimeDescriptorArrayEXT", static_cast<SpvCapability>(5302)},
+        {"StorageUniform16", static_cast<SpvCapability>(4434)},
+        {"FPGAArgumentInterfacesINTEL", static_cast<SpvCapability>(6174)},
+        {"ShadingRateNV", static_cast<SpvCapability>(5291)},
+        {"RegisterLimitsINTEL", static_cast<SpvCapability>(6460)},
+        {"ShaderViewportIndexLayerNV", static_cast<SpvCapability>(5254)},
+        {"WorkgroupMemoryExplicitLayout8BitAccessKHR", static_cast<SpvCapability>(4429)},
+        {"Tessellation", static_cast<SpvCapability>(3)},
+        {"MultiView", static_cast<SpvCapability>(4439)},
+        {"Geometry", static_cast<SpvCapability>(2)},
+        {"DemoteToHelperInvocation", static_cast<SpvCapability>(5379)},
+        {"KernelAttributesINTEL", static_cast<SpvCapability>(5892)},
+        {"TextureBoxFilterQCOM", static_cast<SpvCapability>(4485)},
+        {"TileImageDepthReadAccessEXT", static_cast<SpvCapability>(4167)},
+        {"UnstructuredLoopControlsINTEL", static_cast<SpvCapability>(5886)},
+        {"SplitBarrierINTEL", static_cast<SpvCapability>(6141)},
+        {"GroupNonUniformPartitionedNV", static_cast<SpvCapability>(5297)},
+        {"VulkanMemoryModel", static_cast<SpvCapability>(5345)},
+        {"StoragePushConstant8", static_cast<SpvCapability>(4450)},
+        {"ShaderLayer", static_cast<SpvCapability>(69)},
+        {"UniformTexelBufferArrayDynamicIndexingEXT", static_cast<SpvCapability>(5304)},
+        {"Float64", static_cast<SpvCapability>(10)},
+        {"StorageTexelBufferArrayDynamicIndexing", static_cast<SpvCapability>(5305)},
+        {"SampleMaskOverrideCoverageNV", static_cast<SpvCapability>(5249)},
+        {"SubgroupBufferBlockIOINTEL", static_cast<SpvCapability>(5569)},
+        {"ShaderInvocationReorderNV", static_cast<SpvCapability>(5383)},
+        {"CullDistance", static_cast<SpvCapability>(33)},
+        {"UniformBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5306)},
+        {"StorageImageArrayNonUniformIndexing", static_cast<SpvCapability>(5309)},
+        {"ArbitraryPrecisionIntegersINTEL", static_cast<SpvCapability>(5844)},
+        {"SubgroupVoteKHR", static_cast<SpvCapability>(4431)},
+        {"FPGALoopControlsINTEL", static_cast<SpvCapability>(5888)},
+        {"UniformDecoration", static_cast<SpvCapability>(71)},
+        {"PerViewAttributesNV", static_cast<SpvCapability>(5260)},
+        {"Groups", static_cast<SpvCapability>(18)},
+        {"AsmINTEL", static_cast<SpvCapability>(5606)},
+        {"AtomicFloat32AddEXT", static_cast<SpvCapability>(6033)},
+        {"MaskedGatherScatterINTEL", static_cast<SpvCapability>(6427)},
+        {"GeometryShaderPassthroughNV", static_cast<SpvCapability>(5251)},
+        {"GroupNonUniformRotateKHR", static_cast<SpvCapability>(6026)},
+        {"RayCullMaskKHR", static_cast<SpvCapability>(6020)},
+        {"FPGAMemoryAccessesINTEL", static_cast<SpvCapability>(5898)},
+        {"SubgroupAvcMotionEstimationChromaINTEL", static_cast<SpvCapability>(5698)},
+        {"ShaderClockKHR", static_cast<SpvCapability>(5055)},
+        {"Linkage", static_cast<SpvCapability>(5)},
+        {"SampledRect", static_cast<SpvCapability>(37)},
+        {"FPGAClusterAttributesV2INTEL", static_cast<SpvCapability>(6150)},
+        {"QuadControlKHR", static_cast<SpvCapability>(5087)},
+        {"GenericPointer", static_cast<SpvCapability>(38)},
+        {"MinLod", static_cast<SpvCapability>(42)},
+        {"RuntimeAlignedAttributeINTEL", static_cast<SpvCapability>(5939)},
+        {"Shader", static_cast<SpvCapability>(1)},
+        {"StorageImageArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5309)},
+        {"AtomicStorage", static_cast<SpvCapability>(21)},
+        {"ShaderSMBuiltinsNV", static_cast<SpvCapability>(5373)},
+        {"RoundingModeRTE", static_cast<SpvCapability>(4467)},
+        {"FPGALatencyControlINTEL", static_cast<SpvCapability>(6171)},
+        {"OptNoneINTEL", static_cast<SpvCapability>(6094)},
+        {"ShaderNonUniformEXT", static_cast<SpvCapability>(5301)},
+        {"Pipes", static_cast<SpvCapability>(17)},
+        {"RawAccessChainsNV", static_cast<SpvCapability>(5414)},
+        {"ComputeDerivativeGroupLinearNV", static_cast<SpvCapability>(5350)},
+        {"IndirectReferencesINTEL", static_cast<SpvCapability>(5604)},
+        {"ImageGatherBiasLodAMD", static_cast<SpvCapability>(5009)},
+        {"DotProductInput4x8BitKHR", static_cast<SpvCapability>(6017)},
+        {"CooperativeMatrixNV", static_cast<SpvCapability>(5357)},
+        {"ImageBasic", static_cast<SpvCapability>(13)},
+        {"StorageImageWriteWithoutFormat", static_cast<SpvCapability>(56)},
+        {"BindlessTextureNV", static_cast<SpvCapability>(5390)},
+        {"VulkanMemoryModelDeviceScope", static_cast<SpvCapability>(5346)},
+        {"ImageBuffer", static_cast<SpvCapability>(47)},
+        {"FragmentShaderShadingRateInterlockEXT", static_cast<SpvCapability>(5372)},
+        {"ImageMipmap", static_cast<SpvCapability>(15)},
+        {"StorageBuffer16BitAccess", static_cast<SpvCapability>(4433)},
+        {"GroupNonUniformShuffle", static_cast<SpvCapability>(65)},
+        {"RayQueryPositionFetchKHR", static_cast<SpvCapability>(5391)},
+        {"TextureBlockMatch2QCOM", static_cast<SpvCapability>(4498)},
+        {"FragmentDensityEXT", static_cast<SpvCapability>(5291)},
+        {"StoragePushConstant16", static_cast<SpvCapability>(4435)},
+        {"RoundToInfinityINTEL", static_cast<SpvCapability>(5582)},
+        {"FloatControls2", static_cast<SpvCapability>(6029)},
+        {"VariablePointers", static_cast<SpvCapability>(4442)},
+        {"RayTracingNV", static_cast<SpvCapability>(5340)},
+        {"ImageGatherExtended", static_cast<SpvCapability>(25)},
+        {"ShaderViewportIndex", static_cast<SpvCapability>(70)},
+        {"RayQueryProvisionalKHR", static_cast<SpvCapability>(4471)},
+        {"MemoryAccessAliasingINTEL", static_cast<SpvCapability>(5910)},
+        {"InputAttachmentArrayNonUniformIndexing", static_cast<SpvCapability>(5310)},
+        {"ShaderNonUniform", static_cast<SpvCapability>(5301)},
+        {"ImageQuery", static_cast<SpvCapability>(50)},
+        {"Int64", static_cast<SpvCapability>(11)},
+        {"InputAttachmentArrayDynamicIndexingEXT", static_cast<SpvCapability>(5303)},
+        {"VectorAnyINTEL", static_cast<SpvCapability>(5619)},
+        {"ArbitraryPrecisionFloatingPointINTEL", static_cast<SpvCapability>(5845)},
+        {"GroupNonUniformBallot", static_cast<SpvCapability>(64)},
+        {"Addresses", static_cast<SpvCapability>(4)},
+        {"RayQueryKHR", static_cast<SpvCapability>(4472)},
+        {"ShaderEnqueueAMDX", static_cast<SpvCapability>(5067)},
+        {"FragmentFullyCoveredEXT", static_cast<SpvCapability>(5265)},
+        {"Int16", static_cast<SpvCapability>(22)},
+        {"FPGAInvocationPipeliningAttributesINTEL", static_cast<SpvCapability>(5916)},
+        {"LiteralSampler", static_cast<SpvCapability>(20)},
+        {"UniformBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5306)},
+        {"ImageReadWriteLodAMD", static_cast<SpvCapability>(5015)},
+        {"VulkanMemoryModelKHR", static_cast<SpvCapability>(5345)},
+        {"MeshShadingNV", static_cast<SpvCapability>(5266)},
+        {"StorageImageMultisample", static_cast<SpvCapability>(27)},
+        {"ComputeDerivativeGroupQuadsNV", static_cast<SpvCapability>(5288)},
+        {"UniformTexelBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5311)},
+        {"FragmentMaskAMD", static_cast<SpvCapability>(5010)},
+        {"RayTracingProvisionalKHR", static_cast<SpvCapability>(5353)},
+        {"StorageBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5308)},
+        {"DotProductInput4x8Bit", static_cast<SpvCapability>(6017)},
+        {"UniformTexelBufferArrayDynamicIndexing", static_cast<SpvCapability>(5304)},
+        {"RayTracingDisplacementMicromapNV", static_cast<SpvCapability>(5409)},
+        {"TileImageStencilReadAccessEXT", static_cast<SpvCapability>(4168)},
+        {"CacheControlsINTEL", static_cast<SpvCapability>(6441)},
+        {"Matrix", static_cast<SpvCapability>(0)},
+        {"WorkgroupMemoryExplicitLayoutKHR", static_cast<SpvCapability>(4428)},
+        {"StorageTexelBufferArrayDynamicIndexingEXT", static_cast<SpvCapability>(5305)},
+        {"GeometryPointSize", static_cast<SpvCapability>(24)},
+        {"ExpectAssumeKHR", static_cast<SpvCapability>(5629)},
+        {"SubgroupBallotKHR", static_cast<SpvCapability>(4423)},
+        {"DebugInfoModuleINTEL", static_cast<SpvCapability>(6114)},
+        {"DisplacementMicromapNV", static_cast<SpvCapability>(5380)},
+        {"RayTraversalPrimitiveCullingKHR", static_cast<SpvCapability>(4478)},
+        {"SampleMaskPostDepthCoverage", static_cast<SpvCapability>(4447)},
+        {"FragmentShaderSampleInterlockEXT", static_cast<SpvCapability>(5363)},
+        {"Kernel", static_cast<SpvCapability>(6)},
+        {"Image1D", static_cast<SpvCapability>(44)},
+        {"Sampled1D", static_cast<SpvCapability>(43)},
+        {"TextureBlockMatchQCOM", static_cast<SpvCapability>(4486)},
+        {"StorageBufferArrayDynamicIndexing", static_cast<SpvCapability>(30)},
+        {"SampledImageArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5307)},
+        {"NamedBarrier", static_cast<SpvCapability>(59)},
+        {"SampledImageArrayNonUniformIndexing", static_cast<SpvCapability>(5307)},
+        {"FunctionPointersINTEL", static_cast<SpvCapability>(5603)},
+        {"PhysicalStorageBufferAddressesEXT", static_cast<SpvCapability>(5347)},
+        {"SubgroupDispatch", static_cast<SpvCapability>(58)},
+        {"SubgroupAvcMotionEstimationINTEL", static_cast<SpvCapability>(5696)},
+        {"FragmentShaderPixelInterlockEXT", static_cast<SpvCapability>(5378)},
+        {"StorageInputOutput16", static_cast<SpvCapability>(4436)},
+        {"FPGAKernelAttributesINTEL", static_cast<SpvCapability>(5897)},
+        {"FPGARegINTEL", static_cast<SpvCapability>(5948)},
     };
 
     static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
         UInt32 h = salt;
         for (const char c : str)
             h = (h * 0x01000193) ^ c;
-        return h % 252;
+        return h % 259;
     };
 
     const auto i = hash(str, tableSalt[hash(str, 0)]);
@@ -1111,1076 +1128,1100 @@ static bool lookupSpvCapability(const UnownedStringSlice& str, SpvCapability& va
 
 static bool lookupEnumWithTypePrefix(const UnownedStringSlice& str, SpvWord& value)
 {
-    static const unsigned tableSalt[993] = {
-        0, 1, 2, 2, 3, 3, 14, 2, 4, 1, 0, 0, 0, 0, 0, 1,
-        1, 4, 0, 0, 0, 1, 0, 3, 1, 0, 2, 0, 0, 0, 1, 5,
-        1, 0, 4, 2, 0, 1, 1, 1, 3, 0, 5, 2, 0, 1, 4, 2,
-        1, 1, 0, 1, 1, 1, 12, 2, 0, 0, 2, 0, 2, 0, 0, 0,
-        0, 1, 1, 2, 0, 2, 9, 2, 0, 0, 1, 2, 0, 0, 1, 2,
-        0, 2, 0, 0, 1, 0, 0, 4, 4, 5, 2, 0, 1, 4, 2, 1,
-        0, 1, 3, 1, 3, 0, 0, 1, 3, 3, 0, 1, 1, 0, 1, 0,
-        0, 3, 0, 1, 3, 0, 0, 1, 1, 1, 1, 2, 3, 1, 0, 6,
-        0, 0, 2, 2, 0, 3, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0,
-        2, 0, 1, 2, 0, 0, 0, 4, 4, 1, 4, 4, 9, 1, 3, 1,
-        1, 2, 0, 3, 2, 3, 1, 5, 2, 0, 0, 0, 1, 0, 1, 2,
-        1, 4, 1, 1, 0, 5, 0, 0, 0, 1, 1, 5, 4, 2, 1, 0,
-        2, 1, 1, 13, 1, 2, 0, 1, 0, 3, 2, 8, 3, 0, 2, 3,
-        0, 0, 2, 7, 5, 2, 1, 4, 2, 5, 1, 0, 3, 0, 0, 1,
-        1, 0, 8, 0, 0, 0, 5, 4, 0, 1, 3, 1, 0, 0, 5, 0,
-        7, 0, 0, 7, 3, 1, 2, 1, 2, 3, 2, 1, 0, 0, 1, 1,
-        0, 0, 0, 1, 1, 2, 6, 3, 1, 0, 1, 0, 1, 4, 7, 1,
-        1, 1, 0, 6, 0, 0, 2, 7, 1, 0, 2, 3, 2, 1, 5, 4,
-        3, 1, 0, 0, 0, 0, 1, 1, 1, 6, 0, 3, 0, 1, 1, 6,
-        0, 0, 0, 0, 0, 2, 4, 1, 3, 5, 1, 7, 0, 10, 1, 0,
-        2, 5, 2, 0, 1, 0, 5, 2, 0, 3, 1, 2, 2, 0, 0, 0,
-        1, 5, 3, 0, 0, 2, 2, 7, 9, 0, 2, 2, 1, 3, 3, 0,
-        0, 0, 0, 0, 8, 1, 0, 1, 0, 3, 4, 0, 0, 9, 0, 7,
-        0, 4, 0, 3, 0, 11, 0, 2, 4, 2, 4, 4, 3, 2, 0, 1,
-        0, 3, 0, 0, 4, 14, 1, 0, 0, 0, 0, 0, 5, 0, 0, 1,
-        3, 9, 6, 18, 3, 0, 1, 2, 0, 1, 4, 1, 5, 0, 3, 0,
-        0, 2, 4, 2, 3, 0, 0, 26, 1, 0, 0, 0, 5, 1, 0, 5,
-        2, 0, 0, 2, 3, 1, 4, 4, 5, 1, 1, 0, 1, 0, 0, 2,
-        1, 1, 0, 2, 2, 2, 4, 1, 0, 4, 7, 1, 0, 2, 3, 0,
-        0, 3, 3, 5, 0, 5, 1, 2, 0, 1, 0, 10, 0, 3, 1, 0,
-        10, 1, 1, 3, 3, 3, 0, 1, 1, 5, 0, 22, 0, 5, 1, 10,
-        1, 0, 1, 2, 0, 9, 1, 0, 24, 0, 2, 1, 3, 0, 14, 1,
-        2, 18, 6, 5, 0, 9, 3, 5, 3, 0, 0, 1, 0, 4, 1, 1,
-        0, 0, 2, 1, 0, 2, 3, 1, 3, 0, 1, 0, 1, 1, 1, 0,
-        0, 16, 0, 0, 3, 5, 2, 5, 1, 0, 3, 0, 4, 0, 4, 1,
-        19, 5, 0, 0, 0, 0, 2, 0, 0, 0, 1, 6, 4, 0, 0, 2,
-        1, 0, 1, 0, 0, 0, 12, 0, 0, 0, 0, 12, 0, 5, 8, 0,
-        6, 3, 3, 0, 1, 1, 1, 4, 3, 1, 0, 0, 1, 8, 0, 1,
-        1, 4, 1, 7, 5, 0, 0, 1, 3, 3, 15, 1, 1, 3, 6, 0,
-        1, 4, 1, 2, 13, 24, 0, 0, 7, 3, 4, 1, 0, 0, 1, 5,
-        0, 2, 13, 1, 6, 9, 4, 5, 1, 21, 1, 12, 0, 1, 0, 1,
-        14, 4, 0, 8, 3, 1, 0, 0, 7, 0, 14, 0, 18, 1, 1, 2,
-        0, 4, 0, 0, 0, 1, 0, 4, 3, 1, 0, 2, 0, 16, 0, 9,
-        1, 0, 0, 5, 0, 0, 27, 0, 0, 0, 0, 0, 4, 7, 0, 4,
-        4, 3, 7, 0, 3, 2, 7, 0, 0, 2, 1, 0, 0, 1, 6, 0,
-        0, 0, 0, 1, 23, 2, 0, 16, 0, 4, 0, 2, 1, 29, 1, 13,
-        5, 6, 2, 4, 0, 21, 34, 13, 0, 10, 0, 10, 11, 16, 0, 0,
-        0, 34, 13, 0, 2, 3, 2, 23, 8, 11, 0, 1, 0, 18, 1, 0,
-        1, 7, 0, 0, 0, 6, 0, 1, 0, 0, 11, 0, 1, 27, 28, 1,
-        10, 1, 4, 0, 5, 0, 5, 10, 0, 1, 0, 10, 0, 9, 9, 1,
-        6, 0, 1, 0, 6, 2, 9, 0, 12, 23, 0, 9, 2, 1, 0, 1,
-        3, 18, 57, 2, 6, 2, 43, 5, 0, 0, 2, 3, 23, 54, 0, 2,
-        25, 9, 9, 32, 0, 9, 2, 0, 0, 5, 11, 2, 5, 2, 10, 4,
-        3, 7, 0, 17, 17, 49, 3, 0, 0, 8, 0, 0, 1, 0, 15, 1,
-        0, 13, 0, 13, 1, 1, 41, 0, 3, 0, 2, 9, 0, 5, 105, 0,
-        1, 32, 19, 2, 29, 34, 0, 0, 0, 36, 9, 25, 10, 22, 20, 0,
-        3, 16, 55, 8, 0, 6, 0, 0, 0, 0, 3, 4, 8, 21, 10, 0,
-        0, 53, 36, 0, 0, 40, 0, 8, 0, 70, 0, 0, 44, 0, 5, 3,
-        0, 14, 0, 0, 8, 11, 25, 15, 54, 10, 0, 0, 0, 0, 0, 1,
-        32, 3, 0, 0, 0, 0, 6, 0, 0, 3, 9, 41, 15, 10, 130, 131,
-        132, 0, 57, 199, 0, 4, 184, 0, 4, 0, 49, 0, 0, 81, 5, 50,
-        0, 230, 22, 36, 32, 157, 0, 22, 78, 27, 1, 12, 313, 127, 1, 9,
-        76
+    static const unsigned tableSalt[1016] = {
+        0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 3, 0, 0, 3, 1, 1,
+        1, 0, 1, 0, 4, 3, 1, 2, 2, 1, 3, 0, 0, 0, 1, 4,
+        4, 0, 1, 0, 4, 1, 1, 3, 0, 2, 4, 0, 9, 1, 2, 2,
+        5, 0, 2, 0, 0, 2, 1, 6, 0, 6, 0, 0, 1, 1, 1, 2,
+        1, 3, 1, 5, 2, 1, 1, 0, 3, 10, 0, 0, 1, 5, 0, 0,
+        1, 0, 1, 1, 0, 1, 0, 4, 2, 0, 3, 2, 0, 0, 0, 2,
+        1, 1, 1, 2, 1, 1, 0, 0, 9, 0, 2, 1, 0, 3, 1, 0,
+        0, 1, 4, 4, 1, 1, 11, 1, 0, 0, 2, 3, 0, 0, 1, 2,
+        6, 2, 1, 4, 1, 1, 0, 1, 5, 0, 0, 1, 4, 1, 0, 2,
+        0, 1, 2, 2, 0, 1, 1, 0, 0, 7, 1, 6, 0, 1, 2, 0,
+        1, 1, 3, 1, 4, 3, 1, 1, 1, 0, 9, 0, 0, 0, 0, 7,
+        4, 2, 2, 2, 5, 1, 1, 2, 1, 0, 0, 0, 1, 0, 3, 1,
+        0, 5, 1, 0, 4, 6, 0, 4, 2, 3, 6, 6, 0, 0, 1, 0,
+        1, 8, 1, 1, 0, 1, 5, 0, 11, 0, 7, 4, 1, 0, 0, 0,
+        0, 3, 1, 2, 0, 0, 1, 1, 0, 0, 0, 1, 0, 3, 5, 11,
+        0, 0, 2, 2, 0, 7, 1, 1, 6, 2, 9, 2, 0, 0, 1, 1,
+        1, 0, 9, 8, 4, 1, 1, 1, 1, 1, 0, 0, 0, 15, 3, 4,
+        0, 0, 2, 0, 0, 11, 3, 3, 1, 0, 3, 3, 0, 5, 0, 1,
+        9, 2, 0, 5, 0, 0, 1, 1, 0, 0, 1, 0, 0, 2, 0, 8,
+        1, 2, 10, 11, 2, 13, 4, 0, 1, 1, 0, 0, 1, 2, 1, 3,
+        1, 2, 0, 0, 0, 2, 2, 0, 1, 0, 2, 1, 0, 8, 0, 1,
+        2, 0, 5, 1, 10, 16, 0, 0, 2, 2, 6, 4, 1, 0, 19, 4,
+        4, 3, 0, 0, 0, 4, 0, 0, 2, 0, 8, 3, 2, 0, 1, 11,
+        0, 0, 4, 1, 2, 0, 6, 3, 0, 1, 4, 1, 4, 5, 2, 0,
+        1, 3, 1, 0, 12, 0, 1, 0, 0, 0, 0, 3, 12, 0, 7, 4,
+        8, 2, 6, 0, 3, 0, 3, 1, 0, 0, 2, 0, 6, 5, 0, 2,
+        0, 6, 3, 1, 0, 5, 2, 1, 2, 5, 0, 0, 18, 2, 1, 1,
+        9, 4, 0, 0, 5, 0, 9, 8, 2, 0, 0, 0, 6, 0, 13, 0,
+        2, 2, 0, 0, 0, 1, 1, 1, 1, 1, 0, 5, 0, 1, 2, 2,
+        0, 14, 0, 0, 0, 0, 15, 0, 4, 14, 1, 0, 9, 0, 5, 1,
+        0, 3, 0, 3, 0, 1, 1, 2, 6, 0, 3, 1, 2, 0, 1, 3,
+        0, 7, 1, 1, 4, 0, 5, 0, 2, 3, 2, 15, 14, 2, 0, 6,
+        0, 0, 5, 4, 1, 12, 2, 0, 0, 17, 6, 2, 1, 4, 0, 0,
+        0, 0, 0, 0, 13, 3, 3, 1, 0, 0, 1, 0, 3, 3, 2, 1,
+        0, 2, 0, 0, 0, 2, 10, 1, 0, 0, 3, 8, 0, 19, 0, 2,
+        0, 4, 0, 11, 5, 0, 18, 7, 0, 15, 2, 1, 0, 1, 3, 0,
+        0, 2, 11, 2, 2, 0, 6, 0, 18, 12, 0, 3, 5, 1, 1, 28,
+        4, 1, 0, 3, 3, 0, 1, 28, 4, 0, 5, 29, 5, 0, 9, 8,
+        0, 3, 0, 9, 0, 0, 2, 0, 1, 6, 3, 0, 0, 4, 0, 5,
+        4, 1, 0, 1, 0, 12, 7, 6, 4, 4, 0, 0, 2, 3, 35, 22,
+        2, 3, 1, 0, 4, 0, 5, 0, 0, 0, 0, 0, 3, 9, 0, 1,
+        0, 1, 0, 0, 9, 1, 0, 0, 0, 0, 0, 0, 2, 0, 3, 0,
+        2, 10, 15, 2, 0, 0, 0, 0, 1, 3, 4, 0, 0, 3, 0, 3,
+        0, 0, 16, 1, 2, 2, 6, 2, 1, 26, 7, 12, 7, 3, 0, 0,
+        0, 2, 1, 2, 4, 0, 1, 1, 0, 0, 1, 3, 4, 1, 5, 0,
+        1, 14, 0, 0, 2, 14, 5, 0, 7, 7, 0, 8, 5, 0, 3, 12,
+        2, 1, 0, 1, 2, 12, 4, 2, 11, 0, 7, 5, 1, 0, 3, 0,
+        16, 24, 44, 0, 0, 7, 14, 0, 1, 3, 0, 0, 5, 0, 6, 1,
+        0, 23, 2, 6, 12, 1, 0, 3, 0, 0, 0, 41, 0, 0, 0, 0,
+        7, 13, 0, 32, 1, 2, 0, 0, 0, 2, 6, 2, 8, 20, 7, 0,
+        16, 0, 16, 0, 29, 0, 1, 14, 0, 12, 8, 2, 14, 0, 15, 11,
+        0, 1, 0, 0, 1, 5, 2, 0, 22, 2, 23, 8, 2, 0, 0, 0,
+        33, 22, 0, 18, 18, 3, 2, 1, 0, 1, 26, 2, 2, 12, 0, 3,
+        0, 1, 12, 0, 0, 9, 3, 79, 0, 11, 2, 7, 6, 40, 6, 5,
+        10, 3, 0, 0, 1, 3, 0, 2, 0, 0, 27, 8, 2, 78, 0, 50,
+        3, 2, 3, 14, 4, 2, 5, 0, 5, 27, 0, 7, 97, 0, 2, 4,
+        53, 6, 0, 0, 0, 0, 7, 1, 3, 1, 6, 0, 1, 29, 9, 0,
+        5, 58, 5, 37, 41, 1, 11, 0, 0, 8, 36, 0, 1, 0, 26, 0,
+        2, 55, 0, 1, 13, 0, 11, 2, 0, 71, 24, 2, 0, 0, 0, 0,
+        0, 4, 4, 0, 9, 2, 1, 0, 60, 6, 0, 4, 26, 0, 0, 39,
+        1, 164, 0, 193, 6, 0, 2, 273, 0, 6, 0, 1, 0, 0, 70, 168,
+        1, 17, 4, 0, 0, 567, 1, 19, 76, 2, 114, 0, 0, 0, 3, 7,
+        13, 0, 1, 2, 27, 427, 5, 0, 0, 0, 0, 6, 0, 0, 0, 0,
+        0, 951, 0, 8, 457, 0, 0, 0
     };
 
     using KV = std::pair<const char*, SpvWord>;
 
-    static const KV words[993] =
+    static const KV words[1016] =
     {
-        {"HostAccessQualifierReadWriteINTEL", SpvWord{3}},
-        {"DecorationMaxPrivateCopiesINTEL", SpvWord{5829}},
-        {"CapabilityImageCubeArray", SpvWord{34}},
-        {"CapabilityGeometryStreams", SpvWord{54}},
-        {"BuiltInLayerPerViewNV", SpvWord{5279}},
-        {"CapabilityImageMSArray", SpvWord{48}},
-        {"BuiltInIncomingRayFlagsNV", SpvWord{5351}},
-        {"ImageFormatR16Snorm", SpvWord{19}},
-        {"CapabilityRayTracingOpacityMicromapEXT", SpvWord{5381}},
-        {"DecorationMathOpDSPModeINTEL", SpvWord{5909}},
-        {"ImageFormatRg8", SpvWord{13}},
-        {"BuiltInBaryCoordPullModelAMD", SpvWord{4998}},
-        {"BuiltInBaryCoordNoPerspAMD", SpvWord{4992}},
-        {"BuiltInRayTminKHR", SpvWord{5325}},
-        {"DecorationDoublepumpINTEL", SpvWord{5831}},
-        {"LoopControlIterationMultiple", SpvWord{64}},
-        {"BuiltInMeshViewCountNV", SpvWord{5280}},
-        {"CapabilityStencilExportEXT", SpvWord{5013}},
-        {"DecorationNoAliasINTEL", SpvWord{5915}},
-        {"DecorationLinkageAttributes", SpvWord{41}},
-        {"BuiltInShaderIndexAMDX", SpvWord{5073}},
-        {"BuiltInWarpMaxIDARM", SpvWord{4164}},
-        {"CapabilityOptNoneINTEL", SpvWord{6094}},
-        {"MemoryAccessMakePointerVisible", SpvWord{16}},
-        {"CapabilityAtomicFloat16AddEXT", SpvWord{6095}},
-        {"FunctionControlDontInline", SpvWord{2}},
-        {"AddressingModelPhysicalStorageBuffer64EXT", SpvWord{5348}},
-        {"BuiltInCullPrimitiveEXT", SpvWord{5299}},
-        {"ImageOperandsNonPrivateTexelKHR", SpvWord{1024}},
-        {"BuiltInNumWorkgroups", SpvWord{24}},
-        {"BuiltInSecondaryViewportMaskNV", SpvWord{5258}},
-        {"BuiltInHitKindKHR", SpvWord{5333}},
-        {"BuiltInRayTminNV", SpvWord{5325}},
-        {"CapabilityUniformDecoration", SpvWord{71}},
-        {"CapabilityKernelAttributesINTEL", SpvWord{5892}},
-        {"DecorationLocation", SpvWord{30}},
-        {"ExecutionModeOutputLinesEXT", SpvWord{5269}},
-        {"StorageClassUniform", SpvWord{2}},
-        {"DecorationRegisterINTEL", SpvWord{5825}},
-        {"ImageFormatRgba8ui", SpvWord{32}},
-        {"ImageFormatR8ui", SpvWord{39}},
-        {"DecorationHitObjectShaderRecordBufferNV", SpvWord{5386}},
-        {"CapabilitySampledImageArrayNonUniformIndexing", SpvWord{5307}},
-        {"DecorationSideEffectsINTEL", SpvWord{5608}},
-        {"CapabilityShader", SpvWord{1}},
-        {"ExecutionModelClosestHitKHR", SpvWord{5316}},
-        {"GroupOperationClusteredReduce", SpvWord{3}},
-        {"CapabilityUniformAndStorageBuffer16BitAccess", SpvWord{4434}},
-        {"BuiltInGlobalInvocationId", SpvWord{28}},
-        {"PackedVectorFormatPackedVectorFormat4x8Bit", SpvWord{0}},
-        {"BuiltInClipDistancePerViewNV", SpvWord{5277}},
-        {"MemoryAccessMakePointerAvailable", SpvWord{8}},
-        {"BuiltInLocalInvocationIndex", SpvWord{29}},
-        {"CapabilityExpectAssumeKHR", SpvWord{5629}},
-        {"BuiltInBaryCoordNV", SpvWord{5286}},
-        {"ImageChannelDataTypeSignedInt8", SpvWord{7}},
-        {"GroupOperationPartitionedInclusiveScanNV", SpvWord{7}},
-        {"DecorationSingleElementVectorINTEL", SpvWord{6085}},
-        {"CapabilityDotProduct", SpvWord{6019}},
-        {"DecorationAliasScopeINTEL", SpvWord{5914}},
-        {"OverflowModesSAT_ZERO", SpvWord{2}},
-        {"CapabilityShaderViewportIndex", SpvWord{70}},
-        {"CapabilityFPGAKernelAttributesINTEL", SpvWord{5897}},
-        {"BuiltInGlobalSize", SpvWord{31}},
-        {"ImageChannelDataTypeUnormInt24", SpvWord{15}},
-        {"ExecutionModeOutputTrianglesNV", SpvWord{5298}},
-        {"ExecutionModeDepthGreater", SpvWord{14}},
-        {"BuiltInSubgroupEqMask", SpvWord{4416}},
-        {"CapabilityImageBuffer", SpvWord{47}},
-        {"AccessQualifierWriteOnly", SpvWord{1}},
-        {"BuiltInWorkgroupId", SpvWord{26}},
-        {"MemorySemanticsMakeAvailable", SpvWord{8192}},
-        {"CapabilityFloat16ImageAMD", SpvWord{5008}},
-        {"DecorationMemoryINTEL", SpvWord{5826}},
-        {"OverflowModesSAT", SpvWord{1}},
-        {"CapabilityShaderSMBuiltinsNV", SpvWord{5373}},
-        {"ImageChannelDataTypeUnsignedInt16", SpvWord{11}},
-        {"BuiltInViewportIndex", SpvWord{10}},
-        {"ExecutionModeSubgroupsPerWorkgroupId", SpvWord{37}},
-        {"BuiltInHitTriangleVertexPositionsKHR", SpvWord{5335}},
-        {"CapabilityAtomicStorageOps", SpvWord{4445}},
-        {"MemoryAccessNonPrivatePointerKHR", SpvWord{32}},
-        {"QuantizationModesRND_CONV_ODD", SpvWord{7}},
-        {"ImageChannelOrdersRGB", SpvWord{15}},
-        {"CapabilityGroupNonUniformShuffleRelative", SpvWord{66}},
-        {"CooperativeMatrixOperandsSaturatingAccumulationKHR", SpvWord{16}},
-        {"ScopeShaderCallKHR", SpvWord{6}},
-        {"MemorySemanticsVolatile", SpvWord{32768}},
-        {"CapabilitySubgroupShuffleINTEL", SpvWord{5568}},
-        {"CapabilityArbitraryPrecisionFloatingPointINTEL", SpvWord{5845}},
-        {"BuiltInPointCoord", SpvWord{16}},
-        {"DecorationFPMaxErrorDecorationINTEL", SpvWord{6170}},
-        {"DecorationBinding", SpvWord{33}},
-        {"FunctionParameterAttributeSext", SpvWord{1}},
-        {"SourceLanguageHLSL", SpvWord{5}},
-        {"FunctionParameterAttributeByVal", SpvWord{2}},
-        {"BuiltInFragSizeEXT", SpvWord{5292}},
-        {"ExecutionModeFloatingPointModeIEEEINTEL", SpvWord{5623}},
-        {"BuiltInInstanceCustomIndexNV", SpvWord{5327}},
-        {"CapabilitySubgroupAvcMotionEstimationChromaINTEL", SpvWord{5698}},
-        {"ExecutionModeSchedulerTargetFmaxMhzINTEL", SpvWord{5903}},
-        {"CapabilityVulkanMemoryModelDeviceScopeKHR", SpvWord{5346}},
-        {"BuiltInFragmentSizeNV", SpvWord{5292}},
-        {"BuiltInWorldRayOriginNV", SpvWord{5321}},
-        {"DecorationDescriptorSet", SpvWord{34}},
-        {"LoopControlDependencyInfinite", SpvWord{4}},
-        {"BuiltInWorldRayDirectionKHR", SpvWord{5322}},
-        {"CapabilityAtomicFloat32MinMaxEXT", SpvWord{5612}},
-        {"StorageClassCallableDataKHR", SpvWord{5328}},
-        {"CapabilityStorageBufferArrayDynamicIndexing", SpvWord{30}},
-        {"CapabilityPipes", SpvWord{17}},
-        {"BuiltInBaryCoordNoPerspCentroidAMD", SpvWord{4993}},
-        {"CapabilityShaderStereoViewNV", SpvWord{5259}},
-        {"BuiltInSMCountNV", SpvWord{5375}},
-        {"ImageFormatR8", SpvWord{15}},
-        {"GroupOperationInclusiveScan", SpvWord{1}},
-        {"SamplerAddressingModeClamp", SpvWord{2}},
-        {"LoopControlNone", SpvWord{0}},
-        {"BuiltInCurrentRayTimeNV", SpvWord{5334}},
-        {"CapabilityRuntimeDescriptorArray", SpvWord{5302}},
-        {"ExecutionModeInputTrianglesAdjacency", SpvWord{23}},
-        {"CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR", SpvWord{4429}},
-        {"CapabilityRayTracingKHR", SpvWord{4479}},
-        {"DecorationRelaxedPrecision", SpvWord{0}},
-        {"BuiltInBaryCoordNoPerspKHR", SpvWord{5287}},
-        {"CapabilityAtomicFloat16MinMaxEXT", SpvWord{5616}},
-        {"CapabilityPipeStorage", SpvWord{60}},
-        {"DecorationFPFastMathMode", SpvWord{40}},
-        {"ExecutionModeRoundingModeRTNINTEL", SpvWord{5621}},
-        {"BuiltInPositionPerViewNV", SpvWord{5261}},
-        {"ExecutionModeRegisterMapInterfaceINTEL", SpvWord{6160}},
-        {"MemorySemanticsRelease", SpvWord{4}},
-        {"BuiltInLaunchIdNV", SpvWord{5319}},
-        {"ExecutionModeInputLines", SpvWord{20}},
-        {"ExecutionModeStencilRefLessBackAMD", SpvWord{5084}},
-        {"LoopControlNoFusionINTEL", SpvWord{8388608}},
-        {"CapabilityAtomicStorage", SpvWord{21}},
-        {"ExecutionModelCallableKHR", SpvWord{5318}},
-        {"CapabilityLinkage", SpvWord{5}},
-        {"DecorationMMHostInterfaceReadWriteModeINTEL", SpvWord{6180}},
-        {"ImageOperandsMakeTexelVisibleKHR", SpvWord{512}},
-        {"DecorationDontStaticallyCoalesceINTEL", SpvWord{5901}},
-        {"StoreCacheControlStreamingINTEL", SpvWord{3}},
-        {"DecorationColMajor", SpvWord{5}},
-        {"CapabilityGroupNonUniformPartitionedNV", SpvWord{5297}},
-        {"CapabilityInputAttachmentArrayDynamicIndexing", SpvWord{5303}},
-        {"RayFlagsNoneKHR", SpvWord{0}},
-        {"BuiltInSubgroupGtMaskKHR", SpvWord{4418}},
-        {"StorageClassInput", SpvWord{1}},
-        {"DecorationUniformId", SpvWord{27}},
-        {"BuiltInShadingRateKHR", SpvWord{4444}},
-        {"CapabilitySplitBarrierINTEL", SpvWord{6141}},
-        {"CooperativeMatrixUseMatrixBKHR", SpvWord{1}},
-        {"FPFastMathModeNotNaN", SpvWord{1}},
-        {"FPFastMathModeNone", SpvWord{0}},
-        {"CapabilityImageQuery", SpvWord{50}},
-        {"CapabilityUniformTexelBufferArrayNonUniformIndexingEXT", SpvWord{5311}},
-        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionTriangleKHR", SpvWord{0}},
-        {"DimRect", SpvWord{4}},
-        {"CapabilityShadingRateNV", SpvWord{5291}},
-        {"StorageClassCodeSectionINTEL", SpvWord{5605}},
-        {"CapabilityPhysicalStorageBufferAddresses", SpvWord{5347}},
-        {"ExecutionModelClosestHitNV", SpvWord{5316}},
-        {"MemorySemanticsAcquireRelease", SpvWord{8}},
-        {"ImageFormatR32ui", SpvWord{33}},
-        {"CapabilityRayTraversalPrimitiveCullingKHR", SpvWord{4478}},
-        {"MemoryModelVulkan", SpvWord{3}},
-        {"LoopControlDependencyArrayINTEL", SpvWord{262144}},
-        {"CapabilityIndirectReferencesINTEL", SpvWord{5604}},
-        {"BuiltInViewIndex", SpvWord{4440}},
-        {"CapabilityBFloat16ConversionINTEL", SpvWord{6115}},
-        {"CapabilityFPGAKernelAttributesv2INTEL", SpvWord{6161}},
-        {"BuiltInBaryCoordNoPerspNV", SpvWord{5287}},
-        {"ExecutionModeInvocations", SpvWord{0}},
-        {"HostAccessQualifierReadINTEL", SpvWord{1}},
-        {"ImageFormatRgba16Snorm", SpvWord{16}},
-        {"BuiltInFragDepth", SpvWord{22}},
-        {"DecorationCoherent", SpvWord{23}},
-        {"DecorationPerPrimitiveNV", SpvWord{5271}},
-        {"ImageFormatR16", SpvWord{14}},
-        {"DecorationConstant", SpvWord{22}},
-        {"DecorationIOPipeStorageINTEL", SpvWord{5944}},
-        {"AccessQualifierReadOnly", SpvWord{0}},
-        {"MemoryAccessMakePointerAvailableKHR", SpvWord{8}},
-        {"LoopControlLoopCoalesceINTEL", SpvWord{1048576}},
-        {"CapabilityIntegerFunctions2INTEL", SpvWord{5584}},
-        {"BuiltInGlobalOffset", SpvWord{33}},
-        {"FunctionControlConst", SpvWord{8}},
-        {"CapabilityRayTracingDisplacementMicromapNV", SpvWord{5409}},
-        {"ImageChannelDataTypeUnormInt8", SpvWord{2}},
-        {"DecorationBoundImageNV", SpvWord{5401}},
-        {"FunctionParameterAttributeNoWrite", SpvWord{6}},
-        {"DecorationFPRoundingMode", SpvWord{39}},
-        {"BuiltInObjectToWorldKHR", SpvWord{5330}},
-        {"CapabilityGroupNonUniformVote", SpvWord{62}},
-        {"Dim2D", SpvWord{1}},
-        {"ExecutionModeOutputVertices", SpvWord{26}},
-        {"FPFastMathModeAllowReassocINTEL", SpvWord{131072}},
-        {"DecorationCacheControlLoadINTEL", SpvWord{6442}},
-        {"CapabilityRayQueryKHR", SpvWord{4472}},
-        {"DecorationMMHostInterfaceMaxBurstINTEL", SpvWord{6181}},
-        {"BuiltInObjectRayDirectionNV", SpvWord{5324}},
-        {"BuiltInWorldRayDirectionNV", SpvWord{5322}},
-        {"CapabilityDenormFlushToZero", SpvWord{4465}},
-        {"HostAccessQualifierWriteINTEL", SpvWord{2}},
-        {"ImageChannelOrdersBGRA", SpvWord{18}},
-        {"CapabilityShaderNonUniformEXT", SpvWord{5301}},
-        {"ExecutionModeVertexOrderCw", SpvWord{4}},
-        {"CapabilityCooperativeMatrixKHR", SpvWord{6022}},
-        {"BuiltInHelperInvocation", SpvWord{23}},
-        {"RayFlagsSkipClosestHitShaderKHR", SpvWord{8}},
-        {"StorageClassNodePayloadAMDX", SpvWord{5068}},
-        {"ExecutionModeStencilRefUnchangedFrontAMD", SpvWord{5079}},
-        {"CapabilityDotProductInput4x8BitKHR", SpvWord{6017}},
-        {"DecorationNodeMaxPayloadsAMDX", SpvWord{5020}},
-        {"DecorationMergeINTEL", SpvWord{5834}},
-        {"ImageChannelOrderRGx", SpvWord{11}},
-        {"FPFastMathModeAllowContractFastINTEL", SpvWord{65536}},
-        {"CapabilityDotProductInputAllKHR", SpvWord{6016}},
-        {"DecorationHostAccessINTEL", SpvWord{6188}},
-        {"ImageFormatRgba16", SpvWord{10}},
-        {"MemoryAccessNontemporal", SpvWord{4}},
-        {"CapabilityGlobalVariableHostAccessINTEL", SpvWord{6187}},
-        {"DecorationFuncParamAttr", SpvWord{38}},
-        {"CapabilityRayTracingMotionBlurNV", SpvWord{5341}},
-        {"CooperativeMatrixLayoutColumnMajorKHR", SpvWord{1}},
-        {"ExecutionModeEarlyFragmentTests", SpvWord{9}},
-        {"QuantizationModesRND", SpvWord{2}},
-        {"CapabilityFPGABufferLocationINTEL", SpvWord{5920}},
-        {"DecorationNoContraction", SpvWord{42}},
-        {"ImageFormatRg16ui", SpvWord{36}},
-        {"KernelEnqueueFlagsWaitKernel", SpvWord{1}},
-        {"ImageChannelOrderRGBx", SpvWord{12}},
-        {"MemoryAccessMakePointerVisibleKHR", SpvWord{16}},
-        {"BuiltInBaryCoordKHR", SpvWord{5286}},
-        {"CapabilityFragmentMaskAMD", SpvWord{5010}},
-        {"CapabilityDotProductInput4x8BitPacked", SpvWord{6018}},
-        {"CapabilityStorageInputOutput16", SpvWord{4436}},
-        {"ExecutionModelVertex", SpvWord{0}},
-        {"ImageOperandsMakeTexelAvailable", SpvWord{256}},
-        {"DecorationTrackFinishWritingAMDX", SpvWord{5078}},
-        {"DecorationClobberINTEL", SpvWord{5607}},
-        {"DecorationBuiltIn", SpvWord{11}},
-        {"ExecutionModelCallableNV", SpvWord{5318}},
-        {"ExecutionModelAnyHitKHR", SpvWord{5315}},
-        {"ExecutionModeFloatingPointModeALTINTEL", SpvWord{5622}},
-        {"DecorationInitModeINTEL", SpvWord{6190}},
-        {"CapabilityGroups", SpvWord{18}},
-        {"ExecutionModelMeshEXT", SpvWord{5365}},
-        {"StorageClassShaderRecordBufferNV", SpvWord{5343}},
-        {"BuiltInWarpsPerSMNV", SpvWord{5374}},
-        {"DecorationBoundSamplerNV", SpvWord{5400}},
-        {"StorageClassAtomicCounter", SpvWord{10}},
-        {"MemorySemanticsOutputMemory", SpvWord{4096}},
-        {"BuiltInCoreIDARM", SpvWord{4160}},
-        {"BuiltInVertexId", SpvWord{5}},
-        {"CapabilityPhysicalStorageBufferAddressesEXT", SpvWord{5347}},
-        {"FPDenormModePreserve", SpvWord{0}},
-        {"CapabilityStorageBuffer8BitAccess", SpvWord{4448}},
-        {"DecorationPerVertexNV", SpvWord{5285}},
-        {"ExecutionModeSharedLocalMemorySizeINTEL", SpvWord{5618}},
-        {"ImageChannelDataTypeUnormShort565", SpvWord{4}},
-        {"ExecutionModelTessellationControl", SpvWord{1}},
-        {"QuantizationModesRND_CONV", SpvWord{6}},
-        {"DecorationAliasedPointer", SpvWord{5356}},
-        {"DecorationMaxConcurrencyINTEL", SpvWord{5918}},
-        {"RayQueryIntersectionRayQueryCandidateIntersectionKHR", SpvWord{0}},
-        {"StorageClassCrossWorkgroup", SpvWord{5}},
-        {"DecorationPassthroughNV", SpvWord{5250}},
-        {"CapabilityInt64", SpvWord{11}},
-        {"CapabilityFPGARegINTEL", SpvWord{5948}},
-        {"CapabilityGroupNonUniformQuad", SpvWord{68}},
-        {"BuiltInPrimitiveCountNV", SpvWord{5275}},
-        {"AddressingModelLogical", SpvWord{0}},
-        {"CapabilitySampledBuffer", SpvWord{46}},
-        {"DecorationBindlessSamplerNV", SpvWord{5398}},
-        {"DecorationFuseLoopsInFunctionINTEL", SpvWord{5907}},
-        {"CapabilityNamedBarrier", SpvWord{59}},
-        {"KernelEnqueueFlagsWaitWorkGroup", SpvWord{2}},
-        {"ImageChannelOrderRA", SpvWord{3}},
-        {"CapabilityShaderViewportIndexLayerEXT", SpvWord{5254}},
-        {"CapabilityStorageTexelBufferArrayDynamicIndexingEXT", SpvWord{5305}},
-        {"SamplerFilterModeNearest", SpvWord{0}},
-        {"CapabilityDenormPreserve", SpvWord{4464}},
-        {"DecorationRestrictPointerEXT", SpvWord{5355}},
-        {"SourceLanguageSlang", SpvWord{11}},
-        {"BuiltInBaseVertex", SpvWord{4424}},
-        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionAABBKHR", SpvWord{1}},
-        {"StorageClassPrivate", SpvWord{6}},
-        {"ImageChannelOrderRGBA", SpvWord{5}},
-        {"CapabilityGroupNonUniformShuffle", SpvWord{65}},
-        {"ExecutionModeMaxNodeRecursionAMDX", SpvWord{5071}},
-        {"ImageOperandsVolatileTexel", SpvWord{2048}},
-        {"ImageFormatR64ui", SpvWord{40}},
-        {"ExecutionModeContractionOff", SpvWord{31}},
-        {"CapabilityStorageImageMultisample", SpvWord{27}},
-        {"DecorationGLSLPacked", SpvWord{9}},
-        {"BuiltInMeshViewIndicesNV", SpvWord{5281}},
-        {"CapabilityLoopFuseINTEL", SpvWord{5906}},
-        {"SamplerAddressingModeClampToEdge", SpvWord{1}},
-        {"CapabilityGroupNonUniformClustered", SpvWord{67}},
-        {"CapabilityTileImageDepthReadAccessEXT", SpvWord{4167}},
-        {"CapabilityCoreBuiltinsARM", SpvWord{4165}},
-        {"ExecutionModeNonCoherentStencilAttachmentReadEXT", SpvWord{4171}},
-        {"ImageChannelDataTypeUnsignedInt8", SpvWord{10}},
-        {"CapabilityInputAttachmentArrayNonUniformIndexing", SpvWord{5310}},
-        {"ScopeWorkgroup", SpvWord{2}},
-        {"CapabilityDotProductKHR", SpvWord{6019}},
-        {"MemoryModelSimple", SpvWord{0}},
-        {"ExecutionModePixelInterlockOrderedEXT", SpvWord{5366}},
-        {"BuiltInPosition", SpvWord{0}},
-        {"CapabilityStorageTexelBufferArrayNonUniformIndexing", SpvWord{5312}},
-        {"CapabilityDemoteToHelperInvocationEXT", SpvWord{5379}},
-        {"ImageFormatRg32f", SpvWord{6}},
-        {"CapabilitySampleMaskPostDepthCoverage", SpvWord{4447}},
-        {"CapabilityGroupNonUniformBallot", SpvWord{64}},
-        {"BuiltInObjectRayOriginNV", SpvWord{5323}},
-        {"LoopControlSpeculatedIterationsINTEL", SpvWord{4194304}},
-        {"BuiltInSampleMask", SpvWord{20}},
-        {"ImageOperandsGrad", SpvWord{4}},
-        {"ExecutionModeTriangles", SpvWord{22}},
-        {"CapabilitySignedZeroInfNanPreserve", SpvWord{4466}},
-        {"SourceLanguageUnknown", SpvWord{0}},
-        {"ScopeSubgroup", SpvWord{3}},
-        {"StorageClassIncomingCallableDataKHR", SpvWord{5329}},
-        {"MemorySemanticsRelaxed", SpvWord{0}},
-        {"FunctionParameterAttributeZext", SpvWord{0}},
-        {"CapabilityArbitraryPrecisionFixedPointINTEL", SpvWord{5922}},
-        {"CapabilityClipDistance", SpvWord{32}},
-        {"ImageOperandsConstOffsets", SpvWord{32}},
-        {"RayFlagsCullNoOpaqueKHR", SpvWord{128}},
-        {"ImageFormatRg16", SpvWord{12}},
-        {"ExecutionModelFragment", SpvWord{4}},
-        {"CapabilityStorageImageExtendedFormats", SpvWord{49}},
-        {"StorageClassOutput", SpvWord{3}},
-        {"ExecutionModePointMode", SpvWord{10}},
-        {"CapabilityDeviceGroup", SpvWord{4437}},
-        {"CooperativeMatrixUseMatrixAKHR", SpvWord{0}},
-        {"ExecutionModelRayGenerationNV", SpvWord{5313}},
-        {"CapabilityShaderClockKHR", SpvWord{5055}},
-        {"ExecutionModeInitializer", SpvWord{33}},
-        {"SamplerAddressingModeRepeatMirrored", SpvWord{4}},
-        {"CapabilityDotProductInputAll", SpvWord{6016}},
-        {"CapabilityRayTracingProvisionalKHR", SpvWord{5353}},
-        {"StoreCacheControlWriteBackINTEL", SpvWord{2}},
-        {"CapabilityFPGALoopControlsINTEL", SpvWord{5888}},
-        {"DecorationInitiationIntervalINTEL", SpvWord{5917}},
-        {"MemorySemanticsSubgroupMemory", SpvWord{128}},
-        {"CapabilityStorageImageReadWithoutFormat", SpvWord{55}},
-        {"BuiltInBaryCoordSmoothCentroidAMD", SpvWord{4996}},
-        {"CapabilityDemoteToHelperInvocation", SpvWord{5379}},
-        {"ImageChannelOrderDepthStencil", SpvWord{14}},
-        {"CapabilityUniformTexelBufferArrayDynamicIndexing", SpvWord{5304}},
-        {"CapabilityUniformBufferArrayNonUniformIndexingEXT", SpvWord{5306}},
-        {"ImageFormatR32i", SpvWord{24}},
-        {"ImageFormatRg32i", SpvWord{25}},
-        {"FunctionControlInline", SpvWord{1}},
-        {"MemoryAccessVolatile", SpvWord{1}},
-        {"CapabilityUniformTexelBufferArrayNonUniformIndexing", SpvWord{5311}},
-        {"CapabilityVulkanMemoryModelDeviceScope", SpvWord{5346}},
-        {"DecorationFunctionRoundingModeINTEL", SpvWord{5822}},
-        {"CapabilityDerivativeControl", SpvWord{51}},
-        {"CapabilityStoragePushConstant8", SpvWord{4450}},
-        {"DecorationSecondaryViewportRelativeNV", SpvWord{5256}},
-        {"RayFlagsSkipAABBsKHR", SpvWord{512}},
-        {"DecorationBlock", SpvWord{2}},
-        {"SourceLanguageNZSL", SpvWord{9}},
-        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionNoneKHR", SpvWord{0}},
-        {"KernelEnqueueFlagsNoWait", SpvWord{0}},
-        {"LoadCacheControlUncachedINTEL", SpvWord{0}},
-        {"DecorationForcePow2DepthINTEL", SpvWord{5836}},
-        {"DecorationNoUnsignedWrap", SpvWord{4470}},
-        {"DecorationCPacked", SpvWord{10}},
-        {"BuiltInSubgroupLeMask", SpvWord{4419}},
-        {"CapabilityMeshShadingEXT", SpvWord{5283}},
-        {"LoopControlMaxReinvocationDelayINTEL", SpvWord{33554432}},
-        {"CapabilityMatrix", SpvWord{0}},
-        {"CapabilityFloat64", SpvWord{10}},
-        {"CapabilityFloat16", SpvWord{9}},
-        {"CapabilityImage1D", SpvWord{44}},
-        {"FPRoundingModeRTZ", SpvWord{1}},
-        {"DecorationNonUniform", SpvWord{5300}},
-        {"CapabilitySubgroupImageMediaBlockIOINTEL", SpvWord{5579}},
-        {"DecorationGlobalVariableOffsetINTEL", SpvWord{5628}},
-        {"SelectionControlNone", SpvWord{0}},
-        {"MemorySemanticsCrossWorkgroupMemory", SpvWord{512}},
-        {"CapabilityGroupNonUniform", SpvWord{61}},
-        {"LoopControlMaxConcurrencyINTEL", SpvWord{131072}},
-        {"AddressingModelPhysicalStorageBuffer64", SpvWord{5348}},
-        {"CooperativeMatrixOperandsMatrixCSignedComponentsKHR", SpvWord{4}},
-        {"DecorationStallEnableINTEL", SpvWord{5905}},
-        {"ImageChannelDataTypeHalfFloat", SpvWord{13}},
-        {"DecorationFuncParamIOKindINTEL", SpvWord{5625}},
-        {"BuiltInDrawIndex", SpvWord{4426}},
-        {"BuiltInCullMaskKHR", SpvWord{6021}},
-        {"DecorationPipelineEnableINTEL", SpvWord{5919}},
-        {"CapabilityUnstructuredLoopControlsINTEL", SpvWord{5886}},
-        {"CapabilityGeometry", SpvWord{2}},
-        {"RayFlagsForceOpacityMicromap2StateEXT", SpvWord{1024}},
-        {"FunctionControlNone", SpvWord{0}},
-        {"CapabilityDotProductInput4x8Bit", SpvWord{6017}},
-        {"CapabilityFragmentShaderShadingRateInterlockEXT", SpvWord{5372}},
-        {"CapabilityGroupNonUniformRotateKHR", SpvWord{6026}},
-        {"BuiltInFragInvocationCountEXT", SpvWord{5293}},
-        {"DecorationRowMajor", SpvWord{4}},
-        {"CapabilitySubgroupDispatch", SpvWord{58}},
-        {"DecorationInputAttachmentIndex", SpvWord{43}},
-        {"DecorationBufferLocationINTEL", SpvWord{5921}},
-        {"CapabilityTransformFeedback", SpvWord{53}},
-        {"DimTileImageDataEXT", SpvWord{4173}},
-        {"MemorySemanticsUniformMemory", SpvWord{64}},
-        {"DecorationStream", SpvWord{29}},
-        {"ExecutionModeLocalSizeHintId", SpvWord{39}},
-        {"CapabilityBitInstructions", SpvWord{6025}},
-        {"StorageClassHostOnlyINTEL", SpvWord{5937}},
-        {"CapabilityTextureBlockMatchQCOM", SpvWord{4486}},
-        {"DecorationVectorComputeFunctionINTEL", SpvWord{5626}},
-        {"CapabilityShaderViewportIndexLayerNV", SpvWord{5254}},
-        {"LinkageTypeExport", SpvWord{0}},
-        {"ImageChannelOrderIntensity", SpvWord{8}},
-        {"BuiltInSMIDNV", SpvWord{5377}},
-        {"ExecutionModeMaxWorkgroupSizeINTEL", SpvWord{5893}},
-        {"ImageFormatRgba32f", SpvWord{1}},
-        {"DecorationPerVertexKHR", SpvWord{5285}},
-        {"BuiltInCullDistancePerViewNV", SpvWord{5278}},
-        {"CapabilityShaderEnqueueAMDX", SpvWord{5067}},
-        {"CapabilityShaderNonUniform", SpvWord{5301}},
-        {"CapabilityRayQueryPositionFetchKHR", SpvWord{5391}},
-        {"RayFlagsNoOpaqueKHR", SpvWord{2}},
-        {"BuiltInBaryCoordSmoothSampleAMD", SpvWord{4997}},
-        {"ImageFormatR8Snorm", SpvWord{20}},
-        {"CapabilityUniformTexelBufferArrayDynamicIndexingEXT", SpvWord{5304}},
-        {"KernelProfilingInfoNone", SpvWord{0}},
-        {"ImageOperandsConstOffset", SpvWord{8}},
-        {"CapabilityStorageUniform16", SpvWord{4434}},
-        {"CapabilityUniformBufferArrayDynamicIndexing", SpvWord{28}},
-        {"BuiltInRayTmaxNV", SpvWord{5326}},
-        {"CapabilityVulkanMemoryModel", SpvWord{5345}},
-        {"StorageClassStorageBuffer", SpvWord{12}},
-        {"DimBuffer", SpvWord{5}},
-        {"ImageFormatR16f", SpvWord{9}},
-        {"CapabilityFPGADSPControlINTEL", SpvWord{5908}},
-        {"FunctionParameterAttributeRuntimeAlignedINTEL", SpvWord{5940}},
-        {"DimCube", SpvWord{3}},
-        {"DecorationXfbBuffer", SpvWord{36}},
-        {"ImageFormatRgba8", SpvWord{4}},
-        {"DecorationInvariant", SpvWord{18}},
-        {"CapabilityInt16", SpvWord{22}},
-        {"StorageClassPhysicalStorageBuffer", SpvWord{5349}},
-        {"BuiltInBaryCoordNoPerspSampleAMD", SpvWord{4994}},
-        {"ExecutionModeQuads", SpvWord{24}},
-        {"DecorationFlat", SpvWord{14}},
-        {"BuiltInPrimitiveShadingRateKHR", SpvWord{4432}},
-        {"CapabilityCacheControlsINTEL", SpvWord{6441}},
-        {"CapabilityInt64ImageEXT", SpvWord{5016}},
-        {"CapabilityShaderViewportMaskNV", SpvWord{5255}},
-        {"OverflowModesSAT_SYM", SpvWord{3}},
-        {"ImageFormatRg16Snorm", SpvWord{17}},
-        {"DimSubpassData", SpvWord{6}},
-        {"CapabilitySampleRateShading", SpvWord{35}},
-        {"StorageClassUniformConstant", SpvWord{0}},
-        {"BuiltInCoreMaxIDARM", SpvWord{4162}},
-        {"DecorationWeightTextureQCOM", SpvWord{4487}},
-        {"CapabilityStorageBufferArrayNonUniformIndexingEXT", SpvWord{5308}},
-        {"FunctionParameterAttributeNoReadWrite", SpvWord{7}},
-        {"QuantizationModesRND_INF", SpvWord{4}},
-        {"CapabilityRuntimeAlignedAttributeINTEL", SpvWord{5939}},
-        {"BuiltInHitTNV", SpvWord{5332}},
-        {"CapabilityFragmentBarycentricKHR", SpvWord{5284}},
-        {"DecorationLatencyControlConstraintINTEL", SpvWord{6173}},
-        {"PackedVectorFormatPackedVectorFormat4x8BitKHR", SpvWord{0}},
-        {"CapabilitySubgroupAvcMotionEstimationIntraINTEL", SpvWord{5697}},
-        {"BuiltInBaseInstance", SpvWord{4425}},
-        {"ImageFormatRgb10a2ui", SpvWord{34}},
-        {"CapabilityImageMipmap", SpvWord{15}},
-        {"ExecutionModeRoundingModeRTZ", SpvWord{4463}},
-        {"CapabilityTessellationPointSize", SpvWord{23}},
-        {"DecorationSaturatedConversion", SpvWord{28}},
-        {"CapabilityCooperativeMatrixNV", SpvWord{5357}},
-        {"CapabilityFragmentShaderSampleInterlockEXT", SpvWord{5363}},
-        {"BuiltInViewportMaskPerViewNV", SpvWord{5262}},
-        {"ImageFormatRg16f", SpvWord{7}},
-        {"ImageFormatR16ui", SpvWord{38}},
-        {"SourceLanguageWGSL", SpvWord{10}},
-        {"StorageClassPushConstant", SpvWord{9}},
-        {"CapabilityDisplacementMicromapNV", SpvWord{5380}},
-        {"CapabilityFragmentFullyCoveredEXT", SpvWord{5265}},
-        {"MemoryModelOpenCL", SpvWord{2}},
-        {"DecorationUniform", SpvWord{26}},
-        {"ExecutionModeNumSIMDWorkitemsINTEL", SpvWord{5896}},
-        {"CapabilityFPFastMathModeINTEL", SpvWord{5837}},
-        {"ExecutionModeSpacingEqual", SpvWord{1}},
-        {"BuiltInInstanceId", SpvWord{6}},
-        {"ExecutionModeShadingRateInterlockOrderedEXT", SpvWord{5370}},
-        {"ImageChannelOrderRG", SpvWord{2}},
-        {"ExecutionModeNonCoherentDepthAttachmentReadEXT", SpvWord{4170}},
-        {"BuiltInBaryCoordSmoothAMD", SpvWord{4995}},
-        {"ExecutionModelKernel", SpvWord{6}},
-        {"CapabilityShaderInvocationReorderNV", SpvWord{5383}},
-        {"SamplerAddressingModeRepeat", SpvWord{3}},
-        {"ImageChannelOrderABGR", SpvWord{19}},
-        {"LoadCacheControlInvalidateAfterReadINTEL", SpvWord{3}},
-        {"StorageClassTileImageEXT", SpvWord{4172}},
-        {"ExecutionModePixelCenterInteger", SpvWord{6}},
-        {"ExecutionModeOutputPrimitivesEXT", SpvWord{5270}},
-        {"CapabilityImageReadWrite", SpvWord{14}},
-        {"ExecutionModeRoundingModeRTE", SpvWord{4462}},
-        {"FPRoundingModeRTP", SpvWord{2}},
-        {"CapabilityComputeDerivativeGroupQuadsNV", SpvWord{5288}},
-        {"CapabilityAtomicFloat32AddEXT", SpvWord{6033}},
-        {"CapabilityInputAttachmentArrayNonUniformIndexingEXT", SpvWord{5310}},
-        {"LoopControlMaxIterations", SpvWord{32}},
-        {"ExecutionModeDerivativeGroupLinearNV", SpvWord{5290}},
-        {"FragmentShadingRateVertical4Pixels", SpvWord{2}},
-        {"DecorationPayloadNodeNameAMDX", SpvWord{5091}},
-        {"DecorationSpecId", SpvWord{1}},
-        {"CapabilityGlobalVariableFPGADecorationsINTEL", SpvWord{6189}},
-        {"BuiltInClipDistance", SpvWord{3}},
-        {"BuiltInHitMicroTriangleVertexPositionsNV", SpvWord{5337}},
-        {"DecorationMaxByteOffset", SpvWord{45}},
-        {"CapabilityVulkanMemoryModelKHR", SpvWord{5345}},
-        {"StoreCacheControlWriteThroughINTEL", SpvWord{1}},
-        {"CapabilityFPGAClusterAttributesINTEL", SpvWord{5904}},
-        {"DecorationMMHostInterfaceAddressWidthINTEL", SpvWord{6177}},
-        {"QuantizationModesRND_MIN_INF", SpvWord{5}},
-        {"FPRoundingModeRTE", SpvWord{0}},
-        {"FunctionParameterAttributeNoAlias", SpvWord{4}},
-        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionGeneratedKHR", SpvWord{2}},
-        {"StorageClassHitObjectAttributeNV", SpvWord{5385}},
-        {"DecorationOverrideCoverageNV", SpvWord{5248}},
-        {"CapabilityImageGatherBiasLodAMD", SpvWord{5009}},
-        {"CapabilityBindlessTextureNV", SpvWord{5390}},
-        {"CapabilityFPGALatencyControlINTEL", SpvWord{6171}},
-        {"CapabilityTileImageColorReadAccessEXT", SpvWord{4166}},
-        {"RayFlagsTerminateOnFirstHitKHR", SpvWord{4}},
-        {"DecorationSample", SpvWord{17}},
-        {"FPFastMathModeNotInf", SpvWord{2}},
-        {"DecorationMMHostInterfaceLatencyINTEL", SpvWord{6179}},
-        {"BuiltInHitMicroTriangleVertexBarycentricsNV", SpvWord{5344}},
-        {"ImageFormatRgba32ui", SpvWord{30}},
-        {"BuiltInCoreCountARM", SpvWord{4161}},
-        {"FPRoundingModeRTN", SpvWord{3}},
-        {"BuiltInObjectRayDirectionKHR", SpvWord{5324}},
-        {"BuiltInSubgroupMaxSize", SpvWord{37}},
-        {"BuiltInHitKindFrontFacingMicroTriangleNV", SpvWord{5405}},
-        {"BuiltInSubgroupId", SpvWord{40}},
-        {"CapabilityFloatingPointModeINTEL", SpvWord{5583}},
-        {"QuantizationModesRND_ZERO", SpvWord{3}},
-        {"LoopControlMinIterations", SpvWord{16}},
-        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionTriangleKHR", SpvWord{1}},
-        {"SourceLanguageHERO_C", SpvWord{8}},
-        {"ImageFormatR32f", SpvWord{3}},
-        {"ImageOperandsSignExtend", SpvWord{4096}},
-        {"ImageChannelDataTypeUnsignedIntRaw12EXT", SpvWord{20}},
-        {"ImageChannelOrdersRGBA", SpvWord{17}},
-        {"BuiltInFullyCoveredEXT", SpvWord{5264}},
-        {"ImageOperandsLod", SpvWord{2}},
-        {"LoopControlUnroll", SpvWord{1}},
-        {"FPDenormModeFlushToZero", SpvWord{1}},
-        {"MemoryAccessAligned", SpvWord{2}},
-        {"CapabilityFPGAClusterAttributesV2INTEL", SpvWord{6150}},
-        {"ImageChannelDataTypeUnsignedInt32", SpvWord{12}},
-        {"DecorationRestrict", SpvWord{19}},
-        {"CapabilityStorageImageArrayNonUniformIndexing", SpvWord{5309}},
-        {"ImageChannelOrderLuminance", SpvWord{9}},
-        {"CapabilityStorageImageArrayNonUniformIndexingEXT", SpvWord{5309}},
-        {"LoopControlInitiationIntervalINTEL", SpvWord{65536}},
-        {"LoopControlMaxInterleavingINTEL", SpvWord{2097152}},
-        {"DecorationGLSLShared", SpvWord{8}},
-        {"StorageClassImage", SpvWord{11}},
-        {"FunctionControlPure", SpvWord{4}},
-        {"CapabilityStoragePushConstant16", SpvWord{4435}},
-        {"FPFastMathModeFast", SpvWord{16}},
-        {"CapabilityBlockingPipesINTEL", SpvWord{5945}},
         {"StorageClassHitAttributeKHR", SpvWord{5339}},
-        {"DecorationRestrictPointer", SpvWord{5355}},
-        {"ExecutionModeFinalizer", SpvWord{34}},
-        {"BuiltInLocalInvocationId", SpvWord{27}},
-        {"DecorationFunctionDenormModeINTEL", SpvWord{5823}},
-        {"ExecutionModeOriginLowerLeft", SpvWord{8}},
-        {"BuiltInSampleId", SpvWord{18}},
-        {"HostAccessQualifierNoneINTEL", SpvWord{0}},
-        {"BuiltInNumEnqueuedSubgroups", SpvWord{39}},
-        {"ExecutionModelMissKHR", SpvWord{5317}},
-        {"FPOperationModeALT", SpvWord{1}},
-        {"ExecutionModeOutputPoints", SpvWord{27}},
-        {"StorageClassIncomingCallableDataNV", SpvWord{5329}},
-        {"CapabilityRoundToInfinityINTEL", SpvWord{5582}},
-        {"MemorySemanticsMakeVisible", SpvWord{16384}},
-        {"InitializationModeQualifierInitOnDeviceReprogramINTEL", SpvWord{0}},
-        {"ImageOperandsBias", SpvWord{1}},
-        {"ImageOperandsOffsets", SpvWord{65536}},
-        {"SourceLanguageOpenCL_CPP", SpvWord{4}},
-        {"CapabilityStorageImageWriteWithoutFormat", SpvWord{56}},
-        {"BuiltInFrontFacing", SpvWord{17}},
-        {"DecorationArrayStride", SpvWord{6}},
-        {"SourceLanguageGLSL", SpvWord{2}},
-        {"ExecutionModeOutputLinesNV", SpvWord{5269}},
-        {"CapabilityAtomicFloat64AddEXT", SpvWord{6034}},
-        {"CapabilityUniformAndStorageBuffer8BitAccess", SpvWord{4449}},
-        {"MemorySemanticsAtomicCounterMemory", SpvWord{1024}},
-        {"BuiltInPrimitiveId", SpvWord{7}},
-        {"ExecutionModeEarlyAndLateFragmentTestsAMD", SpvWord{5017}},
-        {"CapabilityGeometryPointSize", SpvWord{24}},
-        {"CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR", SpvWord{4430}},
-        {"DecorationMMHostInterfaceWaitRequestINTEL", SpvWord{6182}},
-        {"ExecutionModeVecTypeHint", SpvWord{30}},
-        {"ExecutionModeNamedBarrierCountINTEL", SpvWord{6417}},
-        {"ImageFormatRg32ui", SpvWord{35}},
-        {"MemorySemanticsSequentiallyConsistent", SpvWord{16}},
-        {"RayFlagsSkipTrianglesKHR", SpvWord{256}},
-        {"ExecutionModeVertexOrderCcw", SpvWord{5}},
-        {"CapabilityGeometryShaderPassthroughNV", SpvWord{5251}},
-        {"BuiltInLaunchSizeKHR", SpvWord{5320}},
-        {"DecorationCacheControlStoreINTEL", SpvWord{6443}},
-        {"BuiltInTaskCountNV", SpvWord{5274}},
-        {"CapabilitySubgroupVoteKHR", SpvWord{4431}},
-        {"CapabilityStorageBufferArrayNonUniformIndexing", SpvWord{5308}},
-        {"BuiltInIncomingRayFlagsKHR", SpvWord{5351}},
-        {"DecorationPerViewNV", SpvWord{5272}},
-        {"BuiltInRayTmaxKHR", SpvWord{5326}},
-        {"BuiltInTessLevelOuter", SpvWord{11}},
-        {"StorageClassIncomingRayPayloadNV", SpvWord{5342}},
-        {"ScopeInvocation", SpvWord{4}},
-        {"CapabilityMultiViewport", SpvWord{57}},
-        {"ImageChannelOrderDepth", SpvWord{13}},
-        {"ImageFormatR16i", SpvWord{28}},
-        {"CapabilityRayTracingPositionFetchKHR", SpvWord{5336}},
-        {"ImageFormatRg8Snorm", SpvWord{18}},
-        {"ImageOperandsNontemporal", SpvWord{16384}},
-        {"CapabilityVectorComputeINTEL", SpvWord{5617}},
-        {"QuantizationModesTRN_ZERO", SpvWord{1}},
-        {"ImageChannelOrderR", SpvWord{0}},
-        {"CapabilityInputAttachmentArrayDynamicIndexingEXT", SpvWord{5303}},
-        {"DecorationStallFreeINTEL", SpvWord{6151}},
-        {"ImageChannelDataTypeUnormInt101010_2", SpvWord{16}},
-        {"LoopControlDontUnroll", SpvWord{2}},
-        {"BuiltInSamplePosition", SpvWord{19}},
-        {"ExecutionModeOutputPrimitivesNV", SpvWord{5270}},
-        {"RayQueryIntersectionRayQueryCommittedIntersectionKHR", SpvWord{1}},
-        {"BuiltInPrimitiveLineIndicesEXT", SpvWord{5295}},
-        {"CapabilityStorageTexelBufferArrayNonUniformIndexingEXT", SpvWord{5312}},
-        {"CapabilityInt8", SpvWord{39}},
-        {"BuiltInPrimitiveTriangleIndicesEXT", SpvWord{5296}},
-        {"ExecutionModeRoundingModeRTPINTEL", SpvWord{5620}},
-        {"CapabilityStorageBuffer16BitAccess", SpvWord{4433}},
-        {"CapabilitySampleMaskOverrideCoverageNV", SpvWord{5249}},
-        {"ImageChannelOrderA", SpvWord{1}},
-        {"ExecutionModelGeometry", SpvWord{3}},
-        {"ExecutionModeStencilRefGreaterFrontAMD", SpvWord{5080}},
-        {"ExecutionModeSubgroupUniformControlFlowKHR", SpvWord{4421}},
-        {"CapabilityAsmINTEL", SpvWord{5606}},
-        {"ImageOperandsMakeTexelVisible", SpvWord{512}},
-        {"DecorationSimpleDualPortINTEL", SpvWord{5833}},
-        {"CapabilitySubgroupBallotKHR", SpvWord{4423}},
-        {"LoopControlPipelineEnableINTEL", SpvWord{524288}},
-        {"CapabilitySampledRect", SpvWord{37}},
-        {"DecorationUserSemantic", SpvWord{5635}},
-        {"StorageClassGeneric", SpvWord{8}},
-        {"ImageFormatRgba32i", SpvWord{21}},
-        {"ImageFormatUnknown", SpvWord{0}},
-        {"StoreCacheControlUncachedINTEL", SpvWord{0}},
-        {"BuiltInNumSubgroups", SpvWord{38}},
-        {"ImageFormatRg8i", SpvWord{27}},
-        {"DecorationNoSignedWrap", SpvWord{4469}},
-        {"StorageClassRayPayloadNV", SpvWord{5338}},
-        {"CapabilityImageReadWriteLodAMD", SpvWord{5015}},
-        {"GroupOperationReduce", SpvWord{0}},
-        {"BuiltInWorldRayOriginKHR", SpvWord{5321}},
-        {"RayFlagsCullOpaqueKHR", SpvWord{64}},
-        {"CapabilityGroupUniformArithmeticKHR", SpvWord{6400}},
-        {"DecorationCounterBuffer", SpvWord{5634}},
-        {"BuiltInFragCoord", SpvWord{15}},
-        {"LinkageTypeLinkOnceODR", SpvWord{2}},
-        {"ImageChannelDataTypeUnormShort555", SpvWord{5}},
-        {"CapabilityPerViewAttributesNV", SpvWord{5260}},
-        {"ImageOperandsMinLod", SpvWord{128}},
-        {"DecorationIndex", SpvWord{32}},
-        {"DecorationSIMTCallINTEL", SpvWord{5599}},
-        {"CapabilitySubgroupAvcMotionEstimationINTEL", SpvWord{5696}},
-        {"CapabilityRayQueryProvisionalKHR", SpvWord{4471}},
-        {"ExecutionModeLocalSize", SpvWord{17}},
-        {"CapabilityImageGatherExtended", SpvWord{25}},
-        {"BuiltInInstanceIndex", SpvWord{43}},
-        {"BuiltInViewportMaskNV", SpvWord{5253}},
-        {"CapabilitySampled1D", SpvWord{43}},
-        {"ImageChannelDataTypeSnormInt16", SpvWord{1}},
-        {"SourceLanguageESSL", SpvWord{1}},
-        {"BuiltInTessCoord", SpvWord{13}},
-        {"BuiltInInstanceCustomIndexKHR", SpvWord{5327}},
-        {"CapabilityMultiView", SpvWord{4439}},
-        {"MemorySemanticsMakeVisibleKHR", SpvWord{16384}},
-        {"FPOperationModeIEEE", SpvWord{0}},
-        {"BuiltInFragStencilRefEXT", SpvWord{5014}},
-        {"ExecutionModeOutputTriangleStrip", SpvWord{29}},
-        {"DecorationStableKernelArgumentINTEL", SpvWord{6183}},
-        {"CapabilityKernel", SpvWord{6}},
-        {"CapabilityAddresses", SpvWord{4}},
-        {"ExecutionModeOriginUpperLeft", SpvWord{7}},
-        {"ExecutionModelMissNV", SpvWord{5317}},
-        {"CapabilityMemoryAccessAliasingINTEL", SpvWord{5910}},
-        {"CapabilityTextureBoxFilterQCOM", SpvWord{4485}},
-        {"ExecutionModeDenormFlushToZero", SpvWord{4460}},
-        {"CapabilitySparseResidency", SpvWord{41}},
-        {"RayFlagsOpaqueKHR", SpvWord{1}},
-        {"FragmentShadingRateHorizontal4Pixels", SpvWord{8}},
-        {"BuiltInPrimitiveIndicesNV", SpvWord{5276}},
-        {"ExecutionModelGLCompute", SpvWord{5}},
-        {"CapabilityGenericPointer", SpvWord{38}},
-        {"BuiltInWorldToObjectNV", SpvWord{5331}},
-        {"DecorationMMHostInterfaceDataWidthINTEL", SpvWord{6178}},
-        {"StorageClassShaderRecordBufferKHR", SpvWord{5343}},
-        {"FunctionControlOptNoneINTEL", SpvWord{65536}},
-        {"DecorationComponent", SpvWord{31}},
-        {"ExecutionModeStencilRefGreaterBackAMD", SpvWord{5083}},
-        {"DecorationCacheSizeINTEL", SpvWord{5900}},
-        {"ExecutionModeOutputLineStrip", SpvWord{28}},
-        {"CapabilityMeshShadingNV", SpvWord{5266}},
-        {"DecorationExplicitInterpAMD", SpvWord{4999}},
-        {"StorageClassHitAttributeNV", SpvWord{5339}},
-        {"DecorationNumbanksINTEL", SpvWord{5827}},
-        {"CapabilityDeviceEnqueue", SpvWord{19}},
-        {"DecorationUserTypeGOOGLE", SpvWord{5636}},
-        {"AccessQualifierReadWrite", SpvWord{2}},
-        {"CapabilityImageFootprintNV", SpvWord{5282}},
-        {"BuiltInPatchVertices", SpvWord{14}},
-        {"StorageClassDeviceOnlyINTEL", SpvWord{5936}},
-        {"MemoryModelGLSL450", SpvWord{1}},
-        {"BuiltInSubgroupGtMask", SpvWord{4418}},
-        {"BuiltInSubgroupLocalInvocationId", SpvWord{41}},
-        {"CapabilityLiteralSampler", SpvWord{20}},
-        {"ImageFormatRgba8Snorm", SpvWord{5}},
-        {"CapabilityIOPipesINTEL", SpvWord{5943}},
-        {"CapabilitySampledImageArrayNonUniformIndexingEXT", SpvWord{5307}},
-        {"CapabilityComputeDerivativeGroupLinearNV", SpvWord{5350}},
-        {"FPFastMathModeNSZ", SpvWord{4}},
-        {"CapabilityFunctionPointersINTEL", SpvWord{5603}},
-        {"CapabilitySampledImageArrayDynamicIndexing", SpvWord{29}},
-        {"DecorationAlignmentId", SpvWord{46}},
-        {"StorageClassRayPayloadKHR", SpvWord{5338}},
-        {"CapabilitySubgroupBufferBlockIOINTEL", SpvWord{5569}},
-        {"SamplerAddressingModeNone", SpvWord{0}},
-        {"CapabilityVariablePointers", SpvWord{4442}},
-        {"CapabilityDrawParameters", SpvWord{4427}},
-        {"ExecutionModeSubgroupsPerWorkgroup", SpvWord{36}},
-        {"ExecutionModelMeshNV", SpvWord{5268}},
-        {"BuiltInObjectRayOriginKHR", SpvWord{5323}},
-        {"DecorationNonWritable", SpvWord{24}},
-        {"ExecutionModelAnyHitNV", SpvWord{5315}},
-        {"DecorationStridesizeINTEL", SpvWord{5883}},
-        {"CapabilityFPGAInvocationPipeliningAttributesINTEL", SpvWord{5916}},
-        {"BuiltInInvocationsPerPixelNV", SpvWord{5293}},
-        {"DecorationNodeSharesPayloadLimitsWithAMDX", SpvWord{5019}},
-        {"CapabilityRayCullMaskKHR", SpvWord{6020}},
-        {"DecorationHlslSemanticGOOGLE", SpvWord{5635}},
-        {"ExecutionModeXfb", SpvWord{11}},
-        {"CapabilityVectorAnyINTEL", SpvWord{5619}},
-        {"CapabilityFPGAArgumentInterfacesINTEL", SpvWord{6174}},
-        {"GroupOperationPartitionedReduceNV", SpvWord{6}},
-        {"DecorationWordsizeINTEL", SpvWord{5884}},
-        {"ImageChannelOrderRx", SpvWord{10}},
-        {"BuiltInPrimitivePointIndicesEXT", SpvWord{5294}},
-        {"FragmentShadingRateHorizontal2Pixels", SpvWord{4}},
-        {"ExecutionModeLocalSizeId", SpvWord{38}},
-        {"BuiltInDeviceIndex", SpvWord{4438}},
-        {"AddressingModelPhysical64", SpvWord{2}},
-        {"ImageOperandsOffset", SpvWord{16}},
-        {"ImageOperandsSample", SpvWord{64}},
-        {"BuiltInWorldToObjectKHR", SpvWord{5331}},
-        {"DecorationTrueDualPortINTEL", SpvWord{5885}},
-        {"MemorySemanticsMakeAvailableKHR", SpvWord{8192}},
-        {"CapabilityGroupNonUniformArithmetic", SpvWord{63}},
-        {"DecorationVectorComputeCallableFunctionINTEL", SpvWord{6087}},
-        {"ExecutionModeMaxNumWorkgroupsAMDX", SpvWord{5077}},
-        {"CapabilityStorageUniformBufferBlock16", SpvWord{4433}},
-        {"CapabilityMinLod", SpvWord{42}},
-        {"CapabilityWorkgroupMemoryExplicitLayoutKHR", SpvWord{4428}},
-        {"DecorationPerPrimitiveEXT", SpvWord{5271}},
-        {"DecorationNoPerspective", SpvWord{13}},
-        {"KernelProfilingInfoCmdExecTime", SpvWord{1}},
-        {"ImageFormatRgb10A2", SpvWord{11}},
-        {"CapabilityUniformBufferArrayNonUniformIndexing", SpvWord{5306}},
-        {"RayFlagsCullBackFacingTrianglesKHR", SpvWord{16}},
-        {"ExecutionModeStencilRefReplacingEXT", SpvWord{5027}},
-        {"DecorationStackCallINTEL", SpvWord{5627}},
-        {"StorageClassNodeOutputPayloadAMDX", SpvWord{5076}},
-        {"CapabilityAtomicFloat64MinMaxEXT", SpvWord{5613}},
-        {"ExecutionModeCoalescingAMDX", SpvWord{5069}},
-        {"LoopControlDependencyLength", SpvWord{8}},
-        {"ImageChannelOrdersRGBx", SpvWord{16}},
-        {"QuantizationModesTRN", SpvWord{0}},
-        {"CapabilityFragmentShadingRateKHR", SpvWord{4422}},
-        {"Dim3D", SpvWord{2}},
-        {"DecorationMaxReplicatesINTEL", SpvWord{5832}},
-        {"ImageChannelDataTypeFloat", SpvWord{14}},
-        {"ExecutionModeDepthReplacing", SpvWord{12}},
-        {"ExecutionModeSpacingFractionalOdd", SpvWord{3}},
-        {"ExecutionModeSampleInterlockUnorderedEXT", SpvWord{5369}},
-        {"StorageClassFunction", SpvWord{7}},
-        {"MemoryAccessAliasScopeINTELMask", SpvWord{65536}},
-        {"DecorationAliased", SpvWord{20}},
-        {"ExecutionModeMaxWorkDimINTEL", SpvWord{5894}},
-        {"DecorationVectorComputeVariableINTEL", SpvWord{5624}},
-        {"BuiltInLaunchIdKHR", SpvWord{5319}},
-        {"DecorationNonUniformEXT", SpvWord{5300}},
-        {"ExecutionModeNoGlobalOffsetINTEL", SpvWord{5895}},
-        {"DecorationViewportRelativeNV", SpvWord{5252}},
-        {"CooperativeMatrixOperandsMatrixBSignedComponentsKHR", SpvWord{2}},
-        {"BuiltInWarpIDNV", SpvWord{5376}},
-        {"BuiltInHitKindBackFacingMicroTriangleNV", SpvWord{5406}},
-        {"BuiltInLayer", SpvWord{9}},
-        {"ExecutionModeSampleInterlockOrderedEXT", SpvWord{5368}},
-        {"BuiltInWorkDim", SpvWord{30}},
-        {"DecorationOffset", SpvWord{35}},
-        {"DecorationBufferBlock", SpvWord{3}},
-        {"DecorationAlignment", SpvWord{44}},
-        {"BuiltInSubgroupEqMaskKHR", SpvWord{4416}},
-        {"BuiltInObjectToWorldNV", SpvWord{5330}},
-        {"CapabilityFragmentBarycentricNV", SpvWord{5284}},
-        {"GroupOperationPartitionedExclusiveScanNV", SpvWord{8}},
-        {"CooperativeMatrixOperandsNoneKHR", SpvWord{0}},
-        {"CapabilityRayTracingNV", SpvWord{5340}},
-        {"DecorationBlockMatchTextureQCOM", SpvWord{4488}},
-        {"BuiltInTessLevelInner", SpvWord{12}},
-        {"BuiltInSubgroupGeMaskKHR", SpvWord{4417}},
-        {"SourceLanguageSYCL", SpvWord{7}},
-        {"DecorationFunctionFloatingPointModeINTEL", SpvWord{6080}},
-        {"Dim1D", SpvWord{0}},
-        {"BuiltInSecondaryPositionNV", SpvWord{5257}},
-        {"RayFlagsCullFrontFacingTrianglesKHR", SpvWord{32}},
-        {"StorageClassPhysicalStorageBufferEXT", SpvWord{5349}},
-        {"ImageChannelDataTypeUnormInt101010", SpvWord{6}},
-        {"ScopeDevice", SpvWord{1}},
-        {"ExecutionModeSubgroupSize", SpvWord{35}},
-        {"DecorationPatch", SpvWord{15}},
-        {"CapabilitySubgroupImageBlockIOINTEL", SpvWord{5570}},
-        {"BuiltInSubgroupLeMaskKHR", SpvWord{4419}},
-        {"BuiltInWarpIDARM", SpvWord{4163}},
-        {"DecorationVolatile", SpvWord{21}},
-        {"SamplerFilterModeLinear", SpvWord{1}},
-        {"BuiltInLaunchSizeNV", SpvWord{5320}},
-        {"CapabilityVariableLengthArrayINTEL", SpvWord{5817}},
-        {"LoadCacheControlCachedINTEL", SpvWord{1}},
-        {"CapabilityCullDistance", SpvWord{33}},
-        {"FunctionParameterAttributeSret", SpvWord{3}},
-        {"CapabilityInterpolationFunction", SpvWord{52}},
-        {"ImageFormatRg8ui", SpvWord{37}},
-        {"CapabilityLongCompositesINTEL", SpvWord{6089}},
-        {"StorageClassCallableDataNV", SpvWord{5328}},
-        {"ImageChannelDataTypeSnormInt8", SpvWord{0}},
-        {"CapabilityRoundingModeRTZ", SpvWord{4468}},
-        {"CapabilityArbitraryPrecisionIntegersINTEL", SpvWord{5844}},
-        {"ImageOperandsNone", SpvWord{0}},
-        {"CooperativeMatrixOperandsMatrixASignedComponentsKHR", SpvWord{1}},
-        {"ExecutionModeDepthUnchanged", SpvWord{16}},
-        {"ExecutionModeLocalSizeHint", SpvWord{18}},
-        {"ExecutionModeSpacingFractionalEven", SpvWord{2}},
-        {"ExecutionModeShadingRateInterlockUnorderedEXT", SpvWord{5371}},
-        {"ExecutionModeDerivativeGroupQuadsNV", SpvWord{5289}},
-        {"ImageOperandsNonPrivateTexel", SpvWord{1024}},
-        {"DecorationReferencedIndirectlyINTEL", SpvWord{5602}},
-        {"StorageClassWorkgroup", SpvWord{4}},
-        {"BuiltInSubgroupGeMask", SpvWord{4417}},
-        {"ImageFormatRgba16ui", SpvWord{31}},
-        {"LoopControlLoopCountINTEL", SpvWord{16777216}},
-        {"CapabilitySampledCubeArray", SpvWord{45}},
-        {"StorageClassIncomingRayPayloadKHR", SpvWord{5342}},
-        {"CapabilityDotProductInput4x8BitPackedKHR", SpvWord{6018}},
-        {"BuiltInPointSize", SpvWord{1}},
-        {"ImageChannelDataTypeUnsignedIntRaw10EXT", SpvWord{19}},
-        {"BuiltInHitKindNV", SpvWord{5333}},
-        {"MemorySemanticsAcquire", SpvWord{2}},
-        {"ExecutionModeShaderIndexAMDX", SpvWord{5073}},
-        {"CapabilityRoundingModeRTE", SpvWord{4467}},
-        {"FragmentShadingRateVertical2Pixels", SpvWord{1}},
-        {"CapabilityFunctionFloatControlINTEL", SpvWord{5821}},
-        {"DecorationAliasedPointerEXT", SpvWord{5356}},
-        {"DecorationCentroid", SpvWord{16}},
-        {"ScopeQueueFamily", SpvWord{5}},
-        {"ExecutionModeInputLinesAdjacency", SpvWord{21}},
-        {"ImageOperandsZeroExtend", SpvWord{8192}},
-        {"MemoryAccessNone", SpvWord{0}},
-        {"LoopControlPeelCount", SpvWord{128}},
-        {"LoadCacheControlConstCachedINTEL", SpvWord{4}},
-        {"DecorationMediaBlockIOINTEL", SpvWord{6140}},
-        {"ExecutionModelIntersectionNV", SpvWord{5314}},
-        {"DecorationMatrixStride", SpvWord{7}},
-        {"DecorationBankwidthINTEL", SpvWord{5828}},
-        {"DecorationRegisterMapKernelArgumentINTEL", SpvWord{6176}},
-        {"CapabilityDebugInfoModuleINTEL", SpvWord{6114}},
-        {"ExecutionModeIsolines", SpvWord{25}},
-        {"ImageFormatR8i", SpvWord{29}},
-        {"CapabilityFPGAMemoryAccessesINTEL", SpvWord{5898}},
-        {"ExecutionModeInputPoints", SpvWord{19}},
-        {"CapabilityFloat16Buffer", SpvWord{8}},
-        {"ExecutionModePixelInterlockUnorderedEXT", SpvWord{5367}},
-        {"CapabilityImageRect", SpvWord{36}},
-        {"BuiltInSubgroupLtMaskKHR", SpvWord{4420}},
-        {"LoopControlPartialCount", SpvWord{256}},
-        {"ImageChannelOrderRGB", SpvWord{4}},
-        {"OverflowModesWRAP", SpvWord{0}},
-        {"ImageOperandsVolatileTexelKHR", SpvWord{2048}},
-        {"CapabilityFragmentDensityEXT", SpvWord{5291}},
-        {"DecorationLatencyControlLabelINTEL", SpvWord{6172}},
-        {"CooperativeMatrixLayoutRowMajorKHR", SpvWord{0}},
-        {"ExecutionModeDenormPreserve", SpvWord{4459}},
-        {"DecorationBindlessImageNV", SpvWord{5399}},
-        {"ImageFormatRgba8i", SpvWord{23}},
-        {"LoadCacheControlStreamingINTEL", SpvWord{2}},
-        {"CapabilityVector16", SpvWord{7}},
-        {"BuiltInInvocationId", SpvWord{8}},
-        {"SelectionControlFlatten", SpvWord{1}},
-        {"BuiltInGlobalLinearId", SpvWord{34}},
-        {"ExecutionModeSignedZeroInfNanPreserve", SpvWord{4461}},
-        {"InitializationModeQualifierInitOnDeviceResetINTEL", SpvWord{1}},
-        {"MemorySemanticsOutputMemoryKHR", SpvWord{4096}},
-        {"AddressingModelPhysical32", SpvWord{1}},
-        {"MemorySemanticsWorkgroupMemory", SpvWord{256}},
-        {"MemoryAccessNonPrivatePointer", SpvWord{32}},
-        {"ExecutionModelTessellationEvaluation", SpvWord{2}},
-        {"DecorationImplementInRegisterMapINTEL", SpvWord{6191}},
-        {"MemorySemanticsImageMemory", SpvWord{2048}},
-        {"CapabilityFPMaxErrorINTEL", SpvWord{6169}},
-        {"DecorationPerTaskNV", SpvWord{5273}},
-        {"SelectionControlDontFlatten", SpvWord{2}},
-        {"BuiltInEnqueuedWorkgroupSize", SpvWord{32}},
-        {"ExecutionModelTaskEXT", SpvWord{5364}},
-        {"ImageChannelOrderARGB", SpvWord{7}},
-        {"ScopeCrossDevice", SpvWord{0}},
-        {"CapabilityFPGAMemoryAttributesINTEL", SpvWord{5824}},
-        {"CapabilityUSMStorageClassesINTEL", SpvWord{5935}},
-        {"ExecutionModeStaticNumWorkgroupsAMDX", SpvWord{5072}},
         {"ScopeQueueFamilyKHR", SpvWord{5}},
-        {"DecorationXfbStride", SpvWord{37}},
-        {"BuiltInCullDistance", SpvWord{4}},
-        {"ImageFormatRgba16f", SpvWord{2}},
-        {"SourceLanguageOpenCL_C", SpvWord{3}},
-        {"BuiltInCoalescedInputCountAMDX", SpvWord{5021}},
-        {"ImageOperandsMakeTexelAvailableKHR", SpvWord{256}},
-        {"ExecutionModelRayGenerationKHR", SpvWord{5313}},
-        {"DecorationHlslCounterBufferGOOGLE", SpvWord{5634}},
-        {"CooperativeMatrixUseMatrixAccumulatorKHR", SpvWord{2}},
-        {"BuiltInRayGeometryIndexKHR", SpvWord{5352}},
-        {"GroupOperationExclusiveScan", SpvWord{2}},
-        {"DecorationBurstCoalesceINTEL", SpvWord{5899}},
-        {"CapabilityInputAttachment", SpvWord{40}},
-        {"ImageFormatRgba16i", SpvWord{22}},
-        {"ExecutionModeDepthLess", SpvWord{15}},
-        {"BuiltInSubgroupLtMask", SpvWord{4420}},
-        {"CapabilityInt64Atomics", SpvWord{12}},
-        {"CooperativeMatrixOperandsMatrixResultSignedComponentsKHR", SpvWord{8}},
-        {"ImageChannelDataTypeUnormInt16", SpvWord{3}},
-        {"MemoryModelVulkanKHR", SpvWord{3}},
-        {"DecorationConduitKernelArgumentINTEL", SpvWord{6175}},
-        {"CapabilityImageBasic", SpvWord{13}},
-        {"ImageFormatR11fG11fB10f", SpvWord{8}},
-        {"DecorationBankBitsINTEL", SpvWord{5835}},
+        {"ImageChannelDataTypeUnsignedInt8", SpvWord{10}},
+        {"CapabilityLoopFuseINTEL", SpvWord{5906}},
+        {"CapabilitySubgroupAvcMotionEstimationChromaINTEL", SpvWord{5698}},
+        {"BuiltInFragCoord", SpvWord{15}},
+        {"CapabilityDisplacementMicromapNV", SpvWord{5380}},
+        {"BuiltInFragmentSizeNV", SpvWord{5292}},
+        {"ExecutionModeNonCoherentStencilAttachmentReadEXT", SpvWord{4171}},
+        {"DecorationUniform", SpvWord{26}},
+        {"ImageFormatRg16Snorm", SpvWord{17}},
+        {"CapabilitySubgroupImageBlockIOINTEL", SpvWord{5570}},
+        {"ImageChannelDataTypeUnormInt101010_2", SpvWord{16}},
+        {"ImageFormatRg8i", SpvWord{27}},
+        {"CapabilityGroupNonUniformPartitionedNV", SpvWord{5297}},
+        {"DecorationMMHostInterfaceAddressWidthINTEL", SpvWord{6177}},
+        {"DecorationSample", SpvWord{17}},
+        {"DecorationFuncParamAttr", SpvWord{38}},
+        {"ExecutionModelAnyHitKHR", SpvWord{5315}},
+        {"CapabilityExpectAssumeKHR", SpvWord{5629}},
+        {"CapabilityLiteralSampler", SpvWord{20}},
+        {"DecorationComponent", SpvWord{31}},
+        {"ImageChannelDataTypeUnsignedIntRaw12EXT", SpvWord{20}},
+        {"ImageChannelDataTypeSignedInt8", SpvWord{7}},
+        {"DecorationFPFastMathMode", SpvWord{40}},
+        {"ImageFormatRg32i", SpvWord{25}},
+        {"DecorationCacheControlLoadINTEL", SpvWord{6442}},
+        {"ImageChannelOrderABGR", SpvWord{19}},
+        {"ExecutionModeSchedulerTargetFmaxMhzINTEL", SpvWord{5903}},
+        {"DecorationSecondaryViewportRelativeNV", SpvWord{5256}},
+        {"CapabilityRayTracingMotionBlurNV", SpvWord{5341}},
+        {"ExecutionModePixelInterlockUnorderedEXT", SpvWord{5367}},
+        {"BuiltInGlobalOffset", SpvWord{33}},
+        {"FunctionParameterAttributeNoWrite", SpvWord{6}},
+        {"DecorationColMajor", SpvWord{5}},
+        {"CapabilityRoundingModeRTE", SpvWord{4467}},
+        {"CapabilityMeshShadingNV", SpvWord{5266}},
         {"CapabilityStorageTexelBufferArrayDynamicIndexing", SpvWord{5305}},
-        {"ExecutionModeStencilRefUnchangedBackAMD", SpvWord{5082}},
-        {"ImageChannelDataTypeSignedInt32", SpvWord{9}},
+        {"MemoryModelOpenCL", SpvWord{2}},
+        {"CapabilityDemoteToHelperInvocationEXT", SpvWord{5379}},
+        {"BuiltInCurrentRayTimeNV", SpvWord{5334}},
+        {"CapabilityShaderClockKHR", SpvWord{5055}},
+        {"CapabilityShaderViewportIndexLayerEXT", SpvWord{5254}},
+        {"ExecutionModeShadingRateInterlockOrderedEXT", SpvWord{5370}},
+        {"LoopControlDontUnroll", SpvWord{2}},
+        {"BuiltInSecondaryViewportMaskNV", SpvWord{5258}},
+        {"DecorationReferencedIndirectlyINTEL", SpvWord{5602}},
+        {"RayFlagsCullOpaqueKHR", SpvWord{64}},
+        {"ExecutionModelRayGenerationKHR", SpvWord{5313}},
+        {"CapabilityVariablePointers", SpvWord{4442}},
+        {"ImageChannelDataTypeUnsignedInt16", SpvWord{11}},
+        {"ExecutionModeNumSIMDWorkitemsINTEL", SpvWord{5896}},
+        {"BuiltInHitKindNV", SpvWord{5333}},
         {"MemorySemanticsNone", SpvWord{0}},
-        {"CapabilityTessellation", SpvWord{3}},
-        {"FunctionParameterAttributeNoCapture", SpvWord{5}},
-        {"DecorationSinglepumpINTEL", SpvWord{5830}},
-        {"ExecutionModeStreamingInterfaceINTEL", SpvWord{6154}},
-        {"DecorationMaxByteOffsetId", SpvWord{47}},
-        {"ExecutionModeOutputTrianglesEXT", SpvWord{5298}},
-        {"ExecutionModePostDepthCoverage", SpvWord{4446}},
-        {"ExecutionModeStencilRefLessFrontAMD", SpvWord{5081}},
-        {"CapabilityTextureSampleWeightedQCOM", SpvWord{4484}},
-        {"LinkageTypeImport", SpvWord{1}},
-        {"CapabilityTileImageStencilReadAccessEXT", SpvWord{4168}},
-        {"CapabilityFragmentShaderPixelInterlockEXT", SpvWord{5378}},
-        {"ExecutionModeNonCoherentColorAttachmentReadEXT", SpvWord{4169}},
+        {"CapabilityRayTracingKHR", SpvWord{4479}},
+        {"BuiltInTessLevelInner", SpvWord{12}},
+        {"CapabilityVulkanMemoryModelDeviceScope", SpvWord{5346}},
+        {"CapabilityImageBasic", SpvWord{13}},
+        {"CapabilityUniformTexelBufferArrayNonUniformIndexingEXT", SpvWord{5311}},
+        {"ImageFormatRgb10a2ui", SpvWord{34}},
+        {"DecorationFunctionDenormModeINTEL", SpvWord{5823}},
+        {"ImageChannelDataTypeFloat", SpvWord{14}},
+        {"CapabilityShaderNonUniformEXT", SpvWord{5301}},
+        {"ImageFormatR32i", SpvWord{24}},
+        {"BuiltInObjectRayDirectionNV", SpvWord{5324}},
+        {"DecorationConstant", SpvWord{22}},
+        {"SamplerAddressingModeRepeat", SpvWord{3}},
+        {"BuiltInRayTminNV", SpvWord{5325}},
+        {"FragmentShadingRateHorizontal2Pixels", SpvWord{4}},
+        {"BuiltInFragDepth", SpvWord{22}},
+        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionTriangleKHR", SpvWord{0}},
+        {"ExecutionModelMeshNV", SpvWord{5268}},
+        {"ExecutionModeDerivativeGroupLinearNV", SpvWord{5290}},
+        {"DecorationNonWritable", SpvWord{24}},
+        {"CapabilityStorageImageWriteWithoutFormat", SpvWord{56}},
+        {"ImageFormatRgba16i", SpvWord{22}},
+        {"QuantizationModesTRN", SpvWord{0}},
+        {"CapabilityStorageBuffer8BitAccess", SpvWord{4448}},
+        {"ImageOperandsVolatileTexel", SpvWord{2048}},
+        {"DecorationStream", SpvWord{29}},
+        {"CapabilityVectorComputeINTEL", SpvWord{5617}},
+        {"ImageFormatUnknown", SpvWord{0}},
+        {"CapabilityDrawParameters", SpvWord{4427}},
+        {"CapabilityBitInstructions", SpvWord{6025}},
+        {"ImageFormatRgba16f", SpvWord{2}},
+        {"StorageClassHitAttributeNV", SpvWord{5339}},
+        {"CapabilityFPGABufferLocationINTEL", SpvWord{5920}},
+        {"BuiltInWorldRayOriginNV", SpvWord{5321}},
+        {"BuiltInSubgroupGtMask", SpvWord{4418}},
+        {"MemorySemanticsAtomicCounterMemory", SpvWord{1024}},
+        {"ImageOperandsNonPrivateTexelKHR", SpvWord{1024}},
+        {"DecorationPassthroughNV", SpvWord{5250}},
+        {"FPOperationModeALT", SpvWord{1}},
+        {"OverflowModesWRAP", SpvWord{0}},
+        {"BuiltInFrontFacing", SpvWord{17}},
+        {"BuiltInSampleId", SpvWord{18}},
+        {"CapabilityRayTracingProvisionalKHR", SpvWord{5353}},
+        {"ScopeWorkgroup", SpvWord{2}},
+        {"ExecutionModeInputPoints", SpvWord{19}},
+        {"DimCube", SpvWord{3}},
+        {"DecorationGlobalVariableOffsetINTEL", SpvWord{5628}},
+        {"DecorationCoherent", SpvWord{23}},
+        {"BuiltInDeviceIndex", SpvWord{4438}},
+        {"CapabilityShaderInvocationReorderNV", SpvWord{5383}},
+        {"CapabilityGroupNonUniformVote", SpvWord{62}},
+        {"CapabilityStorageUniform16", SpvWord{4434}},
+        {"CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR", SpvWord{4429}},
+        {"ImageFormatRgba32ui", SpvWord{30}},
+        {"BuiltInViewIndex", SpvWord{4440}},
+        {"MemoryAccessVolatile", SpvWord{1}},
+        {"CapabilityStorageInputOutput16", SpvWord{4436}},
+        {"DecorationOffset", SpvWord{35}},
         {"DecorationPrefetchINTEL", SpvWord{5902}},
-        {"CapabilityShaderLayer", SpvWord{69}},
-        {"ImageFormatRg16i", SpvWord{26}},
-        {"StorageClassTaskPayloadWorkgroupEXT", SpvWord{5402}},
-        {"ImageChannelDataTypeSignedInt16", SpvWord{8}},
+        {"ImageChannelDataTypeUnsignedIntRaw10EXT", SpvWord{19}},
+        {"CapabilitySubgroupDispatch", SpvWord{58}},
+        {"DecorationMathOpDSPModeINTEL", SpvWord{5909}},
+        {"CapabilityStorageTexelBufferArrayNonUniformIndexing", SpvWord{5312}},
+        {"ExecutionModeSubgroupSize", SpvWord{35}},
+        {"BuiltInClipDistance", SpvWord{3}},
+        {"SourceLanguageGLSL", SpvWord{2}},
+        {"BuiltInTessCoord", SpvWord{13}},
+        {"LoadCacheControlUncachedINTEL", SpvWord{0}},
+        {"ExecutionModeStencilRefUnchangedBackAMD", SpvWord{5082}},
+        {"RayFlagsNoOpaqueKHR", SpvWord{2}},
+        {"ImageFormatRg8Snorm", SpvWord{18}},
+        {"SourceLanguageESSL", SpvWord{1}},
+        {"LoadCacheControlConstCachedINTEL", SpvWord{4}},
+        {"ExecutionModelClosestHitNV", SpvWord{5316}},
+        {"CapabilityStoragePushConstant8", SpvWord{4450}},
+        {"MemorySemanticsVolatile", SpvWord{32768}},
+        {"DecorationNumbanksINTEL", SpvWord{5827}},
+        {"ImageFormatRg32ui", SpvWord{35}},
+        {"DecorationGLSLPacked", SpvWord{9}},
+        {"ExecutionModeStencilRefGreaterBackAMD", SpvWord{5083}},
+        {"CooperativeMatrixUseMatrixAccumulatorKHR", SpvWord{2}},
+        {"FunctionControlDontInline", SpvWord{2}},
+        {"BuiltInSubgroupLeMask", SpvWord{4419}},
+        {"CapabilityUniformTexelBufferArrayDynamicIndexingEXT", SpvWord{5304}},
+        {"BuiltInPatchVertices", SpvWord{14}},
+        {"CapabilityStorageTexelBufferArrayDynamicIndexingEXT", SpvWord{5305}},
+        {"DecorationBoundSamplerNV", SpvWord{5400}},
+        {"ExecutionModeIsolines", SpvWord{25}},
+        {"ExecutionModeFPFastMathDefault", SpvWord{6028}},
+        {"ImageFormatR8i", SpvWord{29}},
+        {"KernelEnqueueFlagsNoWait", SpvWord{0}},
+        {"SamplerAddressingModeClampToEdge", SpvWord{1}},
+        {"ImageFormatR16i", SpvWord{28}},
+        {"CapabilityFloat16", SpvWord{9}},
+        {"ExecutionModeNamedMaximumRegistersINTEL", SpvWord{6463}},
+        {"CapabilityGeometryShaderPassthroughNV", SpvWord{5251}},
+        {"CapabilityInputAttachmentArrayNonUniformIndexing", SpvWord{5310}},
+        {"CapabilityGroupNonUniformClustered", SpvWord{67}},
+        {"ImageChannelDataTypeUnormInt16", SpvWord{3}},
+        {"ImageFormatRg16", SpvWord{12}},
+        {"FragmentShadingRateVertical4Pixels", SpvWord{2}},
+        {"BuiltInCoreCountARM", SpvWord{4161}},
+        {"CapabilityGlobalVariableFPGADecorationsINTEL", SpvWord{6189}},
+        {"CapabilityArbitraryPrecisionFloatingPointINTEL", SpvWord{5845}},
+        {"MemorySemanticsMakeVisible", SpvWord{16384}},
+        {"DecorationNodeSharesPayloadLimitsWithAMDX", SpvWord{5019}},
+        {"RayFlagsCullBackFacingTrianglesKHR", SpvWord{16}},
+        {"LoopControlDependencyInfinite", SpvWord{4}},
+        {"DecorationIOPipeStorageINTEL", SpvWord{5944}},
         {"CapabilityRuntimeDescriptorArrayEXT", SpvWord{5302}},
-        {"SourceLanguageCPP_for_OpenCL", SpvWord{6}},
-        {"DecorationNonReadable", SpvWord{25}},
-        {"CapabilityVariablePointersStorageBuffer", SpvWord{4441}},
-        {"ImageChannelOrderBGRA", SpvWord{6}},
-        {"FPFastMathModeAllowRecip", SpvWord{8}},
-        {"BuiltInWorkgroupSize", SpvWord{25}},
-        {"ImageFormatR64i", SpvWord{41}},
-        {"CapabilityStorageImageArrayDynamicIndexing", SpvWord{31}},
-        {"BuiltInSubgroupSize", SpvWord{36}},
-        {"MemoryAccessNoAliasINTELMask", SpvWord{131072}},
+        {"KernelProfilingInfoCmdExecTime", SpvWord{1}},
+        {"ExecutionModeOutputLineStrip", SpvWord{28}},
+        {"InitializationModeQualifierInitOnDeviceResetINTEL", SpvWord{1}},
+        {"RayFlagsNoneKHR", SpvWord{0}},
+        {"CapabilityInputAttachmentArrayDynamicIndexing", SpvWord{5303}},
+        {"CapabilitySampledImageArrayDynamicIndexing", SpvWord{29}},
+        {"StorageClassRayPayloadNV", SpvWord{5338}},
+        {"BuiltInSecondaryPositionNV", SpvWord{5257}},
+        {"LoopControlSpeculatedIterationsINTEL", SpvWord{4194304}},
+        {"DecorationStackCallINTEL", SpvWord{5627}},
+        {"CapabilityShaderSMBuiltinsNV", SpvWord{5373}},
+        {"CapabilityShaderStereoViewNV", SpvWord{5259}},
+        {"CapabilityStorageImageExtendedFormats", SpvWord{49}},
+        {"ExecutionModeOutputTriangleStrip", SpvWord{29}},
+        {"BuiltInBaryCoordSmoothAMD", SpvWord{4995}},
+        {"DecorationSaturatedConversion", SpvWord{28}},
+        {"CapabilityGeometryPointSize", SpvWord{24}},
+        {"CapabilityRayCullMaskKHR", SpvWord{6020}},
+        {"LoopControlNone", SpvWord{0}},
+        {"DecorationMediaBlockIOINTEL", SpvWord{6140}},
+        {"CapabilityShader", SpvWord{1}},
+        {"CapabilityStoragePushConstant16", SpvWord{4435}},
+        {"DecorationPerTaskNV", SpvWord{5273}},
+        {"BuiltInObjectRayOriginKHR", SpvWord{5323}},
+        {"CapabilityTessellation", SpvWord{3}},
+        {"BuiltInFullyCoveredEXT", SpvWord{5264}},
+        {"CapabilityFPGALatencyControlINTEL", SpvWord{6171}},
+        {"BuiltInInstanceIndex", SpvWord{43}},
+        {"ImageOperandsSignExtend", SpvWord{4096}},
+        {"DecorationNoAliasINTEL", SpvWord{5915}},
+        {"Dim2D", SpvWord{1}},
+        {"DecorationStableKernelArgumentINTEL", SpvWord{6183}},
+        {"CapabilityStorageImageReadWithoutFormat", SpvWord{55}},
+        {"CapabilityRayTracingNV", SpvWord{5340}},
+        {"DecorationNoSignedWrap", SpvWord{4469}},
+        {"BuiltInSampleMask", SpvWord{20}},
+        {"DecorationBlockMatchTextureQCOM", SpvWord{4488}},
+        {"LoopControlMinIterations", SpvWord{16}},
+        {"StorageClassNodePayloadAMDX", SpvWord{5068}},
+        {"DecorationBlock", SpvWord{2}},
+        {"ExecutionModeInputTrianglesAdjacency", SpvWord{23}},
+        {"CapabilityInt64ImageEXT", SpvWord{5016}},
+        {"BuiltInLocalInvocationId", SpvWord{27}},
+        {"DecorationBlockMatchSamplerQCOM", SpvWord{4499}},
+        {"CooperativeMatrixUseMatrixAKHR", SpvWord{0}},
+        {"LoopControlMaxReinvocationDelayINTEL", SpvWord{33554432}},
+        {"CapabilityFragmentDensityEXT", SpvWord{5291}},
+        {"MemorySemanticsMakeAvailable", SpvWord{8192}},
+        {"ExecutionModeStaticNumWorkgroupsAMDX", SpvWord{5072}},
+        {"DecorationFPRoundingMode", SpvWord{39}},
+        {"StorageClassRayPayloadKHR", SpvWord{5338}},
+        {"FunctionControlPure", SpvWord{4}},
+        {"ExecutionModeQuadDerivativesKHR", SpvWord{5088}},
+        {"CapabilityImageGatherBiasLodAMD", SpvWord{5009}},
+        {"CooperativeMatrixLayoutColumnMajorKHR", SpvWord{1}},
+        {"CapabilitySubgroupBallotKHR", SpvWord{4423}},
+        {"ExecutionModelKernel", SpvWord{6}},
+        {"ExecutionModePixelCenterInteger", SpvWord{6}},
+        {"ExecutionModeSubgroupUniformControlFlowKHR", SpvWord{4421}},
+        {"ExecutionModeRoundingModeRTNINTEL", SpvWord{5621}},
+        {"DecorationBindlessSamplerNV", SpvWord{5398}},
+        {"ExecutionModeStencilRefLessFrontAMD", SpvWord{5081}},
+        {"StorageClassCallableDataNV", SpvWord{5328}},
+        {"ExecutionModeMaxWorkgroupSizeINTEL", SpvWord{5893}},
+        {"DecorationNonUniform", SpvWord{5300}},
+        {"CapabilityAtomicFloat64MinMaxEXT", SpvWord{5613}},
+        {"ExecutionModeOutputVertices", SpvWord{26}},
+        {"CapabilityAsmINTEL", SpvWord{5606}},
+        {"FPRoundingModeRTZ", SpvWord{1}},
+        {"CapabilityFPFastMathModeINTEL", SpvWord{5837}},
+        {"DecorationPatch", SpvWord{15}},
+        {"StorageClassPrivate", SpvWord{6}},
+        {"DecorationRegisterMapKernelArgumentINTEL", SpvWord{6176}},
+        {"StoreCacheControlUncachedINTEL", SpvWord{0}},
+        {"ExecutionModeSpacingFractionalEven", SpvWord{2}},
+        {"CapabilityPhysicalStorageBufferAddressesEXT", SpvWord{5347}},
+        {"ExecutionModeMaximallyReconvergesKHR", SpvWord{6023}},
+        {"BuiltInPrimitiveShadingRateKHR", SpvWord{4432}},
+        {"GroupOperationInclusiveScan", SpvWord{1}},
+        {"CapabilityTransformFeedback", SpvWord{53}},
+        {"DecorationCounterBuffer", SpvWord{5634}},
+        {"ScopeInvocation", SpvWord{4}},
+        {"CapabilityFPGAMemoryAccessesINTEL", SpvWord{5898}},
+        {"RayFlagsCullFrontFacingTrianglesKHR", SpvWord{32}},
+        {"DecorationStallFreeINTEL", SpvWord{6151}},
+        {"FunctionParameterAttributeZext", SpvWord{0}},
+        {"CapabilityRoundingModeRTZ", SpvWord{4468}},
+        {"DecorationMMHostInterfaceWaitRequestINTEL", SpvWord{6182}},
+        {"CapabilitySampledRect", SpvWord{37}},
+        {"HostAccessQualifierNoneINTEL", SpvWord{0}},
+        {"CapabilityCooperativeMatrixNV", SpvWord{5357}},
+        {"CapabilityRayQueryPositionFetchKHR", SpvWord{5391}},
+        {"LoadCacheControlStreamingINTEL", SpvWord{2}},
+        {"PackedVectorFormatPackedVectorFormat4x8BitKHR", SpvWord{0}},
+        {"CapabilityShaderLayer", SpvWord{69}},
+        {"BuiltInCullPrimitiveEXT", SpvWord{5299}},
+        {"MemoryModelGLSL450", SpvWord{1}},
+        {"LoopControlMaxInterleavingINTEL", SpvWord{2097152}},
+        {"BuiltInSubgroupLeMaskKHR", SpvWord{4419}},
+        {"CapabilityAtomicFloat16VectorNV", SpvWord{5404}},
+        {"ImageFormatR32ui", SpvWord{33}},
+        {"ExecutionModeSubgroupsPerWorkgroupId", SpvWord{37}},
+        {"DecorationSpecId", SpvWord{1}},
+        {"FPFastMathModeAllowReassoc", SpvWord{131072}},
+        {"LoopControlDependencyArrayINTEL", SpvWord{262144}},
+        {"ImageFormatRgba32i", SpvWord{21}},
+        {"DecorationAliasedPointerEXT", SpvWord{5356}},
+        {"CapabilityRawAccessChainsNV", SpvWord{5414}},
+        {"DecorationFunctionFloatingPointModeINTEL", SpvWord{6080}},
+        {"CapabilityImageRect", SpvWord{36}},
+        {"CapabilityDenormPreserve", SpvWord{4464}},
+        {"CapabilityVulkanMemoryModel", SpvWord{5345}},
+        {"MemoryAccessNone", SpvWord{0}},
+        {"DecorationBankBitsINTEL", SpvWord{5835}},
+        {"CapabilityFPGAClusterAttributesINTEL", SpvWord{5904}},
+        {"CapabilityBlockingPipesINTEL", SpvWord{5945}},
+        {"BuiltInPrimitiveCountNV", SpvWord{5275}},
+        {"ExecutionModelTessellationEvaluation", SpvWord{2}},
+        {"MemoryAccessMakePointerVisibleKHR", SpvWord{16}},
+        {"CapabilitySampled1D", SpvWord{43}},
+        {"BuiltInPointSize", SpvWord{1}},
+        {"ExecutionModeVecTypeHint", SpvWord{30}},
+        {"DecorationDoublepumpINTEL", SpvWord{5831}},
+        {"CapabilitySampleRateShading", SpvWord{35}},
+        {"QuantizationModesRND_MIN_INF", SpvWord{5}},
+        {"CapabilityRayTracingOpacityMicromapEXT", SpvWord{5381}},
+        {"FunctionParameterAttributeSext", SpvWord{1}},
+        {"CapabilityUniformBufferArrayNonUniformIndexingEXT", SpvWord{5306}},
         {"ExecutionModelIntersectionKHR", SpvWord{5314}},
-        {"BuiltInVertexIndex", SpvWord{42}},
+        {"CapabilityFPGAInvocationPipeliningAttributesINTEL", SpvWord{5916}},
+        {"BuiltInBaryCoordPullModelAMD", SpvWord{4998}},
+        {"ExecutionModeNamedBarrierCountINTEL", SpvWord{6417}},
+        {"ExecutionModeMaxNodeRecursionAMDX", SpvWord{5071}},
+        {"FPFastMathModeNotNaN", SpvWord{1}},
+        {"BuiltInMeshViewIndicesNV", SpvWord{5281}},
+        {"CapabilityFloat16ImageAMD", SpvWord{5008}},
+        {"DecorationDontStaticallyCoalesceINTEL", SpvWord{5901}},
+        {"BuiltInWarpIDARM", SpvWord{4163}},
+        {"FPFastMathModeAllowRecip", SpvWord{8}},
+        {"CapabilityWorkgroupMemoryExplicitLayoutKHR", SpvWord{4428}},
+        {"BuiltInSamplePosition", SpvWord{19}},
+        {"BuiltInFragStencilRefEXT", SpvWord{5014}},
+        {"ExecutionModeLocalSize", SpvWord{17}},
+        {"CapabilityVulkanMemoryModelKHR", SpvWord{5345}},
+        {"CapabilityComputeDerivativeGroupQuadsNV", SpvWord{5288}},
+        {"MemoryModelVulkan", SpvWord{3}},
+        {"BuiltInPrimitiveLineIndicesEXT", SpvWord{5295}},
+        {"FunctionParameterAttributeRuntimeAlignedINTEL", SpvWord{5940}},
+        {"MemorySemanticsRelease", SpvWord{4}},
+        {"DecorationIndex", SpvWord{32}},
+        {"QuantizationModesRND", SpvWord{2}},
+        {"DecorationSinglepumpINTEL", SpvWord{5830}},
+        {"MemorySemanticsMakeVisibleKHR", SpvWord{16384}},
+        {"StorageClassDeviceOnlyINTEL", SpvWord{5936}},
+        {"CapabilityFPMaxErrorINTEL", SpvWord{6169}},
+        {"CapabilityImageReadWrite", SpvWord{14}},
+        {"ImageOperandsVolatileTexelKHR", SpvWord{2048}},
+        {"StorageClassIncomingCallableDataKHR", SpvWord{5329}},
+        {"StorageClassTaskPayloadWorkgroupEXT", SpvWord{5402}},
+        {"DecorationAlignment", SpvWord{44}},
+        {"CapabilityFloat64", SpvWord{10}},
+        {"DecorationDescriptorSet", SpvWord{34}},
+        {"ImageChannelOrderIntensity", SpvWord{8}},
+        {"CapabilityDeviceEnqueue", SpvWord{19}},
+        {"QuantizationModesTRN_ZERO", SpvWord{1}},
+        {"CapabilityPipeStorage", SpvWord{60}},
+        {"ExecutionModeLocalSizeHintId", SpvWord{39}},
+        {"OverflowModesSAT", SpvWord{1}},
+        {"CapabilitySubgroupBufferBlockIOINTEL", SpvWord{5569}},
+        {"ImageChannelDataTypeUnormShort565", SpvWord{4}},
+        {"BuiltInInstanceId", SpvWord{6}},
+        {"ImageFormatRgba16", SpvWord{10}},
+        {"CapabilityStencilExportEXT", SpvWord{5013}},
+        {"AddressingModelLogical", SpvWord{0}},
+        {"BuiltInFragSizeEXT", SpvWord{5292}},
+        {"FPFastMathModeNSZ", SpvWord{4}},
+        {"ScopeDevice", SpvWord{1}},
+        {"DecorationSIMTCallINTEL", SpvWord{5599}},
+        {"DecorationMaxByteOffsetId", SpvWord{47}},
+        {"BuiltInPrimitivePointIndicesEXT", SpvWord{5294}},
+        {"PackedVectorFormatPackedVectorFormat4x8Bit", SpvWord{0}},
+        {"DimSubpassData", SpvWord{6}},
+        {"SamplerFilterModeLinear", SpvWord{1}},
+        {"ImageChannelOrderRGBA", SpvWord{5}},
+        {"ImageOperandsMakeTexelAvailable", SpvWord{256}},
+        {"FunctionParameterAttributeNoAlias", SpvWord{4}},
+        {"DecorationAliasedPointer", SpvWord{5356}},
+        {"StorageClassPushConstant", SpvWord{9}},
+        {"ImageFormatR64i", SpvWord{41}},
+        {"CapabilitySampledBuffer", SpvWord{46}},
+        {"CapabilityQuadControlKHR", SpvWord{5087}},
+        {"MemorySemanticsUniformMemory", SpvWord{64}},
+        {"ImageChannelOrderDepthStencil", SpvWord{14}},
+        {"DecorationHostAccessINTEL", SpvWord{6188}},
+        {"ExecutionModePointMode", SpvWord{10}},
+        {"ExecutionModeDepthLess", SpvWord{15}},
+        {"StorageClassFunction", SpvWord{7}},
+        {"CapabilitySubgroupVoteKHR", SpvWord{4431}},
+        {"Dim1D", SpvWord{0}},
+        {"DecorationNoContraction", SpvWord{42}},
+        {"MemoryAccessAliasScopeINTELMask", SpvWord{65536}},
+        {"BuiltInObjectRayDirectionKHR", SpvWord{5324}},
+        {"DecorationFlat", SpvWord{14}},
+        {"CapabilityStorageImageArrayNonUniformIndexing", SpvWord{5309}},
+        {"CapabilityDemoteToHelperInvocation", SpvWord{5379}},
+        {"DecorationAlignmentId", SpvWord{46}},
+        {"CapabilityStorageBufferArrayNonUniformIndexing", SpvWord{5308}},
+        {"DecorationLinkageAttributes", SpvWord{41}},
+        {"ExecutionModeRegisterMapInterfaceINTEL", SpvWord{6160}},
+        {"LoopControlPeelCount", SpvWord{128}},
+        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionGeneratedKHR", SpvWord{2}},
+        {"BuiltInEnqueuedWorkgroupSize", SpvWord{32}},
+        {"ExecutionModeDepthReplacing", SpvWord{12}},
+        {"CapabilityGenericPointer", SpvWord{38}},
+        {"MemorySemanticsOutputMemoryKHR", SpvWord{4096}},
+        {"ExecutionModePostDepthCoverage", SpvWord{4446}},
+        {"DecorationBoundImageNV", SpvWord{5401}},
+        {"CapabilityComputeDerivativeGroupLinearNV", SpvWord{5350}},
+        {"ExecutionModeVertexOrderCcw", SpvWord{5}},
+        {"BuiltInPosition", SpvWord{0}},
+        {"QuantizationModesRND_ZERO", SpvWord{3}},
+        {"CapabilityPerViewAttributesNV", SpvWord{5260}},
+        {"MemorySemanticsCrossWorkgroupMemory", SpvWord{512}},
+        {"SourceLanguageSlang", SpvWord{11}},
+        {"CapabilityUniformTexelBufferArrayNonUniformIndexing", SpvWord{5311}},
+        {"CapabilityUniformDecoration", SpvWord{71}},
+        {"DecorationWordsizeINTEL", SpvWord{5884}},
+        {"ImageOperandsMinLod", SpvWord{128}},
+        {"ImageChannelDataTypeSignedInt16", SpvWord{8}},
+        {"ImageOperandsMakeTexelAvailableKHR", SpvWord{256}},
+        {"ExecutionModeContractionOff", SpvWord{31}},
+        {"OverflowModesSAT_SYM", SpvWord{3}},
+        {"CapabilityMemoryAccessAliasingINTEL", SpvWord{5910}},
+        {"CapabilityImageMSArray", SpvWord{48}},
+        {"DecorationUserSemantic", SpvWord{5635}},
+        {"AccessQualifierWriteOnly", SpvWord{1}},
+        {"DecorationFPMaxErrorDecorationINTEL", SpvWord{6170}},
+        {"ExecutionModelMissKHR", SpvWord{5317}},
+        {"BuiltInIncomingRayFlagsKHR", SpvWord{5351}},
+        {"ExecutionModePixelInterlockOrderedEXT", SpvWord{5366}},
+        {"StorageClassHostOnlyINTEL", SpvWord{5937}},
+        {"StoreCacheControlStreamingINTEL", SpvWord{3}},
+        {"ExecutionModeOutputPoints", SpvWord{27}},
+        {"SourceLanguageWGSL", SpvWord{10}},
+        {"RayQueryIntersectionRayQueryCommittedIntersectionKHR", SpvWord{1}},
+        {"CapabilityGeometry", SpvWord{2}},
+        {"CapabilityTextureBlockMatchQCOM", SpvWord{4486}},
+        {"BuiltInCullDistancePerViewNV", SpvWord{5278}},
+        {"CapabilitySubgroupImageMediaBlockIOINTEL", SpvWord{5579}},
+        {"MemoryModelSimple", SpvWord{0}},
+        {"BuiltInBaryCoordNoPerspAMD", SpvWord{4992}},
+        {"DecorationPerPrimitiveNV", SpvWord{5271}},
+        {"ImageChannelOrderRx", SpvWord{10}},
+        {"DecorationBurstCoalesceINTEL", SpvWord{5899}},
+        {"RayFlagsCullNoOpaqueKHR", SpvWord{128}},
+        {"StorageClassShaderRecordBufferKHR", SpvWord{5343}},
+        {"FPRoundingModeRTP", SpvWord{2}},
+        {"CapabilityAtomicFloat16MinMaxEXT", SpvWord{5616}},
+        {"ImageChannelOrderDepth", SpvWord{13}},
+        {"SourceLanguageOpenCL_CPP", SpvWord{4}},
+        {"ExecutionModelGeometry", SpvWord{3}},
+        {"BuiltInWorkgroupId", SpvWord{26}},
+        {"CapabilityPipes", SpvWord{17}},
+        {"CapabilityAtomicStorage", SpvWord{21}},
+        {"StorageClassPhysicalStorageBufferEXT", SpvWord{5349}},
+        {"LoopControlNoFusionINTEL", SpvWord{8388608}},
+        {"BuiltInHitKindFrontFacingMicroTriangleNV", SpvWord{5405}},
+        {"CapabilityInputAttachmentArrayNonUniformIndexingEXT", SpvWord{5310}},
+        {"ExecutionModelFragment", SpvWord{4}},
+        {"FPRoundingModeRTE", SpvWord{0}},
+        {"CapabilityShaderViewportIndex", SpvWord{70}},
+        {"ImageOperandsOffsets", SpvWord{65536}},
+        {"ExecutionModeFinalizer", SpvWord{34}},
+        {"BuiltInTessLevelOuter", SpvWord{11}},
+        {"CapabilityFPGAClusterAttributesV2INTEL", SpvWord{6150}},
+        {"CapabilityImageFootprintNV", SpvWord{5282}},
+        {"StorageClassHitObjectAttributeNV", SpvWord{5385}},
+        {"LoopControlIterationMultiple", SpvWord{64}},
+        {"ImageOperandsBias", SpvWord{1}},
+        {"ExecutionModelTaskEXT", SpvWord{5364}},
+        {"DecorationArrayStride", SpvWord{6}},
+        {"BuiltInViewportIndex", SpvWord{10}},
+        {"CapabilityOptNoneINTEL", SpvWord{6094}},
+        {"BuiltInPrimitiveIndicesNV", SpvWord{5276}},
+        {"CapabilitySampleMaskOverrideCoverageNV", SpvWord{5249}},
+        {"CapabilityMaskedGatherScatterINTEL", SpvWord{6427}},
+        {"ImageOperandsConstOffset", SpvWord{8}},
+        {"ExecutionModeFloatingPointModeIEEEINTEL", SpvWord{5623}},
+        {"ImageFormatR16f", SpvWord{9}},
+        {"MemoryAccessNontemporal", SpvWord{4}},
+        {"CapabilityVariableLengthArrayINTEL", SpvWord{5817}},
+        {"DecorationVectorComputeVariableINTEL", SpvWord{5624}},
+        {"BuiltInDrawIndex", SpvWord{4426}},
+        {"ImageChannelOrderRA", SpvWord{3}},
+        {"CapabilityFragmentFullyCoveredEXT", SpvWord{5265}},
+        {"DecorationCPacked", SpvWord{10}},
+        {"ImageFormatRgba16Snorm", SpvWord{16}},
+        {"StorageClassImage", SpvWord{11}},
+        {"ImageChannelOrderRGx", SpvWord{11}},
+        {"CapabilityDotProductKHR", SpvWord{6019}},
+        {"MemoryAccessNonPrivatePointerKHR", SpvWord{32}},
+        {"BuiltInBaryCoordNV", SpvWord{5286}},
+        {"DecorationRestrictPointerEXT", SpvWord{5355}},
+        {"CapabilityDeviceGroup", SpvWord{4437}},
+        {"DimTileImageDataEXT", SpvWord{4173}},
+        {"CooperativeMatrixOperandsMatrixCSignedComponentsKHR", SpvWord{4}},
+        {"LoopControlPartialCount", SpvWord{256}},
+        {"CapabilityStorageUniformBufferBlock16", SpvWord{4433}},
+        {"CapabilityFPGADSPControlINTEL", SpvWord{5908}},
+        {"CapabilityGroupNonUniformBallot", SpvWord{64}},
+        {"CapabilityDotProductInputAll", SpvWord{6016}},
+        {"ExecutionModeMaxWorkDimINTEL", SpvWord{5894}},
+        {"CapabilityVectorAnyINTEL", SpvWord{5619}},
+        {"CooperativeMatrixLayoutRowMajorKHR", SpvWord{0}},
+        {"LoadCacheControlCachedINTEL", SpvWord{1}},
+        {"DecorationHlslSemanticGOOGLE", SpvWord{5635}},
+        {"CapabilitySubgroupAvcMotionEstimationIntraINTEL", SpvWord{5697}},
+        {"ExecutionModeDenormFlushToZero", SpvWord{4460}},
+        {"ExecutionModeCoalescingAMDX", SpvWord{5069}},
+        {"BuiltInObjectToWorldKHR", SpvWord{5330}},
+        {"BuiltInBaseInstance", SpvWord{4425}},
+        {"DecorationMemoryINTEL", SpvWord{5826}},
+        {"CapabilityGroupNonUniformShuffle", SpvWord{65}},
+        {"ExecutionModeRoundingModeRTPINTEL", SpvWord{5620}},
+        {"MemorySemanticsAcquire", SpvWord{2}},
+        {"KernelEnqueueFlagsWaitKernel", SpvWord{1}},
+        {"CapabilityTextureBoxFilterQCOM", SpvWord{4485}},
+        {"ExecutionModeTriangles", SpvWord{22}},
+        {"FPFastMathModeNone", SpvWord{0}},
+        {"DecorationCacheSizeINTEL", SpvWord{5900}},
+        {"StorageClassCodeSectionINTEL", SpvWord{5605}},
+        {"BuiltInPointCoord", SpvWord{16}},
+        {"GroupOperationPartitionedExclusiveScanNV", SpvWord{8}},
+        {"BuiltInLaunchSizeNV", SpvWord{5320}},
+        {"FragmentShadingRateHorizontal4Pixels", SpvWord{8}},
+        {"DecorationMaxByteOffset", SpvWord{45}},
+        {"DecorationLocation", SpvWord{30}},
+        {"DecorationMaxPrivateCopiesINTEL", SpvWord{5829}},
+        {"BuiltInTaskCountNV", SpvWord{5274}},
+        {"CapabilityGroups", SpvWord{18}},
+        {"ExecutionModeRoundingModeRTZ", SpvWord{4463}},
+        {"DecorationGLSLShared", SpvWord{8}},
+        {"ImageFormatRgba8i", SpvWord{23}},
+        {"CapabilityInt64Atomics", SpvWord{12}},
+        {"SamplerAddressingModeClamp", SpvWord{2}},
+        {"FPDenormModeFlushToZero", SpvWord{1}},
+        {"BuiltInHitMicroTriangleVertexBarycentricsNV", SpvWord{5344}},
+        {"MemoryModelVulkanKHR", SpvWord{3}},
+        {"CapabilityRuntimeAlignedAttributeINTEL", SpvWord{5939}},
+        {"QuantizationModesRND_CONV_ODD", SpvWord{7}},
+        {"BuiltInBaryCoordSmoothCentroidAMD", SpvWord{4996}},
+        {"MemoryAccessMakePointerAvailable", SpvWord{8}},
+        {"CapabilityFPGAArgumentInterfacesINTEL", SpvWord{6174}},
+        {"BuiltInPrimitiveTriangleIndicesEXT", SpvWord{5296}},
+        {"BuiltInLayer", SpvWord{9}},
+        {"ExecutionModeStencilRefReplacingEXT", SpvWord{5027}},
+        {"FunctionControlOptNoneINTEL", SpvWord{65536}},
+        {"ExecutionModeOutputLinesEXT", SpvWord{5269}},
+        {"ImageOperandsSample", SpvWord{64}},
+        {"AddressingModelPhysical32", SpvWord{1}},
+        {"ImageFormatRg8", SpvWord{13}},
+        {"DecorationViewportRelativeNV", SpvWord{5252}},
+        {"CapabilityFunctionFloatControlINTEL", SpvWord{5821}},
+        {"StorageClassPhysicalStorageBuffer", SpvWord{5349}},
+        {"BuiltInIncomingRayFlagsNV", SpvWord{5351}},
+        {"FPFastMathModeAllowContractFastINTEL", SpvWord{65536}},
+        {"ExecutionModeStencilRefGreaterFrontAMD", SpvWord{5080}},
+        {"CapabilityFragmentShadingRateKHR", SpvWord{4422}},
+        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionAABBKHR", SpvWord{1}},
+        {"BuiltInSubgroupLtMaskKHR", SpvWord{4420}},
+        {"ImageChannelDataTypeUnormInt8", SpvWord{2}},
+        {"ExecutionModeRoundingModeRTE", SpvWord{4462}},
+        {"DimRect", SpvWord{4}},
+        {"ImageChannelOrderR", SpvWord{0}},
+        {"ExecutionModeDepthGreater", SpvWord{14}},
+        {"DecorationConduitKernelArgumentINTEL", SpvWord{6175}},
+        {"FunctionParameterAttributeNoCapture", SpvWord{5}},
+        {"BuiltInBaryCoordNoPerspCentroidAMD", SpvWord{4993}},
+        {"ImageChannelOrdersRGB", SpvWord{15}},
+        {"DecorationCentroid", SpvWord{16}},
+        {"BuiltInSubgroupGeMask", SpvWord{4417}},
+        {"CapabilityFragmentShaderShadingRateInterlockEXT", SpvWord{5372}},
+        {"CapabilityInt16", SpvWord{22}},
+        {"CapabilityFPGAKernelAttributesv2INTEL", SpvWord{6161}},
+        {"ImageFormatR16", SpvWord{14}},
+        {"ImageFormatRg16i", SpvWord{26}},
+        {"ExecutionModeInvocations", SpvWord{0}},
+        {"BuiltInInstanceCustomIndexKHR", SpvWord{5327}},
+        {"LoopControlMaxConcurrencyINTEL", SpvWord{131072}},
+        {"StorageClassCallableDataKHR", SpvWord{5328}},
+        {"ImageChannelOrderA", SpvWord{1}},
+        {"CapabilityDenormFlushToZero", SpvWord{4465}},
+        {"ImageFormatRgba8ui", SpvWord{32}},
+        {"StoreCacheControlWriteBackINTEL", SpvWord{2}},
+        {"DecorationBufferBlock", SpvWord{3}},
+        {"BuiltInSubgroupLocalInvocationId", SpvWord{41}},
+        {"ExecutionModeEarlyAndLateFragmentTestsAMD", SpvWord{5017}},
+        {"BuiltInWarpsPerSMNV", SpvWord{5374}},
+        {"BuiltInRayTmaxNV", SpvWord{5326}},
+        {"BuiltInGlobalSize", SpvWord{31}},
+        {"DecorationMergeINTEL", SpvWord{5834}},
+        {"DecorationNoUnsignedWrap", SpvWord{4470}},
+        {"CapabilityCacheControlsINTEL", SpvWord{6441}},
+        {"CooperativeMatrixOperandsSaturatingAccumulationKHR", SpvWord{16}},
+        {"BuiltInSubgroupLtMask", SpvWord{4420}},
+        {"ExecutionModeDepthUnchanged", SpvWord{16}},
+        {"ImageChannelDataTypeUnormInt101010", SpvWord{6}},
+        {"StorageClassIncomingRayPayloadNV", SpvWord{5342}},
+        {"ExecutionModeOutputLinesNV", SpvWord{5269}},
+        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionNoneKHR", SpvWord{0}},
+        {"LoopControlInitiationIntervalINTEL", SpvWord{65536}},
+        {"ExecutionModeMaximumRegistersINTEL", SpvWord{6461}},
+        {"MemoryAccessMakePointerAvailableKHR", SpvWord{8}},
+        {"CapabilityUniformAndStorageBuffer16BitAccess", SpvWord{4434}},
+        {"MemoryAccessAligned", SpvWord{2}},
+        {"BuiltInSubgroupSize", SpvWord{36}},
+        {"RayFlagsTerminateOnFirstHitKHR", SpvWord{4}},
+        {"CapabilityFragmentBarycentricNV", SpvWord{5284}},
+        {"CapabilityRegisterLimitsINTEL", SpvWord{6460}},
+        {"ExecutionModeRequireFullQuadsKHR", SpvWord{5089}},
+        {"CapabilityDotProduct", SpvWord{6019}},
+        {"ExecutionModelCallableKHR", SpvWord{5318}},
+        {"MemorySemanticsSequentiallyConsistent", SpvWord{16}},
+        {"MemoryAccessNonPrivatePointer", SpvWord{32}},
+        {"CapabilityGeometryStreams", SpvWord{54}},
+        {"CapabilityShadingRateNV", SpvWord{5291}},
+        {"DecorationUniformId", SpvWord{27}},
+        {"StorageClassIncomingCallableDataNV", SpvWord{5329}},
+        {"DecorationMMHostInterfaceLatencyINTEL", SpvWord{6179}},
+        {"BuiltInNumEnqueuedSubgroups", SpvWord{39}},
+        {"ExecutionModeMaximumRegistersIdINTEL", SpvWord{6462}},
+        {"CapabilityClipDistance", SpvWord{32}},
+        {"ExecutionModelMissNV", SpvWord{5317}},
+        {"ScopeShaderCallKHR", SpvWord{6}},
+        {"BuiltInCullDistance", SpvWord{4}},
+        {"ExecutionModeMaxNumWorkgroupsAMDX", SpvWord{5077}},
+        {"CapabilityInt8", SpvWord{39}},
+        {"MemorySemanticsSubgroupMemory", SpvWord{128}},
+        {"ExecutionModelRayGenerationNV", SpvWord{5313}},
+        {"SourceLanguageUnknown", SpvWord{0}},
+        {"CapabilityImage1D", SpvWord{44}},
+        {"CapabilityIntegerFunctions2INTEL", SpvWord{5584}},
+        {"SelectionControlNone", SpvWord{0}},
+        {"BuiltInRayGeometryIndexKHR", SpvWord{5352}},
+        {"MemorySemanticsWorkgroupMemory", SpvWord{256}},
+        {"ScopeSubgroup", SpvWord{3}},
+        {"LoopControlLoopCountINTEL", SpvWord{16777216}},
+        {"BuiltInRayTmaxKHR", SpvWord{5326}},
+        {"FunctionParameterAttributeNoReadWrite", SpvWord{7}},
+        {"ExecutionModeXfb", SpvWord{11}},
+        {"FragmentShadingRateVertical2Pixels", SpvWord{1}},
+        {"MemoryAccessNoAliasINTELMask", SpvWord{131072}},
+        {"ImageFormatR64ui", SpvWord{40}},
+        {"CapabilityStorageBufferArrayNonUniformIndexingEXT", SpvWord{5308}},
+        {"HostAccessQualifierWriteINTEL", SpvWord{2}},
+        {"CapabilitySampledCubeArray", SpvWord{45}},
+        {"DecorationWeightTextureQCOM", SpvWord{4487}},
+        {"ExecutionModeSampleInterlockOrderedEXT", SpvWord{5368}},
+        {"RayFlagsSkipClosestHitShaderKHR", SpvWord{8}},
+        {"CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR", SpvWord{4430}},
+        {"CapabilityStorageBuffer16BitAccess", SpvWord{4433}},
+        {"ExecutionModeLocalSizeId", SpvWord{38}},
+        {"DecorationFuseLoopsInFunctionINTEL", SpvWord{5907}},
+        {"BuiltInBaryCoordSmoothSampleAMD", SpvWord{4997}},
+        {"SamplerFilterModeNearest", SpvWord{0}},
+        {"GroupOperationReduce", SpvWord{0}},
+        {"CapabilityInputAttachmentArrayDynamicIndexingEXT", SpvWord{5303}},
+        {"StorageClassStorageBuffer", SpvWord{12}},
+        {"CapabilityFPGARegINTEL", SpvWord{5948}},
+        {"CapabilityShaderEnqueueAMDX", SpvWord{5067}},
+        {"ExecutionModeNonCoherentDepthAttachmentReadEXT", SpvWord{4170}},
+        {"FPFastMathModeAllowReassocINTEL", SpvWord{131072}},
+        {"CapabilityMultiViewport", SpvWord{57}},
+        {"ExecutionModelVertex", SpvWord{0}},
+        {"LoopControlUnroll", SpvWord{1}},
+        {"SourceLanguageNZSL", SpvWord{9}},
+        {"BuiltInLayerPerViewNV", SpvWord{5279}},
+        {"ExecutionModeLocalSizeHint", SpvWord{18}},
+        {"ImageFormatR8", SpvWord{15}},
+        {"CapabilityUSMStorageClassesINTEL", SpvWord{5935}},
+        {"StorageClassUniformConstant", SpvWord{0}},
+        {"QuantizationModesRND_INF", SpvWord{4}},
+        {"CapabilityImageReadWriteLodAMD", SpvWord{5015}},
+        {"BuiltInPositionPerViewNV", SpvWord{5261}},
+        {"CapabilityFragmentShaderSampleInterlockEXT", SpvWord{5363}},
+        {"ImageOperandsNone", SpvWord{0}},
+        {"ExecutionModeSharedLocalMemorySizeINTEL", SpvWord{5618}},
+        {"CapabilityRayTraversalPrimitiveCullingKHR", SpvWord{4478}},
+        {"CapabilityLongCompositesINTEL", SpvWord{6089}},
+        {"ExecutionModeOutputPrimitivesEXT", SpvWord{5270}},
+        {"DecorationSideEffectsINTEL", SpvWord{5608}},
+        {"MemorySemanticsAcquireRelease", SpvWord{8}},
+        {"RawAccessChainOperandsNone", SpvWord{0}},
+        {"ExecutionModeDerivativeGroupQuadsNV", SpvWord{5289}},
+        {"CapabilityCooperativeMatrixKHR", SpvWord{6022}},
+        {"ImageChannelDataTypeSignedInt32", SpvWord{9}},
+        {"LoopControlDependencyLength", SpvWord{8}},
+        {"ImageFormatR16Snorm", SpvWord{19}},
+        {"DecorationRowMajor", SpvWord{4}},
+        {"ExecutionModelAnyHitNV", SpvWord{5315}},
+        {"BuiltInClipDistancePerViewNV", SpvWord{5277}},
+        {"BuiltInInstanceCustomIndexNV", SpvWord{5327}},
+        {"DecorationPerVertexNV", SpvWord{5285}},
+        {"DecorationVolatile", SpvWord{21}},
+        {"CapabilityImageGatherExtended", SpvWord{25}},
+        {"CapabilityTileImageDepthReadAccessEXT", SpvWord{4167}},
+        {"BuiltInHitTriangleVertexPositionsKHR", SpvWord{5335}},
+        {"FunctionControlInline", SpvWord{1}},
+        {"ImageFormatRg32f", SpvWord{6}},
+        {"SelectionControlDontFlatten", SpvWord{2}},
+        {"BuiltInShaderIndexAMDX", SpvWord{5073}},
+        {"MemorySemanticsRelaxed", SpvWord{0}},
+        {"DimBuffer", SpvWord{5}},
+        {"BuiltInPrimitiveId", SpvWord{7}},
+        {"LoopControlPipelineEnableINTEL", SpvWord{524288}},
+        {"RayFlagsSkipAABBsKHR", SpvWord{512}},
+        {"CapabilityFragmentBarycentricKHR", SpvWord{5284}},
+        {"CapabilityGroupNonUniformRotateKHR", SpvWord{6026}},
+        {"BuiltInWorldToObjectKHR", SpvWord{5331}},
+        {"StorageClassGeneric", SpvWord{8}},
+        {"BuiltInHelperInvocation", SpvWord{23}},
+        {"ExecutionModeFloatingPointModeALTINTEL", SpvWord{5622}},
+        {"CapabilityUnstructuredLoopControlsINTEL", SpvWord{5886}},
+        {"CapabilityMultiView", SpvWord{4439}},
+        {"StorageClassNodeOutputPayloadAMDX", SpvWord{5076}},
+        {"LinkageTypeImport", SpvWord{1}},
+        {"CapabilityAtomicFloat32AddEXT", SpvWord{6033}},
+        {"DecorationVectorComputeFunctionINTEL", SpvWord{5626}},
+        {"CapabilityGroupNonUniformQuad", SpvWord{68}},
+        {"InitializationModeQualifierInitOnDeviceReprogramINTEL", SpvWord{0}},
+        {"CapabilityDebugInfoModuleINTEL", SpvWord{6114}},
+        {"MemoryAccessMakePointerVisible", SpvWord{16}},
+        {"ExecutionModeOriginUpperLeft", SpvWord{7}},
+        {"CooperativeMatrixOperandsMatrixASignedComponentsKHR", SpvWord{1}},
+        {"ImageChannelOrderRGB", SpvWord{4}},
+        {"ExecutionModeDenormPreserve", SpvWord{4459}},
+        {"CapabilitySampledImageArrayNonUniformIndexing", SpvWord{5307}},
+        {"GroupOperationExclusiveScan", SpvWord{2}},
+        {"RayFlagsOpaqueKHR", SpvWord{1}},
+        {"DecorationMaxReplicatesINTEL", SpvWord{5832}},
+        {"ExecutionModeOutputPrimitivesNV", SpvWord{5270}},
+        {"CapabilityRuntimeDescriptorArray", SpvWord{5302}},
+        {"CooperativeMatrixOperandsNoneKHR", SpvWord{0}},
+        {"ImageChannelOrderLuminance", SpvWord{9}},
+        {"DecorationHlslCounterBufferGOOGLE", SpvWord{5634}},
+        {"CapabilityIndirectReferencesINTEL", SpvWord{5604}},
+        {"DecorationFunctionRoundingModeINTEL", SpvWord{5822}},
+        {"CapabilityGroupNonUniformArithmetic", SpvWord{63}},
+        {"OverflowModesSAT_ZERO", SpvWord{2}},
+        {"BuiltInLaunchIdKHR", SpvWord{5319}},
+        {"CapabilityImageQuery", SpvWord{50}},
+        {"BuiltInHitTNV", SpvWord{5332}},
+        {"ImageChannelOrderRG", SpvWord{2}},
+        {"ImageFormatR8ui", SpvWord{39}},
+        {"SamplerAddressingModeRepeatMirrored", SpvWord{4}},
+        {"DecorationNodeMaxPayloadsAMDX", SpvWord{5020}},
+        {"ExecutionModelTessellationControl", SpvWord{1}},
+        {"StorageClassUniform", SpvWord{2}},
+        {"ExecutionModeOutputTrianglesEXT", SpvWord{5298}},
+        {"ExecutionModeInputLinesAdjacency", SpvWord{21}},
+        {"FPFastMathModeFast", SpvWord{16}},
+        {"BuiltInNumWorkgroups", SpvWord{24}},
+        {"StorageClassCrossWorkgroup", SpvWord{5}},
+        {"CapabilityVector16", SpvWord{7}},
+        {"DecorationInvariant", SpvWord{18}},
+        {"AddressingModelPhysical64", SpvWord{2}},
+        {"RawAccessChainOperandsRobustnessPerElementNV", SpvWord{2}},
+        {"ImageChannelDataTypeHalfFloat", SpvWord{13}},
+        {"CapabilityImageCubeArray", SpvWord{34}},
+        {"DecorationPerPrimitiveEXT", SpvWord{5271}},
+        {"CapabilityGroupUniformArithmeticKHR", SpvWord{6400}},
+        {"BuiltInSubgroupEqMask", SpvWord{4416}},
+        {"CapabilityMeshShadingEXT", SpvWord{5283}},
+        {"DecorationNonReadable", SpvWord{25}},
+        {"CapabilityGroupNonUniformShuffleRelative", SpvWord{66}},
+        {"CapabilityFragmentMaskAMD", SpvWord{5010}},
+        {"AccessQualifierReadWrite", SpvWord{2}},
+        {"BuiltInWorldRayOriginKHR", SpvWord{5321}},
+        {"CapabilitySubgroupShuffleINTEL", SpvWord{5568}},
+        {"CapabilityImageBuffer", SpvWord{47}},
+        {"ImageFormatRg16f", SpvWord{7}},
+        {"MemorySemanticsOutputMemory", SpvWord{4096}},
+        {"StorageClassIncomingRayPayloadKHR", SpvWord{5342}},
+        {"RayQueryIntersectionRayQueryCandidateIntersectionKHR", SpvWord{0}},
+        {"DecorationMatrixStride", SpvWord{7}},
+        {"ImageChannelOrderBGRA", SpvWord{6}},
+        {"BuiltInInvocationsPerPixelNV", SpvWord{5293}},
+        {"DecorationPipelineEnableINTEL", SpvWord{5919}},
+        {"ImageOperandsOffset", SpvWord{16}},
+        {"ExecutionModeOutputTrianglesNV", SpvWord{5298}},
+        {"KernelProfilingInfoNone", SpvWord{0}},
+        {"BuiltInViewportMaskNV", SpvWord{5253}},
+        {"DecorationAliasScopeINTEL", SpvWord{5914}},
+        {"DecorationPayloadNodeNameAMDX", SpvWord{5091}},
+        {"CapabilityMinLod", SpvWord{42}},
+        {"DecorationAliased", SpvWord{20}},
+        {"BuiltInSubgroupEqMaskKHR", SpvWord{4416}},
+        {"DecorationHitObjectShaderRecordBufferNV", SpvWord{5386}},
+        {"DecorationBuiltIn", SpvWord{11}},
+        {"StoreCacheControlWriteThroughINTEL", SpvWord{1}},
+        {"DecorationInitiationIntervalINTEL", SpvWord{5917}},
+        {"StorageClassShaderRecordBufferNV", SpvWord{5343}},
+        {"CapabilityDotProductInput4x8BitPackedKHR", SpvWord{6018}},
+        {"ExecutionModeNoGlobalOffsetINTEL", SpvWord{5895}},
+        {"ExecutionModelIntersectionNV", SpvWord{5314}},
+        {"CooperativeMatrixUseMatrixBKHR", SpvWord{1}},
+        {"BuiltInLocalInvocationIndex", SpvWord{29}},
+        {"CapabilityStorageImageArrayDynamicIndexing", SpvWord{31}},
+        {"CapabilityTileImageStencilReadAccessEXT", SpvWord{4168}},
+        {"ExecutionModeInputLines", SpvWord{20}},
+        {"CapabilityTileImageColorReadAccessEXT", SpvWord{4166}},
+        {"BuiltInFragInvocationCountEXT", SpvWord{5293}},
+        {"ImageOperandsMakeTexelVisible", SpvWord{512}},
+        {"CapabilitySubgroupAvcMotionEstimationINTEL", SpvWord{5696}},
+        {"StorageClassWorkgroup", SpvWord{4}},
+        {"CapabilityDotProductInput4x8BitPacked", SpvWord{6018}},
+        {"BuiltInLaunchIdNV", SpvWord{5319}},
+        {"LoopControlMaxIterations", SpvWord{32}},
+        {"StorageClassAtomicCounter", SpvWord{10}},
+        {"ImageFormatRgba8Snorm", SpvWord{5}},
+        {"BuiltInObjectRayOriginNV", SpvWord{5323}},
+        {"HostAccessQualifierReadINTEL", SpvWord{1}},
+        {"ImageChannelOrdersBGRA", SpvWord{18}},
+        {"MemorySemanticsMakeAvailableKHR", SpvWord{8192}},
+        {"CapabilityGroupNonUniform", SpvWord{61}},
+        {"CapabilityRayQueryKHR", SpvWord{4472}},
+        {"ImageFormatRgba32f", SpvWord{1}},
+        {"StorageClassOutput", SpvWord{3}},
+        {"CapabilityCullDistance", SpvWord{33}},
+        {"DecorationStallEnableINTEL", SpvWord{5905}},
+        {"SourceLanguageSYCL", SpvWord{7}},
+        {"CapabilityRayTracingPositionFetchKHR", SpvWord{5336}},
+        {"GroupOperationPartitionedReduceNV", SpvWord{6}},
+        {"ImageFormatRgb10A2", SpvWord{11}},
+        {"CooperativeMatrixOperandsMatrixResultSignedComponentsKHR", SpvWord{8}},
+        {"DecorationExplicitInterpAMD", SpvWord{4999}},
+        {"ImageOperandsLod", SpvWord{2}},
+        {"CapabilityShaderViewportIndexLayerNV", SpvWord{5254}},
+        {"CapabilityUniformBufferArrayNonUniformIndexing", SpvWord{5306}},
+        {"CapabilityDotProductInput4x8Bit", SpvWord{6017}},
+        {"LinkageTypeLinkOnceODR", SpvWord{2}},
+        {"MemorySemanticsImageMemory", SpvWord{2048}},
+        {"FPFastMathModeAllowContract", SpvWord{65536}},
+        {"BuiltInMeshViewCountNV", SpvWord{5280}},
+        {"ImageChannelDataTypeSnormInt16", SpvWord{1}},
+        {"CapabilityShaderNonUniform", SpvWord{5301}},
+        {"ExecutionModeSpacingFractionalOdd", SpvWord{3}},
+        {"FPRoundingModeRTN", SpvWord{3}},
+        {"BuiltInWarpMaxIDARM", SpvWord{4164}},
+        {"CapabilityDotProductInputAllKHR", SpvWord{6016}},
+        {"DecorationBindlessImageNV", SpvWord{5399}},
+        {"DecorationBufferLocationINTEL", SpvWord{5921}},
+        {"DecorationMMHostInterfaceMaxBurstINTEL", SpvWord{6181}},
+        {"DecorationLatencyControlConstraintINTEL", SpvWord{6173}},
+        {"CapabilityStorageTexelBufferArrayNonUniformIndexingEXT", SpvWord{5312}},
+        {"CapabilityTextureBlockMatch2QCOM", SpvWord{4498}},
+        {"BuiltInBaryCoordNoPerspKHR", SpvWord{5287}},
+        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionTriangleKHR", SpvWord{1}},
+        {"DecorationRestrictPointer", SpvWord{5355}},
+        {"BuiltInSMCountNV", SpvWord{5375}},
+        {"DecorationRegisterINTEL", SpvWord{5825}},
+        {"DecorationInitModeINTEL", SpvWord{6190}},
+        {"BuiltInCoalescedInputCountAMDX", SpvWord{5021}},
+        {"FPFastMathModeNotInf", SpvWord{2}},
+        {"GroupOperationPartitionedInclusiveScanNV", SpvWord{7}},
+        {"BuiltInWorldRayDirectionNV", SpvWord{5322}},
+        {"SourceLanguageHERO_C", SpvWord{8}},
+        {"ExecutionModeStencilRefUnchangedFrontAMD", SpvWord{5079}},
+        {"CapabilityUniformBufferArrayDynamicIndexing", SpvWord{28}},
+        {"SourceLanguageOpenCL_C", SpvWord{3}},
+        {"CapabilityBFloat16ConversionINTEL", SpvWord{6115}},
+        {"CooperativeMatrixOperandsMatrixBSignedComponentsKHR", SpvWord{2}},
+        {"StorageClassTileImageEXT", SpvWord{4172}},
+        {"DecorationNonUniformEXT", SpvWord{5300}},
+        {"DecorationXfbBuffer", SpvWord{36}},
+        {"CapabilityFPGAMemoryAttributesINTEL", SpvWord{5824}},
+        {"ImageFormatRgba16ui", SpvWord{31}},
+        {"CapabilitySignedZeroInfNanPreserve", SpvWord{4466}},
+        {"FunctionParameterAttributeSret", SpvWord{3}},
+        {"ExecutionModeStreamingInterfaceINTEL", SpvWord{6154}},
+        {"BuiltInCoreMaxIDARM", SpvWord{4162}},
+        {"DecorationStridesizeINTEL", SpvWord{5883}},
         {"ExecutionModelTaskNV", SpvWord{5267}},
+        {"RawAccessChainOperandsRobustnessPerComponentNV", SpvWord{1}},
+        {"CapabilityFloat16Buffer", SpvWord{8}},
+        {"ExecutionModeSubgroupsPerWorkgroup", SpvWord{36}},
+        {"DecorationOverrideCoverageNV", SpvWord{5248}},
+        {"ImageFormatRg16ui", SpvWord{36}},
+        {"LoopControlLoopCoalesceINTEL", SpvWord{1048576}},
+        {"ExecutionModeSpacingEqual", SpvWord{1}},
+        {"BuiltInBaryCoordNoPerspSampleAMD", SpvWord{4994}},
+        {"DecorationXfbStride", SpvWord{37}},
+        {"QuantizationModesRND_CONV", SpvWord{6}},
+        {"CapabilityTextureSampleWeightedQCOM", SpvWord{4484}},
+        {"BuiltInHitKindBackFacingMicroTriangleNV", SpvWord{5406}},
+        {"DecorationLatencyControlLabelINTEL", SpvWord{6172}},
+        {"ExecutionModeNonCoherentColorAttachmentReadEXT", SpvWord{4169}},
+        {"BuiltInBaseVertex", SpvWord{4424}},
+        {"BuiltInGlobalInvocationId", SpvWord{28}},
+        {"CapabilityRoundToInfinityINTEL", SpvWord{5582}},
+        {"DecorationMMHostInterfaceDataWidthINTEL", SpvWord{6178}},
+        {"ExecutionModeOriginLowerLeft", SpvWord{8}},
+        {"ImageFormatRgba8", SpvWord{4}},
+        {"DecorationBinding", SpvWord{33}},
+        {"LoadCacheControlInvalidateAfterReadINTEL", SpvWord{3}},
+        {"CapabilityFloatingPointModeINTEL", SpvWord{5583}},
+        {"BuiltInWarpIDNV", SpvWord{5376}},
+        {"DecorationRestrict", SpvWord{19}},
+        {"CapabilityFPGAKernelAttributesINTEL", SpvWord{5897}},
+        {"CapabilityFragmentShaderPixelInterlockEXT", SpvWord{5378}},
+        {"BuiltInSubgroupGtMaskKHR", SpvWord{4418}},
+        {"BuiltInSMIDNV", SpvWord{5377}},
+        {"CapabilityRayQueryProvisionalKHR", SpvWord{4471}},
+        {"ImageChannelDataTypeUnormShort555", SpvWord{5}},
+        {"BuiltInSubgroupId", SpvWord{40}},
+        {"ImageFormatR16ui", SpvWord{38}},
+        {"CapabilityArbitraryPrecisionIntegersINTEL", SpvWord{5844}},
+        {"SourceLanguageCPP_for_OpenCL", SpvWord{6}},
+        {"FunctionControlNone", SpvWord{0}},
+        {"CapabilityStorageImageArrayNonUniformIndexingEXT", SpvWord{5309}},
+        {"CapabilityIOPipesINTEL", SpvWord{5943}},
+        {"CapabilityAtomicStorageOps", SpvWord{4445}},
+        {"DecorationBankwidthINTEL", SpvWord{5828}},
+        {"CapabilityGlobalVariableHostAccessINTEL", SpvWord{6187}},
+        {"CapabilityAddresses", SpvWord{4}},
+        {"DecorationSimpleDualPortINTEL", SpvWord{5833}},
+        {"AddressingModelPhysicalStorageBuffer64", SpvWord{5348}},
+        {"CapabilityInterpolationFunction", SpvWord{52}},
+        {"LinkageTypeExport", SpvWord{0}},
+        {"BuiltInWorkgroupSize", SpvWord{25}},
+        {"BuiltInWorldRayDirectionKHR", SpvWord{5322}},
+        {"ImageFormatRg8ui", SpvWord{37}},
+        {"ImageOperandsGrad", SpvWord{4}},
+        {"BuiltInCullMaskKHR", SpvWord{6021}},
+        {"BuiltInObjectToWorldNV", SpvWord{5330}},
+        {"DecorationCacheControlStoreINTEL", SpvWord{6443}},
+        {"CapabilityShaderViewportMaskNV", SpvWord{5255}},
+        {"CapabilityArbitraryPrecisionFixedPointINTEL", SpvWord{5922}},
+        {"CapabilitySplitBarrierINTEL", SpvWord{6141}},
+        {"BuiltInBaryCoordKHR", SpvWord{5286}},
+        {"ImageChannelDataTypeUnsignedInt32", SpvWord{12}},
+        {"BuiltInVertexIndex", SpvWord{42}},
+        {"CapabilityLinkage", SpvWord{5}},
+        {"KernelEnqueueFlagsWaitWorkGroup", SpvWord{2}},
+        {"ExecutionModelGLCompute", SpvWord{5}},
+        {"CapabilityInt64", SpvWord{11}},
+        {"CapabilityFPGALoopControlsINTEL", SpvWord{5888}},
+        {"BuiltInGlobalLinearId", SpvWord{34}},
+        {"BuiltInNumSubgroups", SpvWord{38}},
+        {"BuiltInSubgroupGeMaskKHR", SpvWord{4417}},
+        {"BuiltInWorkDim", SpvWord{30}},
+        {"CapabilityImageMipmap", SpvWord{15}},
+        {"SelectionControlFlatten", SpvWord{1}},
+        {"ImageChannelOrderARGB", SpvWord{7}},
+        {"CapabilityInputAttachment", SpvWord{40}},
+        {"DecorationSingleElementVectorINTEL", SpvWord{6085}},
+        {"DecorationRelaxedPrecision", SpvWord{0}},
+        {"ExecutionModelClosestHitKHR", SpvWord{5316}},
+        {"BuiltInWorldToObjectNV", SpvWord{5331}},
+        {"CapabilityAtomicFloat64AddEXT", SpvWord{6034}},
+        {"ExecutionModeEarlyFragmentTests", SpvWord{9}},
+        {"CapabilityFloatControls2", SpvWord{6029}},
+        {"SourceLanguageZig", SpvWord{12}},
+        {"DecorationVectorComputeCallableFunctionINTEL", SpvWord{6087}},
+        {"CapabilityKernel", SpvWord{6}},
+        {"DecorationMMHostInterfaceReadWriteModeINTEL", SpvWord{6180}},
+        {"BuiltInVertexId", SpvWord{5}},
+        {"CapabilityFunctionPointersINTEL", SpvWord{5603}},
+        {"BuiltInCoreIDARM", SpvWord{4160}},
+        {"BuiltInBaryCoordNoPerspNV", SpvWord{5287}},
+        {"CapabilityRayTracingDisplacementMicromapNV", SpvWord{5409}},
+        {"ExecutionModeSampleInterlockUnorderedEXT", SpvWord{5369}},
+        {"CapabilityStorageImageMultisample", SpvWord{27}},
+        {"DecorationPerVertexKHR", SpvWord{5285}},
+        {"FPOperationModeIEEE", SpvWord{0}},
+        {"CapabilityNamedBarrier", SpvWord{59}},
+        {"CapabilityVulkanMemoryModelDeviceScopeKHR", SpvWord{5346}},
+        {"ExecutionModeShaderIndexAMDX", SpvWord{5073}},
+        {"AddressingModelPhysicalStorageBuffer64EXT", SpvWord{5348}},
+        {"CapabilityDotProductInput4x8BitKHR", SpvWord{6017}},
+        {"ImageOperandsConstOffsets", SpvWord{32}},
+        {"CapabilityKernelAttributesINTEL", SpvWord{5892}},
+        {"DecorationNoPerspective", SpvWord{13}},
+        {"BuiltInViewportMaskPerViewNV", SpvWord{5262}},
+        {"BuiltInInvocationId", SpvWord{8}},
+        {"CapabilitySparseResidency", SpvWord{41}},
+        {"BuiltInSubgroupMaxSize", SpvWord{37}},
+        {"BuiltInShadingRateKHR", SpvWord{4444}},
+        {"AccessQualifierReadOnly", SpvWord{0}},
+        {"SamplerAddressingModeNone", SpvWord{0}},
+        {"ImageChannelDataTypeSnormInt8", SpvWord{0}},
+        {"BuiltInRayTminKHR", SpvWord{5325}},
+        {"StorageClassInput", SpvWord{1}},
+        {"BuiltInHitKindKHR", SpvWord{5333}},
+        {"CapabilityBindlessTextureNV", SpvWord{5390}},
+        {"ExecutionModeInitializer", SpvWord{33}},
+        {"RayFlagsForceOpacityMicromap2StateEXT", SpvWord{1024}},
+        {"DecorationUserTypeGOOGLE", SpvWord{5636}},
+        {"ExecutionModeStencilRefLessBackAMD", SpvWord{5084}},
+        {"ScopeQueueFamily", SpvWord{5}},
+        {"ExecutionModelCallableNV", SpvWord{5318}},
+        {"CapabilityUniformTexelBufferArrayDynamicIndexing", SpvWord{5304}},
+        {"ImageFormatR32f", SpvWord{3}},
+        {"DecorationForcePow2DepthINTEL", SpvWord{5836}},
+        {"Dim3D", SpvWord{2}},
+        {"CapabilityTessellationPointSize", SpvWord{23}},
+        {"CapabilityMatrix", SpvWord{0}},
+        {"DecorationFuncParamIOKindINTEL", SpvWord{5625}},
+        {"NamedMaximumNumberOfRegistersAutoINTEL", SpvWord{0}},
+        {"CapabilityCoreBuiltinsARM", SpvWord{4165}},
+        {"ImageOperandsNontemporal", SpvWord{16384}},
+        {"DecorationImplementInRegisterMapINTEL", SpvWord{6191}},
+        {"CapabilityAtomicFloat32MinMaxEXT", SpvWord{5612}},
+        {"ImageChannelOrderRGBx", SpvWord{12}},
+        {"ImageChannelDataTypeUnormInt24", SpvWord{15}},
+        {"BuiltInHitMicroTriangleVertexPositionsNV", SpvWord{5337}},
+        {"GroupOperationClusteredReduce", SpvWord{3}},
+        {"RayFlagsSkipTrianglesKHR", SpvWord{256}},
+        {"ImageFormatR8Snorm", SpvWord{20}},
+        {"ScopeCrossDevice", SpvWord{0}},
+        {"FPDenormModePreserve", SpvWord{0}},
+        {"ImageChannelOrdersRGBx", SpvWord{16}},
+        {"CapabilityUniformAndStorageBuffer8BitAccess", SpvWord{4449}},
+        {"ExecutionModelMeshEXT", SpvWord{5365}},
+        {"ImageChannelOrdersRGBA", SpvWord{17}},
+        {"FunctionControlConst", SpvWord{8}},
+        {"CapabilityDerivativeControl", SpvWord{51}},
+        {"DecorationPerViewNV", SpvWord{5272}},
+        {"ImageOperandsZeroExtend", SpvWord{8192}},
+        {"DecorationTrackFinishWritingAMDX", SpvWord{5078}},
+        {"FunctionParameterAttributeByVal", SpvWord{2}},
+        {"CapabilityPhysicalStorageBufferAddresses", SpvWord{5347}},
+        {"DecorationClobberINTEL", SpvWord{5607}},
+        {"SourceLanguageHLSL", SpvWord{5}},
+        {"ExecutionModeSignedZeroInfNanPreserve", SpvWord{4461}},
+        {"ExecutionModeVertexOrderCw", SpvWord{4}},
+        {"DecorationTrueDualPortINTEL", SpvWord{5885}},
+        {"ExecutionModeQuads", SpvWord{24}},
+        {"DecorationMaxConcurrencyINTEL", SpvWord{5918}},
+        {"ImageOperandsMakeTexelVisibleKHR", SpvWord{512}},
+        {"ImageOperandsNonPrivateTexel", SpvWord{1024}},
+        {"ImageFormatR11fG11fB10f", SpvWord{8}},
+        {"ExecutionModeShadingRateInterlockUnorderedEXT", SpvWord{5371}},
+        {"FPFastMathModeAllowTransform", SpvWord{262144}},
+        {"HostAccessQualifierReadWriteINTEL", SpvWord{3}},
+        {"CapabilitySampleMaskPostDepthCoverage", SpvWord{4447}},
+        {"CapabilityStorageBufferArrayDynamicIndexing", SpvWord{30}},
+        {"CapabilitySampledImageArrayNonUniformIndexingEXT", SpvWord{5307}},
+        {"CapabilityVariablePointersStorageBuffer", SpvWord{4441}},
+        {"BuiltInLaunchSizeKHR", SpvWord{5320}},
+        {"DecorationInputAttachmentIndex", SpvWord{43}},
+        {"CapabilityAtomicFloat16AddEXT", SpvWord{6095}},
     };
 
     static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
         UInt32 h = salt;
         for (const char c : str)
             h = (h * 0x01000193) ^ c;
-        return h % 993;
+        return h % 1016;
     };
 
     const auto i = hash(str, tableSalt[hash(str, 0)]);
@@ -2206,295 +2247,295 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpUndef:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSourceContinued:
         {
-            const static OperandKind operandTypes[] = {{53}};
+            const static OperandKind operandTypes[] = {{55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpSource:
         {
-            const static OperandKind operandTypes[] = {{10}, {52}, {51}, {53}};
+            const static OperandKind operandTypes[] = {{11}, {54}, {53}, {55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 2, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSourceExtension:
         {
-            const static OperandKind operandTypes[] = {{53}};
+            const static OperandKind operandTypes[] = {{55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpName:
         {
-            const static OperandKind operandTypes[] = {{51}, {53}};
+            const static OperandKind operandTypes[] = {{53}, {55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpMemberName:
         {
-            const static OperandKind operandTypes[] = {{51}, {52}, {53}};
+            const static OperandKind operandTypes[] = {{53}, {54}, {55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpString:
         {
-            const static OperandKind operandTypes[] = {{48}, {53}};
+            const static OperandKind operandTypes[] = {{50}, {55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpLine:
         {
-            const static OperandKind operandTypes[] = {{51}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{53}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpExtension:
         {
-            const static OperandKind operandTypes[] = {{53}};
+            const static OperandKind operandTypes[] = {{55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpExtInstImport:
         {
-            const static OperandKind operandTypes[] = {{48}, {53}};
+            const static OperandKind operandTypes[] = {{50}, {55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpExtInst:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {56}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {58}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpMemoryModel:
         {
-            const static OperandKind operandTypes[] = {{12}, {13}};
+            const static OperandKind operandTypes[] = {{13}, {14}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpEntryPoint:
         {
-            const static OperandKind operandTypes[] = {{11}, {51}, {53}, {51}};
+            const static OperandKind operandTypes[] = {{12}, {53}, {55}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpExecutionMode:
         {
-            const static OperandKind operandTypes[] = {{51}, {14}};
+            const static OperandKind operandTypes[] = {{53}, {15}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpCapability:
         {
-            const static OperandKind operandTypes[] = {{36}};
+            const static OperandKind operandTypes[] = {{37}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeVoid:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeBool:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeInt:
         {
-            const static OperandKind operandTypes[] = {{48}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{50}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeFloat:
         {
-            const static OperandKind operandTypes[] = {{48}, {52}};
+            const static OperandKind operandTypes[] = {{50}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeVector:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{50}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeMatrix:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{50}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeImage:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}, {16}, {52}, {52}, {52}, {52}, {19}, {28}};
+            const static OperandKind operandTypes[] = {{50}, {53}, {17}, {54}, {54}, {54}, {54}, {20}, {29}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 8, 9, 9, operandTypes};
             return true;
         }
         case SpvOpTypeSampler:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeSampledImage:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeArray:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeRuntimeArray:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeStruct:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 0xffff, 2, operandTypes};
             return true;
         }
         case SpvOpTypeOpaque:
         {
-            const static OperandKind operandTypes[] = {{48}, {53}};
+            const static OperandKind operandTypes[] = {{50}, {55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypePointer:
         {
-            const static OperandKind operandTypes[] = {{48}, {15}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {16}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeFunction:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpTypeEvent:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeDeviceEvent:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeReserveId:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeQueue:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypePipe:
         {
-            const static OperandKind operandTypes[] = {{48}, {28}};
+            const static OperandKind operandTypes[] = {{50}, {29}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeForwardPointer:
         {
-            const static OperandKind operandTypes[] = {{51}, {15}};
+            const static OperandKind operandTypes[] = {{53}, {16}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpConstantTrue:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpConstantFalse:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpConstant:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {55}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {57}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConstantComposite:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpConstantSampler:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {17}, {52}, {18}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {18}, {54}, {19}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpConstantNull:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSpecConstantTrue:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSpecConstantFalse:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSpecConstant:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {55}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {57}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSpecConstantComposite:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpSpecConstantOp:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {57}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {59}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFunction:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {4}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {4}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFunctionParameter:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
@@ -2505,901 +2546,901 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpFunctionCall:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpVariable:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {15}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {16}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 4, 4, operandTypes};
             return true;
         }
         case SpvOpImageTexelPointer:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpLoad:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {6}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {6}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 4, 4, operandTypes};
             return true;
         }
         case SpvOpStore:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {6}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {6}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 3, 3, operandTypes};
             return true;
         }
         case SpvOpCopyMemory:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {6}, {6}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {6}, {6}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 4, 4, operandTypes};
             return true;
         }
         case SpvOpCopyMemorySized:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {6}, {6}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {6}, {6}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 5, 5, operandTypes};
             return true;
         }
         case SpvOpAccessChain:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpInBoundsAccessChain:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpPtrAccessChain:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpArrayLength:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGenericPtrMemSemantics:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpInBoundsPtrAccessChain:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpDecorate:
         {
-            const static OperandKind operandTypes[] = {{51}, {31}};
+            const static OperandKind operandTypes[] = {{53}, {32}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpMemberDecorate:
         {
-            const static OperandKind operandTypes[] = {{51}, {52}, {31}};
+            const static OperandKind operandTypes[] = {{53}, {54}, {32}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDecorationGroup:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpGroupDecorate:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 0xffff, 2, operandTypes};
             return true;
         }
         case SpvOpGroupMemberDecorate:
         {
-            const static OperandKind operandTypes[] = {{51}, {59}};
+            const static OperandKind operandTypes[] = {{53}, {61}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 0xffff, 2, operandTypes};
             return true;
         }
         case SpvOpVectorExtractDynamic:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpVectorInsertDynamic:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpVectorShuffle:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpCompositeConstruct:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpCompositeExtract:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpCompositeInsert:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpCopyObject:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTranspose:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSampledImage:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpImageSampleImplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleExplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleDrefImplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSampleDrefExplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjImplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjExplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjDrefImplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjDrefExplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageFetch:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageGather:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageDrefGather:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageRead:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageWrite:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpImage:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageQueryFormat:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageQueryOrder:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageQuerySizeLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpImageQuerySize:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageQueryLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpImageQueryLevels:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageQuerySamples:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertFToU:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertFToS:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertSToF:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertUToF:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpUConvert:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSConvert:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFConvert:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpQuantizeToF16:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertPtrToU:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSatConvertSToU:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSatConvertUToS:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertUToPtr:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpPtrCastToGeneric:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGenericCastToPtr:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGenericCastToPtrExplicit:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {15}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {16}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpBitcast:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSNegate:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFNegate:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpIAdd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFAdd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpISub:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFSub:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIMul:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFMul:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUDiv:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSDiv:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFDiv:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUMod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSRem:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSMod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFRem:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFMod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpVectorTimesScalar:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpMatrixTimesScalar:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpVectorTimesMatrix:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpMatrixTimesVector:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpMatrixTimesMatrix:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpOuterProduct:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpDot:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIAddCarry:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpISubBorrow:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUMulExtended:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSMulExtended:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpAny:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpAll:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpIsNan:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpIsInf:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpIsFinite:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpIsNormal:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSignBitSet:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpLessOrGreater:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpOrdered:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUnordered:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpLogicalEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpLogicalNotEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpLogicalOr:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpLogicalAnd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpLogicalNot:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSelect:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpIEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpINotEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUGreaterThan:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSGreaterThan:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUGreaterThanEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSGreaterThanEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpULessThan:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSLessThan:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpULessThanEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSLessThanEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdNotEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordNotEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdLessThan:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordLessThan:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdGreaterThan:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordGreaterThan:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdLessThanEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordLessThanEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdGreaterThanEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordGreaterThanEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpShiftRightLogical:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpShiftRightArithmetic:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpShiftLeftLogical:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpBitwiseOr:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpBitwiseXor:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpBitwiseAnd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpNot:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpBitFieldInsert:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpBitFieldSExtract:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpBitFieldUExtract:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpBitReverse:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpBitCount:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdx:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdy:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFwidth:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdxFine:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdyFine:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFwidthFine:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdxCoarse:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdyCoarse:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFwidthCoarse:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
@@ -3415,163 +3456,163 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpEmitStreamVertex:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpEndStreamPrimitive:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpControlBarrier:
         {
-            const static OperandKind operandTypes[] = {{50}, {50}, {49}};
+            const static OperandKind operandTypes[] = {{52}, {52}, {51}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpMemoryBarrier:
         {
-            const static OperandKind operandTypes[] = {{50}, {49}};
+            const static OperandKind operandTypes[] = {{52}, {51}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpAtomicLoad:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpAtomicStore:
         {
-            const static OperandKind operandTypes[] = {{51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpAtomicExchange:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicCompareExchange:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {49}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {51}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpAtomicCompareExchangeWeak:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {49}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {51}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpAtomicIIncrement:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpAtomicIDecrement:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpAtomicIAdd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicISub:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicSMin:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicUMin:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicSMax:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicUMax:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicAnd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicOr:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicXor:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpPhi:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {60}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {62}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpLoopMerge:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {3}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {3}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSelectionMerge:
         {
-            const static OperandKind operandTypes[] = {{51}, {2}};
+            const static OperandKind operandTypes[] = {{53}, {2}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpLabel:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpBranch:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpBranchConditional:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpSwitch:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {58}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {60}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 0xffff, 3, operandTypes};
             return true;
         }
@@ -3587,7 +3628,7 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpReturnValue:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
@@ -3598,337 +3639,337 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpLifetimeStart:
         {
-            const static OperandKind operandTypes[] = {{51}, {52}};
+            const static OperandKind operandTypes[] = {{53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpLifetimeStop:
         {
-            const static OperandKind operandTypes[] = {{51}, {52}};
+            const static OperandKind operandTypes[] = {{53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpGroupAsyncCopy:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpGroupWaitEvents:
         {
-            const static OperandKind operandTypes[] = {{50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGroupAll:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupAny:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupBroadcast:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupIAdd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFAdd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFMin:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupUMin:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupSMin:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFMax:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupUMax:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupSMax:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpReadPipe:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpWritePipe:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpReservedReadPipe:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpReservedWritePipe:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpReserveReadPipePackets:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpReserveWritePipePackets:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpCommitReadPipe:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpCommitWritePipe:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIsValidReserveId:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGetNumPipePackets:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGetMaxPipePackets:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupReserveReadPipePackets:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGroupReserveWritePipePackets:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGroupCommitReadPipe:
         {
-            const static OperandKind operandTypes[] = {{50}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{52}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupCommitWritePipe:
         {
-            const static OperandKind operandTypes[] = {{50}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{52}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpEnqueueMarker:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpEnqueueKernel:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 12, 0xffff, 13, operandTypes};
             return true;
         }
         case SpvOpGetKernelNDrangeSubGroupCount:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGetKernelNDrangeMaxSubGroupSize:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGetKernelWorkGroupSize:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGetKernelPreferredWorkGroupSizeMultiple:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpRetainEvent:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpReleaseEvent:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpCreateUserEvent:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpIsValidEvent:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSetUserEventStatus:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpCaptureEventProfilingInfo:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGetDefaultQueue:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpBuildNDRange:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleImplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleExplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleDrefImplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleDrefExplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjImplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjExplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjDrefImplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjDrefExplicitLod:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseFetch:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseGather:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseDrefGather:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseTexelsResident:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
@@ -3939,337 +3980,337 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpAtomicFlagTestAndSet:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpAtomicFlagClear:
         {
-            const static OperandKind operandTypes[] = {{51}, {50}, {49}};
+            const static OperandKind operandTypes[] = {{53}, {52}, {51}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageSparseRead:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpSizeOf:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypePipeStorage:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpConstantPipeStorage:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCreatePipeFromPipeStorage:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGetKernelLocalSizeForSubgroupCount:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGetKernelMaxNumSubgroups:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpTypeNamedBarrier:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpNamedBarrierInitialize:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpMemoryNamedBarrier:
         {
-            const static OperandKind operandTypes[] = {{51}, {50}, {49}};
+            const static OperandKind operandTypes[] = {{53}, {52}, {51}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpModuleProcessed:
         {
-            const static OperandKind operandTypes[] = {{53}};
+            const static OperandKind operandTypes[] = {{55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpExecutionModeId:
         {
-            const static OperandKind operandTypes[] = {{51}, {14}};
+            const static OperandKind operandTypes[] = {{53}, {15}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpDecorateId:
         {
-            const static OperandKind operandTypes[] = {{51}, {31}};
+            const static OperandKind operandTypes[] = {{53}, {32}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformElect:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformAll:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformAny:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformAllEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBroadcast:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBroadcastFirst:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBallot:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformInverseBallot:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBallotBitExtract:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBallotBitCount:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBallotFindLSB:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBallotFindMSB:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformShuffle:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformShuffleXor:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformShuffleUp:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformShuffleDown:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformIAdd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformFAdd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformIMul:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformFMul:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformSMin:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformUMin:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformFMin:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformSMax:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformUMax:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformFMax:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBitwiseAnd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBitwiseOr:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBitwiseXor:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformLogicalAnd:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformLogicalOr:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformLogicalXor:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformQuadBroadcast:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformQuadSwap:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCopyLogical:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpPtrEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpPtrNotEqual:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpPtrDiff:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpColorAttachmentReadEXT:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 4, 4, operandTypes};
             return true;
         }
         case SpvOpDepthAttachmentReadEXT:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 3, 3, operandTypes};
             return true;
         }
         case SpvOpStencilAttachmentReadEXT:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 3, 3, operandTypes};
             return true;
         }
@@ -4280,61 +4321,61 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpSubgroupBallotKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupFirstInvocationKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAllKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAnyKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAllEqualKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformRotateKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupReadInvocationKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpTraceRayKHR:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 11, 11, 11, operandTypes};
             return true;
         }
         case SpvOpExecuteCallableKHR:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpConvertUToAccelerationStructureKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
@@ -4350,463 +4391,499 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpSDot:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {40}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {41}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpUDot:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {40}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {41}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSUDot:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {40}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {41}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSDotAccSat:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {40}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {41}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpUDotAccSat:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {40}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {41}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSUDotAccSat:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {40}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {41}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpTypeCooperativeMatrixKHR:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}, {50}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {53}, {52}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixLoadKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {6}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {6}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 6, 6, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixStoreKHR:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {6}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {6}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixMulAddKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {41}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {42}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixLengthKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeRayQueryKHR:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpRayQueryInitializeKHR:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpRayQueryTerminateKHR:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpRayQueryGenerateIntersectionKHR:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpRayQueryConfirmIntersectionKHR:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpRayQueryProceedKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionTypeKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpImageSampleWeightedQCOM:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageBoxFilterQCOM:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageBlockMatchSSDQCOM:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpImageBlockMatchSADQCOM:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
+            return true;
+        }
+        case SpvOpImageBlockMatchWindowSSDQCOM:
+        {
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
+            return true;
+        }
+        case SpvOpImageBlockMatchWindowSADQCOM:
+        {
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
+            return true;
+        }
+        case SpvOpImageBlockMatchGatherSSDQCOM:
+        {
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
+            return true;
+        }
+        case SpvOpImageBlockMatchGatherSADQCOM:
+        {
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGroupIAddNonUniformAMD:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFAddNonUniformAMD:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFMinNonUniformAMD:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupUMinNonUniformAMD:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupSMinNonUniformAMD:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFMaxNonUniformAMD:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupUMaxNonUniformAMD:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupSMaxNonUniformAMD:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpFragmentMaskFetchAMD:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFragmentFetchAMD:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpReadClockKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFinalizeNodePayloadsAMDX:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpFinishWritingNodePayloadAMDX:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpInitializeNodePayloadsAMDX:
         {
-            const static OperandKind operandTypes[] = {{51}, {50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 4, operandTypes};
+            return true;
+        }
+        case SpvOpGroupNonUniformQuadAllKHR:
+        {
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
+            return true;
+        }
+        case SpvOpGroupNonUniformQuadAnyKHR:
+        {
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordHitMotionNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 14, 14, 14, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordHitWithIndexMotionNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13, 13, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordMissMotionNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetWorldToObjectNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetObjectToWorldNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetObjectRayDirectionNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetObjectRayOriginNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectTraceRayMotionNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13, 13, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetShaderRecordBufferHandleNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetShaderBindingTableRecordIndexNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordEmptyNV:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpHitObjectTraceRayNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12, 12, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordHitNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13, 13, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordHitWithIndexNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12, 12, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordMissNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpHitObjectExecuteShaderNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetCurrentTimeNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetAttributesNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetHitKindNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetPrimitiveIndexNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetGeometryIndexNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetInstanceIdNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetInstanceCustomIndexNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetWorldRayDirectionNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetWorldRayOriginNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetRayTMaxNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetRayTMinNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectIsEmptyNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectIsHitNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectIsMissNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpReorderThreadWithHitObjectNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 3, 3, operandTypes};
             return true;
         }
         case SpvOpReorderThreadWithHintNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeHitObjectNV:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpImageSampleFootprintNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {0}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {0}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 0xffff, 7, operandTypes};
             return true;
         }
         case SpvOpEmitMeshTasksEXT:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSetMeshOutputsEXT:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformPartitionNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpWritePackedPrimitiveIndices4x8NV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpFetchMicroTriangleVertexPositionNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpFetchMicroTriangleVertexBarycentricNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpReportIntersectionNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
@@ -4822,67 +4899,67 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpTraceNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 11, 11, 11, operandTypes};
             return true;
         }
         case SpvOpTraceMotionNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12, 12, operandTypes};
             return true;
         }
         case SpvOpTraceRayMotionNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12, 12, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionTriangleVertexPositionsKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpTypeAccelerationStructureNV:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpExecuteCallableNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeCooperativeMatrixNV:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}, {50}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {53}, {52}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixLoadNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {6}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {6}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixStoreNV:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {6}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {6}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixMulAddNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixLengthNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
@@ -4903,1562 +4980,1580 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpIsHelperInvocationEXT:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpConvertUToImageNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertUToSamplerNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertImageToUNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertSamplerToUNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertUToSampledImageNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertSampledImageToUNV:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSamplerImageAddressingModeNV:
         {
-            const static OperandKind operandTypes[] = {{52}};
+            const static OperandKind operandTypes[] = {{54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
+            return true;
+        }
+        case SpvOpRawAccessChainNV:
+        {
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {10}};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 7, operandTypes};
             return true;
         }
         case SpvOpSubgroupShuffleINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupShuffleDownINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupShuffleUpINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupShuffleXorINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupBlockReadINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupBlockWriteINTEL:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupImageBlockReadINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupImageBlockWriteINTEL:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupImageMediaBlockReadINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupImageMediaBlockWriteINTEL:
         {
-            const static OperandKind operandTypes[] = {{51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpUCountLeadingZerosINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpUCountTrailingZerosINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpAbsISubINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpAbsUSubINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIAddSatINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUAddSatINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIAverageINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUAverageINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIAverageRoundedINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUAverageRoundedINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpISubSatINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUSubSatINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIMul32x16INTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUMul32x16INTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpConstantFunctionPointerINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFunctionPointerCallINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpAsmTargetINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {53}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpAsmINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {53}, {53}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {55}, {55}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAsmCallINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpAtomicFMinEXT:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicFMaxEXT:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAssumeTrueKHR:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpExpectKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpDecorateString:
         {
-            const static OperandKind operandTypes[] = {{51}, {31}};
+            const static OperandKind operandTypes[] = {{53}, {32}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpMemberDecorateString:
         {
-            const static OperandKind operandTypes[] = {{51}, {52}, {31}};
+            const static OperandKind operandTypes[] = {{53}, {54}, {32}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpVmeImageINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpTypeVmeImageINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImePayloadINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcRefPayloadINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcSicPayloadINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcMcePayloadINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcMceResultINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImeResultINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImeResultSingleReferenceStreamoutINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImeResultDualReferenceStreamoutINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImeSingleReferenceStreaminINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImeDualReferenceStreaminINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcRefResultINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcSicResultINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}};
+            const static OperandKind operandTypes[] = {{50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetInterShapePenaltyINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetInterDirectionPenaltyINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetMotionVectorCostFunctionINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetAcOnlyHaarINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToImePayloadINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToImeResultINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToRefPayloadINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToRefResultINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToSicPayloadINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToSicResultINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetMotionVectorsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterDistortionsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetBestInterDistortionsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterMajorShapeINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterMinorShapeINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterDirectionsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterMotionVectorCountINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterReferenceIdsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeInitializeINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetSingleReferenceINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetDualReferenceINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeRefWindowSizeINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeAdjustRefOffsetINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeConvertToMcePayloadINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetMaxMotionVectorCountINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetUnidirectionalMixDisableINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetWeightedSadINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeConvertToMceResultINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetSingleReferenceStreaminINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetDualReferenceStreaminINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeStripSingleReferenceStreamoutINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeStripDualReferenceStreamoutINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetBorderReachedINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetTruncatedSearchIndicationINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcFmeInitializeINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcBmeInitializeINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefConvertToMcePayloadINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefSetBidirectionalMixDisableINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefSetBilinearFilterEnableINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefEvaluateWithSingleReferenceINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefEvaluateWithDualReferenceINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefEvaluateWithMultiReferenceINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefConvertToMceResultINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicInitializeINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicConfigureSkcINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicConfigureIpeLumaINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicConfigureIpeLumaChromaINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 13, 13, 13, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetMotionVectorMaskINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicConvertToMcePayloadINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetBilinearFilterEnableINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetSkcForwardTransformEnableINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicEvaluateIpeINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicEvaluateWithSingleReferenceINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicEvaluateWithDualReferenceINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicEvaluateWithMultiReferenceINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicConvertToMceResultINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetIpeLumaShapeINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetBestIpeLumaDistortionINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetBestIpeChromaDistortionINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetPackedIpeLumaModesINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetIpeChromaModeINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetInterRawSadsINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpVariableLengthArrayINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSaveMemoryINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}};
+            const static OperandKind operandTypes[] = {{49}, {50}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpRestoreMemoryINTEL:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSinCosPiINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCastINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCastFromIntINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCastToIntINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatAddINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSubINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatMulINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatDivINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatGTINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatGEINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLTINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLEINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatEQINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatRecipINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatRSqrtINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCbrtINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatHypotINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSqrtINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLogINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLog2INTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLog10INTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLog1pINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatExpINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatExp2INTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatExp10INTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatExpm1INTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSinINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCosINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSinCosINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSinPiINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCosPiINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatASinINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatASinPiINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatACosINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatACosPiINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatATanINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatATanPiINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatATan2INTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatPowINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatPowRINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatPowNINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {52}, {51}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpLoopControlINTEL:
         {
-            const static OperandKind operandTypes[] = {{52}};
+            const static OperandKind operandTypes[] = {{54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0xffff, 1, operandTypes};
             return true;
         }
         case SpvOpAliasDomainDeclINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 2, 2, operandTypes};
             return true;
         }
         case SpvOpAliasScopeDeclINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 3, 3, operandTypes};
             return true;
         }
         case SpvOpAliasScopeListDeclINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}, {51}};
+            const static OperandKind operandTypes[] = {{50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 0xffff, 2, operandTypes};
             return true;
         }
         case SpvOpFixedSqrtINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedRecipINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedRsqrtINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedSinINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedCosINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedSinCosINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedSinPiINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedCosPiINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedSinCosPiINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedLogINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedExpINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}, {52}, {52}, {52}, {52}, {52}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}, {54}, {54}, {54}, {54}, {54}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpPtrCastToCrossWorkgroupINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpCrossWorkgroupCastToPtrINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpReadPipeBlockingINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpWritePipeBlockingINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFPGARegINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetRayTMinKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetRayFlagsKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionTKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionInstanceCustomIndexKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionInstanceIdKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionGeometryIndexKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionPrimitiveIndexKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionBarycentricsKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionFrontFaceKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionCandidateAABBOpaqueKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionObjectRayDirectionKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionObjectRayOriginKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetWorldRayDirectionKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetWorldRayOriginKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionObjectToWorldKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionWorldToObjectKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpAtomicFAddEXT:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}, {50}, {49}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {52}, {51}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpTypeBufferSurfaceINTEL:
         {
-            const static OperandKind operandTypes[] = {{48}, {28}};
+            const static OperandKind operandTypes[] = {{50}, {29}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeStructContinuedINTEL:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1, 0, 0xffff, 1, operandTypes};
             return true;
         }
         case SpvOpConstantCompositeContinuedINTEL:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1, 0, 0xffff, 1, operandTypes};
             return true;
         }
         case SpvOpSpecConstantCompositeContinuedINTEL:
         {
-            const static OperandKind operandTypes[] = {{51}};
+            const static OperandKind operandTypes[] = {{53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1, 0, 0xffff, 1, operandTypes};
             return true;
         }
         case SpvOpCompositeConstructContinuedINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpConvertFToBF16INTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertBF16ToFINTEL:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpControlBarrierArriveINTEL:
         {
-            const static OperandKind operandTypes[] = {{50}, {50}, {49}};
+            const static OperandKind operandTypes[] = {{52}, {52}, {51}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpControlBarrierWaitINTEL:
         {
-            const static OperandKind operandTypes[] = {{50}, {50}, {49}};
+            const static OperandKind operandTypes[] = {{52}, {52}, {51}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGroupIMulKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFMulKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupBitwiseAndKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupBitwiseOrKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupBitwiseXorKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupLogicalAndKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupLogicalOrKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupLogicalXorKHR:
         {
-            const static OperandKind operandTypes[] = {{47}, {48}, {50}, {34}, {51}};
+            const static OperandKind operandTypes[] = {{49}, {50}, {52}, {35}, {53}};
             v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
+            return true;
+        }
+        case SpvOpMaskedGatherINTEL:
+        {
+            const static OperandKind operandTypes[] = {{49}, {50}, {53}, {54}, {53}, {53}};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
+            return true;
+        }
+        case SpvOpMaskedScatterINTEL:
+        {
+            const static OperandKind operandTypes[] = {{53}, {53}, {54}, {53}};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 4, operandTypes};
             return true;
         }
         default: return false;
@@ -8379,6 +8474,26 @@ static bool getOpName(const SpvOp& k, UnownedStringSlice& v)
             v = UnownedStringSlice{"OpImageBlockMatchSADQCOM"};
             return true;
         }
+        case SpvOpImageBlockMatchWindowSSDQCOM:
+        {
+            v = UnownedStringSlice{"OpImageBlockMatchWindowSSDQCOM"};
+            return true;
+        }
+        case SpvOpImageBlockMatchWindowSADQCOM:
+        {
+            v = UnownedStringSlice{"OpImageBlockMatchWindowSADQCOM"};
+            return true;
+        }
+        case SpvOpImageBlockMatchGatherSSDQCOM:
+        {
+            v = UnownedStringSlice{"OpImageBlockMatchGatherSSDQCOM"};
+            return true;
+        }
+        case SpvOpImageBlockMatchGatherSADQCOM:
+        {
+            v = UnownedStringSlice{"OpImageBlockMatchGatherSADQCOM"};
+            return true;
+        }
         case SpvOpGroupIAddNonUniformAMD:
         {
             v = UnownedStringSlice{"OpGroupIAddNonUniformAMD"};
@@ -8447,6 +8562,16 @@ static bool getOpName(const SpvOp& k, UnownedStringSlice& v)
         case SpvOpInitializeNodePayloadsAMDX:
         {
             v = UnownedStringSlice{"OpInitializeNodePayloadsAMDX"};
+            return true;
+        }
+        case SpvOpGroupNonUniformQuadAllKHR:
+        {
+            v = UnownedStringSlice{"OpGroupNonUniformQuadAllKHR"};
+            return true;
+        }
+        case SpvOpGroupNonUniformQuadAnyKHR:
+        {
+            v = UnownedStringSlice{"OpGroupNonUniformQuadAnyKHR"};
             return true;
         }
         case SpvOpHitObjectRecordHitMotionNV:
@@ -8772,6 +8897,11 @@ static bool getOpName(const SpvOp& k, UnownedStringSlice& v)
         case SpvOpSamplerImageAddressingModeNV:
         {
             v = UnownedStringSlice{"OpSamplerImageAddressingModeNV"};
+            return true;
+        }
+        case SpvOpRawAccessChainNV:
+        {
+            v = UnownedStringSlice{"OpRawAccessChainNV"};
             return true;
         }
         case SpvOpSubgroupShuffleINTEL:
@@ -10034,91 +10164,103 @@ static bool getOpName(const SpvOp& k, UnownedStringSlice& v)
             v = UnownedStringSlice{"OpGroupLogicalXorKHR"};
             return true;
         }
+        case SpvOpMaskedGatherINTEL:
+        {
+            v = UnownedStringSlice{"OpMaskedGatherINTEL"};
+            return true;
+        }
+        case SpvOpMaskedScatterINTEL:
+        {
+            v = UnownedStringSlice{"OpMaskedScatterINTEL"};
+            return true;
+        }
         default: return false;
     }
 }
 
 static bool lookupOperandKind(const UnownedStringSlice& str, OperandKind& value)
 {
-    static const unsigned tableSalt[61] = {
-        0, 4, 1, 0, 0, 1, 0, 0, 0, 0, 1, 3, 0, 0, 0, 1,
-        0, 0, 8, 0, 4, 2, 0, 10, 14, 8, 6, 0, 0, 3, 0, 0,
-        0, 2, 3, 2, 4, 25, 2, 0, 0, 1, 0, 14, 1, 6, 0, 0,
-        4, 2, 0, 0, 13, 5, 4, 19, 6, 9, 11, 24, 0
+    static const unsigned tableSalt[63] = {
+        1, 1, 2, 3, 0, 0, 1, 0, 0, 1, 8, 0, 0, 2, 0, 0,
+        0, 0, 9, 0, 0, 0, 4, 21, 3, 1, 0, 1, 5, 16, 1, 5,
+        3, 2, 0, 0, 0, 4, 2, 7, 2, 4, 0, 3, 10, 0, 0, 0,
+        0, 43, 12, 3, 1, 0, 1, 0, 4, 12, 0, 12, 1, 5, 42
     };
 
     using KV = std::pair<const char*, OperandKind>;
 
-    static const KV words[61] =
+    static const KV words[63] =
     {
-        {"LoopControl", OperandKind{3}},
-        {"MemoryAccess", OperandKind{6}},
-        {"FPDenormMode", OperandKind{23}},
-        {"IdResult", OperandKind{48}},
-        {"PairIdRefLiteralInteger", OperandKind{59}},
-        {"MemorySemantics", OperandKind{5}},
-        {"PackedVectorFormat", OperandKind{40}},
+        {"OverflowModes", OperandKind{27}},
         {"FragmentShadingRate", OperandKind{9}},
-        {"ImageOperands", OperandKind{0}},
-        {"SourceLanguage", OperandKind{10}},
-        {"PairLiteralIntegerIdRef", OperandKind{58}},
-        {"BuiltIn", OperandKind{32}},
-        {"RayFlags", OperandKind{8}},
-        {"InitializationModeQualifier", OperandKind{44}},
-        {"LiteralInteger", OperandKind{52}},
-        {"OverflowModes", OperandKind{26}},
-        {"LoadCacheControl", OperandKind{45}},
-        {"CooperativeMatrixUse", OperandKind{43}},
-        {"PairIdRefIdRef", OperandKind{60}},
-        {"LiteralFloat", OperandKind{54}},
-        {"RayQueryCandidateIntersectionType", OperandKind{39}},
-        {"CooperativeMatrixOperands", OperandKind{41}},
-        {"IdResultType", OperandKind{47}},
-        {"SamplerAddressingMode", OperandKind{17}},
-        {"MemoryModel", OperandKind{13}},
-        {"ImageChannelDataType", OperandKind{21}},
-        {"LiteralContextDependentNumber", OperandKind{55}},
-        {"ExecutionModel", OperandKind{11}},
-        {"HostAccessQualifier", OperandKind{29}},
-        {"AddressingModel", OperandKind{12}},
-        {"IdScope", OperandKind{50}},
-        {"ExecutionMode", OperandKind{14}},
-        {"SelectionControl", OperandKind{2}},
-        {"Capability", OperandKind{36}},
-        {"KernelProfilingInfo", OperandKind{7}},
-        {"LiteralExtInstInteger", OperandKind{56}},
-        {"FPOperationMode", OperandKind{25}},
-        {"QuantizationModes", OperandKind{24}},
-        {"StorageClass", OperandKind{15}},
-        {"FunctionControl", OperandKind{4}},
-        {"RayQueryIntersection", OperandKind{37}},
-        {"SamplerFilterMode", OperandKind{18}},
-        {"IdRef", OperandKind{51}},
-        {"LinkageType", OperandKind{27}},
-        {"AccessQualifier", OperandKind{28}},
-        {"GroupOperation", OperandKind{34}},
-        {"FPRoundingMode", OperandKind{22}},
-        {"IdMemorySemantics", OperandKind{49}},
-        {"Scope", OperandKind{33}},
-        {"LiteralString", OperandKind{53}},
-        {"KernelEnqueueFlags", OperandKind{35}},
+        {"ImageFormat", OperandKind{20}},
+        {"IdRef", OperandKind{53}},
         {"FPFastMathMode", OperandKind{1}},
-        {"Dim", OperandKind{16}},
-        {"FunctionParameterAttribute", OperandKind{30}},
-        {"StoreCacheControl", OperandKind{46}},
-        {"ImageFormat", OperandKind{19}},
-        {"ImageChannelOrder", OperandKind{20}},
-        {"RayQueryCommittedIntersectionType", OperandKind{38}},
-        {"Decoration", OperandKind{31}},
-        {"CooperativeMatrixLayout", OperandKind{42}},
-        {"LiteralSpecConstantOpInteger", OperandKind{57}},
+        {"Dim", OperandKind{17}},
+        {"ImageChannelDataType", OperandKind{22}},
+        {"LoadCacheControl", OperandKind{46}},
+        {"MemorySemantics", OperandKind{5}},
+        {"SamplerFilterMode", OperandKind{19}},
+        {"ExecutionMode", OperandKind{15}},
+        {"FunctionParameterAttribute", OperandKind{31}},
+        {"Decoration", OperandKind{32}},
+        {"KernelProfilingInfo", OperandKind{7}},
+        {"PairLiteralIntegerIdRef", OperandKind{60}},
+        {"StoreCacheControl", OperandKind{47}},
+        {"LiteralInteger", OperandKind{54}},
+        {"StorageClass", OperandKind{16}},
+        {"LiteralExtInstInteger", OperandKind{58}},
+        {"RawAccessChainOperands", OperandKind{10}},
+        {"PairIdRefIdRef", OperandKind{62}},
+        {"CooperativeMatrixLayout", OperandKind{43}},
+        {"LiteralFloat", OperandKind{56}},
+        {"InitializationModeQualifier", OperandKind{45}},
+        {"CooperativeMatrixUse", OperandKind{44}},
+        {"BuiltIn", OperandKind{33}},
+        {"RayQueryIntersection", OperandKind{38}},
+        {"AccessQualifier", OperandKind{29}},
+        {"QuantizationModes", OperandKind{25}},
+        {"RayQueryCandidateIntersectionType", OperandKind{40}},
+        {"CooperativeMatrixOperands", OperandKind{42}},
+        {"IdResultType", OperandKind{49}},
+        {"IdScope", OperandKind{52}},
+        {"PackedVectorFormat", OperandKind{41}},
+        {"SelectionControl", OperandKind{2}},
+        {"SourceLanguage", OperandKind{11}},
+        {"LiteralContextDependentNumber", OperandKind{57}},
+        {"ImageChannelOrder", OperandKind{21}},
+        {"PairIdRefLiteralInteger", OperandKind{61}},
+        {"NamedMaximumNumberOfRegisters", OperandKind{48}},
+        {"FPRoundingMode", OperandKind{23}},
+        {"IdMemorySemantics", OperandKind{51}},
+        {"LiteralString", OperandKind{55}},
+        {"FPDenormMode", OperandKind{24}},
+        {"SamplerAddressingMode", OperandKind{18}},
+        {"LinkageType", OperandKind{28}},
+        {"ImageOperands", OperandKind{0}},
+        {"HostAccessQualifier", OperandKind{30}},
+        {"LiteralSpecConstantOpInteger", OperandKind{59}},
+        {"MemoryAccess", OperandKind{6}},
+        {"ExecutionModel", OperandKind{12}},
+        {"IdResult", OperandKind{50}},
+        {"Capability", OperandKind{37}},
+        {"KernelEnqueueFlags", OperandKind{36}},
+        {"RayQueryCommittedIntersectionType", OperandKind{39}},
+        {"FPOperationMode", OperandKind{26}},
+        {"LoopControl", OperandKind{3}},
+        {"RayFlags", OperandKind{8}},
+        {"AddressingModel", OperandKind{13}},
+        {"FunctionControl", OperandKind{4}},
+        {"Scope", OperandKind{34}},
+        {"GroupOperation", OperandKind{35}},
+        {"MemoryModel", OperandKind{14}},
     };
 
     static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
         UInt32 h = salt;
         for (const char c : str)
             h = (h * 0x01000193) ^ c;
-        return h % 61;
+        return h % 63;
     };
 
     const auto i = hash(str, tableSalt[hash(str, 0)]);
@@ -10135,1076 +10277,1100 @@ static bool lookupOperandKind(const UnownedStringSlice& str, OperandKind& value)
 
 bool lookupEnumWithHexPrefix(const UnownedStringSlice& str, SpvWord& value)
 {
-    static const unsigned tableSalt[993] = {
-        1, 0, 1, 1, 1, 1, 1, 3, 1, 0, 1, 0, 3, 1, 1, 0,
-        2, 0, 0, 1, 0, 2, 1, 0, 4, 1, 0, 0, 0, 2, 0, 0,
-        0, 3, 0, 0, 0, 1, 5, 3, 0, 3, 0, 0, 1, 4, 0, 3,
-        0, 1, 0, 4, 0, 5, 1, 0, 1, 0, 2, 1, 0, 0, 1, 1,
-        1, 2, 0, 1, 2, 2, 3, 0, 2, 0, 2, 1, 0, 2, 3, 2,
-        0, 0, 0, 0, 1, 5, 1, 1, 3, 0, 1, 0, 6, 1, 2, 13,
-        1, 2, 1, 4, 0, 1, 5, 2, 0, 9, 0, 0, 0, 0, 2, 0,
-        0, 1, 8, 0, 0, 0, 0, 3, 7, 1, 2, 3, 2, 1, 2, 1,
-        1, 2, 3, 0, 8, 5, 0, 0, 0, 0, 1, 6, 5, 1, 1, 2,
-        2, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 3, 0, 3, 0, 1,
-        1, 0, 1, 2, 3, 6, 0, 2, 0, 1, 3, 1, 0, 1, 4, 2,
-        0, 0, 4, 1, 1, 0, 0, 6, 0, 1, 0, 3, 4, 1, 3, 6,
-        0, 5, 3, 1, 1, 1, 1, 6, 0, 3, 1, 3, 9, 2, 0, 7,
-        3, 0, 0, 0, 4, 6, 0, 0, 1, 0, 1, 0, 1, 0, 2, 1,
-        10, 0, 0, 3, 1, 2, 11, 0, 2, 1, 12, 2, 0, 6, 2, 2,
-        0, 5, 0, 5, 4, 1, 1, 1, 3, 1, 2, 1, 0, 3, 0, 5,
-        1, 3, 3, 0, 1, 3, 2, 4, 5, 5, 0, 0, 6, 1, 1, 1,
-        0, 5, 0, 0, 0, 2, 1, 2, 3, 2, 1, 1, 2, 0, 1, 4,
-        3, 12, 2, 0, 0, 0, 1, 1, 1, 0, 1, 2, 0, 1, 0, 0,
-        0, 0, 0, 0, 0, 0, 1, 5, 0, 0, 0, 1, 1, 1, 6, 1,
-        2, 2, 0, 2, 1, 0, 8, 1, 0, 4, 3, 3, 1, 0, 0, 0,
-        1, 8, 3, 2, 0, 2, 1, 0, 0, 0, 3, 0, 4, 0, 1, 0,
-        11, 9, 1, 0, 13, 9, 0, 0, 0, 4, 0, 13, 3, 7, 1, 5,
-        2, 2, 0, 0, 0, 1, 0, 12, 5, 0, 6, 9, 1, 0, 5, 1,
-        1, 2, 4, 1, 0, 5, 7, 0, 0, 0, 0, 2, 4, 5, 1, 2,
-        4, 0, 0, 0, 5, 15, 9, 7, 1, 0, 1, 0, 0, 0, 0, 2,
-        5, 3, 5, 21, 0, 0, 0, 1, 0, 1, 7, 0, 3, 4, 0, 0,
-        1, 1, 2, 3, 3, 0, 7, 2, 2, 21, 0, 4, 4, 0, 1, 1,
-        1, 0, 0, 3, 0, 10, 4, 0, 0, 3, 3, 0, 0, 1, 1, 2,
-        2, 1, 2, 2, 2, 1, 0, 0, 27, 1, 0, 8, 0, 0, 9, 0,
-        2, 4, 7, 1, 4, 1, 1, 0, 5, 0, 7, 1, 3, 2, 9, 1,
-        1, 2, 1, 7, 1, 0, 0, 4, 0, 5, 1, 3, 0, 0, 0, 0,
-        1, 1, 1, 0, 0, 2, 0, 2, 3, 11, 1, 0, 0, 0, 1, 2,
-        7, 0, 7, 2, 0, 0, 1, 2, 0, 2, 7, 0, 3, 0, 0, 4,
-        2, 10, 1, 0, 2, 1, 9, 15, 21, 1, 2, 10, 4, 10, 3, 7,
-        7, 5, 0, 5, 5, 0, 8, 0, 2, 0, 0, 0, 0, 5, 0, 0,
-        16, 0, 1, 7, 2, 0, 0, 13, 0, 14, 1, 0, 10, 0, 18, 13,
-        0, 0, 0, 0, 1, 0, 0, 5, 6, 10, 17, 0, 0, 1, 0, 4,
-        7, 2, 3, 26, 1, 0, 5, 0, 0, 3, 0, 10, 2, 0, 1, 1,
-        0, 6, 6, 0, 0, 0, 5, 0, 9, 9, 2, 0, 1, 1, 3, 0,
-        1, 2, 2, 2, 4, 0, 2, 1, 3, 2, 1, 13, 0, 2, 4, 0,
-        0, 3, 0, 1, 0, 6, 1, 2, 1, 21, 2, 13, 7, 3, 0, 4,
-        0, 0, 2, 0, 2, 8, 0, 0, 1, 0, 7, 7, 0, 8, 0, 0,
-        4, 1, 5, 3, 2, 0, 2, 0, 1, 0, 0, 0, 3, 0, 0, 9,
-        14, 1, 17, 0, 12, 5, 2, 6, 3, 2, 0, 3, 3, 0, 8, 3,
-        0, 18, 19, 0, 0, 4, 24, 0, 0, 0, 4, 0, 13, 0, 2, 30,
-        4, 0, 7, 0, 5, 2, 5, 2, 3, 1, 1, 2, 0, 11, 17, 3,
-        39, 1, 24, 0, 1, 7, 2, 19, 6, 0, 12, 29, 0, 0, 14, 0,
-        0, 0, 1, 0, 0, 8, 0, 10, 2, 2, 12, 0, 0, 1, 1, 21,
-        3, 4, 0, 0, 0, 2, 8, 3, 8, 2, 8, 0, 2, 0, 3, 4,
-        0, 0, 9, 37, 0, 2, 0, 2, 0, 11, 0, 0, 6, 19, 0, 0,
-        0, 0, 3, 1, 0, 4, 3, 0, 0, 7, 0, 1, 39, 6, 0, 2,
-        5, 3, 0, 31, 5, 18, 2, 0, 1, 2, 13, 0, 2, 2, 0, 8,
-        0, 43, 0, 1, 0, 2, 2, 0, 22, 1, 2, 1, 0, 0, 20, 0,
-        6, 1, 0, 41, 13, 56, 0, 3, 72, 3, 2, 42, 0, 6, 0, 0,
-        0, 2, 17, 15, 0, 2, 33, 33, 34, 0, 49, 0, 2, 8, 6, 11,
-        0, 0, 0, 0, 16, 3, 9, 15, 0, 0, 0, 5, 8, 2, 0, 3,
-        0, 32, 3, 0, 81, 30, 150, 0, 0, 2, 11, 0, 4, 2, 5, 1,
-        10, 0, 27, 13, 71, 19, 12, 0, 4, 0, 14, 147, 71, 1, 28, 0,
-        35, 0, 23, 85, 20, 3, 0, 52, 70, 1, 3, 4, 9, 63, 0, 0,
-        1, 54, 1, 0, 0, 86, 147, 0, 289, 0, 0, 57, 304, 0, 0, 869,
-        2, 0, 0, 0, 9, 815, 5, 0, 0, 0, 0, 0, 169, 0, 0, 659,
-        1504
+    static const unsigned tableSalt[1016] = {
+        0, 1, 5, 0, 0, 1, 1, 3, 2, 7, 2, 1, 2, 0, 1, 0,
+        4, 2, 0, 8, 1, 3, 5, 3, 4, 0, 5, 1, 0, 3, 1, 1,
+        1, 0, 4, 1, 2, 1, 1, 1, 2, 1, 1, 0, 0, 0, 1, 3,
+        0, 3, 0, 7, 2, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0,
+        1, 2, 5, 2, 1, 2, 6, 4, 1, 3, 1, 1, 0, 2, 1, 1,
+        9, 4, 0, 2, 2, 0, 0, 3, 0, 2, 0, 3, 5, 0, 0, 2,
+        0, 1, 1, 2, 0, 2, 0, 1, 0, 2, 1, 0, 8, 1, 1, 1,
+        4, 1, 3, 0, 2, 1, 1, 3, 2, 1, 1, 0, 1, 0, 3, 0,
+        1, 0, 6, 0, 0, 4, 3, 4, 1, 4, 0, 4, 3, 0, 2, 2,
+        0, 5, 1, 1, 4, 0, 0, 0, 0, 0, 0, 1, 2, 1, 8, 5,
+        3, 2, 1, 0, 0, 0, 5, 1, 11, 1, 0, 1, 4, 0, 1, 7,
+        0, 0, 0, 0, 0, 3, 0, 1, 5, 0, 0, 0, 0, 0, 6, 1,
+        2, 0, 0, 5, 1, 0, 2, 0, 1, 1, 0, 0, 1, 5, 0, 1,
+        0, 0, 0, 1, 2, 0, 4, 4, 4, 2, 0, 0, 1, 0, 0, 2,
+        1, 0, 1, 2, 9, 2, 1, 0, 0, 5, 0, 4, 0, 9, 2, 3,
+        0, 0, 7, 5, 0, 1, 1, 3, 1, 0, 7, 2, 0, 6, 0, 0,
+        1, 0, 2, 2, 0, 1, 5, 2, 0, 0, 0, 10, 0, 0, 2, 0,
+        1, 2, 0, 6, 0, 1, 7, 1, 1, 1, 0, 8, 0, 0, 0, 0,
+        2, 9, 3, 0, 1, 0, 0, 6, 8, 1, 1, 0, 0, 1, 0, 2,
+        0, 2, 3, 0, 10, 1, 1, 0, 0, 0, 6, 6, 1, 0, 11, 0,
+        0, 3, 2, 3, 1, 0, 0, 8, 0, 1, 2, 0, 0, 4, 9, 1,
+        0, 0, 1, 2, 1, 12, 1, 1, 7, 5, 2, 0, 0, 0, 11, 0,
+        0, 2, 4, 2, 2, 13, 0, 5, 4, 2, 0, 0, 3, 5, 1, 6,
+        2, 0, 0, 0, 1, 6, 2, 0, 7, 1, 4, 0, 1, 1, 1, 5,
+        0, 0, 0, 2, 1, 7, 4, 0, 0, 0, 0, 2, 2, 4, 1, 0,
+        2, 8, 0, 2, 2, 0, 0, 0, 3, 0, 3, 6, 4, 3, 2, 3,
+        3, 6, 3, 1, 4, 2, 0, 4, 1, 0, 0, 1, 0, 0, 0, 7,
+        1, 8, 1, 0, 0, 0, 0, 4, 4, 7, 1, 1, 1, 2, 1, 3,
+        4, 5, 1, 4, 0, 1, 1, 1, 0, 11, 4, 4, 2, 0, 6, 2,
+        0, 0, 0, 9, 0, 1, 4, 0, 1, 0, 11, 14, 1, 0, 0, 1,
+        2, 5, 2, 0, 1, 1, 0, 0, 1, 0, 7, 0, 0, 0, 1, 1,
+        0, 1, 0, 1, 0, 0, 8, 15, 2, 0, 4, 4, 0, 8, 0, 1,
+        2, 3, 1, 11, 0, 0, 1, 0, 2, 0, 8, 4, 0, 7, 14, 7,
+        2, 4, 13, 3, 3, 1, 1, 1, 0, 1, 0, 1, 0, 6, 0, 0,
+        6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 30, 0, 4, 0,
+        0, 1, 0, 1, 1, 0, 1, 0, 1, 8, 7, 5, 0, 0, 2, 0,
+        0, 1, 8, 3, 2, 5, 0, 6, 0, 1, 4, 3, 3, 6, 0, 0,
+        2, 4, 1, 4, 0, 6, 6, 0, 7, 2, 0, 1, 1, 2, 0, 0,
+        0, 1, 1, 0, 1, 5, 10, 0, 5, 6, 6, 0, 0, 2, 0, 5,
+        19, 0, 6, 7, 3, 1, 0, 1, 3, 2, 4, 0, 0, 0, 0, 0,
+        3, 6, 0, 0, 1, 0, 4, 3, 0, 13, 1, 12, 0, 2, 4, 10,
+        0, 0, 0, 4, 0, 0, 2, 1, 7, 23, 1, 0, 16, 2, 3, 6,
+        0, 0, 4, 5, 0, 2, 2, 12, 0, 5, 0, 0, 2, 2, 1, 10,
+        9, 3, 2, 0, 17, 0, 0, 8, 0, 4, 1, 8, 1, 1, 14, 0,
+        0, 4, 14, 8, 7, 0, 0, 15, 26, 0, 0, 8, 7, 3, 21, 0,
+        5, 1, 3, 0, 0, 1, 0, 18, 0, 9, 2, 0, 3, 31, 14, 7,
+        7, 0, 7, 27, 2, 10, 32, 3, 1, 31, 5, 16, 15, 0, 1, 0,
+        0, 0, 1, 2, 4, 0, 0, 0, 0, 2, 0, 0, 21, 0, 2, 0,
+        7, 2, 0, 9, 7, 1, 8, 8, 0, 4, 1, 1, 20, 2, 0, 4,
+        5, 2, 12, 0, 14, 10, 9, 0, 2, 10, 3, 5, 1, 1, 0, 0,
+        3, 0, 0, 4, 0, 1, 35, 0, 3, 10, 9, 1, 14, 12, 8, 0,
+        0, 0, 10, 2, 8, 20, 17, 20, 1, 5, 7, 27, 0, 0, 0, 3,
+        4, 1, 0, 4, 5, 0, 10, 13, 1, 0, 21, 1, 0, 0, 0, 8,
+        0, 6, 4, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 8, 8, 2,
+        2, 0, 0, 2, 0, 10, 6, 0, 3, 6, 11, 15, 8, 2, 18, 13,
+        5, 13, 1, 0, 0, 10, 0, 0, 0, 2, 0, 41, 4, 0, 16, 9,
+        7, 0, 32, 0, 4, 0, 6, 0, 6, 20, 0, 1, 0, 0, 0, 0,
+        0, 3, 5, 4, 0, 20, 2, 1, 0, 0, 6, 0, 2, 0, 24, 10,
+        2, 74, 0, 124, 13, 48, 0, 6, 1, 0, 1, 4, 0, 82, 2, 0,
+        32, 25, 88, 0, 18, 0, 0, 11, 31, 22, 20, 0, 10, 4, 30, 0,
+        44, 0, 75, 0, 0, 1, 0, 11, 128, 17, 19, 2, 91, 2, 2, 14,
+        8, 1, 2, 17, 14, 0, 6, 34, 167, 32, 20, 0, 0, 137, 12, 9,
+        0, 3, 5, 176, 18, 2, 62, 168, 366, 47, 423, 258, 209, 0, 0, 0,
+        0, 171, 14, 1, 238, 692, 0, 280
     };
 
     using KV = std::pair<const char*, SpvWord>;
 
-    static const KV words[993] =
+    static const KV words[1016] =
     {
-        {"caViewportIndex", SpvWord{10}},
-        {"akOpenCL_C", SpvWord{3}},
-        {"alTaskEXT", SpvWord{5364}},
-        {"bpPerViewNV", SpvWord{5272}},
-        {"caSecondaryPositionNV", SpvWord{5257}},
-        {"bpMMHostInterfaceMaxBurstINTEL", SpvWord{6181}},
-        {"ceTileImageStencilReadAccessEXT", SpvWord{4168}},
-        {"bpNonUniform", SpvWord{5300}},
-        {"aoNamedBarrierCountINTEL", SpvWord{6417}},
-        {"bpFlat", SpvWord{14}},
-        {"ceIOPipesINTEL", SpvWord{5943}},
-        {"ba2D", SpvWord{1}},
-        {"caInstanceIndex", SpvWord{43}},
-        {"bfUnsignedIntRaw12EXT", SpvWord{20}},
-        {"ceTileImageColorReadAccessEXT", SpvWord{4166}},
-        {"aoPostDepthCoverage", SpvWord{4446}},
-        {"bpMMHostInterfaceDataWidthINTEL", SpvWord{6178}},
-        {"aoDepthReplacing", SpvWord{12}},
-        {"bbNone", SpvWord{0}},
-        {"aoShadingRateInterlockOrderedEXT", SpvWord{5370}},
-        {"bpInputAttachmentIndex", SpvWord{43}},
-        {"aiOpaqueKHR", SpvWord{1}},
-        {"cfRayQueryCommittedIntersectionKHR", SpvWord{1}},
-        {"apPushConstant", SpvWord{9}},
-        {"ceStencilExportEXT", SpvWord{5013}},
-        {"aoStencilRefUnchangedFrontAMD", SpvWord{5079}},
-        {"bpSample", SpvWord{17}},
-        {"ceTransformFeedback", SpvWord{53}},
-        {"ceShaderStereoViewNV", SpvWord{5259}},
-        {"bpDescriptorSet", SpvWord{34}},
-        {"ba3D", SpvWord{2}},
-        {"ceStorageBufferArrayDynamicIndexing", SpvWord{30}},
-        {"bfFloat", SpvWord{14}},
-        {"ceShaderEnqueueAMDX", SpvWord{5067}},
-        {"adLoopCountINTEL", SpvWord{16777216}},
-        {"apCrossWorkgroup", SpvWord{5}},
-        {"ceCooperativeMatrixKHR", SpvWord{6022}},
-        {"ceImageCubeArray", SpvWord{34}},
-        {"coStreamingINTEL", SpvWord{3}},
-        {"caInvocationId", SpvWord{8}},
-        {"ceTextureBoxFilterQCOM", SpvWord{4485}},
-        {"ccPartitionedExclusiveScanNV", SpvWord{8}},
-        {"bfUnsignedInt16", SpvWord{11}},
-        {"adDependencyLength", SpvWord{8}},
-        {"ceComputeDerivativeGroupQuadsNV", SpvWord{5288}},
-        {"bdR32ui", SpvWord{33}},
-        {"ceGeometry", SpvWord{2}},
-        {"ceCooperativeMatrixNV", SpvWord{5357}},
-        {"ceSubgroupShuffleINTEL", SpvWord{5568}},
-        {"ceFloat64", SpvWord{10}},
-        {"aaMakeTexelAvailableKHR", SpvWord{256}},
-        {"beRGBA", SpvWord{5}},
-        {"bdRg16ui", SpvWord{36}},
-        {"ceRayQueryKHR", SpvWord{4472}},
-        {"bpCentroid", SpvWord{16}},
-        {"cePipes", SpvWord{17}},
-        {"apCodeSectionINTEL", SpvWord{5605}},
-        {"bpStream", SpvWord{29}},
-        {"adUnroll", SpvWord{1}},
-        {"alMeshNV", SpvWord{5268}},
-        {"bbClampToEdge", SpvWord{1}},
-        {"adDependencyInfinite", SpvWord{4}},
-        {"beRGB", SpvWord{4}},
-        {"bpIndex", SpvWord{32}},
-        {"bdRg32ui", SpvWord{35}},
-        {"cbShaderCallKHR", SpvWord{6}},
-        {"ceDemoteToHelperInvocation", SpvWord{5379}},
-        {"caCullMaskKHR", SpvWord{6021}},
-        {"cdWaitWorkGroup", SpvWord{2}},
-        {"biRND_CONV_ODD", SpvWord{7}},
-        {"bdR32f", SpvWord{3}},
-        {"bpCacheControlLoadINTEL", SpvWord{6442}},
-        {"bpInvariant", SpvWord{18}},
-        {"bdR32i", SpvWord{24}},
-        {"bdRgba32ui", SpvWord{30}},
-        {"caWorkgroupId", SpvWord{26}},
-        {"bpExplicitInterpAMD", SpvWord{4999}},
-        {"adPeelCount", SpvWord{128}},
-        {"beRA", SpvWord{3}},
-        {"alAnyHitKHR", SpvWord{5315}},
-        {"ceLiteralSampler", SpvWord{20}},
-        {"bpBankBitsINTEL", SpvWord{5835}},
-        {"aoPointMode", SpvWord{10}},
-        {"bpFuseLoopsInFunctionINTEL", SpvWord{5907}},
-        {"aaOffsets", SpvWord{65536}},
-        {"beABGR", SpvWord{19}},
-        {"bpNoSignedWrap", SpvWord{4469}},
-        {"akHLSL", SpvWord{5}},
-        {"ceMeshShadingNV", SpvWord{5266}},
-        {"aoOutputPrimitivesNV", SpvWord{5270}},
-        {"biRND_MIN_INF", SpvWord{5}},
-        {"aoRoundingModeRTPINTEL", SpvWord{5620}},
-        {"ceRayTracingNV", SpvWord{5340}},
-        {"baBuffer", SpvWord{5}},
-        {"aiCullBackFacingTrianglesKHR", SpvWord{16}},
-        {"ceSampledCubeArray", SpvWord{45}},
-        {"ceImageQuery", SpvWord{50}},
-        {"ceDotProductInput4x8BitPacked", SpvWord{6018}},
-        {"coWriteThroughINTEL", SpvWord{1}},
-        {"aoOutputPoints", SpvWord{27}},
-        {"ceBindlessTextureNV", SpvWord{5390}},
-        {"ceGroupUniformArithmeticKHR", SpvWord{6400}},
-        {"alTessellationControl", SpvWord{1}},
-        {"ceVulkanMemoryModelKHR", SpvWord{5345}},
-        {"bpArrayStride", SpvWord{6}},
-        {"cbInvocation", SpvWord{4}},
-        {"bpBankwidthINTEL", SpvWord{5828}},
-        {"apInput", SpvWord{1}},
-        {"bfHalfFloat", SpvWord{13}},
-        {"cbWorkgroup", SpvWord{2}},
-        {"ahNone", SpvWord{0}},
-        {"aoStaticNumWorkgroupsAMDX", SpvWord{5072}},
-        {"ceFragmentBarycentricNV", SpvWord{5284}},
-        {"ceFPGALatencyControlINTEL", SpvWord{6171}},
-        {"caCoreCountARM", SpvWord{4161}},
-        {"aaBias", SpvWord{1}},
-        {"baTileImageDataEXT", SpvWord{4173}},
-        {"bdR8ui", SpvWord{39}},
-        {"ceKernelAttributesINTEL", SpvWord{5892}},
-        {"bpMatrixStride", SpvWord{7}},
-        {"bpNonUniformEXT", SpvWord{5300}},
-        {"amPhysical64", SpvWord{2}},
-        {"bfUnormShort555", SpvWord{5}},
-        {"aoFloatingPointModeALTINTEL", SpvWord{5622}},
-        {"caVertexId", SpvWord{5}},
-        {"caCullDistancePerViewNV", SpvWord{5278}},
-        {"apIncomingCallableDataNV", SpvWord{5329}},
-        {"aaZeroExtend", SpvWord{8192}},
-        {"caInstanceCustomIndexKHR", SpvWord{5327}},
-        {"adNoFusionINTEL", SpvWord{8388608}},
-        {"caCurrentRayTimeNV", SpvWord{5334}},
-        {"ceFragmentShaderShadingRateInterlockEXT", SpvWord{5372}},
-        {"ceShaderNonUniformEXT", SpvWord{5301}},
-        {"bfUnormInt8", SpvWord{2}},
-        {"ceImage1D", SpvWord{44}},
-        {"caFragCoord", SpvWord{15}},
-        {"aoDepthUnchanged", SpvWord{16}},
-        {"afRelaxed", SpvWord{0}},
-        {"bpBindlessSamplerNV", SpvWord{5398}},
-        {"ceSampleMaskPostDepthCoverage", SpvWord{4447}},
-        {"bpFPFastMathMode", SpvWord{40}},
-        {"caFragmentSizeNV", SpvWord{5292}},
-        {"beIntensity", SpvWord{8}},
-        {"bpWordsizeINTEL", SpvWord{5884}},
-        {"ceImageMSArray", SpvWord{48}},
-        {"bfSignedInt8", SpvWord{7}},
-        {"bpHostAccessINTEL", SpvWord{6188}},
-        {"adMaxReinvocationDelayINTEL", SpvWord{33554432}},
-        {"chRayQueryCandidateIntersectionTriangleKHR", SpvWord{0}},
-        {"cePhysicalStorageBufferAddresses", SpvWord{5347}},
-        {"aoInputLines", SpvWord{20}},
-        {"bpPerPrimitiveEXT", SpvWord{5271}},
-        {"ceFPGAArgumentInterfacesINTEL", SpvWord{6174}},
-        {"ceBitInstructions", SpvWord{6025}},
-        {"caInvocationsPerPixelNV", SpvWord{5293}},
-        {"bpAliasScopeINTEL", SpvWord{5914}},
-        {"aoSampleInterlockOrderedEXT", SpvWord{5368}},
-        {"caViewportMaskNV", SpvWord{5253}},
-        {"cePhysicalStorageBufferAddressesEXT", SpvWord{5347}},
-        {"aoPixelInterlockUnorderedEXT", SpvWord{5367}},
-        {"bpBufferLocationINTEL", SpvWord{5921}},
-        {"caNumSubgroups", SpvWord{38}},
-        {"ceAtomicFloat32MinMaxEXT", SpvWord{5612}},
-        {"abAllowRecip", SpvWord{8}},
-        {"afCrossWorkgroupMemory", SpvWord{512}},
-        {"bdR16Snorm", SpvWord{19}},
-        {"caSubgroupEqMaskKHR", SpvWord{4416}},
-        {"aoEarlyAndLateFragmentTestsAMD", SpvWord{5017}},
-        {"bpAliasedPointerEXT", SpvWord{5356}},
-        {"bpNodeMaxPayloadsAMDX", SpvWord{5020}},
-        {"caIncomingRayFlagsNV", SpvWord{5351}},
-        {"ceFragmentFullyCoveredEXT", SpvWord{5265}},
-        {"aoLocalSizeHintId", SpvWord{39}},
-        {"adSpeculatedIterationsINTEL", SpvWord{4194304}},
-        {"caBaryCoordNoPerspNV", SpvWord{5287}},
-        {"bpHlslCounterBufferGOOGLE", SpvWord{5634}},
-        {"aaLod", SpvWord{2}},
-        {"akOpenCL_CPP", SpvWord{4}},
-        {"bdR11fG11fB10f", SpvWord{8}},
-        {"ajHorizontal2Pixels", SpvWord{4}},
-        {"ceInt8", SpvWord{39}},
-        {"bdRg8ui", SpvWord{37}},
-        {"ceStorageImageArrayNonUniformIndexing", SpvWord{5309}},
-        {"ceUnstructuredLoopControlsINTEL", SpvWord{5886}},
-        {"apStorageBuffer", SpvWord{12}},
-        {"aoSpacingEqual", SpvWord{1}},
-        {"bpInitiationIntervalINTEL", SpvWord{5917}},
-        {"caLocalInvocationId", SpvWord{27}},
-        {"caHitMicroTriangleVertexPositionsNV", SpvWord{5337}},
-        {"ceInt64ImageEXT", SpvWord{5016}},
-        {"bfSnormInt16", SpvWord{1}},
-        {"beA", SpvWord{1}},
-        {"anOpenCL", SpvWord{2}},
-        {"ceArbitraryPrecisionFloatingPointINTEL", SpvWord{5845}},
-        {"bfSignedInt16", SpvWord{8}},
-        {"bdRg16Snorm", SpvWord{17}},
-        {"abNotInf", SpvWord{2}},
-        {"ceInputAttachmentArrayDynamicIndexingEXT", SpvWord{5303}},
-        {"aoNoGlobalOffsetINTEL", SpvWord{5895}},
-        {"chRayQueryCandidateIntersectionAABBKHR", SpvWord{1}},
-        {"bpMaxConcurrencyINTEL", SpvWord{5918}},
-        {"caGlobalInvocationId", SpvWord{28}},
-        {"cbCrossDevice", SpvWord{0}},
-        {"bfUnsignedInt32", SpvWord{12}},
-        {"ceFPGADSPControlINTEL", SpvWord{5908}},
-        {"ceRayCullMaskKHR", SpvWord{6020}},
-        {"ceGroupNonUniformShuffle", SpvWord{65}},
-        {"beR", SpvWord{0}},
-        {"bpNumbanksINTEL", SpvWord{5827}},
-        {"ceBFloat16ConversionINTEL", SpvWord{6115}},
-        {"ceIndirectReferencesINTEL", SpvWord{5604}},
-        {"bpSideEffectsINTEL", SpvWord{5608}},
-        {"caLayer", SpvWord{9}},
-        {"caTessCoord", SpvWord{13}},
-        {"ceTileImageDepthReadAccessEXT", SpvWord{4167}},
-        {"ccExclusiveScan", SpvWord{2}},
-        {"ceStorageInputOutput16", SpvWord{4436}},
-        {"amPhysicalStorageBuffer64EXT", SpvWord{5348}},
-        {"caObjectRayOriginKHR", SpvWord{5323}},
-        {"aiCullFrontFacingTrianglesKHR", SpvWord{32}},
-        {"caSubgroupLocalInvocationId", SpvWord{41}},
-        {"caCullPrimitiveEXT", SpvWord{5299}},
-        {"alRayGenerationKHR", SpvWord{5313}},
-        {"ceFPGAClusterAttributesV2INTEL", SpvWord{6150}},
-        {"caGlobalSize", SpvWord{31}},
-        {"bpRestrictPointerEXT", SpvWord{5355}},
-        {"ceGenericPointer", SpvWord{38}},
-        {"alGeometry", SpvWord{3}},
-        {"ckRowMajorKHR", SpvWord{0}},
-        {"aoRoundingModeRTNINTEL", SpvWord{5621}},
-        {"bcNearest", SpvWord{0}},
-        {"agNonPrivatePointerKHR", SpvWord{32}},
-        {"ceInt16", SpvWord{22}},
-        {"ceSampledRect", SpvWord{37}},
-        {"cdWaitKernel", SpvWord{1}},
-        {"bpStackCallINTEL", SpvWord{5627}},
-        {"blImport", SpvWord{1}},
-        {"caRayGeometryIndexKHR", SpvWord{5352}},
-        {"caHitTNV", SpvWord{5332}},
-        {"adMaxIterations", SpvWord{32}},
-        {"apRayPayloadNV", SpvWord{5338}},
-        {"akSYCL", SpvWord{7}},
-        {"bpFPRoundingMode", SpvWord{39}},
-        {"bnReadINTEL", SpvWord{1}},
-        {"caWarpIDARM", SpvWord{4163}},
-        {"caBaryCoordPullModelAMD", SpvWord{4998}},
-        {"bfUnsignedInt8", SpvWord{10}},
-        {"alRayGenerationNV", SpvWord{5313}},
-        {"ceKernel", SpvWord{6}},
-        {"biRND_INF", SpvWord{4}},
-        {"cjSaturatingAccumulationKHR", SpvWord{16}},
-        {"bkSAT_SYM", SpvWord{3}},
-        {"ccPartitionedReduceNV", SpvWord{6}},
-        {"bpBindlessImageNV", SpvWord{5399}},
-        {"caSMCountNV", SpvWord{5375}},
-        {"bpSimpleDualPortINTEL", SpvWord{5833}},
-        {"ceShader", SpvWord{1}},
-        {"ceDemoteToHelperInvocationEXT", SpvWord{5379}},
-        {"ceStorageUniformBufferBlock16", SpvWord{4433}},
-        {"ceNamedBarrier", SpvWord{59}},
-        {"cgRayQueryCommittedIntersectionNoneKHR", SpvWord{0}},
-        {"beDepth", SpvWord{13}},
-        {"bpGlobalVariableOffsetINTEL", SpvWord{5628}},
-        {"bpMathOpDSPModeINTEL", SpvWord{5909}},
-        {"bdR64ui", SpvWord{40}},
-        {"bpBuiltIn", SpvWord{11}},
-        {"ceDotProductInputAll", SpvWord{6016}},
-        {"ceGroupNonUniformVote", SpvWord{62}},
-        {"bpSIMTCallINTEL", SpvWord{5599}},
-        {"ceGroupNonUniformShuffleRelative", SpvWord{66}},
-        {"aiForceOpacityMicromap2StateEXT", SpvWord{1024}},
-        {"aaMakeTexelAvailable", SpvWord{256}},
-        {"aoStencilRefReplacingEXT", SpvWord{5027}},
-        {"caBaryCoordNoPerspKHR", SpvWord{5287}},
-        {"alMeshEXT", SpvWord{5365}},
-        {"ceRayTracingDisplacementMicromapNV", SpvWord{5409}},
-        {"bpCacheControlStoreINTEL", SpvWord{6443}},
-        {"cnStreamingINTEL", SpvWord{2}},
-        {"bpNoPerspective", SpvWord{13}},
-        {"ceRayQueryProvisionalKHR", SpvWord{4471}},
-        {"ceStorageTexelBufferArrayDynamicIndexingEXT", SpvWord{5305}},
-        {"ceStoragePushConstant8", SpvWord{4450}},
-        {"beRx", SpvWord{10}},
-        {"cmInitOnDeviceReprogramINTEL", SpvWord{0}},
-        {"apImage", SpvWord{11}},
-        {"caSubgroupGeMaskKHR", SpvWord{4417}},
-        {"ceStorageUniform16", SpvWord{4434}},
-        {"bpRelaxedPrecision", SpvWord{0}},
-        {"akHERO_C", SpvWord{8}},
-        {"ceGroupNonUniformClustered", SpvWord{67}},
-        {"apUniformConstant", SpvWord{0}},
-        {"apIncomingCallableDataKHR", SpvWord{5329}},
-        {"akWGSL", SpvWord{10}},
-        {"ceFunctionPointersINTEL", SpvWord{5603}},
-        {"cnUncachedINTEL", SpvWord{0}},
-        {"ceFPMaxErrorINTEL", SpvWord{6169}},
-        {"ceFragmentDensityEXT", SpvWord{5291}},
-        {"bhFlushToZero", SpvWord{1}},
-        {"ceImageGatherBiasLodAMD", SpvWord{5009}},
-        {"adLoopCoalesceINTEL", SpvWord{1048576}},
-        {"bdRg32i", SpvWord{25}},
-        {"alMissKHR", SpvWord{5317}},
-        {"aoQuads", SpvWord{24}},
-        {"ceFragmentBarycentricKHR", SpvWord{5284}},
-        {"caPrimitiveCountNV", SpvWord{5275}},
-        {"caHitKindNV", SpvWord{5333}},
-        {"ceGroupNonUniformPartitionedNV", SpvWord{5297}},
-        {"caObjectToWorldNV", SpvWord{5330}},
-        {"aoRoundingModeRTE", SpvWord{4462}},
-        {"ceFloatingPointModeINTEL", SpvWord{5583}},
-        {"cjMatrixCSignedComponentsKHR", SpvWord{4}},
-        {"bpNoContraction", SpvWord{42}},
-        {"caPointSize", SpvWord{1}},
-        {"bpSecondaryViewportRelativeNV", SpvWord{5256}},
-        {"bpSinglepumpINTEL", SpvWord{5830}},
-        {"ceSplitBarrierINTEL", SpvWord{6141}},
-        {"aoDerivativeGroupQuadsNV", SpvWord{5289}},
-        {"ceStorageImageMultisample", SpvWord{27}},
-        {"bgRTN", SpvWord{3}},
-        {"ceSubgroupAvcMotionEstimationINTEL", SpvWord{5696}},
-        {"baCube", SpvWord{3}},
-        {"apShaderRecordBufferNV", SpvWord{5343}},
-        {"bpPerVertexKHR", SpvWord{5285}},
-        {"caPrimitivePointIndicesEXT", SpvWord{5294}},
-        {"apTaskPayloadWorkgroupEXT", SpvWord{5402}},
-        {"aoStencilRefGreaterBackAMD", SpvWord{5083}},
-        {"caRayTminKHR", SpvWord{5325}},
-        {"caNumWorkgroups", SpvWord{24}},
-        {"bdRgba32i", SpvWord{21}},
-        {"ceLoopFuseINTEL", SpvWord{5906}},
-        {"aaNone", SpvWord{0}},
-        {"aoLocalSizeHint", SpvWord{18}},
-        {"caTessLevelOuter", SpvWord{11}},
-        {"aoInvocations", SpvWord{0}},
-        {"aoFloatingPointModeIEEEINTEL", SpvWord{5623}},
-        {"bpNodeSharesPayloadLimitsWithAMDX", SpvWord{5019}},
-        {"ceWorkgroupMemoryExplicitLayout16BitAccessKHR", SpvWord{4430}},
-        {"boRuntimeAlignedINTEL", SpvWord{5940}},
-        {"caSubgroupSize", SpvWord{36}},
-        {"bpNoAliasINTEL", SpvWord{5915}},
-        {"aoSpacingFractionalEven", SpvWord{2}},
-        {"afMakeAvailable", SpvWord{8192}},
-        {"caViewportMaskPerViewNV", SpvWord{5262}},
-        {"ceVectorAnyINTEL", SpvWord{5619}},
-        {"bpClobberINTEL", SpvWord{5607}},
-        {"bjALT", SpvWord{1}},
-        {"caDeviceIndex", SpvWord{4438}},
-        {"caMeshViewIndicesNV", SpvWord{5281}},
-        {"bfUnsignedIntRaw10EXT", SpvWord{19}},
-        {"ceSampledImageArrayDynamicIndexing", SpvWord{29}},
-        {"beBGRA", SpvWord{6}},
-        {"bkWRAP", SpvWord{0}},
-        {"apCallableDataNV", SpvWord{5328}},
-        {"ceFunctionFloatControlINTEL", SpvWord{5821}},
-        {"caBaryCoordNoPerspAMD", SpvWord{4992}},
-        {"ceInt64", SpvWord{11}},
-        {"caIncomingRayFlagsKHR", SpvWord{5351}},
-        {"ceFPGAKernelAttributesv2INTEL", SpvWord{6161}},
-        {"bpInitModeINTEL", SpvWord{6190}},
-        {"caHitKindFrontFacingMicroTriangleNV", SpvWord{5405}},
-        {"amPhysical32", SpvWord{1}},
-        {"afSequentiallyConsistent", SpvWord{16}},
-        {"apRayPayloadKHR", SpvWord{5338}},
-        {"caCullDistance", SpvWord{4}},
-        {"ceSubgroupBallotKHR", SpvWord{4423}},
-        {"aoCoalescingAMDX", SpvWord{5069}},
-        {"bpNonReadable", SpvWord{25}},
-        {"aoSampleInterlockUnorderedEXT", SpvWord{5369}},
-        {"ceWorkgroupMemoryExplicitLayoutKHR", SpvWord{4428}},
-        {"agNone", SpvWord{0}},
-        {"caObjectRayDirectionNV", SpvWord{5324}},
-        {"bpVectorComputeVariableINTEL", SpvWord{5624}},
-        {"beLuminance", SpvWord{9}},
-        {"ceShaderClockKHR", SpvWord{5055}},
-        {"alKernel", SpvWord{6}},
-        {"afAcquireRelease", SpvWord{8}},
-        {"aoSubgroupSize", SpvWord{35}},
-        {"ceImageBuffer", SpvWord{47}},
-        {"ceRayQueryPositionFetchKHR", SpvWord{5391}},
-        {"caShadingRateKHR", SpvWord{4444}},
-        {"aoDepthGreater", SpvWord{14}},
-        {"alCallableNV", SpvWord{5318}},
-        {"ceRayTracingPositionFetchKHR", SpvWord{5336}},
-        {"aoNumSIMDWorkitemsINTEL", SpvWord{5896}},
-        {"ciPackedVectorFormat4x8BitKHR", SpvWord{0}},
-        {"clMatrixBKHR", SpvWord{1}},
-        {"aiCullOpaqueKHR", SpvWord{64}},
-        {"alTessellationEvaluation", SpvWord{2}},
-        {"ceGeometryStreams", SpvWord{54}},
-        {"ceGroupNonUniformRotateKHR", SpvWord{6026}},
-        {"adMinIterations", SpvWord{16}},
-        {"aoOutputVertices", SpvWord{26}},
-        {"bpVolatile", SpvWord{21}},
-        {"caPatchVertices", SpvWord{14}},
-        {"baRect", SpvWord{4}},
-        {"caPositionPerViewNV", SpvWord{5261}},
-        {"afAcquire", SpvWord{2}},
-        {"bmWriteOnly", SpvWord{1}},
-        {"bpUniformId", SpvWord{27}},
-        {"alVertex", SpvWord{0}},
-        {"abAllowReassocINTEL", SpvWord{131072}},
-        {"bpBurstCoalesceINTEL", SpvWord{5899}},
-        {"ceFPGAKernelAttributesINTEL", SpvWord{5897}},
-        {"cbDevice", SpvWord{1}},
-        {"aoXfb", SpvWord{11}},
-        {"ceMemoryAccessAliasingINTEL", SpvWord{5910}},
-        {"caPointCoord", SpvWord{16}},
-        {"ceWorkgroupMemoryExplicitLayout8BitAccessKHR", SpvWord{4429}},
-        {"bpMaxByteOffsetId", SpvWord{47}},
-        {"cnConstCachedINTEL", SpvWord{4}},
-        {"bpPassthroughNV", SpvWord{5250}},
-        {"caViewIndex", SpvWord{4440}},
-        {"caEnqueuedWorkgroupSize", SpvWord{32}},
-        {"aoInputPoints", SpvWord{19}},
-        {"aaConstOffsets", SpvWord{32}},
-        {"ceSubgroupDispatch", SpvWord{58}},
-        {"acFlatten", SpvWord{1}},
-        {"caBaryCoordNoPerspSampleAMD", SpvWord{4994}},
-        {"bdRgb10a2ui", SpvWord{34}},
-        {"aoNonCoherentColorAttachmentReadEXT", SpvWord{4169}},
-        {"bpImplementInRegisterMapINTEL", SpvWord{6191}},
-        {"ceSampled1D", SpvWord{43}},
-        {"bpGLSLPacked", SpvWord{9}},
-        {"cnCachedINTEL", SpvWord{1}},
-        {"aoEarlyFragmentTests", SpvWord{9}},
-        {"ceTessellationPointSize", SpvWord{23}},
-        {"boNoReadWrite", SpvWord{7}},
-        {"caLaunchIdKHR", SpvWord{5319}},
-        {"ceInt64Atomics", SpvWord{12}},
-        {"ceOptNoneINTEL", SpvWord{6094}},
-        {"caSubgroupLtMaskKHR", SpvWord{4420}},
-        {"ceRoundingModeRTE", SpvWord{4467}},
-        {"caObjectToWorldKHR", SpvWord{5330}},
-        {"aaConstOffset", SpvWord{8}},
-        {"ceLinkage", SpvWord{5}},
-        {"aoRoundingModeRTZ", SpvWord{4463}},
-        {"cePerViewAttributesNV", SpvWord{5260}},
-        {"ceExpectAssumeKHR", SpvWord{5629}},
-        {"bpMMHostInterfaceWaitRequestINTEL", SpvWord{6182}},
-        {"cbQueueFamily", SpvWord{5}},
-        {"ccClusteredReduce", SpvWord{3}},
-        {"aiSkipClosestHitShaderKHR", SpvWord{8}},
-        {"apNodePayloadAMDX", SpvWord{5068}},
-        {"ceStorageBuffer8BitAccess", SpvWord{4448}},
-        {"ceInputAttachmentArrayNonUniformIndexing", SpvWord{5310}},
-        {"aoOutputTrianglesNV", SpvWord{5298}},
-        {"blLinkOnceODR", SpvWord{2}},
-        {"bdR16i", SpvWord{28}},
-        {"bbRepeatMirrored", SpvWord{4}},
-        {"abAllowContractFastINTEL", SpvWord{65536}},
-        {"caRayTminNV", SpvWord{5325}},
-        {"bdR16ui", SpvWord{38}},
-        {"besRGBx", SpvWord{16}},
-        {"aaMakeTexelVisibleKHR", SpvWord{512}},
-        {"caWorldRayDirectionKHR", SpvWord{5322}},
-        {"ceFPGAMemoryAccessesINTEL", SpvWord{5898}},
-        {"ceRayTracingKHR", SpvWord{4479}},
-        {"anVulkan", SpvWord{3}},
-        {"bpRestrict", SpvWord{19}},
-        {"caBaryCoordNV", SpvWord{5286}},
-        {"aiSkipTrianglesKHR", SpvWord{256}},
-        {"ceMinLod", SpvWord{42}},
-        {"ceSampledBuffer", SpvWord{46}},
-        {"ceAtomicFloat64AddEXT", SpvWord{6034}},
-        {"ceMultiViewport", SpvWord{57}},
-        {"caWorldToObjectNV", SpvWord{5331}},
-        {"bpUserTypeGOOGLE", SpvWord{5636}},
-        {"bdR64i", SpvWord{41}},
-        {"caHelperInvocation", SpvWord{23}},
-        {"ceDotProductInput4x8BitPackedKHR", SpvWord{6018}},
-        {"aiNoneKHR", SpvWord{0}},
-        {"bfUnormInt101010_2", SpvWord{16}},
-        {"acNone", SpvWord{0}},
-        {"adIterationMultiple", SpvWord{64}},
-        {"bpLocation", SpvWord{30}},
-        {"boSext", SpvWord{1}},
-        {"bjIEEE", SpvWord{0}},
-        {"ceStorageImageReadWithoutFormat", SpvWord{55}},
-        {"bdRgba16f", SpvWord{2}},
-        {"bdRgba16i", SpvWord{22}},
-        {"bpSaturatedConversion", SpvWord{28}},
-        {"clMatrixAccumulatorKHR", SpvWord{2}},
-        {"bpStridesizeINTEL", SpvWord{5883}},
-        {"bpConstant", SpvWord{22}},
-        {"bfSignedInt32", SpvWord{9}},
-        {"ceDeviceEnqueue", SpvWord{19}},
-        {"caWorldRayOriginNV", SpvWord{5321}},
-        {"ceAddresses", SpvWord{4}},
-        {"aaNontemporal", SpvWord{16384}},
-        {"bdRg8", SpvWord{13}},
-        {"caBaseVertex", SpvWord{4424}},
-        {"cjMatrixASignedComponentsKHR", SpvWord{1}},
-        {"aoOutputLineStrip", SpvWord{28}},
-        {"ceImageReadWriteLodAMD", SpvWord{5015}},
-        {"caSubgroupGtMaskKHR", SpvWord{4418}},
-        {"caNumEnqueuedSubgroups", SpvWord{39}},
-        {"beRGBx", SpvWord{12}},
-        {"caWorldRayOriginKHR", SpvWord{5321}},
-        {"bpStableKernelArgumentINTEL", SpvWord{6183}},
-        {"bpFunctionRoundingModeINTEL", SpvWord{5822}},
-        {"beRGx", SpvWord{11}},
-        {"ceDotProductKHR", SpvWord{6019}},
-        {"clMatrixAKHR", SpvWord{0}},
-        {"bpForcePow2DepthINTEL", SpvWord{5836}},
-        {"cdNoWait", SpvWord{0}},
-        {"ceDeviceGroup", SpvWord{4437}},
-        {"ceClipDistance", SpvWord{32}},
-        {"baSubpassData", SpvWord{6}},
-        {"ceDotProduct", SpvWord{6019}},
-        {"abNone", SpvWord{0}},
-        {"ceUniformAndStorageBuffer16BitAccess", SpvWord{4434}},
-        {"ceUniformTexelBufferArrayNonUniformIndexingEXT", SpvWord{5311}},
-        {"ceSampleMaskOverrideCoverageNV", SpvWord{5249}},
-        {"akSlang", SpvWord{11}},
-        {"ceDotProductInputAllKHR", SpvWord{6016}},
-        {"amLogical", SpvWord{0}},
-        {"ceFPGAClusterAttributesINTEL", SpvWord{5904}},
-        {"ceRayTracingOpacityMicromapEXT", SpvWord{5381}},
-        {"ceLongCompositesINTEL", SpvWord{6089}},
-        {"bfSnormInt8", SpvWord{0}},
-        {"ceGlobalVariableFPGADecorationsINTEL", SpvWord{6189}},
-        {"ceDenormFlushToZero", SpvWord{4465}},
-        {"bpHlslSemanticGOOGLE", SpvWord{5635}},
-        {"afImageMemory", SpvWord{2048}},
-        {"caWorkDim", SpvWord{30}},
-        {"aeConst", SpvWord{8}},
-        {"caFragDepth", SpvWord{22}},
-        {"ceIntegerFunctions2INTEL", SpvWord{5584}},
-        {"ceDebugInfoModuleINTEL", SpvWord{6114}},
-        {"caCoreIDARM", SpvWord{4160}},
-        {"bpMediaBlockIOINTEL", SpvWord{6140}},
-        {"ceStorageImageArrayNonUniformIndexingEXT", SpvWord{5309}},
-        {"bpBufferBlock", SpvWord{3}},
-        {"apIncomingRayPayloadKHR", SpvWord{5342}},
-        {"ceSubgroupAvcMotionEstimationIntraINTEL", SpvWord{5697}},
-        {"ceMeshShadingEXT", SpvWord{5283}},
-        {"caInstanceCustomIndexNV", SpvWord{5327}},
-        {"ceGroups", SpvWord{18}},
-        {"ceFPGAInvocationPipeliningAttributesINTEL", SpvWord{5916}},
-        {"aoStencilRefLessFrontAMD", SpvWord{5081}},
-        {"bpRestrictPointer", SpvWord{5355}},
-        {"bpCoherent", SpvWord{23}},
-        {"caSMIDNV", SpvWord{5377}},
-        {"caHitKindBackFacingMicroTriangleNV", SpvWord{5406}},
-        {"aoStencilRefLessBackAMD", SpvWord{5084}},
-        {"ceShaderInvocationReorderNV", SpvWord{5383}},
-        {"ceGroupNonUniformQuad", SpvWord{68}},
-        {"caFragInvocationCountEXT", SpvWord{5293}},
-        {"caInstanceId", SpvWord{6}},
-        {"ceGeometryPointSize", SpvWord{24}},
-        {"adInitiationIntervalINTEL", SpvWord{65536}},
-        {"bpColMajor", SpvWord{5}},
-        {"aiCullNoOpaqueKHR", SpvWord{128}},
-        {"ceStoragePushConstant16", SpvWord{4435}},
-        {"bpDontStaticallyCoalesceINTEL", SpvWord{5901}},
-        {"apFunction", SpvWord{7}},
-        {"alIntersectionNV", SpvWord{5314}},
-        {"ceVariablePointersStorageBuffer", SpvWord{4441}},
-        {"caFullyCoveredEXT", SpvWord{5264}},
-        {"boSret", SpvWord{3}},
-        {"caHitTriangleVertexPositionsKHR", SpvWord{5335}},
-        {"ceShaderNonUniform", SpvWord{5301}},
-        {"bpAlignmentId", SpvWord{46}},
-        {"bdR16", SpvWord{14}},
-        {"ceUniformTexelBufferArrayDynamicIndexing", SpvWord{5304}},
-        {"ceRayTracingProvisionalKHR", SpvWord{5353}},
-        {"aoInitializer", SpvWord{33}},
-        {"ceCullDistance", SpvWord{33}},
-        {"caFragSizeEXT", SpvWord{5292}},
-        {"ceInputAttachmentArrayNonUniformIndexingEXT", SpvWord{5310}},
-        {"cjNoneKHR", SpvWord{0}},
-        {"cgRayQueryCommittedIntersectionGeneratedKHR", SpvWord{2}},
-        {"ceInputAttachment", SpvWord{40}},
-        {"apWorkgroup", SpvWord{4}},
-        {"caSubgroupLtMask", SpvWord{4420}},
-        {"caWarpsPerSMNV", SpvWord{5374}},
-        {"bpPerVertexNV", SpvWord{5285}},
-        {"bdRgba8", SpvWord{4}},
-        {"coWriteBackINTEL", SpvWord{2}},
-        {"aoNonCoherentStencilAttachmentReadEXT", SpvWord{4171}},
-        {"bdRgba16ui", SpvWord{31}},
-        {"aaMinLod", SpvWord{128}},
-        {"bpUniform", SpvWord{26}},
-        {"apDeviceOnlyINTEL", SpvWord{5936}},
-        {"bfUnormInt16", SpvWord{3}},
-        {"cePipeStorage", SpvWord{60}},
-        {"ceRuntimeAlignedAttributeINTEL", SpvWord{5939}},
-        {"caLocalInvocationIndex", SpvWord{29}},
-        {"ceFPGAMemoryAttributesINTEL", SpvWord{5824}},
-        {"aoStreamingInterfaceINTEL", SpvWord{6154}},
-        {"caWarpIDNV", SpvWord{5376}},
-        {"amPhysicalStorageBuffer64", SpvWord{5348}},
-        {"caRayTmaxKHR", SpvWord{5326}},
-        {"ceGroupNonUniformBallot", SpvWord{64}},
-        {"bbRepeat", SpvWord{3}},
-        {"caGlobalLinearId", SpvWord{34}},
-        {"caShaderIndexAMDX", SpvWord{5073}},
-        {"ceVector16", SpvWord{7}},
-        {"bpCounterBuffer", SpvWord{5634}},
-        {"bpBinding", SpvWord{33}},
-        {"bpFunctionFloatingPointModeINTEL", SpvWord{6080}},
-        {"bpMaxReplicatesINTEL", SpvWord{5832}},
-        {"bpViewportRelativeNV", SpvWord{5252}},
-        {"bpOverrideCoverageNV", SpvWord{5248}},
-        {"afMakeAvailableKHR", SpvWord{8192}},
-        {"aoOutputTrianglesEXT", SpvWord{5298}},
-        {"bpFPMaxErrorDecorationINTEL", SpvWord{6170}},
-        {"adPartialCount", SpvWord{256}},
-        {"ceShaderViewportIndexLayerNV", SpvWord{5254}},
-        {"caSubgroupGtMask", SpvWord{4418}},
-        {"caCoreMaxIDARM", SpvWord{4162}},
-        {"bdRgba16Snorm", SpvWord{16}},
-        {"ceVariableLengthArrayINTEL", SpvWord{5817}},
-        {"afRelease", SpvWord{4}},
-        {"alGLCompute", SpvWord{5}},
-        {"ajVertical2Pixels", SpvWord{1}},
-        {"ceSparseResidency", SpvWord{41}},
-        {"cfRayQueryCandidateIntersectionKHR", SpvWord{0}},
-        {"caSubgroupMaxSize", SpvWord{37}},
-        {"ceShaderViewportMaskNV", SpvWord{5255}},
-        {"bbClamp", SpvWord{2}},
-        {"biRND", SpvWord{2}},
-        {"aoSpacingFractionalOdd", SpvWord{3}},
-        {"ceUniformBufferArrayNonUniformIndexingEXT", SpvWord{5306}},
-        {"adPipelineEnableINTEL", SpvWord{524288}},
-        {"bnNoneINTEL", SpvWord{0}},
-        {"ceImageBasic", SpvWord{13}},
-        {"aaGrad", SpvWord{4}},
-        {"apHostOnlyINTEL", SpvWord{5937}},
-        {"caFragStencilRefEXT", SpvWord{5014}},
-        {"aaOffset", SpvWord{16}},
-        {"aaVolatileTexel", SpvWord{2048}},
-        {"abNSZ", SpvWord{4}},
-        {"bpPatch", SpvWord{15}},
-        {"bpHitObjectShaderRecordBufferNV", SpvWord{5386}},
-        {"ceCacheControlsINTEL", SpvWord{6441}},
-        {"aoSubgroupsPerWorkgroup", SpvWord{36}},
-        {"akUnknown", SpvWord{0}},
-        {"adNone", SpvWord{0}},
-        {"ceFPGALoopControlsINTEL", SpvWord{5888}},
-        {"ceShaderLayer", SpvWord{69}},
-        {"aoOriginUpperLeft", SpvWord{7}},
-        {"caSecondaryViewportMaskNV", SpvWord{5258}},
-        {"bpDoublepumpINTEL", SpvWord{5831}},
-        {"bdRgba8ui", SpvWord{32}},
-        {"ccPartitionedInclusiveScanNV", SpvWord{7}},
-        {"caLaunchSizeNV", SpvWord{5320}},
-        {"ceUniformDecoration", SpvWord{71}},
-        {"aoSubgroupUniformControlFlowKHR", SpvWord{4421}},
-        {"ceVulkanMemoryModelDeviceScope", SpvWord{5346}},
-        {"afAtomicCounterMemory", SpvWord{1024}},
-        {"agMakePointerVisibleKHR", SpvWord{16}},
-        {"ceFragmentShadingRateKHR", SpvWord{4422}},
-        {"ajVertical4Pixels", SpvWord{2}},
-        {"ahCmdExecTime", SpvWord{1}},
-        {"alClosestHitKHR", SpvWord{5316}},
-        {"caWorkgroupSize", SpvWord{25}},
-        {"bpIOPipeStorageINTEL", SpvWord{5944}},
-        {"caVertexIndex", SpvWord{42}},
-        {"bgRTE", SpvWord{0}},
-        {"bgRTZ", SpvWord{1}},
-        {"bdRgba16", SpvWord{10}},
-        {"ckColumnMajorKHR", SpvWord{1}},
-        {"cjMatrixResultSignedComponentsKHR", SpvWord{8}},
-        {"aoOriginLowerLeft", SpvWord{8}},
-        {"bdRg16", SpvWord{12}},
-        {"aoMaxNodeRecursionAMDX", SpvWord{5071}},
-        {"ceCoreBuiltinsARM", SpvWord{4165}},
-        {"ceShadingRateNV", SpvWord{5291}},
-        {"bpMaxByteOffset", SpvWord{45}},
-        {"caBaryCoordSmoothSampleAMD", SpvWord{4997}},
-        {"ceFloat16Buffer", SpvWord{8}},
-        {"agNontemporal", SpvWord{4}},
-        {"agNonPrivatePointer", SpvWord{32}},
-        {"aoStencilRefGreaterFrontAMD", SpvWord{5080}},
-        {"ceVectorComputeINTEL", SpvWord{5617}},
-        {"bpAliasedPointer", SpvWord{5356}},
-        {"ajHorizontal4Pixels", SpvWord{8}},
-        {"afVolatile", SpvWord{32768}},
-        {"ciPackedVectorFormat4x8Bit", SpvWord{0}},
-        {"boNoWrite", SpvWord{6}},
-        {"ceFragmentMaskAMD", SpvWord{5010}},
-        {"aoLocalSizeId", SpvWord{38}},
-        {"bpMMHostInterfaceAddressWidthINTEL", SpvWord{6177}},
-        {"bpAliased", SpvWord{20}},
-        {"ceUniformTexelBufferArrayNonUniformIndexing", SpvWord{5311}},
-        {"apPrivate", SpvWord{6}},
-        {"abFast", SpvWord{16}},
-        {"apOutput", SpvWord{3}},
-        {"apTileImageEXT", SpvWord{4172}},
-        {"ceDenormPreserve", SpvWord{4464}},
-        {"bpTrackFinishWritingAMDX", SpvWord{5078}},
-        {"ceBlockingPipesINTEL", SpvWord{5945}},
-        {"ceStorageBufferArrayNonUniformIndexingEXT", SpvWord{5308}},
-        {"beARGB", SpvWord{7}},
-        {"aaVolatileTexelKHR", SpvWord{2048}},
-        {"aoTriangles", SpvWord{22}},
-        {"ceAtomicFloat64MinMaxEXT", SpvWord{5613}},
-        {"ceRoundToInfinityINTEL", SpvWord{5582}},
-        {"bpUserSemantic", SpvWord{5635}},
-        {"akCPP_for_OpenCL", SpvWord{6}},
-        {"ccReduce", SpvWord{0}},
-        {"alAnyHitNV", SpvWord{5315}},
-        {"ceSubgroupBufferBlockIOINTEL", SpvWord{5569}},
-        {"aeInline", SpvWord{1}},
-        {"apShaderRecordBufferKHR", SpvWord{5343}},
-        {"bdR8i", SpvWord{29}},
-        {"ceAsmINTEL", SpvWord{5606}},
-        {"bpXfbStride", SpvWord{37}},
-        {"bdRg8Snorm", SpvWord{18}},
-        {"aaSample", SpvWord{64}},
-        {"aoFinalizer", SpvWord{34}},
-        {"bpNoUnsignedWrap", SpvWord{4470}},
-        {"bpCacheSizeINTEL", SpvWord{5900}},
-        {"bdR8Snorm", SpvWord{20}},
-        {"aiTerminateOnFirstHitKHR", SpvWord{4}},
-        {"bnWriteINTEL", SpvWord{2}},
-        {"caTessLevelInner", SpvWord{12}},
-        {"ceTextureBlockMatchQCOM", SpvWord{4486}},
-        {"ceDrawParameters", SpvWord{4427}},
-        {"aaSignExtend", SpvWord{4096}},
-        {"bpComponent", SpvWord{31}},
-        {"caSubgroupLeMaskKHR", SpvWord{4419}},
-        {"bpBoundImageNV", SpvWord{5401}},
-        {"bdRg32f", SpvWord{6}},
-        {"caSamplePosition", SpvWord{19}},
-        {"bdR8", SpvWord{15}},
-        {"alCallableKHR", SpvWord{5318}},
-        {"besRGBA", SpvWord{17}},
-        {"aoSchedulerTargetFmaxMhzINTEL", SpvWord{5903}},
-        {"ceFPGABufferLocationINTEL", SpvWord{5920}},
-        {"aoDerivativeGroupLinearNV", SpvWord{5290}},
-        {"aoContractionOff", SpvWord{31}},
-        {"caCoalescedInputCountAMDX", SpvWord{5021}},
-        {"ceGroupNonUniform", SpvWord{61}},
-        {"bpPerTaskNV", SpvWord{5273}},
-        {"aoVecTypeHint", SpvWord{30}},
-        {"bnReadWriteINTEL", SpvWord{3}},
-        {"caClipDistance", SpvWord{3}},
-        {"afUniformMemory", SpvWord{64}},
-        {"bpMemoryINTEL", SpvWord{5826}},
-        {"ceInterpolationFunction", SpvWord{52}},
-        {"akESSL", SpvWord{1}},
-        {"aaMakeTexelVisible", SpvWord{512}},
-        {"caSubgroupLeMask", SpvWord{4419}},
-        {"apPhysicalStorageBufferEXT", SpvWord{5349}},
-        {"bkSAT_ZERO", SpvWord{2}},
-        {"caLaunchIdNV", SpvWord{5319}},
-        {"ceDerivativeControl", SpvWord{51}},
-        {"ceDotProductInput4x8Bit", SpvWord{6017}},
-        {"ceStorageImageArrayDynamicIndexing", SpvWord{31}},
-        {"apPhysicalStorageBuffer", SpvWord{5349}},
-        {"aoVertexOrderCw", SpvWord{4}},
-        {"ceSubgroupAvcMotionEstimationChromaINTEL", SpvWord{5698}},
-        {"caBaryCoordSmoothCentroidAMD", SpvWord{4996}},
-        {"boNoCapture", SpvWord{5}},
-        {"agMakePointerAvailable", SpvWord{8}},
-        {"ceUniformTexelBufferArrayDynamicIndexingEXT", SpvWord{5304}},
-        {"afOutputMemory", SpvWord{4096}},
-        {"bcLinear", SpvWord{1}},
-        {"bpMergeINTEL", SpvWord{5834}},
-        {"beDepthStencil", SpvWord{14}},
-        {"aoSignedZeroInfNanPreserve", SpvWord{4461}},
-        {"bpReferencedIndirectlyINTEL", SpvWord{5602}},
-        {"alMissNV", SpvWord{5317}},
-        {"aoIsolines", SpvWord{25}},
-        {"caSubgroupId", SpvWord{40}},
-        {"bpRowMajor", SpvWord{4}},
-        {"caSubgroupEqMask", SpvWord{4416}},
-        {"apIncomingRayPayloadNV", SpvWord{5342}},
-        {"cbQueueFamilyKHR", SpvWord{5}},
-        {"bpConduitKernelArgumentINTEL", SpvWord{6175}},
-        {"akNZSL", SpvWord{9}},
-        {"bfUnormInt101010", SpvWord{6}},
-        {"ceSubgroupVoteKHR", SpvWord{4431}},
-        {"bdR16f", SpvWord{9}},
-        {"caWorldToObjectKHR", SpvWord{5331}},
-        {"ceVulkanMemoryModelDeviceScopeKHR", SpvWord{5346}},
-        {"ceFPGARegINTEL", SpvWord{5948}},
-        {"caGlobalOffset", SpvWord{33}},
-        {"abNotNaN", SpvWord{1}},
-        {"caTaskCountNV", SpvWord{5274}},
-        {"bfUnormInt24", SpvWord{15}},
-        {"cgRayQueryCommittedIntersectionTriangleKHR", SpvWord{1}},
-        {"aoOutputLinesNV", SpvWord{5269}},
-        {"bpStallFreeINTEL", SpvWord{6151}},
-        {"agNoAliasINTELMask", SpvWord{131072}},
-        {"ceAtomicFloat32AddEXT", SpvWord{6033}},
-        {"aoSubgroupsPerWorkgroupId", SpvWord{37}},
-        {"aeNone", SpvWord{0}},
-        {"apHitAttributeKHR", SpvWord{5339}},
-        {"boNoAlias", SpvWord{4}},
-        {"boZext", SpvWord{0}},
-        {"caFrontFacing", SpvWord{17}},
-        {"caPrimitiveShadingRateKHR", SpvWord{4432}},
-        {"bpBoundSamplerNV", SpvWord{5400}},
-        {"caHitMicroTriangleVertexBarycentricsNV", SpvWord{5344}},
-        {"ceStorageImageExtendedFormats", SpvWord{49}},
-        {"acDontFlatten", SpvWord{2}},
-        {"ceRayTraversalPrimitiveCullingKHR", SpvWord{4478}},
-        {"ceFloat16", SpvWord{9}},
-        {"bpCPacked", SpvWord{10}},
-        {"ceImageReadWrite", SpvWord{14}},
-        {"aeDontInline", SpvWord{2}},
-        {"ceDisplacementMicromapNV", SpvWord{5380}},
-        {"bpLatencyControlConstraintINTEL", SpvWord{6173}},
-        {"aoShadingRateInterlockUnorderedEXT", SpvWord{5371}},
-        {"caClipDistancePerViewNV", SpvWord{5277}},
-        {"bpWeightTextureQCOM", SpvWord{4487}},
-        {"ceComputeDerivativeGroupLinearNV", SpvWord{5350}},
-        {"aoNonCoherentDepthAttachmentReadEXT", SpvWord{4170}},
-        {"ceUniformAndStorageBuffer8BitAccess", SpvWord{4449}},
-        {"bmReadOnly", SpvWord{0}},
-        {"adDependencyArrayINTEL", SpvWord{262144}},
-        {"bpVectorComputeCallableFunctionINTEL", SpvWord{6087}},
-        {"bpFuncParamAttr", SpvWord{38}},
-        {"ceAtomicFloat16MinMaxEXT", SpvWord{5616}},
-        {"ceFragmentShaderSampleInterlockEXT", SpvWord{5363}},
-        {"bfUnormShort565", SpvWord{4}},
-        {"ceArbitraryPrecisionIntegersINTEL", SpvWord{5844}},
-        {"ceUniformBufferArrayNonUniformIndexing", SpvWord{5306}},
-        {"bpStallEnableINTEL", SpvWord{5905}},
-        {"alTaskNV", SpvWord{5267}},
-        {"adDontUnroll", SpvWord{2}},
-        {"bpPayloadNodeNameAMDX", SpvWord{5091}},
-        {"bpFunctionDenormModeINTEL", SpvWord{5823}},
-        {"ceShaderViewportIndex", SpvWord{70}},
-        {"ceImageFootprintNV", SpvWord{5282}},
-        {"bpSpecId", SpvWord{1}},
-        {"bpBlock", SpvWord{2}},
-        {"bpXfbBuffer", SpvWord{36}},
-        {"caBaseInstance", SpvWord{4425}},
-        {"ceTessellation", SpvWord{3}},
-        {"ceFPFastMathModeINTEL", SpvWord{5837}},
-        {"aoSharedLocalMemorySizeINTEL", SpvWord{5618}},
-        {"afMakeVisibleKHR", SpvWord{16384}},
-        {"caHitKindKHR", SpvWord{5333}},
-        {"ceVariablePointers", SpvWord{4442}},
-        {"bkSAT", SpvWord{1}},
-        {"ccInclusiveScan", SpvWord{1}},
-        {"ceVulkanMemoryModel", SpvWord{5345}},
-        {"bpLatencyControlLabelINTEL", SpvWord{6172}},
-        {"caMeshViewCountNV", SpvWord{5280}},
-        {"bpPrefetchINTEL", SpvWord{5902}},
-        {"aoDenormPreserve", SpvWord{4459}},
-        {"aoMaxWorkgroupSizeINTEL", SpvWord{5893}},
-        {"bpMaxPrivateCopiesINTEL", SpvWord{5829}},
-        {"caRayTmaxNV", SpvWord{5326}},
-        {"biRND_CONV", SpvWord{6}},
-        {"caLayerPerViewNV", SpvWord{5279}},
-        {"aoRegisterMapInterfaceINTEL", SpvWord{6160}},
-        {"aoDepthLess", SpvWord{15}},
-        {"bdRgba32f", SpvWord{1}},
-        {"cmInitOnDeviceResetINTEL", SpvWord{1}},
-        {"afMakeVisible", SpvWord{16384}},
-        {"aeOptNoneINTEL", SpvWord{65536}},
-        {"ceMultiView", SpvWord{4439}},
-        {"caPrimitiveIndicesNV", SpvWord{5276}},
-        {"ceRoundingModeRTZ", SpvWord{4468}},
-        {"bgRTP", SpvWord{2}},
-        {"cjMatrixBSignedComponentsKHR", SpvWord{2}},
-        {"caObjectRayDirectionKHR", SpvWord{5324}},
-        {"caPrimitiveId", SpvWord{7}},
-        {"aoOutputTriangleStrip", SpvWord{29}},
-        {"aoOutputPrimitivesEXT", SpvWord{5270}},
-        {"caPosition", SpvWord{0}},
-        {"bpMMHostInterfaceReadWriteModeINTEL", SpvWord{6180}},
-        {"biRND_ZERO", SpvWord{3}},
-        {"ceStorageTexelBufferArrayNonUniformIndexingEXT", SpvWord{5312}},
-        {"ceUSMStorageClassesINTEL", SpvWord{5935}},
-        {"coUncachedINTEL", SpvWord{0}},
-        {"besBGRA", SpvWord{18}},
-        {"ceStorageBuffer16BitAccess", SpvWord{4433}},
-        {"ceImageMipmap", SpvWord{15}},
-        {"agMakePointerVisible", SpvWord{16}},
-        {"caWorldRayDirectionNV", SpvWord{5322}},
-        {"bdRg16i", SpvWord{26}},
-        {"bpTrueDualPortINTEL", SpvWord{5885}},
-        {"ceShaderViewportIndexLayerEXT", SpvWord{5254}},
-        {"aoMaxNumWorkgroupsAMDX", SpvWord{5077}},
-        {"beRG", SpvWord{2}},
-        {"caSubgroupGeMask", SpvWord{4417}},
-        {"bpLinkageAttributes", SpvWord{41}},
-        {"adMaxConcurrencyINTEL", SpvWord{131072}},
-        {"aoOutputLinesEXT", SpvWord{5269}},
-        {"ceArbitraryPrecisionFixedPointINTEL", SpvWord{5922}},
-        {"caBaryCoordKHR", SpvWord{5286}},
-        {"ceInputAttachmentArrayDynamicIndexing", SpvWord{5303}},
-        {"anSimple", SpvWord{0}},
-        {"bdRg16f", SpvWord{7}},
-        {"aoInputTrianglesAdjacency", SpvWord{23}},
-        {"aoMaxWorkDimINTEL", SpvWord{5894}},
-        {"bpRegisterMapKernelArgumentINTEL", SpvWord{6176}},
-        {"bpOffset", SpvWord{35}},
-        {"ceStorageTexelBufferArrayNonUniformIndexing", SpvWord{5312}},
-        {"biTRN", SpvWord{0}},
-        {"alClosestHitNV", SpvWord{5316}},
-        {"bdRgba8i", SpvWord{23}},
-        {"agVolatile", SpvWord{1}},
-        {"ceAtomicFloat16AddEXT", SpvWord{6095}},
-        {"caPrimitiveTriangleIndicesEXT", SpvWord{5296}},
-        {"cbSubgroup", SpvWord{3}},
-        {"aoPixelCenterInteger", SpvWord{6}},
-        {"ceSampledImageArrayNonUniformIndexing", SpvWord{5307}},
-        {"caPrimitiveLineIndicesEXT", SpvWord{5295}},
-        {"bdUnknown", SpvWord{0}},
-        {"ceSampleRateShading", SpvWord{35}},
-        {"apHitObjectAttributeNV", SpvWord{5385}},
-        {"aaNonPrivateTexel", SpvWord{1024}},
-        {"ceRuntimeDescriptorArray", SpvWord{5302}},
-        {"afWorkgroupMemory", SpvWord{256}},
-        {"ceStorageImageWriteWithoutFormat", SpvWord{56}},
-        {"aoStencilRefUnchangedBackAMD", SpvWord{5082}},
-        {"bdRgb10A2", SpvWord{11}},
-        {"besRGB", SpvWord{15}},
-        {"ceSubgroupImageBlockIOINTEL", SpvWord{5570}},
-        {"aoShaderIndexAMDX", SpvWord{5073}},
-        {"bhPreserve", SpvWord{0}},
-        {"akGLSL", SpvWord{2}},
-        {"ceImageRect", SpvWord{36}},
-        {"caBaryCoordSmoothAMD", SpvWord{4995}},
-        {"aoVertexOrderCcw", SpvWord{5}},
-        {"ceMatrix", SpvWord{0}},
-        {"adMaxInterleavingINTEL", SpvWord{2097152}},
+        {"cfCooperativeMatrixKHR", SpvWord{6022}},
+        {"amRayGenerationNV", SpvWord{5313}},
+        {"bpNoWrite", SpvWord{6}},
+        {"bpZext", SpvWord{0}},
+        {"cfSubgroupImageMediaBlockIOINTEL", SpvWord{5579}},
+        {"biPreserve", SpvWord{0}},
+        {"cfSampledImageArrayDynamicIndexing", SpvWord{29}},
+        {"apRoundingModeRTE", SpvWord{4462}},
+        {"cfUniformBufferArrayNonUniformIndexingEXT", SpvWord{5306}},
         {"aaNonPrivateTexelKHR", SpvWord{1024}},
-        {"alFragment", SpvWord{4}},
-        {"ceAtomicStorageOps", SpvWord{4445}},
-        {"ceImageGatherExtended", SpvWord{25}},
-        {"ceSampledImageArrayNonUniformIndexingEXT", SpvWord{5307}},
-        {"ceSubgroupImageMediaBlockIOINTEL", SpvWord{5579}},
-        {"bpGLSLShared", SpvWord{8}},
-        {"ceTextureSampleWeightedQCOM", SpvWord{4484}},
-        {"blExport", SpvWord{0}},
-        {"bpSingleElementVectorINTEL", SpvWord{6085}},
-        {"aoPixelInterlockOrderedEXT", SpvWord{5366}},
-        {"afSubgroupMemory", SpvWord{128}},
-        {"bpPipelineEnableINTEL", SpvWord{5919}},
-        {"caDrawIndex", SpvWord{4426}},
-        {"bdRg8i", SpvWord{27}},
-        {"agMakePointerAvailableKHR", SpvWord{8}},
-        {"bpVectorComputeFunctionINTEL", SpvWord{5626}},
-        {"ceSignedZeroInfNanPreserve", SpvWord{4466}},
-        {"caLaunchSizeKHR", SpvWord{5320}},
-        {"bpMMHostInterfaceLatencyINTEL", SpvWord{6179}},
-        {"bpBlockMatchTextureQCOM", SpvWord{4488}},
-        {"bpNonWritable", SpvWord{24}},
-        {"aoDenormFlushToZero", SpvWord{4460}},
-        {"anGLSL450", SpvWord{1}},
-        {"ceFloat16ImageAMD", SpvWord{5008}},
-        {"apUniform", SpvWord{2}},
-        {"bmReadWrite", SpvWord{2}},
-        {"ceGeometryShaderPassthroughNV", SpvWord{5251}},
-        {"bpFuncParamIOKindINTEL", SpvWord{5625}},
-        {"ceShaderSMBuiltinsNV", SpvWord{5373}},
-        {"anVulkanKHR", SpvWord{3}},
-        {"caSampleMask", SpvWord{20}},
-        {"apCallableDataKHR", SpvWord{5328}},
+        {"cfRayTraversalPrimitiveCullingKHR", SpvWord{4478}},
+        {"cbBaryCoordSmoothCentroidAMD", SpvWord{4996}},
+        {"caPayloadNodeNameAMDX", SpvWord{5091}},
+        {"beR32ui", SpvWord{33}},
+        {"caFuncParamAttr", SpvWord{38}},
+        {"cbPosition", SpvWord{0}},
+        {"caXfbStride", SpvWord{37}},
+        {"apShadingRateInterlockOrderedEXT", SpvWord{5370}},
+        {"afSequentiallyConsistent", SpvWord{16}},
+        {"apDepthUnchanged", SpvWord{16}},
+        {"baUniformConstant", SpvWord{0}},
+        {"amFragment", SpvWord{4}},
+        {"cbHitKindKHR", SpvWord{5333}},
+        {"caCacheControlStoreINTEL", SpvWord{6443}},
+        {"cfInputAttachmentArrayNonUniformIndexing", SpvWord{5310}},
+        {"caMergeINTEL", SpvWord{5834}},
+        {"caArrayStride", SpvWord{6}},
+        {"akNone", SpvWord{0}},
+        {"cfNamedBarrier", SpvWord{59}},
+        {"aiCullBackFacingTrianglesKHR", SpvWord{16}},
+        {"cbInvocationsPerPixelNV", SpvWord{5293}},
+        {"cbFragInvocationCountEXT", SpvWord{5293}},
+        {"caFuncParamIOKindINTEL", SpvWord{5625}},
+        {"alOpenCL_C", SpvWord{3}},
+        {"boNoneINTEL", SpvWord{0}},
+        {"caNonWritable", SpvWord{24}},
+        {"bgUnormShort555", SpvWord{5}},
+        {"caRegisterMapKernelArgumentINTEL", SpvWord{6176}},
+        {"caNoPerspective", SpvWord{13}},
+        {"beRg16Snorm", SpvWord{17}},
+        {"cfComputeDerivativeGroupLinearNV", SpvWord{5350}},
+        {"cfDotProductKHR", SpvWord{6019}},
+        {"beRgba32f", SpvWord{1}},
+        {"alNZSL", SpvWord{9}},
+        {"cfSampleRateShading", SpvWord{35}},
+        {"apOutputLinesEXT", SpvWord{5269}},
+        {"apInputTrianglesAdjacency", SpvWord{23}},
+        {"aaNontemporal", SpvWord{16384}},
+        {"caAliasedPointer", SpvWord{5356}},
+        {"caBlockMatchSamplerQCOM", SpvWord{4499}},
+        {"cbTaskCountNV", SpvWord{5274}},
+        {"adDontUnroll", SpvWord{2}},
+        {"cfShaderLayer", SpvWord{69}},
+        {"cfSampledImageArrayNonUniformIndexing", SpvWord{5307}},
+        {"anLogical", SpvWord{0}},
+        {"cfGeometryShaderPassthroughNV", SpvWord{5251}},
+        {"aaMakeTexelVisibleKHR", SpvWord{512}},
+        {"ckMatrixResultSignedComponentsKHR", SpvWord{8}},
+        {"caMediaBlockIOINTEL", SpvWord{6140}},
+        {"aeNone", SpvWord{0}},
+        {"cfGroupNonUniformClustered", SpvWord{67}},
+        {"daAutoINTEL", SpvWord{0}},
+        {"cfSampled1D", SpvWord{43}},
+        {"caMMHostInterfaceDataWidthINTEL", SpvWord{6178}},
+        {"beRg16f", SpvWord{7}},
+        {"cfInputAttachmentArrayDynamicIndexing", SpvWord{5303}},
+        {"beRgba8i", SpvWord{23}},
+        {"cbRayGeometryIndexKHR", SpvWord{5352}},
+        {"beR11fG11fB10f", SpvWord{8}},
+        {"cgRayQueryCommittedIntersectionKHR", SpvWord{1}},
+        {"cbSubgroupGeMaskKHR", SpvWord{4417}},
+        {"baWorkgroup", SpvWord{4}},
+        {"cfShaderStereoViewNV", SpvWord{5259}},
+        {"cfWorkgroupMemoryExplicitLayoutKHR", SpvWord{4428}},
+        {"baCallableDataNV", SpvWord{5328}},
+        {"cfFragmentShaderPixelInterlockEXT", SpvWord{5378}},
+        {"apOutputVertices", SpvWord{26}},
+        {"bfRA", SpvWord{3}},
+        {"abAllowReassoc", SpvWord{131072}},
+        {"caBufferLocationINTEL", SpvWord{5921}},
+        {"baNodePayloadAMDX", SpvWord{5068}},
+        {"baIncomingCallableDataNV", SpvWord{5329}},
+        {"caNoUnsignedWrap", SpvWord{4470}},
+        {"afMakeAvailable", SpvWord{8192}},
+        {"cfFPFastMathModeINTEL", SpvWord{5837}},
+        {"apMaxWorkDimINTEL", SpvWord{5894}},
+        {"cbCullMaskKHR", SpvWord{6021}},
+        {"cbBaseInstance", SpvWord{4425}},
+        {"cbMeshViewIndicesNV", SpvWord{5281}},
+        {"adPeelCount", SpvWord{128}},
+        {"cfSampleMaskOverrideCoverageNV", SpvWord{5249}},
+        {"apXfb", SpvWord{11}},
+        {"afAtomicCounterMemory", SpvWord{1024}},
+        {"cfSubgroupImageBlockIOINTEL", SpvWord{5570}},
+        {"aaVolatileTexelKHR", SpvWord{2048}},
+        {"cbObjectRayOriginNV", SpvWord{5323}},
+        {"cfFPGAKernelAttributesINTEL", SpvWord{5897}},
+        {"cfKernel", SpvWord{6}},
+        {"apEarlyFragmentTests", SpvWord{9}},
+        {"cbPrimitiveIndicesNV", SpvWord{5276}},
+        {"caPerTaskNV", SpvWord{5273}},
+        {"aaGrad", SpvWord{4}},
+        {"baAtomicCounter", SpvWord{10}},
+        {"cbRayTmaxNV", SpvWord{5326}},
+        {"ahNone", SpvWord{0}},
+        {"ajVertical4Pixels", SpvWord{2}},
+        {"cpUncachedINTEL", SpvWord{0}},
+        {"cfInt64", SpvWord{11}},
+        {"cfRayQueryProvisionalKHR", SpvWord{4471}},
+        {"cfWorkgroupMemoryExplicitLayout16BitAccessKHR", SpvWord{4430}},
+        {"afVolatile", SpvWord{32768}},
+        {"coCachedINTEL", SpvWord{1}},
+        {"cbSMCountNV", SpvWord{5375}},
+        {"caRowMajor", SpvWord{4}},
+        {"ckMatrixASignedComponentsKHR", SpvWord{1}},
+        {"afMakeAvailableKHR", SpvWord{8192}},
+        {"baImage", SpvWord{11}},
+        {"afMakeVisibleKHR", SpvWord{16384}},
+        {"amTessellationControl", SpvWord{1}},
+        {"caBurstCoalesceINTEL", SpvWord{5899}},
+        {"agMakePointerAvailable", SpvWord{8}},
+        {"caSinglepumpINTEL", SpvWord{5830}},
+        {"cbSubgroupLtMaskKHR", SpvWord{4420}},
+        {"bnReadWrite", SpvWord{2}},
+        {"caPerViewNV", SpvWord{5272}},
+        {"cfStorageTexelBufferArrayNonUniformIndexing", SpvWord{5312}},
+        {"alZig", SpvWord{12}},
+        {"cbViewportMaskPerViewNV", SpvWord{5262}},
+        {"aeDontInline", SpvWord{2}},
+        {"cbHitTriangleVertexPositionsKHR", SpvWord{5335}},
+        {"cfStorageBufferArrayNonUniformIndexing", SpvWord{5308}},
+        {"cbCullDistance", SpvWord{4}},
+        {"cfFPMaxErrorINTEL", SpvWord{6169}},
+        {"apMaximallyReconvergesKHR", SpvWord{6023}},
+        {"cfStorageImageArrayNonUniformIndexing", SpvWord{5309}},
+        {"coUncachedINTEL", SpvWord{0}},
+        {"bdLinear", SpvWord{1}},
+        {"cfFragmentFullyCoveredEXT", SpvWord{5265}},
+        {"cfGeometry", SpvWord{2}},
+        {"cbSubgroupEqMask", SpvWord{4416}},
+        {"caMaxByteOffsetId", SpvWord{47}},
+        {"aaVolatileTexel", SpvWord{2048}},
+        {"cfInputAttachment", SpvWord{40}},
         {"afNone", SpvWord{0}},
-        {"ceGroupNonUniformArithmetic", SpvWord{63}},
-        {"aoLocalSize", SpvWord{17}},
-        {"bpPerPrimitiveNV", SpvWord{5271}},
-        {"alIntersectionKHR", SpvWord{5314}},
-        {"caWarpMaxIDARM", SpvWord{4164}},
-        {"ceStorageBufferArrayNonUniformIndexing", SpvWord{5308}},
-        {"apNodeOutputPayloadAMDX", SpvWord{5076}},
-        {"ceUniformBufferArrayDynamicIndexing", SpvWord{28}},
-        {"caObjectRayOriginNV", SpvWord{5323}},
-        {"ceRuntimeDescriptorArrayEXT", SpvWord{5302}},
-        {"bdRgba8Snorm", SpvWord{5}},
         {"aiNoOpaqueKHR", SpvWord{2}},
-        {"bpAlignment", SpvWord{44}},
-        {"ceGlobalVariableHostAccessINTEL", SpvWord{6187}},
-        {"caSampleId", SpvWord{18}},
-        {"apAtomicCounter", SpvWord{10}},
-        {"apGeneric", SpvWord{8}},
-        {"ceRayTracingMotionBlurNV", SpvWord{5341}},
+        {"apMaxWorkgroupSizeINTEL", SpvWord{5893}},
+        {"cbDrawIndex", SpvWord{4426}},
+        {"alESSL", SpvWord{1}},
+        {"cbWorkDim", SpvWord{30}},
+        {"acFlatten", SpvWord{1}},
+        {"bnReadOnly", SpvWord{0}},
+        {"amGeometry", SpvWord{3}},
+        {"blSAT_ZERO", SpvWord{2}},
+        {"beRgba16", SpvWord{10}},
+        {"apFPFastMathDefault", SpvWord{6028}},
+        {"caCoherent", SpvWord{23}},
+        {"cdReduce", SpvWord{0}},
         {"aePure", SpvWord{4}},
-        {"ba1D", SpvWord{0}},
-        {"ceFragmentShaderPixelInterlockEXT", SpvWord{5378}},
-        {"ceAtomicStorage", SpvWord{21}},
-        {"agAliasScopeINTELMask", SpvWord{65536}},
-        {"ceDotProductInput4x8BitKHR", SpvWord{6017}},
-        {"bpRegisterINTEL", SpvWord{5825}},
-        {"apHitAttributeNV", SpvWord{5339}},
+        {"cfStorageInputOutput16", SpvWord{4436}},
+        {"cfPerViewAttributesNV", SpvWord{5260}},
+        {"aaMakeTexelAvailableKHR", SpvWord{256}},
+        {"cbCoreCountARM", SpvWord{4161}},
+        {"apPointMode", SpvWord{10}},
+        {"aoVulkanKHR", SpvWord{3}},
+        {"cfInputAttachmentArrayNonUniformIndexingEXT", SpvWord{5310}},
+        {"chRayQueryCommittedIntersectionGeneratedKHR", SpvWord{2}},
+        {"apLocalSize", SpvWord{17}},
+        {"cbBaryCoordPullModelAMD", SpvWord{4998}},
+        {"bfRGBA", SpvWord{5}},
+        {"caReferencedIndirectlyINTEL", SpvWord{5602}},
+        {"cfUniformDecoration", SpvWord{71}},
+        {"adUnroll", SpvWord{1}},
+        {"cfShader", SpvWord{1}},
+        {"cdPartitionedInclusiveScanNV", SpvWord{7}},
+        {"apNumSIMDWorkitemsINTEL", SpvWord{5896}},
+        {"ccShaderCallKHR", SpvWord{6}},
+        {"caNonUniformEXT", SpvWord{5300}},
+        {"beRg32i", SpvWord{25}},
+        {"cfVector16", SpvWord{7}},
+        {"ajHorizontal4Pixels", SpvWord{8}},
+        {"cbViewIndex", SpvWord{4440}},
+        {"apStencilRefGreaterBackAMD", SpvWord{5083}},
+        {"apSpacingFractionalOdd", SpvWord{3}},
+        {"cbVertexIndex", SpvWord{42}},
+        {"cfAtomicFloat32AddEXT", SpvWord{6033}},
+        {"cbSubgroupLtMask", SpvWord{4420}},
+        {"cbWorldToObjectKHR", SpvWord{5331}},
+        {"bfRx", SpvWord{10}},
+        {"apOriginLowerLeft", SpvWord{8}},
+        {"caLatencyControlLabelINTEL", SpvWord{6172}},
+        {"cfBFloat16ConversionINTEL", SpvWord{6115}},
+        {"coStreamingINTEL", SpvWord{2}},
+        {"adPartialCount", SpvWord{256}},
+        {"cfSplitBarrierINTEL", SpvWord{6141}},
+        {"abAllowTransform", SpvWord{262144}},
+        {"baCrossWorkgroup", SpvWord{5}},
+        {"cfFPGAKernelAttributesv2INTEL", SpvWord{6161}},
+        {"cfSubgroupBallotKHR", SpvWord{4423}},
+        {"ckNoneKHR", SpvWord{0}},
+        {"beRg32ui", SpvWord{35}},
+        {"apSharedLocalMemorySizeINTEL", SpvWord{5618}},
+        {"cfGlobalVariableFPGADecorationsINTEL", SpvWord{6189}},
+        {"ccQueueFamilyKHR", SpvWord{5}},
+        {"aoVulkan", SpvWord{3}},
+        {"cfFloat16", SpvWord{9}},
+        {"alHLSL", SpvWord{5}},
+        {"caLatencyControlConstraintINTEL", SpvWord{6173}},
+        {"cbFragmentSizeNV", SpvWord{5292}},
+        {"beR32i", SpvWord{24}},
+        {"cfGlobalVariableHostAccessINTEL", SpvWord{6187}},
+        {"cfUniformBufferArrayDynamicIndexing", SpvWord{28}},
+        {"caXfbBuffer", SpvWord{36}},
+        {"baPhysicalStorageBufferEXT", SpvWord{5349}},
+        {"apStreamingInterfaceINTEL", SpvWord{6154}},
+        {"apPixelInterlockUnorderedEXT", SpvWord{5367}},
+        {"apCoalescingAMDX", SpvWord{5069}},
+        {"beRg16i", SpvWord{26}},
+        {"apSubgroupUniformControlFlowKHR", SpvWord{4421}},
+        {"caMMHostInterfaceMaxBurstINTEL", SpvWord{6181}},
+        {"cdInclusiveScan", SpvWord{1}},
+        {"cfShaderInvocationReorderNV", SpvWord{5383}},
+        {"cbClipDistancePerViewNV", SpvWord{5277}},
+        {"bb2D", SpvWord{1}},
+        {"cfStorageBufferArrayDynamicIndexing", SpvWord{30}},
+        {"bhRTZ", SpvWord{1}},
+        {"cfAtomicFloat16AddEXT", SpvWord{6095}},
+        {"cbSubgroupLeMask", SpvWord{4419}},
+        {"anPhysicalStorageBuffer64EXT", SpvWord{5348}},
+        {"adMaxIterations", SpvWord{32}},
+        {"amAnyHitKHR", SpvWord{5315}},
+        {"afUniformMemory", SpvWord{64}},
         {"afOutputMemoryKHR", SpvWord{4096}},
-        {"cnInvalidateAfterReadINTEL", SpvWord{3}},
-        {"biTRN_ZERO", SpvWord{1}},
-        {"aoInputLinesAdjacency", SpvWord{21}},
-        {"aiSkipAABBsKHR", SpvWord{512}},
-        {"boByVal", SpvWord{2}},
-        {"caBaryCoordNoPerspCentroidAMD", SpvWord{4993}},
-        {"ceStorageTexelBufferArrayDynamicIndexing", SpvWord{5305}},
+        {"bgSnormInt8", SpvWord{0}},
+        {"cfFunctionPointersINTEL", SpvWord{5603}},
+        {"cfFPGAMemoryAttributesINTEL", SpvWord{5824}},
+        {"caNodeSharesPayloadLimitsWithAMDX", SpvWord{5019}},
+        {"caFlat", SpvWord{14}},
+        {"caFunctionDenormModeINTEL", SpvWord{5823}},
+        {"cfShadingRateNV", SpvWord{5291}},
+        {"cbBaryCoordSmoothAMD", SpvWord{4995}},
+        {"apDerivativeGroupQuadsNV", SpvWord{5289}},
+        {"apQuadDerivativesKHR", SpvWord{5088}},
+        {"cbNumEnqueuedSubgroups", SpvWord{39}},
+        {"cfDisplacementMicromapNV", SpvWord{5380}},
+        {"cfAtomicFloat16MinMaxEXT", SpvWord{5616}},
+        {"caNodeMaxPayloadsAMDX", SpvWord{5020}},
+        {"cfShaderViewportMaskNV", SpvWord{5255}},
+        {"cfFloat64", SpvWord{10}},
+        {"caNoContraction", SpvWord{42}},
+        {"cbWorldRayOriginKHR", SpvWord{5321}},
+        {"bfsRGB", SpvWord{15}},
+        {"adIterationMultiple", SpvWord{64}},
+        {"baRayPayloadNV", SpvWord{5338}},
+        {"cfPipes", SpvWord{17}},
+        {"bfRGBx", SpvWord{12}},
+        {"cfShaderClockKHR", SpvWord{5055}},
+        {"aoGLSL450", SpvWord{1}},
+        {"apDenormPreserve", SpvWord{4459}},
+        {"cbSubgroupSize", SpvWord{36}},
+        {"bgUnormInt8", SpvWord{2}},
+        {"cfDotProductInput4x8BitPacked", SpvWord{6018}},
+        {"bfBGRA", SpvWord{6}},
+        {"afImageMemory", SpvWord{2048}},
+        {"bfIntensity", SpvWord{8}},
+        {"cfImageBasic", SpvWord{13}},
+        {"cfFPGABufferLocationINTEL", SpvWord{5920}},
+        {"abNotNaN", SpvWord{1}},
+        {"cfCullDistance", SpvWord{33}},
+        {"caMMHostInterfaceWaitRequestINTEL", SpvWord{6182}},
+        {"ceWaitKernel", SpvWord{1}},
+        {"caGlobalVariableOffsetINTEL", SpvWord{5628}},
+        {"bhRTP", SpvWord{2}},
+        {"cfRuntimeAlignedAttributeINTEL", SpvWord{5939}},
+        {"adSpeculatedIterationsINTEL", SpvWord{4194304}},
+        {"cfGroupUniformArithmeticKHR", SpvWord{6400}},
+        {"apOriginUpperLeft", SpvWord{7}},
+        {"blWRAP", SpvWord{0}},
+        {"caAliased", SpvWord{20}},
+        {"caGLSLShared", SpvWord{8}},
+        {"coConstCachedINTEL", SpvWord{4}},
+        {"adDependencyArrayINTEL", SpvWord{262144}},
+        {"afWorkgroupMemory", SpvWord{256}},
+        {"bhRTE", SpvWord{0}},
+        {"amClosestHitKHR", SpvWord{5316}},
+        {"cfLongCompositesINTEL", SpvWord{6089}},
+        {"cfVulkanMemoryModelDeviceScope", SpvWord{5346}},
+        {"caSaturatedConversion", SpvWord{28}},
+        {"cbBaryCoordNoPerspNV", SpvWord{5287}},
+        {"cfExpectAssumeKHR", SpvWord{5629}},
+        {"cfMeshShadingNV", SpvWord{5266}},
+        {"apOutputLineStrip", SpvWord{28}},
+        {"cfRayTracingDisplacementMicromapNV", SpvWord{5409}},
+        {"amMeshNV", SpvWord{5268}},
+        {"cfStorageBuffer8BitAccess", SpvWord{4448}},
+        {"cfQuadControlKHR", SpvWord{5087}},
+        {"beR16ui", SpvWord{38}},
+        {"caInputAttachmentIndex", SpvWord{43}},
+        {"caHlslSemanticGOOGLE", SpvWord{5635}},
+        {"caPerPrimitiveEXT", SpvWord{5271}},
+        {"baStorageBuffer", SpvWord{12}},
+        {"apShadingRateInterlockUnorderedEXT", SpvWord{5371}},
+        {"ciRayQueryCandidateIntersectionAABBKHR", SpvWord{1}},
+        {"clRowMajorKHR", SpvWord{0}},
+        {"cbShadingRateKHR", SpvWord{4444}},
+        {"apMaximumRegistersIdINTEL", SpvWord{6462}},
+        {"bkIEEE", SpvWord{0}},
+        {"caBindlessImageNV", SpvWord{5399}},
+        {"cfFPGADSPControlINTEL", SpvWord{5908}},
+        {"cfGroupNonUniform", SpvWord{61}},
+        {"cfGeometryStreams", SpvWord{54}},
+        {"bfARGB", SpvWord{7}},
+        {"cbWorldToObjectNV", SpvWord{5331}},
+        {"bgSignedInt32", SpvWord{9}},
+        {"caMatrixStride", SpvWord{7}},
+        {"caSideEffectsINTEL", SpvWord{5608}},
+        {"cbNumWorkgroups", SpvWord{24}},
+        {"agMakePointerAvailableKHR", SpvWord{8}},
+        {"cfIntegerFunctions2INTEL", SpvWord{5584}},
+        {"aaMinLod", SpvWord{128}},
+        {"caSecondaryViewportRelativeNV", SpvWord{5256}},
+        {"ceNoWait", SpvWord{0}},
+        {"cfTileImageStencilReadAccessEXT", SpvWord{4168}},
+        {"cfShaderNonUniform", SpvWord{5301}},
+        {"beRgba16ui", SpvWord{31}},
+        {"abNone", SpvWord{0}},
+        {"cbViewportIndex", SpvWord{10}},
+        {"apStencilRefGreaterFrontAMD", SpvWord{5080}},
+        {"cfFragmentShadingRateKHR", SpvWord{4422}},
+        {"beRg16ui", SpvWord{36}},
+        {"caRestrictPointerEXT", SpvWord{5355}},
+        {"cfGroupNonUniformShuffle", SpvWord{65}},
+        {"apVecTypeHint", SpvWord{30}},
+        {"caRegisterINTEL", SpvWord{5825}},
+        {"cfImageMipmap", SpvWord{15}},
+        {"cfGeometryPointSize", SpvWord{24}},
+        {"apInputLines", SpvWord{20}},
+        {"ckMatrixBSignedComponentsKHR", SpvWord{2}},
+        {"apRoundingModeRTPINTEL", SpvWord{5620}},
+        {"beRgba16i", SpvWord{22}},
+        {"apStencilRefLessBackAMD", SpvWord{5084}},
+        {"cfRayTracingOpacityMicromapEXT", SpvWord{5381}},
+        {"caComponent", SpvWord{31}},
+        {"cfGroupNonUniformQuad", SpvWord{68}},
+        {"apMaxNodeRecursionAMDX", SpvWord{5071}},
+        {"afMakeVisible", SpvWord{16384}},
+        {"bfLuminance", SpvWord{9}},
+        {"alHERO_C", SpvWord{8}},
+        {"blSAT_SYM", SpvWord{3}},
+        {"cfAtomicStorageOps", SpvWord{4445}},
+        {"cfRayTracingMotionBlurNV", SpvWord{5341}},
+        {"apNamedMaximumRegistersINTEL", SpvWord{6463}},
+        {"bgUnsignedInt32", SpvWord{12}},
+        {"caFunctionRoundingModeINTEL", SpvWord{5822}},
+        {"cbBaryCoordNoPerspKHR", SpvWord{5287}},
+        {"cfAtomicFloat64AddEXT", SpvWord{6034}},
+        {"bjRND_ZERO", SpvWord{3}},
+        {"apLocalSizeHint", SpvWord{18}},
+        {"cbRayTmaxKHR", SpvWord{5326}},
+        {"bcRepeat", SpvWord{3}},
+        {"caUniformId", SpvWord{27}},
+        {"aaOffset", SpvWord{16}},
+        {"cfPhysicalStorageBufferAddresses", SpvWord{5347}},
+        {"ajVertical2Pixels", SpvWord{1}},
         {"agAligned", SpvWord{2}},
+        {"cbGlobalOffset", SpvWord{33}},
+        {"cfDotProductInputAll", SpvWord{6016}},
+        {"cbBaryCoordNoPerspAMD", SpvWord{4992}},
+        {"cfFloat16Buffer", SpvWord{8}},
+        {"cfGroupNonUniformVote", SpvWord{62}},
+        {"agNontemporal", SpvWord{4}},
+        {"aaLod", SpvWord{2}},
+        {"cbPositionPerViewNV", SpvWord{5261}},
+        {"cbSubgroupMaxSize", SpvWord{37}},
+        {"ajHorizontal2Pixels", SpvWord{4}},
+        {"caStallFreeINTEL", SpvWord{6151}},
+        {"cbHitKindFrontFacingMicroTriangleNV", SpvWord{5405}},
+        {"cfDebugInfoModuleINTEL", SpvWord{6114}},
+        {"bnWriteOnly", SpvWord{1}},
+        {"abAllowRecip", SpvWord{8}},
+        {"cbViewportMaskNV", SpvWord{5253}},
+        {"aiSkipAABBsKHR", SpvWord{512}},
+        {"apStencilRefUnchangedFrontAMD", SpvWord{5079}},
+        {"baDeviceOnlyINTEL", SpvWord{5936}},
+        {"cbLaunchIdNV", SpvWord{5319}},
+        {"cmMatrixAKHR", SpvWord{0}},
+        {"caExplicitInterpAMD", SpvWord{4999}},
+        {"apOutputTrianglesNV", SpvWord{5298}},
+        {"acDontFlatten", SpvWord{2}},
+        {"cbObjectRayDirectionNV", SpvWord{5324}},
+        {"alSlang", SpvWord{11}},
+        {"cfGroupNonUniformRotateKHR", SpvWord{6026}},
+        {"boWriteINTEL", SpvWord{2}},
+        {"beUnknown", SpvWord{0}},
+        {"cfRayTracingPositionFetchKHR", SpvWord{5336}},
+        {"cfRayQueryPositionFetchKHR", SpvWord{5391}},
+        {"caAlignmentId", SpvWord{46}},
+        {"baShaderRecordBufferNV", SpvWord{5343}},
+        {"bmImport", SpvWord{1}},
+        {"caCounterBuffer", SpvWord{5634}},
+        {"cfDenormFlushToZero", SpvWord{4465}},
+        {"apRequireFullQuadsKHR", SpvWord{5089}},
+        {"baIncomingRayPayloadNV", SpvWord{5342}},
+        {"bgUnsignedIntRaw10EXT", SpvWord{19}},
+        {"ccQueueFamily", SpvWord{5}},
+        {"cfCooperativeMatrixNV", SpvWord{5357}},
+        {"chRayQueryCommittedIntersectionTriangleKHR", SpvWord{1}},
+        {"baHostOnlyINTEL", SpvWord{5937}},
+        {"cpWriteThroughINTEL", SpvWord{1}},
+        {"caColMajor", SpvWord{5}},
+        {"cfLiteralSampler", SpvWord{20}},
+        {"caNoAliasINTEL", SpvWord{5915}},
+        {"caSample", SpvWord{17}},
+        {"cfGroupNonUniformShuffleRelative", SpvWord{66}},
+        {"amMissNV", SpvWord{5317}},
+        {"caConduitKernelArgumentINTEL", SpvWord{6175}},
+        {"caHlslCounterBufferGOOGLE", SpvWord{5634}},
+        {"anPhysical32", SpvWord{1}},
+        {"alSYCL", SpvWord{7}},
+        {"beRgba16Snorm", SpvWord{16}},
+        {"cfSampleMaskPostDepthCoverage", SpvWord{4447}},
+        {"caPerVertexKHR", SpvWord{5285}},
+        {"bfR", SpvWord{0}},
+        {"cfGroupNonUniformBallot", SpvWord{64}},
+        {"chRayQueryCommittedIntersectionNoneKHR", SpvWord{0}},
+        {"cbSubgroupGtMaskKHR", SpvWord{4418}},
+        {"cbLaunchSizeKHR", SpvWord{5320}},
+        {"cfStorageBuffer16BitAccess", SpvWord{4433}},
+        {"caFPFastMathMode", SpvWord{40}},
+        {"beR32f", SpvWord{3}},
+        {"cnInitOnDeviceResetINTEL", SpvWord{1}},
+        {"cbSubgroupGtMask", SpvWord{4418}},
+        {"cfSampledImageArrayNonUniformIndexingEXT", SpvWord{5307}},
+        {"cfFPGALoopControlsINTEL", SpvWord{5888}},
+        {"apInputPoints", SpvWord{19}},
+        {"cbLocalInvocationIndex", SpvWord{29}},
+        {"apOutputPrimitivesNV", SpvWord{5270}},
+        {"cbLocalInvocationId", SpvWord{27}},
+        {"baPushConstant", SpvWord{9}},
+        {"beRg32f", SpvWord{6}},
+        {"cfRayTracingProvisionalKHR", SpvWord{5353}},
+        {"acNone", SpvWord{0}},
+        {"apDepthGreater", SpvWord{14}},
+        {"caMathOpDSPModeINTEL", SpvWord{5909}},
+        {"bdNearest", SpvWord{0}},
+        {"cfDenormPreserve", SpvWord{4464}},
+        {"caFunctionFloatingPointModeINTEL", SpvWord{6080}},
+        {"cbIncomingRayFlagsKHR", SpvWord{5351}},
+        {"cfSignedZeroInfNanPreserve", SpvWord{4466}},
+        {"cfAtomicStorage", SpvWord{21}},
+        {"cbDeviceIndex", SpvWord{4438}},
+        {"cfUniformAndStorageBuffer16BitAccess", SpvWord{4434}},
+        {"cbInvocationId", SpvWord{8}},
+        {"bgSignedInt8", SpvWord{7}},
+        {"cfRoundToInfinityINTEL", SpvWord{5582}},
+        {"cfAddresses", SpvWord{4}},
+        {"cpWriteBackINTEL", SpvWord{2}},
+        {"cfGenericPointer", SpvWord{38}},
+        {"caVectorComputeVariableINTEL", SpvWord{5624}},
+        {"apOutputLinesNV", SpvWord{5269}},
+        {"caSIMTCallINTEL", SpvWord{5599}},
+        {"coInvalidateAfterReadINTEL", SpvWord{3}},
+        {"bpNoReadWrite", SpvWord{7}},
+        {"cbWorldRayDirectionNV", SpvWord{5322}},
+        {"anPhysical64", SpvWord{2}},
+        {"ciRayQueryCandidateIntersectionTriangleKHR", SpvWord{0}},
+        {"amCallableKHR", SpvWord{5318}},
+        {"cfInt64ImageEXT", SpvWord{5016}},
+        {"cfFragmentShaderSampleInterlockEXT", SpvWord{5363}},
+        {"apInvocations", SpvWord{0}},
+        {"cfSubgroupShuffleINTEL", SpvWord{5568}},
+        {"cfArbitraryPrecisionFixedPointINTEL", SpvWord{5922}},
+        {"apSubgroupsPerWorkgroup", SpvWord{36}},
+        {"cbIncomingRayFlagsNV", SpvWord{5351}},
+        {"apShaderIndexAMDX", SpvWord{5073}},
+        {"afCrossWorkgroupMemory", SpvWord{512}},
+        {"caDescriptorSet", SpvWord{34}},
+        {"caCacheControlLoadINTEL", SpvWord{6442}},
+        {"caNoSignedWrap", SpvWord{4469}},
+        {"adMaxConcurrencyINTEL", SpvWord{131072}},
+        {"cmMatrixAccumulatorKHR", SpvWord{2}},
+        {"cfImageQuery", SpvWord{50}},
+        {"aeOptNoneINTEL", SpvWord{65536}},
+        {"cbPrimitiveCountNV", SpvWord{5275}},
+        {"cbClipDistance", SpvWord{3}},
+        {"baHitAttributeKHR", SpvWord{5339}},
+        {"aaNonPrivateTexel", SpvWord{1024}},
+        {"caSingleElementVectorINTEL", SpvWord{6085}},
+        {"ckSaturatingAccumulationKHR", SpvWord{16}},
+        {"cfStorageBufferArrayNonUniformIndexingEXT", SpvWord{5308}},
+        {"cfAtomicFloat32MinMaxEXT", SpvWord{5612}},
+        {"cfFPGAClusterAttributesINTEL", SpvWord{5904}},
+        {"afAcquireRelease", SpvWord{8}},
+        {"cbWarpsPerSMNV", SpvWord{5374}},
+        {"caCPacked", SpvWord{10}},
+        {"caUserSemantic", SpvWord{5635}},
+        {"alUnknown", SpvWord{0}},
+        {"agMakePointerVisible", SpvWord{16}},
+        {"caPipelineEnableINTEL", SpvWord{5919}},
+        {"cfFloat16ImageAMD", SpvWord{5008}},
+        {"cfVectorComputeINTEL", SpvWord{5617}},
+        {"cfMultiViewport", SpvWord{57}},
+        {"cfLoopFuseINTEL", SpvWord{5906}},
+        {"cfImageGatherExtended", SpvWord{25}},
+        {"cfDotProductInput4x8BitPackedKHR", SpvWord{6018}},
+        {"caSpecId", SpvWord{1}},
+        {"adDependencyLength", SpvWord{8}},
+        {"adPipelineEnableINTEL", SpvWord{524288}},
+        {"caForcePow2DepthINTEL", SpvWord{5836}},
+        {"cfSampledCubeArray", SpvWord{45}},
+        {"bpNoCapture", SpvWord{5}},
+        {"apMaximumRegistersINTEL", SpvWord{6461}},
+        {"cfTessellationPointSize", SpvWord{23}},
+        {"abNSZ", SpvWord{4}},
+        {"alOpenCL_CPP", SpvWord{4}},
+        {"bb1D", SpvWord{0}},
+        {"apStencilRefUnchangedBackAMD", SpvWord{5082}},
+        {"cfStoragePushConstant16", SpvWord{4435}},
+        {"adNoFusionINTEL", SpvWord{8388608}},
+        {"alGLSL", SpvWord{2}},
+        {"baFunction", SpvWord{7}},
+        {"caBindlessSamplerNV", SpvWord{5398}},
+        {"biFlushToZero", SpvWord{1}},
+        {"cfSubgroupAvcMotionEstimationIntraINTEL", SpvWord{5697}},
+        {"bgFloat", SpvWord{14}},
+        {"caOffset", SpvWord{35}},
+        {"cbVertexId", SpvWord{5}},
+        {"cbPrimitivePointIndicesEXT", SpvWord{5294}},
+        {"cfSubgroupDispatch", SpvWord{58}},
+        {"cfDotProduct", SpvWord{6019}},
+        {"caSimpleDualPortINTEL", SpvWord{5833}},
+        {"cbEnqueuedWorkgroupSize", SpvWord{32}},
+        {"bjTRN", SpvWord{0}},
+        {"aaMakeTexelVisible", SpvWord{512}},
+        {"caBankBitsINTEL", SpvWord{5835}},
+        {"caNonReadable", SpvWord{25}},
+        {"caVolatile", SpvWord{21}},
+        {"cfImage1D", SpvWord{44}},
+        {"aaOffsets", SpvWord{65536}},
+        {"agAliasScopeINTELMask", SpvWord{65536}},
+        {"apPixelCenterInteger", SpvWord{6}},
+        {"beR16i", SpvWord{28}},
+        {"caConstant", SpvWord{22}},
+        {"beR64i", SpvWord{41}},
+        {"cfMeshShadingEXT", SpvWord{5283}},
+        {"cfStorageImageExtendedFormats", SpvWord{49}},
+        {"bjRND_CONV_ODD", SpvWord{7}},
+        {"bfRGB", SpvWord{4}},
+        {"bmExport", SpvWord{0}},
+        {"apSampleInterlockUnorderedEXT", SpvWord{5369}},
+        {"cbBaryCoordKHR", SpvWord{5286}},
+        {"cbHitMicroTriangleVertexPositionsNV", SpvWord{5337}},
+        {"bfA", SpvWord{1}},
+        {"cbObjectRayOriginKHR", SpvWord{5323}},
+        {"apRoundingModeRTZ", SpvWord{4463}},
+        {"cfFunctionFloatControlINTEL", SpvWord{5821}},
+        {"cbSampleMask", SpvWord{20}},
+        {"cfInt8", SpvWord{39}},
+        {"afRelease", SpvWord{4}},
+        {"apInputLinesAdjacency", SpvWord{21}},
+        {"cfUniformBufferArrayNonUniformIndexing", SpvWord{5306}},
+        {"cfSubgroupAvcMotionEstimationINTEL", SpvWord{5696}},
+        {"cfCacheControlsINTEL", SpvWord{6441}},
+        {"bjRND_MIN_INF", SpvWord{5}},
+        {"amKernel", SpvWord{6}},
+        {"cbShaderIndexAMDX", SpvWord{5073}},
+        {"cbCoreIDARM", SpvWord{4160}},
+        {"baOutput", SpvWord{3}},
+        {"apNonCoherentColorAttachmentReadEXT", SpvWord{4169}},
+        {"bfRGx", SpvWord{11}},
+        {"apInitializer", SpvWord{33}},
+        {"beRgba32i", SpvWord{21}},
+        {"apRegisterMapInterfaceINTEL", SpvWord{6160}},
+        {"aaConstOffsets", SpvWord{32}},
+        {"cbSamplePosition", SpvWord{19}},
+        {"caTrueDualPortINTEL", SpvWord{5885}},
+        {"cfFPGAInvocationPipeliningAttributesINTEL", SpvWord{5916}},
+        {"boReadINTEL", SpvWord{1}},
+        {"apMaxNumWorkgroupsAMDX", SpvWord{5077}},
+        {"cbMeshViewCountNV", SpvWord{5280}},
+        {"apSchedulerTargetFmaxMhzINTEL", SpvWord{5903}},
+        {"cfStorageTexelBufferArrayDynamicIndexing", SpvWord{5305}},
+        {"cfAtomicFloat64MinMaxEXT", SpvWord{5613}},
+        {"aiSkipClosestHitShaderKHR", SpvWord{8}},
+        {"bcRepeatMirrored", SpvWord{4}},
+        {"boReadWriteINTEL", SpvWord{3}},
+        {"beR8Snorm", SpvWord{20}},
+        {"bfsRGBx", SpvWord{16}},
+        {"bgUnormShort565", SpvWord{4}},
+        {"bb3D", SpvWord{2}},
+        {"caRestrictPointer", SpvWord{5355}},
+        {"ahCmdExecTime", SpvWord{1}},
+        {"cfTextureSampleWeightedQCOM", SpvWord{4484}},
+        {"abNotInf", SpvWord{2}},
+        {"akRobustnessPerComponentNV", SpvWord{1}},
+        {"cbBaryCoordNoPerspCentroidAMD", SpvWord{4993}},
+        {"cfFPGALatencyControlINTEL", SpvWord{6171}},
+        {"cfIOPipesINTEL", SpvWord{5943}},
+        {"cfDerivativeControl", SpvWord{51}},
+        {"cbCullDistancePerViewNV", SpvWord{5278}},
+        {"cfMinLod", SpvWord{42}},
+        {"apPixelInterlockOrderedEXT", SpvWord{5366}},
+        {"beR16f", SpvWord{9}},
+        {"apSubgroupSize", SpvWord{35}},
+        {"cbPointSize", SpvWord{1}},
+        {"amMissKHR", SpvWord{5317}},
+        {"apDenormFlushToZero", SpvWord{4460}},
+        {"cfSubgroupAvcMotionEstimationChromaINTEL", SpvWord{5698}},
+        {"aiTerminateOnFirstHitKHR", SpvWord{4}},
+        {"cfRayCullMaskKHR", SpvWord{6020}},
+        {"cbWarpIDARM", SpvWord{4163}},
+        {"caHitObjectShaderRecordBufferNV", SpvWord{5386}},
+        {"bjRND_CONV", SpvWord{6}},
+        {"cbTessCoord", SpvWord{13}},
+        {"adLoopCountINTEL", SpvWord{16777216}},
+        {"apNonCoherentStencilAttachmentReadEXT", SpvWord{4171}},
+        {"cbFragStencilRefEXT", SpvWord{5014}},
+        {"beRg8Snorm", SpvWord{18}},
+        {"caNonUniform", SpvWord{5300}},
+        {"cfVulkanMemoryModelKHR", SpvWord{5345}},
+        {"cgRayQueryCandidateIntersectionKHR", SpvWord{0}},
+        {"caBoundImageNV", SpvWord{5401}},
+        {"apNamedBarrierCountINTEL", SpvWord{6417}},
+        {"cfWorkgroupMemoryExplicitLayout8BitAccessKHR", SpvWord{4429}},
+        {"adMaxReinvocationDelayINTEL", SpvWord{33554432}},
+        {"caLocation", SpvWord{30}},
+        {"beR8i", SpvWord{29}},
+        {"cbSecondaryViewportMaskNV", SpvWord{5258}},
+        {"caMaxReplicatesINTEL", SpvWord{5832}},
+        {"aaSignExtend", SpvWord{4096}},
+        {"cfImageRect", SpvWord{36}},
+        {"cfUniformTexelBufferArrayDynamicIndexing", SpvWord{5304}},
+        {"cfLinkage", SpvWord{5}},
+        {"cfBindlessTextureNV", SpvWord{5390}},
+        {"bcNone", SpvWord{0}},
+        {"beRgba8", SpvWord{4}},
+        {"apIsolines", SpvWord{25}},
+        {"cfRawAccessChainsNV", SpvWord{5414}},
+        {"cfSubgroupBufferBlockIOINTEL", SpvWord{5569}},
+        {"cbGlobalInvocationId", SpvWord{28}},
+        {"apSpacingEqual", SpvWord{1}},
+        {"cfVectorAnyINTEL", SpvWord{5619}},
+        {"cfShaderViewportIndexLayerEXT", SpvWord{5254}},
+        {"cfImageCubeArray", SpvWord{34}},
+        {"apQuads", SpvWord{24}},
+        {"cbSMIDNV", SpvWord{5377}},
+        {"cbSubgroupEqMaskKHR", SpvWord{4416}},
+        {"cbPointCoord", SpvWord{16}},
+        {"aoSimple", SpvWord{0}},
+        {"cfVulkanMemoryModelDeviceScopeKHR", SpvWord{5346}},
+        {"cbBaseVertex", SpvWord{4424}},
+        {"caCentroid", SpvWord{16}},
+        {"cfTextureBlockMatchQCOM", SpvWord{4486}},
+        {"apTriangles", SpvWord{22}},
+        {"cfFloatingPointModeINTEL", SpvWord{5583}},
+        {"caVectorComputeFunctionINTEL", SpvWord{5626}},
+        {"bgUnormInt16", SpvWord{3}},
+        {"apStencilRefReplacingEXT", SpvWord{5027}},
+        {"cfVariablePointersStorageBuffer", SpvWord{4441}},
+        {"cfTextureBlockMatch2QCOM", SpvWord{4498}},
+        {"amTaskNV", SpvWord{5267}},
+        {"amTessellationEvaluation", SpvWord{2}},
+        {"bgSnormInt16", SpvWord{1}},
+        {"caHostAccessINTEL", SpvWord{6188}},
+        {"caFPMaxErrorDecorationINTEL", SpvWord{6170}},
+        {"bfDepth", SpvWord{13}},
+        {"cbWorkgroupId", SpvWord{26}},
+        {"bbCube", SpvWord{3}},
+        {"cbCoreMaxIDARM", SpvWord{4162}},
+        {"caInitiationIntervalINTEL", SpvWord{5917}},
+        {"cbSubgroupLeMaskKHR", SpvWord{4419}},
+        {"cfUnstructuredLoopControlsINTEL", SpvWord{5886}},
+        {"cbHitMicroTriangleVertexBarycentricsNV", SpvWord{5344}},
+        {"adNone", SpvWord{0}},
+        {"cfComputeDerivativeGroupQuadsNV", SpvWord{5288}},
+        {"cbHitKindNV", SpvWord{5333}},
+        {"cbBaryCoordNV", SpvWord{5286}},
+        {"cfStorageUniform16", SpvWord{4434}},
+        {"amGLCompute", SpvWord{5}},
+        {"caVectorComputeCallableFunctionINTEL", SpvWord{6087}},
+        {"cpStreamingINTEL", SpvWord{3}},
+        {"caPerPrimitiveNV", SpvWord{5271}},
+        {"cbFragCoord", SpvWord{15}},
+        {"cfTextureBoxFilterQCOM", SpvWord{4485}},
+        {"beRgba8ui", SpvWord{32}},
+        {"caBlock", SpvWord{2}},
+        {"cfShaderSMBuiltinsNV", SpvWord{5373}},
+        {"bfsRGBA", SpvWord{17}},
+        {"apSampleInterlockOrderedEXT", SpvWord{5368}},
+        {"cfRoundingModeRTE", SpvWord{4467}},
+        {"cbFullyCoveredEXT", SpvWord{5264}},
+        {"cfKernelAttributesINTEL", SpvWord{5892}},
+        {"cfShaderViewportIndexLayerNV", SpvWord{5254}},
+        {"bgSignedInt16", SpvWord{8}},
+        {"caAlignment", SpvWord{44}},
+        {"baInput", SpvWord{1}},
+        {"cbWarpMaxIDARM", SpvWord{4164}},
+        {"apLocalSizeHintId", SpvWord{39}},
+        {"aaZeroExtend", SpvWord{8192}},
+        {"cfSparseResidency", SpvWord{41}},
+        {"cbTessLevelInner", SpvWord{12}},
+        {"caPrefetchINTEL", SpvWord{5902}},
+        {"afRelaxed", SpvWord{0}},
+        {"cfTransformFeedback", SpvWord{53}},
+        {"cfRoundingModeRTZ", SpvWord{4468}},
+        {"cbSecondaryPositionNV", SpvWord{5257}},
+        {"cfBitInstructions", SpvWord{6025}},
+        {"caBoundSamplerNV", SpvWord{5400}},
+        {"cfRayTracingNV", SpvWord{5340}},
+        {"beRgba8Snorm", SpvWord{5}},
+        {"ccInvocation", SpvWord{4}},
+        {"cfStorageImageArrayDynamicIndexing", SpvWord{31}},
+        {"cbCullPrimitiveEXT", SpvWord{5299}},
+        {"caMMHostInterfaceAddressWidthINTEL", SpvWord{6177}},
+        {"cbWorldRayDirectionKHR", SpvWord{5322}},
+        {"apDepthLess", SpvWord{15}},
+        {"cfFragmentShaderShadingRateInterlockEXT", SpvWord{5372}},
+        {"baGeneric", SpvWord{8}},
+        {"bbBuffer", SpvWord{5}},
+        {"abFast", SpvWord{16}},
+        {"cfRuntimeDescriptorArray", SpvWord{5302}},
+        {"cfVulkanMemoryModel", SpvWord{5345}},
+        {"caLinkageAttributes", SpvWord{41}},
+        {"cfMaskedGatherScatterINTEL", SpvWord{6427}},
+        {"ccSubgroup", SpvWord{3}},
+        {"cbCoalescedInputCountAMDX", SpvWord{5021}},
+        {"blSAT", SpvWord{1}},
+        {"caViewportRelativeNV", SpvWord{5252}},
+        {"apOutputPrimitivesEXT", SpvWord{5270}},
+        {"bpByVal", SpvWord{2}},
+        {"cfStorageImageArrayNonUniformIndexingEXT", SpvWord{5309}},
+        {"baNodeOutputPayloadAMDX", SpvWord{5076}},
+        {"bbSubpassData", SpvWord{6}},
+        {"cdPartitionedExclusiveScanNV", SpvWord{8}},
+        {"bmLinkOnceODR", SpvWord{2}},
+        {"beRgb10A2", SpvWord{11}},
+        {"baCallableDataKHR", SpvWord{5328}},
+        {"bfRG", SpvWord{2}},
+        {"aeInline", SpvWord{1}},
+        {"cbBaryCoordSmoothSampleAMD", SpvWord{4997}},
+        {"caUserTypeGOOGLE", SpvWord{5636}},
+        {"bgHalfFloat", SpvWord{13}},
+        {"caPassthroughNV", SpvWord{5250}},
+        {"anPhysicalStorageBuffer64", SpvWord{5348}},
+        {"aiCullOpaqueKHR", SpvWord{64}},
+        {"agMakePointerVisibleKHR", SpvWord{16}},
+        {"cbLayerPerViewNV", SpvWord{5279}},
+        {"cfDeviceEnqueue", SpvWord{19}},
+        {"cfRegisterLimitsINTEL", SpvWord{6460}},
+        {"cfImageReadWriteLodAMD", SpvWord{5015}},
+        {"caMaxPrivateCopiesINTEL", SpvWord{5829}},
+        {"cfShaderNonUniformEXT", SpvWord{5301}},
+        {"caMaxConcurrencyINTEL", SpvWord{5918}},
+        {"apSubgroupsPerWorkgroupId", SpvWord{37}},
+        {"cbObjectRayDirectionKHR", SpvWord{5324}},
+        {"cfSampledBuffer", SpvWord{46}},
+        {"caMemoryINTEL", SpvWord{5826}},
+        {"caTrackFinishWritingAMDX", SpvWord{5078}},
+        {"cfStorageImageReadWithoutFormat", SpvWord{55}},
+        {"amMeshEXT", SpvWord{5365}},
+        {"cfImageBuffer", SpvWord{47}},
+        {"bcClampToEdge", SpvWord{1}},
+        {"ccCrossDevice", SpvWord{0}},
+        {"cfFPGAMemoryAccessesINTEL", SpvWord{5898}},
+        {"cbSubgroupId", SpvWord{40}},
+        {"cfFPGAClusterAttributesV2INTEL", SpvWord{6150}},
+        {"bpSret", SpvWord{3}},
+        {"cfInt64Atomics", SpvWord{12}},
+        {"ccDevice", SpvWord{1}},
+        {"apContractionOff", SpvWord{31}},
+        {"cfRayQueryKHR", SpvWord{4472}},
+        {"aiCullFrontFacingTrianglesKHR", SpvWord{32}},
+        {"cbNumSubgroups", SpvWord{38}},
+        {"cjPackedVectorFormat4x8BitKHR", SpvWord{0}},
+        {"cfDotProductInputAllKHR", SpvWord{6016}},
+        {"adMaxInterleavingINTEL", SpvWord{2097152}},
+        {"cfDrawParameters", SpvWord{4427}},
+        {"aaSample", SpvWord{64}},
+        {"cbHitKindBackFacingMicroTriangleNV", SpvWord{5406}},
+        {"adDependencyInfinite", SpvWord{4}},
+        {"apNonCoherentDepthAttachmentReadEXT", SpvWord{4170}},
+        {"akRobustnessPerElementNV", SpvWord{2}},
+        {"cfDeviceGroup", SpvWord{4437}},
+        {"cbPrimitiveShadingRateKHR", SpvWord{4432}},
+        {"beR64ui", SpvWord{40}},
+        {"amRayGenerationKHR", SpvWord{5313}},
+        {"cbWorkgroupSize", SpvWord{25}},
+        {"caWordsizeINTEL", SpvWord{5884}},
+        {"apFloatingPointModeIEEEINTEL", SpvWord{5623}},
+        {"apFloatingPointModeALTINTEL", SpvWord{5622}},
+        {"cbInstanceIndex", SpvWord{43}},
+        {"cfImageMSArray", SpvWord{48}},
+        {"cfIndirectReferencesINTEL", SpvWord{5604}},
+        {"cfPipeStorage", SpvWord{60}},
+        {"bfsBGRA", SpvWord{18}},
+        {"caUniform", SpvWord{26}},
+        {"beRg16", SpvWord{12}},
+        {"caAliasedPointerEXT", SpvWord{5356}},
+        {"aiSkipTrianglesKHR", SpvWord{256}},
+        {"caOverrideCoverageNV", SpvWord{5248}},
+        {"baUniform", SpvWord{2}},
+        {"cbHelperInvocation", SpvWord{23}},
+        {"cbPrimitiveId", SpvWord{7}},
+        {"apDepthReplacing", SpvWord{12}},
+        {"cfFloatControls2", SpvWord{6029}},
+        {"cfUniformTexelBufferArrayNonUniformIndexingEXT", SpvWord{5311}},
+        {"beRgba32ui", SpvWord{30}},
+        {"cfStorageImageWriteWithoutFormat", SpvWord{56}},
+        {"aiNoneKHR", SpvWord{0}},
+        {"aiCullNoOpaqueKHR", SpvWord{128}},
+        {"amVertex", SpvWord{0}},
+        {"bjRND", SpvWord{2}},
+        {"cbObjectToWorldKHR", SpvWord{5330}},
+        {"cfVariablePointers", SpvWord{4442}},
+        {"baShaderRecordBufferKHR", SpvWord{5343}},
+        {"aaBias", SpvWord{1}},
+        {"cbFrontFacing", SpvWord{17}},
+        {"cbRayTminKHR", SpvWord{5325}},
+        {"cmMatrixBKHR", SpvWord{1}},
+        {"caMMHostInterfaceLatencyINTEL", SpvWord{6179}},
+        {"cfSampledRect", SpvWord{37}},
+        {"caBinding", SpvWord{33}},
+        {"apSpacingFractionalEven", SpvWord{2}},
+        {"amAnyHitNV", SpvWord{5315}},
+        {"cdExclusiveScan", SpvWord{2}},
+        {"bgUnormInt24", SpvWord{15}},
+        {"cfFragmentMaskAMD", SpvWord{5010}},
+        {"cdPartitionedReduceNV", SpvWord{6}},
+        {"cbRayTminNV", SpvWord{5325}},
+        {"bfABGR", SpvWord{19}},
+        {"beRg8", SpvWord{13}},
+        {"caMMHostInterfaceReadWriteModeINTEL", SpvWord{6180}},
+        {"apSignedZeroInfNanPreserve", SpvWord{4461}},
+        {"bjTRN_ZERO", SpvWord{1}},
+        {"aeConst", SpvWord{8}},
+        {"cfAsmINTEL", SpvWord{5606}},
+        {"baTileImageEXT", SpvWord{4172}},
+        {"baHitAttributeNV", SpvWord{5339}},
+        {"aoOpenCL", SpvWord{2}},
+        {"agVolatile", SpvWord{1}},
+        {"apLocalSizeId", SpvWord{38}},
+        {"apOutputTriangleStrip", SpvWord{29}},
+        {"baRayPayloadKHR", SpvWord{5338}},
+        {"baIncomingCallableDataKHR", SpvWord{5329}},
+        {"cfDotProductInput4x8Bit", SpvWord{6017}},
+        {"beRg8ui", SpvWord{37}},
+        {"aaConstOffset", SpvWord{8}},
+        {"cbTessLevelOuter", SpvWord{11}},
+        {"cfGroupNonUniformPartitionedNV", SpvWord{5297}},
+        {"cfUSMStorageClassesINTEL", SpvWord{5935}},
+        {"bpSext", SpvWord{1}},
+        {"alCPP_for_OpenCL", SpvWord{6}},
+        {"caStream", SpvWord{29}},
+        {"ckMatrixCSignedComponentsKHR", SpvWord{4}},
+        {"bpNoAlias", SpvWord{4}},
+        {"apVertexOrderCw", SpvWord{4}},
+        {"bbRect", SpvWord{4}},
+        {"cfDemoteToHelperInvocationEXT", SpvWord{5379}},
+        {"cbObjectToWorldNV", SpvWord{5330}},
+        {"baCodeSectionINTEL", SpvWord{5605}},
+        {"cdClusteredReduce", SpvWord{3}},
+        {"beR16", SpvWord{14}},
+        {"cfClipDistance", SpvWord{32}},
+        {"bgUnsignedInt16", SpvWord{11}},
+        {"cfRuntimeDescriptorArrayEXT", SpvWord{5302}},
+        {"cbWarpIDNV", SpvWord{5376}},
+        {"cfAtomicFloat16VectorNV", SpvWord{5404}},
+        {"caCacheSizeINTEL", SpvWord{5900}},
+        {"cfFragmentBarycentricKHR", SpvWord{5284}},
+        {"amIntersectionNV", SpvWord{5314}},
+        {"ccWorkgroup", SpvWord{2}},
+        {"apNoGlobalOffsetINTEL", SpvWord{5895}},
+        {"baPrivate", SpvWord{6}},
+        {"apOutputPoints", SpvWord{27}},
+        {"adMinIterations", SpvWord{16}},
+        {"afSubgroupMemory", SpvWord{128}},
+        {"cfShaderViewportIndex", SpvWord{70}},
+        {"agNonPrivatePointerKHR", SpvWord{32}},
+        {"abAllowContractFastINTEL", SpvWord{65536}},
+        {"abAllowReassocINTEL", SpvWord{131072}},
+        {"caRestrict", SpvWord{19}},
+        {"apDerivativeGroupLinearNV", SpvWord{5290}},
+        {"bkALT", SpvWord{1}},
+        {"apFinalizer", SpvWord{34}},
+        {"baPhysicalStorageBuffer", SpvWord{5349}},
+        {"beRgba16f", SpvWord{2}},
+        {"cfVariableLengthArrayINTEL", SpvWord{5817}},
+        {"caDoublepumpINTEL", SpvWord{5831}},
+        {"agNonPrivatePointer", SpvWord{32}},
+        {"cfTessellation", SpvWord{3}},
+        {"aiForceOpacityMicromap2StateEXT", SpvWord{1024}},
+        {"afOutputMemory", SpvWord{4096}},
+        {"cfArbitraryPrecisionIntegersINTEL", SpvWord{5844}},
+        {"beRg8i", SpvWord{27}},
+        {"caStackCallINTEL", SpvWord{5627}},
+        {"cfTileImageDepthReadAccessEXT", SpvWord{4167}},
+        {"cjPackedVectorFormat4x8Bit", SpvWord{0}},
+        {"cfUniformTexelBufferArrayNonUniformIndexing", SpvWord{5311}},
+        {"cfMultiView", SpvWord{4439}},
+        {"caImplementInRegisterMapINTEL", SpvWord{6191}},
+        {"cbHitTNV", SpvWord{5332}},
+        {"caBuiltIn", SpvWord{11}},
+        {"beR8ui", SpvWord{39}},
+        {"caInitModeINTEL", SpvWord{6190}},
+        {"caDontStaticallyCoalesceINTEL", SpvWord{5901}},
+        {"cfInt16", SpvWord{22}},
+        {"adInitiationIntervalINTEL", SpvWord{65536}},
+        {"amClosestHitNV", SpvWord{5316}},
+        {"cfSubgroupVoteKHR", SpvWord{4431}},
+        {"caBankwidthINTEL", SpvWord{5828}},
+        {"caGLSLPacked", SpvWord{9}},
+        {"cfGroups", SpvWord{18}},
+        {"afAcquire", SpvWord{2}},
+        {"cfStorageTexelBufferArrayDynamicIndexingEXT", SpvWord{5305}},
+        {"abAllowContract", SpvWord{65536}},
+        {"cbInstanceId", SpvWord{6}},
+        {"cfStorageUniformBufferBlock16", SpvWord{4433}},
+        {"bpRuntimeAlignedINTEL", SpvWord{5940}},
+        {"cfImageGatherBiasLodAMD", SpvWord{5009}},
+        {"amTaskEXT", SpvWord{5364}},
+        {"baHitObjectAttributeNV", SpvWord{5385}},
+        {"cfStoragePushConstant8", SpvWord{4450}},
+        {"alWGSL", SpvWord{10}},
+        {"cfCoreBuiltinsARM", SpvWord{4165}},
+        {"adLoopCoalesceINTEL", SpvWord{1048576}},
+        {"caStallEnableINTEL", SpvWord{5905}},
+        {"apPostDepthCoverage", SpvWord{4446}},
+        {"cfStencilExportEXT", SpvWord{5013}},
+        {"cfUniformAndStorageBuffer8BitAccess", SpvWord{4449}},
+        {"cnInitOnDeviceReprogramINTEL", SpvWord{0}},
+        {"cbFragSizeEXT", SpvWord{5292}},
+        {"cfMatrix", SpvWord{0}},
+        {"caStridesizeINTEL", SpvWord{5883}},
+        {"aaMakeTexelAvailable", SpvWord{256}},
+        {"cbInstanceCustomIndexNV", SpvWord{5327}},
+        {"bhRTN", SpvWord{3}},
+        {"bgUnormInt101010", SpvWord{6}},
+        {"caNumbanksINTEL", SpvWord{5827}},
+        {"cbPatchVertices", SpvWord{14}},
+        {"apOutputTrianglesEXT", SpvWord{5298}},
+        {"cfDemoteToHelperInvocation", SpvWord{5379}},
+        {"cfStorageTexelBufferArrayNonUniformIndexingEXT", SpvWord{5312}},
+        {"cbWorldRayOriginNV", SpvWord{5321}},
+        {"cfPhysicalStorageBufferAddressesEXT", SpvWord{5347}},
+        {"aaNone", SpvWord{0}},
+        {"apStencilRefLessFrontAMD", SpvWord{5081}},
+        {"cfFPGAArgumentInterfacesINTEL", SpvWord{6174}},
+        {"bgUnsignedIntRaw12EXT", SpvWord{20}},
+        {"apVertexOrderCcw", SpvWord{5}},
+        {"agNoAliasINTELMask", SpvWord{131072}},
+        {"amIntersectionKHR", SpvWord{5314}},
+        {"caStableKernelArgumentINTEL", SpvWord{6183}},
+        {"caBufferBlock", SpvWord{3}},
+        {"beR8", SpvWord{15}},
+        {"caInvariant", SpvWord{18}},
+        {"bgUnsignedInt8", SpvWord{10}},
+        {"caFuseLoopsInFunctionINTEL", SpvWord{5907}},
+        {"cbCurrentRayTimeNV", SpvWord{5334}},
+        {"cfStorageImageMultisample", SpvWord{27}},
+        {"cfBlockingPipesINTEL", SpvWord{5945}},
+        {"agNone", SpvWord{0}},
+        {"baTaskPayloadWorkgroupEXT", SpvWord{5402}},
+        {"bbTileImageDataEXT", SpvWord{4173}},
+        {"apRoundingModeRTNINTEL", SpvWord{5621}},
+        {"apEarlyAndLateFragmentTestsAMD", SpvWord{5017}},
+        {"bgUnormInt101010_2", SpvWord{16}},
+        {"cfTileImageColorReadAccessEXT", SpvWord{4166}},
+        {"caClobberINTEL", SpvWord{5607}},
+        {"caAliasScopeINTEL", SpvWord{5914}},
+        {"cfRayTracingKHR", SpvWord{4479}},
+        {"cbLayer", SpvWord{9}},
+        {"cbLaunchIdKHR", SpvWord{5319}},
+        {"bjRND_INF", SpvWord{4}},
+        {"cbInstanceCustomIndexKHR", SpvWord{5327}},
+        {"cbGlobalSize", SpvWord{31}},
+        {"cfImageFootprintNV", SpvWord{5282}},
+        {"cfFragmentDensityEXT", SpvWord{5291}},
+        {"cfInputAttachmentArrayDynamicIndexingEXT", SpvWord{5303}},
+        {"baIncomingRayPayloadKHR", SpvWord{5342}},
+        {"cfImageReadWrite", SpvWord{14}},
+        {"cfShaderEnqueueAMDX", SpvWord{5067}},
+        {"bfDepthStencil", SpvWord{14}},
+        {"cbFragDepth", SpvWord{22}},
+        {"cfFragmentBarycentricNV", SpvWord{5284}},
+        {"cbGlobalLinearId", SpvWord{34}},
+        {"cbSampleId", SpvWord{18}},
+        {"cbSubgroupGeMask", SpvWord{4417}},
+        {"caRelaxedPrecision", SpvWord{0}},
+        {"cfUniformTexelBufferArrayDynamicIndexingEXT", SpvWord{5304}},
+        {"beRgb10a2ui", SpvWord{34}},
+        {"bcClamp", SpvWord{2}},
+        {"cfGroupNonUniformArithmetic", SpvWord{63}},
+        {"caPatch", SpvWord{15}},
+        {"cbPrimitiveLineIndicesEXT", SpvWord{5295}},
+        {"beR16Snorm", SpvWord{19}},
+        {"caPerVertexNV", SpvWord{5285}},
+        {"caFPRoundingMode", SpvWord{39}},
+        {"cbPrimitiveTriangleIndicesEXT", SpvWord{5296}},
+        {"cbLaunchSizeNV", SpvWord{5320}},
+        {"caWeightTextureQCOM", SpvWord{4487}},
+        {"cfOptNoneINTEL", SpvWord{6094}},
+        {"cbBaryCoordNoPerspSampleAMD", SpvWord{4994}},
+        {"caMaxByteOffset", SpvWord{45}},
+        {"cfDotProductInput4x8BitKHR", SpvWord{6017}},
+        {"caIndex", SpvWord{32}},
+        {"apStaticNumWorkgroupsAMDX", SpvWord{5072}},
+        {"caIOPipeStorageINTEL", SpvWord{5944}},
+        {"ceWaitWorkGroup", SpvWord{2}},
+        {"cfMemoryAccessAliasingINTEL", SpvWord{5910}},
+        {"aiOpaqueKHR", SpvWord{1}},
+        {"cfInterpolationFunction", SpvWord{52}},
+        {"amCallableNV", SpvWord{5318}},
+        {"cbSubgroupLocalInvocationId", SpvWord{41}},
+        {"cfArbitraryPrecisionFloatingPointINTEL", SpvWord{5845}},
+        {"caBlockMatchTextureQCOM", SpvWord{4488}},
+        {"cfFPGARegINTEL", SpvWord{5948}},
+        {"clColumnMajorKHR", SpvWord{1}},
     };
 
     static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
         UInt32 h = salt;
         for (const char c : str)
             h = (h * 0x01000193) ^ c;
-        return h % 993;
+        return h % 1016;
     };
 
     const auto i = hash(str, tableSalt[hash(str, 0)]);
@@ -11267,8 +11433,9 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 4: v = UnownedStringSlice{"NSZ"}; return true;
             case 8: v = UnownedStringSlice{"AllowRecip"}; return true;
             case 16: v = UnownedStringSlice{"Fast"}; return true;
-            case 65536: v = UnownedStringSlice{"AllowContractFastINTEL"}; return true;
-            case 131072: v = UnownedStringSlice{"AllowReassocINTEL"}; return true;
+            case 65536: v = UnownedStringSlice{"AllowContract"}; return true;
+            case 131072: v = UnownedStringSlice{"AllowReassoc"}; return true;
+            case 262144: v = UnownedStringSlice{"AllowTransform"}; return true;
             default: return false;
         }
         case 2:
@@ -11385,6 +11552,14 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
         case 10:
         switch(k2)
         {
+            case 0: v = UnownedStringSlice{"None"}; return true;
+            case 1: v = UnownedStringSlice{"RobustnessPerComponentNV"}; return true;
+            case 2: v = UnownedStringSlice{"RobustnessPerElementNV"}; return true;
+            default: return false;
+        }
+        case 11:
+        switch(k2)
+        {
             case 0: v = UnownedStringSlice{"Unknown"}; return true;
             case 1: v = UnownedStringSlice{"ESSL"}; return true;
             case 2: v = UnownedStringSlice{"GLSL"}; return true;
@@ -11397,9 +11572,10 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 9: v = UnownedStringSlice{"NZSL"}; return true;
             case 10: v = UnownedStringSlice{"WGSL"}; return true;
             case 11: v = UnownedStringSlice{"Slang"}; return true;
+            case 12: v = UnownedStringSlice{"Zig"}; return true;
             default: return false;
         }
-        case 11:
+        case 12:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Vertex"}; return true;
@@ -11421,7 +11597,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 5365: v = UnownedStringSlice{"MeshEXT"}; return true;
             default: return false;
         }
-        case 12:
+        case 13:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Logical"}; return true;
@@ -11430,7 +11606,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 5348: v = UnownedStringSlice{"PhysicalStorageBuffer64"}; return true;
             default: return false;
         }
-        case 13:
+        case 14:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Simple"}; return true;
@@ -11439,7 +11615,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 3: v = UnownedStringSlice{"Vulkan"}; return true;
             default: return false;
         }
-        case 14:
+        case 15:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Invocations"}; return true;
@@ -11503,6 +11679,8 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 5082: v = UnownedStringSlice{"StencilRefUnchangedBackAMD"}; return true;
             case 5083: v = UnownedStringSlice{"StencilRefGreaterBackAMD"}; return true;
             case 5084: v = UnownedStringSlice{"StencilRefLessBackAMD"}; return true;
+            case 5088: v = UnownedStringSlice{"QuadDerivativesKHR"}; return true;
+            case 5089: v = UnownedStringSlice{"RequireFullQuadsKHR"}; return true;
             case 5269: v = UnownedStringSlice{"OutputLinesNV"}; return true;
             case 5270: v = UnownedStringSlice{"OutputPrimitivesNV"}; return true;
             case 5289: v = UnownedStringSlice{"DerivativeGroupQuadsNV"}; return true;
@@ -11524,12 +11702,17 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 5895: v = UnownedStringSlice{"NoGlobalOffsetINTEL"}; return true;
             case 5896: v = UnownedStringSlice{"NumSIMDWorkitemsINTEL"}; return true;
             case 5903: v = UnownedStringSlice{"SchedulerTargetFmaxMhzINTEL"}; return true;
+            case 6023: v = UnownedStringSlice{"MaximallyReconvergesKHR"}; return true;
+            case 6028: v = UnownedStringSlice{"FPFastMathDefault"}; return true;
             case 6154: v = UnownedStringSlice{"StreamingInterfaceINTEL"}; return true;
             case 6160: v = UnownedStringSlice{"RegisterMapInterfaceINTEL"}; return true;
             case 6417: v = UnownedStringSlice{"NamedBarrierCountINTEL"}; return true;
+            case 6461: v = UnownedStringSlice{"MaximumRegistersINTEL"}; return true;
+            case 6462: v = UnownedStringSlice{"MaximumRegistersIdINTEL"}; return true;
+            case 6463: v = UnownedStringSlice{"NamedMaximumRegistersINTEL"}; return true;
             default: return false;
         }
-        case 15:
+        case 16:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"UniformConstant"}; return true;
@@ -11562,7 +11745,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 5937: v = UnownedStringSlice{"HostOnlyINTEL"}; return true;
             default: return false;
         }
-        case 16:
+        case 17:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"1D"}; return true;
@@ -11575,7 +11758,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 4173: v = UnownedStringSlice{"TileImageDataEXT"}; return true;
             default: return false;
         }
-        case 17:
+        case 18:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"None"}; return true;
@@ -11585,14 +11768,14 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 4: v = UnownedStringSlice{"RepeatMirrored"}; return true;
             default: return false;
         }
-        case 18:
+        case 19:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Nearest"}; return true;
             case 1: v = UnownedStringSlice{"Linear"}; return true;
             default: return false;
         }
-        case 19:
+        case 20:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Unknown"}; return true;
@@ -11639,7 +11822,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 41: v = UnownedStringSlice{"R64i"}; return true;
             default: return false;
         }
-        case 20:
+        case 21:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"R"}; return true;
@@ -11664,7 +11847,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 19: v = UnownedStringSlice{"ABGR"}; return true;
             default: return false;
         }
-        case 21:
+        case 22:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"SnormInt8"}; return true;
@@ -11688,7 +11871,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 20: v = UnownedStringSlice{"UnsignedIntRaw12EXT"}; return true;
             default: return false;
         }
-        case 22:
+        case 23:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"RTE"}; return true;
@@ -11697,14 +11880,14 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 3: v = UnownedStringSlice{"RTN"}; return true;
             default: return false;
         }
-        case 23:
+        case 24:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Preserve"}; return true;
             case 1: v = UnownedStringSlice{"FlushToZero"}; return true;
             default: return false;
         }
-        case 24:
+        case 25:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"TRN"}; return true;
@@ -11717,14 +11900,14 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 7: v = UnownedStringSlice{"RND_CONV_ODD"}; return true;
             default: return false;
         }
-        case 25:
+        case 26:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"IEEE"}; return true;
             case 1: v = UnownedStringSlice{"ALT"}; return true;
             default: return false;
         }
-        case 26:
+        case 27:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"WRAP"}; return true;
@@ -11733,7 +11916,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 3: v = UnownedStringSlice{"SAT_SYM"}; return true;
             default: return false;
         }
-        case 27:
+        case 28:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Export"}; return true;
@@ -11741,7 +11924,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 2: v = UnownedStringSlice{"LinkOnceODR"}; return true;
             default: return false;
         }
-        case 28:
+        case 29:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"ReadOnly"}; return true;
@@ -11749,7 +11932,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 2: v = UnownedStringSlice{"ReadWrite"}; return true;
             default: return false;
         }
-        case 29:
+        case 30:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"NoneINTEL"}; return true;
@@ -11758,7 +11941,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 3: v = UnownedStringSlice{"ReadWriteINTEL"}; return true;
             default: return false;
         }
-        case 30:
+        case 31:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Zext"}; return true;
@@ -11772,7 +11955,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 5940: v = UnownedStringSlice{"RuntimeAlignedINTEL"}; return true;
             default: return false;
         }
-        case 31:
+        case 32:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"RelaxedPrecision"}; return true;
@@ -11826,6 +12009,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 4470: v = UnownedStringSlice{"NoUnsignedWrap"}; return true;
             case 4487: v = UnownedStringSlice{"WeightTextureQCOM"}; return true;
             case 4488: v = UnownedStringSlice{"BlockMatchTextureQCOM"}; return true;
+            case 4499: v = UnownedStringSlice{"BlockMatchSamplerQCOM"}; return true;
             case 4999: v = UnownedStringSlice{"ExplicitInterpAMD"}; return true;
             case 5019: v = UnownedStringSlice{"NodeSharesPayloadLimitsWithAMDX"}; return true;
             case 5020: v = UnownedStringSlice{"NodeMaxPayloadsAMDX"}; return true;
@@ -11914,7 +12098,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 6443: v = UnownedStringSlice{"CacheControlStoreINTEL"}; return true;
             default: return false;
         }
-        case 32:
+        case 33:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Position"}; return true;
@@ -12035,7 +12219,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 6021: v = UnownedStringSlice{"CullMaskKHR"}; return true;
             default: return false;
         }
-        case 33:
+        case 34:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"CrossDevice"}; return true;
@@ -12047,7 +12231,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 6: v = UnownedStringSlice{"ShaderCallKHR"}; return true;
             default: return false;
         }
-        case 34:
+        case 35:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Reduce"}; return true;
@@ -12059,7 +12243,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 8: v = UnownedStringSlice{"PartitionedExclusiveScanNV"}; return true;
             default: return false;
         }
-        case 35:
+        case 36:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"NoWait"}; return true;
@@ -12067,7 +12251,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 2: v = UnownedStringSlice{"WaitWorkGroup"}; return true;
             default: return false;
         }
-        case 36:
+        case 37:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"Matrix"}; return true;
@@ -12176,6 +12360,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 4484: v = UnownedStringSlice{"TextureSampleWeightedQCOM"}; return true;
             case 4485: v = UnownedStringSlice{"TextureBoxFilterQCOM"}; return true;
             case 4486: v = UnownedStringSlice{"TextureBlockMatchQCOM"}; return true;
+            case 4498: v = UnownedStringSlice{"TextureBlockMatch2QCOM"}; return true;
             case 5008: v = UnownedStringSlice{"Float16ImageAMD"}; return true;
             case 5009: v = UnownedStringSlice{"ImageGatherBiasLodAMD"}; return true;
             case 5010: v = UnownedStringSlice{"FragmentMaskAMD"}; return true;
@@ -12184,6 +12369,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 5016: v = UnownedStringSlice{"Int64ImageEXT"}; return true;
             case 5055: v = UnownedStringSlice{"ShaderClockKHR"}; return true;
             case 5067: v = UnownedStringSlice{"ShaderEnqueueAMDX"}; return true;
+            case 5087: v = UnownedStringSlice{"QuadControlKHR"}; return true;
             case 5249: v = UnownedStringSlice{"SampleMaskOverrideCoverageNV"}; return true;
             case 5251: v = UnownedStringSlice{"GeometryShaderPassthroughNV"}; return true;
             case 5254: v = UnownedStringSlice{"ShaderViewportIndexLayerEXT"}; return true;
@@ -12229,7 +12415,9 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 5383: v = UnownedStringSlice{"ShaderInvocationReorderNV"}; return true;
             case 5390: v = UnownedStringSlice{"BindlessTextureNV"}; return true;
             case 5391: v = UnownedStringSlice{"RayQueryPositionFetchKHR"}; return true;
+            case 5404: v = UnownedStringSlice{"AtomicFloat16VectorNV"}; return true;
             case 5409: v = UnownedStringSlice{"RayTracingDisplacementMicromapNV"}; return true;
+            case 5414: v = UnownedStringSlice{"RawAccessChainsNV"}; return true;
             case 5568: v = UnownedStringSlice{"SubgroupShuffleINTEL"}; return true;
             case 5569: v = UnownedStringSlice{"SubgroupBufferBlockIOINTEL"}; return true;
             case 5570: v = UnownedStringSlice{"SubgroupImageBlockIOINTEL"}; return true;
@@ -12280,6 +12468,7 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 6022: v = UnownedStringSlice{"CooperativeMatrixKHR"}; return true;
             case 6025: v = UnownedStringSlice{"BitInstructions"}; return true;
             case 6026: v = UnownedStringSlice{"GroupNonUniformRotateKHR"}; return true;
+            case 6029: v = UnownedStringSlice{"FloatControls2"}; return true;
             case 6033: v = UnownedStringSlice{"AtomicFloat32AddEXT"}; return true;
             case 6034: v = UnownedStringSlice{"AtomicFloat64AddEXT"}; return true;
             case 6089: v = UnownedStringSlice{"LongCompositesINTEL"}; return true;
@@ -12296,17 +12485,19 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 6187: v = UnownedStringSlice{"GlobalVariableHostAccessINTEL"}; return true;
             case 6189: v = UnownedStringSlice{"GlobalVariableFPGADecorationsINTEL"}; return true;
             case 6400: v = UnownedStringSlice{"GroupUniformArithmeticKHR"}; return true;
+            case 6427: v = UnownedStringSlice{"MaskedGatherScatterINTEL"}; return true;
             case 6441: v = UnownedStringSlice{"CacheControlsINTEL"}; return true;
+            case 6460: v = UnownedStringSlice{"RegisterLimitsINTEL"}; return true;
             default: return false;
         }
-        case 37:
+        case 38:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"RayQueryCandidateIntersectionKHR"}; return true;
             case 1: v = UnownedStringSlice{"RayQueryCommittedIntersectionKHR"}; return true;
             default: return false;
         }
-        case 38:
+        case 39:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"RayQueryCommittedIntersectionNoneKHR"}; return true;
@@ -12314,20 +12505,20 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 2: v = UnownedStringSlice{"RayQueryCommittedIntersectionGeneratedKHR"}; return true;
             default: return false;
         }
-        case 39:
+        case 40:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"RayQueryCandidateIntersectionTriangleKHR"}; return true;
             case 1: v = UnownedStringSlice{"RayQueryCandidateIntersectionAABBKHR"}; return true;
             default: return false;
         }
-        case 40:
+        case 41:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"PackedVectorFormat4x8Bit"}; return true;
             default: return false;
         }
-        case 41:
+        case 42:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"NoneKHR"}; return true;
@@ -12338,14 +12529,14 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 16: v = UnownedStringSlice{"SaturatingAccumulationKHR"}; return true;
             default: return false;
         }
-        case 42:
+        case 43:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"RowMajorKHR"}; return true;
             case 1: v = UnownedStringSlice{"ColumnMajorKHR"}; return true;
             default: return false;
         }
-        case 43:
+        case 44:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"MatrixAKHR"}; return true;
@@ -12353,14 +12544,14 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 2: v = UnownedStringSlice{"MatrixAccumulatorKHR"}; return true;
             default: return false;
         }
-        case 44:
+        case 45:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"InitOnDeviceReprogramINTEL"}; return true;
             case 1: v = UnownedStringSlice{"InitOnDeviceResetINTEL"}; return true;
             default: return false;
         }
-        case 45:
+        case 46:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"UncachedINTEL"}; return true;
@@ -12370,13 +12561,19 @@ static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice
             case 4: v = UnownedStringSlice{"ConstCachedINTEL"}; return true;
             default: return false;
         }
-        case 46:
+        case 47:
         switch(k2)
         {
             case 0: v = UnownedStringSlice{"UncachedINTEL"}; return true;
             case 1: v = UnownedStringSlice{"WriteThroughINTEL"}; return true;
             case 2: v = UnownedStringSlice{"WriteBackINTEL"}; return true;
             case 3: v = UnownedStringSlice{"StreamingINTEL"}; return true;
+            default: return false;
+        }
+        case 48:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"AutoINTEL"}; return true;
             default: return false;
         }
         default: return false;
@@ -12439,255 +12636,265 @@ static bool getOperandKindName(const OperandKind& k, UnownedStringSlice& v)
         }
         case 10:
         {
-            v = UnownedStringSlice{"SourceLanguage"};
+            v = UnownedStringSlice{"RawAccessChainOperands"};
             return true;
         }
         case 11:
         {
-            v = UnownedStringSlice{"ExecutionModel"};
+            v = UnownedStringSlice{"SourceLanguage"};
             return true;
         }
         case 12:
         {
-            v = UnownedStringSlice{"AddressingModel"};
+            v = UnownedStringSlice{"ExecutionModel"};
             return true;
         }
         case 13:
         {
-            v = UnownedStringSlice{"MemoryModel"};
+            v = UnownedStringSlice{"AddressingModel"};
             return true;
         }
         case 14:
         {
-            v = UnownedStringSlice{"ExecutionMode"};
+            v = UnownedStringSlice{"MemoryModel"};
             return true;
         }
         case 15:
         {
-            v = UnownedStringSlice{"StorageClass"};
+            v = UnownedStringSlice{"ExecutionMode"};
             return true;
         }
         case 16:
         {
-            v = UnownedStringSlice{"Dim"};
+            v = UnownedStringSlice{"StorageClass"};
             return true;
         }
         case 17:
         {
-            v = UnownedStringSlice{"SamplerAddressingMode"};
+            v = UnownedStringSlice{"Dim"};
             return true;
         }
         case 18:
         {
-            v = UnownedStringSlice{"SamplerFilterMode"};
+            v = UnownedStringSlice{"SamplerAddressingMode"};
             return true;
         }
         case 19:
         {
-            v = UnownedStringSlice{"ImageFormat"};
+            v = UnownedStringSlice{"SamplerFilterMode"};
             return true;
         }
         case 20:
         {
-            v = UnownedStringSlice{"ImageChannelOrder"};
+            v = UnownedStringSlice{"ImageFormat"};
             return true;
         }
         case 21:
         {
-            v = UnownedStringSlice{"ImageChannelDataType"};
+            v = UnownedStringSlice{"ImageChannelOrder"};
             return true;
         }
         case 22:
         {
-            v = UnownedStringSlice{"FPRoundingMode"};
+            v = UnownedStringSlice{"ImageChannelDataType"};
             return true;
         }
         case 23:
         {
-            v = UnownedStringSlice{"FPDenormMode"};
+            v = UnownedStringSlice{"FPRoundingMode"};
             return true;
         }
         case 24:
         {
-            v = UnownedStringSlice{"QuantizationModes"};
+            v = UnownedStringSlice{"FPDenormMode"};
             return true;
         }
         case 25:
         {
-            v = UnownedStringSlice{"FPOperationMode"};
+            v = UnownedStringSlice{"QuantizationModes"};
             return true;
         }
         case 26:
         {
-            v = UnownedStringSlice{"OverflowModes"};
+            v = UnownedStringSlice{"FPOperationMode"};
             return true;
         }
         case 27:
         {
-            v = UnownedStringSlice{"LinkageType"};
+            v = UnownedStringSlice{"OverflowModes"};
             return true;
         }
         case 28:
         {
-            v = UnownedStringSlice{"AccessQualifier"};
+            v = UnownedStringSlice{"LinkageType"};
             return true;
         }
         case 29:
         {
-            v = UnownedStringSlice{"HostAccessQualifier"};
+            v = UnownedStringSlice{"AccessQualifier"};
             return true;
         }
         case 30:
         {
-            v = UnownedStringSlice{"FunctionParameterAttribute"};
+            v = UnownedStringSlice{"HostAccessQualifier"};
             return true;
         }
         case 31:
         {
-            v = UnownedStringSlice{"Decoration"};
+            v = UnownedStringSlice{"FunctionParameterAttribute"};
             return true;
         }
         case 32:
         {
-            v = UnownedStringSlice{"BuiltIn"};
+            v = UnownedStringSlice{"Decoration"};
             return true;
         }
         case 33:
         {
-            v = UnownedStringSlice{"Scope"};
+            v = UnownedStringSlice{"BuiltIn"};
             return true;
         }
         case 34:
         {
-            v = UnownedStringSlice{"GroupOperation"};
+            v = UnownedStringSlice{"Scope"};
             return true;
         }
         case 35:
         {
-            v = UnownedStringSlice{"KernelEnqueueFlags"};
+            v = UnownedStringSlice{"GroupOperation"};
             return true;
         }
         case 36:
         {
-            v = UnownedStringSlice{"Capability"};
+            v = UnownedStringSlice{"KernelEnqueueFlags"};
             return true;
         }
         case 37:
         {
-            v = UnownedStringSlice{"RayQueryIntersection"};
+            v = UnownedStringSlice{"Capability"};
             return true;
         }
         case 38:
         {
-            v = UnownedStringSlice{"RayQueryCommittedIntersectionType"};
+            v = UnownedStringSlice{"RayQueryIntersection"};
             return true;
         }
         case 39:
         {
-            v = UnownedStringSlice{"RayQueryCandidateIntersectionType"};
+            v = UnownedStringSlice{"RayQueryCommittedIntersectionType"};
             return true;
         }
         case 40:
         {
-            v = UnownedStringSlice{"PackedVectorFormat"};
+            v = UnownedStringSlice{"RayQueryCandidateIntersectionType"};
             return true;
         }
         case 41:
         {
-            v = UnownedStringSlice{"CooperativeMatrixOperands"};
+            v = UnownedStringSlice{"PackedVectorFormat"};
             return true;
         }
         case 42:
         {
-            v = UnownedStringSlice{"CooperativeMatrixLayout"};
+            v = UnownedStringSlice{"CooperativeMatrixOperands"};
             return true;
         }
         case 43:
         {
-            v = UnownedStringSlice{"CooperativeMatrixUse"};
+            v = UnownedStringSlice{"CooperativeMatrixLayout"};
             return true;
         }
         case 44:
         {
-            v = UnownedStringSlice{"InitializationModeQualifier"};
+            v = UnownedStringSlice{"CooperativeMatrixUse"};
             return true;
         }
         case 45:
         {
-            v = UnownedStringSlice{"LoadCacheControl"};
+            v = UnownedStringSlice{"InitializationModeQualifier"};
             return true;
         }
         case 46:
         {
-            v = UnownedStringSlice{"StoreCacheControl"};
+            v = UnownedStringSlice{"LoadCacheControl"};
             return true;
         }
         case 47:
         {
-            v = UnownedStringSlice{"IdResultType"};
+            v = UnownedStringSlice{"StoreCacheControl"};
             return true;
         }
         case 48:
         {
-            v = UnownedStringSlice{"IdResult"};
+            v = UnownedStringSlice{"NamedMaximumNumberOfRegisters"};
             return true;
         }
         case 49:
         {
-            v = UnownedStringSlice{"IdMemorySemantics"};
+            v = UnownedStringSlice{"IdResultType"};
             return true;
         }
         case 50:
         {
-            v = UnownedStringSlice{"IdScope"};
+            v = UnownedStringSlice{"IdResult"};
             return true;
         }
         case 51:
         {
-            v = UnownedStringSlice{"IdRef"};
+            v = UnownedStringSlice{"IdMemorySemantics"};
             return true;
         }
         case 52:
         {
-            v = UnownedStringSlice{"LiteralInteger"};
+            v = UnownedStringSlice{"IdScope"};
             return true;
         }
         case 53:
         {
-            v = UnownedStringSlice{"LiteralString"};
+            v = UnownedStringSlice{"IdRef"};
             return true;
         }
         case 54:
         {
-            v = UnownedStringSlice{"LiteralFloat"};
+            v = UnownedStringSlice{"LiteralInteger"};
             return true;
         }
         case 55:
         {
-            v = UnownedStringSlice{"LiteralContextDependentNumber"};
+            v = UnownedStringSlice{"LiteralString"};
             return true;
         }
         case 56:
         {
-            v = UnownedStringSlice{"LiteralExtInstInteger"};
+            v = UnownedStringSlice{"LiteralFloat"};
             return true;
         }
         case 57:
         {
-            v = UnownedStringSlice{"LiteralSpecConstantOpInteger"};
+            v = UnownedStringSlice{"LiteralContextDependentNumber"};
             return true;
         }
         case 58:
         {
-            v = UnownedStringSlice{"PairLiteralIntegerIdRef"};
+            v = UnownedStringSlice{"LiteralExtInstInteger"};
             return true;
         }
         case 59:
         {
-            v = UnownedStringSlice{"PairIdRefLiteralInteger"};
+            v = UnownedStringSlice{"LiteralSpecConstantOpInteger"};
             return true;
         }
         case 60:
+        {
+            v = UnownedStringSlice{"PairLiteralIntegerIdRef"};
+            return true;
+        }
+        case 61:
+        {
+            v = UnownedStringSlice{"PairIdRefLiteralInteger"};
+            return true;
+        }
+        case 62:
         {
             v = UnownedStringSlice{"PairIdRefIdRef"};
             return true;
@@ -12700,14 +12907,14 @@ static bool getOperandKindUnderneathId(const OperandKind& k, OperandKind& v)
 {
     switch(k.index)
     {
-        case 49:
+        case 51:
         {
             v = OperandKind{5};
             return true;
         }
-        case 50:
+        case 52:
         {
-            v = OperandKind{33};
+            v = OperandKind{34};
             return true;
         }
         default: return false;
