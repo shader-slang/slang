@@ -9308,13 +9308,12 @@ namespace Slang
             this, funcDecl, attr, DeclAssociationKind::PrimalSubstituteFunc);
     }
 
-    struct LinearInheritanceGraphWithInfo
+    struct LinearInheritanceGraphWithAuxInfo
     {
         struct AggTypeDeclWithCtorData
         {
             ConstructorDecl* defCtor = nullptr;
             List<ConstructorDecl*> ctorList;
-            int relativeDepth = 0;
         };
 
         // for some reason `Dictionary` corrupts stack when using large types as a value in my use-case.
@@ -9323,20 +9322,18 @@ namespace Slang
         List<AggTypeDecl*> linearInheritanceGraph;
         List<AggTypeDeclWithCtorData> inheritanceData;
 
-        bool addDecl(AggTypeDecl* decl)
+        void addDecl(AggTypeDecl* decl)
         {
             linearInheritanceGraph.add(decl);
-            if (!inheritanceDictToData.containsKey(decl))
-            {
-                inheritanceData.add({});
-                inheritanceDictToData[decl] = &inheritanceData.getLast();
-                return true;
-            }
-            return false;
+            if (inheritanceDictToData.containsKey(decl))
+                return;
+
+            inheritanceData.add({});
+            inheritanceDictToData[decl] = &inheritanceData.getLast();
         }
     };
     
-    static int32_t _findLevelsOfInheritanceInfo(ASTBuilder* m_astBuilder, AggTypeDecl* decl, int32_t inheritanceLevel, LinearInheritanceGraphWithInfo& linearInheritanceGraph, int maxDepthToStore)
+    static Facet::DirectnessVal _getAuxDataFromInheritanceInfo(LinearInheritanceGraphWithAuxInfo& linearInheritanceGraph, InheritanceInfo& inheritanceInfo, Facet::DirectnessVal maxDepthToStore)
     {
         // Returns LinearInheritanceGraphWithInfo ordered "this"->"super".
         // We will assume multiple `InheritanceDecl`s are possible. We also will assume equal 
@@ -9344,42 +9341,36 @@ namespace Slang
         // This is required to get proper inheritance depth and for setting up the inheritance
         // graph for data processing on non-duplicated data
 
-        int32_t inheritanceDepth = inheritanceLevel;
-        bool newDecl = false;
-        LinearInheritanceGraphWithInfo::AggTypeDeclWithCtorData* aggTypeInfo {};
-        if (inheritanceLevel <= maxDepthToStore)
+        Facet::DirectnessVal inheritanceDepth = 0;
+        for (const auto& facet : inheritanceInfo.facets)
         {
-            newDecl = linearInheritanceGraph.addDecl(decl);
-            aggTypeInfo = linearInheritanceGraph.inheritanceDictToData[decl];
-            aggTypeInfo->relativeDepth = inheritanceDepth;
-        }
-        else 
-            newDecl = false;
+            inheritanceDepth = (inheritanceDepth > facet->directness) ? inheritanceDepth : facet->directness;
 
-        for (auto m : decl->members)
-        {
-            if (auto inheritanceDecl = as<InheritanceDecl>(m))
+            auto facetDecl = facet->getDeclRef().getDecl();
+            auto aggTypeDecl = as<StructDecl>(facetDecl);
+            if (!aggTypeDecl)
+                continue;
+
+            LinearInheritanceGraphWithAuxInfo::AggTypeDeclWithCtorData* aggTypeInfo{};
+            if (inheritanceDepth <= maxDepthToStore)
             {
-                auto validInheritanceBase = as<DeclRefType>(inheritanceDecl->base.type);
-                if (!validInheritanceBase || !validInheritanceBase->getDeclRef())
-                    continue;
-                auto validInheritanceBaseType = as<AggTypeDecl>(validInheritanceBase->getDeclRef().getDecl());
-                if (!validInheritanceBaseType)
-                    continue;
-                inheritanceDepth = std::max(inheritanceDepth, _findLevelsOfInheritanceInfo(m_astBuilder, validInheritanceBaseType, inheritanceLevel + 1, linearInheritanceGraph, maxDepthToStore));
+                linearInheritanceGraph.addDecl(aggTypeDecl);
+                aggTypeInfo = linearInheritanceGraph.inheritanceDictToData[aggTypeDecl];
             }
-            else if (newDecl)
+            else
+                continue;
+
+            for (auto m : aggTypeDecl->members)
             {
                 // Forward declared constructors may be declared in an interface, these must be ignored. 
                 // We can determine these based on the body being nullptr
                 auto ctor = as<ConstructorDecl>(m);
-                if (ctor && ctor->body)
-                {
-                    aggTypeInfo->ctorList.add(ctor);
-                    if (ctor->members.getCount() != 0)
-                        continue;
-                    aggTypeInfo->defCtor = ctor;
-                }
+                if (!ctor || !ctor->body)
+                    continue;
+                aggTypeInfo->ctorList.add(ctor);
+                if (ctor->members.getCount() != 0)
+                    continue;
+                aggTypeInfo->defCtor = ctor;
             }
         }
         return inheritanceDepth;
@@ -9431,7 +9422,7 @@ namespace Slang
         }
         return as<SeqStmt>(stmt->body);
     }
-    static void legalizeCtorOverloadRank(ASTBuilder* m_astBuilder, ConstructorDecl* ctor, int32_t rank)
+    static void legalizeCtorOverloadRank(ASTBuilder* m_astBuilder, ConstructorDecl* ctor, Facet::DirectnessVal rank)
     {
         // It is possible a "this" has a "super". Since we are creating a new constructor 
         // function, if there is a "super", there may be a compile error because a derived 
@@ -9441,7 +9432,7 @@ namespace Slang
         // struct.
         if (auto overloadRank = ctor->findModifier<OverloadRankAttribute>())
         {
-            overloadRank->rank = std::min({ rank, overloadRank->rank });
+            overloadRank->rank = (rank < overloadRank->rank) ? rank : overloadRank->rank;
             return;
         }
 
@@ -9451,10 +9442,12 @@ namespace Slang
     }
     void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
     {
-        LinearInheritanceGraphWithInfo inheritanceInfo;
-        // We need the data of our (maybe) derived struct and (if exists) super.
+        // We need the data of our (maybe) derived "this" and (if exists) "super".
         // We also need the total inheritance depth to properly set overload ranks
-        int32_t levelsOfInheritance = _findLevelsOfInheritanceInfo(m_astBuilder, structDecl, 0, inheritanceInfo, 1);
+        auto inheritanceInfo = this->getShared()->getInheritanceInfo(
+            DeclRefType::create(m_astBuilder, structDecl->getDefaultDeclRef()), 0);
+        LinearInheritanceGraphWithAuxInfo inheritanceAuxInfo;
+        Facet::DirectnessVal levelsOfInheritance = _getAuxDataFromInheritanceInfo(inheritanceAuxInfo, inheritanceInfo, 1);
 
         // The order of automatic constructor generation:
         // 1. Processing will happen in the order of "super"->"this" classes to allow
@@ -9469,8 +9462,8 @@ namespace Slang
         // 4. We only process the "this" and "super" (not "super->super") since all `visitStructDecl`
         //    calls process their own "this"->"super" relationship. "super->super" would be handled 
         //    when `visitStructDecl` sets "this" to "super" and "super" to "super->super".  
-        inheritanceInfo.linearInheritanceGraph.reverse();
-        auto& structInheritanceData = *inheritanceInfo.inheritanceDictToData[structDecl];
+        inheritanceAuxInfo.linearInheritanceGraph.reverse();
+        auto& structInheritanceData = *inheritanceAuxInfo.inheritanceDictToData[structDecl];
 
         std::size_t defaultConstructorsOffset = 0;
         Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
@@ -9486,9 +9479,10 @@ namespace Slang
             }
         };
 
-        for (auto decl : inheritanceInfo.linearInheritanceGraph)
+        
+        for (auto decl : inheritanceAuxInfo.linearInheritanceGraph)
         {
-            auto& declInfo = *inheritanceInfo.inheritanceDictToData[decl];
+            auto& declInfo = *inheritanceAuxInfo.inheritanceDictToData[decl];
 
             if (structDecl != decl)
             {

@@ -12,7 +12,7 @@
 
 namespace Slang
 {
-    InheritanceInfo SharedSemanticsContext::getInheritanceInfo(Type* type)
+    InheritanceInfo SharedSemanticsContext::getInheritanceInfo(Type* type, Facet::DirectnessVal inheritanceDepth)
     {
         // We cache the computed inheritance information for types,
         // and re-use that information whenever possible.
@@ -29,7 +29,7 @@ namespace Slang
         //
         m_mapTypeToInheritanceInfo[type] = InheritanceInfo();
 
-        auto info = _calcInheritanceInfo(type);
+        auto info = _calcInheritanceInfo(type, inheritanceDepth);
         m_mapTypeToInheritanceInfo[type] = info;
 
         getSession()->m_typeDictionarySize = Math::Max(
@@ -38,16 +38,16 @@ namespace Slang
         return info;
     }
 
-    InheritanceInfo SharedSemanticsContext::getInheritanceInfo(DeclRef<ExtensionDecl> const& extension)
+    InheritanceInfo SharedSemanticsContext::getInheritanceInfo(DeclRef<ExtensionDecl> const& extension, Facet::DirectnessVal inheritenceDepth)
     {
         // We bottleneck the calculation of inheritance information
         // for type and `extension` `DeclRef`s through a single
         // routine with an optional `Type` parameter.
         //
-        return _getInheritanceInfo(extension, nullptr);
+        return _getInheritanceInfo(extension, nullptr, inheritenceDepth);
     }
 
-    InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* declRefType)
+    InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* declRefType, Facet::DirectnessVal inheritenceDepth)
     {
         // Just as with `Type`s, we cache and re-use the inheritance
         // information that has been computed for a `DeclRef` whenever
@@ -65,13 +65,13 @@ namespace Slang
         //
         m_mapDeclRefToInheritanceInfo[declRef] = InheritanceInfo();
 
-        auto info = _calcInheritanceInfo(declRef, declRefType);
+        auto info = _calcInheritanceInfo(declRef, declRefType, inheritenceDepth);
         m_mapDeclRefToInheritanceInfo[declRef] = info;
 
         return info;
     }
 
-    InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* declRefType)
+    InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* declRefType, Facet::DirectnessVal inheritanceDepth)
     {
         // This method is the main engine for computing linearized inheritance
         // lists for types and `extension` declarations.
@@ -169,6 +169,7 @@ namespace Slang
             Facet::Kind             kind,
             Type*                   baseType,
             SubtypeWitness*         selfIsBaseWitness,
+            Facet::DirectnessVal relativeInheritanceDepth,
             DeclRef<Decl> const&    baseDeclRef,
             InheritanceInfo const&  baseInheritanceInfo)
         {
@@ -183,7 +184,7 @@ namespace Slang
             //
             baseInfo->facetImpl = FacetImpl(
                 kind,
-                Facet::Directness::Direct,
+                relativeInheritanceDepth,
                 baseDeclRef,
                 baseType,
                 selfIsBaseWitness);
@@ -205,7 +206,8 @@ namespace Slang
         //
         auto addDirectBaseType = [&](
             Type*           baseType,
-            SubtypeWitness* selfIsBaseWitness)
+            SubtypeWitness* selfIsBaseWitness,
+            Facet::DirectnessVal relativeInheritanceDepth)
         {
             // If we are representing inheritance from a type,
             // then we should have a witness that the type
@@ -215,7 +217,7 @@ namespace Slang
             //
             SLANG_ASSERT(selfIsBaseWitness);
 
-            auto baseInheritanceInfo = getInheritanceInfo(baseType);
+            auto baseInheritanceInfo = getInheritanceInfo(baseType, relativeInheritanceDepth);
 
             DeclRef<Decl> baseDeclRef;
             if (auto baseDeclRefType = as<DeclRefType>(baseType))
@@ -227,6 +229,7 @@ namespace Slang
                 Facet::Kind::Type,
                 baseType,
                 selfIsBaseWitness,
+                relativeInheritanceDepth,
                 baseDeclRef,
                 baseInheritanceInfo);
         };
@@ -263,7 +266,7 @@ namespace Slang
                     baseType,
                     typeConstraintDeclRef);
 
-                addDirectBaseType(baseType, satisfyingWitness);
+                addDirectBaseType(baseType, satisfyingWitness, 1 + inheritanceDepth);
             }
         }
         else if (auto genericTypeParamDeclRef = declRef.as<GenericTypeParamDecl>())
@@ -310,7 +313,7 @@ namespace Slang
                     selfType,
                     superType,
                     constraintDeclRef);
-                addDirectBaseType(superType, satisfyingWitness);
+                addDirectBaseType(superType, satisfyingWitness, 1 + inheritanceDepth);
             }
         }
 
@@ -368,11 +371,12 @@ namespace Slang
                 // own linearized inheritance list will include
                 // any transitive based declared on the `extension`.
                 //
-                auto extInheritanceInfo = getInheritanceInfo(extDeclRef);
+                auto extInheritanceInfo = getInheritanceInfo(extDeclRef, inheritanceDepth);
                 addDirectBaseFacet(
                     Facet::Kind::Extension,
                     selfType,
                     selfIsSelf,
+                    1 + inheritanceDepth,
                     extDeclRef,
                     extInheritanceInfo);
             }
@@ -622,8 +626,7 @@ namespace Slang
                 //
                 *indirectFacet = *(foundFacet.getImpl());
                 indirectFacet->next = nullptr;
-                indirectFacet->directness =
-                    Facet::Directness(Facet::DirectnessVal(indirectFacet->directness) + 1);
+                indirectFacet->directness = indirectFacet->directness + 1;
 
                 // When using this facet for subtype tests, or when looking
                 // up member through this facet, we will need a witness
@@ -839,7 +842,7 @@ namespace Slang
         return false;
     }
 
-    InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(Type* type)
+    InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(Type* type, Facet::DirectnessVal inheritanceDepth)
     {
         // The majority of the interesting for for computing linearized
         // inheritance information arises for `DeclRef`s, but we still
@@ -854,7 +857,7 @@ namespace Slang
             // bottleneck through the logic that gets shared between
             // type and `extension` declarations.
             //
-            return _getInheritanceInfo(declRefType->getDeclRef(), declRefType);
+            return _getInheritanceInfo(declRefType->getDeclRef(), declRefType, inheritanceDepth);
         }
         else if (auto conjunctionType = as<AndType>(type))
         {
@@ -868,8 +871,8 @@ namespace Slang
             // must include all the facets from the lists for `L`
             // and `R`, respectively.
             //
-            auto leftInfo = getInheritanceInfo(leftType);
-            auto rightInfo = getInheritanceInfo(rightType);
+            auto leftInfo = getInheritanceInfo(leftType, inheritanceDepth);
+            auto rightInfo = getInheritanceInfo(rightType, inheritanceDepth);
 
             // We have a case of subtype witness that can show that
             // `T : L` or `T : R` based on `T : L&R`. In this case,
@@ -891,7 +894,7 @@ namespace Slang
             DirectBaseInfo leftBaseInfo;
             leftBaseInfo.facetImpl = FacetImpl(
                 Facet::Kind::Type,
-                Facet::Directness::Direct,
+                1 + inheritanceDepth,
                 DeclRef<Decl>(),
                 leftType,
                 selfIsSubtypeOfLeft);
@@ -900,7 +903,7 @@ namespace Slang
             DirectBaseInfo rightBaseInfo;
             rightBaseInfo.facetImpl = FacetImpl(
                 Facet::Kind::Type,
-                Facet::Directness::Direct,
+                1 + inheritanceDepth,
                 DeclRef<Decl>(),
                 rightType,
                 selfIsSubtypeOfRight);

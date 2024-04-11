@@ -313,8 +313,8 @@ namespace Slang
         };
 
             /// How many indirections away from the self facet?
-        typedef unsigned int DirectnessVal;
-        enum class Directness : DirectnessVal
+        typedef uint32_t DirectnessVal;
+        enum Directness : DirectnessVal
         {
             Self = 0,
             Direct = 1,
@@ -383,7 +383,7 @@ namespace Slang
         Facet::Kind kind = Facet::Kind::Type;
 
             /// How many indirections away from the self facet?
-        Facet::Directness directness = Facet::Directness::Self;
+        Facet::DirectnessVal directness = Facet::Directness::Self;
 
             /// The origin of this facet.
             ///
@@ -409,7 +409,7 @@ namespace Slang
 
         FacetImpl(
             Facet::Kind         kind,
-            Facet::Directness   directness,
+            Facet::DirectnessVal   directness,
             DeclRef<Decl>       declRef,
             Type*               type,
             SubtypeWitness*     subtypeWitness)
@@ -633,10 +633,10 @@ namespace Slang
         FunctionDifferentiableLevel getFuncDifferentiableLevel(FunctionDeclBase* func);
 
             /// Get the processed inheritance information for `type`, including all its facets
-        InheritanceInfo getInheritanceInfo(Type* type);
+        InheritanceInfo getInheritanceInfo(Type* type, Facet::DirectnessVal inheritanceDepth);
 
             /// Get the processed inheritance information for `extension`, including all its facets
-        InheritanceInfo getInheritanceInfo(DeclRef<ExtensionDecl> const& extension);
+        InheritanceInfo getInheritanceInfo(DeclRef<ExtensionDecl> const& extension, Facet::DirectnessVal inheritanceDepth);
 
             /// Try get subtype witness from cache, returns true if cache contains a result for the query.
         bool tryGetSubtypeWitnessFromCache(Type* sub, Type* sup, SubtypeWitness*& outWitness)
@@ -672,9 +672,9 @@ namespace Slang
 
         ASTBuilder* _getASTBuilder() { return m_linkage->getASTBuilder(); }
 
-        InheritanceInfo _getInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType);
-        InheritanceInfo _calcInheritanceInfo(Type* type);
-        InheritanceInfo _calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType);
+        InheritanceInfo _getInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType, Facet::DirectnessVal inheritanceDepth);
+        InheritanceInfo _calcInheritanceInfo(Type* type, Facet::DirectnessVal inheritanceDepth);
+        InheritanceInfo _calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType, Facet::DirectnessVal inheritanceDepth);
 
         struct DirectBaseInfo
         {
