@@ -9370,7 +9370,10 @@ namespace Slang
             }
             else if (newDecl)
             {
-                if (auto ctor = as<ConstructorDecl>(m))
+                // Forward declared constructors may be declared in an interface, these must be ignored. 
+                // We can determine these based on the body being nullptr
+                auto ctor = as<ConstructorDecl>(m);
+                if (ctor && ctor->body)
                 {
                     aggTypeInfo->ctorList.add(ctor);
                     if (ctor->members.getCount() != 0)
