@@ -9332,12 +9332,12 @@ namespace Slang
             inheritanceDictToData[decl] = &inheritanceData.getLast();
         }
     };
-    
+
     static Facet::DirectnessVal _getAuxDataFromInheritanceInfo(LinearInheritanceGraphWithAuxInfo& linearInheritanceGraph, InheritanceInfo& inheritanceInfo, Facet::DirectnessVal maxDepthToStore)
     {
         // Returns LinearInheritanceGraphWithInfo ordered "this"->"super".
-        // We will assume multiple `InheritanceDecl`s are possible. We also will assume equal 
-        // `InheritanceDecl`s may show up multiple times inside the inheritance-graph. 
+        // We will assume multiple `InheritanceDecl`s are possible. We also will assume equal
+        // `InheritanceDecl`s may show up multiple times inside the inheritance-graph.
         // This is required to get proper inheritance depth and for setting up the inheritance
         // graph for data processing on non-duplicated data
 
@@ -9362,7 +9362,7 @@ namespace Slang
 
             for (auto m : aggTypeDecl->members)
             {
-                // Forward declared constructors may be declared in an interface, these must be ignored. 
+                // Forward declared constructors may be declared in an interface, these must be ignored.
                 // We can determine these based on the body being nullptr
                 auto ctor = as<ConstructorDecl>(m);
                 if (!ctor || !ctor->body)
@@ -9424,11 +9424,11 @@ namespace Slang
     }
     static void legalizeCtorOverloadRank(ASTBuilder* m_astBuilder, ConstructorDecl* ctor, Facet::DirectnessVal rank)
     {
-        // It is possible a "this" has a "super". Since we are creating a new constructor 
-        // function, if there is a "super", there may be a compile error because a derived 
+        // It is possible a "this" has a "super". Since we are creating a new constructor
+        // function, if there is a "super", there may be a compile error because a derived
         // struct can use a "super"s constructor.
         // To solve this issue and produce C++ like behavior we need to add a overload
-        // rank if not present already to prioritize the default constructor of a derived 
+        // rank if not present already to prioritize the default constructor of a derived
         // struct.
         if (auto overloadRank = ctor->findModifier<OverloadRankAttribute>())
         {
@@ -9451,17 +9451,17 @@ namespace Slang
 
         // The order of automatic constructor generation:
         // 1. Processing will happen in the order of "super"->"this" classes to allow
-        //    us to insert "super" default constructors before resolving field init 
+        //    us to insert "super" default constructors before resolving field init
         //    expressions. We will create a default constructor for "this" if "this"
         //    is missing a default constructor, but "super" has a default constructor.
         // 2. For all struct field init expressions inside our "this", we insert the init
         //    expression as long as it is a L-Value variable. If not L value, this implies the
         //    is using a constant that may have an init expression, but it is not modifiable.
-        //    We will create a default constructor if missing after step 1. 
+        //    We will create a default constructor if missing after step 1.
         // 3. Any generated constructors have overload ranks assigned to avoid ambiguous overloads
         // 4. We only process the "this" and "super" (not "super->super") since all `visitStructDecl`
-        //    calls process their own "this"->"super" relationship. "super->super" would be handled 
-        //    when `visitStructDecl` sets "this" to "super" and "super" to "super->super".  
+        //    calls process their own "this"->"super" relationship. "super->super" would be handled
+        //    when `visitStructDecl` sets "this" to "super" and "super" to "super->super".
         inheritanceAuxInfo.linearInheritanceGraph.reverse();
         auto& structInheritanceData = *inheritanceAuxInfo.inheritanceDictToData[structDecl];
 
@@ -9479,7 +9479,6 @@ namespace Slang
             }
         };
 
-        
         for (auto decl : inheritanceAuxInfo.linearInheritanceGraph)
         {
             auto& declInfo = *inheritanceAuxInfo.inheritanceDictToData[decl];
@@ -9504,7 +9503,7 @@ namespace Slang
                         ctor->ownedScope,
                         LookupMask::Function,
                         LookupOptions::IgnoreInheritance);
-                    
+
                     VarExpr* ctorExpr = m_astBuilder->create<VarExpr>();
                     ctorExpr->scope = ctor->ownedScope;
                     ctorExpr->name = ctorName;

@@ -431,12 +431,6 @@ class Val : public NodeBase
         return (Decl*)(m_operands[index].values.nodeOperand);
     }
 
-    DeclRef<Decl>* getDeclRefOperand(Index index) const
-    {
-        SLANG_ASSERT(m_operands[index].kind == ValNodeOperandKind::ValNode);
-        return (DeclRef<Decl>*)(m_operands[index].values.nodeOperand);
-    }
-
     int64_t getIntConstOperand(Index index) const
     {
         SLANG_ASSERT(m_operands[index].kind == ValNodeOperandKind::ConstantValue);
