@@ -16,15 +16,6 @@ runs:
   steps:
     - name: Set up MSVC dev tools on Windows
       uses: ilammy/msvc-dev-cmd@v1
-    - name: Set up sccache
-      uses: hendrikmuhs/ccache-action@v1.2
-      with:
-        key: ${{inputs.os}}-${{inputs.compiler}}-${{inputs.platform}}-${{inputs.config}}
-        variant: sccache
-        append-timestamp: false
-      # Opportunistically use sccache, it's not available for example on self
-      # hosted runners or ARM
-      continue-on-error: true
     - shell: bash
       run: |
         # Set up system dependencies
@@ -56,12 +47,6 @@ runs:
         echo "CC=$CC" >> "$GITHUB_ENV"
         echo "CXX=$CXX" >> "$GITHUB_ENV"
 
-        # Set CMake to use sccache if it's available
-        if command -v sccache; then
-          echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
-          echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
-        fi
-
         # Some useful variables
         config=${{inputs.config}}
         Config=$(echo "${{inputs.config}}" | sed 's/debug/Debug/;s/release/Release/')
@@ -88,11 +73,30 @@ runs:
       with:
         path: ${{ github.workspace }}/build/llvm-project-install
         key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
+
+    # Run this after building llvm, it's pointless to fill the caches with
+    # infrequent llvm build products
+    - name: Set up sccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{inputs.os}}-${{inputs.compiler}}-${{inputs.platform}}-${{inputs.config}}
+        variant: sccache
+        append-timestamp: false
+      # Opportunistically use sccache, it's not available for example on self
+      # hosted runners or ARM
+      continue-on-error: true
+
     - name: Set environment variable for CMake
       shell: bash
       run: |
         echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
         echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+
+        # Set CMake to use sccache if it's available
+        if command -v sccache; then
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
+          echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
+        fi
 
     # Install swiftshader
     - uses: robinraju/release-downloader@v1.8
