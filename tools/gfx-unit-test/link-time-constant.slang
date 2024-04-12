@@ -1,6 +1,6 @@
 extern static const bool turnOnFeature;
 extern static const float constValue;
-extern static const int numthread = -1;
+extern static const uint numthread = 0;
 extern static const int arraySize = -1;
 
 // Main entry-point. Write some value into buffer depending on link
