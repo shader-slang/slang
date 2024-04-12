@@ -2,6 +2,28 @@ import re
 import optparse
 import os
 import subprocess
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+scope = [
+        'https://spreadsheets.google.com/feeds',
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive',
+        'https://www.googleapis.com/auth/drive.file'
+        ]
+
+creds_str = os.environ[ 'slang_verif_svc' ]
+
+creds_dict = eval(creds_str)
+
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
+
+raw_data_sheet = client.open("VKCTS newly passing").sheet1
+raw_data_records = raw_data_sheet.get_all_records()
+raw_data_index = len(raw_data_records) + 2
+clear_range = raw_data_sheet.worksheet("Sheet1").range("A1:A" + str(raw_data_index))
+raw_data_sheet.values_clear(clear_range)
 
 proc_env = os.environ.copy()
 proc_env["DISABLE_CTS_SLANG"] = "0"
@@ -60,12 +82,25 @@ with open(options.PASSINGLIST, 'r') as tl_f:
         list_passing.append(test_line)
 
 first = True
+newly_passing = []
 for item in passing:
     if not item in list_passing:
         if first:
             print("\nNew passing test(s)")
             first = False
         print(item)
+        newly_passing.append(item)
+
+
+if len(newly_passing) > 0:
+    cell_list = raw_data_sheet.range("A1:A" + str(len(newly_passing) + 1))
+    i = 0
+
+    for new_passing in newly_passing:
+        cell_list[i].value = new_passing
+        i += 1
+      
+    raw_data_sheet.update_cells(cell_list)
 
 
 
