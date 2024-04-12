@@ -990,17 +990,11 @@ void OptionsParser::addOutputPath(char const* inPath)
         ext == toSlice("zip"))
     {
         // These extensions don't indicate a artifact container, just that we want to emit IR
-        if (ext == toSlice("slang-module") ||
-            ext == toSlice("slang-lib"))
-        {
-            // We want to emit IR 
-            m_requestImpl->m_emitIr = true;
-        }
-        else
-        {
-            // We want to write out in an artfact "container", that can hold multiple artifacts.
-            m_compileRequest->setOutputContainerFormat(SLANG_CONTAINER_FORMAT_SLANG_MODULE);
-        }
+        // We want to emit IR
+        m_requestImpl->m_emitIr = true;
+
+        // We want to write out in an artfact "container", that can hold multiple artifacts.
+        m_compileRequest->setOutputContainerFormat(SLANG_CONTAINER_FORMAT_SLANG_MODULE);
 
         m_requestImpl->m_containerOutputPath = path;
     }
