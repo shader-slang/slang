@@ -1013,6 +1013,24 @@ namespace Slang
             }
         }
 
+        // If both are members of an inherited decl, prefer the more derived inheritance member
+        auto leftStruct = left.declRef.getParent().as<StructDecl>();
+        auto rightStruct = right.declRef.getParent().as<StructDecl>();
+        if (leftStruct && rightStruct)
+        {
+            auto leftType = DeclRefType::create(m_astBuilder, leftStruct);
+            auto rightType = DeclRefType::create(m_astBuilder, rightStruct);
+
+            auto inheritanceInfo = getShared()->getInheritanceInfo(leftType);
+            for (auto facet : inheritanceInfo.facets)
+                if (facet.getImpl()->getType()->equals(rightType))
+                    return -1;
+            inheritanceInfo = getShared()->getInheritanceInfo(rightType);
+            for (auto facet : inheritanceInfo.facets)
+                if (facet.getImpl()->getType()->equals(rightType))
+                    return 1;
+        }
+
         // TODO: We should generalize above rules such that in a tie a declaration
         // A::m is better than B::m when all other factors are equal and
         // A inherits from B.

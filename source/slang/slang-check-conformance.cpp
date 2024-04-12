@@ -117,7 +117,7 @@ namespace Slang
         // In the common case, we can use the pre-computed inheritance information for `subType`
         // to enumerate all the types it transitively inherits from.
         //
-        auto inheritanceInfo = getShared()->getInheritanceInfo(subType, 0);
+        auto inheritanceInfo = getShared()->getInheritanceInfo(subType);
         for (auto facet : inheritanceInfo.facets)
         {
             // The `subType` will have a `facet` for each type

@@ -1806,6 +1806,47 @@ namespace Slang
         checkVisibility(varDecl);
     }
 
+    static ConstructorDecl* _createCtor(SemanticsDeclVisitorBase* visitor, ASTBuilder* m_astBuilder, AggTypeDecl* decl)
+    {
+        auto ctor = m_astBuilder->create<ConstructorDecl>();
+        auto ctorName = visitor->getName("$init");
+        ctor->ownedScope = m_astBuilder->create<Scope>();
+        ctor->ownedScope->containerDecl = ctor;
+        ctor->ownedScope->parent = visitor->getScope(decl);
+        ctor->parentDecl = decl;
+        ctor->loc = decl->loc;
+        ctor->closingSourceLoc = ctor->loc;
+        ctor->nameAndLoc.name = ctorName;
+        ctor->nameAndLoc.loc = ctor->loc;
+        ctor->returnType.type = visitor->calcThisType(makeDeclRef(decl));
+        auto body = m_astBuilder->create<BlockStmt>();
+        body->scopeDecl = m_astBuilder->create<ScopeDecl>();
+        body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
+        body->scopeDecl->ownedScope->parent = visitor->getScope(ctor);
+        body->scopeDecl->parentDecl = ctor;
+        body->scopeDecl->loc = ctor->loc;
+        body->scopeDecl->closingSourceLoc = ctor->loc;
+        body->closingSourceLoc = ctor->closingSourceLoc;
+        ctor->body = body;
+        body->body = m_astBuilder->create<SeqStmt>();
+        decl->addMember(ctor);
+        return ctor;
+    }
+
+    static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
+    {
+        for (auto m : structDecl->members)
+        {
+            auto ctor = as<ConstructorDecl>(m);
+            if (!ctor || !ctor->body)
+                continue;
+            if (ctor->members.getCount() != 0)
+                continue;
+            return ctor;
+        }
+        return nullptr;
+    }
+
     void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
     {
         // As described above in `SemanticsDeclHeaderVisitor::checkVarDeclCommon`,
@@ -1825,6 +1866,11 @@ namespace Slang
         {
             structDecl->addTag(TypeTag::Incomplete);
         }
+
+        // add a empty deault CTor if missing
+        auto defaultCtor = _getDefaultCtor(structDecl);
+        if (!defaultCtor)
+            _createCtor(this, m_astBuilder, structDecl);
 
         // Slang supports a convenient syntax to create a wrapper type from
         // an existing type that implements a given interface. For example,
@@ -7261,11 +7307,175 @@ namespace Slang
         }
     }
 
+
+    static SeqStmt* _ensureCtorBodyIsSeqStmt(ASTBuilder* m_astBuilder, ConstructorDecl* decl)
+    {
+        // It is possible BlockStmt has a child with the type of
+        // `ExpressionStmt` if an existing constructor has only 1
+        // expression. This would be a senario we need to
+        // put the `ExpressionStmt` inside a `SeqStmt`.
+        auto stmt = as<BlockStmt>(decl->body);
+        if (!as<SeqStmt>(stmt->body))
+        {
+            auto tmpExpr = stmt->body;
+            auto seqStmt = m_astBuilder->create<SeqStmt>();
+            seqStmt->stmts.add(tmpExpr);
+            stmt->body = seqStmt;
+            return seqStmt;
+        }
+        return as<SeqStmt>(stmt->body);
+    }
+
+    static List<ConstructorDecl*> _getCtorList(StructDecl* structDecl, ConstructorDecl** defaultCtorOut)
+    {
+        List<ConstructorDecl*> ctorList;
+        for (auto m : structDecl->members)
+        {
+            auto ctor = as<ConstructorDecl>(m);
+            if (!ctor || !ctor->body)
+                continue;
+            ctorList.add(ctor);
+            if (ctor->members.getCount() != 0)
+                continue;
+            *defaultCtorOut = ctor;
+        }
+        return ctorList;
+    }
+
     void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     {
         if (aggTypeDecl->hasTag(TypeTag::Incomplete) && aggTypeDecl->hasModifier<HLSLExportModifier>())
         {
             getSink()->diagnose(aggTypeDecl->loc, Diagnostics::cannotExportIncompleteType, aggTypeDecl);
+        }
+    
+        auto structDecl = as<StructDecl>(aggTypeDecl);
+        if (!structDecl)
+            return;
+
+        struct DeclAndCtorInfo
+        {
+            StructDecl* parent = nullptr;
+            ConstructorDecl* defaultCtor = nullptr;
+            List<ConstructorDecl*> ctorList;
+            DeclAndCtorInfo()
+            {
+            }
+            DeclAndCtorInfo(StructDecl* parent, const bool getOnlyDefault)
+            {
+                if (getOnlyDefault)
+                    defaultCtor = _getDefaultCtor(parent);
+                else
+                    ctorList = _getCtorList(parent, &defaultCtor);
+            }
+        };
+        List<DeclAndCtorInfo> inheritanceDefaultCtorList{};
+        for (auto member : structDecl->members)
+        {
+            auto inheritanceMember = as<InheritanceDecl>(member);
+            if (!inheritanceMember)
+                continue;
+            auto declRefType = as<DeclRefType>(inheritanceMember->base.type);
+            if (!declRefType)
+                continue;
+            auto structOfInheritance = as<StructDecl>(declRefType->getDeclRef().getDecl());
+            if (!structOfInheritance)
+                continue;
+            inheritanceDefaultCtorList.add(DeclAndCtorInfo(structOfInheritance, true));
+        }
+        DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(structDecl, false);
+
+        std::size_t insertOffset = 0;
+        Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
+        for (auto& declInfo : inheritanceDefaultCtorList)
+        {
+            if (!declInfo.defaultCtor)
+                continue;
+            for (auto ctor : structDeclInfo.ctorList)
+            {
+                auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+                auto ctorName = declInfo.defaultCtor->getName();
+
+                auto lookupResult = lookUpMember(
+                    m_astBuilder,
+                    this,
+                    ctorName,
+                    declInfo.defaultCtor->returnType.type,
+                    ctor->ownedScope,
+                    LookupMask::Function,
+                    LookupOptions::IgnoreInheritance);
+
+                VarExpr* ctorExpr = m_astBuilder->create<VarExpr>();
+                ctorExpr->scope = ctor->ownedScope;
+                ctorExpr->name = ctorName;
+                ctorExpr->type.type = nullptr;
+                auto invoke = m_astBuilder->create<InvokeExpr>();
+                invoke->functionExpr = createLookupResultExpr(ctorName, lookupResult, nullptr, ctorExpr->loc, nullptr);
+
+                ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+                thisExpr->scope = ctor->ownedScope;
+                thisExpr->type = ctor->returnType.type;
+
+                auto assign = m_astBuilder->create<AssignExpr>();
+                assign->left = coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
+                assign->right = invoke;
+                auto stmt = m_astBuilder->create<ExpressionStmt>();
+                stmt->expression = assign;
+                stmt->loc = ctor->loc;
+
+                seqStmt->stmts.insert(insertOffset, stmt);
+            }
+            insertOffset++;
+        }
+
+        for (auto& m : structDecl->members)
+        {
+            auto varDeclBase = as<VarDeclBase>(m);
+            if (!varDeclBase
+                || !varDeclBase->initExpr)
+                continue;
+
+            for (auto ctor : structDeclInfo.ctorList)
+            {
+                auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+
+                VarExpr* memberVarExpr = m_astBuilder->create<VarExpr>();
+                memberVarExpr->scope = ctor->ownedScope;
+                memberVarExpr->name = m->getName();
+                memberVarExpr->type = nullptr;
+                auto assign = m_astBuilder->create<AssignExpr>();
+                assign->left = memberVarExpr;
+                assign->right = varDeclBase->initExpr;
+                assign->loc = m->loc;
+                auto stmt = m_astBuilder->create<ExpressionStmt>();
+                stmt->expression = assign;
+                stmt->loc = m->loc;
+
+                Expr* checkedMemberVarExpr;
+                if (cachedDeclToCheckedVar.containsKey(m))
+                    checkedMemberVarExpr = cachedDeclToCheckedVar[m];
+                else
+                {
+                    checkedMemberVarExpr = CheckTerm(memberVarExpr);
+                    cachedDeclToCheckedVar.add({ m, checkedMemberVarExpr });
+                }
+                if (!checkedMemberVarExpr->type.isLeftValue)
+                    continue;
+
+                seqStmt->stmts.insert(insertOffset, stmt);
+            }
+
+        }
+
+        if (structDeclInfo.defaultCtor)
+        {
+            auto seqStmt = as<SeqStmt>(as<BlockStmt>(structDeclInfo.defaultCtor->body)->body);
+            if (seqStmt && seqStmt->stmts.getCount() == 0)
+            {
+                structDecl->members.remove(structDeclInfo.defaultCtor);
+                structDecl->invalidateMemberDictionary();
+                structDecl->buildMemberDictionary();
+            }
         }
     }
 
@@ -9308,272 +9518,8 @@ namespace Slang
             this, funcDecl, attr, DeclAssociationKind::PrimalSubstituteFunc);
     }
 
-    struct LinearInheritanceGraphWithAuxInfo
-    {
-        struct AggTypeDeclWithCtorData
-        {
-            ConstructorDecl* defCtor = nullptr;
-            List<ConstructorDecl*> ctorList;
-        };
-
-        // for some reason `Dictionary` corrupts stack when using large types as a value in my use-case.
-        // Due to this, `AggTypeDeclWithCtorData*` is data from `inheritanceData`
-        Dictionary<AggTypeDecl*, AggTypeDeclWithCtorData*> inheritanceDictToData;
-        List<AggTypeDecl*> linearInheritanceGraph;
-        List<AggTypeDeclWithCtorData> inheritanceData;
-
-        void addDecl(AggTypeDecl* decl)
-        {
-            linearInheritanceGraph.add(decl);
-            if (inheritanceDictToData.containsKey(decl))
-                return;
-
-            inheritanceData.add({});
-            inheritanceDictToData[decl] = &inheritanceData.getLast();
-        }
-    };
-
-    static Facet::DirectnessVal _getAuxDataFromInheritanceInfo(LinearInheritanceGraphWithAuxInfo& linearInheritanceGraph, InheritanceInfo& inheritanceInfo, Facet::DirectnessVal maxDepthToStore)
-    {
-        // Returns LinearInheritanceGraphWithInfo ordered "this"->"super".
-        // We will assume multiple `InheritanceDecl`s are possible. We also will assume equal
-        // `InheritanceDecl`s may show up multiple times inside the inheritance-graph.
-        // This is required to get proper inheritance depth and for setting up the inheritance
-        // graph for data processing on non-duplicated data
-
-        Facet::DirectnessVal inheritanceDepth = 0;
-        for (const auto& facet : inheritanceInfo.facets)
-        {
-            inheritanceDepth = (inheritanceDepth > facet->directness) ? inheritanceDepth : facet->directness;
-
-            auto facetDecl = facet->getDeclRef().getDecl();
-            auto aggTypeDecl = as<StructDecl>(facetDecl);
-            if (!aggTypeDecl)
-                continue;
-
-            LinearInheritanceGraphWithAuxInfo::AggTypeDeclWithCtorData* aggTypeInfo{};
-            if (inheritanceDepth <= maxDepthToStore)
-            {
-                linearInheritanceGraph.addDecl(aggTypeDecl);
-                aggTypeInfo = linearInheritanceGraph.inheritanceDictToData[aggTypeDecl];
-            }
-            else
-                continue;
-
-            for (auto m : aggTypeDecl->members)
-            {
-                // Forward declared constructors may be declared in an interface, these must be ignored.
-                // We can determine these based on the body being nullptr
-                auto ctor = as<ConstructorDecl>(m);
-                if (!ctor || !ctor->body)
-                    continue;
-                aggTypeInfo->ctorList.add(ctor);
-                if (ctor->members.getCount() != 0)
-                    continue;
-                aggTypeInfo->defCtor = ctor;
-            }
-        }
-        return inheritanceDepth;
-    }
-
-    static ConstructorDecl* _createCtor(SemanticsDeclAttributesVisitor* visitor, ASTBuilder* m_astBuilder, AggTypeDecl* decl)
-    {
-        auto ctor = m_astBuilder->create<ConstructorDecl>();
-        auto ctorName = visitor->getName("$init");
-        ctor->ownedScope = m_astBuilder->create<Scope>();
-        ctor->ownedScope->containerDecl = ctor;
-        ctor->ownedScope->parent = visitor->getScope(decl);
-        ctor->parentDecl = decl;
-        ctor->loc = decl->loc;
-        ctor->closingSourceLoc = ctor->loc;
-        ctor->nameAndLoc.name = ctorName;
-        ctor->nameAndLoc.loc = ctor->loc;
-        ctor->returnType.type = visitor->calcThisType(makeDeclRef(decl));
-        auto body = m_astBuilder->create<BlockStmt>();
-        body->scopeDecl = m_astBuilder->create<ScopeDecl>();
-        body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
-        body->scopeDecl->ownedScope->parent = visitor->getScope(ctor);
-        body->scopeDecl->parentDecl = ctor;
-        body->scopeDecl->loc = ctor->loc;
-        body->scopeDecl->closingSourceLoc = ctor->loc;
-        body->closingSourceLoc = ctor->closingSourceLoc;
-        ctor->body = body;
-        body->body = m_astBuilder->create<SeqStmt>();
-        decl->addMember(ctor);
-        return ctor;
-    }
-
-    static SeqStmt* legalizeCtorBlockToASeqStmt(ASTBuilder* m_astBuilder, BlockStmt* stmt)
-    {
-        // It is possible BlockStmt has a child with the type of
-        // `ExpressionStmt` if an existing constructor has only 1
-        // expression. This would be a senario we need to
-        // put the `ExpressionStmt` inside a `SeqStmt`.
-        // We need to ensure we are adding to a constructor which can
-        // handle multiple statments since we may be adding field `init`
-        // expressions and function calls to the constructor.
-        if (!as<SeqStmt>(stmt->body))
-        {
-            auto tmpExpr = stmt->body;
-            auto seqStmt = m_astBuilder->create<SeqStmt>();
-            seqStmt->stmts.add(tmpExpr);
-            stmt->body = seqStmt;
-            return seqStmt;
-        }
-        return as<SeqStmt>(stmt->body);
-    }
-    static void legalizeCtorOverloadRank(ASTBuilder* m_astBuilder, ConstructorDecl* ctor, Facet::DirectnessVal rank)
-    {
-        // It is possible a "this" has a "super". Since we are creating a new constructor
-        // function, if there is a "super", there may be a compile error because a derived
-        // struct can use a "super"s constructor.
-        // To solve this issue and produce C++ like behavior we need to add a overload
-        // rank if not present already to prioritize the default constructor of a derived
-        // struct.
-        if (auto overloadRank = ctor->findModifier<OverloadRankAttribute>())
-        {
-            overloadRank->rank = (int32_t(rank) < overloadRank->rank) ? int32_t(rank) : overloadRank->rank;
-            return;
-        }
-
-        auto overloadRankMod = m_astBuilder->create<OverloadRankAttribute>();
-        overloadRankMod->rank = rank;
-        addModifier(ctor, overloadRankMod);
-    }
     void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
     {
-        // We need the data of our (maybe) derived "this" and (if exists) "super".
-        // We also need the total inheritance depth to properly set overload ranks
-        auto inheritanceInfo = this->getShared()->getInheritanceInfo(
-            DeclRefType::create(m_astBuilder, structDecl->getDefaultDeclRef()), 0);
-        LinearInheritanceGraphWithAuxInfo inheritanceAuxInfo;
-        Facet::DirectnessVal levelsOfInheritance = _getAuxDataFromInheritanceInfo(inheritanceAuxInfo, inheritanceInfo, 1);
-
-        // The order of automatic constructor generation:
-        // 1. Processing will happen in the order of "super"->"this" classes to allow
-        //    us to insert "super" default constructors before resolving field init
-        //    expressions. We will create a default constructor for "this" if "this"
-        //    is missing a default constructor, but "super" has a default constructor.
-        // 2. For all struct field init expressions inside our "this", we insert the init
-        //    expression as long as it is a L-Value variable. If not L value, this implies the
-        //    is using a constant that may have an init expression, but it is not modifiable.
-        //    We will create a default constructor if missing after step 1.
-        // 3. Any generated constructors have overload ranks assigned to avoid ambiguous overloads
-        // 4. We only process the "this" and "super" (not "super->super") since all `visitStructDecl`
-        //    calls process their own "this"->"super" relationship. "super->super" would be handled
-        //    when `visitStructDecl` sets "this" to "super" and "super" to "super->super".
-        inheritanceAuxInfo.linearInheritanceGraph.reverse();
-        auto& structInheritanceData = *inheritanceAuxInfo.inheritanceDictToData[structDecl];
-
-        std::size_t defaultConstructorsOffset = 0;
-        Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
-        bool usingNewDefaultCtor = false;
-        bool madeNewCtor = false;
-        auto structDeclDefaultCtorSetup = [&] {
-            if (!structInheritanceData.defCtor)
-            {
-                madeNewCtor = true;
-                structInheritanceData.defCtor = _createCtor(this, m_astBuilder, structDecl);
-                structInheritanceData.ctorList.add(structInheritanceData.defCtor);
-                legalizeCtorOverloadRank(m_astBuilder, structInheritanceData.defCtor, levelsOfInheritance);
-            }
-        };
-
-        for (auto decl : inheritanceAuxInfo.linearInheritanceGraph)
-        {
-            auto& declInfo = *inheritanceAuxInfo.inheritanceDictToData[decl];
-
-            if (structDecl != decl)
-            {
-                if (!declInfo.defCtor)
-                    continue;
-
-                structDeclDefaultCtorSetup();
-                legalizeCtorOverloadRank(m_astBuilder, structInheritanceData.defCtor, levelsOfInheritance);
-                for (auto ctor : structInheritanceData.ctorList)
-                {
-                    auto seqStmt = legalizeCtorBlockToASeqStmt(m_astBuilder, as<BlockStmt>(ctor->body));
-                    auto ctorName = declInfo.defCtor->getName();
-
-                    auto lookupResult = lookUpMember(
-                        m_astBuilder,
-                        this,
-                        ctorName,
-                        declInfo.defCtor->returnType.type,
-                        ctor->ownedScope,
-                        LookupMask::Function,
-                        LookupOptions::IgnoreInheritance);
-
-                    VarExpr* ctorExpr = m_astBuilder->create<VarExpr>();
-                    ctorExpr->scope = ctor->ownedScope;
-                    ctorExpr->name = ctorName;
-                    ctorExpr->type.type = nullptr;
-                    auto invoke = m_astBuilder->create<InvokeExpr>();
-                    invoke->functionExpr = createLookupResultExpr(ctorName, lookupResult, nullptr, ctorExpr->loc, nullptr);
-
-                    ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
-                    thisExpr->scope = ctor->ownedScope;
-                    thisExpr->type = ctor->returnType.type;
-
-                    auto assign = m_astBuilder->create<AssignExpr>();
-                    assign->left = coerce(CoercionSite::Initializer, declInfo.defCtor->returnType.type, thisExpr);
-                    assign->right = invoke;
-                    auto stmt = m_astBuilder->create<ExpressionStmt>();
-                    stmt->expression = assign;
-
-                    seqStmt->stmts.insert(defaultConstructorsOffset, stmt);
-                    usingNewDefaultCtor = true;
-                }
-                defaultConstructorsOffset += 1;
-                continue;
-            }
-            for (auto& m : decl->members)
-            {
-                auto varDeclBase = as<VarDeclBase>(m);
-                if (varDeclBase
-                    && varDeclBase->initExpr)
-                {
-                    structDeclDefaultCtorSetup();
-                    for (auto ctor : declInfo.ctorList)
-                    {
-                        auto seqStmt = legalizeCtorBlockToASeqStmt(m_astBuilder, as<BlockStmt>(ctor->body));
-
-                        VarExpr* memberVarExpr = m_astBuilder->create<VarExpr>();
-                        memberVarExpr->scope = ctor->ownedScope;
-                        memberVarExpr->name = m->getName();
-                        memberVarExpr->type = nullptr;
-                        auto assign = m_astBuilder->create<AssignExpr>();
-                        assign->left = memberVarExpr;
-                        assign->right = varDeclBase->initExpr;
-                        auto stmt = m_astBuilder->create<ExpressionStmt>();
-                        stmt->expression = assign;
-
-                        Expr* checkedMemberVarExpr;
-                        if (cachedDeclToCheckedVar.containsKey(m))
-                            checkedMemberVarExpr = cachedDeclToCheckedVar[m];
-                        else
-                        {
-                            checkedMemberVarExpr = CheckTerm(memberVarExpr);
-                            cachedDeclToCheckedVar.add({ m, checkedMemberVarExpr });
-                        }
-                        if (!checkedMemberVarExpr->type.isLeftValue)
-                            continue;
-
-                        seqStmt->stmts.insert(defaultConstructorsOffset, stmt);
-                        usingNewDefaultCtor = true;
-                    }
-                }
-            }
-        }
-        // we may not use a default Ctor made if a struct only has a `static const` field with a init expression.
-        // If we do not remove the Init it will cause a compile error.
-        if (madeNewCtor && !usingNewDefaultCtor)
-        {
-            structDecl->members.remove(structInheritanceData.defCtor);
-            structDecl->invalidateMemberDictionary();
-            structDecl->buildMemberDictionary();
-        }
-
         int backingWidth = 0;
         [[maybe_unused]]
         int totalWidth = 0;

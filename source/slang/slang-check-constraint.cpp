@@ -743,7 +743,7 @@ namespace Slang
                 if (fstDeclRef.getDecl() != sndDeclRef.getDecl())
                 {
                     {
-                        auto fstTypeInheritanceInfo = getShared()->getInheritanceInfo(fstDeclRefType, 0);
+                        auto fstTypeInheritanceInfo = getShared()->getInheritanceInfo(fstDeclRefType);
                         for (auto supType : fstTypeInheritanceInfo.facets)
                         {
                             if (supType->origin.declRef.getDecl() == sndDeclRef.getDecl())
@@ -755,7 +755,7 @@ namespace Slang
                     }
                     // try the other direction
                     {
-                        auto sndTypeInheritanceInfo = getShared()->getInheritanceInfo(sndDeclRefType, 0);
+                        auto sndTypeInheritanceInfo = getShared()->getInheritanceInfo(sndDeclRefType);
                         for (auto supType : sndTypeInheritanceInfo.facets)
                         {
                             if (supType->origin.declRef.getDecl() == fstDeclRef.getDecl())

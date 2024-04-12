@@ -419,13 +419,13 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     InheritanceInfo inheritanceInfo;
     if (auto extDeclRef = declRef.as<ExtensionDecl>())
     {
-        inheritanceInfo = semantics->getShared()->getInheritanceInfo(extDeclRef, 0);
+        inheritanceInfo = semantics->getShared()->getInheritanceInfo(extDeclRef);
     }
     else
     {
         auto selfType = DeclRefType::create(astBuilder, declRef);
         selfType = selfType->getCanonicalType();
-        inheritanceInfo = semantics->getShared()->getInheritanceInfo(selfType, 0);
+        inheritanceInfo = semantics->getShared()->getInheritanceInfo(selfType);
     }
         
     for (auto facet : inheritanceInfo.facets)
