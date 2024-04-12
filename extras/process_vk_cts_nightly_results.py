@@ -47,9 +47,7 @@ proc_env["DISABLE_CTS_SLANG"] = "0"
 summary = "Test run totals:\n"
 
 cmd = ".\deqp-vk.exe --deqp-archive-dir=" + options.ARCHIVE_DIR + " --deqp-caselist-file=" + options.TESTLIST
-proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, text=True,
-                           env=proc_env)
+proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=proc_env)
 stdout, stderr = proc.communicate()
 
 test_found = False
