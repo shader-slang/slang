@@ -49,9 +49,6 @@ jobs:
         path: test-lists
         sparse-checkout-cone-mode: false
     - name: vkcts setup
-      env:
-        slang_verif_svc: ${{ secrets.slang_verif_svc_cred }}
-        
       run: |
         Expand-Archive VK-GL-CTS_WithSlang-0.0.3-win64.zip
         
@@ -63,7 +60,9 @@ jobs:
 
         copy ${{ github.workspace }}\bin\windows-x64\release\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\test-server.exe
     - name: vkcts run
-      working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
+      env:
+        slang_verif_svc: ${{ secrets.slang_verif_svc_cred }}
+        
       run: |
         #.\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\all-tests.txt > vk-gl-cts-results.txt
         #.\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\extras\temp-list.txt > vk-gl-cts-results.txt
