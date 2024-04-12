@@ -49,6 +49,9 @@ jobs:
         path: test-lists
         sparse-checkout-cone-mode: false
     - name: vkcts setup
+      env:
+        slang_verif_svc: ${{ secrets.slang_verif_svc_cred }}
+        
       run: |
         Expand-Archive VK-GL-CTS_WithSlang-0.0.3-win64.zip
         
