@@ -149,17 +149,25 @@ namespace Slang {
 
                 // If the dependnet file is the same as the module's file path, store it as a relative path
                 // with respect to the search directory discovered above.
-                if (canonicalFilePath == canonicalModulePath)
+                if (file->getPathInfo().hasFileFoundPath())
                 {
-                    auto relativeModulePath = Path::getRelativePath(linkageRoot, canonicalModulePath);
-                    dstModule.dependentFiles.add(relativeModulePath);
+                    if (canonicalFilePath == canonicalModulePath)
+                    {
+                        auto relativeModulePath = Path::getRelativePath(linkageRoot, canonicalModulePath);
+                        dstModule.dependentFiles.add(relativeModulePath);
+                    }
+                    else
+                    {
+                        // For all other dependnet files, store them as relative paths with respect
+                        // to the module's path.
+                        canonicalFilePath = Path::getRelativePath(moduleDir, canonicalFilePath);
+                        dstModule.dependentFiles.add(canonicalFilePath);
+                    }
                 }
                 else
                 {
-                    // For all other dependnet files, store them as relative paths with respect
-                    // to the module's path.
-                    canonicalFilePath = Path::getRelativePath(moduleDir, canonicalFilePath);
-                    dstModule.dependentFiles.add(canonicalFilePath);
+                    // If the module is coming from string instead of an actual file, store it as is.
+                    dstModule.dependentFiles.add(canonicalModulePath);
                 }
             }
             else
@@ -193,6 +201,11 @@ namespace Slang {
     // Output the parsed modules.
     addFrontEndRequestToData(request->getFrontEndReq(), options, out);
 
+    // If we are skipping code generation, then we are done.
+    if(request->getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
+    {
+        return SLANG_OK;
+    }
     //
     auto program = request->getSpecializedGlobalAndEntryPointsComponentType();
 
