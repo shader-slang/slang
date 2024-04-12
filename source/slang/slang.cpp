@@ -6102,7 +6102,7 @@ char const* EndToEndCompileRequest::getDependencyFilePath(int index)
     auto frontEndReq = getFrontEndReq();
     auto program = frontEndReq->getGlobalAndEntryPointsComponentType();
     SourceFile* sourceFile = program->getFileDependencies()[index];
-    return sourceFile->getPathInfo().hasFileFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : "unknown";
+    return sourceFile->getPathInfo().hasFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : "unknown";
 }
 
 int EndToEndCompileRequest::getTranslationUnitCount()
