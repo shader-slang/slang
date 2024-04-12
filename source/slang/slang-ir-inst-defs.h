@@ -359,6 +359,10 @@ INST(UnpackAnyValue, unpackAnyValue, 1, 0)
 INST(WitnessTableEntry, witness_table_entry, 2, 0)
 INST(InterfaceRequirementEntry, interface_req_entry, 2, GLOBAL)
 
+// An inst to represent the workgroup size of the calling entry point.
+// We will materialize this inst during `translateGLSLGlobalVar`.
+INST(GetWorkGroupSize, kIROp_GetWorkGroupSize, 0, HOISTABLE)
+
 INST(Param, param, 0, 0)
 INST(StructField, field, 2, 0)
 INST(Var, var, 0, 0)
