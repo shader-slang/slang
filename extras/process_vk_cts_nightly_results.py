@@ -23,7 +23,9 @@ raw_data_sheet = client.open("VKCTS newly passing").sheet1
 raw_data_records = raw_data_sheet.get_all_records()
 raw_data_index = len(raw_data_records) + 2
 clear_range = raw_data_sheet.range("A1:A" + str(raw_data_index))
-raw_data_sheet.values_clear(clear_range)
+for i in range(0, raw_data_index)
+    clear_range[i].value = ""
+raw_data_sheet.update_cells(clear_range)
 
 proc_env = os.environ.copy()
 proc_env["DISABLE_CTS_SLANG"] = "0"
