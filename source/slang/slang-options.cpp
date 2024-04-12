@@ -2525,11 +2525,7 @@ SlangResult OptionsParser::_parse(
         // If there are no targets and no outputs
         if (m_rawOutputs.getCount() == 0)
         {
-            // And we have a container for output, then enable emitting SlangIR module
-            if (m_requestImpl->m_containerFormat != ContainerFormat::None)
-            {
-                m_requestImpl->m_emitIr = true;
-            }
+            m_requestImpl->m_emitIr = true;
         }
         else
         {

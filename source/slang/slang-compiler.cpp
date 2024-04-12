@@ -1948,7 +1948,7 @@ namespace Slang
         }
 
         // If IR emitting is enabled, add IR to the artifacts
-        if (m_emitIr)
+        if (m_emitIr && (m_containerFormat == ContainerFormat::SlangModule))
         {
             OwnedMemoryStream stream(FileAccess::Write);
             SlangResult res = writeContainerToStream(&stream);
