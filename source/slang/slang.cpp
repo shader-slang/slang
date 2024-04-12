@@ -2224,6 +2224,8 @@ Dictionary<String, IntVal*>& ComponentType::getMangledNameToIntValMap()
 
 ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
 {
+    auto astBuilder = getLinkage()->getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
     return as<ConstantIntVal>(intVal->linkTimeResolve(getMangledNameToIntValMap()));
 }
 
