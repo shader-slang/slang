@@ -2224,6 +2224,8 @@ Dictionary<String, IntVal*>& ComponentType::getMangledNameToIntValMap()
 
 ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
 {
+    auto astBuilder = getLinkage()->getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
     return as<ConstantIntVal>(intVal->linkTimeResolve(getMangledNameToIntValMap()));
 }
 
@@ -3987,13 +3989,6 @@ void Module::setName(String name)
 
 RefPtr<EntryPoint> Module::findEntryPointByName(UnownedStringSlice const& name)
 {
-    // TODO: We should consider having this function be expanded to be able
-    // to look up and validate possible entry-point functions in teh module
-    // even if they were not marked with `[shader(...)]` in the source code.
-    //
-    // With such a change the function would probably need to accept a stage
-    // to use and a sink to write validation errors to.
-
     for(auto entryPoint : m_entryPoints)
     {
         if(entryPoint->getName()->text.getUnownedSlice() == name)
@@ -4001,6 +3996,41 @@ RefPtr<EntryPoint> Module::findEntryPointByName(UnownedStringSlice const& name)
     }
 
     return nullptr;
+}
+
+
+RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
+    UnownedStringSlice const& name,
+    SlangStage stage,
+    ISlangBlob** outDiagnostics)
+{
+    // If there is already an entrypoint marked with the [shader] attribute,
+    // we should just return that.
+    //
+    if (auto existingEntryPoint = findEntryPointByName(name))
+        return existingEntryPoint;
+
+    // If the function hasn't been marked as [shader], then it won't be discovered
+    // by findEntryPointByName. We need to route this to the `findAndValidateEntryPoint`
+    // function. To do that we need to setup a FrontEndCompileRequest and a FrontEndEntryPointRequest.
+    //
+    DiagnosticSink sink(getLinkage()->getSourceManager(), DiagnosticSink::SourceLocationLexer());
+    FrontEndCompileRequest frontEndRequest(getLinkage(), StdWriters::getSingleton(), &sink);
+    RefPtr<TranslationUnitRequest> tuRequest = new TranslationUnitRequest(&frontEndRequest);
+    tuRequest->module = this;
+    tuRequest->moduleName = m_name;
+    frontEndRequest.translationUnits.add(tuRequest);
+    FrontEndEntryPointRequest entryPointRequest(
+        &frontEndRequest,
+        0,
+        getLinkage()->getNamePool()->getName(name),
+        Profile((Stage)stage));
+    auto result = findAndValidateEntryPoint(&entryPointRequest);
+    if (outDiagnostics)
+    {
+        sink.getBlobIfNeeded(outDiagnostics);
+    }
+    return result;
 }
 
 void Module::_addEntryPoint(EntryPoint* entryPoint)
@@ -6242,7 +6272,7 @@ ISlangMutableFileSystem* EndToEndCompileRequest::getCompileRequestResultAsFileSy
 
             // Filter the containerArtifact into things that can be written
             ComPtr<IArtifact> writeArtifact;
-            if (SLANG_SUCCEEDED(ArtifactContainerUtil::filter(m_containerArtifact, writeArtifact)))
+            if (SLANG_SUCCEEDED(ArtifactContainerUtil::filter(m_containerArtifact, writeArtifact)) && writeArtifact)
             {
                 if (SLANG_SUCCEEDED(ArtifactContainerUtil::writeContainer(writeArtifact, "", fileSystem)))
                 {

@@ -2,6 +2,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type -emit-spirv-directly
 
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+
 // To check that our counter-initialization works correctly, set the initial
 // counter to 1 instead of 0
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4, counter=1):out,name=outputBuffer
@@ -9,6 +11,10 @@ AppendStructuredBuffer<int> outputBuffer;
 
 //TEST_INPUT:set inBuffer = ubuffer(data=[1 2 3 4], stride=4)
 RWStructuredBuffer<int> inBuffer;
+
+// Make sure the bindings are correct. outputBuffer should take two slots, and inBuffer
+// should be at binding 2.
+// CHECK: OpDecorate %inBuffer Binding 2
 
 [numthreads(4, 1, 1)]
 void computeMain(uint i : SV_GroupIndex)
