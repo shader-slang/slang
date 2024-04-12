@@ -28,21 +28,8 @@ parser.add_option( "-f", "--testlist", dest="TESTLIST", help="The test list used
 
 (options, args) = parser.parse_args()
 
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-client = gspread.authorize(creds)
-
-raw_data_sheet = client.open("VKCTS newly passing").sheet1
-raw_data_records = raw_data_sheet.get_all_records()
-raw_data_index = len(raw_data_records) + 2
-clear_range = raw_data_sheet.range("A1:A" + str(raw_data_index))
-for i in range(0, raw_data_index):
-    clear_range[i].value = ""
-raw_data_sheet.update_cells(clear_range)
-
 proc_env = os.environ.copy()
 proc_env["DISABLE_CTS_SLANG"] = "0"
-
-
 
 summary = "Test run totals:\n"
 
@@ -91,6 +78,16 @@ for item in passing:
         print(item)
         newly_passing.append(item)
 
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
+
+raw_data_sheet = client.open("VKCTS newly passing").sheet1
+raw_data_records = raw_data_sheet.get_all_records()
+raw_data_index = len(raw_data_records) + 2
+clear_range = raw_data_sheet.range("A1:A" + str(raw_data_index))
+for i in range(0, raw_data_index):
+    clear_range[i].value = ""
+raw_data_sheet.update_cells(clear_range)
 
 if len(newly_passing) > 0:
     cell_list = raw_data_sheet.range("A1:A" + str(len(newly_passing) + 1))
