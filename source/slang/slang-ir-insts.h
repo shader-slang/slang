@@ -687,6 +687,14 @@ struct IRPyExportDecoration : IRDecoration
     UnownedStringSlice getExportName() { return getExportNameOperand()->getStringSlice(); }
 };
 
+struct IRHeaderExportDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_HeaderExportDecoration
+    };
+    IR_LEAF_ISA(HeaderExportDecoration)
+};
 
 struct IRKnownBuiltinDecoration : IRDecoration
 {
@@ -4670,6 +4678,11 @@ public:
     void addPyExportDecoration(IRInst* value, UnownedStringSlice const& exportName)
     {
         addDecoration(value, kIROp_PyExportDecoration, getStringValue(exportName));
+    }
+
+    void addHeaderExportDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_HeaderExportDecoration);
     }
 
     void addCudaDeviceExportDecoration(IRInst* value, UnownedStringSlice const& functionName)

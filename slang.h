@@ -934,6 +934,7 @@ extern "C"
             NoHLSLBinding,
             ValidateUniformity,
             AllowGLSL,
+            EmitHeader,
 
             // Internal
 

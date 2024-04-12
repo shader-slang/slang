@@ -522,6 +522,7 @@ void initCommandOptions(CommandOptions& options)
                                                                   "except for parameters that has explicit bindings in the input source." },
         { OptionKind::ValidateUniformity, "-validate-uniformity", nullptr, "Perform uniformity validation analysis." },
         { OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language." },
+        { OptionKind::EmitHeader, "-emit-header", nullptr, "Emits a header instead of the code (for cpp or cuda target)." },
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -1665,6 +1666,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::NoMangle:
             case OptionKind::ValidateUniformity:
             case OptionKind::AllowGLSL:
+            case OptionKind::EmitHeader:
             case OptionKind::EmitIr:
             case OptionKind::DumpIntermediates:
             case OptionKind::DumpReproOnError:

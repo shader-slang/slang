@@ -362,6 +362,8 @@ public:
 
     void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
 
+    bool isEmmitingHeader();
+
     void emitFuncDecl(IRFunc* func);
     void emitFuncDecl(IRFunc* func, const String& name);
 
