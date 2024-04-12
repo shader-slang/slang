@@ -16,6 +16,18 @@ creds_str = os.environ[ 'slang_verif_svc' ]
 
 creds_dict = eval(creds_str)
 
+passing = []
+list_passing = []
+
+useage = "useage: %prog [options]"
+parser = optparse.OptionParser( useage )
+
+parser.add_option( "-p", "--passinglist", dest="PASSINGLIST", help="The test list of expected passing vk-gl-cts tests [default: %default]", default="slang-passing-tests.txt" )
+parser.add_option( "-a", "--archive_dir", dest="ARCHIVE_DIR", help="The directory where the vulkan directory is found [default: %default]", default="." )
+parser.add_option( "-f", "--testlist", dest="TESTLIST", help="The test list used to run vk-gl-cts [default: %default]", default="all-tests.txt" )
+
+(options, args) = parser.parse_args()
+
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
@@ -30,20 +42,9 @@ raw_data_sheet.update_cells(clear_range)
 proc_env = os.environ.copy()
 proc_env["DISABLE_CTS_SLANG"] = "0"
 
-passing = []
-list_passing = []
 
 
 summary = "Test run totals:\n"
-
-useage = "useage: %prog [options]"
-parser = optparse.OptionParser( useage )
-
-parser.add_option( "-p", "--passinglist", dest="PASSINGLIST", help="The test list of expected passing vk-gl-cts tests [default: %default]", default="slang-passing-tests.txt" )
-parser.add_option( "-a", "--archive_dir", dest="ARCHIVE_DIR", help="The directory where the vulkan directory is found [default: %default]", default="." )
-parser.add_option( "-f", "--testlist", dest="TESTLIST", help="The test list used to run vk-gl-cts [default: %default]", default="all-tests.txt" )
-
-(options, args) = parser.parse_args()
 
 cmd = ".\deqp-vk.exe --deqp-archive-dir=" + options.ARCHIVE_DIR + " --deqp-caselist-file=" + options.TESTLIST
 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
@@ -52,7 +53,6 @@ proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
 stdout, stderr = proc.communicate()
 
 test_found = False
-
 
 for test_line in stdout.splitlines():
     match = re.search(r'Test case \'(.*)\'', test_line)
