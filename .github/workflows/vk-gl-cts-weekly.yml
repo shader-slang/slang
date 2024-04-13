@@ -60,12 +60,12 @@ jobs:
 
         copy ${{ github.workspace }}\bin\windows-x64\release\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\test-server.exe
     - name: vkcts run
+      working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
+      
       env:
         slang_verif_svc: ${{ secrets.slang_verif_svc_cred }}
         
       run: |
-        working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
-        
         python -m pip install --upgrade pip
         pip install gspread oauth2client
         python ${{ github.workspace }}\extras\process_vk_cts_nightly_results.py --passinglist=${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt --archive_dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --testlist=${{ github.workspace }}\extras\temp-list.txt
