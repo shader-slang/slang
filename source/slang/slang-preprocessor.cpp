@@ -857,6 +857,11 @@ struct ExpansionInputStream : InputStream
 
     TokenType peekRawTokenType() { return peekRawToken().type; }
 
+    void setInitiatingMacroSourceLoc(SourceLoc loc)
+    {
+        m_initiatingMacroInvocationLoc = loc;
+        m_isInExpansion = true;
+    }
 private:
         /// The base stream that macro expansion is being applied to
     InputStream*   m_base = nullptr;
@@ -867,6 +872,10 @@ private:
         /// Location of the "iniating" macro invocation in cases where multiple
         /// nested macro invocations might be in flight.
     SourceLoc m_initiatingMacroInvocationLoc;
+
+        /// Whether this ExpansionStream is created in the middle of
+        /// another macro expansion.
+    bool m_isInExpansion = false;
 
         /// One token of lookahead
     Token m_lookaheadToken;
@@ -1429,7 +1438,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
         // invocation location for things like `__LINE__` uses inside
         // of macro bodies.
         //
-        if(activeStream == m_base)
+        if(!m_isInExpansion && activeStream == m_base)
         {
             m_initiatingMacroInvocationLoc = token.loc;
         }
@@ -2110,6 +2119,7 @@ void MacroInvocation::_initCurrentOpStream()
             // applies macro expansion to them.
             //
             ExpansionInputStream* expansion = new ExpansionInputStream(m_preprocessor, stream);
+            expansion->setInitiatingMacroSourceLoc(m_initiatingMacroInvocationLoc);
             m_currentOpStreams.push(expansion);
         }
         break;
