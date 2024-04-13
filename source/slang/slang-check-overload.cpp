@@ -1013,6 +1013,11 @@ namespace Slang
             }
         }
 
+        // If both parents are the same, there is no explicit overload preference without looking
+        // at parameters, which is resolved later.
+        if(left.declRef.getParent() == right.declRef.getParent())
+            return 0;
+
         // If both are members of an inherited decl, prefer the more derived inheritance member
         auto leftStruct = left.declRef.getParent().as<StructDecl>();
         auto rightStruct = right.declRef.getParent().as<StructDecl>();
