@@ -197,10 +197,6 @@ bool isResourceType(IRType* type)
     {
         return true;
     }
-    else if (const auto rwStructBufferType = as<IRStructType>(type))
-    {
-        return true;
-    }
 
     // TODO: need more comprehensive coverage here
 
@@ -216,6 +212,12 @@ bool hasResourceType(IRType* type)
     while (auto ptrType = as<IRPtrTypeBase>(type))
     {
         type = ptrType->getValueType();
+    }
+
+    // Special handling for RWStructuredBuf
+    if (const auto rwStructBufferType = as<IRStructType>(type))
+    {
+        return true;
     }
     return isResourceType(type);
 }
