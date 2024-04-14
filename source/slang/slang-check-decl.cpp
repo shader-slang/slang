@@ -7405,12 +7405,8 @@ namespace Slang
                     LookupMask::Function,
                     LookupOptions::IgnoreInheritance);
 
-                VarExpr* ctorExpr = m_astBuilder->create<VarExpr>();
-                ctorExpr->scope = ctor->ownedScope;
-                ctorExpr->name = ctorName;
-                ctorExpr->type.type = nullptr;
                 auto invoke = m_astBuilder->create<InvokeExpr>();
-                invoke->functionExpr = createLookupResultExpr(ctorName, lookupResult, nullptr, ctorExpr->loc, nullptr);
+                invoke->functionExpr = createLookupResultExpr(ctorName, lookupResult, nullptr, ctor->loc, nullptr);
 
                 ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
                 thisExpr->scope = ctor->ownedScope;
