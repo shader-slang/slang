@@ -1167,6 +1167,91 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addUsersToWorkList(newStore);
     }
 
+    void processNonUniformResourceIndex(IRInst* nonUniformResourceIndexInst)
+    {
+        // implement the translation to spirv by waking up the use-def chain
+        // from nonUniformResource inst of an index to an array of buffer or
+        // texture def all the way to the leaf operations. To be precise:
+        // - go through GEP and see if it calls an intrinsic function,
+        //   then decorate the address itself (GetElementPtr)
+        // - go through GEP to identify the pointer access and the Loads that it
+        //   accesses (GetElementPtr -> Load), then decorate the load instruction.
+        // - go through IntCasts to deal with u32 -> i32 / vice-versa (IntCast)
+        List<IRInst*> resWorkList;
+        resWorkList.add(nonUniformResourceIndexInst);
+
+        // iterate down all the insts that originate from a `nonUniformResourceIndexInst` and pop out the
+        // `nonUniformResourceIndexInst` from the index value itself and wrap it around the parent inst.
+        // For example:
+        for (Index i = 0; i < resWorkList.getCount(); i++)
+        {
+            auto inst = resWorkList[i];
+            traverseUses(inst, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                IRBuilder builder(user);
+                builder.setInsertBefore(user);
+                IRInst* newUser = nullptr;
+                switch (user->getOp())
+                {
+                case kIROp_IntCast:
+                    // Replace intCast(nonUniformRes(x)), into nonUniformRes(intCast(x))
+                    newUser = builder.emitCast(user->getFullType(), inst->getOperand(0));
+                    break;
+                case kIROp_GetElementPtr:
+                    // Ignore when nonUniformRes is not on the index
+                    if (user->getOperand(0)->getOp() != kIROp_NonUniformResourceIndex)
+                    {
+                        // Replace gep(pArray, nonUniformRes(x)), into nonUniformRes(gep(pArray, x))
+                        newUser = builder.emitElementAddress(user->getFullType(), user->getOperand(0), inst->getOperand(0));
+                    }
+                    break;
+                case kIROp_RWStructuredBufferGetElementPtr:
+                    // Replace buffer[nonUniformRes(nonUniformRes(x))], into nonUniformRes(buffer[x])
+                    // This fails when converting rwstructbuf(nonuniformres(gep(...), int) -> rwstructbuf(get(...), int).
+                    // newUser = builder.emitRWStructuredBufferGetElementPtr(inst->getOperand(0), user->getOperand(1));
+                    break;
+                case kIROp_Load:
+                    newUser = builder.emitLoad(user->getFullType(), inst->getOperand(0));
+                    break;
+                default:
+                    // Ignore for all other unknown insts.
+                    break;
+                };
+                if (!newUser)
+                    return;
+
+                auto nonUniformUser = builder.emitNonUniformResourceIndexInst(newUser);
+                user->replaceUsesWith(nonUniformUser);
+
+                switch (user->getOp())
+                {
+                case kIROp_IntCast:
+                case kIROp_Load:
+                case kIROp_GetElementPtr:
+                    resWorkList.add(nonUniformUser);
+                    break;
+                };
+                user->removeAndDeallocate();
+            });
+        }
+
+        // Once all the `NonUniformResourceIndex` insts are visited, and the inst type is bubbled up to the parent,
+        // the next step is to add a decoration to the operands of all nonuniformresourceindex insts.
+        for (int i = 1; i < resWorkList.getCount(); ++i)
+        {
+            auto nonUniformResInst = resWorkList[i];
+            auto operand = nonUniformResInst->getOperand(0);
+            IRBuilder builder(nonUniformResInst);
+
+            if (hasResourceType(operand->getDataType()))
+            {
+                builder.addSPIRVNonUniformResourceDecoration(operand);
+                nonUniformResInst->replaceUsesWith(operand);
+            }
+        }
+    }
+
     void processImageSubscript(IRImageSubscript* subscript)
     {
         if (auto ptrType = as<IRPtrTypeBase>(subscript->getDataType()))
@@ -1822,6 +1907,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_RWStructuredBufferStore:
                 processRWStructuredBufferStore(inst);
                 break;
+            case kIROp_NonUniformResourceIndex:
+                processNonUniformResourceIndex(inst);
+                {
+                    inst->removeFromParent();
+                    m_instsToRemove.add(inst);
+                }
+                break;
             case kIROp_loop:
                 processLoop(as<IRLoop>(inst));
                 break;
@@ -2233,6 +2325,7 @@ void legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
+
     legalizeSPIRV(context, module);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
