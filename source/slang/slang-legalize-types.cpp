@@ -203,6 +203,19 @@ bool isResourceType(IRType* type)
     return false;
 }
 
+// Helper wrapper function around isResourceType that checks not only if the
+// given type is a resourceType, but if it is also a pointer to a resourceType.
+bool hasResourceType(IRType* type)
+{
+    if (isResourceType(type))
+        return true;
+    while (auto ptrType = as<IRPtrTypeBase>(type))
+    {
+        type = ptrType->getValueType();
+    }
+    return isResourceType(type);
+}
+
 ModuleDecl* findModuleForDecl(
     Decl*   decl)
 {
