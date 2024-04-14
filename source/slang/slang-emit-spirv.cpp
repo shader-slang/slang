@@ -3304,6 +3304,17 @@ struct SPIRVEmitContext
             }
             break;
 
+        case kIROp_SPIRVNonUniformResourceDecoration:
+            {
+                emitOpDecorate(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    decoration,
+                    dstID,
+                    SpvDecorationNonUniform
+                );
+            }
+            break;
+
         case kIROp_OutputTopologyDecoration:
             {
                 const auto o = cast<IROutputTopologyDecoration>(decoration);
