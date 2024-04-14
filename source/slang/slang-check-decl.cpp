@@ -9563,7 +9563,8 @@ namespace Slang
         }
         virtual void processDeclModifiers(Decl* decl)
         {
-            handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+            if (decl)
+                handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
         }
         void visitDiscardStmt(DiscardStmt* stmt)
         {
