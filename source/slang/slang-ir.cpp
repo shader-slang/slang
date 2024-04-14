@@ -6133,12 +6133,12 @@ namespace Slang
     }
 
     // IR emitter for a dedicated instruction to represent NonUniformResourceIndex qualifier.
-    IRInst* IRBuilder::emitNonUniformResourceIndex(IRType* type, IRInst* val)
+    IRInst* IRBuilder::emitNonUniformResourceIndexInst(IRInst* val)
     {
         const auto i = createInst<IRInst>(
             this,
             kIROp_NonUniformResourceIndex,
-            type,
+            getTypeType(),
             val);
         addInst(i);
         return i;
