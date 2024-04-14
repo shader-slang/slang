@@ -2752,7 +2752,7 @@ struct SPIRVEmitContext
                 auto targetBlock = as<IRUnconditionalBranch>(inst)->getTargetBlock();
                 IRInst* loopInst = nullptr;
                 if (isLoopTargetBlock(targetBlock, loopInst))
-                    result = emitOpBranch(parent, inst, getIRInstSpvID(loopInst));
+                    return emitOpBranch(parent, inst, getIRInstSpvID(loopInst));
                 // Otherwise, emit a normal branch inst into the target block.
                 result = emitOpBranch(parent, inst, getIRInstSpvID(targetBlock));
                 break;
@@ -2880,8 +2880,8 @@ struct SPIRVEmitContext
             }
             break;
         }
-
-        emitDecorations(inst, getID(result));
+        if (result)
+            emitDecorations(inst, getID(result));
         return result;
     }
 
