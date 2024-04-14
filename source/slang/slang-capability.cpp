@@ -1031,21 +1031,6 @@ CapabilitySet CapabilitySet::getTextualTargetsThisIsMissingFromOther(const Capab
     return set;
 }
 
-void CapabilitySet::removeRequirmentsWhichAreIncompatible(const CapabilitySet& other)
-{
-    CapabilitySet newSet;
-    for (auto thisConjunction : this->m_conjunctions)
-    {
-        for (auto thatConjunction : other.m_conjunctions)
-        {
-            if (!thatConjunction.countIntersectionWith(thisConjunction) == thatConjunction.getExpandedAtoms().getCount())
-                continue;
-            newSet.m_conjunctions.add(thisConjunction);
-        }
-    }
-    m_conjunctions = newSet.m_conjunctions;
-}
-
 // We only run 'join' logic on "this" conjunctions which are compatiable with "other" conjunctions.
 // We only add specific nodes which satisfy the abstractMask.
 // Any non-compatible conjunctions with "other"s cconjunctions will be preserved and unmodified.

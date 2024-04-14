@@ -213,8 +213,6 @@ public:
 
     CapabilitySet getTextualTargetsThisIsMissingFromOther(const CapabilitySet& other);
 
-    void removeRequirmentsWhichAreIncompatible(const CapabilitySet& other);
-
     void canonicalize();
 
         /// Are these two capability sets equal?
