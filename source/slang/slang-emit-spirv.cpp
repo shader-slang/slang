@@ -2591,6 +2591,7 @@ struct SPIRVEmitContext
         /// Emit an instruction that is local to the body of the given `parent`.
     SpvInst* emitLocalInst(SpvInstParent* parent, IRInst* inst)
     {
+        SpvInst* result = nullptr;
         switch( inst->getOp() )
         {
         default:
@@ -2603,65 +2604,91 @@ struct SPIRVEmitContext
             }
         case kIROp_Specialize:
         case kIROp_MissingReturn:
-            return nullptr;
+            break;
         case kIROp_Var:
-            return emitVar(parent, inst);
+            result = emitVar(parent, inst);
+            break;
         case kIROp_Call:
-            return emitCall(parent, static_cast<IRCall*>(inst));
+            result = emitCall(parent, static_cast<IRCall*>(inst));
+            break;
         case kIROp_FieldAddress:
-            return emitFieldAddress(parent, as<IRFieldAddress>(inst));
+            result = emitFieldAddress(parent, as<IRFieldAddress>(inst));
+            break;
         case kIROp_FieldExtract:
-            return emitFieldExtract(parent, as<IRFieldExtract>(inst));
+            result = emitFieldExtract(parent, as<IRFieldExtract>(inst));
+            break;
         case kIROp_GetElementPtr:
-            return emitGetElementPtr(parent, as<IRGetElementPtr>(inst));
+            result = emitGetElementPtr(parent, as<IRGetElementPtr>(inst));
+            break;
         case kIROp_GetOffsetPtr:
-            return emitGetOffsetPtr(parent, inst);
+            result = emitGetOffsetPtr(parent, inst);
+            break;
         case kIROp_GetElement:
-            return emitGetElement(parent, as<IRGetElement>(inst));
+            result = emitGetElement(parent, as<IRGetElement>(inst));
+            break;
         case kIROp_MakeStruct:
-            return emitCompositeConstruct(parent, inst);
+            result = emitCompositeConstruct(parent, inst);
+            break;
         case kIROp_MakeArrayFromElement:
-            return emitMakeArrayFromElement(parent, inst);
+            result = emitMakeArrayFromElement(parent, inst);
+            break;
         case kIROp_MakeMatrixFromScalar:
-            return emitMakeMatrixFromScalar(parent, inst);
+            result = emitMakeMatrixFromScalar(parent, inst);
+            break;
         case kIROp_MakeMatrix:
-            return emitMakeMatrix(parent, inst);
+            result = emitMakeMatrix(parent, inst);
+            break;
         case kIROp_Load:
-            return emitLoad(parent, as<IRLoad>(inst));
+            result = emitLoad(parent, as<IRLoad>(inst));
+            break;
         case kIROp_Store:
-            return emitStore(parent, as<IRStore>(inst));
+            result = emitStore(parent, as<IRStore>(inst));
+            break;
         case kIROp_SwizzledStore:
-            return emitSwizzledStore(parent, as<IRSwizzledStore>(inst));
+            result = emitSwizzledStore(parent, as<IRSwizzledStore>(inst));
+            break;
         case kIROp_swizzleSet:
-            return emitSwizzleSet(parent, as<IRSwizzleSet>(inst));
+            result = emitSwizzleSet(parent, as<IRSwizzleSet>(inst));
+            break;
         case kIROp_RWStructuredBufferGetElementPtr:
-            return emitStructuredBufferGetElementPtr(parent, inst);
+            result = emitStructuredBufferGetElementPtr(parent, inst);
+            break;
         case kIROp_StructuredBufferGetDimensions:
-            return emitStructuredBufferGetDimensions(parent, inst);
+            result = emitStructuredBufferGetDimensions(parent, inst);
+            break;
         case kIROp_swizzle:
-            return emitSwizzle(parent, as<IRSwizzle>(inst));
+            result = emitSwizzle(parent, as<IRSwizzle>(inst));
+            break;
         case kIROp_IntCast:
-            return emitIntCast(parent, as<IRIntCast>(inst));
+            result = emitIntCast(parent, as<IRIntCast>(inst));
+            break;
         case kIROp_FloatCast:
-            return emitFloatCast(parent, as<IRFloatCast>(inst));
+            result = emitFloatCast(parent, as<IRFloatCast>(inst));
+            break;
         case kIROp_CastIntToFloat:
-            return emitIntToFloatCast(parent, as<IRCastIntToFloat>(inst));
+            result = emitIntToFloatCast(parent, as<IRCastIntToFloat>(inst));
+            break;
         case kIROp_CastFloatToInt:
-            return emitFloatToIntCast(parent, as<IRCastFloatToInt>(inst));
+            result = emitFloatToIntCast(parent, as<IRCastFloatToInt>(inst));
+            break;
         case kIROp_CastPtrToInt:
-            return emitCastPtrToInt(parent, inst);
+            result = emitCastPtrToInt(parent, inst);
+            break;
         case kIROp_CastPtrToBool:
-            return emitCastPtrToBool(parent, inst);
+            result = emitCastPtrToBool(parent, inst);
+            break;
         case kIROp_CastIntToPtr:
-            return emitCastIntToPtr(parent, inst);
+            result = emitCastIntToPtr(parent, inst);
+            break;
         case kIROp_PtrCast:
         case kIROp_BitCast:
-            return emitOpBitcast(
+            result = emitOpBitcast(
                 parent,
                 inst,
                 inst->getDataType(),
                 inst->getOperand(0)
             );
+            break;
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
@@ -2684,12 +2711,14 @@ struct SPIRVEmitContext
         case kIROp_Geq:
         case kIROp_Rsh:
         case kIROp_Lsh:
-            return emitArithmetic(parent, inst);
+            result = emitArithmetic(parent, inst);
+            break;
         case kIROp_GlobalValueRef:
             {
                 auto inner = ensureInst(inst->getOperand(0));
                 registerInst(inst, inner);
-                return inner;
+                result = inner;
+                break;
             }
         case kIROp_GetVulkanRayTracingPayloadLocation:
             {
@@ -2703,15 +2732,18 @@ struct SPIRVEmitContext
                 }
                 auto inner = ensureInst(location);
                 registerInst(inst, inner);
-                return inner;
+                result = inner;
+                break;
             }
         case kIROp_Return:
             if (as<IRReturn>(inst)->getVal()->getOp() == kIROp_VoidLit)
-                return emitOpReturn(parent, inst);
+                result = emitOpReturn(parent, inst);
             else
-                return emitOpReturnValue(parent, inst, as<IRReturn>(inst)->getVal());
+                result = emitOpReturnValue(parent, inst, as<IRReturn>(inst)->getVal());
+            break;
         case kIROp_discard:
-            return emitOpKill(parent, inst);
+            result = emitOpKill(parent, inst);
+            break;
         case kIROp_unconditionalBranch:
             {
                 // If we are jumping to the main block of a loop,
@@ -2720,9 +2752,10 @@ struct SPIRVEmitContext
                 auto targetBlock = as<IRUnconditionalBranch>(inst)->getTargetBlock();
                 IRInst* loopInst = nullptr;
                 if (isLoopTargetBlock(targetBlock, loopInst))
-                    return emitOpBranch(parent, inst, getIRInstSpvID(loopInst));
+                    result = emitOpBranch(parent, inst, getIRInstSpvID(loopInst));
                 // Otherwise, emit a normal branch inst into the target block.
-                return emitOpBranch(parent, inst, getIRInstSpvID(targetBlock));
+                result = emitOpBranch(parent, inst, getIRInstSpvID(targetBlock));
+                break;
             }
         case kIROp_loop:
             {
@@ -2738,7 +2771,8 @@ struct SPIRVEmitContext
                 // from the actual loop target block) are emitted first.
                 emitOpBranch(parent, nullptr, blockId);
         
-                return block;
+                result = block;
+                break;
             }
         case kIROp_ifElse:
             {
@@ -2746,7 +2780,7 @@ struct SPIRVEmitContext
                 auto afterBlockID = getIRInstSpvID(ifelseInst->getAfterBlock());
                 emitOpSelectionMerge(parent, nullptr, afterBlockID, SpvSelectionControlMaskNone);
                 auto falseLabel = ifelseInst->getFalseBlock();
-                return emitOpBranchConditional(
+                result = emitOpBranchConditional(
                     parent,
                     inst,
                     ifelseInst->getCondition(),
@@ -2754,13 +2788,14 @@ struct SPIRVEmitContext
                     falseLabel ? getID(ensureInst(falseLabel)) : afterBlockID,
                     makeArray<SpvLiteralInteger>()
                 );
+                break;
             }
         case kIROp_Switch:
             {
                 auto switchInst = as<IRSwitch>(inst);
                 auto mergeBlockID = getIRInstSpvID(switchInst->getBreakLabel());
                 emitOpSelectionMerge(parent, nullptr, mergeBlockID, SpvSelectionControlMaskNone);
-                return emitInstCustomOperandFunc(parent, inst, SpvOpSwitch, [&]() {
+                result = emitInstCustomOperandFunc(parent, inst, SpvOpSwitch, [&]() {
                     emitOperand(switchInst->getCondition());
                     auto defaultLabel = switchInst->getDefaultLabel();
                     emitOperand(defaultLabel ? getID(ensureInst(defaultLabel)) : mergeBlockID);
@@ -2774,13 +2809,17 @@ struct SPIRVEmitContext
                         emitOperand(caseLabel ? getID(ensureInst(caseLabel)) : mergeBlockID);
                     }
                 });
+                break;
             }
         case kIROp_Unreachable:
-            return emitOpUnreachable(parent, inst);
+            result = emitOpUnreachable(parent, inst);
+            break;
         case kIROp_conditionalBranch:
             SLANG_UNEXPECTED("Unstructured branching is not supported by SPIRV.");
+            break;
         case kIROp_MakeVector:
-            return emitConstruct(parent, inst);
+            result = emitConstruct(parent, inst);
+            break;
         case kIROp_MakeVectorFromScalar:
             {
                 const auto scalar = inst->getOperand(0);
@@ -2788,45 +2827,62 @@ struct SPIRVEmitContext
                 SLANG_ASSERT(vecTy);
                 const auto numElems = as<IRIntLit>(vecTy->getElementCount());
                 SLANG_ASSERT(numElems);
-                return emitSplat(parent, inst, scalar, numElems->getValue());
+                result = emitSplat(parent, inst, scalar, numElems->getValue());
             }
+            break;
         case kIROp_MakeArray:
-            return emitConstruct(parent, inst);
+            result = emitConstruct(parent, inst);
+            break;
         case kIROp_Select:
-            return emitInst(parent, inst, SpvOpSelect, inst->getFullType(), kResultID, OperandsOf(inst));
+            result = emitInst(parent, inst, SpvOpSelect, inst->getFullType(), kResultID, OperandsOf(inst));
+            break;
         case kIROp_DebugLine:
-            return emitDebugLine(parent, as<IRDebugLine>(inst));
+            result = emitDebugLine(parent, as<IRDebugLine>(inst));
+            break;
         case kIROp_DebugVar:
-            return emitDebugVar(parent, as<IRDebugVar>(inst));
+            result = emitDebugVar(parent, as<IRDebugVar>(inst));
+            break;
         case kIROp_DebugValue:
-            return emitDebugValue(parent, as<IRDebugValue>(inst));
+            result = emitDebugValue(parent, as<IRDebugValue>(inst));
+            break;
         case kIROp_GetStringHash:
-            return emitGetStringHash(inst);
+            result = emitGetStringHash(inst);
+            break;
         case kIROp_undefined:
-            return emitOpUndef(parent, inst, inst->getDataType());
+            result = emitOpUndef(parent, inst, inst->getDataType());
+            break;
         case kIROp_SPIRVAsm:
-            return emitSPIRVAsm(parent, as<IRSPIRVAsm>(inst));
+            result = emitSPIRVAsm(parent, as<IRSPIRVAsm>(inst));
+            break;
         case kIROp_ImageLoad:
-            return emitImageLoad(parent, as<IRImageLoad>(inst));
+            result = emitImageLoad(parent, as<IRImageLoad>(inst));
+            break;
         case kIROp_ImageStore:
-            return emitImageStore(parent, as<IRImageStore>(inst));
+            result = emitImageStore(parent, as<IRImageStore>(inst));
+            break;
         case kIROp_ImageSubscript:
-            return emitImageSubscript(parent, as<IRImageSubscript>(inst));
+            result = emitImageSubscript(parent, as<IRImageSubscript>(inst));
+            break;
         case kIROp_AtomicCounterIncrement:
             {
                 IRBuilder builder{inst};
                 const auto memoryScope =  emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                 const auto memorySemantics =  emitIntConstant(IRIntegerValue{SpvMemorySemanticsMaskNone}, builder.getUIntType());
-                return emitOpAtomicIIncrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+                result = emitOpAtomicIIncrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
             }
+            break;
         case kIROp_AtomicCounterDecrement:
             {
                 IRBuilder builder{inst};
                 const auto memoryScope =  emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                 const auto memorySemantics =  emitIntConstant(IRIntegerValue{SpvMemorySemanticsMaskNone}, builder.getUIntType());
-                return emitOpAtomicIDecrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+                result = emitOpAtomicIDecrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
             }
+            break;
         }
+
+        emitDecorations(inst, getID(result));
+        return result;
     }
 
     SpvInst* emitImageLoad(SpvInstParent* parent, IRImageLoad* load)
@@ -2927,7 +2983,6 @@ struct SPIRVEmitContext
             emitDecoration(dstID, decoration);
         }
     }
-
 
     SpvExecutionMode getDepthOutputExecutionMode(IRInst* builtinVar)
     {
