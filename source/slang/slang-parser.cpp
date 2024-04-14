@@ -5000,7 +5000,7 @@ namespace Slang
                 {
                     auto token = parser->ReadToken();
                     parser->ReadToken(TokenType::Colon);
-                    token.setContent(UnownedStringSlice("__default_case"));
+                    token.setContent(UnownedStringSlice(""));
                     caseNames.add(token);
                 }
                 else

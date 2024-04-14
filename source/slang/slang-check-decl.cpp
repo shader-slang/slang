@@ -353,6 +353,8 @@ namespace Slang
 
         virtual void processReferencedDecl(Decl* decl) = 0;
 
+        virtual void processDeclModifiers(Decl* decl) = 0;
+
         void dispatchIfNotNull(Stmt* stmt)
         {
             if (!stmt)
@@ -461,6 +463,7 @@ namespace Slang
         {
             dispatchIfNotNull(expr->type.type);
             dispatchIfNotNull(expr->declRef.declRefBase);
+            processDeclModifiers(expr->declRef.getDecl());
         }
         void visitStaticMemberExpr(StaticMemberExpr* expr)
         {
@@ -9481,8 +9484,9 @@ namespace Slang
             ensureDecl(visitor, referencedDecl, DeclCheckState::CapabilityChecked);
         }
         
-        if (resultCaps.implies(nodeCaps))
-            return;
+        // Always join capabilities to ensure only the lowest denominator will be apart of the final requirments.
+        // if we have `function(){ Store(compute|fragment); Sample(fragment); }` join will ensure the capabilities
+        // shall only be satisfied if `fragment` is the target stage, and not `compute`.
 
         auto oldCaps = resultCaps;
         bool isAnyInvalid = resultCaps.isInvalid() || nodeCaps.isInvalid();
@@ -9543,8 +9547,10 @@ namespace Slang
         typedef SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc>> Base;
 
         const ProcessFunc& handleReferenceFunc;
-        CapabilityDeclReferenceVisitor(const ProcessFunc& processFunc, SemanticsContext const& outer)
+        RequireCapabilityAttribute* maybeRequireCapability;
+        CapabilityDeclReferenceVisitor(const ProcessFunc& processFunc, RequireCapabilityAttribute* maybeRequireCapability, SemanticsContext const& outer)
             : handleReferenceFunc(processFunc)
+            , maybeRequireCapability(maybeRequireCapability)
             , SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc>>(outer)
         {
         }
@@ -9554,6 +9560,10 @@ namespace Slang
             if (Base::sourceLocStack.getCount())
                 loc = Base::sourceLocStack.getLast();
             handleReferenceFunc(decl, decl->inferredCapabilityRequirements, loc);
+        }
+        virtual void processDeclModifiers(Decl* decl)
+        {
+            handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
         }
         void visitDiscardStmt(DiscardStmt* stmt)
         {
@@ -9565,17 +9575,21 @@ namespace Slang
             auto targetCaseCount = stmt->targetCases.getCount();
             for (Index targetCaseIndex = 0; targetCaseIndex < targetCaseCount; targetCaseIndex++)
             {
-                // We may revieve a `default:` case for a `__target_switch`. If this is the case,
-                // we must resolve the target capability as `any_target` to hint to the capability 
-                // system that the following function must be defined on all codegen targets. If
-                // we do not handle `default:`, the codegen will fail when trying to find a specific
+                // We may recieve a `default:` case for a `__target_switch`. If this is the case,
+                // we must resolve the target capability for a non empty set of `calling_functions_targets`: 
+                //      ``` default_target = calling_functions_targets-{other_case_targets} ```
+                // 
+                // * `calling_functions_capability` = `requirement attribute` of the calling function; if missing
+                //    we can assume it is `any_target` 
+                //
+                // * `{other_case_targets}` = set of all capabilities all `case` statments target inside the `__target_switch`
+
+                // If we do not handle `default:`, the codegen will fail when trying to find a specific
                 // codegen target not handled explicitly by a `case` statment.
-                
-                // We must also ensure the `default` case is last so we have priority to hit `case` statments
-                // without complex logic. We must shift all case statments when doing this logic instead of 
-                // swapping with the final element since some capabilities have overlapping targets.
-                // As a result order matters when resolving `case` statments
-                if (CapabilityName(stmt->targetCases[targetCaseIndex]->capability) == CapabilityName::__default_case)
+                // We must also ensure the `default` case is last so we have priority to hit `case` statments and can preprocess
+                // `case` statments before the `default` case.
+                CapabilitySet targetCap;
+                if (CapabilityName(stmt->targetCases[targetCaseIndex]->capability) == CapabilityName::Invalid)
                 {
                     if (targetCaseCount - 1 != targetCaseIndex)
                     {
@@ -9583,11 +9597,17 @@ namespace Slang
                             std::swap(stmt->targetCases[i], stmt->targetCases[i + 1]);
                         continue;
                     }
-                    stmt->targetCases[targetCaseIndex]->capability = int32_t(CapabilityName::any_target);
-                }
 
+                    if (!maybeRequireCapability)
+                        targetCap = (CapabilitySet(CapabilityName::any_target).getTextualTargetsThisIsMissingFromOther(set));
+                    else 
+                        targetCap = (maybeRequireCapability->capabilitySet.getTextualTargetsThisIsMissingFromOther(set));
+                }
+                else
+                {
+                    targetCap = CapabilitySet(CapabilityName(stmt->targetCases[targetCaseIndex]->capability));
+                }
                 auto targetCase = stmt->targetCases[targetCaseIndex];
-                auto targetCap = CapabilitySet(CapabilityName(targetCase->capability));
                 auto oldCap = targetCap;
                 auto bodyCap = getStatementCapabilityUsage(this, targetCase->body);
                 targetCap.join(bodyCap);
@@ -9601,6 +9621,7 @@ namespace Slang
             set.canonicalize();
             handleReferenceFunc(stmt, set, stmt->loc);
         }
+
         void visitRequireCapabilityDecl(RequireCapabilityDecl* decl)
         {
             handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
@@ -9608,9 +9629,9 @@ namespace Slang
     };
 
     template<typename ProcessFunc>
-    void visitReferencedDecls(SemanticsContext& context, NodeBase* node, SourceLoc initialLoc, const ProcessFunc& func)
+    void visitReferencedDecls(SemanticsContext& context, NodeBase* node, SourceLoc initialLoc, RequireCapabilityAttribute* maybeRequireCapability, const ProcessFunc& func)
     {
-        CapabilityDeclReferenceVisitor<ProcessFunc> visitor(func, context);
+        CapabilityDeclReferenceVisitor<ProcessFunc> visitor(func, maybeRequireCapability, context);
         visitor.sourceLocStack.add(initialLoc);
 
         if (auto val = as<Val>(node))
@@ -9629,7 +9650,7 @@ namespace Slang
             return CapabilitySet();
 
         CapabilitySet inferredRequirements;
-        visitReferencedDecls(*visitor, stmt, stmt->loc, [&](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+        visitReferencedDecls(*visitor, stmt, stmt->loc, nullptr, [&](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
             {
                 _propagateRequirement(visitor, inferredRequirements, stmt, node, nodeCaps, refLoc);
             });
@@ -9638,11 +9659,7 @@ namespace Slang
 
     void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
-        visitReferencedDecls(*this, varDecl->type.type, varDecl->loc, [this, varDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
-            {
-                _propagateRequirement(this, varDecl->inferredCapabilityRequirements, varDecl, node, nodeCaps, refLoc);
-            });
-        visitReferencedDecls(*this, varDecl->initExpr, varDecl->loc, [this, varDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+        visitReferencedDecls(*this, varDecl->type.type, varDecl->loc, varDecl->findModifier<RequireCapabilityAttribute>(), [this, varDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
             {
                 _propagateRequirement(this, varDecl->inferredCapabilityRequirements, varDecl, node, nodeCaps, refLoc);
             });
@@ -9701,14 +9718,20 @@ namespace Slang
         decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
     }
 
+    static inline UnownedStringSlice breakAtThisDeclNameToCheckCapability = UnownedStringSlice("");
+
     void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
     {
+#ifdef _DEBUG
+        if (funcDecl->getName() && funcDecl->getName()->text.equals(breakAtThisDeclNameToCheckCapability))
+            __debugbreak();
+#endif 
         for (auto member : funcDecl->members)
         {
             ensureDecl(member, DeclCheckState::CapabilityChecked);
             _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, member, member->inferredCapabilityRequirements, member->loc);
         }
-        visitReferencedDecls(*this, funcDecl->body, funcDecl->loc, [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+        visitReferencedDecls(*this, funcDecl->body, funcDecl->loc, funcDecl->findModifier<RequireCapabilityAttribute>(), [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
             {
                 _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, node, nodeCaps, refLoc);
             });
@@ -9722,7 +9745,7 @@ namespace Slang
                 _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, parentAggTypeDecl, parentAggTypeDecl->inferredCapabilityRequirements, funcDecl->loc);
             }
         }
-        
+
         auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
 
         if (!declaredCaps.isEmpty())
@@ -9767,6 +9790,9 @@ namespace Slang
             {
                 // For public decls, we need to enforce that the function
                 // only uses capabilities that it declares.
+                // At a minimum we will propegate shader requirements to our 
+                // function from calling children in all cases so the parent
+                // can enforce shader targets correctly and propegate to `main`
                 const CapabilityConjunctionSet* failedAvailableCapabilityConjunction = nullptr;
                 if (!CapabilitySet::checkCapabilityRequirement(
                     declaredCaps,
@@ -9776,6 +9802,8 @@ namespace Slang
                     diagnoseUndeclaredCapability(funcDecl, Diagnostics::useOfUndeclaredCapability, failedAvailableCapabilityConjunction);
                     funcDecl->inferredCapabilityRequirements = declaredCaps;
                 }
+                else
+                    funcDecl->inferredCapabilityRequirements.simpleJoinWithSetMask(declaredCaps, CapabilityName::stage);
             }
             else
             {
@@ -9913,7 +9941,7 @@ namespace Slang
         while (traceLevels > 0)
         {
             refDecl = nullptr;
-            visitReferencedDecls(*visitor, decl, decl->loc, [&](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+            visitReferencedDecls(*visitor, decl, decl->loc, decl->findModifier<RequireCapabilityAttribute>(), [&](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
                 {
                     if (nodeCaps.isIncompatibleWith(incompatibleAtom))
                     {
@@ -9944,6 +9972,8 @@ namespace Slang
     void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const CapabilityConjunctionSet* failedAvailableSet)
     {
         if (decl->inferredCapabilityRequirements.getExpandedAtoms().getCount() == 0)
+            return;
+        if(!failedAvailableSet)
             return;
 
         // There are two causes for why type checking failed on failedAvailableSet.
