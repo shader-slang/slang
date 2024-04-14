@@ -197,6 +197,10 @@ bool isResourceType(IRType* type)
     {
         return true;
     }
+    else if (const auto rwStructBufferType = as<IRStructType>(type))
+    {
+        return true;
+    }
 
     // TODO: need more comprehensive coverage here
 
