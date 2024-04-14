@@ -3734,6 +3734,11 @@ void AllMemoryBarrierWithGroupSync()
     }
 }
 
+// Returns the workgroup size of the calling entry point.
+[require(compute)]
+__intrinsic_op($(kIROp_GetWorkGroupSize))
+int3 WorkgroupSize();
+
 // Test if any components is non-zero (HLSL SM 1.0)
 
 __generic<T : __BuiltinType>
