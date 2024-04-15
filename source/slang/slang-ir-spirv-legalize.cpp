@@ -1275,6 +1275,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 nonUniformResInst->removeAndDeallocate();
             }
         }
+        nonUniformResourceIndexInst->removeFromParent();
+        m_instsToRemove.add(nonUniformResourceIndexInst);
     }
 
     void processImageSubscript(IRImageSubscript* subscript)
@@ -1934,10 +1936,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_NonUniformResourceIndex:
                 processNonUniformResourceIndex(inst);
-                {
-                    inst->removeFromParent();
-                    m_instsToRemove.add(inst);
-                }
                 break;
             case kIROp_loop:
                 processLoop(as<IRLoop>(inst));
