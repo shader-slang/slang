@@ -1181,7 +1181,7 @@ namespace Slang
         /// "under-construction" and not being checked, then it's safe to
         /// consider all names we've inserted so far. This is used when
         /// checking to see if a keyword is shadowed.
-        IgnoreInheritance = 1 << 4, //< Lookup only non inheritance children of a struct (including `extension`)
+        IgnoreInheritance = 1 << 4, ///< Lookup only non inheritance children of a struct (including `extension`)
     };
     inline LookupOptions operator&(LookupOptions a, LookupOptions b)
     {

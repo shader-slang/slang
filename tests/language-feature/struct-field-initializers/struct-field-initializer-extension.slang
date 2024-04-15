@@ -11,10 +11,6 @@ struct DefaultStructNoInit
 };
 extension DefaultStructNoInit
 {
-    __init(int indata)
-    {
-        //unused
-    }
 }
 
 struct DefaultStructWithInit
@@ -25,10 +21,6 @@ struct DefaultStructWithInit
 };
 extension DefaultStructWithInit
 {
-    __init(int indata)
-    {
-        //unused
-    }
     __init()
     {
         data0 = 3;
