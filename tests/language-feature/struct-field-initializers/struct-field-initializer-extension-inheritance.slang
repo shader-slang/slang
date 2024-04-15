@@ -1,10 +1,7 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -use-dxil -compute -entry computeMain
-
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
 RWStructuredBuffer<int> outputBuffer;
+
+//CHECK: error 30851
 
 struct DefaultStructNoInit_base
 {

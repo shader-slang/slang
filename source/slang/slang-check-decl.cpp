@@ -213,6 +213,7 @@ namespace Slang
 
             /// Validate that the target type of an extension `decl` is valid.
         void _validateExtensionDeclTargetType(ExtensionDecl* decl);
+        void _validateExtensionDeclMembers(ExtensionDecl* decl);
 
         void visitExtensionDecl(ExtensionDecl* decl);
     };
@@ -7802,14 +7803,27 @@ namespace Slang
         }
     }
 
+    void SemanticsDeclBasesVisitor::_validateExtensionDeclMembers(ExtensionDecl* decl)
+    {
+        for (auto m : decl->members)
+        {
+            auto ctor = as<ConstructorDecl>(m);
+            if (!ctor || !ctor->body || ctor->members.getCount() != 0)
+                continue;
+            getSink()->diagnose(m->loc, Diagnostics::invalidMemberTypeInExtension, m->astNodeType);
+        }
+    }
+
     void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
     {
-        // We check the target type expression, and then validate
+        // We check the target type expression and members, and then validate
         // that the type it names is one that it makes sense
         // to extend.
         //
         decl->targetType = CheckProperType(decl->targetType);
         _validateExtensionDeclTargetType(decl);
+
+        _validateExtensionDeclMembers(decl);
 
         for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
