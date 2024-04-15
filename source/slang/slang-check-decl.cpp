@@ -1851,7 +1851,7 @@ namespace Slang
 
         auto parseLookupItemLogic = [&](LookupResultItem& item)
         {
-            auto ctor = as<ConstructorDecl>(lookupDefaultConstructor.item.declRef.getDecl());
+            auto ctor = as<ConstructorDecl>(item.declRef.getDecl());
             if (!ctor || !ctor->body)
                 return (ConstructorDecl*)nullptr;
             if (ctor->members.getCount() != 0)

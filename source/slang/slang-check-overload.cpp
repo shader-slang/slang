@@ -1000,7 +1000,7 @@ namespace Slang
         if(leftIsModule != rightIsModule)
             return int(rightIsModule) - int(leftIsModule);
 
-        // If both are interface requirements, prefer to more derived interface.
+        // If both are interface requirements, prefer the more derived interface.
         if (leftIsInterfaceRequirement && rightIsInterfaceRequirement)
         {
             auto leftType = DeclRefType::create(m_astBuilder, leftDeclRefParent);
@@ -1015,25 +1015,24 @@ namespace Slang
             }
         }
 
-        // If both parents are the same and 1 declRef has specialization of generics 
-        // whilst the other is not, specialized calls are always prefered
+        // If both parents are the same we have ambiguity
         if(left.declRef.getParent() == right.declRef.getParent())
             return 0;
 
-        auto leftStruct = leftDeclRefParent.as<AggTypeDeclBase>();
-        auto rightStruct = rightDeclRefParent.as<AggTypeDeclBase>();
-        if (leftStruct && rightStruct)
+        auto leftAggType = leftDeclRefParent.as<AggTypeDeclBase>();
+        auto rightAggType = rightDeclRefParent.as<AggTypeDeclBase>();
+        if (leftAggType && rightAggType)
         {
             auto leftType = DeclRefType::create(m_astBuilder, leftDeclRefParent);
             auto rightType = DeclRefType::create(m_astBuilder, rightDeclRefParent);
 
             auto inheritanceInfo = getShared()->getInheritanceInfo(rightType);
             for (auto facet : inheritanceInfo.facets)
-                if (facet.getImpl()->getType()->equals(rightType))
+                if (facet.getImpl()->getDeclRef().equals(leftDeclRefParent))
                     return 1;
             inheritanceInfo = getShared()->getInheritanceInfo(leftType);
             for (auto facet : inheritanceInfo.facets)
-                if (facet.getImpl()->getType()->equals(rightType))
+                if (facet.getImpl()->getDeclRef().equals(rightDeclRefParent))
                     return -1;
         }
 
