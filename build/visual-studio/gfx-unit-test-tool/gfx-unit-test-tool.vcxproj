@@ -323,6 +323,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\swap-chain-resize-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\texture-types-tests.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\uint16-structured-buffer.cpp" />
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
   </ItemGroup>
   <ItemGroup>

@@ -939,6 +939,8 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
     }
 
     ResourceViewInternalImpl* internalResourceView = nullptr;
+    auto resourceViewImpl = static_cast<ResourceViewImpl*>(resourceView);
+
     switch (resourceView->getViewDesc()->type)
     {
 #if SLANG_GFX_HAS_DXR_SUPPORT
@@ -953,7 +955,6 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
 #endif
     default:
     {
-        auto resourceViewImpl = static_cast<ResourceViewImpl*>(resourceView);
         // Hold a reference to the resource to prevent its destruction.
         const auto resourceOffset = bindingRange.baseIndex + offset.bindingArrayIndex;
         m_boundResources[resourceOffset] = resourceViewImpl->m_resource;
@@ -964,13 +965,21 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
     }
 
     auto descriptorSlotIndex = bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex;
-    if (internalResourceView->m_descriptor.cpuHandle.ptr)
+    D3D12Descriptor srcDescriptor = {};
+
+    SLANG_RETURN_ON_FAIL(internalResourceView->getBufferDescriptorForBinding(
+        static_cast<DeviceImpl*>(m_device.get()),
+        resourceViewImpl,
+        bindingRange.bufferElementStride,
+        srcDescriptor));
+
+    if (srcDescriptor.cpuHandle.ptr)
     {
         d3dDevice->CopyDescriptorsSimple(
             1,
             m_descriptorSet.resourceTable.getCpuHandle(
                 bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex),
-            internalResourceView->m_descriptor.cpuHandle,
+            srcDescriptor.cpuHandle,
             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
     else
