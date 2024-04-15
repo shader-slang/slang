@@ -8057,7 +8057,7 @@ public vec4 noise4(vector<float, N> x)
 // TODO: if called after a return, error.
 
 [ForceInline]
-[require(glsl_hlsl_spirv, compute_tesscontrol_tesseval_gfx)]
+[require(glsl_hlsl_spirv, shader_stages_compute_tesscontrol_tesseval)]
 public void barrier()
 {
     __target_switch
