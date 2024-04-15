@@ -174,11 +174,39 @@ SlangResult ResourceViewInternalImpl::getBufferDescriptorForBinding(
 
     // We need to create and cache a d3d12 descriptor for the resource view that encodes
     // the given buffer stride.
+    auto bufferResImpl = static_cast<BufferResourceImpl*>(view->m_resource.get());
     auto desc = view->m_desc;
-    desc.bufferElementSize = bufferStride;
-
+    Size bufferSize = 0;
+    if (desc.bufferElementSize == 0)
+    {
+        // If buffer element size is 0, we assume the buffer range from original desc is in bytes.
+        bufferSize = desc.bufferRange.elementCount;
+        if (bufferSize == 0)
+        {
+            bufferSize = bufferResImpl->getDesc()->sizeInBytes - desc.bufferRange.firstElement;
+        }
+        desc.bufferElementSize = bufferStride;
+        desc.bufferRange.firstElement /= bufferStride;
+        desc.bufferRange.elementCount = bufferSize / bufferStride;
+    }
+    else
+    {
+        // If buffer element size is not 0, we assume the buffer range from original desc is in elements
+        // of original stride.
+        if (desc.bufferRange.elementCount == 0)
+        {
+            bufferSize = bufferResImpl->getDesc()->sizeInBytes - desc.bufferRange.firstElement * desc.bufferElementSize;
+        }
+        else
+        {
+            bufferSize = desc.bufferRange.elementCount * desc.bufferElementSize;
+        }
+        desc.bufferElementSize = bufferStride;
+        desc.bufferRange.firstElement = desc.bufferRange.firstElement * desc.bufferElementSize / bufferStride;
+        desc.bufferRange.elementCount = bufferSize / bufferStride;
+    }
     SLANG_RETURN_ON_FAIL(createD3D12BufferDescriptor(
-        static_cast<BufferResourceImpl*>(view->m_resource.get()),
+        bufferResImpl,
         static_cast<BufferResourceImpl*>(view->m_counterResource.get()),
         desc,
         device,
