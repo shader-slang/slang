@@ -1183,6 +1183,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // iterate down all the insts that originate from a `nonUniformResourceIndexInst` and pop out the
         // `nonUniformResourceIndexInst` from the index value itself and wrap it around the parent inst.
         // For example:
+        IRCall* callInst = nullptr;
+        List<IRInst*> newCallArgs;
         for (Index i = 0; i < resWorkList.getCount(); i++)
         {
             auto inst = resWorkList[i];
@@ -1214,6 +1216,22 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 case kIROp_Load:
                     newUser = builder.emitLoad(user->getFullType(), inst->getOperand(0));
                     break;
+                case kIROp_Call:
+                    callInst = as<IRCall>(user);
+                    if (callInst)
+                    {
+                        for (UInt i = 0; i < callInst->getArgCount(); i++)
+                        {
+                            auto arg = callInst->getArg(i);
+                            if (auto nonUniformInst = as<IRNonUniformResourceIndex>(arg))
+                            {
+                                arg = nonUniformInst->getOperand(0);
+                            }
+                            newCallArgs.add(arg);
+                        }
+                        newUser = builder.emitCallInst(user->getFullType(), callInst->getCallee(), newCallArgs);
+                    }
+                    break;
                 default:
                     // Ignore for all other unknown insts.
                     break;
@@ -1229,6 +1247,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 case kIROp_IntCast:
                 case kIROp_Load:
                 case kIROp_GetElementPtr:
+                case kIROp_Call:
                     resWorkList.add(nonUniformUser);
                     break;
                 };
@@ -1248,6 +1267,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 builder.addSPIRVNonUniformResourceDecoration(operand);
                 nonUniformResInst->replaceUsesWith(operand);
+            }
+            else if (auto callOp = as<IRCall>(operand))
+            {
+                builder.addSPIRVNonUniformResourceDecoration(operand);
+                nonUniformResInst->replaceUsesWith(operand);
+                nonUniformResInst->removeAndDeallocate();
             }
         }
     }
