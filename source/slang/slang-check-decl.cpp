@@ -9723,7 +9723,7 @@ namespace Slang
 
     void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
     {
-#ifdef _DEBUG
+#if defined(_DEBUG) && _WIN32 && defined(_MSC_VER)
         if (funcDecl->getName() && funcDecl->getName()->text.equals(breakAtThisDeclNameToCheckCapability))
             __debugbreak();
 #endif 
@@ -9770,12 +9770,13 @@ namespace Slang
         if (declaredCaps.isEmpty())
         {
             // If the user has not declared any capabilities,
-            // we should diagnose an error if this is a public symbol.
+            // we should diagnose a warning if any_target is not
+            // a super-set by exact atoms. 
             if (vis == DeclVisibility::Public && !funcDecl->inferredCapabilityRequirements.isEmpty())
             {
                 if (!getModuleDecl(funcDecl)->isInLegacyLanguage)
                 {
-                    if (funcDecl->inferredCapabilityRequirements != getAnyPlatformCapabilitySet())
+                    if (!funcDecl->inferredCapabilityRequirements.isExactSubset(getAnyPlatformCapabilitySet()))
                     {
                         getSink()->diagnose(
                             funcDecl->loc,

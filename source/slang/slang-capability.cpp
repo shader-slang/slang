@@ -1274,6 +1274,24 @@ bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, C
     return true;
 }
 
+bool CapabilitySet::isExactSubset(CapabilitySet const& maybeSuperSet)
+{
+    // This should only be used when absolutely required due to the 
+    // cost for complex sets. Simple sets are fine (glsl|spirv...)
+    for (auto& thisCon : m_conjunctions)
+    {
+        bool foundEqualCon = false;
+        for (auto& thatCon : maybeSuperSet.m_conjunctions)
+        {
+            if (thisCon == thatCon)
+                foundEqualCon = true;
+        }
+        if (foundEqualCon == false)
+            return false;
+    }
+    return true;
+}
+
 void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
 {
     bool isFirstSet = true;

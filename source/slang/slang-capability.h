@@ -230,6 +230,8 @@ public:
 
     static bool checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, const CapabilityConjunctionSet*& outFailedAvailableSet);
 
+    bool isExactSubset(CapabilitySet const& maybeSuperSet);
+
 private:
     // The underlying representation we use is a list of conjunctions.
     //

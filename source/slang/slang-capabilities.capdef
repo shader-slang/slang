@@ -154,6 +154,8 @@ def _cuda_sm_9_0 : _cuda_sm_8_0;
 
 // SPIRV extensions.
 
+def SOURCE_EXT_GL_NV_compute_shader_derivatives : spirv_1_0;
+
 def SPV_EXT_fragment_shader_interlock : spirv_1_0;
 def SPV_KHR_fragment_shader_barycentric : spirv_1_0;
 def SPV_EXT_fragment_fully_covered : spirv_1_0;
@@ -251,6 +253,7 @@ def _GL_KHR_shader_subgroup_shuffle : glsl;
 def _GL_KHR_shader_subgroup_shuffle_relative : glsl;
 def _GL_KHR_shader_subgroup_shuffle_clustered : glsl;
 def _GL_KHR_shader_subgroup_vote : glsl;
+def _GL_NV_compute_shader_derivatives : glsl;
 def _GL_NV_shader_subgroup_partitioned : glsl;
 def _GL_NV_ray_tracing_motion_blur : glsl_spirv_1_4;
 def _GL_NV_shader_atomic_fp16_vector : glsl;
@@ -294,6 +297,7 @@ alias GL_KHR_shader_subgroup_shuffle = _GL_KHR_shader_subgroup_shuffle | spvGrou
 alias GL_KHR_shader_subgroup_shuffle_relative = _GL_KHR_shader_subgroup_shuffle_relative | spvGroupNonUniformShuffle;
 alias GL_KHR_shader_subgroup_vote = _GL_KHR_shader_subgroup_vote | spvGroupNonUniformVote;
 alias GL_KHR_shader_subgroup_quad = _GL_KHR_shader_subgroup_quad | spvGroupNonUniformQuad;
+alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SOURCE_EXT_GL_NV_compute_shader_derivatives;
 alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | spirv_1_0;
 alias GL_NV_shader_subgroup_partitioned = _GL_NV_shader_subgroup_partitioned | spvGroupNonUniformPartitionedNV;
 alias GL_NV_ray_tracing_motion_blur = _GL_NV_ray_tracing_motion_blur | spvRayTracingMotionBlurNV;
@@ -305,7 +309,7 @@ alias GL_NV_ray_tracing = GL_EXT_ray_tracing;
 
 // Define feature names
 
-alias compute_tesscontrol_tesseval_gfx = compute + tesscontrol + tesseval + any_gfx_target;
+alias compute_tesscontrol_tesseval_gfx = compute | tesscontrol | tesseval;
 
 alias nvapi = hlsl_nvapi;
 alias raytracing = GL_EXT_ray_tracing | _sm_6_5 | cuda;
@@ -315,7 +319,8 @@ alias rayquery = GL_EXT_ray_query | _sm_6_5;
 alias raytracing_motionblur =  raytracing + motionblur | cuda;
 alias ser_motion = ser + motionblur;
 alias shaderclock = GL_EXT_shader_realtime_clock | hlsl_nvapi | cpp | cuda;
-alias meshshading = spvMeshShadingEXT + _sm_6_5 + _GL_EXT_mesh_shader + amplification;
+alias meshshading_internal = spvMeshShadingEXT + _sm_6_5 + _GL_EXT_mesh_shader;
+alias meshshading = amplification + meshshading_internal | mesh + meshshading_internal;
 alias fragmentshaderinterlock = _GL_ARB_fragment_shader_interlock | hlsl_nvapi | spvFragmentShaderPixelInterlockEXT;
 alias atomic64 = GL_EXT_shader_atomic_int64 | _sm_6_6 | cpp | cuda;
 alias atomicfloat = GL_EXT_shader_atomic_float | _sm_6_0 + hlsl_nvapi | cpp | cuda;
@@ -460,8 +465,10 @@ alias atomic_hlsl_sm_6_6 = _sm_6_6;
 alias byteaddressbuffer = sm_4_0;
 alias byteaddressbuffer_rw = sm_4_0 + shader_stages_fragment_compute;
 alias consumestructuredbuffer = sm_5_0 + shader_stages_fragment_compute;
-alias fragmentprocessing = fragment + sm_5_0;
-alias fragmentprocessing_derivativecontrol = fragment + sm_5_0 + GL_ARB_derivative_control;
+alias fragmentprocessing = fragment + sm_5_0 
+                         | compute + GL_NV_compute_shader_derivatives;
+alias fragmentprocessing_derivativecontrol = fragment + sm_5_0 + GL_ARB_derivative_control
+                                           | compute + GL_NV_compute_shader_derivatives;
 alias getattributeatvertex = fragment + _sm_6_1 | fragment + GL_EXT_fragment_shader_barycentric;
 alias memorybarrier_compute = compute + sm_5_0;
 alias structuredbuffer = sm_4_0;
@@ -470,14 +477,14 @@ alias texture_sm_4_1 = sm_4_1 + GLSL_150;
 alias texture_sm_4_1_fragment = cpp + sm_4_1
                               | cuda + sm_4_1
                               | glsl + sm_4_1 + GLSL_150
-                              | hlsl + sm_4_1 + fragment
+                              | hlsl + sm_4_1 + fragment + raytracing_allstages
                               | spirv_1_0 + sm_4_1
                               ;
 alias texture_sm_4_1_clamp_fragment = texture_sm_4_1_fragment + GL_ARB_sparse_texture_clamp;
 alias texture_sm_4_1_vertex_fragment_geometry = cpp + sm_4_1
                                               | cuda + sm_4_1
                                               | glsl + sm_4_1 + GLSL_150
-                                              | hlsl + sm_4_1 + shader_stages_vertex_fragment_geometry
+                                              | hlsl + sm_4_1 + shader_stages_vertex_fragment_geometry + raytracing_allstages
                                               | spirv_1_0 + sm_4_1
                                               ;
 alias texture_gather_sm_4_1 = texture_sm_4_1_vertex_fragment_geometry + GL_ARB_texture_gather;

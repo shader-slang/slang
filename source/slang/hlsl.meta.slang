@@ -60,7 +60,7 @@ uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RasterizerOrderedSt
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
-[require(cuda_glsl_hlsl_spirv, appendstructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv, appendstructuredbuffer)]
 struct AppendStructuredBuffer
 {
     __intrinsic_op($(kIROp_StructuredBufferAppend))
@@ -1675,7 +1675,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions + isArray + 1> locationAndSampleIndex)
     {
         return Load(__vectorReshape<Shape.dimensions + isArray>(locationAndSampleIndex), locationAndSampleIndex[Shape.dimensions + isArray]);
@@ -2572,7 +2572,7 @@ struct StructuredBuffer
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLConsumeStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLConsumeStructuredBufferType))
-[require(cuda_glsl_hlsl_spirv, consumestructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv, consumestructuredbuffer)]
 struct ConsumeStructuredBuffer
 {
     __intrinsic_op($(kIROp_StructuredBufferConsume))
@@ -3372,7 +3372,7 @@ for(auto item : kMutableStructuredBufferCases) {
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
-[require(cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
 struct $(item.name)
 {
     uint DecrementCounter();
@@ -10494,9 +10494,6 @@ void TraceMotionRay(
 }
 
 // 10.3.3
-__target_intrinsic(hlsl)
-[require(hlsl, raytracing_intersection)]
-bool ReportHit<A>(float tHit, uint hitKind, A attributes);
 
 [require(glsl_spirv, raytracing_intersection)]
 bool __reportIntersection(float tHit, uint hitKind)
@@ -10513,15 +10510,21 @@ bool __reportIntersection(float tHit, uint hitKind)
 }
 
 __generic<A>
-__specialized_for_target(glsl)
-__specialized_for_target(spirv)
+[ForceInline]
+[require(glsl_hlsl_spirv, raytracing_intersection)]
 bool ReportHit(float tHit, uint hitKind, A attributes)
 {
-    [__vulkanHitAttributes]
-    static A a;
-
-    a = attributes;
-    return __reportIntersection(tHit, hitKind);
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "ReportHit($0, $1, $2)";
+    case glsl:
+    case spirv:
+        [__vulkanHitAttributes]
+        static A a;
+        a = attributes;
+        return __reportIntersection(tHit, hitKind);
+    }
 }
 
 // 10.3.4

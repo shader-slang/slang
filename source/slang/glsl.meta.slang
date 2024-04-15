@@ -108,7 +108,8 @@ public in uvec3 gl_LocalInvocationID : SV_GroupThreadID;
 public property uint3 gl_NumWorkGroups {
 
     [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
-    get {
+    get 
+    {
         __target_switch
         {
         case glsl:
@@ -121,19 +122,14 @@ public property uint3 gl_NumWorkGroups {
     }
 }
 
-public property uint3 gl_WorkGroupSize {
-
+[require(compute)]
+public property uint3 gl_WorkGroupSize
+{
+    [__unsafeForceInlineEarly]
     [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
-    get {
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_WorkGroupSize)";
-        case spirv:
-            return spirv_asm {
-                    result:$$uint3 = OpLoad builtin(WorkgroupSize:uint3);
-                };
-        }
+    get
+    {
+        return WorkgroupSize();
     }
 }
 
