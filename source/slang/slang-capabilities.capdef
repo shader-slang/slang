@@ -127,6 +127,7 @@ alias shader_stages_compute_fragment = fragment | compute;
 alias shader_stages_fragment_geometry_vertex = vertex | fragment | geometry;
 alias shader_stages_hull_domain = hull | domain;
 alias raytracing_stages_fragment = raytracing_stages | fragment;
+alias raytracing_stages_compute = raytracing_stages | compute;
 alias raytracing_stages_compute_fragment = raytracing_stages | shader_stages_compute_fragment;
 alias raytracing_stages_fragment_geometry_vertex = raytracing_stages | shader_stages_fragment_geometry_vertex;
 
@@ -332,7 +333,7 @@ alias groupnonuniform = GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_s
                         | _sm_6_0 | cuda;
 alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
 alias shadermemorycontrol = glsl | spirv_1_0 | _sm_5_0;
-alias shadermemorycontrol_compute = compute + shadermemorycontrol;
+alias shadermemorycontrol_compute = raytracing_stages_compute + shadermemorycontrol;
 alias subpass = fragment + any_gfx_target;
 alias subgroup_basic = GL_KHR_shader_subgroup_basic | GL_KHR_shader_subgroup_basic + spirv_1_0 | _sm_6_0 | _cuda_sm_7_0;
 alias subgroup_basic_ballot = GL_KHR_shader_subgroup_basic + GL_KHR_shader_subgroup_ballot | _sm_6_0 | _cuda_sm_7_0;
@@ -472,7 +473,7 @@ alias fragmentprocessing = fragment + sm_5_0
 alias fragmentprocessing_derivativecontrol = fragment + sm_5_0 + GL_ARB_derivative_control
                                            | compute + GL_NV_compute_shader_derivatives;
 alias getattributeatvertex = fragment + _sm_6_1 | fragment + GL_EXT_fragment_shader_barycentric;
-alias memorybarrier_compute = compute + sm_5_0;
+alias memorybarrier_compute = raytracing_stages_compute + sm_5_0;
 alias structuredbuffer = sm_4_0;
 alias structuredbuffer_rw = sm_4_0 + raytracing_stages_compute_fragment;
 alias texture_sm_4_1 = sm_4_1 + GLSL_150;
