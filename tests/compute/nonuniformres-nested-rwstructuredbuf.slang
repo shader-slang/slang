@@ -1,5 +1,3 @@
-// vk-texture-indexing.slang
-
 //TEST:SIMPLE(filecheck=CHECK1):-target spirv -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK2):-target spirv -entry main -stage compute -emit-spirv-directly
 
