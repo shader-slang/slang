@@ -79,7 +79,7 @@ namespace gfx_test
             R"(
                 export static const bool turnOnFeature = true;
                 export static const float constValue = 2.0;
-                export static const int numthread = 2;
+                export static const uint numthread = 2;
                 export static const int arraySize = 4;
             )"));
         

@@ -2224,6 +2224,8 @@ Dictionary<String, IntVal*>& ComponentType::getMangledNameToIntValMap()
 
 ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
 {
+    auto astBuilder = getLinkage()->getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
     return as<ConstantIntVal>(intVal->linkTimeResolve(getMangledNameToIntValMap()));
 }
 
@@ -6100,7 +6102,7 @@ char const* EndToEndCompileRequest::getDependencyFilePath(int index)
     auto frontEndReq = getFrontEndReq();
     auto program = frontEndReq->getGlobalAndEntryPointsComponentType();
     SourceFile* sourceFile = program->getFileDependencies()[index];
-    return sourceFile->getPathInfo().hasFileFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : "unknown";
+    return sourceFile->getPathInfo().hasFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : "unknown";
 }
 
 int EndToEndCompileRequest::getTranslationUnitCount()
@@ -6270,7 +6272,7 @@ ISlangMutableFileSystem* EndToEndCompileRequest::getCompileRequestResultAsFileSy
 
             // Filter the containerArtifact into things that can be written
             ComPtr<IArtifact> writeArtifact;
-            if (SLANG_SUCCEEDED(ArtifactContainerUtil::filter(m_containerArtifact, writeArtifact)))
+            if (SLANG_SUCCEEDED(ArtifactContainerUtil::filter(m_containerArtifact, writeArtifact)) && writeArtifact)
             {
                 if (SLANG_SUCCEEDED(ArtifactContainerUtil::writeContainer(writeArtifact, "", fileSystem)))
                 {

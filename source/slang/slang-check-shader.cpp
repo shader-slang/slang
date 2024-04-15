@@ -1242,7 +1242,7 @@ namespace Slang
                 // Find the generic argument index of the corresponding generic parameter type in the
                 // generic parameter set.
                 //
-                for (auto member : genericDeclRef.getDecl()->members)
+                for (auto member : genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDecl>())
                 {
                     if (member == genParamDeclRef.getDecl())
                     {
