@@ -3361,6 +3361,7 @@ struct SPIRVEmitContext
 
         case kIROp_SPIRVNonUniformResourceDecoration:
             {
+                requireSPIRVCapability(SpvCapabilityShaderNonUniform);
                 emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
