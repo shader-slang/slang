@@ -5890,6 +5890,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, condExpr));
+
+            // One thing to be careful here is that lowering irCondition
+            // may create additional blocks due to short circuiting, so
+            // the block we are current inserting into is not necessarily
+            // the same as `testLabel`.
+            // 
             auto invCondition = builder->emitNot(irCondition->getDataType(), irCondition);
 
             // Now we want to `break` if the loop condition is false,
@@ -5907,15 +5913,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // 
             // mergeBlock:
             //   goto breakLabel;
-            auto mergeBlock = builder->emitBlock();
-            builder->emitBranch(loopHead);
-
-            builder->setInsertInto(testLabel);
+            auto mergeBlock = builder->createBlock();
             builder->emitIfElse(
                 invCondition,
                 breakLabel,
                 mergeBlock,
                 mergeBlock);
+
+            insertBlock(mergeBlock);
+            builder->emitBranch(loopHead);
         }
 
         // Finally we insert the label that a `break` will jump to
