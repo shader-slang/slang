@@ -477,14 +477,14 @@ alias texture_sm_4_1 = sm_4_1 + GLSL_150;
 alias texture_sm_4_1_fragment = cpp + sm_4_1
                               | cuda + sm_4_1
                               | glsl + sm_4_1 + GLSL_150
-                              | hlsl + sm_4_1 + fragment + raytracing_allstages
+                              | hlsl + sm_4_1 + fragment + raytracing_stages
                               | spirv_1_0 + sm_4_1
                               ;
 alias texture_sm_4_1_clamp_fragment = texture_sm_4_1_fragment + GL_ARB_sparse_texture_clamp;
 alias texture_sm_4_1_vertex_fragment_geometry = cpp + sm_4_1
                                               | cuda + sm_4_1
                                               | glsl + sm_4_1 + GLSL_150
-                                              | hlsl + sm_4_1 + shader_stages_vertex_fragment_geometry + raytracing_allstages
+                                              | hlsl + sm_4_1 + shader_stages_vertex_fragment_geometry + raytracing_stages
                                               | spirv_1_0 + sm_4_1
                                               ;
 alias texture_gather_sm_4_1 = texture_sm_4_1_vertex_fragment_geometry + GL_ARB_texture_gather;
