@@ -125,6 +125,8 @@ alias raytracing_stages_raygen_closesthit_miss_callable = raygen | closesthit | 
 alias shader_stages_fragment_compute = fragment | compute;
 alias shader_stages_vertex_fragment_geometry = vertex | fragment | geometry;
 alias shader_stages_hull_domain = hull | domain;
+alias raytracing_stages_fragment = raytracing_stages | fragment;
+alias raytracing_stages_vertex_fragment_geometry = raytracing_stages | shader_stages_vertex_fragment_geometry;
 
 def _sm_4_0 : hlsl;
 def _sm_4_1 : _sm_4_0;
@@ -477,14 +479,14 @@ alias texture_sm_4_1 = sm_4_1 + GLSL_150;
 alias texture_sm_4_1_fragment = cpp + sm_4_1
                               | cuda + sm_4_1
                               | glsl + sm_4_1 + GLSL_150
-                              | hlsl + sm_4_1 + fragment + raytracing_stages
+                              | hlsl + sm_4_1 + raytracing_stages_fragment
                               | spirv_1_0 + sm_4_1
                               ;
 alias texture_sm_4_1_clamp_fragment = texture_sm_4_1_fragment + GL_ARB_sparse_texture_clamp;
 alias texture_sm_4_1_vertex_fragment_geometry = cpp + sm_4_1
                                               | cuda + sm_4_1
                                               | glsl + sm_4_1 + GLSL_150
-                                              | hlsl + sm_4_1 + shader_stages_vertex_fragment_geometry + raytracing_stages
+                                              | hlsl + sm_4_1 + raytracing_stages_vertex_fragment_geometry
                                               | spirv_1_0 + sm_4_1
                                               ;
 alias texture_gather_sm_4_1 = texture_sm_4_1_vertex_fragment_geometry + GL_ARB_texture_gather;
