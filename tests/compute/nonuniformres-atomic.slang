@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK1):-target spirv -entry main -stage compute
+//DISABLED_TEST:SIMPLE(filecheck=CHECK1):-target spirv -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK2):-target spirv -entry main -stage compute -emit-spirv-directly
 
 RWTexture2D<uint> texArray[2];

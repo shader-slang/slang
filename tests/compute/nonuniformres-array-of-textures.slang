@@ -3,8 +3,6 @@
 
 Texture2D<float> textures[2];
 RWTexture2D<float2> outputTexture;
-uint2 iVals;
-float2 fVals;
 [numthreads(1, 1, 1)]
 void main(uint2 pixelIndex : SV_DispatchThreadID)
 {

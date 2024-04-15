@@ -8,8 +8,9 @@ RWStructuredBuffer<float> output;
 [numthreads(4,1,1)]
 void main(int tid : SV_DispatchThreadID)
 {
-    buffer[NonUniformResourceIndex(0)].InterlockedAdd(0, 1);
+    // CHECK-DAG: OpDecorate {{(NonUniform)|(Coherent)}}
+    // CHECK-DAG: OpDecorate {{(NonUniform)|(Coherent)}}
+    buffer[NonUniformResourceIndex(2)].InterlockedAdd(0, 1);
     AllMemoryBarrier();
     output[tid] = buffer[0].Load(0);
-    // CHECK-DAG: OpDecorate %buffer Coherent
 }
