@@ -987,6 +987,8 @@ namespace Slang
         // directly (it is only visible through the requirement witness
         // information for inheritance declarations).
         //
+        auto leftDeclRefParent = left.declRef.getParent();
+        auto rightDeclRefParent = right.declRef.getParent();
         bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
         bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
         if(leftIsInterfaceRequirement != rightIsInterfaceRequirement)
@@ -1001,8 +1003,8 @@ namespace Slang
         // If both are interface requirements, prefer to more derived interface.
         if (leftIsInterfaceRequirement && rightIsInterfaceRequirement)
         {
-            auto leftType = DeclRefType::create(m_astBuilder, left.declRef.getParent());
-            auto rightType = DeclRefType::create(m_astBuilder, right.declRef.getParent());
+            auto leftType = DeclRefType::create(m_astBuilder, leftDeclRefParent);
+            auto rightType = DeclRefType::create(m_astBuilder, rightDeclRefParent);
 
             if (!leftType->equals(rightType))
             {
@@ -1013,27 +1015,26 @@ namespace Slang
             }
         }
 
-        // If both parents are the same, there is no explicit overload preference without looking
-        // at parameters, which is resolved later.
+        // If both parents are the same and 1 declRef has specialization of generics 
+        // whilst the other is not, specialized calls are always prefered
         if(left.declRef.getParent() == right.declRef.getParent())
             return 0;
 
-        // If both are members of an inherited decl, prefer the more derived inheritance member
-        auto leftStruct = left.declRef.getParent().as<StructDecl>();
-        auto rightStruct = right.declRef.getParent().as<StructDecl>();
+        auto leftStruct = leftDeclRefParent.as<AggTypeDeclBase>();
+        auto rightStruct = rightDeclRefParent.as<AggTypeDeclBase>();
         if (leftStruct && rightStruct)
         {
-            auto leftType = DeclRefType::create(m_astBuilder, leftStruct);
-            auto rightType = DeclRefType::create(m_astBuilder, rightStruct);
+            auto leftType = DeclRefType::create(m_astBuilder, leftDeclRefParent);
+            auto rightType = DeclRefType::create(m_astBuilder, rightDeclRefParent);
 
-            auto inheritanceInfo = getShared()->getInheritanceInfo(leftType);
-            for (auto facet : inheritanceInfo.facets)
-                if (facet.getImpl()->getType()->equals(rightType))
-                    return -1;
-            inheritanceInfo = getShared()->getInheritanceInfo(rightType);
+            auto inheritanceInfo = getShared()->getInheritanceInfo(rightType);
             for (auto facet : inheritanceInfo.facets)
                 if (facet.getImpl()->getType()->equals(rightType))
                     return 1;
+            inheritanceInfo = getShared()->getInheritanceInfo(leftType);
+            for (auto facet : inheritanceInfo.facets)
+                if (facet.getImpl()->getType()->equals(rightType))
+                    return -1;
         }
 
         // TODO: We should generalize above rules such that in a tie a declaration

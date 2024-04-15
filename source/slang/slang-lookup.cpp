@@ -416,6 +416,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     // With semantics context, we can do a comprehensive lookup by scanning through
     // the linearized inheritance list.
 
+    auto selfType = DeclRefType::create(astBuilder, declRef);
     InheritanceInfo inheritanceInfo;
     if (auto extDeclRef = declRef.as<ExtensionDecl>())
     {
@@ -423,7 +424,6 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     }
     else
     {
-        auto selfType = DeclRefType::create(astBuilder, declRef);
         selfType = selfType->getCanonicalType();
         inheritanceInfo = semantics->getShared()->getInheritanceInfo(selfType);
     }
@@ -442,6 +442,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             continue;
         }
 
+        auto extensionFacet = as<ExtensionDecl>(facet.getImpl()->getDeclRef().getDecl());
         // If we are looking up in an interface, and the lookup request told us
         // to skip interfaces, we should do so here.
         if (auto baseInterfaceDeclRef = containerDeclRef.as<InterfaceDecl>())
@@ -449,9 +450,11 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             if (int(request.options) & int(LookupOptions::IgnoreBaseInterfaces))
                 continue;
         }
-        // If we are looking up only immediate members, ignore non "Self" facets
+        // If we are looking up only immediate members, ignore non "Self" facets or extension to "Self"
         else if (int(request.options) & int(LookupOptions::IgnoreInheritance) 
-            && facet.getImpl()->directness != Facet::Directness::Self)
+            && (facet.getImpl()->directness != Facet::Directness::Self
+                && (!extensionFacet || !extensionFacet->targetType.type->equals(selfType))
+                ))
         {
                 continue;
         }

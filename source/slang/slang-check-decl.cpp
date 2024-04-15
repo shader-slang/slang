@@ -1833,18 +1833,83 @@ namespace Slang
         return ctor;
     }
 
-    static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
+    static ConstructorDecl* _getDefaultCtor(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl)
     {
-        for (auto m : structDecl->members)
+        // we may have a default ctor inside an extension, 
+        // lookup will resolve the location of our default ctor
+        auto lookupDefaultConstructor = lookUpMember(
+            m_astBuilder,
+            visitor,
+            visitor->getName("$init"),
+            DeclRefType::create(m_astBuilder, structDecl),
+            structDecl->ownedScope,
+            LookupMask::Function,
+            LookupOptions::IgnoreInheritance);
+
+        if (!lookupDefaultConstructor.isValid())
+            return nullptr;
+
+        auto parseLookupItemLogic = [&](LookupResultItem& item)
         {
-            auto ctor = as<ConstructorDecl>(m);
+            auto ctor = as<ConstructorDecl>(lookupDefaultConstructor.item.declRef.getDecl());
             if (!ctor || !ctor->body)
-                continue;
+                return (ConstructorDecl*)nullptr;
             if (ctor->members.getCount() != 0)
-                continue;
+                return (ConstructorDecl*)nullptr;
             return ctor;
+        };
+        if (lookupDefaultConstructor.items.getCount() == 0)
+        {
+            return parseLookupItemLogic(lookupDefaultConstructor.item);
+        }
+        for (auto m : lookupDefaultConstructor.items)
+        {
+            auto result = parseLookupItemLogic(m);
+            if (result)
+                return result;
         }
         return nullptr;
+    }
+
+
+    static List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut)
+    {
+        List<ConstructorDecl*> ctorList;
+
+        auto lookupDefaultConstructor = lookUpMember(
+            m_astBuilder,
+            visitor,
+            visitor->getName("$init"),
+            DeclRefType::create(m_astBuilder, structDecl),
+            structDecl->ownedScope,
+            LookupMask::Function,
+            LookupOptions::IgnoreInheritance);
+
+        if (!lookupDefaultConstructor.isValid())
+            return ctorList;
+
+        auto parseLookupItemLogic = [&](LookupResultItem& item)
+        {
+            auto ctor = as<ConstructorDecl>(item.declRef.getDecl());
+            if (!ctor || !ctor->body)
+                return;
+            ctorList.add(ctor);
+            if (ctor->members.getCount() != 0)
+                return;
+            *defaultCtorOut = ctor;
+        };
+        if (lookupDefaultConstructor.items.getCount() == 0)
+        {
+            parseLookupItemLogic(lookupDefaultConstructor.item);
+            return ctorList;
+        }
+
+        for (auto m : lookupDefaultConstructor.items)
+        {
+            parseLookupItemLogic(m);
+        }
+
+        return ctorList;
     }
 
     void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
@@ -1866,11 +1931,6 @@ namespace Slang
         {
             structDecl->addTag(TypeTag::Incomplete);
         }
-
-        // add a empty deault CTor if missing
-        auto defaultCtor = _getDefaultCtor(structDecl);
-        if (!defaultCtor)
-            _createCtor(this, m_astBuilder, structDecl);
 
         // Slang supports a convenient syntax to create a wrapper type from
         // an existing type that implements a given interface. For example,
@@ -7326,22 +7386,6 @@ namespace Slang
         return as<SeqStmt>(stmt->body);
     }
 
-    static List<ConstructorDecl*> _getCtorList(StructDecl* structDecl, ConstructorDecl** defaultCtorOut)
-    {
-        List<ConstructorDecl*> ctorList;
-        for (auto m : structDecl->members)
-        {
-            auto ctor = as<ConstructorDecl>(m);
-            if (!ctor || !ctor->body)
-                continue;
-            ctorList.add(ctor);
-            if (ctor->members.getCount() != 0)
-                continue;
-            *defaultCtorOut = ctor;
-        }
-        return ctorList;
-    }
-
     void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     {
         if (aggTypeDecl->hasTag(TypeTag::Incomplete) && aggTypeDecl->hasModifier<HLSLExportModifier>())
@@ -7361,12 +7405,12 @@ namespace Slang
             DeclAndCtorInfo()
             {
             }
-            DeclAndCtorInfo(StructDecl* parent, const bool getOnlyDefault)
+            DeclAndCtorInfo(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* parent, const bool getOnlyDefault)
             {
                 if (getOnlyDefault)
-                    defaultCtor = _getDefaultCtor(parent);
+                    defaultCtor = _getDefaultCtor(m_astBuilder, visitor, parent);
                 else
-                    ctorList = _getCtorList(parent, &defaultCtor);
+                    ctorList = _getCtorList(m_astBuilder, visitor, parent, &defaultCtor);
             }
         };
         List<DeclAndCtorInfo> inheritanceDefaultCtorList{};
@@ -7381,32 +7425,29 @@ namespace Slang
             auto structOfInheritance = as<StructDecl>(declRefType->getDeclRef().getDecl());
             if (!structOfInheritance)
                 continue;
-            inheritanceDefaultCtorList.add(DeclAndCtorInfo(structOfInheritance, true));
+            inheritanceDefaultCtorList.add(DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, true));
         }
-        DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(structDecl, false);
+        DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, false);
 
         std::size_t insertOffset = 0;
         Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
-        for (auto& declInfo : inheritanceDefaultCtorList)
+        for (auto ctor : structDeclInfo.ctorList)
         {
-            if (!declInfo.defaultCtor)
-                continue;
-            for (auto ctor : structDeclInfo.ctorList)
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+            seqStmtChild->stmts.reserve(inheritanceDefaultCtorList.getCount());
+            for (auto& declInfo : inheritanceDefaultCtorList)
             {
-                auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
-                auto ctorName = declInfo.defaultCtor->getName();
+                if (!declInfo.defaultCtor)
+                    continue;
 
-                auto lookupResult = lookUpMember(
-                    m_astBuilder,
-                    this,
-                    ctorName,
-                    declInfo.defaultCtor->returnType.type,
-                    ctor->ownedScope,
-                    LookupMask::Function,
-                    LookupOptions::IgnoreInheritance);
+                auto ctorToInvoke = m_astBuilder->create<VarExpr>();
+                ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
+                ctorToInvoke->name = declInfo.defaultCtor->getName();
+                ctorToInvoke->loc = declInfo.defaultCtor->loc;
 
                 auto invoke = m_astBuilder->create<InvokeExpr>();
-                invoke->functionExpr = createLookupResultExpr(ctorName, lookupResult, nullptr, ctor->loc, nullptr);
+                invoke->functionExpr = ctorToInvoke;
 
                 ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
                 thisExpr->scope = ctor->ownedScope;
@@ -7419,30 +7460,38 @@ namespace Slang
                 stmt->expression = assign;
                 stmt->loc = ctor->loc;
 
-                seqStmt->stmts.insert(insertOffset, stmt);
+                seqStmtChild->stmts.add(stmt);
             }
-            insertOffset++;
-        }
 
-        for (auto& m : structDecl->members)
-        {
-            auto varDeclBase = as<VarDeclBase>(m);
-            if (!varDeclBase
-                || !varDeclBase->initExpr)
+            if (seqStmtChild->stmts.getCount() == 0)
                 continue;
 
-            for (auto ctor : structDeclInfo.ctorList)
+            seqStmt->stmts.insert(0, seqStmtChild);
+            insertOffset = 1;
+        }
+
+        for (auto ctor : structDeclInfo.ctorList)
+        {
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+            seqStmtChild->stmts.reserve(structDecl->members.getCount());
+            for (auto& m : structDecl->members)
             {
-                auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+                auto varDeclBase = as<VarDeclBase>(m);
+                if (!varDeclBase
+                    || !varDeclBase->initExpr)
+                    continue;
 
                 VarExpr* memberVarExpr = m_astBuilder->create<VarExpr>();
                 memberVarExpr->scope = ctor->ownedScope;
                 memberVarExpr->name = m->getName();
                 memberVarExpr->type = nullptr;
+
                 auto assign = m_astBuilder->create<AssignExpr>();
                 assign->left = memberVarExpr;
                 assign->right = varDeclBase->initExpr;
                 assign->loc = m->loc;
+
                 auto stmt = m_astBuilder->create<ExpressionStmt>();
                 stmt->expression = assign;
                 stmt->loc = m->loc;
@@ -7458,9 +7507,11 @@ namespace Slang
                 if (!checkedMemberVarExpr->type.isLeftValue)
                     continue;
 
-                seqStmt->stmts.insert(insertOffset, stmt);
+                seqStmtChild->stmts.add(stmt);
             }
-
+            if (seqStmtChild->stmts.getCount() == 0)
+                continue;
+            seqStmt->stmts.insert(insertOffset, seqStmtChild);
         }
 
         if (structDeclInfo.defaultCtor)
@@ -9516,6 +9567,12 @@ namespace Slang
 
     void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
     {
+        // add a empty deault CTor if missing; checking in attributes 
+        // to avoid circular checking logic
+        auto defaultCtor = _getDefaultCtor(m_astBuilder, this, structDecl);
+        if (!defaultCtor)
+            _createCtor(this, m_astBuilder, structDecl);
+
         int backingWidth = 0;
         [[maybe_unused]]
         int totalWidth = 0;
