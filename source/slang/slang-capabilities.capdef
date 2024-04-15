@@ -126,6 +126,7 @@ alias shader_stages_fragment_compute = fragment | compute;
 alias shader_stages_vertex_fragment_geometry = vertex | fragment | geometry;
 alias shader_stages_hull_domain = hull | domain;
 alias raytracing_stages_fragment = raytracing_stages | fragment;
+alias raytracing_stages_fragment_compute = raytracing_stages | fragment | compute;
 alias raytracing_stages_vertex_fragment_geometry = raytracing_stages | shader_stages_vertex_fragment_geometry;
 
 def _sm_4_0 : hlsl;
@@ -460,13 +461,13 @@ alias DX_6_7 = sm_6_7;
 
 alias sm_2_0_GLSL_140 = sm_4_0 | glsl | spirv_1_0 | cuda | cpp;
 alias sm_2_0_GLSL_400 = sm_4_0 | glsl | spirv_1_0 | cuda | cpp;
-alias appendstructuredbuffer = sm_5_0 + shader_stages_fragment_compute;
+alias appendstructuredbuffer = sm_5_0 + raytracing_stages_fragment_compute;
 alias atomic_hlsl = _sm_4_0;
 alias atomic_hlsl_nvapi = _sm_4_0 + hlsl_nvapi;
 alias atomic_hlsl_sm_6_6 = _sm_6_6;
 alias byteaddressbuffer = sm_4_0;
-alias byteaddressbuffer_rw = sm_4_0 + shader_stages_fragment_compute;
-alias consumestructuredbuffer = sm_5_0 + shader_stages_fragment_compute;
+alias byteaddressbuffer_rw = sm_4_0 + raytracing_stages_fragment_compute;
+alias consumestructuredbuffer = sm_5_0 + raytracing_stages_fragment_compute;
 alias fragmentprocessing = fragment + sm_5_0 
                          | compute + GL_NV_compute_shader_derivatives;
 alias fragmentprocessing_derivativecontrol = fragment + sm_5_0 + GL_ARB_derivative_control
@@ -474,7 +475,7 @@ alias fragmentprocessing_derivativecontrol = fragment + sm_5_0 + GL_ARB_derivati
 alias getattributeatvertex = fragment + _sm_6_1 | fragment + GL_EXT_fragment_shader_barycentric;
 alias memorybarrier_compute = compute + sm_5_0;
 alias structuredbuffer = sm_4_0;
-alias structuredbuffer_rw = sm_4_0 + shader_stages_fragment_compute;
+alias structuredbuffer_rw = sm_4_0 + raytracing_stages_fragment_compute;
 alias texture_sm_4_1 = sm_4_1 + GLSL_150;
 alias texture_sm_4_1_fragment = cpp + sm_4_1
                               | cuda + sm_4_1
