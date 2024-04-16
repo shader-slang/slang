@@ -68,12 +68,6 @@ jobs:
       run: |
         $ErrorActionPreference = "SilentlyContinue"
         cd .\FalcorBin\tests
-        ls
-        ls testing
-        python --version
-        python ./testing/run_unit_tests.py --help
-        python ./testing/run_unit_tests.py --list-configs
-        python ./testing/run_unit_tests.py --config windows-vs2022-Release
         python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
         cd ../../
     - name: falcor-image-test
