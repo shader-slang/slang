@@ -9487,11 +9487,11 @@ namespace Slang
         // Always join capabilities to ensure only the lowest denominator will be apart of the final requirments.
         // if we have `function(){ Store(compute|fragment); Sample(fragment); }` join will ensure the capabilities
         // shall only be satisfied if `fragment` is the target stage, and not `compute`.
+        resultCaps.join(nodeCaps);
 
         auto oldCaps = resultCaps;
         bool isAnyInvalid = resultCaps.isInvalid() || nodeCaps.isInvalid();
-        resultCaps.join(nodeCaps);
-        
+
         auto decl = as<Decl>(userNode);
 
         if (!isAnyInvalid && resultCaps.isInvalid())
@@ -9600,9 +9600,9 @@ namespace Slang
                     }
 
                     if (!maybeRequireCapability)
-                        targetCap = (CapabilitySet(CapabilityName::any_target).getTextualTargetsThisIsMissingFromOther(set));
+                        targetCap = (CapabilitySet(CapabilityName::any_target).getTargetsThisIsMissingFromOther(set));
                     else 
-                        targetCap = (maybeRequireCapability->capabilitySet.getTextualTargetsThisIsMissingFromOther(set));
+                        targetCap = (maybeRequireCapability->capabilitySet.getTargetsThisIsMissingFromOther(set));
                 }
                 else
                 {
@@ -9792,9 +9792,9 @@ namespace Slang
             {
                 // For public decls, we need to enforce that the function
                 // only uses capabilities that it declares.
-                // At a minimum we will propegate shader requirements to our 
+                // At a minimum we will propagate shader requirements to our 
                 // function from calling children in all cases so the parent
-                // can enforce shader targets correctly and propegate to `main`
+                // can enforce shader targets correctly and propagate to `main`
                 const CapabilityConjunctionSet* failedAvailableCapabilityConjunction = nullptr;
                 if (!CapabilitySet::checkCapabilityRequirement(
                     declaredCaps,

@@ -211,7 +211,7 @@ public:
 
     void simpleJoinWithSetMask(const CapabilitySet& other, CapabilityName abstractMask);
 
-    CapabilitySet getTextualTargetsThisIsMissingFromOther(const CapabilitySet& other);
+    CapabilitySet getTargetsThisIsMissingFromOther(const CapabilitySet& other);
 
     void canonicalize();
 

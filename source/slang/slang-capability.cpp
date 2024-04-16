@@ -988,7 +988,7 @@ void CapabilitySet::canonicalize()
     m_conjunctions.sort();
 }
 
-CapabilitySet CapabilitySet::getTextualTargetsThisIsMissingFromOther(const CapabilitySet& other)
+CapabilitySet CapabilitySet::getTargetsThisIsMissingFromOther(const CapabilitySet& other)
 {
     CapabilitySet conflicts{};
     List<CapabilityConjunctionSet> textualTargetsNotHandled;
