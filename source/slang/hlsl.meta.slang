@@ -2661,12 +2661,14 @@ ${{{{
     __target_intrinsic(cuda, "atomicAdd($0._getPtrAt<uint64_t>($1), $2)")
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd);
 
+    [ForceInline]
     __specialized_for_target(hlsl)
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
     {
         __atomicAdd(this, byteAddress, __asuint2(valueToAdd));
     }
 
+    [ForceInline]
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
@@ -3104,6 +3106,7 @@ ${{{{
 }}}}
 
     // Added operations:
+    [ForceInline]
     void InterlockedAdd(
         UINT dest,
         UINT value,
@@ -5391,6 +5394,7 @@ void GroupMemoryBarrierWithGroupSync()
 
 // Atomics
 
+[ForceInline]
 __glsl_version(430)
 void InterlockedAdd(__ref  int dest,  int value)
 {
@@ -5407,6 +5411,7 @@ void InterlockedAdd(__ref  int dest,  int value)
     }
 }
 
+[ForceInline]
 __glsl_version(430)
 void InterlockedAdd(__ref uint dest, uint value)
 {
@@ -5429,6 +5434,7 @@ void InterlockedAdd(__ref uint dest, int value)
     InterlockedAdd(dest, (uint)value);
 }
 
+[ForceInline]
 __glsl_version(430)
 void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
 {
@@ -5446,6 +5452,7 @@ void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
     }
 }
 
+[ForceInline]
 __glsl_version(430)
 void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
 {
@@ -14577,6 +14584,7 @@ __generic<Shape:__ITextureShape1D2D3D, let format : int>
 extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite), 0, 0, format>
 {
     [__requiresNVAPI]
+    [ForceInline]
     __glsl_extension(GL_EXT_shader_atomic_float)
     void InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value, out float originalValue)
     {
