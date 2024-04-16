@@ -176,7 +176,7 @@ SlangResult ResourceViewInternalImpl::getBufferDescriptorForBinding(
     // the given buffer stride.
     auto bufferResImpl = static_cast<BufferResourceImpl*>(view->m_resource.get());
     auto desc = view->m_desc;
-    Size bufferSize = 0;
+    uint64_t bufferSize = 0;
     if (desc.bufferElementSize == 0)
     {
         // If buffer element size is 0, we assume the buffer range from original desc is in bytes.

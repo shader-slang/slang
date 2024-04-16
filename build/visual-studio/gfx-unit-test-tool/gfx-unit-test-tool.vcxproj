@@ -351,6 +351,7 @@
     <None Include="..\..\..\tools\gfx-unit-test\swapchain-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy-textures.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\uint16-buffer.slang" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">

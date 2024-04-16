@@ -55,12 +55,12 @@ static inline SpecializationParamLayout* convert(SlangReflectionTypeParameter * 
     return (SpecializationParamLayout*) typeParam;
 }
 
-static inline VarDeclBase* convert(SlangReflectionVariable* var)
+static inline Decl* convert(SlangReflectionVariable* var)
 {
-    return (VarDeclBase*) var;
+    return (Decl*) var;
 }
 
-static inline SlangReflectionVariable* convert(VarDeclBase* var)
+static inline SlangReflectionVariable* convert(Decl* var)
 {
     return (SlangReflectionVariable*) var;
 }
@@ -932,7 +932,7 @@ SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(SlangReflectionTy
         for(Index f = 0; f < fieldCount; ++f)
         {
             auto field = structTypeLayout->fields[f];
-            if(getReflectionName(field->varDecl.getDecl())->text.getUnownedSlice() == name)
+            if(getReflectionName(field->getVariable())->text.getUnownedSlice() == name)
                 return f;
         }
     }
@@ -2508,6 +2508,9 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeSpaceO
 SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* inVar)
 {
     auto var = convert(inVar);
+    if (as<InheritanceDecl>(var))
+        return "$base";
+
     if(!var) return nullptr;
 
     // If the variable is one that has an "external" name that is supposed
@@ -2521,14 +2524,19 @@ SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* inVa
 SLANG_API SlangReflectionType* spReflectionVariable_GetType(SlangReflectionVariable* inVar)
 {
     auto var = convert(inVar);
+
+    if (auto inheritanceDecl = as<InheritanceDecl>(var))
+        return convert(inheritanceDecl->base.type);
+
     if(!var) return nullptr;
 
-    return  convert(var->getType());
+    return  convert(as<VarDeclBase>(var)->getType());
 }
 
 SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflectionVariable* inVar, SlangModifierID modifierID)
 {
     auto var = convert(inVar);
+
     if(!var) return nullptr;
 
     Modifier* modifier = nullptr;
@@ -2571,7 +2579,7 @@ SLANG_API SlangReflectionVariable* spReflectionVariableLayout_GetVariable(SlangR
     auto varLayout = convert(inVarLayout);
     if(!varLayout) return nullptr;
 
-    return convert(varLayout->varDecl.getDecl());
+    return (SlangReflectionVariable*)(varLayout->varDecl.getDecl());
 }
 
 SLANG_API SlangReflectionTypeLayout* spReflectionVariableLayout_GetTypeLayout(SlangReflectionVariableLayout* inVarLayout)

@@ -205,5 +205,8 @@
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\tools\gfx-unit-test\uint16-buffer.slang">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
