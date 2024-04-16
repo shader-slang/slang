@@ -2888,7 +2888,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMax64(uint byteAddress, int64_t value)
     {
         __target_switch
@@ -2898,7 +2898,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMax64(uint byteAddress, int64_t value, out int64_t outOriginalValue)
     {
         __target_switch
@@ -2908,7 +2908,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMax64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -2918,7 +2918,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMax64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -2947,7 +2947,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMin64(uint byteAddress, int64_t value)
     {
         __target_switch
@@ -2957,7 +2957,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMin64(uint byteAddress, int64_t value, out int64_t outOriginalValue)
     {
         __target_switch
@@ -2967,7 +2967,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMin64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -2977,7 +2977,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMin64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -3006,7 +3006,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedAnd64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -3016,7 +3016,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedAnd64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -3045,7 +3045,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedOr64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -3055,7 +3055,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedOr64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -3084,7 +3084,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedXor64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -3094,7 +3094,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedXor64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -3122,7 +3122,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedExchangeFloat(uint byteAddress, float value, out float outOriginalValue)
     {
         __target_switch
@@ -3132,7 +3132,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedExchange64(uint byteAddress, int64_t value, out int64_t outOriginalValue)
     {
         __target_switch
@@ -3142,7 +3142,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedExchange64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -3210,9 +3210,7 @@ ${{{{
         }
     }
 
-    __specialized_for_target(hlsl)
     [ForceInline]
-    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
     {
         __target_switch
@@ -3228,7 +3226,6 @@ ${{{{
         }
     }
     [ForceInline]
-    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -3245,7 +3242,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedCompareStoreFloatBitwise(uint byteAddress, float compareValue, float value)
     {
         __target_switch
@@ -3255,7 +3252,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedCompareExchangeFloatBitwise(uint byteAddress, float compareValue, float value, out float outOriginalValue)
     {
         __target_switch
@@ -3265,7 +3262,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedCompareStore64(uint byteAddress, int64_t compareValue, int64_t value)
     {
         __target_switch
@@ -3275,32 +3272,12 @@ ${{{{
     }
 
     [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
-    void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm ".InterlockedCompareExchange64";
-        }
-    }
-
-    [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedCompareStore64(uint byteAddress, uint64_t compareValue, uint64_t value)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".InterlockedCompareStore64";
-        }
-    }
-
-    [ForceInline]
-    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
-    void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm ".InterlockedCompareExchange64";
         }
     }
 
