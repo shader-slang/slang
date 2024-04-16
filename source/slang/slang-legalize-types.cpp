@@ -214,7 +214,7 @@ bool hasResourceType(IRType* type)
         type = ptrType->getValueType();
     }
 
-    // Special handling for RWStructuredBuf
+    // Special handling for a RWStructuredBufGetElementPtr
     if (const auto rwStructBufferType = as<IRStructType>(type))
     {
         return true;
