@@ -78,7 +78,7 @@ bool isComInterfaceType(IRType* type);
 // If `type` is a vector, returns its element type. Otherwise, return `type`.
 IRType* getVectorElementType(IRType* type);
 
-bool hasResourceType(IRType* type);
+bool canDecorateNonUniformInst(IRInst* nonUniformInst, IRInst* baseInst);
 
 IROp getTypeStyle(IROp op);
 IROp getTypeStyle(BaseType op);

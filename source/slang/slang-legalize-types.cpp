@@ -204,9 +204,23 @@ bool isResourceType(IRType* type)
 }
 
 // Helper wrapper function around isResourceType that checks not only if the
-// given type is a resourceType, but if it is also a pointer to a resourceType.
-bool hasResourceType(IRType* type)
+// given input inst is a valid candidate for promoting from an operand of
+// `NonUniformResourceIndex` inst into a decoration.
+bool canDecorateNonUniformInst(IRInst* nonUniformInst, IRInst* baseInst)
 {
+    // It is only required to decorate the base inst, if the `NonUniformResourceIndex` inst
+    // around it has any active uses, but this is not always the case, especially if it is a
+    // tail call to an intrinsic / atomic or a load operation. So, we handle those separately.
+    if (baseInst->getOp() == kIROp_Call)
+        return true;
+    else if (!nonUniformInst->hasUses())
+        return false;
+    else if (baseInst->getOp() == kIROp_Load)
+        return true;
+
+    // We can promote a `NonUniformResourceIndex` inst to a decorator only
+    // when the input is a resourceType, or a pointer to a resourceType.
+    auto type = baseInst->getDataType();
     if (isResourceType(type))
         return true;
     while (auto ptrType = as<IRPtrTypeBase>(type))
