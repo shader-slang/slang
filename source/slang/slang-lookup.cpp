@@ -224,13 +224,17 @@ static void _lookUpDirectAndTransparentMembers(
         }
     }
 
-    // TODO(tfoley): should we look up in the transparent decls
-    // if we already has a hit in the current container?
     for(auto transparentInfo : containerDecl->getTransparentMembers())
     {
         // The reference to the transparent member should use the same
         // path as we used in referring to its parent.
         DeclRef<Decl> transparentMemberDeclRef = astBuilder->getMemberDeclRef(parentDeclRef, transparentInfo.decl);
+
+        // If we have already started checking this member, there is no need to send another check.
+        // We just need to ensure a transparent member is ready for reference. Transparent members 
+        // should only be a circular dependency if a direct member (not the goal here).
+        if (transparentMemberDeclRef.getDecl()->checkState.isBeingChecked())
+            continue;
 
         // We need to leave a breadcrumb so that we know that the result
         // of lookup involves a member lookup step here
