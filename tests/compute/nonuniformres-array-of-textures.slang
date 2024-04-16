@@ -7,12 +7,12 @@ RWTexture2D<float2> outputTexture;
 void main(uint2 pixelIndex : SV_DispatchThreadID)
 {
 
-    // CHECK1-DAG: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK1-DAG: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK1-DAG: OpDecorate %[[VAR3:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK1-DAG: OpDecorate %[[VAR4:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK1-DAG: OpDecorate %[[VAR5:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK1-DAG: OpDecorate %[[VAR6:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK1: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK1: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK1: OpDecorate %[[VAR3:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK1: OpDecorate %[[VAR4:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK1: OpDecorate %[[VAR5:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK1: OpDecorate %[[VAR6:[a-zA-Z0-9_]+]] NonUniform
 
     // CHECK1: %[[VAR1]] = OpCopyObject %{{.*}}
     // CHECK1: %[[VAR2]] = OpAccessChain %_ptr_UniformConstant_{{.*}} %{{.*}} %[[VAR1]]
@@ -21,10 +21,10 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
     // CHECK1: %[[VAR5]] = OpAccessChain %_ptr_UniformConstant_{{.*}} %{{.*}} %[[VAR4]]
     // CHECK1: %[[VAR6]] = OpLoad %{{.*}} %[[VAR5]]
 
-    // CHECK2-DAG: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK2-DAG: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK2-DAG: OpDecorate %[[VAR3:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK2-DAG: OpDecorate %[[VAR4:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK2: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK2: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK2: OpDecorate %[[VAR3:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK2: OpDecorate %[[VAR4:[a-zA-Z0-9_]+]] NonUniform
     // CHECK2: %[[VAR1]] = OpAccessChain %_ptr_UniformConstant_{{.*}} %textures{{.*}}
     // CHECK2: %[[VAR2]] = OpLoad %{{.*}} %[[VAR1]]
     // CHECK2: %[[VAR3]] = OpAccessChain %_ptr_UniformConstant_{{.*}} %textures{{.*}}
