@@ -114,11 +114,13 @@ namespace Slang
                         if (use != &typeUser->typeUse)
                             continue;
 
-                        if (auto layoutDecor = typeUser->findDecoration<IRLayoutDecoration>())
-                        {
-                            // Replace the original VarLayout with the new StructTypeVarLayout.
-                            if (auto varLayout = as<IRVarLayout>(layoutDecor->getLayout()))
-                            {
+                        auto layoutDecor = typeUser->findDecoration<IRLayoutDecoration>();
+                        if (!layoutDecor)
+                            continue;
+                        // Replace the original VarLayout with the new StructTypeVarLayout.
+                        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+                        if (!varLayout)
+                            continue;
                                 IRBuilder subBuilder(typeUser);
                                 IRVarLayout::Builder newVarLayoutBuilder(&subBuilder, typeInfo.typeLayout);
                                 newVarLayoutBuilder.cloneEverythingButOffsetsFrom(varLayout);
