@@ -213,6 +213,7 @@ namespace Slang
 
             /// Validate that the target type of an extension `decl` is valid.
         void _validateExtensionDeclTargetType(ExtensionDecl* decl);
+        void _validateExtensionDeclMembers(ExtensionDecl* decl);
 
         void visitExtensionDecl(ExtensionDecl* decl);
     };
@@ -1817,6 +1818,85 @@ namespace Slang
             addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
         }
         checkVisibility(varDecl);
+    }
+
+    static ConstructorDecl* _createCtor(SemanticsDeclVisitorBase* visitor, ASTBuilder* m_astBuilder, AggTypeDecl* decl)
+    {
+        auto ctor = m_astBuilder->create<ConstructorDecl>();
+        auto ctorName = visitor->getName("$init");
+        ctor->ownedScope = m_astBuilder->create<Scope>();
+        ctor->ownedScope->containerDecl = ctor;
+        ctor->ownedScope->parent = visitor->getScope(decl);
+        ctor->parentDecl = decl;
+        ctor->loc = decl->loc;
+        ctor->closingSourceLoc = ctor->loc;
+        ctor->nameAndLoc.name = ctorName;
+        ctor->nameAndLoc.loc = ctor->loc;
+        ctor->returnType.type = visitor->calcThisType(makeDeclRef(decl));
+        auto body = m_astBuilder->create<BlockStmt>();
+        body->scopeDecl = m_astBuilder->create<ScopeDecl>();
+        body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
+        body->scopeDecl->ownedScope->parent = visitor->getScope(ctor);
+        body->scopeDecl->parentDecl = ctor;
+        body->scopeDecl->loc = ctor->loc;
+        body->scopeDecl->closingSourceLoc = ctor->loc;
+        body->closingSourceLoc = ctor->closingSourceLoc;
+        ctor->body = body;
+        body->body = m_astBuilder->create<SeqStmt>();
+        decl->addMember(ctor);
+        return ctor;
+    }
+
+    static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
+    {
+        for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+        {
+            if (!ctor->body || ctor->members.getCount() != 0)
+                continue;
+            return ctor;
+        }
+        return nullptr;
+    }
+
+
+    static List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut)
+    {
+        List<ConstructorDecl*> ctorList;
+
+        auto ctorLookupResult = lookUpMember(
+            m_astBuilder,
+            visitor,
+            visitor->getName("$init"),
+            DeclRefType::create(m_astBuilder, structDecl),
+            structDecl->ownedScope,
+            LookupMask::Function,
+            LookupOptions::IgnoreInheritance);
+
+        if (!ctorLookupResult.isValid())
+            return ctorList;
+
+        auto lookupResultHandle = [&](LookupResultItem& item)
+        {
+            auto ctor = as<ConstructorDecl>(item.declRef.getDecl());
+            if (!ctor || !ctor->body)
+                return;
+            ctorList.add(ctor);
+            if (ctor->members.getCount() != 0)
+                return;
+            *defaultCtorOut = ctor;
+        };
+        if (ctorLookupResult.items.getCount() == 0)
+        {
+            lookupResultHandle(ctorLookupResult.item);
+            return ctorList;
+        }
+
+        for (auto m : ctorLookupResult.items)
+        {
+            lookupResultHandle(m);
+        }
+
+        return ctorList;
     }
 
     void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
@@ -7274,11 +7354,159 @@ namespace Slang
         }
     }
 
+
+    static SeqStmt* _ensureCtorBodyIsSeqStmt(ASTBuilder* m_astBuilder, ConstructorDecl* decl)
+    {
+        // It is possible BlockStmt has a child with the type of
+        // `ExpressionStmt` if an existing constructor has only 1
+        // expression. This would be a senario we need to
+        // put the `ExpressionStmt` inside a `SeqStmt`.
+        auto stmt = as<BlockStmt>(decl->body);
+        if (!as<SeqStmt>(stmt->body))
+        {
+            auto tmpExpr = stmt->body;
+            auto seqStmt = m_astBuilder->create<SeqStmt>();
+            seqStmt->stmts.add(tmpExpr);
+            stmt->body = seqStmt;
+            return seqStmt;
+        }
+        return as<SeqStmt>(stmt->body);
+    }
+
     void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     {
         if (aggTypeDecl->hasTag(TypeTag::Incomplete) && aggTypeDecl->hasModifier<HLSLExportModifier>())
         {
             getSink()->diagnose(aggTypeDecl->loc, Diagnostics::cannotExportIncompleteType, aggTypeDecl);
+        }
+    
+        auto structDecl = as<StructDecl>(aggTypeDecl);
+        if (!structDecl)
+            return;
+
+        struct DeclAndCtorInfo
+        {
+            StructDecl* parent = nullptr;
+            ConstructorDecl* defaultCtor = nullptr;
+            List<ConstructorDecl*> ctorList;
+            DeclAndCtorInfo()
+            {
+            }
+            DeclAndCtorInfo(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* parent, const bool getOnlyDefault)
+            {
+                if (getOnlyDefault)
+                    defaultCtor = _getDefaultCtor(parent);
+                else
+                    ctorList = _getCtorList(m_astBuilder, visitor, parent, &defaultCtor);
+            }
+        };
+        List<DeclAndCtorInfo> inheritanceDefaultCtorList{};
+        for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
+        {
+            auto declRefType = as<DeclRefType>(inheritanceMember->base.type);
+            if (!declRefType)
+                continue;
+            auto structOfInheritance = as<StructDecl>(declRefType->getDeclRef().getDecl());
+            if (!structOfInheritance)
+                continue;
+            inheritanceDefaultCtorList.add(DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, true));
+        }
+        DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, false);
+
+        Index insertOffset = 0;
+        Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
+        for (auto ctor : structDeclInfo.ctorList)
+        {
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+            seqStmtChild->stmts.reserve(inheritanceDefaultCtorList.getCount());
+            for (auto& declInfo : inheritanceDefaultCtorList)
+            {
+                if (!declInfo.defaultCtor)
+                    continue;
+
+                auto ctorToInvoke = m_astBuilder->create<VarExpr>();
+                ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
+                ctorToInvoke->name = declInfo.defaultCtor->getName();
+                ctorToInvoke->loc = declInfo.defaultCtor->loc;
+                ctorToInvoke->type = structDeclInfo.defaultCtor->returnType.type;
+
+                auto invoke = m_astBuilder->create<InvokeExpr>();
+                invoke->functionExpr = ctorToInvoke;
+
+                ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+                thisExpr->scope = ctor->ownedScope;
+                thisExpr->type = ctor->returnType.type;
+
+                auto assign = m_astBuilder->create<AssignExpr>();
+                assign->left = coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
+                assign->right = invoke;
+                auto stmt = m_astBuilder->create<ExpressionStmt>();
+                stmt->expression = assign;
+                stmt->loc = ctor->loc;
+
+                seqStmtChild->stmts.add(stmt);
+            }
+
+            if (seqStmtChild->stmts.getCount() == 0)
+                continue;
+
+            seqStmt->stmts.insert(0, seqStmtChild);
+            insertOffset = 1;
+        }
+
+        for (auto ctor : structDeclInfo.ctorList)
+        {
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+            seqStmtChild->stmts.reserve(structDecl->members.getCount());
+            for (auto& m : structDecl->members)
+            {
+                auto varDeclBase = as<VarDeclBase>(m);
+                if (!varDeclBase
+                    || !varDeclBase->initExpr)
+                    continue;
+
+                VarExpr* memberVarExpr = m_astBuilder->create<VarExpr>();
+                memberVarExpr->scope = ctor->ownedScope;
+                memberVarExpr->name = m->getName();
+
+                auto assign = m_astBuilder->create<AssignExpr>();
+                assign->left = memberVarExpr;
+                assign->right = varDeclBase->initExpr;
+                assign->loc = m->loc;
+
+                auto stmt = m_astBuilder->create<ExpressionStmt>();
+                stmt->expression = assign;
+                stmt->loc = m->loc;
+
+                Expr* checkedMemberVarExpr;
+                if (cachedDeclToCheckedVar.containsKey(m))
+                    checkedMemberVarExpr = cachedDeclToCheckedVar[m];
+                else
+                {
+                    checkedMemberVarExpr = CheckTerm(memberVarExpr);
+                    cachedDeclToCheckedVar.add({ m, checkedMemberVarExpr });
+                }
+                if (!checkedMemberVarExpr->type.isLeftValue)
+                    continue;
+
+                seqStmtChild->stmts.add(stmt);
+            }
+            if (seqStmtChild->stmts.getCount() == 0)
+                continue;
+            seqStmt->stmts.insert(insertOffset, seqStmtChild);
+        }
+
+        if (structDeclInfo.defaultCtor)
+        {
+            auto seqStmt = as<SeqStmt>(as<BlockStmt>(structDeclInfo.defaultCtor->body)->body);
+            if (seqStmt && seqStmt->stmts.getCount() == 0)
+            {
+                structDecl->members.remove(structDeclInfo.defaultCtor);
+                structDecl->invalidateMemberDictionary();
+                structDecl->buildMemberDictionary();
+            }
         }
     }
 
@@ -7558,14 +7786,27 @@ namespace Slang
         }
     }
 
+    void SemanticsDeclBasesVisitor::_validateExtensionDeclMembers(ExtensionDecl* decl)
+    {
+        for (auto m : decl->members)
+        {
+            auto ctor = as<ConstructorDecl>(m);
+            if (!ctor || !ctor->body || ctor->members.getCount() != 0)
+                continue;
+            getSink()->diagnose(m->loc, Diagnostics::invalidMemberTypeInExtension, m->astNodeType);
+        }
+    }
+
     void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
     {
-        // We check the target type expression, and then validate
+        // We check the target type expression and members, and then validate
         // that the type it names is one that it makes sense
         // to extend.
         //
         decl->targetType = CheckProperType(decl->targetType);
         _validateExtensionDeclTargetType(decl);
+
+        _validateExtensionDeclMembers(decl);
 
         for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
@@ -9323,6 +9564,12 @@ namespace Slang
 
     void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
     {
+        // add a empty deault CTor if missing; checking in attributes 
+        // to avoid circular checking logic
+        auto defaultCtor = _getDefaultCtor(structDecl);
+        if (!defaultCtor)
+            _createCtor(this, m_astBuilder, structDecl);
+
         int backingWidth = 0;
         [[maybe_unused]]
         int totalWidth = 0;

@@ -4172,6 +4172,16 @@ namespace Slang
         return CreateErrorExpr(expr);
     }
 
+    Expr* SemanticsExprVisitor::visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
+    {
+        // CastToSuperType is effectively a struct field.
+        // As long as the type is not readonly tagged we
+        // can use CastToSuperType as an L-value
+        if(!expr->type.hasReadOnlyOnTarget)
+            expr->type.isLeftValue = true;
+        return expr;
+    }
+
     Expr* SemanticsExprVisitor::visitReturnValExpr(ReturnValExpr* expr)
     {
         auto scope = expr->scope;

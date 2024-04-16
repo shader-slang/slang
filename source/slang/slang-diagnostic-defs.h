@@ -522,6 +522,7 @@ DIAGNOSTIC(30831, Error, cannotInheritFromImplicitlySealedDeclarationInAnotherMo
 DIAGNOSTIC(30832, Error, invalidTypeForInheritance, "type '$0' cannot be used for inheritance")
 
 DIAGNOSTIC(30850, Error, invalidExtensionOnType, "type '$0' cannot be extended. `extension` can only be used to extend a nominal type.")
+DIAGNOSTIC(30851, Error, invalidMemberTypeInExtension, "$0 cannot be apart of an `extension`")
 
 // 309xx: subscripts
 DIAGNOSTIC(30900, Error, multiDimensionalArrayNotSupported, "multi-dimensional array is not supported.")
