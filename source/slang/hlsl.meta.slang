@@ -2551,6 +2551,7 @@ ${{{{
 
     __cuda_sm_version(2.0)
     [__requiresNVAPI]
+    [ForceInline]
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue)
     {
         __target_switch
@@ -2569,6 +2570,7 @@ ${{{{
 
     // FP16x2
     [__requiresNVAPI]
+    [ForceInline]
     uint _NvInterlockedAddFp16x2(uint byteAddress, uint fp16x2Value)
     {
         __target_switch
@@ -2617,6 +2619,7 @@ ${{{{
     // Without returning original value
 
     [__requiresNVAPI]
+    [ForceInline]
     __cuda_sm_version(2.0)
     void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
@@ -2635,6 +2638,7 @@ ${{{{
     }
 
     // Int64 Add
+    [ForceInline]
     __cuda_sm_version(6.0)
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue)
     {
@@ -3116,6 +3120,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     void InterlockedAdd(
         UINT dest,
         UINT value)
