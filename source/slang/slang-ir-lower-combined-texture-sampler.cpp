@@ -107,53 +107,49 @@ namespace Slang
                 continue;
                     auto typeInfo = context.lowerCombinedTextureSamplerType(textureType);
 
-                    for (auto use = textureType->firstUse; use; use = use->nextUse)
-                    {
-                        auto typeUser = use->getUser();
-                        if (use != &typeUser->typeUse)
-                            continue;
+            for (auto use = textureType->firstUse; use; use = use->nextUse)
+            {
+                auto typeUser = use->getUser();
+                if (use != &typeUser->typeUse)
+                    continue;
 
-                        auto layoutDecor = typeUser->findDecoration<IRLayoutDecoration>();
-                        if (!layoutDecor)
-                            continue;
-                        // Replace the original VarLayout with the new StructTypeVarLayout.
-                        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
-                        if (!varLayout)
-                            continue;
-                                IRBuilder subBuilder(typeUser);
-                                IRVarLayout::Builder newVarLayoutBuilder(&subBuilder, typeInfo.typeLayout);
-                                newVarLayoutBuilder.cloneEverythingButOffsetsFrom(varLayout);
-                                IRVarOffsetAttr* resOffsetAttr = nullptr;
-                                IRVarOffsetAttr* descriptorTableSlotOffsetAttr = nullptr;
+                auto layoutDecor = typeUser->findDecoration<IRLayoutDecoration>();
+                if (!layoutDecor)
+                    continue;
+                // Replace the original VarLayout with the new StructTypeVarLayout.
+                auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+                if (!varLayout)
+                    continue;
+                IRBuilder subBuilder(typeUser);
+                IRVarLayout::Builder newVarLayoutBuilder(&subBuilder, typeInfo.typeLayout);
+                newVarLayoutBuilder.cloneEverythingButOffsetsFrom(varLayout);
+                IRVarOffsetAttr* resOffsetAttr = nullptr;
+                IRVarOffsetAttr* descriptorTableSlotOffsetAttr = nullptr;
 
-                                for (auto offsetAttr : varLayout->getOffsetAttrs())
-                                {
-                                    if (offsetAttr->getResourceKind() == LayoutResourceKind::UnorderedAccess ||
-                                        offsetAttr->getResourceKind() == LayoutResourceKind::ShaderResource)
-                                        resOffsetAttr = offsetAttr;
-                                    else if (offsetAttr->getResourceKind() == LayoutResourceKind::DescriptorTableSlot)
-                                        descriptorTableSlotOffsetAttr = offsetAttr;
-                                    auto info = newVarLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
-                                    info->offset = offsetAttr->getOffset();
-                                    info->space = offsetAttr->getSpace();
-                                    info->kind = offsetAttr->getResourceKind();
-                                }
-                                // If the user provided an layout offset for the texture but not for descriptor table slot, then
-                                // we use the texture offset for the descriptor table slot offset.
-                                if (resOffsetAttr && !descriptorTableSlotOffsetAttr)
-                                {
-                                    auto info = newVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
-                                    info->offset = resOffsetAttr->getOffset();
-                                    info->space = resOffsetAttr->getSpace();
-                                    info->kind = LayoutResourceKind::DescriptorTableSlot;
-                                }
-                                auto newVarLayout = newVarLayoutBuilder.build();
-                                subBuilder.addLayoutDecoration(typeUser, newVarLayout);
-                                varLayout->removeAndDeallocate();
-                            }
-                        }
-                    }
+                for (auto offsetAttr : varLayout->getOffsetAttrs())
+                {
+                    if (offsetAttr->getResourceKind() == LayoutResourceKind::UnorderedAccess ||
+                        offsetAttr->getResourceKind() == LayoutResourceKind::ShaderResource)
+                        resOffsetAttr = offsetAttr;
+                    else if (offsetAttr->getResourceKind() == LayoutResourceKind::DescriptorTableSlot)
+                        descriptorTableSlotOffsetAttr = offsetAttr;
+                    auto info = newVarLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
+                    info->offset = offsetAttr->getOffset();
+                    info->space = offsetAttr->getSpace();
+                    info->kind = offsetAttr->getResourceKind();
                 }
+                // If the user provided an layout offset for the texture but not for descriptor table slot, then
+                // we use the texture offset for the descriptor table slot offset.
+                if (resOffsetAttr && !descriptorTableSlotOffsetAttr)
+                {
+                    auto info = newVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
+                    info->offset = resOffsetAttr->getOffset();
+                    info->space = resOffsetAttr->getSpace();
+                    info->kind = LayoutResourceKind::DescriptorTableSlot;
+                }
+                auto newVarLayout = newVarLayoutBuilder.build();
+                subBuilder.addLayoutDecoration(typeUser, newVarLayout);
+                varLayout->removeAndDeallocate();
             }
         }
 
