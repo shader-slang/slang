@@ -2380,8 +2380,9 @@ namespace Slang
     {
         // check the type being inherited from
         auto base = inheritanceDecl->base;
-        CheckConstraintSubType(base);
-        base = TranslateTypeNode(base);
+        SemanticsDeclBasesVisitor baseVistor(withDeclToExcludeFromLookup(getParentDecl(inheritanceDecl)));
+        baseVistor.CheckConstraintSubType(base);
+        base = baseVistor.TranslateTypeNode(base);
         inheritanceDecl->base = base;
 
         // Note: we do not check whether the type being inherited from
