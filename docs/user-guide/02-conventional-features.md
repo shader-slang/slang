@@ -198,7 +198,7 @@ enum Channel : uint16_t
 }
 ```
 
-By default, the underlying type of an enumeration type is `int`. Enumeration types are implicitly convertible to its underlying type. All enumeration types conform to the builtin `ILogical` interface, which provides operator overloads for bit operations. The following code is allowed:
+By default, the underlying type of an enumeration type is `int`. Enumeration types are implicitly convertible to their underlying type. All enumeration types conform to the builtin `ILogical` interface, which provides operator overloads for bit operations. The following code is allowed:
 
 ```csharp
 void test()
@@ -329,7 +329,7 @@ Slang supports the following expression forms with nearly identical syntax to HL
 > #### Note ####
 > Like HLSL but unlike most other C-family languages, the `&&` and `||` operators do *not* currently perform "short-circuiting". 
 > they evaluate all of their operands unconditionally.
-> However, the `?:` operator do perform short-circuiting if the condition is a scalar. Use of `?:` where the condition is a vector is deprecated in Slang. The vector version of `?:` operator does *not* perform short-circuiting, and the user is advised to call `select` instead.
+> However, the `?:` operator does perform short-circuiting if the condition is a scalar. Use of `?:` where the condition is a vector is deprecated in Slang. The vector version of `?:` operator does *not* perform short-circuiting, and the user is advised to call `select` instead.
 > The default behavior of these operators is likely to change in a future Slang release.
 
 Additional expression forms specific to shading languages follow.
@@ -641,7 +641,7 @@ Some system-defined binding semantics may only be available on specific targets 
 
 > #### Note ####
 > Instead of using ordinary function parameters with system-defined binding semantics, GLSL uses special system-defined global variables with the `gl_` name prefix.
-> Some recent HLSL features has introduced special globally-defined functions that behave similarly to these `gl_` globals.
+> Some recent HLSL features have introduced special globally-defined functions that behave similarly to these `gl_` globals.
 
 #### User-Defined Binding Semantics
 

@@ -54,7 +54,7 @@ Result FenceImpl::init(const IFence::Desc& desc)
         exportSemaphoreWin32HandleInfoKHR.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR;
         exportSemaphoreWin32HandleInfoKHR.pNext = timelineCreateInfo.pNext;;
         exportSemaphoreWin32HandleInfoKHR.pAttributes = nullptr;
-        exportSemaphoreWin32HandleInfoKHR.dwAccess = DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE;
+        exportSemaphoreWin32HandleInfoKHR.dwAccess = GENERIC_ALL;
         exportSemaphoreWin32HandleInfoKHR.name = (LPCWSTR)nullptr;
 #endif
         exportSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO_KHR;

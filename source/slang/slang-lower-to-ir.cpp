@@ -4744,6 +4744,28 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // sense to specialize a key.
             return extractField(superType, value, declaredSubtypeWitness->getDeclRef().getDecl());
         }
+        else if (auto transitiveSubtypeWitness = as<TransitiveSubtypeWitness>(subTypeWitness))
+        {
+            // Try to resolve the inheritance situation which may show-up with 2+ levels of inheritance.
+            // We will recursivly follow through the subType->midType & midType->superType witnesses until 
+            // we resolve DeclaredSubtypeWitness's
+            LoweredValInfo subToMid;
+            if (auto witness = as<SubtypeWitness>(transitiveSubtypeWitness->getSubToMid()))
+                subToMid = emitCastToConcreteSuperTypeRec(value, lowerType(context, witness->getSup()), witness);
+            else
+            {
+                SLANG_ASSERT(!"unhandled");
+                return nullptr;
+            }
+
+            if (auto witness = as<SubtypeWitness>(transitiveSubtypeWitness->getMidToSup()))
+                return emitCastToConcreteSuperTypeRec(subToMid, superType, witness);
+            else
+            {
+                SLANG_ASSERT(!"unhandled");
+                return nullptr;
+            }
+        }
         else
         {
             SLANG_ASSERT(!"unhandled");
@@ -5890,6 +5912,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, condExpr));
+
+            // One thing to be careful here is that lowering irCondition
+            // may create additional blocks due to short circuiting, so
+            // the block we are current inserting into is not necessarily
+            // the same as `testLabel`.
+            // 
             auto invCondition = builder->emitNot(irCondition->getDataType(), irCondition);
 
             // Now we want to `break` if the loop condition is false,
@@ -5907,15 +5935,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // 
             // mergeBlock:
             //   goto breakLabel;
-            auto mergeBlock = builder->emitBlock();
-            builder->emitBranch(loopHead);
-
-            builder->setInsertInto(testLabel);
+            auto mergeBlock = builder->createBlock();
             builder->emitIfElse(
                 invCondition,
                 breakLabel,
                 mergeBlock,
                 mergeBlock);
+
+            insertBlock(mergeBlock);
+            builder->emitBranch(loopHead);
         }
 
         // Finally we insert the label that a `break` will jump to

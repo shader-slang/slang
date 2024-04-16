@@ -3,6 +3,7 @@
 
 #include "slang-syntax.h"
 #include "slang-ir-insts.h"
+#include "slang-check-impl.h"
 
 #include "../compiler-core/slang-artifact-desc-util.h"
 
@@ -2843,14 +2844,10 @@ createStructuredBufferWithCounterTypeLayout(
 
     for(auto& typeResourceInfo : typeLayout->resourceInfos)
     {
-        const auto counterResourceInfo
+        auto counterResourceInfo
             = counterVarLayout->findOrAddResourceInfo(typeResourceInfo.kind);
-        const auto counterTypeResourceInfo
-            = counterVarLayout->getTypeLayout()->FindResourceInfo(typeResourceInfo.kind);
         // We expect this index to be 1
         counterResourceInfo->index = typeResourceInfo.count.getFiniteValue();
-        // likewise
-        typeResourceInfo.count += counterTypeResourceInfo->count;
     }
 
     typeLayout->counterVarLayout = counterVarLayout;
@@ -3335,7 +3332,7 @@ void StructTypeLayoutBuilder::beginLayoutIfNeeded(
 }
 
 RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
-    DeclRef<VarDeclBase>    field,
+    DeclRef<Decl>    field,
     TypeLayoutResult        fieldResult)
 {
     SLANG_ASSERT(m_typeLayout);
@@ -4085,6 +4082,16 @@ static TypeLayoutResult _createTypeLayout(
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
 
             _addLayout(context, type, typeLayout);
+
+            // Add all base fields first.
+            for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(context.astBuilder, structDeclRef))
+            {
+                auto baseType = getSup(context.astBuilder, inheritanceDeclRef);
+                if (isInterfaceType(baseType))
+                    continue;
+                auto baseTypeLayout = _createTypeLayout(context, baseType);
+                typeLayoutBuilder.addField(inheritanceDeclRef, baseTypeLayout);
+            }
 
             // First, add all fields with explicit offsets.
             for (auto field : getFields(context.astBuilder, structDeclRef, MemberFilterStyle::Instance))

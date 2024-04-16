@@ -2040,7 +2040,6 @@ namespace Slang
 
         SubtypeWitness* checkAndConstructSubtypeWitness(Type* subType, Type* superType);
 
-        bool isInterfaceType(Type* type);
         bool isValidGenericConstraintType(Type* type);
 
         bool isTypeDifferentiable(Type* type);
@@ -2630,7 +2629,6 @@ namespace Slang
         CASE(OverloadedExpr)
         CASE(OverloadedExpr2)
         CASE(AggTypeCtorExpr)
-        CASE(CastToSuperTypeExpr)
         CASE(ModifierCastExpr)
         CASE(LetExpr)
         CASE(ExtractExistentialValueExpr)
@@ -2648,6 +2646,7 @@ namespace Slang
 
         Expr* visitThisExpr(ThisExpr* expr);
         Expr* visitThisTypeExpr(ThisTypeExpr* expr);
+        Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr);
         Expr* visitReturnValExpr(ReturnValExpr* expr);
         Expr* visitAndTypeExpr(AndTypeExpr* expr);
         Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
@@ -2762,6 +2761,8 @@ namespace Slang
     };
 
     bool isUnsizedArrayType(Type* type);
+
+    bool isInterfaceType(Type* type);
 
     EnumDecl* isEnumType(Type* type);
 
