@@ -102,10 +102,9 @@ namespace Slang
         // Lower combined texture sampler type into a struct type.
         for (auto globalInst : module->getGlobalInsts())
         {
-            if (auto textureType = as<IRTextureTypeBase>(globalInst))
-            {
-                if (getIntVal(textureType->getIsCombinedInst()) != 0)
-                {
+            auto textureType = as<IRTextureTypeBase>(globalInst);
+            if (!textureType || getIntVal(textureType->getIsCombinedInst()) == 0)
+                continue;
                     auto typeInfo = context.lowerCombinedTextureSamplerType(textureType);
 
                     for (auto use = textureType->firstUse; use; use = use->nextUse)
