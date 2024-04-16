@@ -1182,8 +1182,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // iterate down all the insts that originate from a `nonUniformResourceIndexInst` and pop out the
         // `nonUniformResourceIndexInst` from the index value itself and wrap it around the parent inst.
         // For example:
-        IRCall* callInst = nullptr;
-        List<IRInst*> newCallArgs;
         auto insti = nonUniformResourceIndexInst;
         while (insti->getOp() == kIROp_NonUniformResourceIndex)
         {
@@ -1200,62 +1198,65 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto user = use->getUser();
                 IRBuilder builder(user);
                 builder.setInsertBefore(user);
+
+                // The `NonUniformResourceIndex` instruction can be used by a simple instruction
+                // or a tail call in case of an atomic operation. Declare appropriate
+                // variables needed to build one of the required chain operations.
                 IRInst* newUser = nullptr;
-                IRInst* nonUniformUser = nullptr;
+                IRCall* callInst = nullptr;
+                List<IRInst*> callArgs;
                 switch (user->getOp())
                 {
                 case kIROp_IntCast:
                     // Replace intCast(nonUniformRes(x)), into nonUniformRes(intCast(x))
                     newUser = builder.emitCast(user->getFullType(), inst->getOperand(0));
-                    nonUniformUser = builder.emitNonUniformResourceIndexInst(newUser);
+                    newUser = builder.emitNonUniformResourceIndexInst(newUser);
                     break;
                 case kIROp_GetElementPtr:
-                    // Ignore when nonUniformRes is not on the index
+                    // Ignore when `NonUniformResourceIndex` is not on the index
                     if (user->getOperand(0)->getOp() != kIROp_NonUniformResourceIndex)
                     {
                         // Replace gep(pArray, nonUniformRes(x)), into nonUniformRes(gep(pArray, x))
                         newUser = builder.emitElementAddress(user->getFullType(), user->getOperand(0), inst->getOperand(0));
                     }
-                    nonUniformUser = builder.emitNonUniformResourceIndexInst(newUser);
-                    break;
-                case kIROp_RWStructuredBufferGetElementPtr:
-                    // Replace buffer[nonUniformRes(nonUniformRes(x))], into nonUniformRes(buffer[x])
-                    // This fails when converting rwstructbuf(nonuniformres(gep(...), int) -> rwstructbuf(get(...), int).
-                    // newUser = builder.emitRWStructuredBufferGetElementPtr(inst->getOperand(0), user->getOperand(1));
+                    newUser = builder.emitNonUniformResourceIndexInst(newUser);
                     break;
                 case kIROp_NonUniformResourceIndex:
-                    nonUniformUser = builder.emitNonUniformResourceIndexInst(inst->getOperand(0));
+                    // Replace nonUniformRes(nonUniformRes(x)), into nonUniformRes(x)
+                    newUser = builder.emitNonUniformResourceIndexInst(inst->getOperand(0));
                     break;
                 case kIROp_Load:
+                    // Replace load(nonUniformRes(x)), into nonUniformRes(load(x))
                     newUser = builder.emitLoad(user->getFullType(), inst->getOperand(0));
-                    nonUniformUser = builder.emitNonUniformResourceIndexInst(newUser);
+                    newUser = builder.emitNonUniformResourceIndexInst(newUser);
                     break;
                 case kIROp_Call:
+                    // Replace call(..., nonUniformRes(x), ...), into nonUniformRes(call(..., x, ...)
                     callInst = as<IRCall>(user);
-                    if (callInst)
+                    for (UInt argi = 0; argi < callInst->getArgCount(); argi++)
                     {
-                        for (UInt argi = 0; argi < callInst->getArgCount(); argi++)
+                        auto arg = callInst->getArg(argi);
+                        if (auto nonUniformInst = as<IRNonUniformResourceIndex>(arg))
                         {
-                            auto arg = callInst->getArg(argi);
-                            if (auto nonUniformInst = as<IRNonUniformResourceIndex>(arg))
-                            {
-                                arg = nonUniformInst->getOperand(0);
-                            }
-                            newCallArgs.add(arg);
+                            arg = nonUniformInst->getOperand(0);
                         }
-                        newUser = builder.emitCallInst(user->getFullType(), callInst->getCallee(), newCallArgs);
-                        nonUniformUser = builder.emitNonUniformResourceIndexInst(newUser);
+                        callArgs.add(arg);
                     }
+                    newUser = builder.emitCallInst(user->getFullType(), callInst->getCallee(), callArgs);
+                    newUser = builder.emitNonUniformResourceIndexInst(newUser);
                     break;
                 default:
                     // Ignore for all other unknown insts.
                     break;
                 };
-                if (!nonUniformUser)
+
+                // Early exit when we no longer could process the `NonUniformResourceIndex` inst.
+                if (!newUser)
                     return;
 
-                user->replaceUsesWith(nonUniformUser);
-
+                // Update the worklist with the newly added `NonUniformResourceIndex` inst, based on
+                // the base inst it was constructed around, in case we need to further bubble up
+                // the `NonUniformResourceIndex` inst.
                 switch (user->getOp())
                 {
                 case kIROp_Call:
@@ -1263,9 +1264,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 case kIROp_GetElementPtr:
                 case kIROp_Load:
                 case kIROp_NonUniformResourceIndex:
-                    resWorkList.add(nonUniformUser);
+                    resWorkList.add(newUser);
                     break;
                 };
+
+                // Clean up the base inst from the IR module, to avoid duplicate decorations.
+                user->replaceUsesWith(newUser);
                 user->removeAndDeallocate();
             });
         }
