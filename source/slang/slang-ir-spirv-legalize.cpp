@@ -1293,6 +1293,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 {
                     builder.addSPIRVNonUniformResourceDecoration(operand);
                     nonUniformResInst->replaceUsesWith(operand);
+                    nonUniformResInst->removeAndDeallocate();
                 }
             }
         }
