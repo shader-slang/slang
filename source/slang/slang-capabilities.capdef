@@ -124,12 +124,12 @@ alias raytracing_stages_anyhit_closesthit_intersection_miss = anyhit | closesthi
 alias raytracing_stages_raygen_closesthit_miss_callable = raygen | closesthit | miss | callable;
 alias shader_stages_compute_tesscontrol_tesseval = compute | tesscontrol | tesseval;
 alias shader_stages_compute_fragment = fragment | compute;
-alias shader_stages_fragment_geometry_vertex = vertex | fragment | geometry;
+alias shader_stages_compute_fragment_geometry_vertex = compute | fragment | geometry | vertex;
 alias shader_stages_hull_domain = hull | domain;
 alias raytracing_stages_fragment = raytracing_stages | fragment;
 alias raytracing_stages_compute = raytracing_stages | compute;
 alias raytracing_stages_compute_fragment = raytracing_stages | shader_stages_compute_fragment;
-alias raytracing_stages_fragment_geometry_vertex = raytracing_stages | shader_stages_fragment_geometry_vertex;
+alias raytracing_stages_compute_fragment_geometry_vertex = raytracing_stages | shader_stages_compute_fragment_geometry_vertex;
 
 def _sm_4_0 : hlsl;
 def _sm_4_1 : _sm_4_0;
@@ -477,17 +477,18 @@ alias memorybarrier_compute = raytracing_stages_compute + sm_5_0;
 alias structuredbuffer = sm_4_0;
 alias structuredbuffer_rw = sm_4_0 + raytracing_stages_compute_fragment;
 alias texture_sm_4_1 = sm_4_1 + GLSL_150;
+// Sample works inside a compute shader despite lacking LOD information in HLSL (hack?) and GLSL(glslang hack?)
 alias texture_sm_4_1_fragment = cpp + sm_4_1
                               | cuda + sm_4_1
                               | glsl + sm_4_1 + GLSL_150
-                              | hlsl + sm_4_1 + fragment
+                              | hlsl + sm_4_1 + raytracing_stages_compute_fragment
                               | spirv_1_0 + sm_4_1
                               ;
 alias texture_sm_4_1_clamp_fragment = texture_sm_4_1_fragment + GL_ARB_sparse_texture_clamp;
 alias texture_sm_4_1_vertex_fragment_geometry = cpp + sm_4_1
                                               | cuda + sm_4_1
                                               | glsl + sm_4_1 + GLSL_150
-                                              | hlsl + sm_4_1 + shader_stages_fragment_geometry_vertex
+                                              | hlsl + sm_4_1 + raytracing_stages_compute_fragment_geometry_vertex
                                               | spirv_1_0 + sm_4_1
                                               ;
 alias texture_gather_sm_4_1 = texture_sm_4_1_vertex_fragment_geometry + GL_ARB_texture_gather;
