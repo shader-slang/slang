@@ -5587,6 +5587,38 @@ namespace Slang
         return varDeclrStatement;
     }
 
+    static void desugarIfLetStatement(IfLetStmt* ifletStatement, Parser* parser)
+    {
+        VarExpr* varExpr = parser->astBuilder->create<VarExpr>();
+        varExpr->scope = parser->currentScope;
+        parser->FillPosition(varExpr);
+        varExpr->name = ifletStatement->varDecl->getName();
+
+        // create a "var.hasValue" expression
+        MemberExpr* memberExpr = parser->astBuilder->create<MemberExpr>();
+        memberExpr->baseExpression = varExpr;
+        parser->FillPosition(memberExpr);
+        memberExpr->name = getName(parser, "hasValue");
+
+        // create a "==" operator
+        auto opExpr = parser->astBuilder->create<VarExpr>();
+        opExpr->name = getName(parser, "==");
+        opExpr->scope = parser->currentScope;
+        parser->FillPosition(opExpr);
+
+        // create a 'true' literal
+        BoolLiteralExpr* boolLiteralExpr = parser->astBuilder->create<BoolLiteralExpr>();
+        boolLiteralExpr->value = true;
+
+        // create a "var.hasValue == true" expression
+        InfixExpr* infixExpr = parser->astBuilder->create<InfixExpr>();
+        infixExpr->loc = opExpr->loc;
+        infixExpr->functionExpr = opExpr;
+        infixExpr->arguments.add(memberExpr);
+        infixExpr->arguments.add(boolLiteralExpr);
+        ifletStatement->predicate = infixExpr;
+    }
+
     IfStmt* Parser::parseIfStatement()
     {
         IfStmt* ifStatement = nullptr;
@@ -5596,9 +5628,15 @@ namespace Slang
         auto expr = ParseExpression();
         if (auto letExpr = as<LetExpr>(expr))
         {
+            ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
+            pushScopeAndSetParent(scopeDecl);
+
             ifStatement = astBuilder->create<IfLetStmt>();
             ((IfLetStmt*)ifStatement)->varDecl = letExpr->decl;
             ((IfLetStmt*)ifStatement)->initExpr = letExpr->body;
+
+            AddMember(currentScope->containerDecl, letExpr->decl);
+            desugarIfLetStatement((IfLetStmt*)ifStatement, this);
         }
         else
         {
@@ -5612,6 +5650,11 @@ namespace Slang
         {
             ReadToken("else");
             ifStatement->negativeStatement = ParseStatement(ifStatement);
+        }
+
+        if (as<LetExpr>(expr))
+        {
+            PopScope();
         }
         return ifStatement;
     }

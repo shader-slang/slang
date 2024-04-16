@@ -367,6 +367,11 @@ namespace Slang
 
     void SemanticsStmtVisitor::visitIfStmt(IfStmt *stmt)
     {
+        if (auto ifletStmt = as<IfLetStmt>(stmt))
+        {
+            ensureDeclBase(ifletStmt->varDecl, DeclCheckState::DefinitionChecked, this);
+        }
+
         stmt->predicate = checkPredicateExpr(stmt->predicate);
         checkStmt(stmt->positiveStatement);
         checkStmt(stmt->negativeStatement);
