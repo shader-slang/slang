@@ -226,7 +226,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [ForceInline]
     [__readNone]
-    [require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+    [require(glsl_hlsl_spirv, texture_sm_4_1)]
     float CalculateLevelOfDetail(TextureCoord location)
     {
         __target_switch
@@ -245,7 +245,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [ForceInline]
     [__readNone]
-    [require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+    [require(glsl_hlsl_spirv, texture_sm_4_1)]
     float CalculateLevelOfDetailUnclamped(TextureCoord location)
     {
         __target_switch
@@ -677,7 +677,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+    [require(glsl_hlsl_spirv, texture_sm_4_1)]
     float CalculateLevelOfDetail(SamplerState s, TextureCoord location)
     {
         __target_switch
@@ -696,7 +696,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+    [require(glsl_hlsl_spirv, texture_sm_4_1)]
     float CalculateLevelOfDetailUnclamped(SamplerState s, TextureCoord location)
     {
         __target_switch
