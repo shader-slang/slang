@@ -185,7 +185,8 @@ namespace Slang
                         {
                             auto combinedSamplerType = inst->getOperand(0)->getDataType();
                             auto loweredInfo = context.mapTypeToLoweredInfo.tryGetValue(combinedSamplerType);
-                            if (!loweredInfo) continue;
+                            if (!loweredInfo) 
+                                continue;
                             builder.setInsertBefore(inst);
                             auto fieldExtract = builder.emitFieldExtract(inst->getFullType(), inst->getOperand(0),
                                 inst->getOp() == kIROp_CombinedTextureSamplerGetSampler ? loweredInfo->sampler : loweredInfo->texture);
