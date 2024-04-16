@@ -1834,40 +1834,14 @@ namespace Slang
         return ctor;
     }
 
-    static ConstructorDecl* _getDefaultCtor(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl)
+    static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
     {
-        // we may have a default ctor inside an extension, 
-        // lookup will resolve the location of our default ctor
-        auto lookupDefaultConstructor = lookUpMember(
-            m_astBuilder,
-            visitor,
-            visitor->getName("$init"),
-            DeclRefType::create(m_astBuilder, structDecl),
-            structDecl->ownedScope,
-            LookupMask::Function,
-            LookupOptions::IgnoreInheritance);
-
-        if (!lookupDefaultConstructor.isValid())
-            return nullptr;
-
-        auto parseLookupItemLogic = [&](LookupResultItem& item)
+        for (auto m : structDecl->members)
         {
-            auto ctor = as<ConstructorDecl>(item.declRef.getDecl());
-            if (!ctor || !ctor->body)
-                return (ConstructorDecl*)nullptr;
-            if (ctor->members.getCount() != 0)
-                return (ConstructorDecl*)nullptr;
+            auto ctor = as<ConstructorDecl>(m);
+            if (!ctor || !ctor->body || ctor->members.getCount() != 0)
+                continue;
             return ctor;
-        };
-        if (lookupDefaultConstructor.items.getCount() == 0)
-        {
-            return parseLookupItemLogic(lookupDefaultConstructor.item);
-        }
-        for (auto m : lookupDefaultConstructor.items)
-        {
-            auto result = parseLookupItemLogic(m);
-            if (result)
-                return result;
         }
         return nullptr;
     }
@@ -7409,7 +7383,7 @@ namespace Slang
             DeclAndCtorInfo(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* parent, const bool getOnlyDefault)
             {
                 if (getOnlyDefault)
-                    defaultCtor = _getDefaultCtor(m_astBuilder, visitor, parent);
+                    defaultCtor = _getDefaultCtor(parent);
                 else
                     ctorList = _getCtorList(m_astBuilder, visitor, parent, &defaultCtor);
             }
@@ -7446,6 +7420,7 @@ namespace Slang
                 ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
                 ctorToInvoke->name = declInfo.defaultCtor->getName();
                 ctorToInvoke->loc = declInfo.defaultCtor->loc;
+                ctorToInvoke->type = structDeclInfo.defaultCtor->returnType.type;
 
                 auto invoke = m_astBuilder->create<InvokeExpr>();
                 invoke->functionExpr = ctorToInvoke;
@@ -7486,7 +7461,6 @@ namespace Slang
                 VarExpr* memberVarExpr = m_astBuilder->create<VarExpr>();
                 memberVarExpr->scope = ctor->ownedScope;
                 memberVarExpr->name = m->getName();
-                memberVarExpr->type = nullptr;
 
                 auto assign = m_astBuilder->create<AssignExpr>();
                 assign->left = memberVarExpr;
@@ -9583,7 +9557,7 @@ namespace Slang
     {
         // add a empty deault CTor if missing; checking in attributes 
         // to avoid circular checking logic
-        auto defaultCtor = _getDefaultCtor(m_astBuilder, this, structDecl);
+        auto defaultCtor = _getDefaultCtor(structDecl);
         if (!defaultCtor)
             _createCtor(this, m_astBuilder, structDecl);
 
