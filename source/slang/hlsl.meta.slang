@@ -210,12 +210,21 @@ struct __TextureImpl<T, Shape: __ITextureShape, let isArray:int, let isMS:int, l
 }
 
 // Combined texture sampler specific functions
-__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 {
     static const int access = 0;
 
     typealias TextureCoord = vector<float, Shape.dimensions>;
+
+    __intrinsic_op($(kIROp_CombinedTextureSamplerGetTexture))
+    __TextureImpl<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> __getTexture();
+
+    __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
+    SamplerState __getSampler();
+
+    __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
+    SamplerComparisonState __getComparisonSampler();
 
     [ForceInline]
     [__readNone]
@@ -224,7 +233,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "CalculateLevelOfDetail";
+            {
+                return __getTexture().CalculateLevelOfDetail(__getSampler(), location);
+            }
         case glsl:
             __intrinsic_asm "textureQueryLod($0, $1).x";
         case spirv:
@@ -242,7 +253,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "CalculateLevelOfDetailUnclamped";
+            {
+            return __getTexture().CalculateLevelOfDetailUnclamped(__getSampler(), location);
+            }
         case glsl:
             __intrinsic_asm "textureQueryLod($0, $1).y";
         case spirv:
@@ -293,7 +306,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         {
             case cpp:
             case hlsl:
-                __intrinsic_asm ".Sample";
+                return __getTexture().Sample(__getSampler(), location);
             case glsl:
                 __intrinsic_asm "$ctexture($0, $1)$z";
             case cuda:
@@ -342,7 +355,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         {
             case cpp:
             case hlsl:
-                __intrinsic_asm ".Sample";
+                return __getTexture().Sample(__getSampler(), location, offset, clamp);
             case glsl:
                 __intrinsic_asm "$ctextureOffsetClampARB($0, $1, $2, $3)$z";
             case spirv:
@@ -370,7 +383,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         {
             case cpp:
             case hlsl:
-                __intrinsic_asm ".SampleBias";
+                return __getTexture().SampleBias(__getSampler(), location, bias);
             case glsl:
                 __intrinsic_asm "$ctexture($0, $1, $2)$z";
             case spirv:
@@ -390,7 +403,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         {
             case cpp:
             case hlsl:
-            __intrinsic_asm ".SampleBias";
+                return __getTexture().SampleBias(__getSampler(), location, bias, offset);
             case glsl:
             __intrinsic_asm "$ctextureOffset($0, $1, $3, $2)$z";
             case spirv:
@@ -422,7 +435,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __glsl_texture(__makeVector(location, compareValue));
             }
         case hlsl:
-            __intrinsic_asm ".SampleCmp";
+            return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue);
         case spirv:
             return spirv_asm
             {
@@ -447,7 +460,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __glsl_texture_level_zero(__makeVector(location, compareValue));
             }
         case hlsl:
-            __intrinsic_asm ".SampleCmpLevelZero";
+            return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
         case spirv:
             const float zeroFloat = 0.0f;
             return spirv_asm
@@ -473,7 +486,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __glsl_texture_offset(__makeVector(location, compareValue), offset);
             }
         case hlsl:
-            __intrinsic_asm ".SampleCmp";
+            return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset);
         case spirv:
             return spirv_asm
             {
@@ -498,7 +511,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __glsl_texture_offset_level_zero(__makeVector(location, compareValue), offset);
             }
         case hlsl:
-            __intrinsic_asm ".SampleCmpLevelZero";
+            return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
         case spirv:
             const float zeroFloat = 0.0f;
             return spirv_asm
@@ -515,7 +528,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         {
             case cpp:
             case hlsl:
-            __intrinsic_asm ".SampleGrad";
+                return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
+
             case glsl:
             __intrinsic_asm "$ctextureGrad($0, $1, $2, $3)$z";
             case spirv:
@@ -534,7 +548,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         {
             case cpp:
             case hlsl:
-            __intrinsic_asm ".SampleGrad";
+                return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset);
             case glsl:
             __intrinsic_asm "$ctextureGradOffset($0, $1, $2, $3, $4)$z";
             case spirv:
@@ -554,7 +568,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         {
             case cpp:
             case hlsl:
-            __intrinsic_asm ".SampleGrad";
+                return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset, lodClamp);
             case glsl:
             __intrinsic_asm "$ctextureGradOffsetClampARB($0, $1, $2, $3, $4, $5)$z";
             case spirv:
@@ -574,7 +588,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         {
             case cpp:
             case hlsl:
-                __intrinsic_asm ".SampleLevel";
+                return __getTexture().SampleLevel(__getSampler(), location, level);
             case glsl:
                 __intrinsic_asm "$ctextureLod($0, $1, $2)$z";
             case cuda:
@@ -624,7 +638,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         {
             case cpp:
             case hlsl:
-                __intrinsic_asm ".SampleLevel";
+                return __getTexture().SampleLevel(__getSampler(), location, level, offset);
+
             case glsl:
                 __intrinsic_asm "$ctextureLodOffset($0, $1, $2, $3)$z";
             case spirv:
