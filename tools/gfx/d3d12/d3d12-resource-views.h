@@ -12,13 +12,36 @@ namespace d3d12
 
 using namespace Slang;
 
+class ResourceViewImpl;
+
 class ResourceViewInternalImpl
 {
 public:
+    // The default descriptor for the view.
     D3D12Descriptor m_descriptor;
+
+    // StructuredBuffer descriptors for different strides.
+    Dictionary<uint32_t, D3D12Descriptor> m_mapBufferStrideToDescriptor;
+
     RefPtr<D3D12GeneralExpandingDescriptorHeap> m_allocator;
+
     ~ResourceViewInternalImpl();
+
+    // Get a d3d12 descriptor from the buffer view with the given buffer element stride.
+    SlangResult getBufferDescriptorForBinding(
+        DeviceImpl* device,
+        ResourceViewImpl* view,
+        uint32_t bufferStride,
+        D3D12Descriptor& outDescriptor);
 };
+
+SlangResult createD3D12BufferDescriptor(
+    BufferResourceImpl* buffer,
+    BufferResourceImpl* counterBuffer,
+    IResourceView::Desc const& desc,
+    DeviceImpl* device,
+    D3D12GeneralExpandingDescriptorHeap* descriptorHeap,
+    D3D12Descriptor* outDescriptor);
 
 class ResourceViewImpl
     : public ResourceViewBase

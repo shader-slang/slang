@@ -514,8 +514,8 @@ class VarLayout : public Layout
 {
 public:
     // The variable we are laying out
-    DeclRef<VarDeclBase>          varDecl;
-    VarDeclBase* getVariable() { return varDecl.getDecl(); }
+    DeclRef<Decl>          varDecl;
+    VarDeclBase* getVariable() { return varDecl.as<VarDeclBase>().getDecl(); }
 
     Name* getName() { return getVariable()->getName(); }
 
@@ -721,7 +721,7 @@ public:
     // TODO: This should map from a declaration to the *index*
     // in the array above, rather than to the actual pointer,
     // so that we 
-    Dictionary<VarDeclBase*, RefPtr<VarLayout>> mapVarToLayout;
+    Dictionary<Decl*, RefPtr<VarLayout>> mapVarToLayout;
 };
 
 class GenericParamTypeLayout : public TypeLayout
@@ -1207,7 +1207,7 @@ public:
         /// One of the `beginLayout*()` functions must have been called previously.
         ///
     RefPtr<VarLayout> addField(
-        DeclRef<VarDeclBase>    field,
+        DeclRef<Decl>    field,
         TypeLayoutResult        fieldResult);
 
     RefPtr<VarLayout> addExplicitUniformField(
