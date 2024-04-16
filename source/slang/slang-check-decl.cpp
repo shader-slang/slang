@@ -1846,10 +1846,9 @@ namespace Slang
 
     static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
     {
-        for (auto m : structDecl->members)
+        for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
         {
-            auto ctor = as<ConstructorDecl>(m);
-            if (!ctor || !ctor->body || ctor->members.getCount() != 0)
+            if (!ctor->body || ctor->members.getCount() != 0)
                 continue;
             return ctor;
         }
@@ -1861,7 +1860,7 @@ namespace Slang
     {
         List<ConstructorDecl*> ctorList;
 
-        auto lookupDefaultConstructor = lookUpMember(
+        auto ctorLookupResult = lookUpMember(
             m_astBuilder,
             visitor,
             visitor->getName("$init"),
@@ -1870,10 +1869,10 @@ namespace Slang
             LookupMask::Function,
             LookupOptions::IgnoreInheritance);
 
-        if (!lookupDefaultConstructor.isValid())
+        if (!ctorLookupResult.isValid())
             return ctorList;
 
-        auto parseLookupItemLogic = [&](LookupResultItem& item)
+        auto lookupResultHandle = [&](LookupResultItem& item)
         {
             auto ctor = as<ConstructorDecl>(item.declRef.getDecl());
             if (!ctor || !ctor->body)
@@ -1883,15 +1882,15 @@ namespace Slang
                 return;
             *defaultCtorOut = ctor;
         };
-        if (lookupDefaultConstructor.items.getCount() == 0)
+        if (ctorLookupResult.items.getCount() == 0)
         {
-            parseLookupItemLogic(lookupDefaultConstructor.item);
+            lookupResultHandle(ctorLookupResult.item);
             return ctorList;
         }
 
-        for (auto m : lookupDefaultConstructor.items)
+        for (auto m : ctorLookupResult.items)
         {
-            parseLookupItemLogic(m);
+            lookupResultHandle(m);
         }
 
         return ctorList;
@@ -7399,11 +7398,8 @@ namespace Slang
             }
         };
         List<DeclAndCtorInfo> inheritanceDefaultCtorList{};
-        for (auto member : structDecl->members)
+        for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
         {
-            auto inheritanceMember = as<InheritanceDecl>(member);
-            if (!inheritanceMember)
-                continue;
             auto declRefType = as<DeclRefType>(inheritanceMember->base.type);
             if (!declRefType)
                 continue;
@@ -7414,7 +7410,7 @@ namespace Slang
         }
         DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, false);
 
-        std::size_t insertOffset = 0;
+        Index insertOffset = 0;
         Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
         for (auto ctor : structDeclInfo.ctorList)
         {
