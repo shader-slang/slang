@@ -2887,6 +2887,46 @@ ${{{{
         return __atomicMax(buf[byteAddress / 8], value);
     }
 
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedMax64(uint byteAddress, int64_t value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedMax64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedMax64(uint byteAddress, int64_t value, out int64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedMax64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedMax64(uint byteAddress, uint64_t value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedMax64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedMax64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedMax64";
+        }
+    }
+
     // Min
 
     __cuda_sm_version(5.0)
@@ -2904,6 +2944,46 @@ ${{{{
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicMin(buf[byteAddress / 8], value);
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedMin64(uint byteAddress, int64_t value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedMin64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedMin64(uint byteAddress, int64_t value, out int64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedMin64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedMin64(uint byteAddress, uint64_t value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedMin64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedMin64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedMin64";
+        }
     }
 
     // And
@@ -2925,6 +3005,26 @@ ${{{{
         return __atomicAnd(buf[byteAddress / 8], value);
     }
 
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedAnd64(uint byteAddress, uint64_t value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedAnd64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedAnd64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedAnd64";
+        }
+    }
+
     // Or
 
     __cuda_sm_version(5.0)
@@ -2942,6 +3042,26 @@ ${{{{
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicOr(buf[byteAddress / 8], value);
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedOr64(uint byteAddress, uint64_t value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedOr64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedOr64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedOr64";
+        }
     }
 
     // Xor
@@ -2963,6 +3083,26 @@ ${{{{
         return __atomicXor(buf[byteAddress / 8], value);
     }
 
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedXor64(uint byteAddress, uint64_t value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedXor64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedXor64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedXor64";
+        }
+    }
+
     // Exchange
 
     __target_intrinsic(cuda, "atomicExch($0._getPtrAt<uint64_t>($1), $2)")
@@ -2981,15 +3121,58 @@ ${{{{
         return __atomicExchange(buf[byteAddress / 8], value);
     }
 
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedExchangeFloat(uint byteAddress, float value, out float outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedExchangeFloat";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedExchange64(uint byteAddress, int64_t value, out int64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedExchange64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedExchange64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedExchange64";
+        }
+    }
+
     // SM6.6 6 64bit atomics.
     [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedAdd64(uint byteAddress, int64_t valueToAdd)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedAdd64";
+        case glsl:
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<int64_t>(this);
+            __atomicAdd(buf[byteAddress / 8], valueToAdd);
+        }
+    }
+
+    [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedAdd64(uint byteAddress, int64_t valueToAdd, out int64_t outOriginalValue)
     {
         __target_switch
         {
-        case hlsl:
-            __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
-            return;
+        case hlsl: __intrinsic_asm ".InterlockedAdd64";
         case glsl:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<int64_t>(this);
@@ -2997,14 +3180,28 @@ ${{{{
             return;
         }
     }
+
     [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedAdd64(uint byteAddress, uint64_t valueToAdd)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedAdd64";
+        case glsl:
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+            __atomicAdd(buf[byteAddress / 8], valueToAdd);
+        }
+    }
+
+    [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedAdd64(uint byteAddress, uint64_t valueToAdd, out uint64_t outOriginalValue)
     {
         __target_switch
         {
-        case hlsl:
-            __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
-            return;
+        case hlsl: __intrinsic_asm ".InterlockedAdd64";
         case glsl:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
@@ -3012,7 +3209,10 @@ ${{{{
             return;
         }
     }
+
+    __specialized_for_target(hlsl)
     [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
     {
         __target_switch
@@ -3028,6 +3228,7 @@ ${{{{
         }
     }
     [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -3040,6 +3241,66 @@ ${{{{
             let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
             outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
             return;
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedCompareStoreFloatBitwise(uint byteAddress, float compareValue, float value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedCompareStoreFloatBitwise";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedCompareExchangeFloatBitwise(uint byteAddress, float compareValue, float value, out float outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedCompareExchangeFloatBitwise";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedCompareStore64(uint byteAddress, int64_t compareValue, int64_t value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedCompareStore64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedCompareExchange64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedCompareStore64(uint byteAddress, uint64_t compareValue, uint64_t value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedCompareStore64";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedCompareExchange64";
         }
     }
 
@@ -5620,6 +5881,42 @@ void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
     }
 }
 
+[ForceInline]
+void InterlockedAdd(__ref  int64_t dest,  int64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAdd";
+    }
+}
+
+[ForceInline]
+void InterlockedAdd(__ref  int64_t dest,  int64_t value, out  int64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAdd";
+    }
+}
+
+[ForceInline]
+void InterlockedAdd(__ref  uint64_t dest,  uint64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAdd";
+    }
+}
+
+[ForceInline]
+void InterlockedAdd(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAdd";
+    }
+}
+
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref  int dest,  int value)
@@ -5690,6 +5987,24 @@ void InterlockedAnd(__ref uint dest, uint value, out uint original_value)
     }
 }
 
+[ForceInline]
+void InterlockedAnd(__ref  uint64_t dest,  uint64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAnd";
+    }
+}
+
+[ForceInline]
+void InterlockedAnd(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAnd";
+    }
+}
+
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value, out  int original_value)
@@ -5723,6 +6038,60 @@ void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value,
             %original:$$uint = OpAtomicCompareExchange &dest Device None None $value $compare_value;
             OpStore &original_value %original
         };
+    }
+}
+
+[ForceInline]
+void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_value, float value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareExchangeFloatBitwise";
+    }
+}
+
+[ForceInline]
+void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_value, float value, out float original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareExchangeFloatBitwise";
+    }
+}
+
+[ForceInline]
+void InterlockedCompareExchange(__ref  int64_t dest,  int64_t compare_value,  int64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+    }
+}
+
+[ForceInline]
+void InterlockedCompareExchange(__ref  int64_t dest,  int64_t compare_value,  int64_t value, out  int64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+    }
+}
+
+[ForceInline]
+void InterlockedCompareExchange(__ref  uint64_t dest,  uint64_t compare_value,  uint64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+    }
+}
+
+[ForceInline]
+void InterlockedCompareExchange(__ref  uint64_t dest,  uint64_t compare_value,  uint64_t value, out  uint64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
     }
 }
 
@@ -5760,6 +6129,33 @@ void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value)
     }
 }
 
+[ForceInline]
+void InterlockedCompareStoreFloatBitwise(__ref  float dest,  float compare_value, float value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareStoreFloatBitwise";
+    }
+}
+
+[ForceInline]
+void InterlockedCompareStore(__ref int64_t dest, int64_t compare_value, int64_t value);
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareStore";
+    }
+}
+
+[ForceInline]
+void InterlockedCompareStore(__ref uint64_t dest, uint64_t compare_value, uint64_t value);
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareStore";
+    }
+}
+
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
@@ -5793,6 +6189,60 @@ void InterlockedExchange(__ref uint dest, uint value, out uint original_value)
             %r:$$uint = OpAtomicExchange &dest Device None $value;
             OpStore &original_value %r
         };
+    }
+}
+
+[ForceInline]
+void InterlockedExchange(__ref  float dest,  float value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedExchange";
+    }
+}
+
+[ForceInline]
+void InterlockedExchange(__ref  float dest,  float value, out  float original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedExchange";
+    }
+}
+
+[ForceInline]
+void InterlockedExchange(__ref  int64_t dest,  int64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedExchange";
+    }
+}
+
+[ForceInline]
+void InterlockedExchange(__ref  int64_t dest,  int64_t value, out  int64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedExchange";
+    }
+}
+
+[ForceInline]
+void InterlockedExchange(__ref  uint64_t dest,  uint64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedExchange";
+    }
+}
+
+[ForceInline]
+void InterlockedExchange(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedExchange";
     }
 }
 
@@ -5866,6 +6316,42 @@ void InterlockedMax(__ref uint dest, uint value, out uint original_value)
     }
 }
 
+[ForceInline]
+void InterlockedMax(__ref  int64_t dest,  int64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMax";
+    }
+}
+
+[ForceInline]
+void InterlockedMax(__ref  int64_t dest,  int64_t value, out  int64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMax";
+    }
+}
+
+[ForceInline]
+void InterlockedMax(__ref  uint64_t dest,  uint64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMax";
+    }
+}
+
+[ForceInline]
+void InterlockedMax(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMax";
+    }
+}
+
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref  int dest,  int value)
@@ -5933,6 +6419,42 @@ void InterlockedMin(__ref uint dest, uint value, out uint original_value)
             %v:$$uint = OpAtomicUMin &dest Device None $value;
             OpStore &original_value %v
         };
+    }
+}
+
+[ForceInline]
+void InterlockedMin(__ref  int64_t dest,  int64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMin";
+    }
+}
+
+[ForceInline]
+void InterlockedMin(__ref  int64_t dest,  int64_t value, out  int64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMin";
+    }
+}
+
+[ForceInline]
+void InterlockedMin(__ref  uint64_t dest,  uint64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMin";
+    }
+}
+
+[ForceInline]
+void InterlockedMin(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMin";
     }
 }
 
@@ -6006,6 +6528,24 @@ void InterlockedOr(__ref uint dest, uint value, out uint original_value)
     }
 }
 
+[ForceInline]
+void InterlockedOr(__ref  uint64_t dest,  uint64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedOr";
+    }
+}
+
+[ForceInline]
+void InterlockedOr(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedOr";
+    }
+}
+
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref  int dest,  int value)
@@ -6075,6 +6615,25 @@ void InterlockedXor(__ref uint dest, uint value, out uint original_value)
         };
     }
 }
+
+[ForceInline]
+void InterlockedXor(__ref  uint64_t dest,  uint64_t value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedXor";
+    }
+}
+
+[ForceInline]
+void InterlockedXor(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedXor";
+    }
+}
+
 
 // Is floating-point value finite?
 

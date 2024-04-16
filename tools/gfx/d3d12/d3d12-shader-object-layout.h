@@ -66,6 +66,9 @@ public:
         /// as a sub-object.
         uint32_t subObjectIndex;
 
+        /// The stride of a structured buffer.
+        uint32_t bufferElementStride;
+
         bool isRootParameter;
 
         /// Is this binding range represent a specialization point, such as an existential value, or a `ParameterBlock<IFoo>`.

@@ -227,16 +227,6 @@ namespace Slang
         return nullptr;
     }
 
-    bool SemanticsVisitor::isInterfaceType(Type* type)
-    {
-        if (auto declRefType = as<DeclRefType>(type))
-        {
-            if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
-                return true;
-        }
-        return false;
-    }
-
     bool SemanticsVisitor::isValidGenericConstraintType(Type* type)
     {
         if (auto andType = as<AndType>(type))
