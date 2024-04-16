@@ -1059,6 +1059,18 @@ SLANG_API SlangParameterCategory spReflectionTypeLayout_GetParameterCategory(Sla
     return getParameterCategory(typeLayout);
 }
 
+SLANG_API uint32_t spReflectionTypeLayout_GetFieldCount(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if (!typeLayout) return 0;
+
+    if (auto structTypeLayout = as<StructTypeLayout>(typeLayout))
+    {
+        return (uint32_t)structTypeLayout->fields.getCount();
+    }
+    return 0;
+}
+
 SLANG_API unsigned spReflectionTypeLayout_GetCategoryCount(SlangReflectionTypeLayout* inTypeLayout)
 {
     auto typeLayout = convert(inTypeLayout);
