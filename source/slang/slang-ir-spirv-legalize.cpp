@@ -1275,30 +1275,21 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
 
         // Once all the `NonUniformResourceIndex` insts are visited, and the inst type is bubbled up to the parent,
-        // the next step is to add a decoration to the operands of all nonuniformresourceindex insts.
+        // the next step is to add a decoration to the operands of all `NonUniformResourceIndex` insts.
         for (int i = 0; i < resWorkList.getCount(); ++i)
         {
-            auto nonUniformResInst = resWorkList[i];
-            auto operand = nonUniformResInst->getOperand(0);
-
-            IRBuilder builder(operand);
-            if (operand && operand->getOp() == kIROp_Call)
+            // For each of the `NonUniformResourceIndex` inst that remain, decorate the base inst
+            // with a [NonUniformResource] decoration, which is the operand0 of the inst.
+            auto inst = resWorkList[i];
+            auto operand = inst->getOperand(0);
+            if (!operand)
+                continue;
+            if (canDecorateNonUniformInst(inst, operand))
             {
+                IRBuilder builder(operand);
                 builder.addSPIRVNonUniformResourceDecoration(operand);
-                nonUniformResInst->replaceUsesWith(operand);
-                nonUniformResInst->removeAndDeallocate();
-            }
-            else
-            {
-                if (!operand && !nonUniformResInst->hasUses())
-                    continue;
-
-                if (auto loadOp = as<IRLoad>(operand) || hasResourceType(operand->getDataType()))
-                {
-                    builder.addSPIRVNonUniformResourceDecoration(operand);
-                    nonUniformResInst->replaceUsesWith(operand);
-                    nonUniformResInst->removeAndDeallocate();
-                }
+                inst->replaceUsesWith(operand);
+                inst->removeAndDeallocate();
             }
         }
         nonUniformResourceIndexInst->removeFromParent();
