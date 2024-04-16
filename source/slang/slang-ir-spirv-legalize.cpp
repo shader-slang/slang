@@ -1178,13 +1178,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         //   accesses (GetElementPtr -> Load), then decorate the load instruction.
         // - go through IntCasts to deal with u32 -> i32 / vice-versa (IntCast)
         List<IRInst*> resWorkList;
-        resWorkList.add(nonUniformResourceIndexInst);
 
         // iterate down all the insts that originate from a `nonUniformResourceIndexInst` and pop out the
         // `nonUniformResourceIndexInst` from the index value itself and wrap it around the parent inst.
         // For example:
         IRCall* callInst = nullptr;
         List<IRInst*> newCallArgs;
+        auto insti = nonUniformResourceIndexInst;
+        while (insti->getOp() == kIROp_NonUniformResourceIndex)
+        {
+            if (resWorkList.getCount() != 0)
+                resWorkList.removeLast();
+            resWorkList.add(insti);
+            insti = insti->getOperand(0);
+        }
         for (Index i = 0; i < resWorkList.getCount(); i++)
         {
             auto inst = resWorkList[i];
@@ -1194,11 +1201,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 IRBuilder builder(user);
                 builder.setInsertBefore(user);
                 IRInst* newUser = nullptr;
+                IRInst* nonUniformUser = nullptr;
                 switch (user->getOp())
                 {
                 case kIROp_IntCast:
                     // Replace intCast(nonUniformRes(x)), into nonUniformRes(intCast(x))
                     newUser = builder.emitCast(user->getFullType(), inst->getOperand(0));
+                    nonUniformUser = builder.emitNonUniformResourceIndexInst(newUser);
                     break;
                 case kIROp_GetElementPtr:
                     // Ignore when nonUniformRes is not on the index
@@ -1207,22 +1216,27 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         // Replace gep(pArray, nonUniformRes(x)), into nonUniformRes(gep(pArray, x))
                         newUser = builder.emitElementAddress(user->getFullType(), user->getOperand(0), inst->getOperand(0));
                     }
+                    nonUniformUser = builder.emitNonUniformResourceIndexInst(newUser);
                     break;
                 case kIROp_RWStructuredBufferGetElementPtr:
                     // Replace buffer[nonUniformRes(nonUniformRes(x))], into nonUniformRes(buffer[x])
                     // This fails when converting rwstructbuf(nonuniformres(gep(...), int) -> rwstructbuf(get(...), int).
                     // newUser = builder.emitRWStructuredBufferGetElementPtr(inst->getOperand(0), user->getOperand(1));
                     break;
+                case kIROp_NonUniformResourceIndex:
+                    nonUniformUser = builder.emitNonUniformResourceIndexInst(inst->getOperand(0));
+                    break;
                 case kIROp_Load:
                     newUser = builder.emitLoad(user->getFullType(), inst->getOperand(0));
+                    nonUniformUser = builder.emitNonUniformResourceIndexInst(newUser);
                     break;
                 case kIROp_Call:
                     callInst = as<IRCall>(user);
                     if (callInst)
                     {
-                        for (UInt i = 0; i < callInst->getArgCount(); i++)
+                        for (UInt argi = 0; argi < callInst->getArgCount(); argi++)
                         {
-                            auto arg = callInst->getArg(i);
+                            auto arg = callInst->getArg(argi);
                             if (auto nonUniformInst = as<IRNonUniformResourceIndex>(arg))
                             {
                                 arg = nonUniformInst->getOperand(0);
@@ -1230,24 +1244,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             newCallArgs.add(arg);
                         }
                         newUser = builder.emitCallInst(user->getFullType(), callInst->getCallee(), newCallArgs);
+                        nonUniformUser = builder.emitNonUniformResourceIndexInst(newUser);
                     }
                     break;
                 default:
                     // Ignore for all other unknown insts.
                     break;
                 };
-                if (!newUser)
+                if (!nonUniformUser)
                     return;
 
-                auto nonUniformUser = builder.emitNonUniformResourceIndexInst(newUser);
                 user->replaceUsesWith(nonUniformUser);
 
                 switch (user->getOp())
                 {
-                case kIROp_IntCast:
-                case kIROp_Load:
-                case kIROp_GetElementPtr:
                 case kIROp_Call:
+                case kIROp_IntCast:
+                case kIROp_GetElementPtr:
+                case kIROp_Load:
+                case kIROp_NonUniformResourceIndex:
                     resWorkList.add(nonUniformUser);
                     break;
                 };
@@ -1257,22 +1272,28 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // Once all the `NonUniformResourceIndex` insts are visited, and the inst type is bubbled up to the parent,
         // the next step is to add a decoration to the operands of all nonuniformresourceindex insts.
-        for (int i = 1; i < resWorkList.getCount(); ++i)
+        for (int i = 0; i < resWorkList.getCount(); ++i)
         {
             auto nonUniformResInst = resWorkList[i];
             auto operand = nonUniformResInst->getOperand(0);
-            IRBuilder builder(nonUniformResInst);
 
-            if (hasResourceType(operand->getDataType()))
-            {
-                builder.addSPIRVNonUniformResourceDecoration(operand);
-                nonUniformResInst->replaceUsesWith(operand);
-            }
-            else if (auto callOp = as<IRCall>(operand))
+            IRBuilder builder(operand);
+            if (operand && operand->getOp() == kIROp_Call)
             {
                 builder.addSPIRVNonUniformResourceDecoration(operand);
                 nonUniformResInst->replaceUsesWith(operand);
                 nonUniformResInst->removeAndDeallocate();
+            }
+            else
+            {
+                if (!operand && !nonUniformResInst->hasUses())
+                    continue;
+
+                if (auto loadOp = as<IRLoad>(operand) || hasResourceType(operand->getDataType()))
+                {
+                    builder.addSPIRVNonUniformResourceDecoration(operand);
+                    nonUniformResInst->replaceUsesWith(operand);
+                }
             }
         }
         nonUniformResourceIndexInst->removeFromParent();
