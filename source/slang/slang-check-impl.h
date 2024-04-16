@@ -2040,7 +2040,6 @@ namespace Slang
 
         SubtypeWitness* checkAndConstructSubtypeWitness(Type* subType, Type* superType);
 
-        bool isInterfaceType(Type* type);
         bool isValidGenericConstraintType(Type* type);
 
         bool isTypeDifferentiable(Type* type);
@@ -2762,6 +2761,8 @@ namespace Slang
     };
 
     bool isUnsizedArrayType(Type* type);
+
+    bool isInterfaceType(Type* type);
 
     EnumDecl* isEnumType(Type* type);
 

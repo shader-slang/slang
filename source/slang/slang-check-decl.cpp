@@ -1330,6 +1330,16 @@ namespace Slang
         return arrayType->isUnsized();
     }
 
+    bool isInterfaceType(Type* type)
+    {
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+                return true;
+        }
+        return false;
+    }
+
     EnumDecl* isEnumType(Type* type)
     {
         if (auto declRefType = as<DeclRefType>(type))

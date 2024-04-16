@@ -116,6 +116,7 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
         uint32_t count = (uint32_t)typeLayout->getBindingRangeBindingCount(r);
         slang::TypeLayoutReflection* slangLeafTypeLayout =
             typeLayout->getBindingRangeLeafTypeLayout(r);
+        
         BindingRangeInfo bindingRangeInfo = {};
         bindingRangeInfo.bindingType = slangBindingType;
         bindingRangeInfo.resourceShape = slangLeafTypeLayout->getResourceShape();
@@ -126,6 +127,21 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
             typeLayout,
             r);
         bindingRangeInfo.isSpecializable = typeLayout->isBindingRangeSpecializable(r);
+        switch (slangBindingType)
+        {
+        case slang::BindingType::RawBuffer:
+        case slang::BindingType::TypedBuffer:
+        case slang::BindingType::MutableRawBuffer:
+        case slang::BindingType::MutableTypedBuffer:
+            {
+                auto bufferElementType = slangLeafTypeLayout->getElementTypeLayout();
+                if (bufferElementType)
+                {
+                    bindingRangeInfo.bufferElementStride = (uint32_t)bufferElementType->getStride();
+                }
+            }
+            break;
+        }
         if (bindingRangeInfo.isRootParameter)
         {
             RootParameterInfo rootInfo = {};

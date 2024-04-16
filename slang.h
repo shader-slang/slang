@@ -2390,6 +2390,7 @@ extern "C"
     SLANG_API size_t spReflectionTypeLayout_GetStride(SlangReflectionTypeLayout* type, SlangParameterCategory category);
     SLANG_API int32_t spReflectionTypeLayout_getAlignment(SlangReflectionTypeLayout* type, SlangParameterCategory category);
 
+    SLANG_API uint32_t spReflectionTypeLayout_GetFieldCount(SlangReflectionTypeLayout* type);
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(SlangReflectionTypeLayout* type, unsigned index);
 
     SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(SlangReflectionTypeLayout* typeLayout, const char* nameBegin, const char* nameEnd);
@@ -2884,7 +2885,7 @@ namespace slang
 
         unsigned int getFieldCount()
         {
-            return getType()->getFieldCount();
+            return spReflectionTypeLayout_GetFieldCount((SlangReflectionTypeLayout*)this);
         }
 
         VariableLayoutReflection* getFieldByIndex(unsigned int index)
