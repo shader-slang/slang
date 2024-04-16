@@ -244,7 +244,7 @@ Opaque types (and structure or array types that contain them) may be limited in 
 
 #### Texture Types
 
-Texture types -- including `Texure2D`, `TextureCubeArray`, `RWTexture2D`, and more -- are used to access formatted data for read, write, and sampling operations.
+Texture types -- including `Texture2D`, `TextureCubeArray`, `RWTexture2D`, and more -- are used to access formatted data for read, write, and sampling operations.
 Textures can be used to represent simple images, but also support _mipmapping_ as a way to reduce noise when sampling at lower than full resolution.
 The full space of texture types follows the formula:
 
@@ -254,7 +254,7 @@ where:
 
 * The _access_ can be read-only (no prefix), read-write (`RW`), or read-write with a guarantee of rasterization order for operations on the given resource (`RasterizerOrdered`).
 * The _base shape_ can be `1D`, `2D`, `3D`, or `Cube`.
-* The _multisample-ness_ can non-multiple-sample, or multi-sampled (`MS`).
+* The _multisample-ness_ can be non-multiple-sample, or multi-sampled (`MS`).
 * The _array-ness_  can either be non-arrayed, or arrayed (`Array`).
 * The _element type_ can either be explicitly specified (`<T>`) or left as the default of `float4`
 
@@ -575,7 +575,7 @@ A single parameter may use both the D3D-style and Vulkan-style markup, but in ea
 > #### Note ####
 > Explicit binding markup is tedious to write and error-prone to maintain.
 > It is almost never required in Slang codebases.
-> The Slang compiler can automatically synthesize bindings in a completely deterministic fashion and in most cases the bindings it generates are the as what a programmer would have written manually.
+> The Slang compiler can automatically synthesize bindings in a completely deterministic fashion and in most cases the bindings it generates are what a programmer would have written manually.
 
 Shader Entry Points
 -------------------
