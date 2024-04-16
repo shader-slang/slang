@@ -1505,6 +1505,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
 
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
+    [require(glsl, texture_sm_4_1_samplerless)]
     T __glsl_load(vector<int, Shape.dimensions+isArray> location)
     {
         __intrinsic_asm "$ctexelFetch($0, ($1), 0)$z";
@@ -1513,7 +1514,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
     {
         __target_switch
@@ -1550,7 +1551,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1598,7 +1599,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
         __glsl_extension(GL_EXT_samplerless_texture_functions)
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -1642,7 +1643,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
@@ -1684,7 +1685,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1729,7 +1730,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
         __glsl_extension(GL_EXT_samplerless_texture_functions)
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -2599,7 +2600,7 @@ struct InputPatch
 };
 
 __generic<T, let N : int>
-[require(glsl_hlsl_spirv, shader_stages_hull_domain)]
+[require(glsl_hlsl_spirv, shader_stages_domain_hull)]
 __magic_type(HLSLOutputPatchType)
 __intrinsic_type($(kIROp_HLSLOutputPatchType))
 struct OutputPatch
@@ -10586,6 +10587,7 @@ __generic<T, let format:int>
 extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 {
     [__readNone]
+    [require(glsl_hlsl_spirv, texture_sm_4_1)]
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -10602,6 +10604,7 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     $(isReadOnly?"[__readNone] ":"")
+    [require(glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(int location)
     {
         __target_switch
@@ -10617,11 +10620,11 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 
     $(isReadOnly?"[__readNone] ":"")
     T Load(int location, out uint status);
-
     __subscript(uint index) -> T {
 
         $(isReadOnly?"[__readNone] ":"")
         [ForceInline]
+        [require(glsl_hlsl_spirv, texture_sm_4_1)]
         get { return Load((int)index); }
 ${{{{
         if (access != SLANG_RESOURCE_ACCESS_READ) {
