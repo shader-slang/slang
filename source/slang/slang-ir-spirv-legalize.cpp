@@ -1199,18 +1199,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 IRBuilder builder(user);
                 builder.setInsertBefore(user);
 
-                // The `NonUniformResourceIndex` instruction can be used by a simple instruction
-                // or a tail call in case of an atomic operation. Declare appropriate
-                // variables needed to build one of the required chain operations.
                 IRInst* newUser = nullptr;
-                IRCall* callInst = nullptr;
-                List<IRInst*> callArgs;
                 switch (user->getOp())
                 {
                 case kIROp_IntCast:
                     // Replace intCast(nonUniformRes(x)), into nonUniformRes(intCast(x))
                     newUser = builder.emitCast(user->getFullType(), inst->getOperand(0));
-                    newUser = builder.emitNonUniformResourceIndexInst(newUser);
                     break;
                 case kIROp_GetElementPtr:
                     // Ignore when `NonUniformResourceIndex` is not on the index
@@ -1219,57 +1213,41 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         // Replace gep(pArray, nonUniformRes(x)), into nonUniformRes(gep(pArray, x))
                         newUser = builder.emitElementAddress(user->getFullType(), user->getOperand(0), inst->getOperand(0));
                     }
-                    newUser = builder.emitNonUniformResourceIndexInst(newUser);
                     break;
                 case kIROp_NonUniformResourceIndex:
                     // Replace nonUniformRes(nonUniformRes(x)), into nonUniformRes(x)
-                    newUser = builder.emitNonUniformResourceIndexInst(inst->getOperand(0));
+                    newUser = inst->getOperand(0);
                     break;
                 case kIROp_Load:
                     // Replace load(nonUniformRes(x)), into nonUniformRes(load(x))
                     newUser = builder.emitLoad(user->getFullType(), inst->getOperand(0));
-                    newUser = builder.emitNonUniformResourceIndexInst(newUser);
-                    break;
-                case kIROp_Call:
-                    // Replace call(..., nonUniformRes(x), ...), into nonUniformRes(call(..., x, ...)
-                    callInst = as<IRCall>(user);
-                    for (UInt argi = 0; argi < callInst->getArgCount(); argi++)
-                    {
-                        auto arg = callInst->getArg(argi);
-                        if (auto nonUniformInst = as<IRNonUniformResourceIndex>(arg))
-                        {
-                            arg = nonUniformInst->getOperand(0);
-                        }
-                        callArgs.add(arg);
-                    }
-                    newUser = builder.emitCallInst(user->getFullType(), callInst->getCallee(), callArgs);
-                    newUser = builder.emitNonUniformResourceIndexInst(newUser);
                     break;
                 default:
                     // Ignore for all other unknown insts.
                     break;
                 };
 
-                // Early exit when we no longer could process the `NonUniformResourceIndex` inst.
+                // Early exit when we could not process the `NonUniformResourceIndex` inst.
                 if (!newUser)
                     return;
+
+                auto nonuniformUser = builder.emitNonUniformResourceIndexInst(newUser);
 
                 // Update the worklist with the newly added `NonUniformResourceIndex` inst, based on
                 // the base inst it was constructed around, in case we need to further bubble up
                 // the `NonUniformResourceIndex` inst.
                 switch (user->getOp())
                 {
-                case kIROp_Call:
                 case kIROp_IntCast:
                 case kIROp_GetElementPtr:
                 case kIROp_Load:
                 case kIROp_NonUniformResourceIndex:
-                    resWorkList.add(newUser);
+                    resWorkList.add(nonuniformUser);
                     break;
                 };
 
                 // Clean up the base inst from the IR module, to avoid duplicate decorations.
-                user->replaceUsesWith(newUser);
+                user->replaceUsesWith(nonuniformUser);
                 user->removeAndDeallocate();
             });
         }
@@ -1278,13 +1256,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // the next step is to add a decoration to the operands of all `NonUniformResourceIndex` insts.
         for (int i = 0; i < resWorkList.getCount(); ++i)
         {
+            // It is only required to decorate the base inst, if the `NonUniformResourceIndex` inst
+            // around it has any active uses.
+            auto inst = resWorkList[i];
+            if (!inst->hasUses())
+                continue;
+
             // For each of the `NonUniformResourceIndex` inst that remain, decorate the base inst
             // with a [NonUniformResource] decoration, which is the operand0 of the inst.
-            auto inst = resWorkList[i];
             auto operand = inst->getOperand(0);
-            if (!operand)
-                continue;
-            if (canDecorateNonUniformInst(inst, operand))
+            if (containsResource(operand->getDataType()))
             {
                 IRBuilder builder(operand);
                 builder.addSPIRVNonUniformResourceDecoration(operand);
