@@ -42,7 +42,7 @@ for(unsigned pp = 0; pp < parameterCount; pp++)
 We can also enumerate the compile entry points, in order to inspect their parameters:
 
 ```c++
-SlangUInt entryPointCount = shaderRefelction->getEntryPointCount();
+SlangUInt entryPointCount = shaderReflection->getEntryPointCount();
 for(SlangUInt ee = 0; ee < entryPointCount; ee++)
 {
 	slang::EntryPointReflection* entryPoint =
