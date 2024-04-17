@@ -79,7 +79,6 @@ class IfStmt : public Stmt
     Stmt* negativeStatement = nullptr;
 };
 
-
 // A statement that can be escaped with a `break`
 class BreakableStmt : public ScopeStmt 
 {
