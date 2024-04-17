@@ -224,13 +224,13 @@ static void _lookUpDirectAndTransparentMembers(
         }
     }
 
-    // TODO(tfoley): should we look up in the transparent decls
-    // if we already has a hit in the current container?
     for(auto transparentInfo : containerDecl->getTransparentMembers())
     {
         // The reference to the transparent member should use the same
         // path as we used in referring to its parent.
         DeclRef<Decl> transparentMemberDeclRef = astBuilder->getMemberDeclRef(parentDeclRef, transparentInfo.decl);
+        if (transparentMemberDeclRef.getDecl() == request.declToExclude)
+            continue;
 
         // We need to leave a breadcrumb so that we know that the result
         // of lookup involves a member lookup step here
