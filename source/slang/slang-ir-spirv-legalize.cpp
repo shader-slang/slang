@@ -1169,7 +1169,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processNonUniformResourceIndex(IRInst* nonUniformResourceIndexInst)
     {
-        // implement the translation to spirv by waking up the use-def chain
+        // implement the translation to spirv by walking up the use-def chain
         // from nonUniformResource inst of an index to an array of buffer or
         // texture def all the way to the leaf operations. To be precise:
         // - go through GEP and see if it calls an intrinsic function,
@@ -1179,9 +1179,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // - go through IntCasts to deal with u32 -> i32 / vice-versa (IntCast)
         List<IRInst*> resWorkList;
 
-        // iterate down all the insts that originate from a `nonUniformResourceIndexInst` and pop out the
-        // `nonUniformResourceIndexInst` from the index value itself and wrap it around the parent inst.
-        // For example:
+        // Handle cases when `nonUniformResourceIndexInst` inst is wrapped around
+        // an index in a nested fashion, i.e. nonUniform(nonUniform((index)) by
+        // only adding the inner-most inst in the worklist, and work our way out.
         auto insti = nonUniformResourceIndexInst;
         while (insti->getOp() == kIROp_NonUniformResourceIndex)
         {
@@ -1190,6 +1190,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             resWorkList.add(insti);
             insti = insti->getOperand(0);
         }
+
+        // For all the users of a `nonUniformResourceIndexInst`, make them directly
+        // use the underlying base inst that is wrapped by `nonUniformResourceIndex`
+        // and finally wrap them with a `nonUniformResourceIndex`, and add back to the
+        // worklist, and keep bubbling them up until it can.
         for (Index i = 0; i < resWorkList.getCount(); i++)
         {
             auto inst = resWorkList[i];
@@ -1252,8 +1257,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             });
         }
 
-        // Once all the `NonUniformResourceIndex` insts are visited, and the inst type is bubbled up to the parent,
-        // the next step is to add a decoration to the operands of all `NonUniformResourceIndex` insts.
+        // Once all the `NonUniformResourceIndex` insts are visited, and the inst type is bubbled up
+        // to the parent, a decoration is added to the operands of the insts.
         for (int i = 0; i < resWorkList.getCount(); ++i)
         {
             // It is only required to decorate the base inst, if the `NonUniformResourceIndex` inst
@@ -2350,7 +2355,6 @@ void legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
-
     legalizeSPIRV(context, module);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
