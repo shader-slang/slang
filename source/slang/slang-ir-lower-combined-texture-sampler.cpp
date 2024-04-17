@@ -19,7 +19,6 @@ namespace Slang
     struct LowerCombinedSamplerContext
     {
         Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapTypeToLoweredInfo;
-        TargetRequest* target;
 
         LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerType(IRTextureTypeBase* textureType)
         {
