@@ -10620,7 +10620,9 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
     }
 
     $(isReadOnly?"[__readNone] ":"")
+    $(requireToSet)
     T Load(int location, out uint status);
+
     __subscript(uint index) -> T {
 
         $(isReadOnly?"[__readNone] ":"")
@@ -10630,7 +10632,9 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 ${{{{
         if (access != SLANG_RESOURCE_ACCESS_READ) {
 }}}}
-            [nonmutating] set
+            [nonmutating] 
+            $(requireToSet)
+            set
             {
                 __target_switch
                 {
