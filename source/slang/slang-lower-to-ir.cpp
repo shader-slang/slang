@@ -5603,12 +5603,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        if (auto ifletStmt = as<IfLetStmt>(stmt))
-        {
-            auto varDel = ifletStmt->varDecl;
-            lowerDecl(context, varDel);
-        }
-
         auto condExpr = stmt->predicate;
         auto thenStmt = stmt->positiveStatement;
         auto elseStmt = stmt->negativeStatement;

@@ -79,12 +79,6 @@ class IfStmt : public Stmt
     Stmt* negativeStatement = nullptr;
 };
 
-class IfLetStmt: public IfStmt
-{
-    SLANG_AST_CLASS(IfLetStmt)
-    VarDecl* varDecl = nullptr;
-    Expr* initExpr = nullptr;
-};
 
 // A statement that can be escaped with a `break`
 class BreakableStmt : public ScopeStmt 
