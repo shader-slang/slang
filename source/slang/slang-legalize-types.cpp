@@ -203,27 +203,18 @@ bool isResourceType(IRType* type)
     return false;
 }
 
-// Helper wrapper function around isResourceType that checks not only if the
-// given input type is a resource, or a pointer to a resource.
-bool containsResource(IRType* type)
+// Helper wrapper function around isResourceType that checks if the given
+// type is a pointer to a resource type or a physical storage buffer.
+bool isPointerToResourceType(IRType* type)
 {
-    // We can promote a `NonUniformResourceIndex` inst to a decorator only
-    // when the input is a resourceType, or a pointer to a resourceType.
-    if (isResourceType(type))
-    {
-        return true;
-    }
-
     while (auto ptrType = as<IRPtrTypeBase>(type))
     {
+        if (ptrType->getAddressSpace() == SpvStorageClassStorageBuffer ||
+            ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBufferEXT)
+            return true;
         type = ptrType->getValueType();
     }
 
-    // Special handling for a RWStructuredBufGetElementPtr
-    if (type->getOp() == kIROp_StructType)
-    {
-        return true;
-    }
     return isResourceType(type);
 }
 

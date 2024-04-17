@@ -78,7 +78,9 @@ bool isComInterfaceType(IRType* type);
 // If `type` is a vector, returns its element type. Otherwise, return `type`.
 IRType* getVectorElementType(IRType* type);
 
-bool containsResource(IRType* type);
+bool isResourceType(IRType* type);
+
+bool isPointerToResourceType(IRType* type);
 
 IROp getTypeStyle(IROp op);
 IROp getTypeStyle(BaseType op);

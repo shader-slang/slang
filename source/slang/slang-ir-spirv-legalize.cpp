@@ -1263,9 +1263,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 continue;
 
             // For each of the `NonUniformResourceIndex` inst that remain, decorate the base inst
-            // with a [NonUniformResource] decoration, which is the operand0 of the inst.
+            // with a [NonUniformResource] decoration, which is the operand0 of the inst, only
+            // when the type is a resource type, or a pointer to a resource type, or a pointer
+            // in the Physical Storage buffer address space.
             auto operand = inst->getOperand(0);
-            if (containsResource(operand->getDataType()))
+            auto type = operand->getDataType();
+            if (isResourceType(type) ||
+                isPointerToResourceType(type))
             {
                 IRBuilder builder(operand);
                 builder.addSPIRVNonUniformResourceDecoration(operand);
