@@ -5597,23 +5597,7 @@ namespace Slang
         parser->FillPosition(memberExpr);
         memberExpr->name = getName(parser, "hasValue");
 
-        // create a "==" operator
-        auto opExpr = parser->astBuilder->create<VarExpr>();
-        opExpr->name = getName(parser, "==");
-        opExpr->scope = parser->currentScope;
-        parser->FillPosition(opExpr);
-
-        // create a 'true' literal
-        BoolLiteralExpr* boolLiteralExpr = parser->astBuilder->create<BoolLiteralExpr>();
-        boolLiteralExpr->value = true;
-
-        // create a "var.hasValue == true" expression
-        InfixExpr* infixExpr = parser->astBuilder->create<InfixExpr>();
-        infixExpr->loc = opExpr->loc;
-        infixExpr->functionExpr = opExpr;
-        infixExpr->arguments.add(memberExpr);
-        infixExpr->arguments.add(boolLiteralExpr);
-        return infixExpr;
+        return memberExpr;
     }
 
     // Parse the syntax 'if (let var = X as Y)'
@@ -5637,7 +5621,7 @@ namespace Slang
 
         // insert 'let tempVarDecl = X as Y;'
         auto tempVarDecl = astBuilder->create<LetDecl>();
-        tempVarDecl->nameAndLoc = NameLoc(getName(this, "OptVar"), identifierToken.loc);
+        tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
         tempVarDecl->initExpr = initExpr;
         AddMember(currentScope->containerDecl, tempVarDecl);
 
