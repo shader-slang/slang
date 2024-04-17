@@ -476,11 +476,9 @@ alias atomic_hlsl_sm_6_6 = _sm_6_6;
 alias byteaddressbuffer = sm_4_0;
 alias byteaddressbuffer_rw = sm_4_0;
 alias consumestructuredbuffer = sm_5_0;
-alias fragmentprocessing = fragment + sm_5_0 
-                         | compute + GL_NV_compute_shader_derivatives;
-alias fragmentprocessing_derivativecontrol = fragment + sm_5_0 + GL_ARB_derivative_control
-                                           | compute + GL_NV_compute_shader_derivatives;
-alias getattributeatvertex = fragment + _sm_6_1 | fragment + GL_EXT_fragment_shader_barycentric;
+alias fragmentprocessing = sm_5_0 | GL_NV_compute_shader_derivatives;
+alias fragmentprocessing_derivativecontrol = sm_5_0 + GL_ARB_derivative_control | GL_NV_compute_shader_derivatives;
+alias getattributeatvertex = _sm_6_1 | GL_EXT_fragment_shader_barycentric;
 alias memorybarrier_compute = raytracing_stages_compute + sm_5_0;
 alias structuredbuffer = sm_4_0;
 alias structuredbuffer_rw = sm_4_0;
