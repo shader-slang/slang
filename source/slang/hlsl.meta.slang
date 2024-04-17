@@ -6990,10 +6990,12 @@ T __copyObject<T>(T v)
    }
 }
 
+/// `NonUniformResourceIndex` function is used to indicate if the resource index is
+/// divergent, and ensure scalarization happens correctly for each divergent lane.
 [__readNone]
 __generic<T:__BuiltinArithmeticType>
 __intrinsic_op($(kIROp_NonUniformResourceIndex))
-   T NonUniformResourceIndex(T index);
+T NonUniformResourceIndex(T index);
 
 /// HLSL allows NonUniformResourceIndex around non int/uint types.
 /// It's effect is presumably to ignore it, which the following implementation does.

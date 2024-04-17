@@ -1180,7 +1180,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         List<IRInst*> resWorkList;
 
         // Handle cases when `nonUniformResourceIndexInst` inst is wrapped around
-        // an index in a nested fashion, i.e. nonUniform(nonUniform((index)) by
+        // an index in a nested fashion, i.e. nonUniform(nonUniform(index)) by
         // only adding the inner-most inst in the worklist, and work our way out.
         auto insti = nonUniformResourceIndexInst;
         while (insti->getOp() == kIROp_NonUniformResourceIndex)
