@@ -3883,14 +3883,6 @@ namespace Slang
         return decl;
     }
 
-    static NodeBase* parseIfLetDecl(
-        Parser* parser, void* /*userData*/)
-    {
-        LetDecl* decl = parser->astBuilder->create<LetDecl>();
-        parseModernVarDeclBaseCommon(parser, decl);
-        return decl;
-    }
-
     static NodeBase* parseVarDecl(
         Parser* parser, void* /*userData*/)
     {
@@ -5624,36 +5616,6 @@ namespace Slang
         return infixExpr;
     }
 
-    static VarDecl* parseIfLetExpr(Parser* parser)
-    {
-        Decl* parsedDecl = nullptr;
-        auto identifierToken = peekToken(parser);
-        auto name = identifierToken.getName();
-        auto syntaxDecl = tryLookUpSyntaxDecl(parser, name);
-        if (!syntaxDecl)
-        {
-            parser->diagnose(identifierToken, Diagnostics::syntaxError);
-            return parser->astBuilder->create<VarDecl>();
-        }
-        SyntaxParseCallback restoreCallBack = syntaxDecl->parseCallback;
-        syntaxDecl->parseCallback = parseIfLetDecl;
-        bool ret = tryParseUsingSyntaxDeclImpl<Decl>(parser, syntaxDecl, &parsedDecl);
-        syntaxDecl->parseCallback = restoreCallBack;
-
-        if (ret)
-        {
-            if (auto varDel = as<LetDecl>(parsedDecl))
-            {
-                if (as<AsTypeExpr>(varDel->initExpr))
-                {
-                    return varDel;
-                }
-            }
-        }
-        parser->diagnose(identifierToken, Diagnostics::syntaxError);
-        return parser->astBuilder->create<VarDecl>();
-    }
-
     // Parse the syntax 'if (let var = X as Y)'
     Stmt* Parser::parseIfLetStatement()
     {
@@ -5667,19 +5629,22 @@ namespace Slang
         ReadToken("if");
         ReadToken(TokenType::LParent);
 
-        // This is the variable actual declared in the if_let syntax
-        auto valDecl = parseIfLetExpr(this);
+        // parse 'let var = X as Y'
+        ReadToken("let");
+        auto identifierToken = ReadToken(TokenType::Identifier);
+        ReadToken(TokenType::OpAssign);
+        auto initExpr = ParseInitExpr();
 
         // insert 'let tempVarDecl = X as Y;'
         auto tempVarDecl = astBuilder->create<LetDecl>();
-        tempVarDecl->nameAndLoc = NameLoc(getName(this, "OptVar"), valDecl->loc);
-        tempVarDecl->initExpr = valDecl->initExpr;
+        tempVarDecl->nameAndLoc = NameLoc(getName(this, "OptVar"), identifierToken.loc);
+        tempVarDecl->initExpr = initExpr;
         AddMember(currentScope->containerDecl, tempVarDecl);
 
-        DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
-        FillPosition(varDeclrStatement);
-        varDeclrStatement->decl = tempVarDecl;
-        newBody->stmts.add(varDeclrStatement);
+        DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
+        FillPosition(tmpVarDeclStmt);
+        tmpVarDeclStmt->decl = tempVarDecl;
+        newBody->stmts.add(tmpVarDeclStmt);
 
         // construct 'if (tempVarDecl.hasValue == true)'
         VarExpr* tempVarExpr = astBuilder->create<VarExpr>();
@@ -5715,14 +5680,16 @@ namespace Slang
             memberExpr->baseExpression = tempVarExpr;
             memberExpr->name = getName(this, "value");
 
-            valDecl->initExpr = memberExpr;
+            auto varDecl = astBuilder->create<LetDecl>();
+            varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
+            varDecl->initExpr = memberExpr;
 
             DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
-            varDeclrStatement->decl = valDecl;
+            varDeclrStatement->decl = varDecl;
 
             // Add scope to the variable declared in the if_let syntax such
             // that this variable cannot be used outside the positive statement
-            AddMember(positiveScopeDecl, valDecl);
+            AddMember(positiveScopeDecl, varDecl);
 
             seqPositiveStmt->stmts.add(varDeclrStatement);
             seqPositiveStmt->stmts.add(ifStatement->positiveStatement);
