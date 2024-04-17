@@ -10580,7 +10580,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     char const* glslTextureSizeFunc = (isReadOnly) ? "textureSize" : "imageSize";
     char const* glslLoadFuncName = (isReadOnly) ? "texelFetch" : "imageLoad";
     char const* spvLoadInstName = (isReadOnly) ? "OpImageFetch" : "OpImageRead";
-    char const* requireToSetQuery = (isReadOnly) ? "[require(glsl_hlsl_spirv, image_size)]" : "[require(glsl_hlsl_spirv, image_size)]";
+    char const* requireToSetQuery = (isReadOnly) ? "[require(glsl_hlsl_spirv, texture_size)]" : "[require(glsl_hlsl_spirv, image_size)]";
     char const* requireToSet = (isReadOnly) ? "[require(glsl_hlsl_spirv, texture_sm_4_1)]" : "[require(glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]";
 }}}}
 
@@ -10588,7 +10588,7 @@ __generic<T, let format:int>
 extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 {
     [__readNone]
-    $(requireToSet)
+    $(requireToSetQuery)
     void GetDimensions(out uint dim)
     {
         __target_switch
