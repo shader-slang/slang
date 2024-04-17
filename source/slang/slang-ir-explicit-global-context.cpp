@@ -61,7 +61,7 @@ struct IntroduceExplicitGlobalContextPass
                     // this is represented as a variable with the `@GroupShared`
                     // rate on its type.
                     //
-                    if( m_target == CodeGenTarget::CUDASource )
+                    if( m_target == CodeGenTarget::CUDASource || m_target == CodeGenTarget::CUDAHeader )
                     {
                         if( as<IRGroupSharedRate>(globalVar->getRate()) )
                             continue;
@@ -102,7 +102,7 @@ struct IntroduceExplicitGlobalContextPass
                     // For CUDA output, we want to leave the global uniform
                     // parameter where it is, because it will translate to
                     // a global `__constant__` variable.
-                    if(m_target == CodeGenTarget::CUDASource)
+                    if(m_target == CodeGenTarget::CUDASource || m_target == CodeGenTarget::CUDAHeader )
                         continue;
 
                     SLANG_ASSERT(!m_globalUniformsParam);
@@ -136,7 +136,7 @@ struct IntroduceExplicitGlobalContextPass
         // it is responsible for introducing the explicit entry-point
         // parameter that is used for passing in the global param(s).
         //
-        if( m_target == CodeGenTarget::CUDASource )
+        if( m_target == CodeGenTarget::CUDASource || m_target == CodeGenTarget::CUDAHeader )
         {
             if( !m_globalUniformsParam && (m_globalVars.getCount() == 0) )
             {
@@ -294,7 +294,7 @@ struct IntroduceExplicitGlobalContextPass
             //
             globalUniformsParam->insertBefore(firstOrdinary);
         }
-        else if(m_target == CodeGenTarget::CPPSource)
+        else if(m_target == CodeGenTarget::CPPSource || m_target == CodeGenTarget::CPPHeader)
         {
             // The nature of our current ABI for entry points on CPU
             // means that we need an explicit parameter to be *declared*

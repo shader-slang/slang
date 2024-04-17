@@ -17,6 +17,7 @@
 #include "slang-ir-check-recursive-type.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-defunctionalization.h"
+#include "slang-ir-header-export.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
@@ -318,6 +319,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::HostCPPSource:
             break;
         case CodeGenTarget::CUDASource:
+        case CodeGenTarget::CUDAHeader:
             collectOptiXEntryPointUniformParams(irModule);
             #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "OPTIX ENTRY POINT UNIFORMS COLLECTED");
@@ -326,6 +328,7 @@ Result linkAndOptimizeIR(
             break;
 
         case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CPPHeader:
             passOptions.alwaysCreateCollectedParam = true;
             [[fallthrough]];
         default:
@@ -349,7 +352,10 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
+        generateTransitiveHeaderExports(irModule, sink);
         break;
     }
 
@@ -358,11 +364,13 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
     {
         lowerComInterfaces(irModule, artifactDesc.style, sink);
         generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
         generateDllExportFuncs(irModule, sink);
+        generateTransitiveHeaderExports(irModule, sink);
         break;
     }
     default: break;
@@ -474,6 +482,7 @@ Result linkAndOptimizeIR(
         handleAutoBindNames(irModule);
         break;
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         removeTorchKernels(irModule);
         handleAutoBindNames(irModule);
         break;
@@ -782,6 +791,7 @@ Result linkAndOptimizeIR(
     switch(target)
     {
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
         {
             synthesizeActiveMask(
@@ -834,12 +844,14 @@ Result linkAndOptimizeIR(
 
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
         {
             legalizeEntryPointVaryingParamsForCPU(irModule, codeGenContext->getSink());
         }
         break;
 
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             legalizeEntryPointVaryingParamsForCUDA(irModule, codeGenContext->getSink());
         }
@@ -879,10 +891,12 @@ Result linkAndOptimizeIR(
         moveGlobalVarInitializationToEntryPoints(irModule);
         break;
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         moveGlobalVarInitializationToEntryPoints(irModule);
         introduceExplicitGlobalContext(irModule, target);
-        if(target == CodeGenTarget::CPPSource)
+        if(target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
         {
             convertEntryPointPtrParamsToRawPtrs(irModule);
         }

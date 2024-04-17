@@ -522,7 +522,6 @@ void initCommandOptions(CommandOptions& options)
                                                                   "except for parameters that has explicit bindings in the input source." },
         { OptionKind::ValidateUniformity, "-validate-uniformity", nullptr, "Perform uniformity validation analysis." },
         { OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language." },
-        { OptionKind::EmitHeader, "-emit-header", nullptr, "Emits a header instead of the code (for cpp or cuda target)." },
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -1666,7 +1665,6 @@ SlangResult OptionsParser::_parse(
             case OptionKind::NoMangle:
             case OptionKind::ValidateUniformity:
             case OptionKind::AllowGLSL:
-            case OptionKind::EmitHeader:
             case OptionKind::EmitIr:
             case OptionKind::DumpIntermediates:
             case OptionKind::DumpReproOnError:
@@ -2749,6 +2747,7 @@ SlangResult OptionsParser::_parse(
         (m_rawTargets[0].format == CodeGenTarget::HostCPPSource ||
             m_rawTargets[0].format == CodeGenTarget::PyTorchCppBinding ||
             m_rawTargets[0].format == CodeGenTarget::CUDASource ||
+            m_rawTargets[0].format == CodeGenTarget::CUDAHeader ||
             m_rawTargets[0].format == CodeGenTarget::SPIRV ||
             m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
             ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind == ArtifactKind::HostCallable))
@@ -2809,8 +2808,10 @@ SlangResult OptionsParser::_parse(
                 switch (outputFormat)
                 {
                     case CodeGenTarget::CPPSource:
+                    case CodeGenTarget::CPPHeader:
                     case CodeGenTarget::PTX:
                     case CodeGenTarget::CUDASource:
+                    case CodeGenTarget::CUDAHeader:
 
                     case CodeGenTarget::HostHostCallable:
                     case CodeGenTarget::ShaderHostCallable:

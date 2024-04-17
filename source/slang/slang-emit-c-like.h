@@ -362,7 +362,8 @@ public:
 
     void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
 
-    bool isEmmitingHeader();
+    bool shouldEmitHeader();
+    void markForHeaderExport(IRInst* inst);
 
     void emitFuncDecl(IRFunc* func);
     void emitFuncDecl(IRFunc* func, const String& name);
@@ -462,6 +463,7 @@ public:
 
 
 
+    virtual bool shouldEmitOnlyHeader() { return false; }
     virtual bool doesTargetSupportPtrTypes() { return false; }
     virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;

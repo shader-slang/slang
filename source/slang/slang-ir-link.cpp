@@ -1478,7 +1478,9 @@ static bool doesTargetAllowUnresolvedFuncSymbol(TargetRequest* req)
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::SPIRV:
         if (req->getOptionSet().getBoolOption(CompilerOptionName::IncompleteLibrary))
             return true;

@@ -84,12 +84,14 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
             return SourceLanguage::C;
         }
         case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CPPHeader:
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::PyTorchCppBinding:
         {
             return SourceLanguage::CPP;
         }
         case CodeGenTarget::CUDASource:
+        case CodeGenTarget::CUDAHeader:
         {
             return SourceLanguage::CUDA;
         }
@@ -1112,20 +1114,26 @@ String CLikeSourceEmitter::getName(IRInst* inst)
     if(!m_mapInstToName.tryGetValue(inst, name))
     {
         // unmangle names, when emitting header
-        if (isEmmitingHeader()) {
-            if (auto nameHintDecor = inst->findDecoration<IRNameHintDecoration>()) 
+        if (shouldEmitOnlyHeader())
+        {
+            if (auto nameHintDecor = inst->findDecoration<IRNameHintDecoration>())
             {
                 StringBuilder sb;
                 for (auto c : nameHintDecor->getName()) {
                     if (c == '.')
-                        sb.append('_');
-                    else {
+                    {
+                        sb.append("::");
+                    }
+                    else
+                    {
                         sb.append(c);
                     }
                 }
                 name = sb.produceString();
             }
-        } else {
+        }
+        else
+        {
             name = generateName(inst);
         }
         m_mapInstToName.add(inst, name);
@@ -3349,7 +3357,7 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     emitSemantics(func);
 
     // TODO: encode declaration vs. definition
-    if(!isEmmitingHeader() && isDefinition(func))
+    if(!shouldEmitOnlyHeader() && isDefinition(func))
     {
         m_writer->emit("\n{\n");
         m_writer->indent();
@@ -3479,11 +3487,6 @@ bool CLikeSourceEmitter::isTargetIntrinsic(IRInst* inst)
     return findTargetIntrinsicDefinition(inst, intrinsicDef);
 }
 
-bool CLikeSourceEmitter::isEmmitingHeader() {
-    return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::EmitHeader);
-}
-
-
 bool shouldWrappInExternCBlock(IRFunc* func)
 {
     for (auto decor : func->getDecorations())
@@ -3500,8 +3503,9 @@ bool shouldWrappInExternCBlock(IRFunc* func)
 
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
 {
-    // When emmiting header, skip if should not be emmited.
-    if (isEmmitingHeader() && !func->findDecoration<IRHeaderExportDecoration>()) {
+    // When emiting header, skip if should not be emited.
+    if (shouldEmitOnlyHeader() && !func->findDecoration<IRHeaderExportDecoration>())
+    {
         return;
     }
 
@@ -3552,10 +3556,9 @@ void CLikeSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
-    // TODO: add similar functionality like markTypeForPyExport for [HeaderExport]
-
-    // When emmiting header, skip if should not be emmited.
-    if (isEmmitingHeader() && !structType->findDecoration<IRHeaderExportDecoration>()) {
+    // When emiting header, skip if should not be emited.
+    if (shouldEmitOnlyHeader() && !structType->findDecoration<IRHeaderExportDecoration>())
+    {
         return;
     }
 
@@ -3953,10 +3956,13 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
             m_writer->emit("\n");
             emitType(varType, initFuncName);
             
-            // When emmiting header, emit only declaration.
-            if (isEmmitingHeader()) {
+            // When emiting header, emit only declaration.
+            if (shouldEmitOnlyHeader())
+            {
                 m_writer->emit(";\n");
-            } else {
+            }
+            else
+            {
                 m_writer->emit("()\n{\n");
                 m_writer->indent();
                 emitFunctionBody(varDecl);
