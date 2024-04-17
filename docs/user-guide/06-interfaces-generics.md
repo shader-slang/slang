@@ -677,6 +677,54 @@ T compute<T>(T a1, T a2)
 // compute(3, 1) == 2
 ```
 
+`as` operator can also be used in the `if` predicate to test if an object can be downcasted to a specific type, once the downcast test is successful,
+the object can be used in the `if` block as the downcasted type without the need to retrieve the `Optional<T>::value` property:
+```csharp
+interface IFoo
+{
+    void foo();
+}
+
+struct MyImpl1 : IFoo
+{
+    void foo() { printf("MyImpl1");}
+}
+
+struct MyImpl2 : IFoo
+{
+    void foo() { printf("MyImpl2");}
+}
+
+struct MyImpl3 : IFoo
+{
+    void foo() { printf("MyImpl3");}
+}
+
+void test(IFoo foo)
+{
+    if (t == foo as MyImpl1)
+    {
+        t.foo();
+    }
+    else if (t == foo as MyImpl2)
+    {
+        t.foo();
+    }
+    else
+        printf("fail");
+}
+
+void main()
+{
+    MyImpl1 v1;
+    test(v1);
+
+    MyImpl2 v2;
+    test(v2);
+}
+
+```
+
 Extensions to Interfaces
 -----------------------------
 
