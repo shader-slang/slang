@@ -226,7 +226,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [ForceInline]
     [__readNone]
-    [require(glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetail(TextureCoord location)
     {
         __target_switch
@@ -245,7 +245,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [ForceInline]
     [__readNone]
-    [require(glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetailUnclamped(TextureCoord location)
     {
         __target_switch
@@ -677,7 +677,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetail(SamplerState s, TextureCoord location)
     {
         __target_switch
@@ -696,7 +696,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetailUnclamped(SamplerState s, TextureCoord location)
     {
         __target_switch
@@ -1445,7 +1445,7 @@ ${{{{
             auto glslComponent = (isCmp ? "" :glslComponentNames[componentId == 0 ? 0 : componentId - 1]);
     }}}}
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_gather_sm_4_1)]
+    [require(glsl_hlsl_spirv, texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam))
     {
         __target_switch
@@ -1457,7 +1457,7 @@ ${{{{
         }
     }
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_gather_sm_4_1)]
+    [require(glsl_hlsl_spirv, texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam), constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1469,7 +1469,7 @@ ${{{{
         }
     }
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_gather_sm_4_1)]
+    [require(glsl_hlsl_spirv, texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam),
         constexpr vector<int, Shape.planeDimensions> offset1,
         constexpr vector<int, Shape.planeDimensions> offset2,
@@ -1931,7 +1931,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
 {
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
@@ -1952,7 +1952,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, vector<int, Shape.dimensions+isArray> offset)
     {
         __target_switch
@@ -1986,7 +1986,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
         }
     }
 
-    [require(glsl, texture_sm_4_1)]
+    [require(glsl, texture_sm_4_1_compute_fragment)]
     void __glslImageStore(vector<int, Shape.dimensions+isArray> location, int sampleIndex, T value)
     {
         __intrinsic_asm "imageStore($0, $1, $2, $V3)";
@@ -1996,7 +1996,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
         get
         {
             __target_switch
@@ -2012,7 +2012,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
 
         [nonmutating]
         [ForceInline]
-        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
         set(T newValue)
         {
             __target_switch
@@ -2540,7 +2540,6 @@ struct StructuredBuffer
 {
     [__readNone]
     [__unsafeForceInlineEarly]
-    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -2631,13 +2630,13 @@ struct $(item.name)
     __target_intrinsic(cpp)
     __target_intrinsic(cuda)
     [__unsafeForceInlineEarly]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
     void GetDimensions(out uint dim);
 
     [__unsafeForceInlineEarly]
     __specialized_for_target(spirv)
     __specialized_for_target(glsl)
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
     void GetDimensions(out uint dim)
     {
         dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
@@ -10581,13 +10580,15 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     char const* glslTextureSizeFunc = (isReadOnly) ? "textureSize" : "imageSize";
     char const* glslLoadFuncName = (isReadOnly) ? "texelFetch" : "imageLoad";
     char const* spvLoadInstName = (isReadOnly) ? "OpImageFetch" : "OpImageRead";
+    char const* requireToSetQuery = (isReadOnly) ? "[require(glsl_hlsl_spirv, image_size)]" : "[require(glsl_hlsl_spirv, image_size)]";
+    char const* requireToSet = (isReadOnly) ? "[require(glsl_hlsl_spirv, texture_sm_4_1)]" : "[require(glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]";
 }}}}
 
 __generic<T, let format:int>
 extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 {
     [__readNone]
-    [require(glsl_hlsl_spirv, texture_sm_4_1)]
+    $(requireToSet)
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -10604,7 +10605,7 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     $(isReadOnly?"[__readNone] ":"")
-    [require(glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    $(requireToSet)
     T Load(int location)
     {
         __target_switch
@@ -10624,7 +10625,7 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 
         $(isReadOnly?"[__readNone] ":"")
         [ForceInline]
-        [require(glsl_hlsl_spirv, texture_sm_4_1)]
+        $(requireToSet)
         get { return Load((int)index); }
 ${{{{
         if (access != SLANG_RESOURCE_ACCESS_READ) {

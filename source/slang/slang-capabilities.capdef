@@ -228,7 +228,11 @@ def spvShaderNonUniform : spirv_1_5;
 def _GL_ARB_derivative_control : glsl;
 def _GL_ARB_fragment_shader_interlock : glsl;
 def _GL_ARB_gpu_shader5 : glsl;
+def _GL_ARB_shader_image_size : glsl;
+def _GL_ARB_shader_texture_image_samples : glsl;
 def _GL_ARB_sparse_texture_clamp : glsl;
+def _GL_EXT_texture_query_lod : glsl;
+def _GL_ARB_texture_query_levels : glsl;
 def _GL_ARB_texture_cube_map : glsl;
 def _GL_ARB_texture_gather : glsl;
 def _GL_EXT_buffer_reference : glsl;
@@ -273,6 +277,8 @@ alias GL_ARB_derivative_control = _GL_ARB_derivative_control | spvDerivativeCont
 alias GL_ARB_fragment_shader_interlock = _GL_ARB_fragment_shader_interlock | spvFragmentShaderPixelInterlockEXT;
 alias GL_ARB_gpu_shader5 = _GL_ARB_gpu_shader5 | spirv_1_0;
 alias GL_ARB_sparse_texture_clamp = _GL_ARB_fragment_shader_interlock | spirv_1_0;
+alias GL_EXT_texture_query_lod = _GL_EXT_texture_query_lod | spvImageQuery;
+alias GL_ARB_texture_query_levels = _GL_ARB_texture_query_levels |spvImageQuery;
 alias GL_ARB_texture_cube_map = _GL_ARB_texture_cube_map | spirv_1_0;
 alias GL_ARB_texture_gather = _GL_ARB_texture_gather | spirv_1_0;
 alias GL_EXT_buffer_reference = _GL_ARB_fragment_shader_interlock | spirv_1_5;
@@ -303,6 +309,8 @@ alias GL_KHR_shader_subgroup_shuffle_relative = _GL_KHR_shader_subgroup_shuffle_
 alias GL_KHR_shader_subgroup_vote = _GL_KHR_shader_subgroup_vote | spvGroupNonUniformVote;
 alias GL_KHR_shader_subgroup_quad = _GL_KHR_shader_subgroup_quad | spvGroupNonUniformQuad;
 alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SOURCE_EXT_GL_NV_compute_shader_derivatives;
+alias GL_ARB_shader_image_size = _GL_ARB_shader_image_size | spvImageQuery;
+alias GL_ARB_shader_texture_image_samples = _GL_ARB_shader_texture_image_samples | spvImageQuery;
 alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | spirv_1_0;
 alias GL_NV_shader_subgroup_partitioned = _GL_NV_shader_subgroup_partitioned | spvGroupNonUniformPartitionedNV;
 alias GL_NV_ray_tracing_motion_blur = _GL_NV_ray_tracing_motion_blur | spvRayTracingMotionBlurNV;
@@ -478,6 +486,13 @@ alias structuredbuffer = sm_4_0;
 alias structuredbuffer_rw = sm_4_0 + raytracing_stages_compute_fragment;
 alias texture_sm_4_1 = sm_4_1 | GLSL_150;
 alias texture_sm_4_1_samplerless = texture_sm_4_1 + GL_EXT_samplerless_texture_functions;
+alias texture_sm_4_1_compute_fragment = cpp + texture_sm_4_1
+                              | cuda + texture_sm_4_1
+                              | glsl + texture_sm_4_1
+                              | hlsl + texture_sm_4_1 + raytracing_stages_compute_fragment
+                              | spirv_1_0 + texture_sm_4_1
+                              ;
+// supposedly works on compute but docs say nothing, so for now keep as compute_fragment
 alias texture_sm_4_1_fragment = cpp + texture_sm_4_1
                               | cuda + texture_sm_4_1
                               | glsl + texture_sm_4_1
@@ -491,7 +506,12 @@ alias texture_sm_4_1_vertex_fragment_geometry = cpp + texture_sm_4_1
                                               | hlsl + texture_sm_4_1 + raytracing_stages_compute_fragment_geometry_vertex
                                               | spirv_1_0 + texture_sm_4_1
                                               ;
-alias texture_gather_sm_4_1 = texture_sm_4_1_vertex_fragment_geometry + GL_ARB_texture_gather;
+alias texture_gather = texture_sm_4_1_vertex_fragment_geometry + GL_ARB_texture_gather;
+alias image_samples = texture_sm_4_1_compute_fragment + GL_ARB_shader_texture_image_samples;
+alias image_size = texture_sm_4_1_compute_fragment + GL_ARB_shader_image_size;
+alias texture_size = texture_sm_4_1 + GL_ARB_shader_image_size;
+alias texture_querylod = texture_sm_4_1 + GL_EXT_texture_query_lod;
+alias texture_querylevels = texture_sm_4_1 + GL_ARB_texture_query_levels;
 
 alias atomic_glsl_float1 = GL_EXT_shader_atomic_float;
 alias atomic_glsl_float2 = GL_EXT_shader_atomic_float2;
@@ -499,8 +519,6 @@ alias atomic_glsl_halfvec = GL_NV_shader_atomic_fp16_vector;
 alias atomic_glsl = GLSL_430_SPIRV_1_0;
 alias atomic_glsl_int64 = atomic_glsl + GL_EXT_shader_atomic_int64;
 alias GLSL_430_SPIRV_1_0_compute = GLSL_420_SPIRV_1_0 + compute;
-alias image_samples = GLSL_450 | spirv_1_0 + spvImageQuery | sm_4_1;
-alias image_query = GLSL_430 | GLSL_430 + spvImageQuery;
 alias image_loadstore = GL_EXT_shader_image_load_store + GLSL_420;
 alias nonuniformqualifier = sm_5_1;
 alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp;

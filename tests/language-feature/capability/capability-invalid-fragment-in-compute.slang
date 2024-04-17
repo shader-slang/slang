@@ -1,11 +1,10 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -emit-spirv-directly -entry computeMain -stage compute -allow-glsl
 // CHECK: error 36107
 SamplerState samplerState;
-RWByteAddressBuffer rw;
+Texture2D<int> rw;
 
 [numthreads(1,1,1)]
 void computeMain()
 {
-    clip(-1);
-    rw.Store(0, 1);
+    clip(rw.Load(0));
 }
