@@ -2785,6 +2785,7 @@ ${{{{
     // Without returning original value
 
     [__requiresNVAPI]
+    [ForceInline]
     __cuda_sm_version(2.0)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_float1)]
@@ -2805,6 +2806,7 @@ ${{{{
     }
 
     // Int64 Add
+    [ForceInline]
     __cuda_sm_version(6.0)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda6_int64)]
@@ -2830,6 +2832,7 @@ ${{{{
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda6_int64)]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd);
 
+    [ForceInline]
     __specialized_for_target(hlsl)
     [ForceInline]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
@@ -2837,6 +2840,7 @@ ${{{{
         __atomicAdd(this, byteAddress, __asuint2(valueToAdd));
     }
 
+    [ForceInline]
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
     [ForceInline]
@@ -5782,6 +5786,7 @@ void GroupMemoryBarrierWithGroupSync()
 
 // Atomics
 
+[ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref  int dest,  int value)
@@ -5799,6 +5804,7 @@ void InterlockedAdd(__ref  int dest,  int value)
     }
 }
 
+[ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref uint dest, uint value)
@@ -5822,6 +5828,7 @@ void InterlockedAdd(__ref uint dest, int value)
     InterlockedAdd(dest, (uint)value);
 }
 
+[ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
@@ -5840,6 +5847,7 @@ void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
     }
 }
 
+[ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
@@ -15110,6 +15118,7 @@ __generic<Shape:__ITextureShape1D2D3D, let format : int>
 extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite), 0, 0, format>
 {
     [__requiresNVAPI]
+    [ForceInline]
     __glsl_extension(GL_EXT_shader_atomic_float)
     [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_float1)]
     void InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value, out float originalValue)

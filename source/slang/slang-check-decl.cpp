@@ -2383,8 +2383,15 @@ namespace Slang
     {
         // check the type being inherited from
         auto base = inheritanceDecl->base;
-        CheckConstraintSubType(base);
-        base = TranslateTypeNode(base);
+        Decl* toExclude = nullptr;
+        Decl* parent = getParentDecl(inheritanceDecl);
+        // We exclude in the case that a circular reference is possible. This is when a parent is a transparent decl.
+        // If we just blanket "block" all ensure's of a parent a generic may fail when trying to fetch a parent
+        if (parent->findModifier<TransparentModifier>())
+            toExclude = parent;
+        SemanticsDeclVisitorBase baseVistor(this->withDeclToExcludeFromLookup(toExclude));
+        baseVistor.CheckConstraintSubType(base);
+        base = baseVistor.TranslateTypeNode(base);
         inheritanceDecl->base = base;
 
         // Note: we do not check whether the type being inherited from
