@@ -8,7 +8,6 @@
 #include "slang-source-loc.h"
 #include "slang-token.h"
 
-#include "../slang/slang-compiler-options.h"
 #include "../../slang.h"
 
 namespace Slang
