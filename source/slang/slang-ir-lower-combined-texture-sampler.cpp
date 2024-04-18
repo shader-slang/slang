@@ -104,7 +104,7 @@ namespace Slang
             auto textureType = as<IRTextureTypeBase>(globalInst);
             if (!textureType || getIntVal(textureType->getIsCombinedInst()) == 0)
                 continue;
-                    auto typeInfo = context.lowerCombinedTextureSamplerType(textureType);
+            auto typeInfo = context.lowerCombinedTextureSamplerType(textureType);
 
             for (auto use = textureType->firstUse; use; use = use->nextUse)
             {
