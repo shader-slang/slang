@@ -2,6 +2,9 @@
 
 typedef uint UINT;
 
+__intrinsic_op($(kIROp_RequireGLSLExtension))
+void __requireGLSLExtension(String extensionName);
+
 __intrinsic_op($(kIROp_FloatCast))
 T __floatCast<T, U>(U v);
 
@@ -245,7 +248,7 @@ float __glsl_texture_level_zero<TSampler, TCoord>(TSampler s, TCoord value);
 [require(glsl, texture_sm_4_1)]
 float __glsl_texture_level_zero_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value)
 {
-    __requireGLSLExtension(GL_EXT_texture_shadow_lod);
+    __requireGLSLExtension("GL_EXT_texture_shadow_lod");
     __target_switch
     {
     case glsl:
@@ -260,7 +263,7 @@ float __glsl_texture_offset_level_zero<TSampler, TCoord, TOffset>(TSampler s, TC
 [require(glsl, texture_shadowlod)]
 float __glsl_texture_offset_level_zero_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset)
 {
-    __requireGLSLExtension(GL_EXT_texture_shadow_lod);
+    __requireGLSLExtension("GL_EXT_texture_shadow_lod");
     __target_switch
     {
     case glsl:
@@ -295,7 +298,7 @@ float __glsl_texture_level_zero<TTexture, TCoord>(TTexture t,SamplerComparisonSt
 [require(glsl, texture_sm_4_1)]
 float __glsl_texture_level_zero_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value)
 {
-    __requireGLSLExtension(GL_EXT_texture_shadow_lod);
+    __requireGLSLExtension("GL_EXT_texture_shadow_lod");
     __target_switch
     {
     case glsl:
@@ -310,7 +313,7 @@ float __glsl_texture_offset_level_zero<TTexture, TCoord, TOffset>(TTexture t,Sam
 [require(glsl, texture_sm_4_1)]
 float __glsl_texture_offset_level_zero_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset)
 {
-    __requireGLSLExtension(GL_EXT_texture_shadow_lod);
+    __requireGLSLExtension("GL_EXT_texture_shadow_lod");
     __target_switch
     {
     case glsl:
@@ -9042,9 +9045,6 @@ __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(cuda, "_waveProductMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveActiveProduct($1)")
 matrix<T,N,M> WaveMaskProduct(WaveMask mask, matrix<T,N,M> expr);
-
-__intrinsic_op($(kIROp_RequireGLSLExtension))
-void __requireGLSLExtension(String extensionName);
 
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)

@@ -519,6 +519,7 @@ alias image_size = texture_sm_4_1_compute_fragment + GL_ARB_shader_image_size;
 alias texture_size = texture_sm_4_1 + GL_ARB_shader_image_size;
 alias texture_querylod = texture_sm_4_1 + GL_EXT_texture_query_lod;
 alias texture_querylevels = texture_sm_4_1 + GL_ARB_texture_query_levels;
+alias texture_shadowlod = texture_sm_4_1 + GL_EXT_texture_shadow_lod;
 
 alias atomic_glsl_float1 = GL_EXT_shader_atomic_float;
 alias atomic_glsl_float2 = GL_EXT_shader_atomic_float2;
@@ -531,7 +532,6 @@ alias nonuniformqualifier = sm_5_1;
 alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp;
 alias texturefootprint = GL_NV_shader_texture_footprint + GLSL_450 | hlsl_nvapi + _sm_4_0;
 alias texturefootprintclamp = texturefootprint + GL_ARB_sparse_texture_clamp;
-alias texture_shadowlod = GL_EXT_texture_shadow_lod + GLSL_140;
 alias texture_cube = GL_ARB_texture_cube_map;
 alias shader5_sm_4_0 = GL_ARB_gpu_shader5 | sm_4_0;
 alias shader5_sm_5_0 = GL_ARB_gpu_shader5 | sm_5_0;
