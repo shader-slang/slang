@@ -361,6 +361,21 @@ struct SimpleArrayLayoutInfo : SimpleLayoutInfo
     }
 };
 
+struct ObjectLayoutInfo
+{
+    ShortList<SimpleLayoutInfo, 2> layoutInfos;
+    ObjectLayoutInfo() = default;
+    ObjectLayoutInfo(SimpleLayoutInfo layoutInfo)
+    {
+        layoutInfos.add(layoutInfo);
+    }
+    SimpleLayoutInfo getSimple()
+    {
+        SLANG_ASSERT(layoutInfos.getCount() == 1);
+        return layoutInfos[0];
+    }
+};
+
 struct LayoutRulesImpl;
 class VarLayout;
 
@@ -988,7 +1003,7 @@ struct ObjectLayoutRulesImpl
     };
 
     // Compute layout info for an object type
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& options) = 0;
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& options) = 0;
 };
 
 struct LayoutRulesImpl
@@ -1046,7 +1061,7 @@ struct LayoutRulesImpl
 
     // Forward `ObjectLayoutRulesImpl` interface
 
-    SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const ObjectLayoutRulesImpl::Options& options)
+    ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const ObjectLayoutRulesImpl::Options& options)
     {
         return objectRules->GetObjectLayout(kind, options);
     }

@@ -45,6 +45,7 @@
 #include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-bit-cast.h"
+#include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-size-of.h"
 #include "slang-ir-lower-reinterpret.h"
@@ -94,6 +95,7 @@
 
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
+#include "slang-emit-metal.h"
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
 #include "slang-emit-torch.h"
@@ -542,6 +544,11 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::HLSL)
     {
         lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
+    }
+
+    if (target == CodeGenTarget::HLSL || ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    {
+        lowerCombinedTextureSamplers(irModule, sink);
     }
 
     addUserTypeHintDecorations(irModule);
@@ -1169,6 +1176,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             case SourceLanguage::CUDA:
             {
                 sourceEmitter = new CUDASourceEmitter(desc);
+                break;
+            }
+            case SourceLanguage::Metal:
+            {
+                sourceEmitter = new MetalSourceEmitter(desc);
                 break;
             }
             default: break;

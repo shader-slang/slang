@@ -1709,6 +1709,10 @@ CapabilitySet TargetRequest::getTargetCaps()
         atoms.add(CapabilityName::cuda);
         break;
 
+    case CodeGenTarget::Metal:
+        atoms.add(CapabilityName::metal);
+        break;
+
     default:
         break;
     }

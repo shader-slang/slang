@@ -342,6 +342,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-emit-cuda.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-glsl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-hlsl.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-emit-metal.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-precedence.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-spirv-ops-debug-info-ext.h" />
@@ -423,6 +424,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-bit-cast.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-buffer-element-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-com-methods.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-combined-texture-sampler.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-error-handling.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-existential.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generic-call.h" />
@@ -575,6 +577,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-emit-cuda.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-glsl.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-hlsl.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-emit-metal.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-precedence.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-source-writer.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-spirv.cpp" />
@@ -650,6 +653,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-bit-cast.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-buffer-element-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-com-methods.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-combined-texture-sampler.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-error-handling.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-existential.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generic-call.cpp" />
