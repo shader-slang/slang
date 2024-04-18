@@ -45,6 +45,7 @@
 #include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-bit-cast.h"
+#include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-size-of.h"
 #include "slang-ir-lower-reinterpret.h"
@@ -543,6 +544,11 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::HLSL)
     {
         lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
+    }
+
+    if (target == CodeGenTarget::HLSL || ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    {
+        lowerCombinedTextureSamplers(irModule, sink);
     }
 
     addUserTypeHintDecorations(irModule);
