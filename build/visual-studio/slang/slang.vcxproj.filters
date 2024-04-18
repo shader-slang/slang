@@ -540,6 +540,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-wrap-global-context.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1221,6 +1224,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-wrap-global-context.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.cpp">

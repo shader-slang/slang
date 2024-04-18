@@ -274,7 +274,39 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             return true;
         }
         break;
+        case kIROp_RWStructuredBufferGetElementPtr:
+        {
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = false;
 
+            auto prec = getInfo(EmitOp::Add);
+            needClose = maybeEmitParens(outerPrec, prec);
+            emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+            m_writer->emit("+");
+            emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
+            maybeCloseParens(needClose);
+            return true;
+        }
+        case kIROp_StructuredBufferLoad:
+        case kIROp_RWStructuredBufferLoad:
+        {
+            auto prec = getInfo(EmitOp::Postfix);
+            emitOperand(inst->getOperand(0), leftSide(inOuterPrec, prec));
+            m_writer->emit("[");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit("]");
+            return true;
+        }
+        case kIROp_RWStructuredBufferStore:
+        {
+            auto prec = getInfo(EmitOp::Postfix);
+            emitOperand(inst->getOperand(0), leftSide(inOuterPrec, prec));
+            m_writer->emit("[");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit("] = ");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            return true;
+        }
         default: break;
     }
     // Not handled
@@ -479,12 +511,38 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_ParameterBlockType:
         case kIROp_ConstantBufferType:
         {
-            m_writer->emit("constant ");
             emitType((IRType*)type->getOperand(0));
+            m_writer->emit(" constant*");
+            return;
+        }
+        case kIROp_PtrType:
+        case kIROp_InOutType:
+        case kIROp_OutType:
+        case kIROp_RefType:
+        case kIROp_ConstRefType:
+        {
+            auto ptrType = cast<IRPtrTypeBase>(type);
+            emitType((IRType*)ptrType->getValueType());
+            switch ((AddressSpace)ptrType->getAddressSpace())
+            {
+            case AddressSpace::Global:
+                m_writer->emit(" device");
+                break;
+            case AddressSpace::Uniform:
+                m_writer->emit(" constant");
+                break;
+            case AddressSpace::ThreadLocal:
+                m_writer->emit(" thread");
+                break;
+            case AddressSpace::GroupShared:
+                m_writer->emit(" threadgroup");
+                break;
+            }
             m_writer->emit("*");
             return;
         }
-        default: break;
+        default:
+            break;
     }
 
     if (auto texType = as<IRTextureType>(type))
@@ -499,9 +557,8 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
     else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
-        m_writer->emit("device ");
         emitType(structuredBufferType->getElementType());
-        m_writer->emit("*");
+        m_writer->emit(" device*");
         return;
     }
     else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
@@ -511,10 +568,11 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             case kIROp_HLSLByteAddressBufferType:
             case kIROp_HLSLRWByteAddressBufferType:
             case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
-                m_writer->emit("device ");
-                m_writer->emit("uint32_t *");
+                m_writer->emit("uint32_t device*");
                 break;
-            case kIROp_RaytracingAccelerationStructureType:         m_writer->emit("acceleration_structure<instancing>"); break;
+            case kIROp_RaytracingAccelerationStructureType:
+                m_writer->emit("acceleration_structure<instancing>");
+                break;
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
                 break;
@@ -650,7 +708,8 @@ void MetalSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 
 void MetalSourceEmitter::emitFrontMatterImpl(TargetRequest*)
 {
-    
+    m_writer->emit("#include <metal_stdlib>\n");
+    m_writer->emit("using namespace metal;\n");
 }
 
 void MetalSourceEmitter::emitGlobalInstImpl(IRInst* inst)
