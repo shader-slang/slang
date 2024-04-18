@@ -173,15 +173,6 @@ public:
         return diagnoseImpl(getDiagnosticPos(pos), info, sizeof...(args), as);
     }
 
-    template<typename P, typename... Args>
-    bool diagnoseCapabilityErrors(CompilerOptionSet& optionSet, P const& pos, DiagnosticInfo const& info, Args const&... args)
-    {
-        if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
-            return false;
-        DiagnosticArg as[] = { DiagnosticArg(args)... };
-        return diagnoseImpl(getDiagnosticPos(pos), info, sizeof...(args), as);
-    }
-
     template<typename P>
     bool diagnose(P const& pos, DiagnosticInfo const& info)
     {

@@ -519,7 +519,7 @@ namespace Slang
             targetCaps.join(stageCapabilitySet);
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
-                sink->diagnoseCapabilityErrors(linkage->m_optionSet, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
+                diagnoseCapabilityErrors(sink, linkage->m_optionSet, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
                 auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getExpandedAtoms();
 
                 // Find out what exactly is incompatible and print out a trace of provenance to
