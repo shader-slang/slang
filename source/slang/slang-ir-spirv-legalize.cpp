@@ -1237,6 +1237,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     return;
 
                 auto nonuniformUser = builder.emitNonUniformResourceIndexInst(newUser);
+                user->replaceUsesWith(nonuniformUser);
 
                 // Update the worklist with the newly added `NonUniformResourceIndex` inst, based on
                 // the base inst it was constructed around, in case we need to further bubble up
@@ -1252,7 +1253,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 };
 
                 // Clean up the base inst from the IR module, to avoid duplicate decorations.
-                user->replaceUsesWith(nonuniformUser);
                 user->removeAndDeallocate();
             });
         }
@@ -1265,8 +1265,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             // around it has any active uses.
             auto inst = resWorkList[i];
             if (!inst->hasUses())
+            {
+                inst->removeAndDeallocate();
                 continue;
-
+            }
             // For each of the `NonUniformResourceIndex` inst that remain, decorate the base inst
             // with a [NonUniformResource] decoration, which is the operand0 of the inst, only
             // when the type is a resource type, or a pointer to a resource type, or a pointer
