@@ -1119,16 +1119,7 @@ String CLikeSourceEmitter::getName(IRInst* inst)
             if (auto nameHintDecor = inst->findDecoration<IRNameHintDecoration>())
             {
                 StringBuilder sb;
-                for (auto c : nameHintDecor->getName()) {
-                    if (c == '.')
-                    {
-                        sb.append("::");
-                    }
-                    else
-                    {
-                        sb.append(c);
-                    }
-                }
+                appendScrubbedName(nameHintDecor->getName(), sb);
                 name = sb.produceString();
             }
         }
