@@ -45,6 +45,7 @@ def glsl : target + textualTarget;
 def c : target + textualTarget;
 def cpp : target + textualTarget;
 def cuda : target + textualTarget;
+def metal : target + textualTarget;
 
 // We have multiple capabilities for the various SPIR-V versions,
 // arranged so that they inherit from one another to represent which versions

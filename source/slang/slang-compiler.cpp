@@ -480,7 +480,10 @@ namespace Slang
             {
                 return SourceLanguage::SPIRV;
             }
-            
+            case PassThroughMode::MetalC:
+            {
+                return SourceLanguage::Metal;
+            }
             default: break;
         }
         SLANG_ASSERT(!"Unknown compiler");
@@ -499,6 +502,7 @@ namespace Slang
             case CodeGenTarget::HostCPPSource:
             case CodeGenTarget::PyTorchCppBinding:
             case CodeGenTarget::CSource:
+            case CodeGenTarget::Metal:
             {
                 return PassThroughMode::None;
             }
@@ -1617,6 +1621,7 @@ namespace Slang
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::PyTorchCppBinding:
         case CodeGenTarget::CSource:
+        case CodeGenTarget::Metal:
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
                 
