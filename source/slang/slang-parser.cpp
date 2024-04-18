@@ -7544,7 +7544,6 @@ namespace Slang
         return asmExpr;
     }
 
-
     static Expr* parsePrefixExpr(Parser* parser)
     {
         auto tokenType = peekTokenType(parser);

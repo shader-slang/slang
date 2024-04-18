@@ -677,8 +677,8 @@ T compute<T>(T a1, T a2)
 // compute(3, 1) == 2
 ```
 
-`as` operator can also be used in the `if` predicate to test if an object can be downcasted to a specific type, once the downcast test is successful,
-the object can be used in the `if` block as the downcasted type without the need to retrieve the `Optional<T>::value` property:
+`as` operator can also be used in the `if` predicate to test if an object can be casted to a specific type, once the cast test is successful,
+the object can be used in the `if` block as the casted type without the need to retrieve the `Optional<T>::value` property:
 ```csharp
 interface IFoo
 {
@@ -702,11 +702,21 @@ struct MyImpl3 : IFoo
 
 void test(IFoo foo)
 {
-    if (t == foo as MyImpl1)
+    // This syntax will be desugared to the following:
+    // {
+    //      Optional<MyImpl1> $OptVar = foo as MyImpl1;
+    //      if ($OptVar.hasValue)
+    //      {
+    //          MyImpl1 t = $OptVar.value;
+    //          t.foo();
+    //      }
+    //      else if ...
+    // }
+    if (let t == foo as MyImpl1)
     {
         t.foo();
     }
-    else if (t == foo as MyImpl2)
+    else if (let t == foo as MyImpl2)
     {
         t.foo();
     }
