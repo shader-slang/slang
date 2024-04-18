@@ -9748,13 +9748,12 @@ namespace Slang
             ensureDecl(visitor, referencedDecl, DeclCheckState::CapabilityChecked);
         }
         
-        // Always join capabilities to ensure only the lowest denominator will be apart of the final requirments.
-        // if we have `function(){ Store(compute|fragment); Sample(fragment); }` join will ensure the capabilities
-        // shall only be satisfied if `fragment` is the target stage, and not `compute`.
-        resultCaps.join(nodeCaps);
+        if (resultCaps.implies(nodeCaps))
+            return;
 
         auto oldCaps = resultCaps;
         bool isAnyInvalid = resultCaps.isInvalid() || nodeCaps.isInvalid();
+        resultCaps.join(nodeCaps);
         
         auto decl = as<Decl>(userNode);
 
