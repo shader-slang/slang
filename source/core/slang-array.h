@@ -159,14 +159,14 @@ namespace Slang
 	void insertArray(Array<T, SIZE>& arr, const T& val, TArgs... args)
 	{
 		arr.add(val);
-		insertArray(arr, args...);
+		insertArray<T>(arr, args...);
 	}
 
 	template<typename ...TArgs>
 	auto makeArray(TArgs ...args) -> Array<typename FirstType<TArgs...>::Type, sizeof...(args)>
 	{
 		Array<typename FirstType<TArgs...>::Type, Index(sizeof...(args))> rs;
-		insertArray(rs, args...);
+		insertArray<typename FirstType<TArgs...>::Type>(rs, args...);
 		return rs;
 	}
 

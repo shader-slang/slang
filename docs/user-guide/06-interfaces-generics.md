@@ -738,7 +738,7 @@ void main()
 Extensions to Interfaces
 -----------------------------
 
-In addtion to extending ordinary types, you can define extensions on interfaces as well:
+In addition to extending ordinary types, you can define extensions on interfaces as well:
 ```csharp
 // An example interface.
 interface IFoo
@@ -806,9 +806,9 @@ Builtin Interfaces
 Slang supports the following builtin interfaces:
 
 - `IComparable`, provides methods for comparing two values of the conforming type. Supported by all basic data types, vector types and matrix types.
-- `IRangedValue`, proivides methods for retrieving the minimum and maxinum value expressed by the range of the type. Supported by all integer and floating-point scalar types.
-- `IArithmetic`, provides methods for the `+`, '-`, '*`, `/`, `%` and negating operations. Also provide a method for explicit conversion from `int`. Implemented by all builtin integer and floating-point scalar, vector and matrix types.
-- `ILogical`, provides methods for all bit operations and logical `and`, `or`, `not` oeprations. Also provide a method for explicit conversion from `int`. Implemented by all builtin integer scalar, vector and matrix types.
+- `IRangedValue`, provides methods for retrieving the minimum and maximum value expressed by the range of the type. Supported by all integer and floating-point scalar types.
+- `IArithmetic`, provides methods for the `+`, `-`, `*`, `/`, `%` and negating operations. Also provide a method for explicit conversion from `int`. Implemented by all builtin integer and floating-point scalar, vector and matrix types.
+- `ILogical`, provides methods for all bit operations and logical `and`, `or`, `not` operations. Also provide a method for explicit conversion from `int`. Implemented by all builtin integer scalar, vector and matrix types.
 - `IInteger`, represents a logical integer that supports both `IArithmetic` and `ILogical` operations. Implemented by all builtin integer scalar types.
 - `IDifferentiable`, represents a value that is differentiable.
 - `IFloat`, represents a logical float that supports both `IArithmetic`, `ILogical` and `IDifferentiable` operations. Also provides methods to convert to and from `float`. Implemented by all builtin floating-point scalar, vector and matrix types.
@@ -817,7 +817,7 @@ Slang supports the following builtin interfaces:
 - `__BuiltinIntegerType`, implemented by all integer scalar types.
 - `__BuiltinFloatingPointType`, implemented by all floating-point scalar types.
 - `__BuiltinArithmeticType`, implemented by all integer and floating-point scalar types.
-- `__BuiltinLogicalType`, implemmented by all integer types and the `bool` type.
+- `__BuiltinLogicalType`, implemented by all integer types and the `bool` type.
 
 Operator overloads are defined for `IArithmetic`, `ILogical`, `IInteger`, `IFloat`, `__BuiltinIntegerType`, `__BuiltinFloatingPointType`,  `__BuiltinArithmeticType` and `__BuiltinLogicalType` types, so the following code is valid:
 

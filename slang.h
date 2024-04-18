@@ -609,6 +609,7 @@ extern "C"
         SLANG_HOST_CPP_SOURCE,          ///< C++ code for host library or executable.
         SLANG_HOST_HOST_CALLABLE,       ///< Host callable host code (ie non kernel/shader) 
         SLANG_CPP_PYTORCH_BINDING,      ///< C++ PyTorch binding code.
+        SLANG_METAL,                    ///< Metal shading language
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -641,6 +642,7 @@ extern "C"
         SLANG_PASS_THROUGH_NVRTC,                   ///< NVRTC Cuda compiler
         SLANG_PASS_THROUGH_LLVM,                    ///< LLVM 'compiler' - includes LLVM and Clang
         SLANG_PASS_THROUGH_SPIRV_OPT,               ///< SPIRV-opt
+        SLANG_PASS_THROUGH_METAL,                   ///< Metal compiler
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
@@ -743,6 +745,7 @@ extern "C"
         SLANG_SOURCE_LANGUAGE_CPP,
         SLANG_SOURCE_LANGUAGE_CUDA,
         SLANG_SOURCE_LANGUAGE_SPIRV,
+        SLANG_SOURCE_LANGUAGE_METAL,
         SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
@@ -2390,6 +2393,7 @@ extern "C"
     SLANG_API size_t spReflectionTypeLayout_GetStride(SlangReflectionTypeLayout* type, SlangParameterCategory category);
     SLANG_API int32_t spReflectionTypeLayout_getAlignment(SlangReflectionTypeLayout* type, SlangParameterCategory category);
 
+    SLANG_API uint32_t spReflectionTypeLayout_GetFieldCount(SlangReflectionTypeLayout* type);
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(SlangReflectionTypeLayout* type, unsigned index);
 
     SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(SlangReflectionTypeLayout* typeLayout, const char* nameBegin, const char* nameEnd);
@@ -2884,7 +2888,7 @@ namespace slang
 
         unsigned int getFieldCount()
         {
-            return getType()->getFieldCount();
+            return spReflectionTypeLayout_GetFieldCount((SlangReflectionTypeLayout*)this);
         }
 
         VariableLayoutReflection* getFieldByIndex(unsigned int index)

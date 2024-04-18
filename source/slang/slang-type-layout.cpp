@@ -3,6 +3,7 @@
 
 #include "slang-syntax.h"
 #include "slang-ir-insts.h"
+#include "slang-check-impl.h"
 
 #include "../compiler-core/slang-artifact-desc-util.h"
 
@@ -740,7 +741,7 @@ static LayoutResourceKind _getHLSLLayoutResourceKind(ShaderParameterKind kind)
 
 struct GLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& options) override
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& options) override
     {
         int slotCount = 1;
 
@@ -777,7 +778,7 @@ GLSLObjectLayoutRulesImpl kGLSLObjectLayoutRulesImpl;
 
 struct GLSLPushConstantBufferObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind /*kind*/, const Options& /* options */) override
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind /*kind*/, const Options& /* options */) override
     {
         // Special-case the layout for a constant-buffer, because we don't
         // want it to allocate a descriptor-table slot
@@ -788,7 +789,7 @@ GLSLPushConstantBufferObjectLayoutRulesImpl kGLSLPushConstantBufferObjectLayoutR
 
 struct GLSLShaderRecordConstantBufferObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind /*kind*/, const Options& /* options */) override
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind /*kind*/, const Options& /* options */) override
     {
         // Special-case the layout for a constant-buffer, because we don't
         // want it to allocate a descriptor-table slot
@@ -799,7 +800,7 @@ GLSLShaderRecordConstantBufferObjectLayoutRulesImpl kGLSLShaderRecordConstantBuf
 
 struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */) override
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */) override
     {
         switch( kind )
         {
@@ -827,7 +828,19 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
             return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, 1);
 
         case ShaderParameterKind::TextureSampler:
+            {
+                ObjectLayoutInfo info;
+                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::ShaderResource, 1));
+                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::SamplerState, 1));
+                return info;
+            }
         case ShaderParameterKind::MutableTextureSampler:
+            {
+                ObjectLayoutInfo info;
+                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::UnorderedAccess, 1));
+                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::SamplerState, 1));
+                return info;
+            }
         case ShaderParameterKind::InputRenderTarget:
             // TODO: how to handle these?
         default:
@@ -980,7 +993,7 @@ CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 
 struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */) override
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */) override
     {
         switch (kind)
         {
@@ -1033,7 +1046,7 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
     // of opaque handle (as opposed to a pointer) such as CUsurfObject, CUtexObject
     typedef unsigned long long ObjectHandle;
 
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options & /* options */) override
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options & /* options */) override
     {
         switch (kind)
         {
@@ -1536,6 +1549,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
+    case CodeGenTarget::Metal:
     {
         // For now lets use some fairly simple CPU binding rules
 
@@ -1655,6 +1669,24 @@ static TypeLayoutResult createSimpleTypeLayout(
     return TypeLayoutResult(typeLayout, info);
 }
 
+static TypeLayoutResult createSimpleTypeLayout(
+    const ObjectLayoutInfo& info,
+    Type* type,
+    LayoutRulesImpl* rules)
+{
+    RefPtr<TypeLayout> typeLayout = new TypeLayout();
+
+    typeLayout->type = type;
+    typeLayout->rules = rules;
+
+    typeLayout->uniformAlignment = info.layoutInfos[0].alignment;
+
+    for (auto entry : info.layoutInfos)
+        typeLayout->addResourceUsage(entry.kind, entry.size);
+
+    return TypeLayoutResult(typeLayout, info.layoutInfos[0]);
+}
+
 static SimpleLayoutInfo _getParameterGroupLayoutInfo(
     TypeLayoutContext const& context,
     ParameterGroupType* type,
@@ -1662,15 +1694,15 @@ static SimpleLayoutInfo _getParameterGroupLayoutInfo(
 {
     if( as<ConstantBufferType>(type) )
     {
-        return rules->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context.objectLayoutOptions);
+        return rules->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context.objectLayoutOptions).getSimple();
     }
     else if( as<TextureBufferType>(type) )
     {
-        return rules->GetObjectLayout(ShaderParameterKind::TextureUniformBuffer, context.objectLayoutOptions);
+        return rules->GetObjectLayout(ShaderParameterKind::TextureUniformBuffer, context.objectLayoutOptions).getSimple();
     }
     else if( as<GLSLShaderStorageBufferType>(type) )
     {
-        return rules->GetObjectLayout(ShaderParameterKind::ShaderStorageBuffer, context.objectLayoutOptions);
+        return rules->GetObjectLayout(ShaderParameterKind::ShaderStorageBuffer, context.objectLayoutOptions).getSimple();
     }
     else if (as<ParameterBlockType>(type))
     {
@@ -1786,6 +1818,10 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
         {
             // Currently DXBytecode and DXIL are generated via HLSL
             return SourceLanguage::HLSL;
+        }
+        case CodeGenTarget::Metal:
+        {
+            return SourceLanguage::Metal;
         }
         case CodeGenTarget::CSource:
         {
@@ -2358,7 +2394,8 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
         // the overall layout, to account for it.
         //
         auto cbUsage = parameterGroupRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context.objectLayoutOptions);
-        containerTypeLayout->addResourceUsage(cbUsage.kind, cbUsage.size);
+        for (auto layoutInfo : cbUsage.layoutInfos)
+            containerTypeLayout->addResourceUsage(layoutInfo.kind, layoutInfo.size);
     }
 
     // Similarly to how we only need a constant buffer to be allocated
@@ -2864,7 +2901,7 @@ createStructuredBufferTypeLayout(
     RefPtr<TypeLayout>          elementTypeLayout)
 {
     auto rules = context.rules;
-    auto info = rules->GetObjectLayout(kind, context.objectLayoutOptions);
+    auto info = rules->GetObjectLayout(kind, context.objectLayoutOptions).getSimple();
 
     auto typeLayout = new StructuredBufferTypeLayout();
 
@@ -3331,7 +3368,7 @@ void StructTypeLayoutBuilder::beginLayoutIfNeeded(
 }
 
 RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
-    DeclRef<VarDeclBase>    field,
+    DeclRef<Decl>    field,
     TypeLayoutResult        fieldResult)
 {
     SLANG_ASSERT(m_typeLayout);
@@ -3795,7 +3832,7 @@ static TypeLayoutResult _createTypeLayout(
     else if (const auto samplerStateType = as<SamplerStateType>(type))
     {
         return createSimpleTypeLayout(
-            rules->GetObjectLayout(ShaderParameterKind::SamplerState, context.objectLayoutOptions),
+            rules->GetObjectLayout(ShaderParameterKind::SamplerState, context.objectLayoutOptions).getSimple(),
             type,
             rules);
     }
@@ -3819,7 +3856,7 @@ static TypeLayoutResult _createTypeLayout(
         }
         else
         {
-            switch( textureType->getAccess() )
+            switch (textureType->getAccess())
             {
             default:
                 kind = ShaderParameterKind::MutableTexture;
@@ -3830,9 +3867,9 @@ static TypeLayoutResult _createTypeLayout(
                 break;
             }
         }
-
+        auto objLayout = rules->GetObjectLayout(kind, context.objectLayoutOptions);
         return createSimpleTypeLayout(
-            rules->GetObjectLayout(kind, context.objectLayoutOptions),
+            objLayout,
             type,
             rules);
     }
@@ -3877,7 +3914,7 @@ static TypeLayoutResult _createTypeLayout(
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, KIND)                                                \
     else if(auto type_##TYPE = as<TYPE>(type)) do {                     \
-        auto info = rules->GetObjectLayout(ShaderParameterKind::KIND, context.objectLayoutOptions);  \
+        auto info = rules->GetObjectLayout(ShaderParameterKind::KIND, context.objectLayoutOptions).getSimple();  \
         auto typeLayout = createStructuredBufferTypeLayout(             \
                 context,                                                \
                 ShaderParameterKind::KIND,                              \
@@ -4081,6 +4118,16 @@ static TypeLayoutResult _createTypeLayout(
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
 
             _addLayout(context, type, typeLayout);
+
+            // Add all base fields first.
+            for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(context.astBuilder, structDeclRef))
+            {
+                auto baseType = getSup(context.astBuilder, inheritanceDeclRef);
+                if (isInterfaceType(baseType))
+                    continue;
+                auto baseTypeLayout = _createTypeLayout(context, baseType);
+                typeLayoutBuilder.addField(inheritanceDeclRef, baseTypeLayout);
+            }
 
             // First, add all fields with explicit offsets.
             for (auto field : getFields(context.astBuilder, structDeclRef, MemberFilterStyle::Instance))

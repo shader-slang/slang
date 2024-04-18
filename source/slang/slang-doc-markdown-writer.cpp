@@ -479,7 +479,10 @@ static DocMarkdownWriter::Requirement _getRequirementFromTargetToken(const Token
     {
         return Requirement{ CodeGenTarget::CSource, targetName };
     }
-    
+    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::metal))
+    {
+        return Requirement{ CodeGenTarget::Metal, targetName };
+    }
     return Requirement{ CodeGenTarget::Unknown, String() };
 }
 
