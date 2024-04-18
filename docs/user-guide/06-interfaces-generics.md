@@ -712,11 +712,11 @@ void test(IFoo foo)
     //      }
     //      else if ...
     // }
-    if (let t == foo as MyImpl1)
+    if (let t = foo as MyImpl1) // t is of type MyImpl1
     {
         t.foo();
     }
-    else if (let t == foo as MyImpl2)
+    else if (let t = foo as MyImpl2) // t is of type MyImpl2
     {
         t.foo();
     }
