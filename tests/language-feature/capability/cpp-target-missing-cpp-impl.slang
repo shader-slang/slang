@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute -allow-glsl
-
+//TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS): -target cpp -entry computeMain -stage compute -allow-glsl -ignore-capabilities
+// CHECK_IGNORE_CAPS-NOT: error 36107
 // CHECK: error 36107
 
 layout(binding = 0) buffer MyBlockName

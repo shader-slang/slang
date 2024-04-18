@@ -839,6 +839,7 @@ extern "C"
             Language,
             MatrixLayoutColumn, // bool
             MatrixLayoutRow,    // bool
+            IgnoreCapabilities, // bool
             ModuleName,         // stringValue0: module name.
             Output,
             Profile,            // intValue0: profile

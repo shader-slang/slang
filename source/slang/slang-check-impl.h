@@ -793,6 +793,7 @@ namespace Slang
         {}
 
         SharedSemanticsContext* getShared() { return m_shared; }
+        CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
         ASTBuilder* getASTBuilder() { return m_astBuilder; }
 
         DiagnosticSink* getSink() { return m_sink; }
@@ -2768,7 +2769,7 @@ namespace Slang
 
     DeclVisibility getDeclVisibility(Decl* decl);
 
-    void diagnoseCapabilityProvenance(DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom);
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom);
 
     void _ensureAllDeclsRec(
         SemanticsDeclVisitorBase* visitor,

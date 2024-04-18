@@ -289,6 +289,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Language,     "-lang", "-lang <language>", "Set the language for the following input files."},
         { OptionKind::MatrixLayoutColumn, "-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major."},
         { OptionKind::MatrixLayoutRow,"-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major."},
+        { OptionKind::IgnoreCapabilities,"-ignore-capabilities", nullptr, "Do not warn or error if capabilities are violated"},
         { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
         "Set the module name to use when compiling multiple .slang source files into a single module."},
         { OptionKind::Output, "-o", "-o <path>", 
@@ -1684,6 +1685,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::VulkanEmitReflection:
             case OptionKind::MatrixLayoutRow:
             case OptionKind::MatrixLayoutColumn:
+            case OptionKind::IgnoreCapabilities:
             case OptionKind::DefaultImageFormatUnknown:
             case OptionKind::Obfuscate:
             case OptionKind::OutputIncludes:

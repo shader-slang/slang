@@ -8,6 +8,7 @@
 #include "slang-source-loc.h"
 #include "slang-token.h"
 
+#include "../slang/slang-compiler-options.h"
 #include "../../slang.h"
 
 namespace Slang
@@ -168,6 +169,15 @@ public:
     template<typename P, typename... Args>
     bool diagnose(P const& pos, DiagnosticInfo const& info, Args const&... args )
     {
+        DiagnosticArg as[] = { DiagnosticArg(args)... };
+        return diagnoseImpl(getDiagnosticPos(pos), info, sizeof...(args), as);
+    }
+
+    template<typename P, typename... Args>
+    bool diagnoseCapabilityErrors(CompilerOptionSet& optionSet, P const& pos, DiagnosticInfo const& info, Args const&... args)
+    {
+        if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+            return false;
         DiagnosticArg as[] = { DiagnosticArg(args)... };
         return diagnoseImpl(getDiagnosticPos(pos), info, sizeof...(args), as);
     }
