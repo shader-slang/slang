@@ -91,6 +91,10 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
         {
             return SourceLanguage::CUDA;
         }
+        case CodeGenTarget::Metal:
+        {
+            return SourceLanguage::Metal;
+        }
     }
 }
 
@@ -3699,7 +3703,6 @@ void CLikeSourceEmitter::emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, 
 {
     // TODO(JS): We could push all of this onto the target impls, and then not need so many virtual hooks.
     emitVarDecorationsImpl(varDecl);
-
     emitTempModifiers(varDecl);
 
     if (!layout)

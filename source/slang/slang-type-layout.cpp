@@ -1537,6 +1537,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
+    case CodeGenTarget::Metal:
     {
         // For now lets use some fairly simple CPU binding rules
 
@@ -1787,6 +1788,10 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
         {
             // Currently DXBytecode and DXIL are generated via HLSL
             return SourceLanguage::HLSL;
+        }
+        case CodeGenTarget::Metal:
+        {
+            return SourceLanguage::Metal;
         }
         case CodeGenTarget::CSource:
         {
