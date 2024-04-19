@@ -654,6 +654,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level)
     {
@@ -705,6 +706,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
@@ -1094,6 +1096,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
     {
@@ -1146,6 +1149,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
