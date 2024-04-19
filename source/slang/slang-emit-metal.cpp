@@ -100,7 +100,7 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
         case SLANG_TEXTURE_2D:		m_writer->emit("2d");		break;
         case SLANG_TEXTURE_3D:		m_writer->emit("3d");		break;
         case SLANG_TEXTURE_CUBE:	m_writer->emit("cube");	    break;
-        case SLANG_TEXTURE_BUFFER:  m_writer->emit("1d");           break;
+        case SLANG_TEXTURE_BUFFER:  m_writer->emit("_buffer");           break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             break;
@@ -539,6 +539,15 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 break;
             }
             m_writer->emit("*");
+            return;
+        }
+        case kIROp_ArrayType:
+        {
+            m_writer->emit("array<");
+            emitType((IRType*)type->getOperand(0));
+            m_writer->emit(", ");
+            emitVal(type->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(">");
             return;
         }
         default:

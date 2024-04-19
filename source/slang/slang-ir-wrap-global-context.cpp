@@ -65,7 +65,8 @@ namespace Slang
                 {
                     auto newParam = builder.createParam(globalParam.first->getFullType());
                     newParam->insertBefore(paramInsertPoint);
-
+                    if (auto name = findNameHint(globalParam.first))
+                        builder.addNameHintDecoration(newParam, name);
                     newParams.add({newParam, globalParam.second});
                 }
 
@@ -111,7 +112,7 @@ namespace Slang
             }
 
             // Before everything, we need to move all global parameters to the entry point parameters.
-            // For each global parameter, e.g. `uniform float4 g;`, with will replace it with a global
+            // For each global parameter, e.g. `uniform float4 g;`, we will replace it with a global
             // variable, e.g. `float4 _g;`, and add a new parameter to the each entry point, and copy
             // the value from the entry point parameter to the global variable.
             moveGlobalParametersToEntryPoint(module);
