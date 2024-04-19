@@ -77,6 +77,10 @@ def glsl_spirv_1_4 : glsl_spirv_1_3;
 def glsl_spirv_1_5 : glsl_spirv_1_4;
 def glsl_spirv_1_6 : glsl_spirv_1_5;
 
+def metallib_2_3 : metal;
+def metallib_2_4 : metallib_2_3;
+
+
 abstract stage;
 def vertex : stage;
 def fragment : stage;
@@ -398,3 +402,6 @@ alias DX_6_4 = sm_6_4;
 alias DX_6_5 = sm_6_5;
 alias DX_6_6 = sm_6_6;
 alias DX_6_7 = sm_6_7;
+
+alias METAL_2_3 = metallib_2_3;
+alias METAL_2_4 = metallib_2_4;
