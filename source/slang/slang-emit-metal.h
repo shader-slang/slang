@@ -54,6 +54,8 @@ protected:
     
     virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
 
+    virtual bool doesTargetSupportPtrTypes() SLANG_OVERRIDE { return true; }
+
         // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
         // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
     void _emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling = "register");
