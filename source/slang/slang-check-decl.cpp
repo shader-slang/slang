@@ -9760,7 +9760,9 @@ namespace Slang
             // then the decl is using things that require conflicting set of capabilities, and we should diagnose an error.
             if (referencedDecl && decl)
             {
-                visitor->getSink()->diagnose(
+                diagnoseCapabilityErrors(
+                    visitor->getSink(),
+                    visitor->getOptionSet(),
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToUseOfDecl,
                     referencedDecl,
@@ -9770,7 +9772,9 @@ namespace Slang
             }
             else if (decl)
             {
-                visitor->getSink()->diagnose(
+                diagnoseCapabilityErrors(
+                    visitor->getSink(),
+                    visitor->getOptionSet(),
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToStatement,
                     nodeCaps,
@@ -9779,7 +9783,9 @@ namespace Slang
             }
             else
             {
-                visitor->getSink()->diagnose(
+                diagnoseCapabilityErrors(
+                    visitor->getSink(),
+                    visitor->getOptionSet(),
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToStatementEnclosingFunc,
                     nodeCaps,
@@ -9807,8 +9813,11 @@ namespace Slang
         typedef SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc>> Base;
 
         const ProcessFunc& handleReferenceFunc;
-        CapabilityDeclReferenceVisitor(const ProcessFunc& processFunc, SemanticsContext const& outer)
+
+        SemanticsContext& outerContext;
+        CapabilityDeclReferenceVisitor(const ProcessFunc& processFunc, SemanticsContext& outer)
             : handleReferenceFunc(processFunc)
+            , outerContext(outer)
             , SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc>>(outer)
         {
         }
@@ -9834,7 +9843,7 @@ namespace Slang
                 targetCap.join(bodyCap);
                 if (targetCap.isInvalid())
                 {
-                    Base::getSink()->diagnose(targetCase->body->loc, Diagnostics::conflictingCapabilityDueToStatement, bodyCap, "target_switch", oldCap);
+                    diagnoseCapabilityErrors(Base::getSink(), outerContext.getOptionSet(), targetCase->body->loc, Diagnostics::conflictingCapabilityDueToStatement, bodyCap, "target_switch", oldCap);
                 }
                 for (auto& conjunction : targetCap.getExpandedAtoms())
                     set.unionWith(conjunction);
@@ -9974,7 +9983,7 @@ namespace Slang
                 auto stageCaps = CapabilitySet(Profile(entryPointAttr->stage).getCapabilityName());
                 if (declaredCaps.isIncompatibleWith(stageCaps))
                 {
-                    getSink()->diagnose(funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
+                    diagnoseCapabilityErrors(getSink(), this->getOptionSet(), funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
                 }
                 else
                 {
@@ -9994,7 +10003,9 @@ namespace Slang
                 {
                     if (funcDecl->inferredCapabilityRequirements != getAnyPlatformCapabilitySet())
                     {
-                        getSink()->diagnose(
+                        diagnoseCapabilityErrors(
+                            getSink(),
+                            this->getOptionSet(),
                             funcDecl->loc,
                             Diagnostics::missingCapabilityRequirementOnPublicDecl,
                             funcDecl, funcDecl->inferredCapabilityRequirements);
@@ -10110,7 +10121,7 @@ namespace Slang
         return defaultVis;
     }
 
-    void diagnoseCapabilityProvenance(DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom)
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom)
     {
         HashSet<Decl*> printedDecls;
         auto thisModule = getModuleDecl(decl);
@@ -10141,7 +10152,7 @@ namespace Slang
         }
         if (declToPrint)
         {
-            sink->diagnose(declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
+            diagnoseCapabilityErrors(sink, optionSet, declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
         }
     }
 
@@ -10164,14 +10175,14 @@ namespace Slang
                             loc = refLoc;
                         }
                         else
-                            sink->diagnose(refLoc, Diagnostics::seeDefinitionOf, "statement");
+                            diagnoseCapabilityErrors(sink, visitor->getOptionSet(), refLoc, Diagnostics::seeDefinitionOf, "statement");
                     }
                 });
             if (!refDecl)
                 break;
             if (printedDecls.add(refDecl))
             {
-                sink->diagnose(loc, Diagnostics::seeUsingOf, refDecl);
+                diagnoseCapabilityErrors(sink, visitor->getOptionSet(), loc, Diagnostics::seeUsingOf, refDecl);
                 decl = refDecl;
             }
             else
@@ -10220,7 +10231,7 @@ namespace Slang
                     continue;
                 if (decl->inferredCapabilityRequirements.isIncompatibleWith(atom))
                 {
-                    getSink()->diagnose(decl->loc, Diagnostics::declHasDependenciesNotDefinedOnTarget, decl, atom);
+                    diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, Diagnostics::declHasDependenciesNotDefinedOnTarget, decl, atom);
                     diagnoseIncompatibleAtomProvenance(this, getSink(), decl, atom);
                     return;
                 }
@@ -10279,10 +10290,10 @@ namespace Slang
             }
         }
 
-        getSink()->diagnose(decl->loc, diagnosticInfo, decl, missingAtom);
+        diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, diagnosticInfo, decl, missingAtom);
         
         // Print provenances.
-        diagnoseCapabilityProvenance(getSink(), decl, missingAtom);
+        diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, missingAtom);
     }
 
 }
