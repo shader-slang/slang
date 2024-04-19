@@ -203,6 +203,21 @@ bool isResourceType(IRType* type)
     return false;
 }
 
+// Helper wrapper function around isResourceType that checks if the given
+// type is a pointer to a resource type or a physical storage buffer.
+bool isPointerToResourceType(IRType* type)
+{
+    while (auto ptrType = as<IRPtrTypeBase>(type))
+    {
+        if (ptrType->getAddressSpace() == SpvStorageClassStorageBuffer ||
+            ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBufferEXT)
+            return true;
+        type = ptrType->getValueType();
+    }
+
+    return isResourceType(type);
+}
+
 ModuleDecl* findModuleForDecl(
     Decl*   decl)
 {

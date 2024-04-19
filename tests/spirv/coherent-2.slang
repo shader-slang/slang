@@ -12,4 +12,6 @@ void main(int tid : SV_DispatchThreadID)
     AllMemoryBarrier();
     output[tid] = buffer[0].Load(0);
     // CHECK-DAG: OpDecorate %buffer Coherent
+    // CHECK-DAG: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK: %[[VAR1]] = OpAccessChain %{{.*}} %buffer
 }

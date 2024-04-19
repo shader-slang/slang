@@ -61,6 +61,7 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] =
     { SLANG_SHADER_HOST_CALLABLE,  "",                                          "host-callable,callable",   "Host callable" },
     { SLANG_OBJECT_CODE,    "obj,o",                                            "object-code",              "Object code" },
     { SLANG_HOST_HOST_CALLABLE, "",                                             "host-host-callable",       "Host callable for host execution" },
+    { SLANG_METAL,          "metal",                                            "metal",                    "Metal shader source"},
 };
 
 static const NamesDescriptionValue s_languageInfos[] =

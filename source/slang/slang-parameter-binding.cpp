@@ -2642,7 +2642,8 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(
 
     auto layoutInfo = context->getRulesFamily()
                           ->getConstantBufferRules(context->getTargetRequest()->getOptionSet())
-                          ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions);
+                          ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions)
+                          .getSimple();
 
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
@@ -2662,7 +2663,8 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
 
     auto layoutInfo = context->getRulesFamily()
         ->getConstantBufferRules(context->getTargetRequest()->getOptionSet())
-        ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions);
+        ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions)
+        .getSimple();
 
     const Index count = Index(layoutInfo.size.getFiniteValue());
 

@@ -1908,6 +1908,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_RWStructuredBufferLoadStatus:
     case kIROp_RWStructuredBufferStore:
     case kIROp_RWStructuredBufferGetElementPtr:
+    case kIROp_NonUniformResourceIndex:
     case kIROp_IsType:
     case kIROp_ImageSubscript:
     case kIROp_ImageLoad:
@@ -1920,6 +1921,22 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_GetSequentialID:
     case kIROp_GetStringHash:
     case kIROp_SPIRVAsm:
+    case kIROp_SPIRVAsmOperandLiteral:
+    case kIROp_SPIRVAsmOperandInst:
+    case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
+    case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
+    case kIROp_SPIRVAsmOperandRayCallableFromLocation:
+    case kIROp_SPIRVAsmOperandEnum:
+    case kIROp_SPIRVAsmOperandBuiltinVar:
+    case kIROp_SPIRVAsmOperandGLSL450Set:
+    case kIROp_SPIRVAsmOperandDebugPrintfSet:
+    case kIROp_SPIRVAsmOperandId:
+    case kIROp_SPIRVAsmOperandResult:
+    case kIROp_SPIRVAsmOperandTruncate:
+    case kIROp_SPIRVAsmOperandEntryPoint:
+    case kIROp_SPIRVAsmOperandSampledType:
+    case kIROp_SPIRVAsmOperandImageType:
+    case kIROp_SPIRVAsmOperandSampledImageType:
     case kIROp_DebugLine:
     case kIROp_DebugVar:
     case kIROp_DebugValue:

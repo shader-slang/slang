@@ -2068,6 +2068,21 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             maybeCloseParens(assignNeedsClose);
             return true;
         }
+        case kIROp_NonUniformResourceIndex:
+        {
+            // Need to emit as a Function call for HLSL
+            m_writer->emit("nonuniformEXT");
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+
+            // Forcibly enabling the GL extension when using 'implict-sized' arrays
+            // with the qualifier. May be this is not advisable.
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_nonuniform_qualifier"));
+
+            // Handled
+            return true;
+        }
         default: break;
     }
 

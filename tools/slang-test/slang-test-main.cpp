@@ -967,6 +967,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         case SLANG_CPP_PYTORCH_BINDING:
         case SLANG_HOST_CPP_SOURCE:
         case SLANG_CUDA_SOURCE:
+        case SLANG_METAL:
         {
             return 0;
         }

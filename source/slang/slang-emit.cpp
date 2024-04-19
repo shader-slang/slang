@@ -45,6 +45,7 @@
 #include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-bit-cast.h"
+#include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-size-of.h"
 #include "slang-ir-lower-reinterpret.h"
@@ -68,6 +69,7 @@
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-wrap-structured-buffers.h"
+#include "slang-ir-wrap-global-context.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-translate-glsl-global-var.h"
@@ -94,6 +96,7 @@
 
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
+#include "slang-emit-metal.h"
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
 #include "slang-emit-torch.h"
@@ -542,6 +545,11 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::HLSL)
     {
         lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
+    }
+
+    if (target == CodeGenTarget::HLSL || ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    {
+        lowerCombinedTextureSamplers(irModule, sink);
     }
 
     addUserTypeHintDecorations(irModule);
@@ -1075,6 +1083,12 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
 
+    // Metal does not allow global variables and global parameters, so
+    // we need to convert them into an explicit global context parameter
+    // passed around through a function parameter.
+    if (target == CodeGenTarget::Metal)
+        wrapGlobalScopeInContextType(irModule);
+
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
 
@@ -1169,6 +1183,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             case SourceLanguage::CUDA:
             {
                 sourceEmitter = new CUDASourceEmitter(desc);
+                break;
+            }
+            case SourceLanguage::Metal:
+            {
+                sourceEmitter = new MetalSourceEmitter(desc);
                 break;
             }
             default: break;

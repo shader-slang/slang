@@ -1685,8 +1685,6 @@ SlangResult OptionsParser::_parse(
             case OptionKind::VulkanUseEntryPointName:
             case OptionKind::VulkanUseGLLayout:
             case OptionKind::VulkanEmitReflection:
-            case OptionKind::MatrixLayoutRow:
-            case OptionKind::MatrixLayoutColumn:
             case OptionKind::ZeroInitialize:
             case OptionKind::DefaultImageFormatUnknown:
             case OptionKind::Obfuscate:
@@ -1696,6 +1694,10 @@ SlangResult OptionsParser::_parse(
             case OptionKind::IncompleteLibrary:
             case OptionKind::NoHLSLBinding:
                 linkage->m_optionSet.set(optionKind, true); break;
+                break;
+            case OptionKind::MatrixLayoutRow:
+            case OptionKind::MatrixLayoutColumn:
+                linkage->m_optionSet.setMatrixLayoutMode((optionKind == OptionKind::MatrixLayoutRow) ? MatrixLayoutMode::kMatrixLayoutMode_RowMajor : MatrixLayoutMode::kMatrixLayoutMode_ColumnMajor);
                 break;
             case OptionKind::NoCodeGen:
                 linkage->m_optionSet.set(OptionKind::SkipCodeGen, true); break;
