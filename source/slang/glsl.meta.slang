@@ -1941,7 +1941,7 @@ public vector<T,4> textureProj(Sampler3D<vector<T,N>> sampler, vec4 p, float bia
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler1DShadow sampler, vec4 p)
 {
     return texture(sampler, p.xyz / p.w);
