@@ -289,6 +289,9 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Language,     "-lang", "-lang <language>", "Set the language for the following input files."},
         { OptionKind::MatrixLayoutColumn, "-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major."},
         { OptionKind::MatrixLayoutRow,"-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major."},
+        { OptionKind::ZeroInitialize, "-zero-initialize", nullptr, 
+        "Set all variables which lack an init expression to zero."
+        "Structs will only default struct-fields to 0 if the field lacks an init expression and assignment in default constructor."},
         { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
         "Set the module name to use when compiling multiple .slang source files into a single module."},
         { OptionKind::Output, "-o", "-o <path>", 
@@ -1684,6 +1687,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::VulkanEmitReflection:
             case OptionKind::MatrixLayoutRow:
             case OptionKind::MatrixLayoutColumn:
+            case OptionKind::ZeroInitialize:
             case OptionKind::DefaultImageFormatUnknown:
             case OptionKind::Obfuscate:
             case OptionKind::OutputIncludes:

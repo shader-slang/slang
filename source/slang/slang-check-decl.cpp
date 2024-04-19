@@ -1636,6 +1636,23 @@ namespace Slang
             }
         }
 
+        if (!varDecl->initExpr &&
+            getOptionSet().hasOption(CompilerOptionName::ZeroInitialize))
+        {
+            auto* defaultCall = m_astBuilder->create<VarExpr>();
+            defaultCall->type = QualType();
+            defaultCall->name = getName("__default");
+            defaultCall->scope = varDecl->parentDecl->ownedScope;
+
+            auto* defaultFunction = m_astBuilder->create<GenericAppExpr>();
+            defaultFunction->functionExpr = defaultCall;
+            defaultFunction->arguments.add(varDecl->type.exp);
+
+            auto* defaultExpr = m_astBuilder->create<InvokeExpr>();
+            defaultExpr->functionExpr = defaultFunction;
+            varDecl->initExpr = defaultExpr;
+        }
+        
         if (varDecl->initExpr)
         {
             if (as<BasicExpressionType>(varDecl->type.type))
