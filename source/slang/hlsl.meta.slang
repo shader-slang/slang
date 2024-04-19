@@ -500,6 +500,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 return __glsl_texture_array_shadow(this, location, compareValue);
             }
+            return __glsl_texture(this, __makeVector(location, compareValue));
         case hlsl:
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue);
         case spirv:
@@ -938,6 +939,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             {
                 return __glsl_texture_array_shadow(this, s, location, compareValue);
             }
+            return __glsl_texture(this, s, __makeVector(location, compareValue));
         case hlsl:
             __intrinsic_asm ".SampleCmp";
         case spirv:
