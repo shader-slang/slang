@@ -12,6 +12,7 @@ struct BitCastLoweringContext
     TargetProgram* targetProgram;
     IRModule* module;
     OrderedHashSet<IRInst*> workList;
+    DiagnosticSink* sink;
 
     void addToWorkList(IRInst* inst)
     {
@@ -212,6 +213,14 @@ struct BitCastLoweringContext
         auto operand = inst->getOperand(0);
         auto fromType = operand->getDataType();
         auto toType = inst->getDataType();
+
+        IRSizeAndAlignment toTypeSize;
+        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toTypeSize);
+        IRSizeAndAlignment fromTypeSize;
+        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromTypeSize);
+        if (fromTypeSize.size != toTypeSize.size)
+            sink->diagnose(inst->sourceLoc, Diagnostics::notEqualBitCastSize, fromType, fromTypeSize.size, toType, toTypeSize.size);
+
         if (as<IRBasicType>(fromType) != nullptr && as<IRBasicType>(toType) != nullptr)
         {
             // Both fromType and toType are basic types, no processing needed.
@@ -247,11 +256,12 @@ struct BitCastLoweringContext
     }
 };
 
-void lowerBitCast(TargetProgram* targetProgram, IRModule* module)
+void lowerBitCast(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
 {
     BitCastLoweringContext context;
     context.module = module;
     context.targetProgram = targetProgram;
+    context.sink = sink;
     context.processModule();
 }
 
