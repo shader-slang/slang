@@ -4911,7 +4911,7 @@ T dd$(xOrY)_fine(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 vector<T, N> dd$(xOrY)_fine(vector<T, N> x)
 {
     __target_switch
