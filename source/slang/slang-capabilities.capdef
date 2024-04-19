@@ -132,6 +132,18 @@ alias raytracing_stages_compute = raytracing_stages | compute;
 alias raytracing_stages_compute_fragment = raytracing_stages | shader_stages_compute_fragment;
 alias raytracing_stages_compute_fragment_geometry_vertex = raytracing_stages | shader_stages_compute_fragment_geometry_vertex;
 
+def _GLSL_130 : glsl;
+def _GLSL_140 : _GLSL_130;
+def _GLSL_150 : _GLSL_140;
+def _GLSL_330 : _GLSL_150;
+def _GLSL_400 : _GLSL_330;
+def _GLSL_410 : _GLSL_400;
+def _GLSL_420 : _GLSL_410;
+def _GLSL_430 : _GLSL_420;
+def _GLSL_440 : _GLSL_430;
+def _GLSL_450 : _GLSL_440;
+def _GLSL_460 : _GLSL_450;
+
 def _sm_4_0 : hlsl;
 def _sm_4_1 : _sm_4_0;
 def _sm_5_0 : _sm_4_1;
@@ -440,20 +452,20 @@ alias sm_6_7 = _sm_6_7
              | cpp;
 // Profiles
 
-alias GLSL_110 = sm_4_0;
-alias GLSL_130 = GLSL_110 + sm_4_1;
-alias GLSL_140 = GLSL_130;
-alias GLSL_150 = GLSL_140;
-alias GLSL_330 = GLSL_150;
-alias GLSL_400 = GLSL_330 + sm_5_0;
-alias GLSL_410 = GLSL_400 + sm_5_1 + spirv_1_3;
-alias GLSL_420 = GLSL_410;
-alias GLSL_430 = GLSL_420;
-alias GLSL_440 = GLSL_430 + sm_6_0 | GLSL_430 + spirv_1_5 + sm_6_0;
-alias GLSL_450 = GLSL_440 + sm_6_3 | GLSL_440 + spirv_1_5 + sm_6_3;
-alias GLSL_410_SPIRV_1_0 = GLSL_400;
-alias GLSL_420_SPIRV_1_0 = GLSL_410_SPIRV_1_0;
-alias GLSL_430_SPIRV_1_0 = GLSL_420_SPIRV_1_0;
+alias GLSL_130 = _GLSL_130 + sm_4_0;
+alias GLSL_140 = _GLSL_140 + GLSL_130 + sm_4_1;
+alias GLSL_150 = _GLSL_150 + GLSL_140;
+alias GLSL_330 = _GLSL_330 + GLSL_150;
+alias GLSL_400 = _GLSL_400 + GLSL_330 + sm_5_0;
+alias GLSL_410 = _GLSL_410 + GLSL_400 + sm_5_1 + spirv_1_3;
+alias GLSL_420 = _GLSL_420 + GLSL_410;
+alias GLSL_430 = _GLSL_430 + GLSL_420;
+alias GLSL_440 = _GLSL_440 + GLSL_430 + spirv_1_5 + sm_6_0;
+alias GLSL_450 = _GLSL_450 + GLSL_440 + spirv_1_5 + sm_6_3;
+alias GLSL_460 = _GLSL_460 + GLSL_450;
+alias GLSL_410_SPIRV_1_0 = _GLSL_410 + GLSL_400;
+alias GLSL_420_SPIRV_1_0 = _GLSL_420 + GLSL_410_SPIRV_1_0;
+alias GLSL_430_SPIRV_1_0 = _GLSL_430 + GLSL_420_SPIRV_1_0;
 
 alias DX_4_0 = sm_4_0;
 alias DX_4_1 = sm_4_1;
@@ -479,17 +491,19 @@ alias byteaddressbuffer_rw = sm_4_0 + raytracing_stages_compute_fragment;
 alias consumestructuredbuffer = sm_5_0 + raytracing_stages_compute_fragment;
 alias fragmentprocessing = raytracing_stages_compute_fragment + _sm_5_0
                          | fragment + glsl_spirv
-                         | compute + GL_NV_compute_shader_derivatives
+                         | raytracing_stages_compute + GL_NV_compute_shader_derivatives
+                         | raytracing_stages_compute_fragment + GLSL_460
                          ;
 alias fragmentprocessing_derivativecontrol = raytracing_stages_compute_fragment + _sm_5_0
                                            | fragment + GL_ARB_derivative_control
                                            | compute + GL_NV_compute_shader_derivatives
+                                           | raytracing_stages_compute_fragment + GLSL_460
                                            ;
 alias getattributeatvertex = fragment + _sm_6_1 | fragment + GL_EXT_fragment_shader_barycentric;
 alias memorybarrier_compute = raytracing_stages_compute + sm_5_0;
 alias structuredbuffer = sm_4_0;
 alias structuredbuffer_rw = sm_4_0 + raytracing_stages_compute_fragment;
-alias texture_sm_4_1 = sm_4_1 | GLSL_150;
+alias texture_sm_4_1 = sm_4_1 | _GLSL_150;
 alias texture_sm_4_1_samplerless = texture_sm_4_1 + GL_EXT_samplerless_texture_functions;
 alias texture_sm_4_1_compute_fragment = cpp + texture_sm_4_1
                               | cuda + texture_sm_4_1
@@ -573,4 +587,3 @@ alias all = _sm_6_7 + hlsl_nvapi
           | spirv_1_5 + sm_6_7
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + spvGroupNonUniformPartitionedNV
              + spvRayTracingMotionBlurNV + spvRayTracingMotionBlurNV;
-alias GLSL_460 = glsl_spirv_1_5 + all | spirv_1_5 + all;
