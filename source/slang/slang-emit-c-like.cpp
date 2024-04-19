@@ -1300,6 +1300,9 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 
     case kIROp_GetVulkanRayTracingPayloadLocation:
         return true;
+
+    case kIROp_NonUniformResourceIndex:
+        return true;
     }
 
     // Layouts and attributes are only present to annotate other
@@ -2369,6 +2372,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_GroupMemoryBarrierWithGroupSync:
         m_writer->emit("GroupMemoryBarrierWithGroupSync()");
+        break;
+
+    case kIROp_NonUniformResourceIndex:
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General)); // Directly emit NonUniformResourceIndex Operand0;
         break;
 
     case kIROp_getNativeStr:

@@ -7483,59 +7483,12 @@ T __copyObject<T>(T v)
    }
 }
 
-
-__glsl_extension(GL_EXT_nonuniform_qualifier)
-[__readNone]
-[ForceInline]
+/// `NonUniformResourceIndex` function is used to indicate if the resource index is
+/// divergent, and ensure scalarization happens correctly for each divergent lane.
+__generic<T:__BuiltinArithmeticType>
+__intrinsic_op($(kIROp_NonUniformResourceIndex))
 [require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
-uint NonUniformResourceIndex(uint index)
-{
-    __target_switch
-    {
-    case hlsl:
-        __intrinsic_asm "NonUniformResourceIndex";
-    case glsl:
-        __intrinsic_asm "nonuniformEXT";
-    case spirv:
-        var indexCopy = __copyObject(index);
-        spirv_asm
-        {
-            OpCapability ShaderNonUniform;
-            OpDecorate $indexCopy NonUniform;
-        };
-        return indexCopy;
-    case cpp:
-    case cuda:
-        return index;
-    }
-}
-
-__glsl_extension(GL_EXT_nonuniform_qualifier)
-[__readNone]
-[ForceInline]
-[NonUniformReturn]
-[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
-int NonUniformResourceIndex(int index)
-{
-    __target_switch
-    {
-    case hlsl:
-        __intrinsic_asm "NonUniformResourceIndex";
-    case glsl:
-        __intrinsic_asm "nonuniformEXT";
-    case spirv:
-        var indexCopy = __copyObject(index);
-        spirv_asm
-        {
-            OpCapability ShaderNonUniform;
-            OpDecorate $indexCopy NonUniform;
-        };
-        return indexCopy;
-    case cpp:
-    case cuda:
-        return index;
-    }
-}
+T NonUniformResourceIndex(T index);
 
 /// HLSL allows NonUniformResourceIndex around non int/uint types.
 /// It's effect is presumably to ignore it, which the following implementation does.

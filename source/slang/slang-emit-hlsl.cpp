@@ -725,6 +725,18 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             return false;
         }
         break;
+        case kIROp_NonUniformResourceIndex:
+        {
+            // Need to emit as a Function call for HLSL
+            m_writer->emit("NonUniformResourceIndex");
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+
+            // Handled
+            return true;
+        }
+        break;
 
         default: break;
     }
