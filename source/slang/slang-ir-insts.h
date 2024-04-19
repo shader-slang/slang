@@ -327,6 +327,18 @@ struct IRRequireGLSLVersionDecoration : IRDecoration
     }
 };
 
+struct IRSPIRVNonUniformResourceDecoration : IRDecoration
+{
+    enum { kOp = kIROp_SPIRVNonUniformResourceDecoration };
+    IR_LEAF_ISA(RequireGLSLVersionDecoration)
+
+    IRConstant* getSPIRVNonUniformResourceOperand() { return cast<IRConstant>(getOperand(0)); }
+    IntegerLiteralValue getSPIRVNonUniformResource()
+    {
+        return getSPIRVNonUniformResourceOperand()->value.intVal;
+    }
+};
+
 struct IRRequireSPIRVVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireSPIRVVersionDecoration };
@@ -2336,6 +2348,11 @@ struct IRStructuredBufferGetDimensions : IRInst
     IRInst* getBuffer() { return getOperand(0); }
 };
 
+struct IRNonUniformResourceIndex : IRInst
+{
+    IR_LEAF_ISA(NonUniformResourceIndex);
+};
+
 struct IRLoadReverseGradient : IRInst
 {
     IR_LEAF_ISA(LoadReverseGradient)
@@ -4229,6 +4246,8 @@ public:
     IRInst* emitGenericAsm(UnownedStringSlice asmText);
 
     IRInst* emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index);
+
+    IRInst* emitNonUniformResourceIndexInst(IRInst* val);
     //
     // Decorations
     //
@@ -4453,6 +4472,11 @@ public:
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
         addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
+    }
+
+    void addSPIRVNonUniformResourceDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_SPIRVNonUniformResourceDecoration);
     }
 
     void addRequireCUDASMVersionDecoration(IRInst* value, const SemanticVersion& version)
