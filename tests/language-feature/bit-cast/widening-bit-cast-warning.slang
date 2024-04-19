@@ -3,7 +3,7 @@
 uniform StructuredBuffer<uint32_t> in;
 uniform RWStructuredBuffer<uint64_t> out;
 
-//CHECK: warning 30102{{.*}}4{{.*}}8
+//CHECK: warning 41202{{.*}}4{{.*}}8
 
 [numthreads(4, 1, 1)]
 [shader("compute")]

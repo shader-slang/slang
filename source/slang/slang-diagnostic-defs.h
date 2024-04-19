@@ -358,9 +358,6 @@ DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid
 
 DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
 
-DIAGNOSTIC(30102, Warning, notEqualBitCastSize, "trying to bit_cast not equally sized type '$0' with size '$1' into type '$2' with size '$3'")
-DIAGNOSTIC(30103, Warning, notEqualReinterpretCastSize, "trying to reinterpret not equally sized type '$0' with size '$1' into type '$2' with size '$3'")
-
 // Include
 DIAGNOSTIC(30500, Error, includedFileMissingImplementing, "missing 'implementing' declaration in the included source file '$0'.")
 DIAGNOSTIC(30501, Error, includedFileMissingImplementingDoYouMeanImport, "missing 'implementing' declaration in the included source file '$0'. The file declares that it defines module '$1', do you mean 'import' instead?")
@@ -746,6 +743,10 @@ DIAGNOSTIC(45001, Error, unresolvedSymbol, "unresolved external symbol '$0'.")
 
 DIAGNOSTIC(41201, Warning, expectDynamicUniformArgument, "argument for '$0' might not be a dynamic uniform, use `asDynamicUniform()` to silence this warning.")
 DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this location must be dynamic uniform, use `asDynamicUniform()` to silence this warning.")
+
+
+DIAGNOSTIC(41202, Warning, notEqualBitCastSize, "trying to bit_cast not equally sized type '$0' with size '$1' into type '$2' with size '$3'")
+DIAGNOSTIC(41203, Warning, notEqualReinterpretCastSize, "trying to reinterpret not equally sized type '$0' with size '$1' into type '$2' with size '$3'")
 
 //
 // 5xxxx - Target code generation.
