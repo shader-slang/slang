@@ -16,7 +16,7 @@ namespace Slang
     {
         if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
             return false;
-        sink->diagnose(pos, info, args...);
+        return sink->diagnose(pos, info, args...);
     }
 
         /// Should the given `decl` be treated as a static rather than instance declaration?

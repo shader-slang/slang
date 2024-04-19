@@ -1783,14 +1783,14 @@ public vector<T,4> texture(__TextureImpl<
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DShadow sampler, vec3 p)
 {
     return sampler.SampleCmp(p.x, p.z);
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DShadow sampler, vec3 p, float bias)
 {
     // TODO: Need to apply bias
@@ -1798,28 +1798,28 @@ public float texture(sampler1DShadow sampler, vec3 p, float bias)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler2DShadow sampler, vec3 p)
 {
     return sampler.SampleCmp(p.xy, p.z);
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler2DShadow sampler, vec3 p, float bias)
 {
     // TODO: Need to apply bias
     return sampler.SampleCmp(p.xy, p.z);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p)
 {
     return sampler.SampleCmp(p.xyz, p.w);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p, float bias)
 {
@@ -1828,14 +1828,14 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DArrayShadow sampler, vec3 p)
 {
     return sampler.SampleCmp(p.xy, p.z);
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
 {
     // TODO: Need to apply bias
@@ -1843,14 +1843,14 @@ public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler2DArrayShadow sampler, vec4 p)
 {
     return sampler.SampleCmp(p.xyz, p.w);
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
 public float texture(samplerCubeArrayShadow sampler, vec4 p, float compare)
 {
     return sampler.SampleCmp(p, compare);
@@ -1948,21 +1948,21 @@ public float textureProj(sampler1DShadow sampler, vec4 p)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler1DShadow sampler, vec4 p, float bias)
 {
     return texture(sampler, p.xyz / p.w, bias);
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler2DShadow sampler, vec4 p)
 {
     return texture(sampler, p.xyz / p.w);
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
 {
     return texture(sampler, p.xyz / p.w, bias);
@@ -1999,7 +1999,7 @@ public vector<T,4> textureLod(__TextureImpl<
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 {
     // TODO: Need to apply lod
@@ -2007,7 +2007,7 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 {
     // TODO: Need to apply lod
@@ -2015,7 +2015,7 @@ public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
 {
     // TODO: Need to apply lod
@@ -2051,7 +2051,7 @@ public vector<T,4> textureOffset(Sampler3D<vector<T,N>> sampler, vec3 p, constex
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
 {
     // TODO: Need to apply bias
@@ -2059,7 +2059,7 @@ public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offs
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset, float bias = 0.0)
 {
     // TODO: Need to apply bias
@@ -2083,7 +2083,7 @@ public vector<T,4> textureOffset(Sampler2DArray<vector<T,N>> sampler, vec3 p, co
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int offset, float bias = 0.0)
 {
     // TODO: Need to apply bias
@@ -2091,7 +2091,7 @@ public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int o
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2 offset)
 {
     return sampler.SampleCmp(p.xyz, p.w, offset);
@@ -2262,14 +2262,14 @@ public vector<T,4> textureProjOffset(Sampler3D<vector<T,N>> sampler, vec4 p, con
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int offset, float bias = 0.0)
 {
     return textureOffset(sampler, p.xyz / p.w, offset, bias);
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 offset, float bias = 0.0)
 {
     return textureOffset(sampler, p.xyz / p.w, offset, bias);
@@ -2306,7 +2306,7 @@ public vector<T,4> textureLodOffset(__TextureImpl<
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, constexpr int offset)
 {
     // TODO: Need to apply lod
@@ -2314,7 +2314,7 @@ public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, conste
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, constexpr ivec2 offset)
 {
     // TODO: Need to apply lod
@@ -2322,7 +2322,7 @@ public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, conste
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, constexpr int offset)
 {
     // TODO: Need to apply lod
@@ -2374,14 +2374,14 @@ public vector<T,4> textureProjLod(Sampler3D<vector<T,N>> sampler, vec4 p, float 
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLod(sampler1DShadow sampler, vec4 p, float lod)
 {
     return textureLod(sampler, p.xyz / p.w, lod);
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLod(sampler2DShadow sampler, vec4 p, float lod)
 {
     return textureLod(sampler, p.xyz / p.w, lod);
@@ -2432,14 +2432,14 @@ public vector<T,4> textureProjLodOffset(Sampler3D<vector<T,N>> sampler, vec4 p, 
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLodOffset(sampler1DShadow sampler, vec4 p, float lod, constexpr int offset)
 {
     return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLodOffset(sampler2DShadow sampler, vec4 p, float lod, constexpr ivec2 offset)
 {
     return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
@@ -2477,7 +2477,7 @@ public vector<T,4> textureGrad(__TextureImpl<
 }
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy)
 {
     // TODO: Not implemented
@@ -2485,7 +2485,7 @@ public float textureGrad(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy
 }
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler1DArrayShadow sampler, vec3 p, float dPdx, float dPdy)
 {
     // TODO: Not implemented
@@ -2493,7 +2493,7 @@ public float textureGrad(sampler1DArrayShadow sampler, vec3 p, float dPdx, float
 }
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2501,7 +2501,7 @@ public float textureGrad(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
 }
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_shadowlod_cube)]
 public float textureGrad(samplerCubeShadow sampler, vec4 p, vec3 dPdx, vec3 dPdy)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2509,7 +2509,7 @@ public float textureGrad(samplerCubeShadow sampler, vec4 p, vec3 dPdx, vec3 dPdy
 }
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2547,7 +2547,7 @@ public vector<T,4> textureGradOffset(__TextureImpl<
 }
 
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy, constexpr int offset)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2555,7 +2555,7 @@ public float textureGradOffset(sampler1DShadow sampler, vec3 p, float dPdx, floa
 }
 
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2563,7 +2563,7 @@ public float textureGradOffset(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 
 }
 
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler1DArrayShadow sampler, vec3 p, float dPdx, float dPdy, constexpr int offset)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2571,7 +2571,7 @@ public float textureGradOffset(sampler1DArrayShadow sampler, vec3 p, float dPdx,
 }
 
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2623,14 +2623,14 @@ public vector<T,4> textureProjGrad(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 
 }
 
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjGrad(sampler1DShadow sampler, vec4 p, float dPdx, float dPdy)
 {
     return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
 }
 
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjGrad(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy)
 {
     return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
@@ -2681,14 +2681,14 @@ public vector<T,4> textureProjGradOffset(Sampler3D<vector<T,N>> sampler, vec4 p,
 }
 
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjGradOffset(sampler1DShadow sampler, vec4 p, float dPdx, float dPdy, constexpr int offset)
 {
     return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
 }
 
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjGradOffset(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
     return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
@@ -3002,49 +3002,49 @@ public vec4 textureCubeLod(samplerCube sampler, vec3 coord, float lod)
     return textureLod(sampler, coord, lod);
 }
 
-[require(glsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow1D(sampler1DShadow sampler, vec3 coord)
 {
     return texture(sampler, coord);
 }
 
-[require(glsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow1D(sampler1DShadow sampler, vec3 coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
-[require(glsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow2D(sampler2DShadow sampler, vec3 coord)
 {
     return texture(sampler, coord);
 }
 
-[require(glsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow2D(sampler2DShadow sampler, vec3 coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
-[require(glsl_spirv, texture_sm_4_1)]
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow1DProj(sampler1DShadow sampler, vec4 coord)
 {
     return textureProj(sampler, coord);
 }
 
-[require(glsl_spirv, texture_sm_4_1)]
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow1DProj(sampler1DShadow sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
-[require(glsl_spirv, texture_sm_4_1)]
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow2DProj(sampler2DShadow sampler, vec4 coord)
 {
     return textureProj(sampler, coord);
 }
 
-[require(glsl_spirv, texture_sm_4_1)]
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow2DProj(sampler2DShadow sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
