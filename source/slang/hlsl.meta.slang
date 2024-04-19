@@ -40,24 +40,24 @@ struct GLSLShaderStorageBuffer {}
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T,L> buffer);
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(StructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RWStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RasterizerOrderedStructuredBuffer<T,L> buffer);
 
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
@@ -82,7 +82,7 @@ struct AppendStructuredBuffer
 
 __magic_type(HLSLByteAddressBufferType)
 __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
-[require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
 struct ByteAddressBuffer
 {
     [__readNone]
@@ -2540,23 +2540,23 @@ uint64_t __asuint64(uint2 i)
 //
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
-[require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
 T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
-[require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
 T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, int offset);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
-[require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
 T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, int offset);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
-[require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
 void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, int offset, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
-[require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
 void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, T value);
 
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
@@ -3640,7 +3640,7 @@ for(auto item : kMutableStructuredBufferCases) {
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
-[require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
 struct $(item.name)
 {
     uint DecrementCounter();

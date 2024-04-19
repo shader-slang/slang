@@ -71,6 +71,7 @@ alias cpp_cuda = cpp | cuda;
 alias cpp_cuda_glsl_spirv = cpp | cuda | glsl | spirv;
 alias cpp_cuda_glsl_hlsl = cpp | cuda | glsl | hlsl;
 alias cpp_cuda_glsl_hlsl_spirv = cpp | cuda | glsl | hlsl | spirv_1_0;
+alias cpp_cuda_glsl_hlsl_metal_spirv = cpp | cuda | glsl | hlsl | metal | spirv_1_0;
 alias cpp_cuda_hlsl = cpp | cuda | hlsl;
 alias cpp_glsl = cpp | glsl;
 alias cpp_glsl_hlsl_spirv = cpp | glsl | hlsl | spirv_1_0;
@@ -378,25 +379,33 @@ alias sm_4_0 = _sm_4_0
              | glsl_spirv_1_0 + _GL_ARB_sparse_texture_clamp + _GL_EXT_samplerless_texture_functions
              | spirv_1_0 + spvImageQuery + spvImageGatherExtended + spvMinLod + SPV_GOOGLE_user_type
              | _cuda_sm_2_0
-             | cpp;
+             | metal
+             | cpp
+             ;
 
 alias sm_4_1 = _sm_4_1
              | glsl_spirv_1_0 + sm_4_0
              | spirv_1_0 + sm_4_0
              | _cuda_sm_6_0
-             | cpp;
+             | metal
+             | cpp
+             ;
 
 alias sm_5_0 = _sm_5_0 
              | glsl_spirv_1_0 + sm_4_1 + _GL_KHR_memory_scope_semantics
              | spirv_1_0 + sm_4_1 + spvDerivativeControl + spvFragmentFullyCoveredEXT
              | _cuda_sm_9_0
-             | cpp;
+             | metal
+             | cpp
+             ;
 
 alias sm_5_1 = _sm_5_1 
              | glsl_spirv_1_0 + sm_5_0 + _GL_ARB_gpu_shader5 + _GL_EXT_nonuniform_qualifier
              | spirv_1_0 + sm_5_0 + spvShaderNonUniform
              | _cuda_sm_9_0
-             | cpp;
+             | metal
+             | cpp
+             ;
 
 alias sm_6_0 = _sm_6_0 
              | glsl_spirv_1_3 + sm_5_1
@@ -404,37 +413,49 @@ alias sm_6_0 = _sm_6_0
              | spirv_1_3 + sm_5_1
                 + groupnonuniform + atomicfloat 
              | _cuda_sm_9_0 
-             | cpp;
+             | metal
+             | cpp
+             ;
 
 alias sm_6_1 = _sm_6_1 
              | glsl_spirv_1_3 + sm_6_0 + fragmentshaderbarycentric 
              | spirv_1_3 + sm_6_0 + fragmentshaderbarycentric 
              | _cuda_sm_9_0
-             | cpp;
+             | metal
+             | cpp
+             ;
 
 alias sm_6_2 = _sm_6_2
              | glsl_spirv_1_3 + sm_6_1
              | spirv_1_3 + sm_6_1
              | _cuda_sm_9_0
-             | cpp;
+             | metal
+             | cpp
+             ;
 
 alias sm_6_3 = _sm_6_3 
              | glsl_spirv_1_4 + sm_6_2 + _GL_EXT_ray_tracing
              | spirv_1_4 + sm_6_2 + SPV_KHR_ray_tracing
              | _cuda_sm_9_0
-             | cpp;
+             | metal
+             | cpp
+             ;
 
 alias sm_6_4 = _sm_6_4
              | glsl_spirv_1_4 + sm_6_3
              | spirv_1_4 + sm_6_3
              | _cuda_sm_9_0
-             | cpp;
+             | metal
+             | cpp
+             ;
 
 alias sm_6_5 = _sm_6_5
              | glsl_spirv_1_4 + sm_6_4 + raytracing + meshshading
              | spirv_1_4 + sm_6_4 + raytracing + meshshading
              | _cuda_sm_9_0
-             | cpp;
+             | metal
+             | cpp
+             ;
 
 alias sm_6_6 = _sm_6_6
              | glsl_spirv_1_5 + sm_6_5
@@ -443,79 +464,94 @@ alias sm_6_6 = _sm_6_6
                 + GL_EXT_shader_atomic_int64 + atomicfloat2
                 + SPV_EXT_descriptor_indexing
              | _cuda_sm_9_0
-             | cpp;
+             | metal
+             | cpp
+             ;
 
 alias sm_6_7 = _sm_6_7
              | glsl_spirv_1_5 + sm_6_6
              | spirv_1_5 + sm_6_6
              | _cuda_sm_9_0
-             | cpp;
+             | metal
+             | cpp
+             ;
 // Profiles
 
 alias GLSL_130 = _GLSL_130
                | _sm_4_0
                | _cuda_sm_2_0
                | spirv_1_0
+               | metal
                | cpp
                ;
 alias GLSL_140 = _GLSL_140
                | _sm_4_1
                | _cuda_sm_2_0
                | spirv_1_0
+                | metal
                | cpp
                ;
 alias GLSL_150 = _GLSL_150
                | _sm_4_1
                | _cuda_sm_2_0
                | spirv_1_0
+               | metal
                | cpp
                ;
 alias GLSL_330 = _GLSL_330
                | _sm_5_0
                | _cuda_sm_6_0
                | spirv_1_0
+               | metal
                | cpp
                ;
 alias GLSL_400 = _GLSL_400
                | _sm_5_1
                | _cuda_sm_6_0
                | spirv_1_3
+               | metal
                | cpp
                ;
 alias GLSL_410 = _GLSL_410
                | _sm_5_1
                | _cuda_sm_6_0
                | spirv_1_3
+               | metal
                | cpp
                ;
 alias GLSL_420 = _GLSL_420
                | _sm_5_1
                | _cuda_sm_6_0
                | spirv_1_3
+               | metal
                | cpp
                ;
 alias GLSL_430 = _GLSL_430
                | _sm_5_1
                | _cuda_sm_6_0
                | spirv_1_3
+               | metal
                | cpp
                ;
 alias GLSL_440 = _GLSL_440
                | _sm_6_0
                | _cuda_sm_6_0
                | spirv_1_5
+               | metal
                | cpp
                ;
 alias GLSL_450 = _GLSL_450
                | _sm_6_0
                | _cuda_sm_6_0
                | spirv_1_5
+               | metal
                | cpp
                ;
 alias GLSL_460 = _GLSL_460
                | _sm_6_6
                | _cuda_sm_6_0
                | spirv_1_5
+               | metal
                | cpp
                ;
 
