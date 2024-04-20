@@ -1234,6 +1234,7 @@ struct IRSpecialize : IRInst
     // after the generic value come the arguments
     UInt getArgCount() { return getOperandCount() - 1; }
     IRInst* getArg(UInt index) { return getOperand(index + 1); }
+    IRUse* getArgOperand(Index i) { return getOperands() + 1 + i; }
 
     IR_LEAF_ISA(Specialize)
 };
