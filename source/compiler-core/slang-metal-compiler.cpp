@@ -38,7 +38,7 @@ namespace Slang
             return ArtifactDescUtil::isDisassembly(from, to) && from.payload == ArtifactPayload::MetalAIR;
         }
 
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact)
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) override
         {
             // Use metal-objdump to disassemble the Metal IR.
 
