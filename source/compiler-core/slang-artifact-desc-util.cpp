@@ -287,6 +287,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         case SLANG_OBJECT_CODE:             return Desc::make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
         case SLANG_HOST_HOST_CALLABLE:      return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);
         case SLANG_METAL:                   return Desc::make(Kind::Source, Payload::Metal, Style::Kernel, 0);
+        case SLANG_METAL_LIB:               return Desc::make(Kind::Executable, Payload::MetalAIR, Style::Kernel, 0);
+        case SLANG_METAL_LIB_ASM:           return Desc::make(Kind::Assembly, Payload::MetalAIR, Style::Kernel, 0);
         default: break;
     }
 
@@ -328,6 +330,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
                 case Payload::C:            return SLANG_C_SOURCE;
                 case Payload::Cpp:          return (desc.style == Style::Host) ? SLANG_HOST_CPP_SOURCE : SLANG_CPP_SOURCE;
                 case Payload::CUDA:         return SLANG_CUDA_SOURCE;
+                case Payload::Metal:        return SLANG_METAL;
                 default: break;
             }
             break;
@@ -340,6 +343,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
                 case Payload::DXIL:         return SLANG_DXIL_ASM;
                 case Payload::DXBC:         return SLANG_DXBC_ASM;
                 case Payload::PTX:          return SLANG_PTX;
+                case Payload::MetalAIR:     return SLANG_METAL_LIB_ASM;
                 default: break;
             }
         }
@@ -367,6 +371,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
                 case Payload::DXIL:         return SLANG_DXIL;
                 case Payload::DXBC:         return SLANG_DXBC;
                 case Payload::PTX:          return SLANG_PTX;
+                case Payload::MetalAIR:     return SLANG_METAL_LIB_ASM;
                 default: break;
             }
         }
@@ -638,7 +643,7 @@ static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
 
         case Payload::SlangIR:      return toSlice("slang-ir");
         
-        case Payload::MetalAIR:     return toSlice("air");
+        case Payload::MetalAIR:     return toSlice("metallib");
 
         case Payload::PdbDebugInfo: return toSlice("pdb");
         case Payload::SourceMap:    return toSlice("map");
