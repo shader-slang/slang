@@ -935,13 +935,13 @@ static void addExplicitParameterBinding(
         if (overlappedVarLayout)
         {
             //legal if atomicUint
-            if(parameterInfo->varLayout->varDecl.getDecl()->getType()->astNodeType == ASTNodeType::GLSLAtomicUintType
-                && overlappedVarLayout->varDecl.getDecl()->getType()->astNodeType == ASTNodeType::GLSLAtomicUintType)
+            if(parameterInfo->varLayout->getVariable()->getType()->astNodeType == ASTNodeType::GLSLAtomicUintType
+                && overlappedVarLayout->getVariable()->getType()->astNodeType == ASTNodeType::GLSLAtomicUintType)
             {
                 return;
             }
-            auto paramA = parameterInfo->varLayout->varDecl.getDecl();
-            auto paramB = overlappedVarLayout->varDecl.getDecl();
+            auto paramA = parameterInfo->varLayout->getVariable();
+            auto paramB = overlappedVarLayout->getVariable();
 
             auto& diagnosticInfo = Diagnostics::parameterBindingsOverlap;
 
@@ -1024,7 +1024,8 @@ static void addExplicitParameterBindings_HLSL(
             // TODO: warning here!
         }
 
-        addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), semanticInfo, count);
+        if (auto varDeclBase = varDecl.as<VarDeclBase>())
+            addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, count);
     }
 }
 
@@ -1133,10 +1134,12 @@ static void addExplicitParameterBindings_GLSL(
         auto count = resInfo->count;
         semanticInfo.kind = kind;
 
-        addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), semanticInfo, count);
-        if (foundSubpass)
-            addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), subpassSemanticInfo, count);
-
+        if (auto varDeclBase = varDecl.as<VarDeclBase>())
+        {
+            addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, count);
+            if (foundSubpass)
+                addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), subpassSemanticInfo, count);
+        }
         return;
     }
 
@@ -1147,7 +1150,7 @@ static void addExplicitParameterBindings_GLSL(
     // If we have the options, but cannot infer bindings, we don't need to go further
     if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
     {
-        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
+        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
         return;
     }
 
@@ -1169,7 +1172,7 @@ static void addExplicitParameterBindings_GLSL(
 
     // We can't infer TextureSampler from HLSL (it's not an HLSL concept)
     // So use default layout
-    auto varType = varDecl.getDecl()->getType();
+    auto varType = getType(context->getASTBuilder(), varDecl.as<VarDeclBase>());
     if (auto textureType = as<TextureType>(varType))
     {
         if (textureType->isCombined())
@@ -1187,7 +1190,7 @@ static void addExplicitParameterBindings_GLSL(
     // If inference is not enabled for this kind, we can issue a warning
     if (!hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
     {
-        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
+        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
         return;
     }
 
@@ -1201,7 +1204,7 @@ static void addExplicitParameterBindings_GLSL(
 
     const LayoutSize count = resInfo->count;
 
-    addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), semanticInfo, count);
+    addExplicitParameterBinding(context, parameterInfo, as<VarDeclBase>(varDecl.getDecl()), semanticInfo, count);
 }
 
 // Given a single parameter, collect whatever information we have on
@@ -2408,7 +2411,10 @@ struct ScopeLayoutBuilder
         {
             auto rules = m_layoutContext.rules;
             m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, rules);
-            auto fieldPendingDataVarLayout = m_pendingDataTypeLayoutBuilder.addField(varLayout->varDecl, fieldPendingDataTypeLayout);
+            auto varDeclBase = varLayout->varDecl.as<VarDeclBase>();
+            if (!varDeclBase)
+                return;
+            auto fieldPendingDataVarLayout = m_pendingDataTypeLayoutBuilder.addField(varDeclBase, fieldPendingDataTypeLayout);
 
             m_structLayout->pendingDataTypeLayout = m_pendingDataTypeLayoutBuilder.getTypeLayout();
 
@@ -2636,7 +2642,8 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(
 
     auto layoutInfo = context->getRulesFamily()
                           ->getConstantBufferRules(context->getTargetRequest()->getOptionSet())
-                          ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions);
+                          ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions)
+                          .getSimple();
 
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
@@ -2656,7 +2663,8 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
 
     auto layoutInfo = context->getRulesFamily()
         ->getConstantBufferRules(context->getTargetRequest()->getOptionSet())
-        ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions);
+        ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions)
+        .getSimple();
 
     const Index count = Index(layoutInfo.size.getFiniteValue());
 
@@ -4011,7 +4019,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
             if( varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
             {
                 needDefaultConstantBuffer = true;
-                diagnoseGlobalUniform(&sharedContext, varLayout->varDecl.getDecl());
+                diagnoseGlobalUniform(&sharedContext, as<VarDeclBase>(varLayout->varDecl.getDecl()));
             }
         }
     }

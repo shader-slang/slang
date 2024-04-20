@@ -6132,6 +6132,18 @@ namespace Slang
         return i;
     }
 
+    // IR emitter for a dedicated instruction to represent NonUniformResourceIndex qualifier.
+    IRInst* IRBuilder::emitNonUniformResourceIndexInst(IRInst* val)
+    {
+        const auto i = createInst<IRInst>(
+            this,
+            kIROp_NonUniformResourceIndex,
+            getTypeType(),
+            val);
+        addInst(i);
+        return i;
+    }
+
     //
     // Decorations
     //
@@ -8056,6 +8068,8 @@ namespace Slang
         case kIROp_StructuredBufferLoad:
         case kIROp_RWStructuredBufferLoad:
         case kIROp_RWStructuredBufferGetElementPtr:
+        case kIROp_CombinedTextureSamplerGetSampler:
+        case kIROp_CombinedTextureSamplerGetTexture:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
         case kIROp_LoadReverseGradient:
         case kIROp_ReverseGradientDiffPairRef:

@@ -92,6 +92,9 @@ namespace Slang
         CUDAObjectCode      = SLANG_CUDA_OBJECT_CODE,
         ObjectCode          = SLANG_OBJECT_CODE,
         HostHostCallable    = SLANG_HOST_HOST_CALLABLE,
+        Metal               = SLANG_METAL,
+        MetalLib            = SLANG_METAL_LIB,
+        MetalLibAssembly    = SLANG_METAL_LIB_ASM,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
@@ -1236,6 +1239,7 @@ namespace Slang
         NVRTC = SLANG_PASS_THROUGH_NVRTC,                   ///< NVRTC CUDA compiler
         LLVM = SLANG_PASS_THROUGH_LLVM,                     ///< LLVM 'compiler'
         SpirvOpt = SLANG_PASS_THROUGH_SPIRV_OPT,            ///< pass thorugh spirv to spirv-opt
+        MetalC = SLANG_PASS_THROUGH_METAL,
         CountOf = SLANG_PASS_THROUGH_COUNT_OF,              
     };
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);

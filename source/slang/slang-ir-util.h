@@ -75,6 +75,14 @@ Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* inte
 
 bool isComInterfaceType(IRType* type);
 
+// If `type` is a vector, returns its element type. Otherwise, return `type`.
+IRType* getVectorElementType(IRType* type);
+
+// True if type is a resource backing memory
+bool isResourceType(IRType* type);
+
+// True if type is a pointer to a resource
+bool isPointerToResourceType(IRType* type);
 
 IROp getTypeStyle(IROp op);
 IROp getTypeStyle(BaseType op);

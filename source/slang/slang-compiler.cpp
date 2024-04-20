@@ -480,7 +480,10 @@ namespace Slang
             {
                 return SourceLanguage::SPIRV;
             }
-            
+            case PassThroughMode::MetalC:
+            {
+                return SourceLanguage::Metal;
+            }
             default: break;
         }
         SLANG_ASSERT(!"Unknown compiler");
@@ -499,6 +502,7 @@ namespace Slang
             case CodeGenTarget::HostCPPSource:
             case CodeGenTarget::PyTorchCppBinding:
             case CodeGenTarget::CSource:
+            case CodeGenTarget::Metal:
             {
                 return PassThroughMode::None;
             }
@@ -525,6 +529,11 @@ namespace Slang
             case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
                 return PassThroughMode::Glslang;
+            }
+            case CodeGenTarget::MetalLib:
+            case CodeGenTarget::MetalLibAssembly:
+            {
+                return PassThroughMode::MetalC;
             }
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
@@ -953,6 +962,7 @@ namespace Slang
             case CodeGenTarget::DXBytecode:         return CodeGenTarget::HLSL;
             case CodeGenTarget::DXIL:               return CodeGenTarget::HLSL;
             case CodeGenTarget::SPIRV:              return CodeGenTarget::GLSL;
+            case CodeGenTarget::MetalLib:           return CodeGenTarget::Metal;
             default: break;
         }
         return CodeGenTarget::Unknown;
@@ -1542,6 +1552,7 @@ namespace Slang
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::DXBytecodeAssembly:
             case CodeGenTarget::DXILAssembly:
+            case CodeGenTarget::MetalLibAssembly:
             {
                 // First compile to an intermediate target for the corresponding binary format.
                 const CodeGenTarget intermediateTarget = _getIntermediateTarget(target);
@@ -1569,6 +1580,7 @@ namespace Slang
                 [[fallthrough]];
             case CodeGenTarget::DXIL:
             case CodeGenTarget::DXBytecode:
+            case CodeGenTarget::MetalLib:
             case CodeGenTarget::PTX:
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
@@ -1598,6 +1610,8 @@ namespace Slang
         case CodeGenTarget::SPIRV:
         case CodeGenTarget::DXIL:
         case CodeGenTarget::DXBytecode:
+        case CodeGenTarget::MetalLib:
+        case CodeGenTarget::MetalLibAssembly:
         case CodeGenTarget::PTX:
         case CodeGenTarget::HostHostCallable:
         case CodeGenTarget::ShaderHostCallable:
@@ -1617,6 +1631,7 @@ namespace Slang
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::PyTorchCppBinding:
         case CodeGenTarget::CSource:
+        case CodeGenTarget::Metal:
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
                 

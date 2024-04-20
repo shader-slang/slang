@@ -967,6 +967,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         case SLANG_CPP_PYTORCH_BINDING:
         case SLANG_HOST_CPP_SOURCE:
         case SLANG_CUDA_SOURCE:
+        case SLANG_METAL:
         {
             return 0;
         }
@@ -984,6 +985,12 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         case SLANG_DXIL_ASM:
         {
             return PassThroughFlag::Dxc;
+        }
+
+        case SLANG_METAL_LIB:
+        case SLANG_METAL_LIB_ASM:
+        {
+            return PassThroughFlag::Metal;
         }
 
         case SLANG_SHADER_HOST_CALLABLE:
