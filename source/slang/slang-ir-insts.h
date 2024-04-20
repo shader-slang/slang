@@ -687,6 +687,7 @@ struct IRPyExportDecoration : IRDecoration
     UnownedStringSlice getExportName() { return getExportNameOperand()->getStringSlice(); }
 };
 
+
 struct IRKnownBuiltinDecoration : IRDecoration
 {
     enum
