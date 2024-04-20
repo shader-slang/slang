@@ -745,7 +745,7 @@ DIAGNOSTIC(41201, Warning, expectDynamicUniformArgument, "argument for '$0' migh
 DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this location must be dynamic uniform, use `asDynamicUniform()` to silence this warning.")
 
 
-DIAGNOSTIC(41202, Warning, notEqualBitCastSize, "trying to bit_cast not equally sized type '$0' with size '$1' into type '$2' with size '$3'")
+DIAGNOSTIC(41202, Error, notEqualBitCastSize, "trying to bit_cast not equally sized type '$0' with size '$1' into type '$2' with size '$3'")
 DIAGNOSTIC(41203, Warning, notEqualReinterpretCastSize, "trying to reinterpret not equally sized type '$0' with size '$1' into type '$2' with size '$3'")
 
 //

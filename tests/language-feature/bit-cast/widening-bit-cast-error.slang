@@ -1,12 +1,12 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage compute -entry computeMain
 
-uniform StructuredBuffer<uint64_t> in;
-uniform RWStructuredBuffer<uint32_t> out;
+uniform StructuredBuffer<uint32_t> in;
+uniform RWStructuredBuffer<uint64_t> out;
 
-//CHECK: warning 41202{{.*}}8{{.*}}4
+//CHECK: error 41202{{.*}}4{{.*}}8
 
 [numthreads(4, 1, 1)]
 [shader("compute")]
 void computeMain() {
-    out[0] = bit_cast<uint32_t, uint64_t>(in[0]);
+    out[0] = bit_cast<uint64_t, uint32_t>(in[0]);
 }

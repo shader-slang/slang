@@ -218,11 +218,11 @@ struct BitCastLoweringContext
         getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toTypeSize);
         IRSizeAndAlignment fromTypeSize;
         getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromTypeSize);
-        if (fromTypeSize.size != toTypeSize.size)
-            sink->diagnose(inst->sourceLoc, Diagnostics::notEqualBitCastSize, fromType, fromTypeSize.size, toType, toTypeSize.size);
 
         if (as<IRBasicType>(fromType) != nullptr && as<IRBasicType>(toType) != nullptr)
         {
+            if (fromTypeSize.size != toTypeSize.size)
+                sink->diagnose(inst->sourceLoc, Diagnostics::notEqualBitCastSize, fromType, fromTypeSize.size, toType, toTypeSize.size);
             // Both fromType and toType are basic types, no processing needed.
             return;
         }
@@ -247,6 +247,10 @@ struct BitCastLoweringContext
         {
             return;
         }
+
+        if (fromTypeSize.size != toTypeSize.size)
+            sink->diagnose(inst->sourceLoc, Diagnostics::notEqualBitCastSize, fromType, fromTypeSize.size, toType, toTypeSize.size);
+
         // Enumerate all fields in to-type and obtain its value from operand object.
         IRBuilder builder(module);
         builder.setInsertBefore(inst);
