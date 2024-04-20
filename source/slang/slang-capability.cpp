@@ -988,6 +988,104 @@ void CapabilitySet::canonicalize()
     m_conjunctions.sort();
 }
 
+CapabilitySet CapabilitySet::getTargetsThisIsMissingFromOther(const CapabilitySet& other)
+{
+    CapabilitySet conflicts{};
+    List<CapabilityConjunctionSet> textualTargetsNotHandled;
+    for (auto conjunction : this->m_conjunctions)
+    {
+        textualTargetsNotHandled.add({});
+        auto& currentList = textualTargetsNotHandled.getLast();
+        for (auto thatNode : conjunction.getExpandedAtoms())
+        {
+            // To make this faster we can make an assumption that the nodes are:
+            // {textualTarget, targetAbstract(), targetAbstract(), nonTarget}
+            // this assumption is not being used since it relies on ordering of .capdef file
+            if (_getInfo(thatNode).abstractBase == CapabilityName::target)
+                currentList.getExpandedAtoms().add(thatNode);
+        }
+    }
+    for (auto& thatConjunction : other.m_conjunctions)
+    {
+        // Worth the check to early leave due to ~5*5 elements to loop around
+        if (textualTargetsNotHandled.getCount() == 0)
+            break;
+
+        for (int i = 0 ; i < textualTargetsNotHandled.getCount(); i++)
+        {
+            auto& textualTargets = textualTargetsNotHandled[i];
+
+            if (textualTargets.countIntersectionWith(thatConjunction) != textualTargets.getExpandedAtoms().getCount())
+                continue;
+            
+            textualTargetsNotHandled[i] = textualTargets.makeEmpty();
+        }
+    }
+    CapabilitySet set;
+    for (auto& i : textualTargetsNotHandled)
+    {
+        if (i.isEmpty())
+            continue;
+        set.unionWith(i);
+    }
+    return set;
+}
+
+// We only run 'join' logic on "this" conjunctions which are compatiable with "other" conjunctions.
+// We only add specific nodes which satisfy the abstractMask.
+// Any non-compatible conjunctions with "other"s cconjunctions will be preserved and unmodified.
+void CapabilitySet::simpleJoinWithSetMask(const CapabilitySet& other, CapabilityName abstractMask)
+{
+    CapabilitySet resultSet;
+    HashSet<CapabilityConjunctionSet*> setUsed;
+    // get used abstract mask nodes per conjunction so we can trivially check 
+    // if we need to add the abstract mask node to avoid duplicates
+    List<HashSet<CapabilityAtom>> abstractMaskNodeInUse;
+    abstractMaskNodeInUse.growToCount(m_conjunctions.getCount());
+    for (int i = 0; i < m_conjunctions.getCount(); i++)
+    {
+        auto& thisConjunction = m_conjunctions[i];
+        auto& setOfInUseNode = abstractMaskNodeInUse[i];
+
+        for (auto& atom : thisConjunction.getExpandedAtoms())
+        {
+            if (_getInfo(atom).abstractBase != abstractMask)
+                continue;
+            setOfInUseNode.add(atom);
+        }
+    }
+
+    for (auto& thatConjunction : other.m_conjunctions)
+    {
+        for (int i = 0; i < m_conjunctions.getCount(); i++)
+        {
+            auto& thisConjunction = m_conjunctions[i];
+            auto& setOfInUseNode = abstractMaskNodeInUse[i];
+            CapabilityConjunctionSet conjunctionToAddToResultSet;
+
+            if (thisConjunction.isIncompatibleWith(thatConjunction))
+                continue;
+            conjunctionToAddToResultSet = thisConjunction;
+            setUsed.add(&thisConjunction);
+            for (auto atom : thatConjunction.getExpandedAtoms())
+            {
+                if (_getInfo(atom).abstractBase != abstractMask
+                    || setOfInUseNode.contains(atom))
+                    continue;
+                conjunctionToAddToResultSet.getExpandedAtoms().add(atom);
+            }
+            conjunctionToAddToResultSet.getExpandedAtoms().sort();
+            resultSet.unionWith(conjunctionToAddToResultSet);
+        }
+    }
+    for (auto& c : m_conjunctions)
+    {
+        if (!setUsed.contains(&c))
+            resultSet.m_conjunctions.add(c);
+    }
+    m_conjunctions = resultSet.m_conjunctions;
+}    
+
 void CapabilitySet::join(const CapabilitySet& other)
 {
     if (isEmpty() || other.isInvalid())
@@ -1173,6 +1271,24 @@ bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, C
         }
     }
 
+    return true;
+}
+
+bool CapabilitySet::isExactSubset(CapabilitySet const& maybeSuperSet)
+{
+    // This should only be used when absolutely required due to the 
+    // cost for complex sets. Simple sets are fine (glsl|spirv...)
+    for (auto& thisCon : m_conjunctions)
+    {
+        bool foundEqualCon = false;
+        for (auto& thatCon : maybeSuperSet.m_conjunctions)
+        {
+            if (thisCon == thatCon)
+                foundEqualCon = true;
+        }
+        if (foundEqualCon == false)
+            return false;
+    }
     return true;
 }
 

@@ -209,6 +209,10 @@ public:
 
     void unionWith(const CapabilityConjunctionSet& other);
 
+    void simpleJoinWithSetMask(const CapabilitySet& other, CapabilityName abstractMask);
+
+    CapabilitySet getTargetsThisIsMissingFromOther(const CapabilitySet& other);
+
     void canonicalize();
 
         /// Are these two capability sets equal?
@@ -225,6 +229,8 @@ public:
     bool isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps) const;
 
     static bool checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, const CapabilityConjunctionSet*& outFailedAvailableSet);
+
+    bool isExactSubset(CapabilitySet const& maybeSuperSet);
 
 private:
     // The underlying representation we use is a list of conjunctions.

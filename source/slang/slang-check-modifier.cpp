@@ -1613,6 +1613,37 @@ namespace Slang
         }
     }
 
+    void postProcessingOnModifiers(Modifiers& modifiers)
+    {
+        // compress all `require` nodes into 1 `require` modifier
+        RequireCapabilityAttribute* firstRequire = nullptr;
+        Modifier* previous = nullptr;
+        Modifier* next = nullptr;
+        for (auto m = modifiers.first; m != nullptr; m = next)
+        {
+            next = m->next;
+            //
+
+            if (auto req = as<RequireCapabilityAttribute>(m))
+            {
+                if (!firstRequire)
+                {
+                    firstRequire = req;
+                    previous = m;
+                    continue;
+                }
+                for(auto& con : req->capabilitySet.getExpandedAtoms())
+                    firstRequire->capabilitySet.unionWith(con);
+                if(previous)
+                    previous->next = next;
+                continue;
+            }
+
+            //
+            previous = m;
+        }
+    }
+
     void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     {
         // TODO(tfoley): need to make sure this only
@@ -1685,6 +1716,8 @@ namespace Slang
         // Whether we actually re-wrote anything or note, lets
         // install the new list of modifiers on the declaration
         syntaxNode->modifiers.first = resultModifiers;
+
+        postProcessingOnModifiers(syntaxNode->modifiers);
     }
 
 

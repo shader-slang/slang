@@ -7,6 +7,7 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-sccp.h"
 #include "../core/slang-performance-profiler.h"
 
 namespace Slang
@@ -211,7 +212,29 @@ struct SpecializationContext
         IRGeneric* genericVal,
         IRSpecialize* specializeInst)
     {
-        // First, we want to see if an existing specialization
+        // We need to fold the generic arguments here in order to uniquely identify
+        // which specializations need to be generated.
+        // The folding of the generic-arguments are deferred until the specialization
+        // step here, because the exact value of the generic-arguments can be unknown
+        // until the specialization. The exact values of the generic-arguments may come
+        // from the other modules, and they will be unknown until linking the modules.
+        //
+        UInt argCount = specializeInst->getArgCount();
+        {
+            IRBuilder builder(module);
+            for (UInt ii = 0; ii < argCount; ++ii)
+            {
+                IRUse* argUse = specializeInst->getArgOperand(ii);
+                auto originalArg = argUse->get();
+                IRInst* foldedArg = tryConstantFoldInst(module, originalArg);
+                if (foldedArg == originalArg)
+                    continue;
+
+                specializeInst = as<IRSpecialize>(builder.replaceOperand(argUse, foldedArg));
+            }
+        }
+
+        // We want to see if an existing specialization
         // has already been made. To do that we will construct a key
         // for lookup in the generic specialization context.
         //
@@ -223,7 +246,6 @@ struct SpecializationContext
         //
         Key key;
         key.vals.add(specializeInst->getBase());
-        UInt argCount = specializeInst->getArgCount();
         for (UInt ii = 0; ii < argCount; ++ii)
         {
             key.vals.add(specializeInst->getArg(ii));
