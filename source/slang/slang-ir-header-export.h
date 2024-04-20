@@ -5,6 +5,6 @@ namespace Slang
 {
     struct IRModule;
     class DiagnosticSink;
-    // Transitively marks as [HeaderExport].
-    void generateTransitiveHeaderExports(IRModule* module, DiagnosticSink* sink);
+    // Transitively marks as __extern_cpp (ExternCppDecoration).
+    void generateTransitiveExternCpp(IRModule* module, DiagnosticSink* sink);
 }

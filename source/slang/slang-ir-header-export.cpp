@@ -7,17 +7,19 @@
 namespace Slang
 {
 
-static void markForHeaderExport_(IRBuilder & builder, IRInst * inst)
+static void addExternCppDecorationTransitively_(IRBuilder & builder, IRInst * inst)
 {
+    // addExternCppDecoration transitively for function params and struct members (nested)
+    
     if (auto func = as<IRFunc>(inst))
     {
-        if (!func->findDecoration<IRHeaderExportDecoration>())
+        if (!func->findDecoration<IRExternCppDecoration>())
         {    
-            builder.addHeaderExportDecoration(func);
+            builder.addExternCppDecoration(func, UnownedStringSlice(""));
         }
         for (auto param : func->getFirstBlock()->getParams())
         {
-            markForHeaderExport_(builder, param->getDataType());
+            addExternCppDecorationTransitively_(builder, param->getDataType());
         }
     }
     else if (auto type = as<IRType>(inst))
@@ -32,14 +34,14 @@ static void markForHeaderExport_(IRBuilder & builder, IRInst * inst)
             IRBuilder builder(structType->getModule());
 
             // If it already has a header-export decoration, we're done.
-            if (!structType->findDecoration<IRHeaderExportDecoration>())
+            if (!structType->findDecoration<IRExternCppDecoration>())
             {    
-                builder.addHeaderExportDecoration(structType);
+                builder.addExternCppDecoration(structType, UnownedStringSlice(""));
             }
 
             for (auto field : structType->getFields())
             {
-                markForHeaderExport_(builder, field->getFieldType());
+                addExternCppDecorationTransitively_(builder, field->getFieldType());
             }
             return;
         }
@@ -47,10 +49,10 @@ static void markForHeaderExport_(IRBuilder & builder, IRInst * inst)
         {
             // TODO: not sure about this
             IRBuilder builder(arrayType->getModule());
-            if (!arrayType->findDecoration<IRHeaderExportDecoration>())
-                builder.addHeaderExportDecoration(arrayType);
+            if (!arrayType->findDecoration<IRExternCppDecoration>())
+                builder.addExternCppDecoration(arrayType, UnownedStringSlice(""));
 
-            markForHeaderExport_(builder, arrayType->getElementType());
+            addExternCppDecorationTransitively_(builder, arrayType->getElementType());
             return;
         }
     }
@@ -61,12 +63,12 @@ struct HeaderExportContext
     IRModule* module;
     DiagnosticSink* diagnosticSink;
 
-    void processInst(IRInst* inst, IRHeaderExportDecoration* headerExportDecoration)
+    void processInst(IRInst* inst, IRExternCppDecoration* externCppDecoration)
     {
         IRBuilder builder(module);
-        // TODO: required? builder.addNameHintDecoration(inst, headerExportDecoration->getFunctionName());
-        // TODO: required? builder.addExternCppDecoration(inst, headerExportDecoration->getFunctionName());
-        markForHeaderExport_(builder, inst);
+        addExternCppDecorationTransitively_(builder, inst);
+        // TODO: required? builder.addNameHintDecoration(inst, externCppDecoration->getFunctionName());
+        // TODO: required? builder.addExternCppDecoration(inst, externCppDecoration->getFunctionName());
         // TODO: required? builder.addPublicDecoration(inst);
         // TODO: required? builder.addKeepAliveDecoration(inst);
         // TODO: required? builder.addHLSLExportDecoration(inst);
@@ -74,7 +76,7 @@ struct HeaderExportContext
 
     void processModule()
     {
-        struct Candidate { IRInst* inst; IRHeaderExportDecoration* exportDecoration; };
+        struct Candidate { IRInst* inst; IRExternCppDecoration* exportDecoration; };
         List<Candidate> candidates;
         for (auto childInst : module->getGlobalInsts())
         {
@@ -82,9 +84,9 @@ struct HeaderExportContext
             {
             case kIROp_Func:
             case kIROp_StructType:
-                if (auto headerExportDecoration = childInst->findDecoration<IRHeaderExportDecoration>())
+                if (auto externCppDecoration = childInst->findDecoration<IRExternCppDecoration>())
                 {
-                    candidates.add(Candidate{ as<IRInst>(childInst), headerExportDecoration });
+                    candidates.add(Candidate{ as<IRInst>(childInst), externCppDecoration });
                 }
                 break;
             default:
@@ -99,7 +101,7 @@ struct HeaderExportContext
     }
 };
 
-void generateTransitiveHeaderExports(IRModule* module, DiagnosticSink* sink)
+void generateTransitiveExternCpp(IRModule* module, DiagnosticSink* sink)
 {
     HeaderExportContext context;
     context.module = module;

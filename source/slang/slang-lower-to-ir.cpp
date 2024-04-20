@@ -1382,7 +1382,6 @@ static void addLinkageDecoration(
         else if (as<CudaKernelAttribute>(modifier))
         {
             builder->addCudaKernelDecoration(inst);
-            builder->addHeaderExportDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addHLSLExportDecoration(inst);
             builder->addKeepAliveDecoration(inst);
@@ -1408,11 +1407,6 @@ static void addLinkageDecoration(
                 ? pyExportModifier->name.getUnownedSlice()
                 : decl->getName()->text.getUnownedSlice());
             builder->addHLSLExportDecoration(inst);
-        }
-        else if (as<HeaderExportAttribute>(modifier))
-        {
-            builder->addKeepAliveDecoration(inst);
-            builder->addHeaderExportDecoration(inst);
         }
         else if (auto knownBuiltinModifier = as<KnownBuiltinAttribute>(modifier))
         {

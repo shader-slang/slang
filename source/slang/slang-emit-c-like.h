@@ -363,7 +363,6 @@ public:
     void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
 
     bool shouldEmitHeader();
-    void markForHeaderExport(IRInst* inst);
 
     void emitFuncDecl(IRFunc* func);
     void emitFuncDecl(IRFunc* func, const String& name);

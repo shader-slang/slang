@@ -26,7 +26,6 @@ struct DllExportContext
         dllExportDecoration->insertAtStart(wrapper);
         builder.addNameHintDecoration(wrapper, dllExportDecoration->getFunctionName());
         builder.addExternCppDecoration(wrapper, dllExportDecoration->getFunctionName());
-        builder.addHeaderExportDecoration(wrapper);
         builder.addPublicDecoration(wrapper);
         builder.addKeepAliveDecoration(wrapper);
         builder.addHLSLExportDecoration(wrapper);

@@ -1249,11 +1249,6 @@ class PyExportAttribute : public Attribute
     String name;
 };
 
-class HeaderExportAttribute : public Attribute
-{
-    SLANG_AST_CLASS(HeaderExportAttribute)
-};
-
 class PreferRecomputeAttribute : public Attribute
 {
     SLANG_AST_CLASS(PreferRecomputeAttribute)

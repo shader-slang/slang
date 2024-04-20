@@ -3494,8 +3494,7 @@ bool shouldWrappInExternCBlock(IRFunc* func)
 
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
 {
-    // When emiting header, skip if should not be emited.
-    if (shouldEmitOnlyHeader() && !func->findDecoration<IRHeaderExportDecoration>())
+    if (shouldEmitOnlyHeader() && !func->findDecoration<IRExternCppDecoration>())
     {
         return;
     }
@@ -3547,8 +3546,7 @@ void CLikeSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
-    // When emiting header, skip if should not be emited.
-    if (shouldEmitOnlyHeader() && !structType->findDecoration<IRHeaderExportDecoration>())
+    if (shouldEmitOnlyHeader() && !structType->findDecoration<IRExternCppDecoration>())
     {
         return;
     }
