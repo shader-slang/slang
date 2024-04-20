@@ -236,6 +236,14 @@ newoption {
     allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
+newoption {
+    trigger     = "glibc-forward-compatible",
+    description = "(Optional) Build slang against older version of glibc (2.27) to be forward compatible with older systems",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 buildGlslang = (_OPTIONS["build-glslang"] == "true")
@@ -254,6 +262,7 @@ enableAsan = (_OPTIONS["enable-asan"] == "true")
 dxOnVk = (_OPTIONS["dx-on-vk"] == "true")
 enableAftermath = (_OPTIONS["enable-aftermath"] == "true")
 defaultSPIRVDirect = (_OPTIONS["default-spirv-direct"] == "true")
+glibcForwardCompatible = (_OPTIONS["glibc-forward-compatible"] == "true")
 
 -- If stdlib embedding is enabled, disable stdlib source embedding by default
 disableStdlibSource = enableEmbedStdLib
@@ -278,6 +287,10 @@ end
 
 targetInfo = slangUtil.getTargetInfo()
 
+printf("target name " .. targetInfo.name)
+if (targetInfo.name == "linux-x86_64") and (glibcForwardCompatible) then
+    targetInfo.name = targetInfo.name .. "-glibc-2.27"
+end
 --
 -- Update the dependencies for the target
 --
