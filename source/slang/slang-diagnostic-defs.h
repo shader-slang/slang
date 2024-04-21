@@ -745,8 +745,8 @@ DIAGNOSTIC(41201, Warning, expectDynamicUniformArgument, "argument for '$0' migh
 DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this location must be dynamic uniform, use `asDynamicUniform()` to silence this warning.")
 
 
-DIAGNOSTIC(41202, Error, notEqualBitCastSize, "trying to bit_cast not equally sized type '$0' with size '$1' into type '$2' with size '$3'")
-DIAGNOSTIC(41203, Warning, notEqualReinterpretCastSize, "trying to reinterpret not equally sized type '$0' with size '$1' into type '$2' with size '$3'")
+DIAGNOSTIC(41202, Error, notEqualBitCastSize, "invalid to bit_cast differently sized types: '$0' with size '$1' casted into '$2' with size '$3'")
+DIAGNOSTIC(41203, Warning, notEqualReinterpretCastSize, "reinterpret<> into not equally sized types: '$0' with size '$1' casted into '$2' with size '$3'")
 
 //
 // 5xxxx - Target code generation.
