@@ -224,7 +224,7 @@ void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     if (shouldForceUnpackConstantBufferElements(type) || hasExplicitConstantBufferOffset(type))
     {
         // If the user has provided any explicit `packoffset` modifiers,
-        // or the user has explicitly requested for cbuffer fields to be packed,
+        // or the user has explicitly requested for cbuffer fields to be unpacked,
         // we have to unwrap the struct and emit the fields directly.
         emitStructDeclarationsBlock(as<IRStructType>(elementType), true);
         m_writer->emit("\n");
