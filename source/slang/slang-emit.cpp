@@ -352,8 +352,9 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
-    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+        break;
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDAHeader:
         generateTransitiveExternCpp(irModule, sink);
         break;
@@ -364,8 +365,14 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CPPSource:
-    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
+    {
+        lowerComInterfaces(irModule, artifactDesc.style, sink);
+        generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
+        generateDllExportFuncs(irModule, sink);
+        break;
+    }
+    case CodeGenTarget::CPPHeader:
     {
         lowerComInterfaces(irModule, artifactDesc.style, sink);
         generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
