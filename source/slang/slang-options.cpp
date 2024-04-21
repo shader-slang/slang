@@ -292,6 +292,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::ZeroInitialize, "-zero-initialize", nullptr, 
         "Set all variables which lack an init expression to zero."
         "Structs will only default struct-fields to 0 if the field lacks an init expression and assignment in default constructor."},
+        { OptionKind::IgnoreCapabilities,"-ignore-capabilities", nullptr, "Do not warn or error if capabilities are violated"},
         { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
         "Set the module name to use when compiling multiple .slang source files into a single module."},
         { OptionKind::Output, "-o", "-o <path>", 
@@ -1686,6 +1687,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::VulkanUseGLLayout:
             case OptionKind::VulkanEmitReflection:
             case OptionKind::ZeroInitialize:
+            case OptionKind::IgnoreCapabilities:
             case OptionKind::DefaultImageFormatUnknown:
             case OptionKind::Obfuscate:
             case OptionKind::OutputIncludes:
@@ -2818,6 +2820,9 @@ SlangResult OptionsParser::_parse(
                     case CodeGenTarget::ShaderSharedLibrary:
                     case CodeGenTarget::PyTorchCppBinding:
                     case CodeGenTarget::DXIL:
+                    case CodeGenTarget::MetalLib:
+                    case CodeGenTarget::MetalLibAssembly:
+                    case CodeGenTarget::Metal:
                         rawOutput.isWholeProgram = true;
                         break;
                     case CodeGenTarget::SPIRV:

@@ -107,12 +107,15 @@ SlangResult GCCDownstreamCompilerUtil::calcVersion(const ExecutableLocation& exe
         UnownedStringSlice::fromLiteral("clang version"),
         UnownedStringSlice::fromLiteral("gcc version"),
         UnownedStringSlice::fromLiteral("Apple LLVM version"),
+        UnownedStringSlice::fromLiteral("Apple metal version"),
+
     };
     const SlangPassThrough types[] =
     {
         SLANG_PASS_THROUGH_CLANG,
         SLANG_PASS_THROUGH_GCC,
         SLANG_PASS_THROUGH_CLANG,
+        SLANG_PASS_THROUGH_METAL,
     };
 
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(prefixes) == SLANG_COUNT_OF(types));
@@ -262,8 +265,9 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
         const auto split1 = split[1].trim();
         const auto text = split[2].trim();
 
-        // Check for special handling for clang (Can be Clang or clang apparently)
+        // Check for special handling for clang or metal
         if (split0.startsWith(UnownedStringSlice::fromLiteral("clang")) ||
+            split0.startsWith(UnownedStringSlice::fromLiteral("metal")) ||
             split0.startsWith(UnownedStringSlice::fromLiteral("Clang")) ||
             split0 == UnownedStringSlice::fromLiteral("g++") ||
             split0 == UnownedStringSlice::fromLiteral("gcc"))
@@ -468,6 +472,11 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
 
         // C++17 since we share headers with slang itself (which uses c++17)
         cmdLine.addArg("-std=c++17");
+    }
+    
+    if (targetDesc.payload == ArtifactDesc::Payload::MetalAIR)
+    {
+        cmdLine.addArg("-std=macos-metal2.3");
     }
 
     // Our generated code very often casts between dissimilar types with the

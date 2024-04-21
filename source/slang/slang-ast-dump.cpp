@@ -303,7 +303,10 @@ struct ASTDumpContext
     {
         m_writer->emit(v);
     }
-    
+    void dump(CapabilityName v)
+    {
+        m_writer->emit(capabilityNameToString(v));
+    }
 
     void dump(const SemanticVersion& version)
     {

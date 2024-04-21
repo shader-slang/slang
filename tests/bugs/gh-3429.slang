@@ -50,6 +50,6 @@ void computeMain()
     // CHECK: loadDataConditionFalse
     float v = getDataDependingOnCondition(gPushConstants.bufferHasOnlyOneElement);
 
-    int2 pixelIndex = int2(DispatchRaysIndex().xy);
+    int2 pixelIndex = int2(0);
     gResultImage[pixelIndex] = float4(v, v, v, 1.0);
 }
