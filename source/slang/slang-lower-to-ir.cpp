@@ -8428,9 +8428,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
+        bool isStruct = false;
         IRType* irAggType = nullptr;
         if (as<StructDecl>(decl))
         {
+            isStruct = true;
             irAggType = subBuilder->createStructType();
         }
         else if (as<ClassDecl>(decl))
@@ -8551,11 +8553,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Add modifier to constructors so they are aware of the parent IRType.
         // This follows the lowering logic of ensureAllDeclsRec->{visitAggTypeDecl, visitFunctionDeclBase}
-        for (auto ctor : decl->getMembersOfType<ConstructorDecl>())
+        if(isStruct)
         {
-            auto parentAggTypeModifier = this->context->astBuilder->create<ParentAggTypeModifier>();
-            parentAggTypeModifier->setArg(irAggType);
-            addModifier(ctor, parentAggTypeModifier);
+            for (auto ctor : decl->getMembersOfType<ConstructorDecl>())
+            {
+                auto parentStructTypeModifier = this->context->astBuilder->create<ParentStructTypeModifier>();
+                parentStructTypeModifier->setArg(irAggType);
+                addModifier(ctor, parentStructTypeModifier);
+            }
         }
 
         // There may be members not handled by the above logic (e.g.,
@@ -9963,9 +9968,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subContext = nestedContextFunc.getContext();
         auto lowered = lowerFuncDeclInContext(subContext, subBuilder, decl);
 
-        auto parentAggTypeModifier = decl->findModifier<ParentAggTypeModifier>();
-        if (parentAggTypeModifier && decl->members.getCount() == 0)
-            subBuilder->addDefaultCtorDecoration(parentAggTypeModifier->getArg(), lowered.val);
+        auto parentStructTypeModifier = decl->findModifier<ParentStructTypeModifier>();
+        if (parentStructTypeModifier && decl->members.getCount() == 0)
+            as<IRStructType>(parentStructTypeModifier->getArg())->defaultCtor = as<IRFunc>(lowered.val);
 
         return lowered;
     }

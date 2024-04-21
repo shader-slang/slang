@@ -1587,9 +1587,9 @@ class DynamicUniformModifier : public Modifier
 
 // Sharing IRInst data of AggType (Struct/Interface) with members.
 struct IRType;
-class ParentAggTypeModifier : public Modifier
+class ParentStructTypeModifier : public Modifier
 {
-    SLANG_AST_CLASS(ParentAggTypeModifier)
+    SLANG_AST_CLASS(ParentStructTypeModifier)
     IRType* parentAggType;
 
 public:

@@ -508,13 +508,6 @@ struct IRWaveSizeDecoration : IRDecoration
     IRIntLit* getNumLanes() { return cast<IRIntLit>(getOperand(0)); }
 };
 
-struct IRDefaultCtorDecoration : IRDecoration
-{
-    enum { kOp = kIROp_DefaultCtorDecoration };
-    IR_LEAF_ISA(DefaultCtorDecoration)
-    IRFunc* getCtor() { return cast<IRFunc>(getOperand(0)); }
-};
-
 struct IREntryPointDecoration : IRDecoration
 {
     enum { kOp = kIROp_EntryPointDecoration };
@@ -3624,8 +3617,6 @@ public:
 
     IRInst* addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, IRInst* z);
     IRInst* addWaveSizeDecoration(IRInst* inst, IRInst* numLanes);
-
-    IRInst* addDefaultCtorDecoration(IRInst* inst, IRInst* ctor);
 
     IRInst* emitSpecializeInst(
         IRType*         type,

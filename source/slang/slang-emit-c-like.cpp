@@ -4212,10 +4212,6 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
 
     for(auto child : inst->getDecorationsAndChildren())
     {
-        // Definitions of `DefaultCtor` only need to be emitted if used
-        // in a call, else we get recursive definitions.
-        if (as<IRDefaultCtorDecoration>(child))
-            continue;
         ensureInstOperandsRec(ctx, child);
     }
 }
