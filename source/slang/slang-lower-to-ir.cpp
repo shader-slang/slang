@@ -8549,6 +8549,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+        // Add modifier to constructors so they are aware of the parent IRType.
+        // This follows the lowering logic of ensureAllDeclsRec->{visitAggTypeDecl, visitFunctionDeclBase}
+        for (auto ctor : decl->getMembersOfType<ConstructorDecl>())
+        {
+            auto parentAggTypeModifier = this->context->astBuilder->create<ParentAggTypeModifier>();
+            parentAggTypeModifier->setArg(irAggType);
+            addModifier(ctor, parentAggTypeModifier);
+        }
+
         // There may be members not handled by the above logic (e.g.,
         // member functions), but we will not immediately force them
         // to be emitted here, so as not to risk a circular dependency.
@@ -9952,7 +9961,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         NestedContext nestedContextFunc(this);
         auto subBuilder = nestedContextFunc.getBuilder();
         auto subContext = nestedContextFunc.getContext();
-        return lowerFuncDeclInContext(subContext, subBuilder, decl);
+        auto lowered = lowerFuncDeclInContext(subContext, subBuilder, decl);
+
+        auto parentAggTypeModifier = decl->findModifier<ParentAggTypeModifier>();
+        if (parentAggTypeModifier && decl->members.getCount() == 0)
+            subBuilder->addDefaultCtorDecoration(parentAggTypeModifier->getArg(), lowered.val);
+
+        return lowered;
     }
 
     LoweredValInfo visitGenericDecl(GenericDecl * genDecl)

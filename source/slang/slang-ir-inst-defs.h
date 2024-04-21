@@ -1018,6 +1018,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         // Stores flag bits of which memory qualifiers an object has
     INST(MemoryQualifierSetDecoration, MemoryQualifierSetDecoration, 1, 0)
 
+        /// Marks on a struct internally for noting a aggType->Constructor relationship
+    INST(DefaultCtorDecoration, DefaultCtorDecoration, 1, 0)
+
         /// Marks a function as one which access a bitfield with the specified
         /// backing value key, width and offset
     INST(BitFieldAccessorDecoration, BitFieldAccessorDecoration, 3, 0)

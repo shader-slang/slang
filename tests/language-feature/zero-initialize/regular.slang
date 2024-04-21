@@ -6,7 +6,31 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-enum MyFlags
+enum MyFlags1
+{
+    Zero = 0,
+    One,
+}
+
+enum MyFlags2 : uint8_t
+{
+    Zero = 0,
+    One,
+}
+
+enum MyFlags3 : uint16_t
+{
+    Zero = 0,
+    One,
+}
+
+enum MyFlags4 : uint32_t
+{
+    Zero = 0,
+    One,
+}
+
+enum MyFlags5 : uint64_t
 {
     Zero = 0,
     One,
@@ -59,6 +83,10 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     && vectorVal1 == vector<int, 2>(0)
     && vectorVal2 == vector<int, 3>(0)
     && vectorVal3 == vector<int, 4>(0)
-    && MyFlags::One == MyFlags(1)
+    && MyFlags1::One == MyFlags1(1)
+    && MyFlags2::One == MyFlags2(1)
+    && MyFlags3::One == MyFlags3(1)
+    && MyFlags4::One == MyFlags4(1)
+    && MyFlags5::One == MyFlags5(1)
     ;
 }

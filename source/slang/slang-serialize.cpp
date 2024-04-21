@@ -440,6 +440,11 @@ SerialIndex SerialWriter::addPointer(const NodeBase* node)
     }
 }
 
+SerialIndex SerialWriter::addPointer(const IRType* obj)
+{
+    SLANG_UNUSED(obj)
+    return SerialIndex(0);
+}
 SerialIndex SerialWriter::addPointer(const RefObject* obj)
 {
     // Null is always 0

@@ -1585,6 +1585,24 @@ class DynamicUniformModifier : public Modifier
     SLANG_AST_CLASS(DynamicUniformModifier)
 };
 
+// Sharing IRInst data of AggType (Struct/Interface) with members.
+struct IRType;
+class ParentAggTypeModifier : public Modifier
+{
+    SLANG_AST_CLASS(ParentAggTypeModifier)
+    IRType* parentAggType;
+
+public:
+    void setArg(IRType* ptrIn)
+    {
+        parentAggType = ptrIn;
+    }
+    IRType* getArg()
+    {
+        return (IRType*)parentAggType;
+    }
+};
+
 class MemoryQualifierSetModifier : public Modifier
 {
     SLANG_AST_CLASS(MemoryQualifierSetModifier);

@@ -3717,6 +3717,12 @@ namespace Slang
         }
         case kIROp_StructType:
         {
+            IRInst* defaultCtor = nullptr;
+            if (auto defaultCtorDecoration = actualType->findDecoration<IRDefaultCtorDecoration>())
+                defaultCtor = defaultCtorDecoration->getCtor();
+            if (defaultCtor)
+                return emitCallInst(actualType, defaultCtor, 0, nullptr);
+            
             List<IRInst*> elements;
             auto structType = as<IRStructType>(actualType);
             for (auto field : structType->getFields())
@@ -5111,6 +5117,15 @@ namespace Slang
         };
 
         return addDecoration(inst, kIROp_WaveSizeDecoration, operands, 1);
+    }
+
+    IRInst* IRBuilder::addDefaultCtorDecoration(IRInst* inst, IRInst* ctor)
+    {
+        IRInst* operands[1] = {
+            ctor
+        };
+
+        return addDecoration(inst, kIROp_DefaultCtorDecoration, operands, 1);
     }
 
     IRInst* IRBuilder::emitSwizzle(
