@@ -74,6 +74,8 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
         case CodeGenTarget::DXBytecodeAssembly:
         case CodeGenTarget::DXIL:
         case CodeGenTarget::DXILAssembly:
+        case CodeGenTarget::MetalLib:
+        case CodeGenTarget::MetalLibAssembly:
         {
             return SourceLanguage::Unknown;
         }

@@ -61,7 +61,9 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] =
     { SLANG_SHADER_HOST_CALLABLE,  "",                                          "host-callable,callable",   "Host callable" },
     { SLANG_OBJECT_CODE,    "obj,o",                                            "object-code",              "Object code" },
     { SLANG_HOST_HOST_CALLABLE, "",                                             "host-host-callable",       "Host callable for host execution" },
-    { SLANG_METAL,          "metal",                                            "metal",                    "Metal shader source"},
+    { SLANG_METAL,          "metal",                                            "metal",                    "Metal shader source" },
+    { SLANG_METAL_LIB,      "metallib",                                         "metallib",                 "Metal Library Bytecode" },
+    { SLANG_METAL_LIB_ASM,  "metallib-asm"                                      "metallib-asm",             "Metal Library Bytecode assembly" },
 };
 
 static const NamesDescriptionValue s_languageInfos[] =
@@ -88,6 +90,7 @@ static const NamesDescriptionValue s_compilerInfos[] =
     { SLANG_PASS_THROUGH_NVRTC,     "nvrtc",     "NVRTC CUDA compiler" },
     { SLANG_PASS_THROUGH_LLVM,      "llvm",     "LLVM/Clang `slang-llvm`" },
     { SLANG_PASS_THROUGH_SPIRV_OPT, "spirv-opt",  "spirv-tools SPIRV optimizer" },
+    { SLANG_PASS_THROUGH_METAL,     "metal",    "Metal shader compiler" },
 };
 
 static const NamesDescriptionValue s_archiveTypeInfos[] =

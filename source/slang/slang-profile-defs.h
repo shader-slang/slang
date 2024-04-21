@@ -49,7 +49,7 @@ LANGUAGE(SPIRV,				spirv)
 LANGUAGE(SPIRV_GL,			spirv_gl)
 LANGUAGE(C,                 c)
 LANGUAGE(CPP,               cpp)
-
+LANGUAGE(METAL,             metal)
 LANGUAGE_ALIAS(GLSL,		glsl_gl)
 LANGUAGE_ALIAS(SPIRV,		spirv_vk)
 
@@ -86,6 +86,7 @@ PROFILE_STAGE_ALIAS(Fragment, fragment, Pixel)
 
 PROFILE_FAMILY(DX)
 PROFILE_FAMILY(GLSL)
+PROFILE_FAMILY(METAL)
 
 // Profile versions
 PROFILE_VERSION(DX_4_0,             DX)
@@ -110,6 +111,9 @@ PROFILE_VERSION(GLSL_430,           GLSL)
 PROFILE_VERSION(GLSL_440,           GLSL)
 PROFILE_VERSION(GLSL_450,           GLSL)
 PROFILE_VERSION(GLSL_460,           GLSL)
+
+PROFILE_VERSION(METAL_2_3,          METAL)
+PROFILE_VERSION(METAL_2_4,          METAL)
 
 
 // Specific profiles
@@ -229,6 +233,8 @@ PROFILE_ALIAS(DX_None_6_5,  DX_Lib_6_5,     sm_6_5)
 PROFILE_ALIAS(DX_None_6_6,  DX_Lib_6_6,     sm_6_6)
 PROFILE_ALIAS(DX_None_6_7,  DX_Lib_6_7,     sm_6_7)
 
+PROFILE(METAL_LIB_2_3,            metallib_2_3,       Unknown, METAL_2_3)
+PROFILE(METAL_LIB_2_4,            metallib_2_4,       Unknown, METAL_2_4)
 
 // Define all the GLSL profiles
 

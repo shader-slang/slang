@@ -2816,6 +2816,9 @@ SlangResult OptionsParser::_parse(
                     case CodeGenTarget::ShaderSharedLibrary:
                     case CodeGenTarget::PyTorchCppBinding:
                     case CodeGenTarget::DXIL:
+                    case CodeGenTarget::MetalLib:
+                    case CodeGenTarget::MetalLibAssembly:
+                    case CodeGenTarget::Metal:
                         rawOutput.isWholeProgram = true;
                         break;
                     case CodeGenTarget::SPIRV:

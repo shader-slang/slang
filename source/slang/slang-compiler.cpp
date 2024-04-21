@@ -530,6 +530,11 @@ namespace Slang
             {
                 return PassThroughMode::Glslang;
             }
+            case CodeGenTarget::MetalLib:
+            case CodeGenTarget::MetalLibAssembly:
+            {
+                return PassThroughMode::MetalC;
+            }
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:
@@ -957,6 +962,7 @@ namespace Slang
             case CodeGenTarget::DXBytecode:         return CodeGenTarget::HLSL;
             case CodeGenTarget::DXIL:               return CodeGenTarget::HLSL;
             case CodeGenTarget::SPIRV:              return CodeGenTarget::GLSL;
+            case CodeGenTarget::MetalLib:           return CodeGenTarget::Metal;
             default: break;
         }
         return CodeGenTarget::Unknown;
@@ -1546,6 +1552,7 @@ namespace Slang
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::DXBytecodeAssembly:
             case CodeGenTarget::DXILAssembly:
+            case CodeGenTarget::MetalLibAssembly:
             {
                 // First compile to an intermediate target for the corresponding binary format.
                 const CodeGenTarget intermediateTarget = _getIntermediateTarget(target);
@@ -1573,6 +1580,7 @@ namespace Slang
                 [[fallthrough]];
             case CodeGenTarget::DXIL:
             case CodeGenTarget::DXBytecode:
+            case CodeGenTarget::MetalLib:
             case CodeGenTarget::PTX:
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
@@ -1602,6 +1610,8 @@ namespace Slang
         case CodeGenTarget::SPIRV:
         case CodeGenTarget::DXIL:
         case CodeGenTarget::DXBytecode:
+        case CodeGenTarget::MetalLib:
+        case CodeGenTarget::MetalLibAssembly:
         case CodeGenTarget::PTX:
         case CodeGenTarget::HostHostCallable:
         case CodeGenTarget::ShaderHostCallable:

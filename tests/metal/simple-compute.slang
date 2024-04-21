@@ -1,8 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal
+//TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
 
 uniform RWStructuredBuffer<float> outputBuffer;
 
 // CHECK: {{.*}}kernel{{.*}} void main_kernel(float device* {{.*}})
+
+// CHECK-ASM: define void @main_kernel
 
 void func(float v)
 {

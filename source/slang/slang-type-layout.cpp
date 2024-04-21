@@ -1550,6 +1550,8 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
     {
         // For now lets use some fairly simple CPU binding rules
 
@@ -1820,6 +1822,8 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
             return SourceLanguage::HLSL;
         }
         case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalLib:
+        case CodeGenTarget::MetalLibAssembly:
         {
             return SourceLanguage::Metal;
         }

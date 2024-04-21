@@ -987,6 +987,12 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
             return PassThroughFlag::Dxc;
         }
 
+        case SLANG_METAL_LIB:
+        case SLANG_METAL_LIB_ASM:
+        {
+            return PassThroughFlag::Metal;
+        }
+
         case SLANG_SHADER_HOST_CALLABLE:
         case SLANG_HOST_HOST_CALLABLE:
 
