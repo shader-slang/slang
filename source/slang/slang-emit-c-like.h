@@ -251,6 +251,7 @@ public:
     void emitType(IRType* type, NameLoc const& nameAndLoc);
     bool hasExplicitConstantBufferOffset(IRInst* cbufferType);
     bool isSingleElementConstantBuffer(IRInst* cbufferType);
+    bool shouldForceUnpackConstantBufferElements(IRInst* cbufferType);
 
     //
     // Expressions

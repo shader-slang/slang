@@ -932,6 +932,7 @@ extern "C"
             Heterogeneous,
             NoMangle,
             NoHLSLBinding,
+            NoHLSLPackConstantBufferElements,
             ValidateUniformity,
             AllowGLSL,
 
