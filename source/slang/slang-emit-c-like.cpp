@@ -2066,6 +2066,21 @@ bool CLikeSourceEmitter::isSingleElementConstantBuffer(IRInst* cbufferType)
     return true;
 }
 
+bool CLikeSourceEmitter::shouldForceUnpackConstantBufferElements(IRInst* cbufferType)
+{
+    if (getTargetReq()->getTarget() != CodeGenTarget::HLSL)
+        return false;
+    if (!getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::NoHLSLPackConstantBufferElements))
+        return false;
+    auto type = as<IRUniformParameterGroupType>(cbufferType);
+    if (!type)
+        return false;
+    auto structType = as<IRStructType>(type->getElementType());
+    if (!structType)
+        return false;
+    return true;
+}
+
 void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
@@ -2195,8 +2210,9 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
-            auto skipBase = isD3DTarget(getTargetReq()) &&
-                hasExplicitConstantBufferOffset(ii->getBase()->getDataType());
+            bool skipBase = (isD3DTarget(getTargetReq()) &&
+                hasExplicitConstantBufferOffset(ii->getBase()->getDataType())) ||
+                shouldForceUnpackConstantBufferElements(ii->getBase()->getDataType());
             if (!skipBase)
             {
                 auto base = ii->getBase();
