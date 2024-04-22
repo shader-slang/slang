@@ -965,7 +965,7 @@ Result linkAndOptimizeIR(
 
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
-    lowerBitCast(targetProgram, irModule);
+    lowerBitCast(targetProgram, irModule, sink);
 
     bool emitSpirvDirectly = targetProgram->getOptionSet().shouldEmitSPIRVDirectly();
 
