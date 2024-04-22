@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL_SPIRV): -target spirv -entry computeMain -profile cs_6_2 -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry computeMain -profile cs_6_2 -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry computeMain -profile cs_6_2 -emit-spirv-directly
 //TEST:CROSS_COMPILE: -target dxil-assembly -entry computeMain -profile cs_6_2
 
@@ -27,17 +27,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     half2 h2 = halfTexture2.Sample(s, uv);
     half4 h4 = halfTexture4.Sample(s, uv);
 #else
-    // CHECK_GLSL_SPIRV: {{.*}} = OpImageRead
-    // CHECK_GLSL_SPIRV: {{.*}} = OpFConvert %half
-    // CHECK_SPIRV: {{.*}} = OpImageRead %v4half
+    // CHECK_SPIRV: {{.*}} = OpImageRead
+    // CHECK_SPIRV: {{.*}} = OpFConvert
     half h = halfTexture[pos2];
-    // CHECK_GLSL_SPIRV: {{.*}} = OpImageRead
-    // CHECK_GLSL_SPIRV: {{.*}} = OpFConvert %v2half
-    // CHECK_SPIRV: {{.*}} = OpImageRead %v4half
+    // CHECK_SPIRV: {{.*}} = OpImageRead
+    // CHECK_SPIRV: {{.*}} = OpFConvert
     half2 h2 = halfTexture2[pos2];
-    // CHECK_GLSL_SPIRV: {{.*}} = OpImageRead
-    // CHECK_GLSL_SPIRV: {{.*}} = OpFConvert %v4half
-    // CHECK_SPIRV: {{.*}} = OpImageRead %v4half
+    // CHECK_SPIRV: {{.*}} = OpImageRead
+    // CHECK_SPIRV: {{.*}} = OpFConvert
     half4 h4 = halfTexture4[pos2];
 #endif
     // Store a results

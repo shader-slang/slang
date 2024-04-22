@@ -1939,7 +1939,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                 case spirv:
                     return spirv_asm
                     {
-                        OpImageWrite $this $location $newValue;
+                        OpImageWrite $this $location __convertTexel(newValue);
                     };
             }
         }
@@ -2051,7 +2051,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
                 case spirv:
                     return spirv_asm
                     {
-                        OpImageWrite $this $location $newValue Sample $sampleIndex;
+                        OpImageWrite $this $location __convertTexel(newValue) Sample $sampleIndex;
                     };
             }
         }
@@ -10625,7 +10625,7 @@ ${{{{
                 case hlsl: __intrinsic_asm "($0)[$1] = $2";
                 case glsl: __intrinsic_asm "imageStore($0, int($1), $V2)";
                 case spirv: spirv_asm {
-                        OpImageWrite $this $index $newValue;
+                        OpImageWrite $this $index __convertTexel(newValue);
                     };
                 }
             }
