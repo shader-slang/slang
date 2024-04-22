@@ -1639,7 +1639,8 @@ namespace Slang
             }
         }
 
-        // We must keep zero-initialize in SemanticsDeclHeaderVisitor.
+        // We must keep zero-initialize for struct fields in 
+        // SemanticsDeclHeaderVisitor.
         // This is done because else a ctor will be initialized before
         // we can set struct fields to `__default`.
         if (!varDecl->initExpr &&

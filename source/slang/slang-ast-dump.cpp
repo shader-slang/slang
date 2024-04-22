@@ -53,11 +53,6 @@ struct ASTDumpContext
     void dumpObjectFull(const ReflectClassInfo& type, NodeBase* obj, Index objIndex);
     void dumpObjectReference(const ReflectClassInfo& type, NodeBase* obj, Index objIndex);
 
-    void dump(void* ptr)
-    {
-        _dumpPtr(ptr);
-    }
-
     void dump(NodeBase* node)
     {
         if (node == nullptr)

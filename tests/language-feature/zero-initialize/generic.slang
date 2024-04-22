@@ -12,14 +12,14 @@ bool getValue()
     T genericOut;
     return genericOut == T(0);
 }
-bool getValueB()
+bool getValueBoolean()
 {
     bool genericOut;
     return genericOut == bool(0);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-bool getValueV()
+bool getValueVector()
 {
     typealias gvec = vector<T, N>;
 
@@ -27,7 +27,7 @@ bool getValueV()
     return genericOut == gvec(T(0));
 }
 __generic<let N : int>
-bool getValueVB()
+bool getValueVectorBoolean()
 {
     typealias gvec = vector<bool, N>;
 
@@ -54,54 +54,54 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     && getValue<half>()
     && getValue<float>()
     && getValue<double>()
-    && getValueB()
+    && getValueBoolean()
 
-    && getValueV<int, 2>()
+    && getValueVector<int, 2>()
 #ifndef DX12
-    && getValueV<uint8_t, 2>()
-    && getValueV<int8_t, 2>()
+    && getValueVector<uint8_t, 2>()
+    && getValueVector<int8_t, 2>()
 #endif
-    && getValueV<uint16_t, 2>()
-    && getValueV<int16_t, 2>()
-    && getValueV<uint32_t, 2>()
-    && getValueV<int32_t, 2>()
-    && getValueV<uint64_t, 2>()
-    && getValueV<int64_t, 2>()
-    && getValueV<half, 2>()
-    && getValueV<float, 2>()
-    && getValueV<double, 2>()
-    && getValueVB<2>()
+    && getValueVector<uint16_t, 2>()
+    && getValueVector<int16_t, 2>()
+    && getValueVector<uint32_t, 2>()
+    && getValueVector<int32_t, 2>()
+    && getValueVector<uint64_t, 2>()
+    && getValueVector<int64_t, 2>()
+    && getValueVector<half, 2>()
+    && getValueVector<float, 2>()
+    && getValueVector<double, 2>()
+    && getValueVectorBoolean<2>()
 
-    && getValueV<int, 3>()
+    && getValueVector<int, 3>()
 #ifndef DX12
-    && getValueV<uint8_t, 3>()
-    && getValueV<int8_t, 3>()
+    && getValueVector<uint8_t, 3>()
+    && getValueVector<int8_t, 3>()
 #endif
-    && getValueV<uint16_t, 3>()
-    && getValueV<int16_t, 3>()
-    && getValueV<uint32_t, 3>()
-    && getValueV<int32_t, 3>()
-    && getValueV<uint64_t, 3>()
-    && getValueV<int64_t, 3>()
-    && getValueV<half, 3>()
-    && getValueV<float, 3>()
-    && getValueV<double, 3>()
-    && getValueVB<3>()
+    && getValueVector<uint16_t, 3>()
+    && getValueVector<int16_t, 3>()
+    && getValueVector<uint32_t, 3>()
+    && getValueVector<int32_t, 3>()
+    && getValueVector<uint64_t, 3>()
+    && getValueVector<int64_t, 3>()
+    && getValueVector<half, 3>()
+    && getValueVector<float, 3>()
+    && getValueVector<double, 3>()
+    && getValueVectorBoolean<3>()
 
-    && getValueV<int, 4>()
+    && getValueVector<int, 4>()
 #ifndef DX12
-    && getValueV<uint8_t, 4>()
-    && getValueV<int8_t, 4>()
+    && getValueVector<uint8_t, 4>()
+    && getValueVector<int8_t, 4>()
 #endif
-    && getValueV<uint16_t, 4>()
-    && getValueV<int16_t, 4>()
-    && getValueV<uint32_t, 4>()
-    && getValueV<int32_t, 4>()
-    && getValueV<uint64_t, 4>()
-    && getValueV<int64_t, 4>()
-    && getValueV<half, 4>()
-    && getValueV<float, 4>()
-    && getValueV<double, 4>()
-    && getValueVB<4>()
+    && getValueVector<uint16_t, 4>()
+    && getValueVector<int16_t, 4>()
+    && getValueVector<uint32_t, 4>()
+    && getValueVector<int32_t, 4>()
+    && getValueVector<uint64_t, 4>()
+    && getValueVector<int64_t, 4>()
+    && getValueVector<half, 4>()
+    && getValueVector<float, 4>()
+    && getValueVector<double, 4>()
+    && getValueVectorBoolean<4>()
     ;
 }

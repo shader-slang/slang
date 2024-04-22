@@ -498,6 +498,9 @@ struct SharedIRGenContext
     Dictionary<Stmt*, IRBlock*> breakLabels;
     Dictionary<Stmt*, IRBlock*> continueLabels;
 
+    // A reference manager to a ctor's parent
+    Dictionary<FunctionDeclBase*, IRType*> ctorBaseToParentStruct;
+
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
@@ -8557,9 +8560,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             for (auto ctor : decl->getMembersOfType<ConstructorDecl>())
             {
-                auto parentStructTypeModifier = this->context->astBuilder->create<ParentStructTypeModifier>();
-                parentStructTypeModifier->setArg(irAggType);
-                addModifier(ctor, parentStructTypeModifier);
+                context->shared->ctorBaseToParentStruct[as<FunctionDeclBase>(ctor)] = irAggType;
             }
         }
 
@@ -9968,9 +9969,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subContext = nestedContextFunc.getContext();
         auto lowered = lowerFuncDeclInContext(subContext, subBuilder, decl);
 
-        auto parentStructTypeModifier = decl->findModifier<ParentStructTypeModifier>();
-        if (parentStructTypeModifier && decl->members.getCount() == 0)
-            as<IRStructType>(parentStructTypeModifier->getArg())->defaultCtor = as<IRFunc>(lowered.val);
+        IRType** maybeParentStruct = this->context->shared->ctorBaseToParentStruct.tryGetValue(decl);
+        if (maybeParentStruct && decl->members.getCount() == 0)
+            as<IRStructType>(*maybeParentStruct)->defaultCtor = as<IRFunc>(lowered.val);
 
         return lowered;
     }

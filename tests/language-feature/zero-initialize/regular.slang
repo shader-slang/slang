@@ -1,39 +1,61 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -xslang -zero-initialize
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -emit-spirv-directly -allow-glsl -xslang -zero-initialize
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -entry computeMain -allow-glsl -xslang -zero-initialize
-//TEST(smoke,compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-dx12 -use-dxil -compute -entry computeMain -allow-glsl -xslang -zero-initialize
+//TEST(smoke,compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-dx12 -use-dxil -compute -entry computeMain -allow-glsl -profile sm_6_2 -xslang -zero-initialize -xslang -DDX12
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-enum MyFlags1
+enum MyFlags
 {
     Zero = 0,
     One,
 }
+MyFlags getMyFlagsUint_One()
+{
+    return MyFlags::One;
+}
 
-enum MyFlags2 : uint8_t
+#ifndef DX12
+enum MyFlags_uint8 : uint8_t
 {
     Zero = 0,
     One,
 }
+MyFlags_uint8 getMyFlagsUint8_One()
+{
+    return MyFlags_uint8::One;
+}
+#endif
 
-enum MyFlags3 : uint16_t
+enum MyFlags_uint16 : uint16_t
 {
     Zero = 0,
     One,
 }
+MyFlags_uint16 getMyFlagsUint16_One()
+{
+    return MyFlags_uint16::One;
+}
 
-enum MyFlags4 : uint32_t
+enum MyFlags_uint32 : uint32_t
 {
     Zero = 0,
     One,
 }
+MyFlags_uint32 getMyFlagsUint32_One()
+{
+    return MyFlags_uint32::One;
+}
 
-enum MyFlags5 : uint64_t
+enum MyFlags_uint64 : uint64_t
 {
     Zero = 0,
     One,
+}
+MyFlags_uint64 getMyFlagsUint64_One()
+{
+    return MyFlags_uint64::One;
 }
 
 int getDefaultInt()
@@ -69,24 +91,26 @@ vector<int, 4> getDefaultIntVec4()
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    int reg1 = getDefaultInt();
-    float reg2 = getDefaultFloat();
-    double reg3 = getDefaultDouble();
-    vector<int, 2> vectorVal1 = getDefaultIntVec2();
-    vector<int, 3> vectorVal2 = getDefaultIntVec3();
-    vector<int, 4> vectorVal3 = getDefaultIntVec4();
+    int defaultInt = getDefaultInt();
+    float defaultFloat = getDefaultFloat();
+    double defaultDouble = getDefaultDouble();
+    vector<int, 2> vector2 = getDefaultIntVec2();
+    vector<int, 3> vector3 = getDefaultIntVec3();
+    vector<int, 4> vector4 = getDefaultIntVec4();
 // BUF: 1
     outputBuffer[0] = true
-    && reg1 == 0
-    && reg2 == 0
-    && reg3 == 0
-    && vectorVal1 == vector<int, 2>(0)
-    && vectorVal2 == vector<int, 3>(0)
-    && vectorVal3 == vector<int, 4>(0)
-    && MyFlags1::One == MyFlags1(1)
-    && MyFlags2::One == MyFlags2(1)
-    && MyFlags3::One == MyFlags3(1)
-    && MyFlags4::One == MyFlags4(1)
-    && MyFlags5::One == MyFlags5(1)
+    && defaultInt == 0
+    && defaultFloat == 0
+    && defaultDouble == 0
+    && vector2 == vector<int, 2>(0)
+    && vector3 == vector<int, 3>(0)
+    && vector4 == vector<int, 4>(0)
+    && MyFlags::One == getMyFlagsUint_One()
+#ifndef DX12
+    && MyFlags_uint8::One == getMyFlagsUint8_One()
+#endif
+    && MyFlags_uint16::One == getMyFlagsUint16_One()
+    && MyFlags_uint32::One == getMyFlagsUint32_One()
+    && MyFlags_uint64::One == getMyFlagsUint64_One();
     ;
 }

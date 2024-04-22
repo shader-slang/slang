@@ -29,7 +29,6 @@ typedef uint32_t SerialSourceLoc;
 class NodeBase;
 class Val;
 struct ValNodeDesc;
-struct IRType;
 
 // Pre-declare
 class SerialClasses;
@@ -152,7 +151,6 @@ struct SerialPointer
     // Helpers so we can choose what kind of pointer we have based on the (unused) type of the pointer passed in
     SLANG_FORCE_INLINE RefObject* _get(const RefObject*) { return m_kind == SerialTypeKind::RefObject ? reinterpret_cast<RefObject*>(m_ptr) : nullptr; }
     SLANG_FORCE_INLINE NodeBase* _get(const NodeBase*) { return m_kind == SerialTypeKind::NodeBase ? reinterpret_cast<NodeBase*>(m_ptr) : nullptr; }
-    SLANG_FORCE_INLINE RefObject* _get(const IRType*) { return nullptr; }
 
     template <typename T>
     T* dynamicCast()
@@ -355,7 +353,6 @@ public:
         };
     };
 
-    SerialIndex addPointer(const IRType* obj);
     SerialIndex addPointer(const NodeBase* ptr);
     SerialIndex addPointer(const RefObject* ptr);
 
