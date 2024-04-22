@@ -146,8 +146,10 @@ Result FramebufferImpl::init(DeviceImpl* renderer, const IFramebuffer::Desc& des
     }
     else
     {
-        m_width = 1;
-        m_height = 1;
+        // In case we create an "empty" framebuffer, use the maximum viewport dimensions.
+        // This to allow arbitrary viewport sizes when rendering to the empty framebuffer.
+        m_width = m_renderer->m_api.m_deviceProperties.limits.maxViewportDimensions[0];
+        m_height = m_renderer->m_api.m_deviceProperties.limits.maxViewportDimensions[1];
         layerCount = 1;
     }
     if (layerCount == 0)
