@@ -21,7 +21,7 @@ if [[ "aarch64" == "${TARGETARCH}"  && "release" == "${CONFIGURATION}" ]]; then
 fi
 
 if [[ ! -z ${GLIBC_COMPATIBLE} ]]; then
-    glibcCompatible="--glibcForwardCompatible=true"
+    glibcCompatible="--glibc-forward-compatible=true"
 fi
 
 if [[ "${ARCH}" != "${TARGETARCH}" ]]; then
