@@ -348,8 +348,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
-    [require(glsl_hlsl_spirv, texture_querylod)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetailUnclamped(TextureCoord location)
     {
         __target_switch
@@ -369,8 +369,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
-    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location)
     {
         __target_switch
@@ -474,8 +474,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -605,8 +605,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -627,8 +627,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
     {
         __target_switch
@@ -647,10 +647,10 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
-    __glsl_extension(GL_ARB_sparse_texture_clamp)
     [__readNone]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
     {
         __target_switch
@@ -794,8 +794,8 @@ __generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let s
 extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     [__readNone]
-    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
     {
         __target_switch
@@ -847,8 +847,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -868,10 +868,10 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     [__readNone]
     [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __target_switch
@@ -902,8 +902,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __target_switch
@@ -924,8 +924,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1104,8 +1104,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
+    [__readNone]
     [ForceInline]
-    [__readNone]__glsl_extension(GL_ARB_sparse_texture_clamp)
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
     {
@@ -2834,7 +2835,6 @@ ${{{{
     [__requiresNVAPI]
     [ForceInline]
     __cuda_sm_version(2.0)
-    [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
@@ -2855,7 +2855,6 @@ ${{{{
     // Int64 Add
     [ForceInline]
     __cuda_sm_version(6.0)
-    [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda6_int64)]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue)
     {
@@ -2879,7 +2878,6 @@ ${{{{
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda6_int64)]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd);
 
-    [ForceInline]
     __specialized_for_target(hlsl)
     [ForceInline]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
@@ -2887,7 +2885,6 @@ ${{{{
         __atomicAdd(this, byteAddress, __asuint2(valueToAdd));
     }
 
-    [ForceInline]
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
     [ForceInline]
@@ -2927,6 +2924,7 @@ ${{{{
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicMax(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -2986,6 +2984,7 @@ ${{{{
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicMin(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -3045,6 +3044,7 @@ ${{{{
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicAnd(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -3084,6 +3084,7 @@ ${{{{
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicOr(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -3123,6 +3124,7 @@ ${{{{
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicXor(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -3161,6 +3163,7 @@ ${{{{
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicExchange(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -3276,6 +3279,7 @@ ${{{{
             return;
         }
     }
+
     [ForceInline]
     void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
