@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage anyhit -profile glsl_460+GL_EXT_ray_tracing
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage anyhit -profile glsl_460+GL_EXT_ray_tracing -emit-spirv-via-glsl
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage anyhit -profile sm_6_5 -DNOMOTION
 
