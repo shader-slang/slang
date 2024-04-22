@@ -72,7 +72,7 @@ uniform usampler2DMS uniform_usampler2DMS;
 uniform usampler2DMSArray uniform_usampler2DMSArray;
 #endif // #if defined(TEST_when_multisampling_works)
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
     , Sampler2D<vector<T,N>> gsampler2D
     , Sampler2DRect<vector<T,N>> gsampler2DRect
@@ -400,6 +400,104 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         ;
 }
 
+__generic<T : __BuiltinArithmeticType, let N : int>
+bool itextureFuncs(Sampler1D<vector<T, N>> gsampler1D
+    , Sampler2D<vector<T, N>> gsampler2D
+    , Sampler2DRect<vector<T, N>> gsampler2DRect
+    , Sampler3D<vector<T, N>> gsampler3D
+    , SamplerCube<vector<T, N>> gsamplerCube
+    , Sampler1DArray<vector<T, N>> gsampler1DArray
+    , Sampler2DArray<vector<T, N>> gsampler2DArray
+    , SamplerCubeArray<vector<T, N>> gsamplerCubeArray
+    , SamplerBuffer<vector<T, N>> gsamplerBuffer
+#if defined(TEST_when_multisampling_works)
+    , Sampler2DMS<vector<T, N>> gsampler2DMS
+    , Sampler2DMSArray<vector<T, N>> gsampler2DMSArray
+#endif // #if defined(TEST_when_multisampling_works)
+)
+{
+    typealias gvec4 = vector<T, 4>;
+
+    constexpr ivec2 ivec2_0 = ivec2(0);
+
+    return true
+        // 8.9.1. Texture Query Functions
+        && int(0) == textureSize(gsampler1D, int(0))
+        && ivec2(0) == textureSize(gsampler2D, int(0))
+        && ivec3(0) == textureSize(gsampler3D, int(0))
+        && ivec2(0) == textureSize(gsamplerCube, int(0))
+        && int(0) == textureSize(uniform_sampler1DShadow, int(0))
+        && ivec2(0) == textureSize(uniform_sampler2DShadow, int(0))
+        && ivec2(0) == textureSize(uniform_samplerCubeShadow, int(0))
+        && ivec3(0) == textureSize(gsamplerCubeArray, int(0))
+        && ivec3(0) == textureSize(uniform_samplerCubeArrayShadow, int(0))
+        && ivec2(0) == textureSize(gsampler2DRect)
+        && ivec2(0) == textureSize(uniform_sampler2DRectShadow)
+        && ivec2(0) == textureSize(gsampler1DArray, int(0))
+        && ivec2(0) == textureSize(uniform_sampler1DArrayShadow, int(0))
+        && ivec3(0) == textureSize(gsampler2DArray, int(0))
+        && ivec3(0) == textureSize(uniform_sampler2DArrayShadow, int(0))
+        && int(0) == textureSize(gsamplerBuffer)
+#if defined(TEST_when_multisampling_works)
+        && ivec2(0) == textureSize(gsampler2DMS)
+        && ivec3(0) == textureSize(gsampler2DMSArray)
+#endif
+        && gvec4(T(0)) == texelFetch(gsampler1D, int(0), int(0))
+        && gvec4(T(0)) == texelFetch(gsampler2D, ivec2(0), int(0))
+        && gvec4(T(0)) == texelFetch(gsampler3D, ivec3(0), int(0))
+        && gvec4(T(0)) == texelFetch(gsampler2DRect, ivec2(0))
+        && gvec4(T(0)) == texelFetch(gsampler1DArray, ivec2(0), int(0))
+        && gvec4(T(0)) == texelFetch(gsampler2DArray, ivec3(0), int(0))
+        && gvec4(T(0)) == texelFetch(gsamplerBuffer, int(0))
+#if defined(TEST_when_multisampling_works)
+        && gvec4(T(0)) == texelFetch(gsampler2DMS, ivec2(0), int(0))
+        && gvec4(T(0)) == texelFetch(gsampler2DMSArray, ivec3(0), int(0))
+#endif // #if defined(TEST_when_multisampling_works)
+        && gvec4(T(0)) == texelFetchOffset(gsampler1D, int(0), int(0), __LINE__)
+        && gvec4(T(0)) == texelFetchOffset(gsampler2D, ivec2(0), int(0), { __LINE__ })
+        && gvec4(T(0)) == texelFetchOffset(gsampler3D, ivec3(0), int(0), { __LINE__ })
+        && gvec4(T(0)) == texelFetchOffset(gsampler2DRect, ivec2(0), { __LINE__ })
+        && gvec4(T(0)) == texelFetchOffset(gsampler1DArray, ivec2(0), int(0), __LINE__)
+        && gvec4(T(0)) == texelFetchOffset(gsampler2DArray, ivec3(0), int(0), { __LINE__ })
+        // 8.9.4. Texture Gather Functions
+        && gvec4(T(0)) == textureGather(gsampler2D, vec2(0))
+        && gvec4(T(0)) == textureGather(gsampler2D, vec2(0), int(0))
+        && gvec4(T(0)) == textureGather(gsampler2DArray, vec3(0))
+        && gvec4(T(0)) == textureGather(gsampler2DArray, vec3(0), int(0))
+        && gvec4(T(0)) == textureGather(gsamplerCube, vec3(0))
+        && gvec4(T(0)) == textureGather(gsamplerCube, vec3(0), int(0))
+        && gvec4(T(0)) == textureGather(gsamplerCubeArray, vec4(0))
+        && gvec4(T(0)) == textureGather(gsamplerCubeArray, vec4(0), int(0))
+        && gvec4(T(0)) == textureGather(gsampler2DRect, vec2(0))
+        && gvec4(T(0)) == textureGather(gsampler2DRect, vec2(0), int(0))
+        && vec4(0) == textureGather(uniform_sampler2DShadow, vec2(0), float(0))
+        && vec4(0) == textureGather(uniform_sampler2DArrayShadow, vec3(0), float(0))
+        && vec4(0) == textureGather(uniform_samplerCubeShadow, vec3(0), float(0))
+        && vec4(0) == textureGather(uniform_samplerCubeArrayShadow, vec4(0), float(0))
+        && vec4(0) == textureGather(uniform_sampler2DRectShadow, vec2(0), float(0))
+        && gvec4(T(0)) == textureGatherOffset(gsampler2D, vec2(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffset(gsampler2D, vec2(0), { __LINE__ }, int(0))
+        && gvec4(T(0)) == textureGatherOffset(gsampler2DArray, vec3(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffset(gsampler2DArray, vec3(0), { __LINE__ }, int(0))
+        && vec4(0) == textureGatherOffset(uniform_sampler2DShadow, vec2(0), float(0), { __LINE__ })
+        && vec4(0) == textureGatherOffset(uniform_sampler2DArrayShadow, vec3(0), float(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), { __LINE__ }, int(0))
+        && vec4(0) == textureGatherOffset(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ })
+#if defined(TEST_when_constexpr_works)
+           && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ })         // constexpr not working
+           && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ }, int(0)) // constexpr not working
+           && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ })    // constexpr not working
+           && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ }, int(0)) // constexpr not working
+           && vec4(0) == textureGatherOffsets(uniform_sampler2DShadow, vec2(0), float(0), { __LINE__ }) // constexpr not working
+           && vec4(0) == textureGatherOffsets(uniform_sampler2DArrayShadow, vec3(0), float(0), { __LINE__ })                              // constexpr not working
+           && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }) // constexpr not working
+           && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }, int(0)) // constexpr not working
+           && vec4(0) == textureGatherOffsets(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ }) // constexpr not working
+#endif                                                      // #if defined(TEST_when_constexpr_works)
+        ;
+}
+
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -425,7 +523,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
             , uniform_sampler2DMSArray
 #endif // #if defined(TEST_when_multisampling_works)
             )
-        && textureFuncs(
+        && itextureFuncs(
             uniform_isampler1D
             , uniform_isampler2D
             , uniform_isampler2DRect
@@ -440,7 +538,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
             , uniform_isampler2DMSArray
 #endif // #if defined(TEST_when_multisampling_works)
             )
-        && textureFuncs(
+        && itextureFuncs(
             uniform_usampler1D
             , uniform_usampler2D
             , uniform_usampler2DRect

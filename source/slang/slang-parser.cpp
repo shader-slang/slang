@@ -199,6 +199,7 @@ namespace Slang
         Stmt* parseLabelStatement();
         DeclStmt* parseVarDeclrStatement(Modifiers modifiers);
         IfStmt* parseIfStatement();
+        Stmt* parseIfLetStatement();
         ForStmt* ParseForStatement();
         WhileStmt* ParseWhileStatement();
         DoWhileStmt* ParseDoWhileStatement();
@@ -5276,7 +5277,16 @@ namespace Slang
         if (LookAheadToken(TokenType::LBrace))
             statement = parseBlockStatement();
         else if (LookAheadToken("if"))
-            statement = parseIfStatement();
+        {
+            if(LookAheadToken("let", 2))
+            {
+                statement = parseIfLetStatement();
+            }
+            else
+            {
+                statement = parseIfStatement();
+            }
+        }
         else if (LookAheadToken("for"))
             statement = ParseForStatement();
         else if (LookAheadToken("while"))
@@ -5577,6 +5587,103 @@ namespace Slang
         auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers);
         varDeclrStatement->decl = decl;
         return varDeclrStatement;
+    }
+
+    static Expr* constructIfLetPredicate(Parser* parser, VarExpr* varExpr)
+    {
+        // create a "var.hasValue" expression
+        MemberExpr* memberExpr = parser->astBuilder->create<MemberExpr>();
+        memberExpr->baseExpression = varExpr;
+        parser->FillPosition(memberExpr);
+        memberExpr->name = getName(parser, "hasValue");
+
+        return memberExpr;
+    }
+
+    // Parse the syntax 'if (let var = X as Y)'
+    Stmt* Parser::parseIfLetStatement()
+    {
+        ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
+        pushScopeAndSetParent(scopeDecl);
+
+        SeqStmt* newBody = astBuilder->create<SeqStmt>();
+
+        IfStmt* ifStatement = astBuilder->create<IfStmt>();
+        FillPosition(ifStatement);
+        ReadToken("if");
+        ReadToken(TokenType::LParent);
+
+        // parse 'let var = X as Y'
+        ReadToken("let");
+        auto identifierToken = ReadToken(TokenType::Identifier);
+        ReadToken(TokenType::OpAssign);
+        auto initExpr = ParseInitExpr();
+
+        // insert 'let tempVarDecl = X as Y;'
+        auto tempVarDecl = astBuilder->create<LetDecl>();
+        tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
+        tempVarDecl->initExpr = initExpr;
+        AddMember(currentScope->containerDecl, tempVarDecl);
+
+        DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
+        FillPosition(tmpVarDeclStmt);
+        tmpVarDeclStmt->decl = tempVarDecl;
+        newBody->stmts.add(tmpVarDeclStmt);
+
+        // construct 'if (tempVarDecl.hasValue == true)'
+        VarExpr* tempVarExpr = astBuilder->create<VarExpr>();
+        tempVarExpr->scope = currentScope;
+        FillPosition(tempVarExpr);
+        tempVarExpr->name = tempVarDecl->getName();
+        ifStatement->predicate = constructIfLetPredicate(this, tempVarExpr);
+
+        ReadToken(TokenType::RParent);
+
+        // Create a new scope surrounding the positive statement, will be used for
+        // the variable declared in the if_let syntax
+        ScopeDecl* positiveScopeDecl = astBuilder->create<ScopeDecl>();
+        pushScopeAndSetParent(positiveScopeDecl);
+        ifStatement->positiveStatement = ParseStatement(ifStatement);
+        PopScope();
+
+        if (LookAheadToken("else"))
+        {
+            ReadToken("else");
+            ifStatement->negativeStatement = ParseStatement(ifStatement);
+        }
+
+        if (ifStatement->positiveStatement)
+        {
+            auto seqPositiveStmt = as<SeqStmt>(ifStatement->positiveStatement);
+            if (!seqPositiveStmt)
+            {
+                seqPositiveStmt = astBuilder->create<SeqStmt>();
+            }
+
+            MemberExpr* memberExpr = astBuilder->create<MemberExpr>();
+            memberExpr->baseExpression = tempVarExpr;
+            memberExpr->name = getName(this, "value");
+
+            auto varDecl = astBuilder->create<LetDecl>();
+            varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
+            varDecl->initExpr = memberExpr;
+
+            DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
+            varDeclrStatement->decl = varDecl;
+
+            // Add scope to the variable declared in the if_let syntax such
+            // that this variable cannot be used outside the positive statement
+            AddMember(positiveScopeDecl, varDecl);
+
+            seqPositiveStmt->stmts.add(varDeclrStatement);
+            seqPositiveStmt->stmts.add(ifStatement->positiveStatement);
+            ifStatement->positiveStatement = seqPositiveStmt;
+        }
+
+        newBody->stmts.add(ifStatement);
+        PopScope();
+
+        return newBody;
     }
 
     IfStmt* Parser::parseIfStatement()

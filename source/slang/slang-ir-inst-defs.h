@@ -345,6 +345,8 @@ INST(GetOptionalValue, getOptionalValue, 1, 0)
 INST(OptionalHasValue, optionalHasValue, 1, 0)
 INST(MakeOptionalValue, makeOptionalValue, 1, 0)
 INST(MakeOptionalNone, makeOptionalNone, 1, 0)
+INST(CombinedTextureSamplerGetTexture, CombinedTextureSamplerGetTexture, 1, 0)
+INST(CombinedTextureSamplerGetSampler, CombinedTextureSamplerGetSampler, 1, 0)
 INST(Call, call, 1, 0)
 
 INST(RTTIObject, rtti_object, 0, 0)

@@ -152,7 +152,7 @@ For example, a fragment kernel cannot use both `u0` and `SV_Target0` at once.
 Direct3D 12
 -----------
 
-Direct3D 12 (D3D12) is the current major version of the Direct2D API.
+Direct3D 12 (D3D12) is the current major version of the Direct3D API.
 
 D3D12 kernels must be compiled to the DirectX Intermediate Language (DXIL).
 DXIL is a layered encoding based off of LLVM bitcode; it introduces additional formatting rules and constraints which are loosely documented.
@@ -294,7 +294,7 @@ High-level-language shader parameters are bounding to a "binding" index for Open
 The binding index of a parameter is the zero-based index of the slot (of the appropriate kind) that must be used to pass an argument value.
 
 Note that while OpenGL and Vulkan both use binding indices for shader parameters like textures, the semantics of those are different because OpenGL uses distinct slots for passing buffers and textures.
-For OpenGL is is legal to have a texture that uses `binding=2` and a buffer that uses `binding=2` in the same kernel, because those are indices of distinct kinds of slots, while this scenario would typically be invalid for Vulkan.
+For OpenGL it is legal to have a texture that uses `binding=2` and a buffer that uses `binding=2` in the same kernel, because those are indices of distinct kinds of slots, while this scenario would typically be invalid for Vulkan.
 
 CUDA and OptiX
 --------------
@@ -347,7 +347,7 @@ For the purposes of Slang, different CPU-based host platforms are largely the sa
 All support binary code in a native machine-code format.
 All CPU platforms Slang supports use a flat memory model with a single virtual address space, where any data type can be stored at any virtual address.
 
-Note that this section consider CPU-based platforms only as targets for kernel compilation; using a CPU as a target for scalar "host" code is an advanced target beyond the scope of this document.
+Note that this section considers CPU-based platforms only as targets for kernel compilation; using a CPU as a target for scalar "host" code is an advanced target beyond the scope of this document.
 
 ### Pipelines
 

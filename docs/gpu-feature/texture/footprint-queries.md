@@ -48,7 +48,7 @@ To query the footprint that would be accessed by this operation, we can use an o
 
 ```hlsl
 uint granularity = ...;
-TextureFootprint2D footprint = texure.queryFootprintCoarse(granularity,
+TextureFootprint2D footprint = texture.queryFootprintCoarse(granularity,
     sampler, coords);
 ```
 

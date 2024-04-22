@@ -16,6 +16,13 @@ bool isPointerOfType(IRInst* type, IROp opCode)
     return false;
 }
 
+IRType* getVectorElementType(IRType* type)
+{
+    if (auto vectorType = as<IRVectorType>(type))
+        return vectorType->getElementType();
+    return type;
+}
+
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType)
 {
     Dictionary<IRInst*, IRInst*> result;
