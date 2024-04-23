@@ -7464,6 +7464,10 @@ namespace Slang
 
         for (auto ctor : structDeclInfo.ctorList)
         {
+            ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+            thisExpr->scope = ctor->ownedScope;
+            thisExpr->type = ctor->returnType.type;
+
             auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
             auto seqStmtChild = m_astBuilder->create<SeqStmt>();
             seqStmtChild->stmts.reserve(structDecl->members.getCount());
@@ -7474,12 +7478,16 @@ namespace Slang
                     || !varDeclBase->initExpr)
                     continue;
 
-                VarExpr* memberVarExpr = m_astBuilder->create<VarExpr>();
-                memberVarExpr->scope = ctor->ownedScope;
-                memberVarExpr->name = m->getName();
+                MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
+                memberExpr->baseExpression = thisExpr;
+                memberExpr->declRef = m->getDefaultDeclRef();
+                memberExpr->scope = ctor->ownedScope;
+                memberExpr->loc = m->loc;
+                memberExpr->name = m->getName();
+                memberExpr->type = DeclRefType::create(getASTBuilder(), m->getDefaultDeclRef());
 
                 auto assign = m_astBuilder->create<AssignExpr>();
-                assign->left = memberVarExpr;
+                assign->left = memberExpr;
                 assign->right = varDeclBase->initExpr;
                 assign->loc = m->loc;
 
@@ -7492,7 +7500,7 @@ namespace Slang
                     checkedMemberVarExpr = cachedDeclToCheckedVar[m];
                 else
                 {
-                    checkedMemberVarExpr = CheckTerm(memberVarExpr);
+                    checkedMemberVarExpr = CheckTerm(memberExpr);
                     cachedDeclToCheckedVar.add({ m, checkedMemberVarExpr });
                 }
                 if (!checkedMemberVarExpr->type.isLeftValue)
