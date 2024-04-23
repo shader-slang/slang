@@ -1602,19 +1602,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         // If we see `__convertTexel(x)`, we need to return a vector<__sampledElementType(x), 4>.
         IRInst* operand = inst->getOperand(0);
-        auto elementType = getSPIRVSampledElementType(operand->getFullType());
-        auto valueElementType = getVectorElementType(operand->getFullType());
+        auto elementType = getSPIRVSampledElementType(operand->getDataType());
+        auto valueElementType = getVectorElementType(operand->getDataType());
         IRBuilder builder(inst);
         builder.setInsertBefore(asmBlockInst);
         if (elementType != valueElementType)
         {
-            auto floatCastType = replaceVectorElementType(operand->getFullType(), elementType);
+            auto floatCastType = replaceVectorElementType(operand->getDataType(), elementType);
             operand = builder.emitCast(floatCastType, operand);
         }
         auto vecType = builder.getVectorType(elementType, 4);
-        if (vecType != operand->getFullType())
+        if (vecType != operand->getDataType())
         {
-            if (!as<IRVectorType>(operand->getFullType()))
+            if (!as<IRVectorType>(operand->getDataType()))
                 operand = builder.emitMakeVectorFromScalar(vecType, operand);
             else
                 operand = builder.emitVectorReshape(vecType, operand);
