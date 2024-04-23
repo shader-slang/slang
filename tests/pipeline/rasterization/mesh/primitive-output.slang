@@ -2,7 +2,6 @@
 
 // Test that a simple mesh shader compiles
 
-//TEST:CROSS_COMPILE:-target spirv -profile glsl_450+spirv_1_4 -entry main -stage mesh
 //TEST:SIMPLE(filecheck=SPV_CHECK):-target spirv -profile glsl_450+spirv_1_4 -entry main -stage mesh
 
 //SPV_CHECK-NOT: SPV_NV_mesh_shader

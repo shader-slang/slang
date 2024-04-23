@@ -4118,6 +4118,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 {
                     return builder->emitSPIRVAsmOperandTruncate();
                 }
+            case SPIRVAsmOperand::ConvertTexel:
+                {
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitSPIRVAsmOperandConvertTexel(i);
+                }
             case SPIRVAsmOperand::EntryPoint:
                 {
                     return builder->emitSPIRVAsmOperandEntryPoint();

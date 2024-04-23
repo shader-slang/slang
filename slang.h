@@ -706,11 +706,7 @@ extern "C"
         /* When set, will generate SPIRV directly rather than via glslang. */
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
-#if defined(SLANG_CONFIG_DEFAULT_SPIRV_DIRECT)
     constexpr static SlangTargetFlags kDefaultTargetFlags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
-#else
-    constexpr static SlangTargetFlags kDefaultTargetFlags = 0;
-#endif
 
     /*!
     @brief Options to control floating-point precision guarantees for a target.

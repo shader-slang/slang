@@ -231,7 +231,7 @@ namespace Slang
             {
                 // For spirv, we always want to lower all matrix types, because matrix types
                 // are considered abstract types.
-                if (!target->getOptionSet().shouldEmitSPIRVDirectly())
+                if (!target->shouldEmitSPIRVDirectly())
                 {
                     // For other targets, we only lower the matrix types if they differ from the default
                     // matrix layout.
@@ -280,7 +280,7 @@ namespace Slang
                 // For spirv backend, we always want to lower all array types, even if the element type
                 // comes out the same. This is because different layout rules may have different array
                 // stride requirements.
-                if (!target->getOptionSet().shouldEmitSPIRVDirectly())
+                if (!target->shouldEmitSPIRVDirectly())
                 {
                     if (!loweredInnerTypeInfo.convertLoweredToOriginal)
                     {
@@ -327,7 +327,7 @@ namespace Slang
                 // For spirv backend, we always want to lower all array types, even if the element type
                 // comes out the same. This is because different layout rules may have different array
                 // stride requirements.
-                if (!target->getOptionSet().shouldEmitSPIRVDirectly())
+                if (!target->shouldEmitSPIRVDirectly())
                 {
                     // For non-spirv target, we skip lowering this type if all field types are unchanged.
                     if (isTrivial)
@@ -404,7 +404,7 @@ namespace Slang
                 return info;
             }
 
-            if (target->getOptionSet().shouldEmitSPIRVDirectly())
+            if (target->shouldEmitSPIRVDirectly())
             {
                 switch (target->getTargetReq()->getTarget())
                 {
@@ -838,7 +838,7 @@ namespace Slang
             return IRTypeLayoutRules::getNatural();
 
         // If we are just emitting GLSL, we can just use the general layout rule.
-        if (!target->getOptionSet().shouldEmitSPIRVDirectly())
+        if (!target->shouldEmitSPIRVDirectly())
             return IRTypeLayoutRules::getNatural();
 
         // If the user specified a scalar buffer layout, then just use that.

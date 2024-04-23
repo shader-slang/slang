@@ -1,6 +1,7 @@
 // atomic-float-byte-address-buffer-cross.slang
 
-//TEST:SIMPLE(filecheck=CHECK): -profile cs_6_5 -entry computeMain -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK_SPV): -profile cs_6_5 -entry computeMain -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK): -profile cs_6_5 -entry computeMain -target spirv-assembly -emit-spirv-via-glsl
 // We can't do this test, because it relies on nvAPI
 //DISABLE_TEST:CROSS_COMPILE: -profile cs_6_5 -entry computeMain -target dxil
 
