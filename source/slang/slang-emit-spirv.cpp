@@ -437,6 +437,10 @@ constexpr bool isPlural<IRUse*> = true;
 template<typename T>
 constexpr bool isSingular = !isPlural<T>;
 
+struct SPIRVEmitContext;
+bool isInstUsedInStage(SPIRVEmitContext& context, IRInst* inst, Stage s);
+HashSet<IRFunc*>* EntryPointsUsingInst(SPIRVEmitContext& context, IRInst* inst);
+
 // Now that we've defined the intermediate data structures we will
 // use to represent SPIR-V code during emission, we will move on
 // to defining the main context type that will drive SPIR-V
@@ -1276,6 +1280,11 @@ struct SPIRVEmitContext
         );
         m_extensionInsts[name] = result;
         return result;
+    }
+
+    bool hasExtensionDeclaration(const UnownedStringSlice& name)
+    {
+        return m_extensionInsts.containsKey(name);
     }
 
     struct SpvTypeInstKey
@@ -2730,6 +2739,44 @@ struct SPIRVEmitContext
                 auto inner = ensureInst(location);
                 registerInst(inst, inner);
                 result = inner;
+                break;
+            }
+        case kIROp_RequireComputeDerivative:
+            {
+                auto parentFunc = getParentFunc(inst);
+                if (hasExtensionDeclaration(UnownedStringSlice("SPV_NV_compute_shader_derivatives")))
+                    break;
+
+                HashSet<IRFunc*>* entryPointsUsingInst = EntryPointsUsingInst(*this, parentFunc);
+                for (IRFunc* entryPoint : *entryPointsUsingInst)
+                {
+                    bool isQuad = true;
+                    IREntryPointDecoration* entryPointDecor = nullptr;
+                    for(auto dec : entryPoint->getDecorations())
+                    {
+                        if(auto maybeEntryPointDecor = as<IREntryPointDecoration>(dec))
+                            entryPointDecor = maybeEntryPointDecor;
+                        if(as<IRDerivativeGroupLinearDecoration>(dec))
+                            isQuad = false;
+                    }
+                    if (!entryPointDecor || entryPointDecor->getProfile().getStage() != Stage::Compute)
+                        continue;
+
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_compute_shader_derivatives"));
+                    auto numThreadsDecor =  entryPointDecor->findDecoration<IRNumThreadsDecoration>();
+                    if (isQuad)
+                    {
+                        verifyComputeDerivativeGroupModifiers(this->m_sink, inst->sourceLoc, true, false, numThreadsDecor);
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, entryPoint, SpvExecutionModeDerivativeGroupQuadsNV);
+                        emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, SpvCapabilityComputeDerivativeGroupQuadsNV);
+                    }
+                    else
+                    {
+                        verifyComputeDerivativeGroupModifiers(this->m_sink, inst->sourceLoc, false, true, numThreadsDecor);                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, entryPoint, SpvExecutionModeDerivativeGroupLinearNV);
+                        emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, SpvCapabilityComputeDerivativeGroupLinearNV);
+                    }
+                }
+
                 break;
             }
         case kIROp_Return:
@@ -6076,6 +6123,14 @@ struct SPIRVEmitContext
     {
     }
 };
+
+HashSet<IRFunc*>* EntryPointsUsingInst(SPIRVEmitContext& context, IRInst* inst)
+{
+    auto* referencingEntryPoints = context.m_referencingEntryPoints.tryGetValue(inst);
+    if (!referencingEntryPoints)
+        return nullptr;
+    return referencingEntryPoints;
+}
 
 bool isInstUsedInStage(SPIRVEmitContext& context, IRInst* inst, Stage s)
 {

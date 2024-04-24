@@ -7781,6 +7781,7 @@ public vector<float, N> dFdyCoarse(vector<float, N> p)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthFine(float p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7804,6 +7805,7 @@ __generic<let N : int>
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthFine(vector<float, N> p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7827,6 +7829,7 @@ public vector<float, N> fwidthFine(vector<float, N> p)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthCoarse(float p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7850,6 +7853,7 @@ __generic<let N : int>
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthCoarse(vector<float, N> p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:

@@ -2171,7 +2171,7 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
         }
     }
 
-    // The function may have IRRequireGLSLExtensionInst in its body. We also need to look for them.
+    // The function may have various requirment declaring functions its body. We also need to look for them.
     auto func = as<IRFunc>(inst);
     if (!func)
         return;
@@ -2183,6 +2183,40 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
         if (auto requireGLSLExt = as<IRRequireGLSLExtension>(childInst))
         {
             _requireGLSLExtension(requireGLSLExt->getExtensionName());
+        }
+        else if (auto requireComputeDerivative = as<IRRequireComputeDerivative>(childInst))
+        {
+            if (m_entryPointStage != Stage::Compute
+                || m_requiredPreludesRaw.contains("layout(derivative_group_quadsNV) in;")
+                || m_requiredPreludesRaw.contains("layout(derivative_group_linearNV) in;")
+                )
+                return;
+
+            _requireGLSLExtension(UnownedStringSlice("GL_NV_compute_shader_derivatives"));
+
+            // This will only run once per program.
+            IRInst* entryPoint = nullptr;
+            for (auto i : this->m_irModule->getGlobalInsts())
+            {
+                if (i->findDecoration<IREntryPointDecoration>())
+                {
+                    entryPoint = i;
+                    break;
+                }
+            }
+
+            bool isQuad = !entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>();
+            auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
+            if (isQuad)
+            {
+                verifyComputeDerivativeGroupModifiers(getSink(), inst->sourceLoc, true, false, numThreadsDecor);
+                m_requiredPreludesRaw.add("layout(derivative_group_quadsNV) in;");
+            }
+            else
+            {
+                verifyComputeDerivativeGroupModifiers(getSink(), inst->sourceLoc, false, true, numThreadsDecor);
+                m_requiredPreludesRaw.add("layout(derivative_group_linearNV) in;");
+            }
         }
     }
 }

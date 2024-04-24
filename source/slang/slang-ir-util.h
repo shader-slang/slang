@@ -328,6 +328,43 @@ inline bool isCompositeType(IRType* type)
 
 IRParam* getParamAt(IRBlock* block, UIndex ii);
 
+static inline void verifyComputeDerivativeGroupModifiers(
+    DiagnosticSink* sink,
+    SourceLoc errorLoc,
+    bool quadAttr,
+    bool linearAttr,
+    IRNumThreadsDecoration* numThreadsDecor)
+{   
+    if (!numThreadsDecor)
+        return;
+
+    if(quadAttr && linearAttr)
+    {
+        sink->diagnose(errorLoc, Diagnostics::onlyOneOfDerivativeGroupLinearOrQuadCanBeSet);
+    }
+
+    IRIntegerValue x = 1;
+    IRIntegerValue y = 1;
+    IRIntegerValue z = 1;
+    if(numThreadsDecor->getX())
+        x = numThreadsDecor->getX()->getValue();
+    if(numThreadsDecor->getY())
+        y = numThreadsDecor->getY()->getValue();
+    if(numThreadsDecor->getZ())
+        z = numThreadsDecor->getZ()->getValue();
+
+    if(quadAttr)
+    {
+        if(x %2 != 0 || y %2 != 0)
+            sink->diagnose(errorLoc, Diagnostics::derivativeGroupQuadMustBeMultiple2ForXYThreads);
+    }
+    else if(linearAttr)
+    {
+        if ((x * y * z) % 4 != 0)
+            sink->diagnose(errorLoc, Diagnostics::derivativeGroupLinearMustBeMultiple4ForTotalThreadCount);
+    }
+}
+
 }
 
 #endif

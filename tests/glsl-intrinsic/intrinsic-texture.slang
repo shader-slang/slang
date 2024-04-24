@@ -1,13 +1,18 @@
 #version 450 core
 #extension GL_EXT_texture_shadow_lod : enable
 
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl
+//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -DCOMPUTE
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage fragment -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK_SPV_DIRECT): -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DCOMPUTE
+//TEST:SIMPLE(filecheck=CHECK_SPV_DIRECT): -allow-glsl -stage fragment -entry computeMain -target spirv -emit-spirv-directly 
+//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DCOMPUTE
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage fragment -entry computeMain -target cuda
 
 // Disabling following targets because they are currently causing compile errors.
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage fragment -entry computeMain -target hlsl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage fragment -entry computeMain -target cpp
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DCOMPUTE
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DCOMPUTE
 
 // "Offset" family of texture functions in GLSL requires offset parameter to be a constant value.
 // It appears that slangc removes the constant-ness of constant values.
@@ -20,6 +25,11 @@
 
 //RWStructuredBuffer<float> outputBuffer;
 //layout(location = 0) out vec4 o_color;
+
+buffer MyBlockName
+{
+    int result;
+} outputBuffer;
 
 uniform sampler1DShadow uniform_sampler1DShadow;
 uniform sampler2DShadow uniform_sampler2DShadow;
@@ -498,16 +508,19 @@ bool itextureFuncs(Sampler1D<vector<T, N>> gsampler1D
         ;
 }
 
-[numthreads(4, 1, 1)]
+#ifdef COMPUTE
+[numthreads(2, 2, 1)]
+#endif
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
+    // CHECK_SPV_DIRECT: OpEntryPoint
     // CHECK_HLSL: void computeMain(
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
 
-    bool r = true
+    outputBuffer.result = true
         && textureFuncs(
             uniform_sampler1D
             , uniform_sampler2D

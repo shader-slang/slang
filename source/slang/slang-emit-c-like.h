@@ -587,6 +587,7 @@ public:
     // to use for it when emitting code.
     Dictionary<IRInst*, String> m_mapInstToName;
 
+    OrderedHashSet<String> m_requiredPreludesRaw;
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
 };
 

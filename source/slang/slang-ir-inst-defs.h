@@ -594,6 +594,7 @@ INST_RANGE(TerminatorInst, Return, Unreachable)
 
 INST(RequirePrelude, RequirePrelude, 1, 0)
 INST(RequireGLSLExtension, RequireGLSLExtension, 1, 0)
+INST(RequireComputeDerivative, RequireComputeDerivative, 0, 0)
 
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point
@@ -861,6 +862,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
         /// Applie to an IR function and signals that inlining should not be performed unless unavoidable.
     INST(NoInlineDecoration, noInline, 0, 0)
+
+    INST(DerivativeGroupQuadDecoration, DerivativeGroupQuad, 0, 0)
+    INST(DerivativeGroupLinearDecoration, DerivativeGroupLinear, 0, 0)
 
         // Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
     INST(NonCopyableTypeDecoration, nonCopyable, 0, 0)
