@@ -9,7 +9,7 @@ name: MacOS Release
 jobs:
   build_with_signing:
     name: Upload Release Asset
-    runs-on: macos-latest-arm64
+    runs-on: macos-latest
     strategy:
       matrix:
         configuration: ['release'] # 'debug'

@@ -11,7 +11,7 @@ concurrency:
 jobs:
   build: 
     name: MacOS Build CI
-    runs-on: macos-latest-arm64
+    runs-on: macos-latest
     
     strategy:
       matrix:
