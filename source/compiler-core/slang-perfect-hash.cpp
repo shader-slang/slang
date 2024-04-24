@@ -146,7 +146,7 @@ String perfectHashToEmbeddableCpp(
     w.print("bool %s(const UnownedStringSlice& str, %s& value)\n", String(funcName).getBuffer(), String(valueType).getBuffer());
     line("{");
 
-    w.print("    static const unsigned tableSalt[%ld] = {\n", hashParams.saltTable.getCount());
+    w.print("    static const unsigned tableSalt[%d] = {\n", (int)hashParams.saltTable.getCount());
     w.print("       ");
     for (Index i = 0; i < hashParams.saltTable.getCount(); ++i)
     {
@@ -170,7 +170,7 @@ String perfectHashToEmbeddableCpp(
     w.print("    using KV = std::pair<const char*, %s>;\n", String(valueType).getBuffer());
     line("");
 
-    w.print("    static const KV words[%ld] =\n", hashParams.destTable.getCount());
+    w.print("    static const KV words[%d] =\n", (int)hashParams.destTable.getCount());
     line("    {");
     for (Index i = 0; i < hashParams.destTable.getCount(); ++i)
     {
@@ -191,7 +191,7 @@ String perfectHashToEmbeddableCpp(
     line("        UInt32 h = salt;");
     line("        for (const char c : str)");
     line("            h = (h * 0x01000193) ^ c;");
-    w.print("        return h %% %ld;\n", hashParams.saltTable.getCount());
+    w.print("        return h %% %d;\n", (int)hashParams.saltTable.getCount());
     line("    };");
     line("");
 

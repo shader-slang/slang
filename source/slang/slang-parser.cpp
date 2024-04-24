@@ -5453,7 +5453,7 @@ namespace Slang
     bool lookAheadTokenAfterModifiers(Parser* parser, const char* token)
     {
         TokenReader tokenPreview = parser->tokenReader;
-        for (Index i = 0;; i++)
+        for (;;)
         {
             if (tokenPreview.peekToken().getContent() == token)
                 return true;

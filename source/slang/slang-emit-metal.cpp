@@ -160,7 +160,6 @@ void MetalSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUnifor
 
 void MetalSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
 {
-    auto profile = m_effectiveProfile;
     auto stage = entryPointDecor->getProfile().getStage();
 
     switch (stage)

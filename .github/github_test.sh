@@ -18,6 +18,10 @@ if [ "${ARCHITECTURE}" == "x86_64" ]; then
     ARCHITECTURE="x64"
 fi
 
+if [ "${ARCHITECTURE}" == "arm64" ]; then
+    ARCHITECTURE="aarch64"
+fi
+
 # CONFIGURATION=release or debug
 if [ "${CC}" == "gcc" ] && [ "${CONFIGURATION}" == "release" ] && [ "${ARCHITECTURE}" == "x64" ]
 then
