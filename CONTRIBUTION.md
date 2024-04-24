@@ -75,7 +75,7 @@ For a quick reference, follow the instructions below.
 #### Windows
 Download and install CMake from [CMake.org/download](https://cmake.org/download)
 
-Run CMake with a following command to generate Makefile:
+Run CMake with the following command to generate a Visual Studio 2022 Solution:
 ```
 # For VisualStudio 2022
 C:\git\slang> cmake.exe --preset vs2022
