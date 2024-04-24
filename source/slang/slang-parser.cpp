@@ -7248,6 +7248,13 @@ namespace Slang
             parser->ReadMatchingToken(TokenType::RParent);
             return SPIRVAsmOperand{ SPIRVAsmOperand::SampledImageType, Token{}, typeExpr };
         }
+        else if (AdvanceIf(parser, "__convertTexel"))
+        {
+            parser->ReadToken(TokenType::LParent);
+            const auto texelExpr = parser->ParseExpression();
+            parser->ReadMatchingToken(TokenType::RParent);
+            return SPIRVAsmOperand{ SPIRVAsmOperand::ConvertTexel, Token{}, texelExpr };
+        }
         // The pseudo-operand for component truncation
         else if(parser->LookAheadToken("__truncate"))
         {

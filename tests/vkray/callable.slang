@@ -1,6 +1,6 @@
 // callable.slang
 
-//TEST:SIMPLE(filecheck=CHECK): -profile glsl_460+spirv_1_4 -stage callable -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK): -profile glsl_460+spirv_1_4 -stage callable -entry main -target spirv-assembly -emit-spirv-via-glsl
 
 import callable_shared;
 

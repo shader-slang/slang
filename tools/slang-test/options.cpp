@@ -290,9 +290,9 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->skipApiDetection = true;
         }
-        else if (strcmp(arg, "-emit-spirv-directly") == 0)
+        else if (strcmp(arg, "-emit-spirv-via-glsl") == 0)
         {
-            optionsOut->emitSPIRVDirectly = true;
+            optionsOut->emitSPIRVDirectly = false;
         }
         else if (strcmp(arg, "-expected-failure-list") == 0)
         {

@@ -3773,7 +3773,12 @@ namespace Slang
         return nullptr;
     }
 
-    static int _getTypeStyleId(IRType* type)
+    enum class TypeCastStyle
+    {
+        Unknown = -1, 
+        Int, Float, Bool, Ptr, Void
+    };
+    static TypeCastStyle _getTypeStyleId(IRType* type)
     {
         if (auto vectorType = as<IRVectorType>(type))
         {
@@ -3787,22 +3792,24 @@ namespace Slang
         switch (style)
         {
         case kIROp_IntType:
-            return 0;
+            return TypeCastStyle::Int;
         case kIROp_FloatType:
-            return 1;
+        case kIROp_HalfType:
+        case kIROp_DoubleType:
+            return TypeCastStyle::Float;
         case kIROp_BoolType:
-            return 2;
+            return TypeCastStyle::Bool;
         case kIROp_PtrType:
         case kIROp_InOutType:
         case kIROp_OutType:
         case kIROp_RawPointerType:
         case kIROp_RefType:
         case kIROp_ConstRefType:
-            return 3;
+            return TypeCastStyle::Ptr;
         case kIROp_VoidType:
-            return 4;
+            return TypeCastStyle::Void;
         default:
-            return -1;
+            return TypeCastStyle::Unknown;
         }
     }
 
@@ -3814,14 +3821,14 @@ namespace Slang
         auto toStyle = _getTypeStyleId(type);
         auto fromStyle = _getTypeStyleId(value->getDataType());
 
-        if (fromStyle == kIROp_VoidType)
+        if (fromStyle == TypeCastStyle::Void)
         {
             // We shouldn't be casting from void to other types.
             SLANG_UNREACHABLE("cast from void type");
         }
 
-        SLANG_RELEASE_ASSERT(toStyle != -1);
-        SLANG_RELEASE_ASSERT(fromStyle != -1);
+        SLANG_RELEASE_ASSERT(toStyle != TypeCastStyle::Unknown);
+        SLANG_RELEASE_ASSERT(fromStyle != TypeCastStyle::Unknown);
 
         struct OpSeq
         {
@@ -3845,7 +3852,7 @@ namespace Slang
             /* From Ptr   */ {kIROp_CastPtrToInt, {kIROp_CastPtrToInt, kIROp_CastIntToFloat}, kIROp_CastPtrToBool, kIROp_BitCast, kIROp_CastToVoid},
         };
 
-        auto op = opMap[fromStyle][toStyle];
+        auto op = opMap[(int)fromStyle][(int)toStyle];
         if (op.op0 == kIROp_Nop)
             return value;
         auto t = type;
@@ -5894,6 +5901,18 @@ namespace Slang
             inst->getFullType(),
             inst
             );
+        return i;
+    }
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandConvertTexel(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandConvertTexel,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
         return i;
     }
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandRayPayloadFromLocation(IRInst* inst)

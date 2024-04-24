@@ -1,13 +1,14 @@
 #version 450 core
 #extension GL_EXT_texture_shadow_lod : enable
 
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage fragment -entry computeMain -target spirv
-//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage fragment -entry computeMain -target cuda
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl
+// TODO: test direct to spirv backend.
+//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -emit-spirv-via-glsl -stage compute -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda
 
 // Disabling following targets because they are currently causing compile errors.
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage fragment -entry computeMain -target hlsl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage fragment -entry computeMain -target cpp
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
 // "Offset" family of texture functions in GLSL requires offset parameter to be a constant value.
 // It appears that slangc removes the constant-ness of constant values.

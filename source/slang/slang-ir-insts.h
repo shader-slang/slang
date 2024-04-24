@@ -4227,6 +4227,7 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);
     IRSPIRVAsmOperand* createSPIRVAsmOperandInst(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandConvertTexel(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandRayPayloadFromLocation(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandRayAttributeFromLocation(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandRayCallableFromLocation(IRInst* inst);

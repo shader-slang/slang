@@ -967,9 +967,9 @@ Result linkAndOptimizeIR(
     // bit_cast on basic types.
     lowerBitCast(targetProgram, irModule, sink);
 
-    bool emitSpirvDirectly = targetProgram->getOptionSet().shouldEmitSPIRVDirectly();
+    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
 
-    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
         eliminateDeadCode(irModule);

@@ -1598,6 +1598,33 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return (as<IRSPIRVAsmInst>(inst) || as<IRSPIRVAsmOperand>(inst));
     }
 
+    void processConvertTexel(IRInst* asmBlockInst, IRInst* inst)
+    {
+        // If we see `__convertTexel(x)`, we need to return a vector<__sampledElementType(x), 4>.
+        IRInst* operand = inst->getOperand(0);
+        auto elementType = getSPIRVSampledElementType(operand->getDataType());
+        auto valueElementType = getVectorElementType(operand->getDataType());
+        IRBuilder builder(inst);
+        builder.setInsertBefore(asmBlockInst);
+        if (elementType != valueElementType)
+        {
+            auto floatCastType = replaceVectorElementType(operand->getDataType(), elementType);
+            operand = builder.emitCast(floatCastType, operand);
+        }
+        auto vecType = builder.getVectorType(elementType, 4);
+        if (vecType != operand->getDataType())
+        {
+            if (!as<IRVectorType>(operand->getDataType()))
+                operand = builder.emitMakeVectorFromScalar(vecType, operand);
+            else
+                operand = builder.emitVectorReshape(vecType, operand);
+        }
+        builder.setInsertBefore(inst);
+        auto spvAsmOperand = builder.emitSPIRVAsmOperandInst(operand);
+        inst->replaceUsesWith(spvAsmOperand);
+        inst->removeAndDeallocate();
+    }
+
     void processSPIRVAsm(IRSPIRVAsm* inst)
     {
         // Move anything that is not an spirv instruction to the outer parent.
@@ -1605,6 +1632,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             if (!isAsmInst(child))
                 child->insertBefore(inst);
+            else if (child->getOp() == kIROp_SPIRVAsmOperandConvertTexel)
+                processConvertTexel(inst, child);
         }
     }
 

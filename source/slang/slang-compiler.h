@@ -2402,6 +2402,11 @@ namespace Slang
 
         HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions() { return m_targetReq->getHLSLToVulkanLayoutOptions(); }
 
+        bool shouldEmitSPIRVDirectly()
+        {
+            return isKhronosTarget(m_targetReq) && getOptionSet().shouldEmitSPIRVDirectly();
+        }
+
     private:
         RefPtr<IRModule> createIRModuleForLayout(DiagnosticSink* sink);
 
