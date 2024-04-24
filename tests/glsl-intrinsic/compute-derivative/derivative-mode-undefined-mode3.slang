@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK_SPV_SYNTAX): -allow-glsl -stage compute -entry main -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK_SPV_SYNTAX): -allow-glsl -stage compute -entry main -target spirv
 // CHECK_SPV_SYNTAX: DerivativeGroupQuadsNV
 
 //TEST:SIMPLE(filecheck=CHECK_GLSL_SYNTAX): -allow-glsl -stage compute -entry main -target glsl

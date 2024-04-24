@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK_SPV_SYNTAX): -allow-glsl -fvk-use-entrypoint-name -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK_SPV_SYNTAX): -allow-glsl -fvk-use-entrypoint-name -target spirv
 // CHECK_SPV_SYNTAX: DerivativeGroupQuadsNV
 // CHECK_SPV_SYNTAX: DerivativeGroupQuadsNV
 

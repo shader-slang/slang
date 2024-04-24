@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target glsl -DLINEAR_SLANG
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DLINEAR_SLANG
+//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target spirv -DLINEAR_SLANG
 
 //TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target glsl -DLINEAR_GLSL
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DLINEAR_GLSL
+//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target spirv -DLINEAR_GLSL
 // CHECK: error 31211
 
 buffer MyBlockName
