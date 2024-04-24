@@ -95,8 +95,11 @@ LegalVal LegalVal::wrappedBuffer(
 //
 
 IRTypeLegalizationContext::IRTypeLegalizationContext(
+    TargetProgram* target,
     IRModule* inModule)
 {
+    targetProgram = target;
+
     session = inModule->getSession();
     module = inModule;
 
@@ -3868,8 +3871,8 @@ static void legalizeTypes(
 //
 struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
 {
-    IRResourceTypeLegalizationContext(IRModule* module)
-        : IRTypeLegalizationContext(module)
+    IRResourceTypeLegalizationContext(TargetProgram* target, IRModule* module)
+        : IRTypeLegalizationContext(target, module)
     {}
 
     bool isSpecialType(IRType* type) override
@@ -3903,8 +3906,8 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
 //
 struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
 {
-    IRExistentialTypeLegalizationContext(IRModule* module)
-        : IRTypeLegalizationContext(module)
+    IRExistentialTypeLegalizationContext(TargetProgram* target, IRModule* module)
+        : IRTypeLegalizationContext(target, module)
     {}
 
     bool isSpecialType(IRType* inType) override
@@ -3944,8 +3947,8 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
 // a public function signature.
 struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 {
-    IREmptyTypeLegalizationContext(IRModule* module)
-        : IRTypeLegalizationContext(module)
+    IREmptyTypeLegalizationContext(TargetProgram* target, IRModule* module)
+        : IRTypeLegalizationContext(target, module)
     {}
 
     bool isSpecialType(IRType*) override
@@ -3985,6 +3988,7 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 // specialized context type to use to get the job done.
 
 void legalizeResourceTypes(
+    TargetProgram* target,
     IRModule*       module,
     DiagnosticSink* sink)
 {
@@ -3992,11 +3996,12 @@ void legalizeResourceTypes(
 
     SLANG_UNUSED(sink);
 
-    IRResourceTypeLegalizationContext context(module);
+    IRResourceTypeLegalizationContext context(target, module);
     legalizeTypes(&context);
 }
 
 void legalizeExistentialTypeLayout(
+    TargetProgram* target,
     IRModule*       module,
     DiagnosticSink* sink)
 {
@@ -4005,15 +4010,15 @@ void legalizeExistentialTypeLayout(
     SLANG_UNUSED(module);
     SLANG_UNUSED(sink);
 
-    IRExistentialTypeLegalizationContext context(module);
+    IRExistentialTypeLegalizationContext context(target, module);
     legalizeTypes(&context);
 }
 
-void legalizeEmptyTypes(IRModule* module, DiagnosticSink* sink)
+void legalizeEmptyTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
 
-    IREmptyTypeLegalizationContext context(module);
+    IREmptyTypeLegalizationContext context(target, module);
     legalizeTypes(&context);
 }
 
