@@ -9,12 +9,12 @@ name: MacOS Release
 jobs:
   build_with_signing:
     name: Upload Release Asset
-    runs-on: macos-latest
+    runs-on: macos-latest-arm64
     strategy:
       matrix:
         configuration: ['release'] # 'debug'
         compiler: ['clang']
-        platform: ['x64'] 
+        platform: ['aarch64'] 
         targetPlatform: ['x64', 'aarch64'] 
     steps:
       - name: Checkout code

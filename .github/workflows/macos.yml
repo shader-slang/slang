@@ -11,14 +11,14 @@ concurrency:
 jobs:
   build: 
     name: MacOS Build CI
-    runs-on: macos-latest
+    runs-on: macos-latest-arm64
     
     strategy:
       matrix:
         configuration: ['release'] # 'debug'
         compiler: ['clang']
-        platform: ['x64'] 
-        targetPlatform: ['x64'] 
+        platform: ['arm64'] 
+        targetPlatform: ['arm64'] 
     steps:
     - uses: actions/checkout@v3
       with:
@@ -64,7 +64,7 @@ jobs:
         path: |
           ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE }}
     - name: test
-      if:  ${{ matrix.targetPlatform != 'aarch64' }}
+      if:  ${{ matrix.targetPlatform != 'x64' }}
       run: 
         CONFIGURATION=${{matrix.configuration}}
         CC=${{matrix.compiler}}
