@@ -73,28 +73,35 @@ Please follow the instructions of how to [Building Slang from Source](docs/build
 For a quick reference, follow the instructions below.
 
 #### Windows
-Find where the premake executable is. The location may change when we upgrade Premake.
-```
-C:\git\slang> where /r external\slang-binaries\premake premake*.exe
-```
+Download and install CMake from [CMake.org/download](https://cmake.org/download)
 
-Run the premake with the following command line options after replacing "PREMAKE" with the result from the previous command.
+Run CMake with a following command to generate Makefile:
 ```
-# For VisualStudio 2019
-C:\git\slang> PREMAKE vs2019 --deps=true --arch=x64
-# For VisualStudio 2017
-C:\git\slang> PREMAKE vs2017 --deps=true --arch=x64
+# For VisualStudio 2022
+C:\git\slang> cmake.exe --preset vs2022
 ```
 
 Open slang.sln with VisualStudio IDE and build it for "x64".
 
-#### Linux
-Find where the premake is and run it with gmake2 option.
+Or you can build with a following command:
 ```
-$ PREMAKE="$(find external/slang-binaries/premake -type f -iname 'premake5' | grep bin/linux-64)"
-$ chmod u+x "$PREMAKE"
-$ "$PREMAKE" gmake2 --deps=true --arch=x64
-$ make config=release_x64
+C:\git\slang> cmake.exe --build --preset release
+```
+
+#### Linux
+Install CMake and Ninja.
+```
+$ sudo apt-get install cmake ninja-build
+```
+
+Run CMake with a following command to generate Makefile:
+```
+$ cmake --preset default
+```
+
+Build with a following command:
+```
+$ cmake --build --preset release
 ```
 
 ### Making Changes
