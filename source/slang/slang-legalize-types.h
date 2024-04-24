@@ -602,10 +602,11 @@ struct IRTypeLegalizationContext
     Session*    session;
     IRModule*   module;
     IRBuilder*  builder;
-
+    TargetProgram* targetProgram;
     IRBuilder builderStorage;
 
     IRTypeLegalizationContext(
+        TargetProgram* target,
         IRModule* inModule);
 
     // When inserting new globals, put them before this one.
@@ -710,14 +711,17 @@ LegalType createLegalUniformBufferTypeForExistentials(
 
 
 void legalizeExistentialTypeLayout(
+    TargetProgram* target,
     IRModule*       module,
     DiagnosticSink* sink);
 
 void legalizeResourceTypes(
+    TargetProgram* target,
     IRModule*       module,
     DiagnosticSink* sink);
 
 void legalizeEmptyTypes(
+    TargetProgram* target,
     IRModule* module,
     DiagnosticSink* sink);
 
