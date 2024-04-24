@@ -9847,7 +9847,7 @@ namespace Slang
                 loc = Base::sourceLocStack.getLast();
             handleReferenceFunc(decl, decl->inferredCapabilityRequirements, loc);
         }
-        virtual void processDeclModifiers(Decl* decl)
+        virtual void processDeclModifiers(Decl* decl) override
         {
             if (decl)
                 handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
