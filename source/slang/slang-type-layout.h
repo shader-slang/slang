@@ -272,7 +272,11 @@ typedef slang::ParameterCategory LayoutResourceKind;
     x(SubElementRegisterSpace) \
     x(VertexInput) \
     x(FragmentOutput) \
-    x(InputAttachmentIndex)
+    x(InputAttachmentIndex) \
+    \
+    x(MetalBuffer) \
+    x(MetalTexture) \
+    x(MetalArgumentBufferElement)
 
 #define SLANG_PARAMETER_CATEGORY_FLAG(x) x = ParameterCategoryFlags(1) << int(slang::x), 
 

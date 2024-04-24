@@ -583,6 +583,7 @@ Result linkAndOptimizeIR(
         //  will have (more) legal shader code.
         //
         legalizeExistentialTypeLayout(
+            targetProgram,
             irModule,
             sink);
 
@@ -603,6 +604,7 @@ Result linkAndOptimizeIR(
         // then become multiple variables/parameters/arguments/etc.
         //
         legalizeResourceTypes(
+            targetProgram,
             irModule,
             sink);
 
@@ -617,6 +619,7 @@ Result linkAndOptimizeIR(
         // On CPU/CUDA targets, we simply elminate any empty types if
         // they are not part of public interface.
         legalizeEmptyTypes(
+            targetProgram,
             irModule,
             sink);
     }
@@ -876,6 +879,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
+    case CodeGenTarget::Metal:
         moveGlobalVarInitializationToEntryPoints(irModule);
         break;
     case CodeGenTarget::CPPSource:
@@ -941,9 +945,12 @@ Result linkAndOptimizeIR(
 
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
-        // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
-        // a simple storage type that has target independent layout based on the kind of buffer resource.
-        lowerBufferElementTypeToStorageType(targetProgram, irModule);
+        if (!isMetalTarget(targetRequest))
+        {
+            // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
+            // a simple storage type that has target independent layout based on the kind of buffer resource.
+            lowerBufferElementTypeToStorageType(targetProgram, irModule);
+        }
     }
 
     // Rewrite functions that return arrays to return them via `out` parameter,
