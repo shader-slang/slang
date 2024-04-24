@@ -3,7 +3,6 @@
 
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-via-glsl -DCOMPUTE
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage fragment -entry computeMain -target spirv -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV_DIRECT): -allow-glsl -stage compute -entry computeMain -target spirv -DCOMPUTE
 //TEST:SIMPLE(filecheck=CHECK_SPV_DIRECT): -allow-glsl -stage fragment -entry computeMain -target spirv

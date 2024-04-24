@@ -5724,7 +5724,7 @@ vector<T, N> fwidth(vector<T, N> x)
     case spirv:
         return spirv_asm
         {
-            OpFwidth $$T result $x;
+            OpFwidth $$vector<T, N> result $x;
         };
     }
 }
