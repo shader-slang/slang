@@ -283,7 +283,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             needClose = maybeEmitParens(outerPrec, prec);
             emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
             m_writer->emit("+");
-            emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
+            emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
             maybeCloseParens(needClose);
             return true;
         }
