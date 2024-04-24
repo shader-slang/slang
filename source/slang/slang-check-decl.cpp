@@ -6944,6 +6944,13 @@ namespace Slang
         if (!doFunctionSignaturesMatch(newDeclRef, oldDeclRef))
             return SLANG_OK;
 
+        // If the declatation is declared by 'extern', and new definition is with 'export', then
+        // we should let overload resolution to handle it.
+        if (oldDecl->hasModifier<ExternModifier>() && newDecl->hasModifier<HLSLExportModifier>())
+        {
+            return SLANG_OK;
+        }
+
         // If we get this far, then we've got two declarations in the same
         // scope, with the same name and signature, so they appear
         // to be redeclarations.
@@ -9840,7 +9847,7 @@ namespace Slang
                 loc = Base::sourceLocStack.getLast();
             handleReferenceFunc(decl, decl->inferredCapabilityRequirements, loc);
         }
-        virtual void processDeclModifiers(Decl* decl)
+        virtual void processDeclModifiers(Decl* decl) override
         {
             if (decl)
                 handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);

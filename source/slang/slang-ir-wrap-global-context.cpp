@@ -65,8 +65,7 @@ namespace Slang
                 {
                     auto newParam = builder.createParam(globalParam.first->getFullType());
                     newParam->insertBefore(paramInsertPoint);
-                    if (auto name = findNameHint(globalParam.first))
-                        builder.addNameHintDecoration(newParam, name);
+                    globalParam.first->transferDecorationsTo(newParam);
                     newParams.add({newParam, globalParam.second});
                 }
 
