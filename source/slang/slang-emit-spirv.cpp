@@ -1876,7 +1876,7 @@ struct SPIRVEmitContext
         setImageFormatCapabilityAndExtension(SpvImageFormatUnknown, SpvCapabilityShader);
         return emitOpTypeImage(
             assignee,
-            dropVector((IRType*)sampledType),
+            getVectorElementType((IRType*)sampledType),
             dim,
             SpvLiteralInteger::from32(ImageOpConstants::unknownDepthImage),
             SpvLiteralInteger::from32(0),
@@ -2027,12 +2027,12 @@ struct SPIRVEmitContext
         //
         // The op itself
         //
-        
+        auto sampledElementType = getSPIRVSampledElementType(sampledType);
         if (inst->isCombined())
         {
             auto imageType = emitOpTypeImage(
                 nullptr,
-                dropVector((IRType*)sampledType),
+                sampledElementType,
                 dim,
                 SpvLiteralInteger::from32(depth),
                 SpvLiteralInteger::from32(arrayed),
@@ -2047,7 +2047,7 @@ struct SPIRVEmitContext
 
         return emitOpTypeImage(
             assignee,
-            dropVector((IRType*)sampledType),
+            sampledElementType,
             dim,
             SpvLiteralInteger::from32(depth),
             SpvLiteralInteger::from32(arrayed),
@@ -4874,20 +4874,13 @@ struct SPIRVEmitContext
         }
     }
 
-    IRType* dropVector(IRType* t)
-    {
-        if(const auto v = as<IRVectorType>(t))
-            return v->getElementType();
-        return t;
-    };
-
     SpvInst* emitIntCast(SpvInstParent* parent, IRIntCast* inst)
     {
         const auto fromTypeV = inst->getOperand(0)->getDataType();
         const auto toTypeV = inst->getDataType();
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
-        const auto fromType = dropVector(fromTypeV);
-        const auto toType = dropVector(toTypeV);
+        const auto fromType = getVectorElementType(fromTypeV);
+        const auto toType = getVectorElementType(toTypeV);
 
         if (as<IRBoolType>(fromType))
         {
@@ -4953,8 +4946,8 @@ struct SPIRVEmitContext
         const auto fromTypeV = inst->getOperand(0)->getDataType();
         const auto toTypeV = inst->getDataType();
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
-        const auto fromType = dropVector(fromTypeV);
-        const auto toType = dropVector(toTypeV);
+        const auto fromType = getVectorElementType(fromTypeV);
+        const auto toType = getVectorElementType(toTypeV);
         SLANG_ASSERT(isFloatingType(fromType));
         SLANG_ASSERT(isFloatingType(toType));
         SLANG_ASSERT(!isTypeEqual(fromType, toType));
@@ -4967,8 +4960,8 @@ struct SPIRVEmitContext
         const auto fromTypeV = inst->getOperand(0)->getDataType();
         const auto toTypeV = inst->getDataType();
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
-        const auto fromType = dropVector(fromTypeV);
-        const auto toType = dropVector(toTypeV);
+        const auto fromType = getVectorElementType(fromTypeV);
+        const auto toType = getVectorElementType(toTypeV);
         SLANG_ASSERT(isFloatingType(toType));
 
         if (isIntegralType(fromType))
@@ -5003,8 +4996,8 @@ struct SPIRVEmitContext
         const auto fromTypeV = inst->getOperand(0)->getDataType();
         const auto toTypeV = inst->getDataType();
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
-        const auto fromType = dropVector(fromTypeV);
-        const auto toType = dropVector(toTypeV);
+        const auto fromType = getVectorElementType(fromTypeV);
+        const auto toType = getVectorElementType(toTypeV);
         SLANG_ASSERT(isFloatingType(fromType));
 
         if (as<IRBoolType>(toType))
@@ -5222,7 +5215,7 @@ struct SPIRVEmitContext
 
     SpvInst* emitVectorOrScalarArithmetic(SpvInstParent* parent, IRInst* instToRegister, IRInst* type, IROp op, UInt operandCount, ArrayView<IRInst*> operands)
     {
-        IRType* elementType = dropVector(operands[0]->getDataType());
+        IRType* elementType = getVectorElementType(operands[0]->getDataType());
         IRBasicType* basicType = as<IRBasicType>(elementType);
         bool isFloatingPoint = false;
         bool isBool = false;
@@ -5860,7 +5853,7 @@ struct SPIRVEmitContext
                     // Make a 4 vector of the component type
                     IRBuilder builder(m_irModule);
                     const auto elementType = cast<IRType>(operand->getValue());
-                    const auto sampledType = builder.getVectorType(dropVector(elementType), 4);
+                    const auto sampledType = builder.getVectorType(getSPIRVSampledElementType(getVectorElementType(elementType)), 4);
                     emitOperand(ensureInst(sampledType));
                     break;
                 }
@@ -5914,7 +5907,7 @@ struct SPIRVEmitContext
                             // Make a 4 vector of the component type
                             IRBuilder builder(m_irModule);
                             const auto elementType = cast<IRType>(operand->getValue());
-                            return builder.getVectorType(dropVector(elementType), 4);
+                            return builder.getVectorType(getVectorElementType(elementType), 4);
                         }
                     case kIROp_SPIRVAsmOperandEnum:
                     case kIROp_SPIRVAsmOperandLiteral:
@@ -5931,9 +5924,22 @@ struct SPIRVEmitContext
                 const auto toIdOperand = spvInst->getSPIRVOperands()[1];
                 const auto fromType = getSlangType(spvInst->getSPIRVOperands()[2]);
                 const auto fromIdOperand = spvInst->getSPIRVOperands()[3];
-
-                // The component types must be the same
-                SLANG_ASSERT(isTypeEqual(dropVector(toType), dropVector(fromType)));
+                auto fromElementType = getSPIRVSampledElementType(fromType);
+                SpvInst* fromSpvInst = nullptr;
+                // If the component types are not the same, convert them to be so.
+                if (!isTypeEqual(getVectorElementType(toType), fromElementType))
+                {
+                    auto newFromType = replaceVectorElementType(fromType, getVectorElementType(toType));
+                    fromSpvInst = emitInstCustomOperandFunc(
+                        parent,
+                        nullptr,
+                        SpvOpFConvert,
+                        [&]() {
+                            emitOperand(newFromType);
+                            emitOperand(kResultID),
+                                emitSpvAsmOperand(fromIdOperand);
+                        });
+                }
 
                 // If we don't need truncation, but a different result ID is
                 // expected, then just unify them in the idMap
@@ -5948,7 +5954,7 @@ struct SPIRVEmitContext
                         [&](){
                             emitOperand(toType);
                             emitSpvAsmOperand(toIdOperand);
-                            emitSpvAsmOperand(fromIdOperand);
+                            fromSpvInst ? emitOperand(fromSpvInst) : emitSpvAsmOperand(fromIdOperand);
                         }
                     );
                 }
@@ -5962,7 +5968,7 @@ struct SPIRVEmitContext
                         [&](){
                             emitOperand(toType);
                             emitSpvAsmOperand(toIdOperand);
-                            emitSpvAsmOperand(fromIdOperand);
+                            fromSpvInst ? emitOperand(fromSpvInst) : emitSpvAsmOperand(fromIdOperand);
                             emitOperand(SpvLiteralInteger::from32(0));
                         }
                     );
@@ -5977,7 +5983,7 @@ struct SPIRVEmitContext
                         [&](){
                             emitOperand(toType);
                             emitSpvAsmOperand(toIdOperand);
-                            emitSpvAsmOperand(fromIdOperand);
+                            fromSpvInst ? emitOperand(fromSpvInst) : emitSpvAsmOperand(fromIdOperand);
                         }
                     );
                 }
@@ -5997,7 +6003,7 @@ struct SPIRVEmitContext
                         [&](){
                             emitOperand(toType);
                             emitSpvAsmOperand(toIdOperand);
-                            emitSpvAsmOperand(fromIdOperand);
+                            fromSpvInst ? emitOperand(fromSpvInst) : emitSpvAsmOperand(fromIdOperand);
                             emitOperand(emitOpUndef(parent, nullptr, fromVector));
                             for(Int32 i = 0; i < toVectorSize; ++i)
                                 emitOperand(SpvLiteralInteger::from32(i));

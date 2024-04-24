@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK0):-target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK1):-target hlsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=CHECK2):-target spirv -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK2):-target spirv -entry main -stage compute -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK3):-target spirv -entry main -stage compute -emit-spirv-directly
 
 RWTexture2D<uint> texArray[2];

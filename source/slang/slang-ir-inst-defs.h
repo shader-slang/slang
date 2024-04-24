@@ -1187,6 +1187,7 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // This isn't hoistable, as we sometimes need to change the used value and
     // instructions around the specific asm block
     INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, 0)    
+    INST(SPIRVAsmOperandConvertTexel, SPIRVAsmOperandConvertTexel, 1, 0)
     //a late resolving type to handle the case of ray objects (resolving late due to constexpr data requirment)
     INST(SPIRVAsmOperandRayPayloadFromLocation, SPIRVAsmOperandRayPayloadFromLocation, 1, 0)
     INST(SPIRVAsmOperandRayAttributeFromLocation, SPIRVAsmOperandRayAttributeFromLocation, 1, 0)
@@ -1200,7 +1201,6 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A reference to the glsl450 instruction set.
     INST(SPIRVAsmOperandGLSL450Set, SPIRVAsmOperandGLSL450Set, 0, HOISTABLE)
     INST(SPIRVAsmOperandDebugPrintfSet, SPIRVAsmOperandDebugPrintfSet, 0, HOISTABLE)
-
     // A string which is given a unique ID in the backend, used to refer to
     // results of other instrucions in the same asm block
     INST(SPIRVAsmOperandId, SPIRVAsmOperandId, 1, HOISTABLE)

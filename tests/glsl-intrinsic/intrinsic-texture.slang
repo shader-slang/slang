@@ -3,10 +3,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -DCOMPUTE
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage fragment -entry computeMain -target spirv
-//TEST:SIMPLE(filecheck=CHECK_SPV_DIRECT): -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DCOMPUTE
-//TEST:SIMPLE(filecheck=CHECK_SPV_DIRECT): -allow-glsl -stage fragment -entry computeMain -target spirv -emit-spirv-directly 
+//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-via-glsl -DCOMPUTE
+//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage fragment -entry computeMain -target spirv -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=CHECK_SPV_DIRECT): -allow-glsl -stage compute -entry computeMain -target spirv -DCOMPUTE
+//TEST:SIMPLE(filecheck=CHECK_SPV_DIRECT): -allow-glsl -stage fragment -entry computeMain -target spirv
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DCOMPUTE
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage fragment -entry computeMain -target cuda
 

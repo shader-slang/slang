@@ -313,6 +313,10 @@ static void overAllBlocks(IRModule* module, F f)
 
 void hoistInstOutOfASMBlocks(IRBlock* block);
 
+IRType* getSPIRVSampledElementType(IRInst* sampledType);
+
+IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
+
 inline bool isCompositeType(IRType* type)
 {
     switch (type->getOp())

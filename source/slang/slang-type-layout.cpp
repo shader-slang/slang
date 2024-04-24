@@ -1796,7 +1796,7 @@ bool isCUDATarget(TargetRequest* targetReq)
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language
-    if (targetProgram->getOptionSet().shouldEmitSPIRVDirectly())
+    if (targetProgram->shouldEmitSPIRVDirectly())
     {
         return SourceLanguage::Unknown;
     }

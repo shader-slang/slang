@@ -1544,6 +1544,27 @@ void hoistInstOutOfASMBlocks(IRBlock* block)
     }
 }
 
+IRType* getSPIRVSampledElementType(IRInst* sampledType)
+{
+    auto sampledElementType = getVectorElementType((IRType*)sampledType);
+    if (sampledElementType->getOp() == kIROp_HalfType)
+    {
+        IRBuilder builder(sampledType);
+        sampledElementType = builder.getBasicType(BaseType::Float);
+    }
+    return sampledElementType;
+}
+
+IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t)
+{
+    if (auto orignalVectorType = as<IRVectorType>(originalVectorType))
+    {
+        IRBuilder builder(originalVectorType);
+        return builder.getVectorType(t, orignalVectorType->getElementCount());
+    }
+    return t;
+}
+
 IRParam* getParamAt(IRBlock* block, UIndex ii)
 {
     UIndex index = 0;

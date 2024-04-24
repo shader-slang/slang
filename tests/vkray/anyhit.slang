@@ -5,7 +5,7 @@
 // where we cannot infer the required SPIR-V version from the code
 // (and glslang doesn't include any such inference ability).
 
-//TEST:SIMPLE(filecheck=CHECK): -profile glsl_460+spirv_1_4 -stage anyhit -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK): -profile glsl_460+spirv_1_4 -stage anyhit -entry main -target spirv-assembly -emit-spirv-via-glsl
 
 struct SphereHitAttributes
 {
