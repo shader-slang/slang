@@ -293,7 +293,7 @@ static void emitReflectionVarBindingInfoJSON(
     CASE(REGISTER_SPACE, registerSpace);
     CASE(SUB_ELEMENT_REGISTER_SPACE, subElementRegisterSpace);
     CASE(GENERIC, generic);
-
+    CASE(METAL_ARGUMENT_BUFFER_ELEMENT, metalArgumentBufferElement);
     #undef CASE
 
         default:
