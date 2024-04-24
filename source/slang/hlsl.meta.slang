@@ -2,6 +2,9 @@
 
 typedef uint UINT;
 
+__intrinsic_op($(kIROp_RequireGLSLExtension))
+void __requireGLSLExtension(String extensionName);
+
 __intrinsic_op($(kIROp_FloatCast))
 T __floatCast<T, U>(U v);
 
@@ -37,24 +40,30 @@ struct GLSLShaderStorageBuffer {}
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T,L> buffer);
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(StructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RWStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RasterizerOrderedStructuredBuffer<T,L> buffer);
 
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
+[require(cpp_cuda_glsl_hlsl_spirv, appendstructuredbuffer)]
 struct AppendStructuredBuffer
 {
     __intrinsic_op($(kIROp_StructuredBufferAppend))
@@ -73,6 +82,7 @@ struct AppendStructuredBuffer
 
 __magic_type(HLSLByteAddressBufferType)
 __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
 struct ByteAddressBuffer
 {
     [__readNone]
@@ -135,6 +145,7 @@ struct ByteAddressBuffer
     uint4 Load4(int location, out uint status);
 
     [__readNone]
+    [ForceInline]
     T Load<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location);
@@ -213,69 +224,89 @@ struct __TextureImpl<T, Shape: __ITextureShape, let isArray:int, let isMS:int, l
 // Combined texture sampler specific functions
 
 __target_intrinsic(glsl, "texture($0, $1)")
+[require(glsl, texture_sm_4_1)]
 float __glsl_texture<TSampler, TCoord>(TSampler s, TCoord value);
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "texture($0, $1)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value);
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "texture($0, $1, $2)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_3d_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare);
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureOffset($0, $1, $2)")
+__target_intrinsic(glsl, "textureOffset($0, $1, $2)")
+[require(glsl, texture_sm_4_1)]
 float __glsl_texture_offset<TSampler, TCoord, TOffset>( TSampler s, TCoord value, constexpr TOffset offset);
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "textureOffset($0, $1, $2)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset);
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "textureLod($0, $1, 0)")
+[require(glsl, texture_sm_4_1)]
 float __glsl_texture_level_zero<TSampler, TCoord>(TSampler s, TCoord value);
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "textureLod($0, $1, 0)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_level_zero_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value);
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "textureLodOffset($0, $1, 0, $2)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_offset_level_zero<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset);
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "textureLodOffset($0, $1, 0, $2)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_offset_level_zero_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset);
 
 __target_intrinsic(glsl, "texture($p, $2)")
+[require(glsl, texture_sm_4_1)]
 float __glsl_texture<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value);
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "texture($p, $2)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_1d_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value);
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "texture($p, $2, $3)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_3d_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare);
 
-__glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "textureOffset($p, $2, $3)")
+[require(glsl, texture_sm_4_1)]
 float __glsl_texture_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset);
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "textureOffset($p, $2, $3)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset);
 
-__glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "textureLod($p, $2, 0)")
+[require(glsl, texture_sm_4_1)]
 float __glsl_texture_level_zero<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value);
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "textureLod($p, $2, 0)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_level_zero_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value);
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "textureLodOffset($p, $2, 0, $3)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_offset_level_zero<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset);
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 __target_intrinsic(glsl, "textureLodOffset($p, $2, 0, $3)")
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_offset_level_zero_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset);
 
 
@@ -295,8 +326,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
     SamplerComparisonState __getComparisonSampler();
 
-    [ForceInline]
     [__readNone]
+    [ForceInline]
+    [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetail(TextureCoord location)
     {
         __target_switch
@@ -315,8 +347,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
-    [ForceInline]
     [__readNone]
+    [ForceInline]
+    [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetailUnclamped(TextureCoord location)
     {
         __target_switch
@@ -336,6 +369,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location)
     {
         __target_switch
@@ -384,7 +419,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __target_switch
@@ -405,7 +442,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
     __target_intrinsic(hlsl)
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         status = 0;
@@ -413,6 +452,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __target_switch
@@ -433,6 +474,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -453,6 +496,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
+    [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -482,6 +526,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
+    [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -508,6 +553,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone] 
     [ForceInline]
+    [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -533,6 +579,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
+    [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -558,6 +605,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -578,6 +627,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
     {
         __target_switch
@@ -596,8 +647,10 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
-    __glsl_extension(GL_ARB_sparse_texture_clamp)
     [__readNone]
+    [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
     {
         __target_switch
@@ -618,6 +671,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level)
     {
         __target_switch
@@ -668,6 +723,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -696,6 +753,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 
     [__readNone]
     [ForceInline]
+    [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetail(SamplerState s, TextureCoord location)
     {
         __target_switch
@@ -714,6 +772,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 
     [__readNone]
     [ForceInline]
+    [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetailUnclamped(SamplerState s, TextureCoord location)
     {
         __target_switch
@@ -735,6 +794,8 @@ __generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let s
 extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     [__readNone]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
     {
         __target_switch
@@ -786,6 +847,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -806,7 +869,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __target_switch
@@ -827,8 +892,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    [__readNone]
     __target_intrinsic(hlsl)
+    [__readNone]
+    [ForceInline]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         status = 0;
@@ -836,6 +902,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __target_switch
@@ -856,6 +924,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -875,7 +945,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    [__readNone] [ForceInline]
+    [__readNone]
+    [ForceInline]
+    [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -904,7 +976,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    [__readNone] [ForceInline]
+    [__readNone]
+    [ForceInline]
+    [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -930,7 +1004,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    [__readNone] [ForceInline]
+    [__readNone]
+    [ForceInline]
+    [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -955,7 +1031,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    [__readNone] [ForceInline]
+    [__readNone]
+    [ForceInline]
+    [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -982,6 +1060,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -1002,6 +1082,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
     {
         __target_switch
@@ -1022,8 +1104,10 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    __glsl_extension(GL_ARB_sparse_texture_clamp)
     [__readNone]
+    [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
     {
         __target_switch
@@ -1045,6 +1129,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
     {
         __target_switch
@@ -1096,6 +1182,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1153,6 +1241,7 @@ ${{{{
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 extension __TextureImpl<T,Shape,isArray,1,sampleCount,access,isShadow,isCombined,format>
 {
+    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_vertex_fragment_geometry)]
     float2 GetSamplePosition(int s);
 }
 
@@ -1162,6 +1251,7 @@ Array<T,4> __makeArray<T>(T v0, T v1, T v2, T v3);
 // Gather for scalar textures.
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location, int component)
 {
     __target_switch
@@ -1177,6 +1267,7 @@ vector<TElement,4> __glsl_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, int component)
 {
     __target_switch
@@ -1191,6 +1282,7 @@ vector<TElement,4> __glsl_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gather_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, constexpr vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, int component)
 {
     __target_switch
@@ -1206,6 +1298,7 @@ vector<TElement,4> __glsl_gather_offset(__TextureImpl<T, Shape, isArray, 0, samp
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gather_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, int component)
 {
     __target_switch
@@ -1220,6 +1313,7 @@ vector<TElement,4> __glsl_gather_offset(__TextureImpl<T, Shape, isArray, 0, samp
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset1,
     constexpr vector<int, Shape.planeDimensions> offset2,
@@ -1242,6 +1336,7 @@ vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sam
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset1,
     constexpr vector<int, Shape.planeDimensions> offset2,
@@ -1263,6 +1358,7 @@ vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sam
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue)
 {
     __target_switch
@@ -1278,6 +1374,7 @@ vector<TElement,4> __glsl_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCo
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue)
 {
     __target_switch
@@ -1292,6 +1389,7 @@ vector<TElement,4> __glsl_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCo
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue, constexpr vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
@@ -1307,6 +1405,7 @@ vector<TElement,4> __glsl_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, s
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue, constexpr vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
@@ -1321,6 +1420,7 @@ vector<TElement,4> __glsl_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, s
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue,
     vector<int, Shape.planeDimensions> offset1,
     vector<int, Shape.planeDimensions> offset2,
@@ -1342,6 +1442,7 @@ vector<TElement,4> __glsl_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, 
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(glsl_spirv, GLSL_400)]
 vector<TElement,4> __glsl_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue,
     vector<int, Shape.planeDimensions> offset1,
     vector<int, Shape.planeDimensions> offset2,
@@ -1392,6 +1493,7 @@ ${{{{
             auto glslComponent = (isCmp ? "" :glslComponentNames[componentId == 0 ? 0 : componentId - 1]);
     }}}}
     [ForceInline]
+    [require(glsl_hlsl_spirv, texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam))
     {
         __target_switch
@@ -1403,6 +1505,7 @@ ${{{{
         }
     }
     [ForceInline]
+    [require(glsl_hlsl_spirv, texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam), constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1414,6 +1517,7 @@ ${{{{
         }
     }
     [ForceInline]
+    [require(glsl_hlsl_spirv, texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam),
         constexpr vector<int, Shape.planeDimensions> offset1,
         constexpr vector<int, Shape.planeDimensions> offset2,
@@ -1449,6 +1553,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
 
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
+    [require(glsl, texture_sm_4_1_samplerless)]
     T __glsl_load(vector<int, Shape.dimensions+isArray> location)
     {
         __intrinsic_asm "$ctexelFetch($0, ($1), 0)$z";
@@ -1457,6 +1562,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
     {
         __target_switch
@@ -1493,6 +1599,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1540,6 +1647,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
         __glsl_extension(GL_EXT_samplerless_texture_functions)
         [__readNone]
         [ForceInline]
+        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -1583,6 +1691,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
@@ -1615,6 +1724,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
 
     [__readNone]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions + isArray + 1> locationAndSampleIndex)
     {
         return Load(__vectorReshape<Shape.dimensions + isArray>(locationAndSampleIndex), locationAndSampleIndex[Shape.dimensions + isArray]);
@@ -1623,6 +1733,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1667,6 +1778,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
         __glsl_extension(GL_EXT_samplerless_texture_functions)
         [__readNone]
         [ForceInline]
+        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -1676,7 +1788,6 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
                     __intrinsic_asm "($0).sample[$2][$1]";
                 case glsl:
                 case spirv:
-                case cuda:
                     return Load(location, sampleIndex);
             }
         }
@@ -1696,6 +1807,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 {
     [__readNone]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location)
     {
         __target_switch
@@ -1745,6 +1857,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 
     [__readNone]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location, vector<int, Shape.dimensions+isArray> offset)
     {
         __target_switch
@@ -1765,6 +1878,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 
     [__readNone]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location, vector<int, Shape.dimensions+isArray> offset, out uint status)
     {
         __target_switch
@@ -1778,6 +1892,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
         }
     }
 
+    [require(glsl, texture_sm_4_1)]
     void __glslImageStore(vector<int, Shape.dimensions+isArray> location, T value)
     {
         __intrinsic_asm "imageStore($0, $1, $V2)";
@@ -1787,6 +1902,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
     {
         [__readNone]
         [ForceInline]
+        [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
         get
         {
             __target_switch
@@ -1803,6 +1919,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 
         [nonmutating]
         [ForceInline]
+        [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
         set(T newValue)
         {
             __target_switch
@@ -1862,6 +1979,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
 {
     [__readNone]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
@@ -1882,6 +2000,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
 
     [__readNone]
     [ForceInline]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, vector<int, Shape.dimensions+isArray> offset)
     {
         __target_switch
@@ -1915,6 +2034,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
         }
     }
 
+    [require(glsl, texture_sm_4_1_compute_fragment)]
     void __glslImageStore(vector<int, Shape.dimensions+isArray> location, int sampleIndex, T value)
     {
         __intrinsic_asm "imageStore($0, $1, $2, $V3)";
@@ -1924,6 +2044,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
     {
         [__readNone]
         [ForceInline]
+        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
         get
         {
             __target_switch
@@ -1933,13 +2054,13 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
                     __intrinsic_asm "$0.sample[$2][$1]";
                 case glsl:
                 case spirv:
-                case cuda:
                     return Load(location, sampleIndex);
             }
         }
 
         [nonmutating]
         [ForceInline]
+        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
         set(T newValue)
         {
             __target_switch
@@ -2003,7 +2124,13 @@ ${{{{
         if (shape == kStdlibShapeIndex3D && isArray == 1)
             continue;
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
+
+        StringBuilder requireStringBuilder;
+        if (shape == kStdlibShapeIndexCube)
+            requireStringBuilder << "[require(any_target, texture_cube)]";
+        auto requireString = requireStringBuilder.toString();
 }}}}
+$(requireString)
 typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(arrayPostFix[isArray])$(msPostFix[isMS])<T=float4, let sampleCount:int=0, let format:int=0> = __TextureImpl<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
 ${{{{
 }
@@ -2017,6 +2144,8 @@ ${{{{
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_float)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_float1)]
 float __atomicAdd(__ref float value, float amount)
 {
     __target_switch
@@ -2034,6 +2163,8 @@ float __atomicAdd(__ref float value, float amount)
 
 __glsl_version(430)
 __glsl_extension(GL_NV_shader_atomic_fp16_vector)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_halfvec)]
 half2 __atomicAdd(__ref half2 value, half2 amount)
 {
     __target_switch
@@ -2052,18 +2183,23 @@ half2 __atomicAdd(__ref half2 value, half2 amount)
 // Helper for hlsl, using NVAPI
 __target_intrinsic(hlsl, "NvInterlockedAddUint64($0, $1, $2)")
 [__requiresNVAPI]
+[require(hlsl, atomic_hlsl_nvapi)]
 uint2 __atomicAdd(RWByteAddressBuffer buf, uint offset, uint2);
 
 // atomic add for hlsl using SM6.6
 __target_intrinsic(hlsl, "$0.InterlockedAdd64($1, $2, $3)")
+[require(hlsl, atomic_hlsl_sm_6_6)]
 void __atomicAdd(RWByteAddressBuffer buf, uint offset, int64_t value, out int64_t originalValue);
 __target_intrinsic(hlsl, "$0.InterlockedAdd64($1, $2, $3)")
+[require(hlsl, atomic_hlsl_sm_6_6)]
 void __atomicAdd(RWByteAddressBuffer buf, uint offset, uint64_t value, out uint64_t originalValue);
 
 // Int versions require glsl 4.30
 // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/atomicAdd.xhtml
 
 __glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
 int __atomicAdd(__ref int value, int amount)
 {
     __target_switch
@@ -2078,6 +2214,8 @@ int __atomicAdd(__ref int value, int amount)
 }
 
 __glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
 uint __atomicAdd(__ref uint value, uint amount)
 {
     __target_switch
@@ -2093,6 +2231,8 @@ uint __atomicAdd(__ref uint value, uint amount)
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_int64)]
 int64_t __atomicAdd(__ref int64_t value, int64_t amount)
 {
     __target_switch
@@ -2110,6 +2250,8 @@ int64_t __atomicAdd(__ref int64_t value, int64_t amount)
 __target_intrinsic(glsl, "atomicAdd($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicAdd(__ref uint64_t value, uint64_t amount)
 {
     __target_switch
@@ -2130,16 +2272,21 @@ uint64_t __atomicAdd(__ref uint64_t value, uint64_t amount)
 
 __target_intrinsic(hlsl, "NvInterlockedCompareExchangeUint64($0, $1, $2, $3)")
 [__requiresNVAPI]
+[require(hlsl, atomic_hlsl_nvapi)]
 uint2 __cas(RWByteAddressBuffer buf, uint offset, uint2 compareValue, uint2 value);
 
 // CAS using SM6.6
 __target_intrinsic(hlsl, "$0.InterlockedCompareExchange64($1, $2, $3, $4)")
+[require(hlsl, atomic_hlsl_sm_6_6)]
 void __cas(RWByteAddressBuffer buf, uint offset, in int64_t compare_value, in int64_t value, out int64_t original_value);
 __target_intrinsic(hlsl, "$0.InterlockedCompareExchange64($1, $2, $3, $4)")
+[require(hlsl, atomic_hlsl_sm_6_6)]
 void __cas(RWByteAddressBuffer buf, uint offset, in uint64_t compare_value, in uint64_t value, out uint64_t original_value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_int64)]
 int64_t __cas(__ref int64_t ioValue, int64_t compareValue, int64_t newValue)
 {
     __target_switch
@@ -2156,6 +2303,8 @@ int64_t __cas(__ref int64_t ioValue, int64_t compareValue, int64_t newValue)
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __cas(__ref uint64_t ioValue, uint64_t compareValue, uint64_t newValue)
 {
     __target_switch
@@ -2174,10 +2323,13 @@ uint64_t __cas(__ref uint64_t ioValue, uint64_t compareValue, uint64_t newValue)
 
 __target_intrinsic(hlsl, "NvInterlockedMaxUint64($0, $1, $2)")
 [__requiresNVAPI]
+[require(hlsl, atomic_hlsl_nvapi)]
 uint2 __atomicMax(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicMax(__ref uint64_t ioValue, uint64_t value)
 {
     __target_switch
@@ -2193,7 +2345,9 @@ uint64_t __atomicMax(__ref uint64_t ioValue, uint64_t value)
 }
 
 __glsl_version(430)
-__glsl_extension(GL_EXT_shader_atomic_float_min_max)
+__glsl_extension(GL_EXT_shader_atomic_float2)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_float2)]
 float __atomicMax(__ref float ioValue, float value)
 {
     __target_switch
@@ -2210,7 +2364,9 @@ float __atomicMax(__ref float ioValue, float value)
 }
 
 __glsl_version(430)
-__glsl_extension(GL_EXT_shader_atomic_float_min_max)
+__glsl_extension(GL_EXT_shader_atomic_float2)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_float2)]
 half __atomicMax(__ref half ioValue, half value)
 {
     __target_switch
@@ -2230,10 +2386,13 @@ half __atomicMax(__ref half ioValue, half value)
 
 __target_intrinsic(hlsl, "NvInterlockedMinUint64($0, $1, $2)")
 [__requiresNVAPI]
+[require(hlsl, atomic_hlsl_nvapi)]
 uint2 __atomicMin(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicMin(__ref uint64_t ioValue, uint64_t value)
 {
     __target_switch
@@ -2249,7 +2408,9 @@ uint64_t __atomicMin(__ref uint64_t ioValue, uint64_t value)
 }
 
 __glsl_version(430)
-__glsl_extension(GL_EXT_shader_atomic_float_min_max)
+__glsl_extension(GL_EXT_shader_atomic_float2)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_float2)]
 float __atomicMin(__ref float ioValue, float value)
 {
     __target_switch
@@ -2266,7 +2427,9 @@ float __atomicMin(__ref float ioValue, float value)
 }
 
 __glsl_version(430)
-__glsl_extension(GL_EXT_shader_atomic_float_min_max)
+__glsl_extension(GL_EXT_shader_atomic_float2)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_float2)]
 half __atomicMin(__ref half ioValue, half value)
 {
     __target_switch
@@ -2286,10 +2449,13 @@ half __atomicMin(__ref half ioValue, half value)
 
 __target_intrinsic(hlsl, "NvInterlockedAndUint64($0, $1, $2)")
 [__requiresNVAPI]
+[require(hlsl, atomic_hlsl_nvapi)]
 uint2 __atomicAnd(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicAnd(__ref uint64_t ioValue, uint64_t value)
 {
     __target_switch
@@ -2308,10 +2474,13 @@ uint64_t __atomicAnd(__ref uint64_t ioValue, uint64_t value)
 
 __target_intrinsic(hlsl, "NvInterlockedOrUint64($0, $1, $2)")
 [__requiresNVAPI]
+[require(hlsl, atomic_hlsl_nvapi)]
 uint2 __atomicOr(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicOr(__ref uint64_t ioValue, uint64_t value)
 {
     __target_switch
@@ -2330,10 +2499,13 @@ uint64_t __atomicOr(__ref uint64_t ioValue, uint64_t value)
 
 __target_intrinsic(hlsl, "NvInterlockedXorUint64($0, $1, $2)")
 [__requiresNVAPI]
+[require(hlsl, atomic_hlsl_nvapi)]
 uint2 __atomicXor(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicXor(__ref uint64_t ioValue, uint64_t value)
 {
     __target_switch
@@ -2352,10 +2524,13 @@ uint64_t __atomicXor(__ref uint64_t ioValue, uint64_t value)
 
 __target_intrinsic(hlsl, "NvInterlockedExchangeUint64($0, $1, $2)")
 [__requiresNVAPI]
+[require(hlsl, atomic_hlsl_nvapi)]
 uint2 __atomicExchange(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl_int64)]
 uint64_t __atomicExchange(__ref uint64_t ioValue, uint64_t value)
 {
     __target_switch
@@ -2372,11 +2547,13 @@ uint64_t __atomicExchange(__ref uint64_t ioValue, uint64_t value)
 
 // Conversion between uint64_t and uint2
 
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 uint2 __asuint2(uint64_t i)
 {
     return uint2(uint(i), uint(uint64_t(i) >> 32));
 }
 
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 uint64_t __asuint64(uint2 i)
 {
     return (uint64_t(i.y) << 32) | i.x;
@@ -2385,18 +2562,23 @@ uint64_t __asuint64(uint2 i)
 //
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
 T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
 T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, int offset);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
 T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, int offset);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
 void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, int offset, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
 void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, T value);
 
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
@@ -2419,15 +2601,18 @@ struct StructuredBuffer
     __target_intrinsic(glsl, "$0._data[$1]")
     __target_intrinsic(spirv, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
     [__readNone]
+    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
     T Load(int location);
 
     __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
+    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
         [__readNone]
         __intrinsic_op($(kIROp_StructuredBufferLoad))
+        [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
         get;
     };
 };
@@ -2435,6 +2620,7 @@ struct StructuredBuffer
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLConsumeStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLConsumeStructuredBufferType))
+[require(cpp_cuda_glsl_hlsl_spirv, consumestructuredbuffer)]
 struct ConsumeStructuredBuffer
 {
     __intrinsic_op($(kIROp_StructuredBufferConsume))
@@ -2452,6 +2638,7 @@ struct ConsumeStructuredBuffer
 };
 
 __generic<T, let N : int>
+[require(glsl_hlsl_spirv, hull)]
 __magic_type(HLSLInputPatchType)
 __intrinsic_type($(kIROp_HLSLInputPatchType))
 struct InputPatch
@@ -2460,6 +2647,7 @@ struct InputPatch
 };
 
 __generic<T, let N : int>
+[require(glsl_hlsl_spirv, shader_stages_domain_hull)]
 __magic_type(HLSLOutputPatchType)
 __intrinsic_type($(kIROp_HLSLOutputPatchType))
 struct OutputPatch
@@ -2490,11 +2678,13 @@ struct $(item.name)
     __target_intrinsic(cpp)
     __target_intrinsic(cuda)
     [__unsafeForceInlineEarly]
+    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
     void GetDimensions(out uint dim);
 
     [__unsafeForceInlineEarly]
     __specialized_for_target(spirv)
     __specialized_for_target(glsl)
+    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
     void GetDimensions(out uint dim)
     {
         dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
@@ -2502,6 +2692,7 @@ struct $(item.name)
 
     __target_intrinsic(hlsl)
     [__NoSideEffect]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     uint Load(int location)
     {
         return __byteAddressBufferLoad<uint>(this, location);
@@ -2512,6 +2703,7 @@ struct $(item.name)
 
     __target_intrinsic(hlsl)
     [__NoSideEffect]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     uint2 Load2(int location)
     {
         return __byteAddressBufferLoad<uint2>(this, location);
@@ -2522,6 +2714,7 @@ struct $(item.name)
 
     __target_intrinsic(hlsl)
     [__NoSideEffect]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     uint3 Load3(int location)
     {
         return __byteAddressBufferLoad<uint3>(this, location);
@@ -2532,6 +2725,7 @@ struct $(item.name)
 
     __target_intrinsic(hlsl)
     [__NoSideEffect]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     uint4 Load4(int location)
     {
         return __byteAddressBufferLoad<uint4>(this, location);
@@ -2541,6 +2735,7 @@ struct $(item.name)
     uint4 Load4(int location, out uint status);
 
     [__NoSideEffect]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     T Load<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location);
@@ -2569,6 +2764,7 @@ ${{{{
     __cuda_sm_version(2.0)
     [__requiresNVAPI]
     [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue)
     {
         __target_switch
@@ -2588,6 +2784,7 @@ ${{{{
     // FP16x2
     [__requiresNVAPI]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_nvapi)]
     uint _NvInterlockedAddFp16x2(uint byteAddress, uint fp16x2Value)
     {
         __target_switch
@@ -2638,6 +2835,7 @@ ${{{{
     [__requiresNVAPI]
     [ForceInline]
     __cuda_sm_version(2.0)
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
         __target_switch
@@ -2657,6 +2855,7 @@ ${{{{
     // Int64 Add
     [ForceInline]
     __cuda_sm_version(6.0)
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda6_int64)]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue)
     {
         __target_switch
@@ -2676,18 +2875,19 @@ ${{{{
     // Without returning original value
     __cuda_sm_version(6.0)
     __target_intrinsic(cuda, "atomicAdd($0._getPtrAt<uint64_t>($1), $2)")
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda6_int64)]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd);
 
-    [ForceInline]
     __specialized_for_target(hlsl)
+    [ForceInline]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
     {
         __atomicAdd(this, byteAddress, __asuint2(valueToAdd));
     }
 
-    [ForceInline]
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
     {
         let buf = __getEquivalentStructuredBuffer<int64_t>(this);
@@ -2697,9 +2897,11 @@ ${{{{
     // Cas uint64_t
 
     __target_intrinsic(cuda, "(*$4 = atomicCAS($0._getPtrAt<uint64_t>($1), $2, $3))")
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
         outOriginalValue = __asuint64(__cas(this, byteAddress, __asuint2(compareValue), __asuint2(value)));
@@ -2707,6 +2909,7 @@ ${{{{
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
@@ -2715,23 +2918,26 @@ ${{{{
 
     // Max
 
-    __cuda_sm_version(3.5)
+    __cuda_sm_version(5.0)
     __target_intrinsic(cuda, "atomicMax($0._getPtrAt<uint64_t>($1), $2)")
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda5_int64)]
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicMax(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicMax(buf[byteAddress / 8], value);
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMax64(uint byteAddress, int64_t value)
     {
         __target_switch
@@ -2740,8 +2946,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMax64(uint byteAddress, int64_t value, out int64_t outOriginalValue)
     {
         __target_switch
@@ -2750,8 +2956,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMax64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -2760,8 +2966,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMax64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -2772,23 +2978,26 @@ ${{{{
 
     // Min
 
-    __cuda_sm_version(3.5)
+    __cuda_sm_version(5.0)
     __target_intrinsic(cuda, "atomicMin($0._getPtrAt<uint64_t>($1), $2)")
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda5_int64)]
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicMin(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicMin(buf[byteAddress / 8], value);
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMin64(uint byteAddress, int64_t value)
     {
         __target_switch
@@ -2797,8 +3006,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMin64(uint byteAddress, int64_t value, out int64_t outOriginalValue)
     {
         __target_switch
@@ -2807,8 +3016,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMin64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -2817,8 +3026,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedMin64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -2829,22 +3038,26 @@ ${{{{
 
     // And
 
+    __cuda_sm_version(5.0)
     __target_intrinsic(cuda, "atomicAnd($0._getPtrAt<uint64_t>($1), $2)")
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda5_int64)]
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicAnd(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicAnd(buf[byteAddress / 8], value);
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedAnd64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -2853,8 +3066,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedAnd64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -2865,22 +3078,26 @@ ${{{{
 
     // Or
 
+    __cuda_sm_version(5.0)
     __target_intrinsic(cuda, "atomicOr($0._getPtrAt<uint64_t>($1), $2)")
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda5_int64)]
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicOr(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicOr(buf[byteAddress / 8], value);
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedOr64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -2889,8 +3106,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedOr64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -2901,22 +3118,26 @@ ${{{{
 
     // Xor
 
+    __cuda_sm_version(5.0)
     __target_intrinsic(cuda, "atomicXor($0._getPtrAt<uint64_t>($1), $2)")
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda5_int64)]
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicXor(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicXor(buf[byteAddress / 8], value);
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedXor64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -2925,8 +3146,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedXor64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -2938,21 +3159,24 @@ ${{{{
     // Exchange
 
     __target_intrinsic(cuda, "atomicExch($0._getPtrAt<uint64_t>($1), $2)")
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicExchange(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
+    [ForceInline]
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value)
     {
         let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicExchange(buf[byteAddress / 8], value);
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedExchangeFloat(uint byteAddress, float value, out float outOriginalValue)
     {
         __target_switch
@@ -2961,8 +3185,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedExchange64(uint byteAddress, int64_t value, out int64_t outOriginalValue)
     {
         __target_switch
@@ -2971,8 +3195,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedExchange64(uint byteAddress, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -2983,6 +3207,7 @@ ${{{{
 
     // SM6.6 6 64bit atomics.
     [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedAdd64(uint byteAddress, int64_t valueToAdd)
     {
         __target_switch
@@ -2996,6 +3221,7 @@ ${{{{
     }
 
     [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedAdd64(uint byteAddress, int64_t valueToAdd, out int64_t outOriginalValue)
     {
         __target_switch
@@ -3005,10 +3231,12 @@ ${{{{
         case spirv:
             let buf = __getEquivalentStructuredBuffer<int64_t>(this);
             outOriginalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
+            return;
         }
     }
 
     [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedAdd64(uint byteAddress, uint64_t valueToAdd)
     {
         __target_switch
@@ -3022,6 +3250,7 @@ ${{{{
     }
 
     [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedAdd64(uint byteAddress, uint64_t valueToAdd, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -3031,35 +3260,44 @@ ${{{{
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
             outOriginalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
+            return;
         }
     }
 
-    __specialized_for_target(hlsl)
-    void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
-    {
-        __cas(this, byteAddress, compareValue, value, outOriginalValue);
-    }
-    __specialized_for_target(glsl)
-    __specialized_for_target(spirv)
-    void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
-    {
-        let buf = __getEquivalentStructuredBuffer<int64_t>(this);
-        outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
-    }
-    __specialized_for_target(hlsl)
-    void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
-    {
-        __cas(this, byteAddress, compareValue, value, outOriginalValue);
-    }
-    __specialized_for_target(glsl)
-    __specialized_for_target(spirv)
-    void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
-    {
-        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
-        outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
-    }
-    [require(hlsl)]
     [ForceInline]
+    void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __cas(this, byteAddress, compareValue, value, outOriginalValue);
+            return;
+        case glsl:
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<int64_t>(this);
+            outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
+            return;
+        }
+    }
+
+    [ForceInline]
+    void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __cas(this, byteAddress, compareValue, value, outOriginalValue);
+            return;
+        case glsl:
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+            outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
+            return;
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedCompareStoreFloatBitwise(uint byteAddress, float compareValue, float value)
     {
         __target_switch
@@ -3068,8 +3306,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedCompareExchangeFloatBitwise(uint byteAddress, float compareValue, float value, out float outOriginalValue)
     {
         __target_switch
@@ -3078,8 +3316,8 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedCompareStore64(uint byteAddress, int64_t compareValue, int64_t value)
     {
         __target_switch
@@ -3088,33 +3326,13 @@ ${{{{
         }
     }
 
-    [require(hlsl)]
     [ForceInline]
-    void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm ".InterlockedCompareExchange64";
-        }
-    }
-
-    [require(hlsl)]
-    [ForceInline]
+    [require(hlsl, atomic_hlsl_sm_6_6)]
     void InterlockedCompareStore64(uint byteAddress, uint64_t compareValue, uint64_t value)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".InterlockedCompareStore64";
-        }
-    }
-
-    [require(hlsl)]
-    [ForceInline]
-    void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm ".InterlockedCompareExchange64";
         }
     }
 
@@ -3124,6 +3342,7 @@ ${{{{
 
     // Added operations:
     [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedAdd(
         UINT dest,
         UINT value,
@@ -3141,6 +3360,7 @@ ${{{{
     }
 
     [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedAdd(
         UINT dest,
         UINT value)
@@ -3156,6 +3376,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedAnd(
         UINT dest,
         UINT value,
@@ -3172,6 +3394,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedAnd(
         UINT dest,
         UINT value)
@@ -3187,6 +3411,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedCompareExchange(
         UINT dest,
         UINT compare_value,
@@ -3204,6 +3430,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedCompareStore(
         UINT dest,
         UINT compare_value,
@@ -3220,6 +3448,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedExchange(
         UINT dest,
         UINT value,
@@ -3236,6 +3466,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedMax(
         UINT dest,
         UINT value,
@@ -3252,6 +3484,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedMax(
         UINT dest,
         UINT value)
@@ -3267,6 +3501,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedMin(
         UINT dest,
         UINT value,
@@ -3283,6 +3519,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedMin(
         UINT dest,
         UINT value)
@@ -3298,6 +3536,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedOr(
         UINT dest,
         UINT value,
@@ -3314,6 +3554,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedOr(
         UINT dest,
         UINT value)
@@ -3329,6 +3571,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedXor(
         UINT dest,
         UINT value,
@@ -3345,6 +3589,8 @@ ${{{{
         }
     }
 
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void InterlockedXor(
         UINT dest,
         UINT value)
@@ -3419,6 +3665,7 @@ for(auto item : kMutableStructuredBufferCases) {
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
+[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
 struct $(item.name)
 {
     uint DecrementCounter();
@@ -3458,6 +3705,7 @@ ${{{{
 }}}}
 
 __generic<T>
+[require(glsl_hlsl_spirv, geometry)]
 __magic_type(HLSLPointStreamType)
 __intrinsic_type($(kIROp_HLSLPointStreamType))
 struct PointStream
@@ -3486,6 +3734,7 @@ struct PointStream
 };
 
 __generic<T>
+[require(glsl_hlsl_spirv, geometry)]
 __magic_type(HLSLLineStreamType)
 __intrinsic_type($(kIROp_HLSLLineStreamType))
 struct LineStream
@@ -3514,6 +3763,7 @@ struct LineStream
 };
 
 __generic<T>
+[require(glsl_hlsl_spirv, geometry)]
 __magic_type(HLSLTriangleStreamType)
 __intrinsic_type($(kIROp_HLSLTriangleStreamType))
 struct TriangleStream
@@ -3571,6 +3821,7 @@ __target_intrinsic(cuda, "$P_abs($0)")
 __target_intrinsic(cpp, "$P_abs($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T abs(T x);
 /*{
     // Note: this simple definition may not be appropriate for floating-point inputs
@@ -3582,6 +3833,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> abs(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, abs, x);
@@ -3590,6 +3842,7 @@ vector<T, N> abs(vector<T, N> x)
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, abs, x);
@@ -3602,6 +3855,7 @@ __target_intrinsic(cuda, "$P_abs($0)")
 __target_intrinsic(cpp, "$P_abs($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T abs(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -3609,6 +3863,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> abs(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, abs, x);
@@ -3617,6 +3872,7 @@ vector<T, N> abs(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, abs, x);
@@ -3631,6 +3887,7 @@ __target_intrinsic(cuda, "$P_acos($0)")
 __target_intrinsic(cpp, "$P_acos($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Acos _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T acos(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -3638,6 +3895,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Acos _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> acos(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, acos, x);
@@ -3646,6 +3904,7 @@ vector<T, N> acos(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> acos(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, acos, x);
@@ -3736,6 +3995,7 @@ bool all(matrix<T,N,M> x)
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
 __glsl_extension(GL_KHR_memory_scope_semantics)
+[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void AllMemoryBarrier()
 {
     __target_switch
@@ -3752,6 +4012,7 @@ void AllMemoryBarrier()
 
 // Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
 __glsl_extension(GL_KHR_memory_scope_semantics)
+[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void AllMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -3864,6 +4125,7 @@ __target_intrinsic(cuda, "$P_asdouble($0, $1)")
 __target_intrinsic(spirv, "%v = OpCompositeConstruct _type(uint2) resultId _0 _1; OpExtInst resultType resultId glsl450 59 %v")
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 double asdouble(uint lowbits, uint highbits);
 
 // Reinterpret bits as a float (HLSL SM 4.0)
@@ -3874,6 +4136,7 @@ __target_intrinsic(cpp, "$P_asfloat($0)")
 __target_intrinsic(cuda, "$P_asfloat($0)")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 float asfloat(int x);
 
 __target_intrinsic(hlsl)
@@ -3882,6 +4145,7 @@ __target_intrinsic(cpp, "$P_asfloat($0)")
 __target_intrinsic(cuda, "$P_asfloat($0)")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 float asfloat(uint x);
 
 __generic<let N : int>
@@ -3889,6 +4153,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "intBitsToFloat")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 vector<float, N> asfloat(vector< int, N> x)
 {
     VECTOR_MAP_UNARY(float, N, asfloat, x);
@@ -3899,6 +4164,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uintBitsToFloat")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 vector<float,N> asfloat(vector<uint,N> x)
 {
     VECTOR_MAP_UNARY(float, N, asfloat, x);
@@ -3907,6 +4173,7 @@ vector<float,N> asfloat(vector<uint,N> x)
 __generic<let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 matrix<float,N,M> asfloat(matrix< int,N,M> x)
 {
     MATRIX_MAP_UNARY(float, N, M, asfloat, x);
@@ -3915,6 +4182,7 @@ matrix<float,N,M> asfloat(matrix< int,N,M> x)
 __generic<let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 matrix<float,N,M> asfloat(matrix<uint,N,M> x)
 {
     MATRIX_MAP_UNARY(float, N, M, asfloat, x);
@@ -3923,18 +4191,21 @@ matrix<float,N,M> asfloat(matrix<uint,N,M> x)
 // No op
 [__unsafeForceInlineEarly]
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 float asfloat(float x)
 { return x; }
 
 __generic<let N : int>
 [__unsafeForceInlineEarly]
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<float,N> asfloat(vector<float,N> x)
 { return x; }
 
 __generic<let N : int, let M : int>
 [__unsafeForceInlineEarly]
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<float,N,M> asfloat(matrix<float,N,M> x)
 { return x; }
 
@@ -3946,6 +4217,7 @@ __target_intrinsic(cuda, "$P_asin($0)")
 __target_intrinsic(cpp, "$P_asin($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Asin _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T asin(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -3953,6 +4225,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Asin _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> asin(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T,N,asin,x);
@@ -3961,6 +4234,7 @@ vector<T, N> asin(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> asin(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T,N,M,asin,x);
@@ -3974,6 +4248,7 @@ __target_intrinsic(cpp, "$P_asint($0)")
 __target_intrinsic(cuda, "$P_asint($0)")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 int asint(float x);
 
 __target_intrinsic(hlsl)
@@ -3982,6 +4257,7 @@ __target_intrinsic(cpp, "$P_asint($0)")
 __target_intrinsic(cuda, "$P_asint($0)")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 int asint(uint x);
 
 __generic<let N : int>
@@ -3989,6 +4265,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToInt")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 vector<int, N> asint(vector<float, N> x)
 {
     VECTOR_MAP_UNARY(int, N, asint, x);
@@ -3999,6 +4276,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "ivec$N0($0)")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 vector<int, N> asint(vector<uint, N> x)
 {
     VECTOR_MAP_UNARY(int, N, asint, x);
@@ -4007,6 +4285,7 @@ vector<int, N> asint(vector<uint, N> x)
 __generic<let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 matrix<int, N, M> asint(matrix<float, N, M> x)
 {
     MATRIX_MAP_UNARY(int, N, M, asint, x);
@@ -4015,6 +4294,7 @@ matrix<int, N, M> asint(matrix<float, N, M> x)
 __generic<let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 matrix<int, N, M> asint(matrix<uint, N, M> x)
 {
     MATRIX_MAP_UNARY(int, N, M, asint, x);
@@ -4023,18 +4303,21 @@ matrix<int, N, M> asint(matrix<uint, N, M> x)
 // No op
 [__unsafeForceInlineEarly]
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 int asint(int x)
 { return x; }
 
 __generic<let N : int>
 [__unsafeForceInlineEarly]
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 vector<int,N> asint(vector<int,N> x)
 { return x; }
 
 __generic<let N : int, let M : int>
 [__unsafeForceInlineEarly]
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 matrix<int,N,M> asint(matrix<int,N,M> x)
 { return x; }
 
@@ -4042,6 +4325,7 @@ matrix<int,N,M> asint(matrix<int,N,M> x)
 
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 void asuint(double value, out uint lowbits, out uint highbits)
 {
     __target_switch
@@ -4070,6 +4354,7 @@ __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 __target_intrinsic(cpp, "$P_asuint($0)")
 __target_intrinsic(cuda, "$P_asuint($0)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 uint asuint(float x);
 
 __target_intrinsic(hlsl)
@@ -4078,6 +4363,7 @@ __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 __target_intrinsic(cpp, "$P_asuint($0)")
 __target_intrinsic(cuda, "$P_asuint($0)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 uint asuint(int x);
 
 __generic<let N : int>
@@ -4085,6 +4371,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToUint")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 vector<uint,N> asuint(vector<float,N> x)
 {
     VECTOR_MAP_UNARY(uint, N, asuint, x);
@@ -4095,6 +4382,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uvec$N0($0)")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 vector<uint, N> asuint(vector<int, N> x)
 {
     VECTOR_MAP_UNARY(uint, N, asuint, x);
@@ -4103,6 +4391,7 @@ vector<uint, N> asuint(vector<int, N> x)
 __generic<let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 matrix<uint,N,M> asuint(matrix<float,N,M> x)
 {
     MATRIX_MAP_UNARY(uint, N, M, asuint, x);
@@ -4111,6 +4400,7 @@ matrix<uint,N,M> asuint(matrix<float,N,M> x)
 __generic<let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 matrix<uint, N, M> asuint(matrix<int, N, M> x)
 {
     MATRIX_MAP_UNARY(uint, N, M, asuint, x);
@@ -4171,13 +4461,16 @@ __target_intrinsic(glsl, "uint16_t(packHalf2x16(vec2($0, 0.0)))")
 __target_intrinsic(cuda, "__half_as_ushort")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 uint16_t asuint16(float16_t value);
 
 [__readNone]
+[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
 { VECTOR_MAP_UNARY(uint16_t, N, asuint16, value); }
 
 [__readNone]
+[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 matrix<uint16_t,R,C> asuint16<let R : int, let C : int>(matrix<float16_t,R,C> value)
 { MATRIX_MAP_UNARY(uint16_t, R, C, asuint16, value); }
 
@@ -4188,6 +4481,7 @@ __target_intrinsic(glsl, "float16_t(unpackHalf2x16($0).x)")
 __target_intrinsic(cuda, "__ushort_as_half")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 float16_t asfloat16(uint16_t value);
 
 [__readNone]
@@ -4203,18 +4497,41 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<uint16_t,R,C> v
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "__half_as_short")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
-[__unsafeForceInlineEarly][__readNone] int16_t asint16(float16_t value) { return asuint16(value); }
-__target_intrinsic(hlsl) [__unsafeForceInlineEarly][__readNone] vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value) { return asuint16(value); }
-__target_intrinsic(hlsl) [__unsafeForceInlineEarly][__readNone] matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> value) { return asuint16(value); }
+[__unsafeForceInlineEarly]
+[__readNone]
+[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+int16_t asint16(float16_t value) { return asuint16(value); }
+
+__target_intrinsic(hlsl)
+[__unsafeForceInlineEarly]
+[__readNone] 
+[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value) { return asuint16(value); }
+
+__target_intrinsic(hlsl)
+[__unsafeForceInlineEarly]
+[__readNone]
+[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> value) { return asuint16(value); }
 
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "__short_as_half")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
-[__unsafeForceInlineEarly] float16_t asfloat16(int16_t value) { return asfloat16(asuint16(value)); }
+[__unsafeForceInlineEarly] 
+[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+float16_t asfloat16(int16_t value) { return asfloat16(asuint16(value)); }
 
-__target_intrinsic(hlsl) [__unsafeForceInlineEarly][__readNone] vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value) { return asfloat16(asuint16(value)); }
-__target_intrinsic(hlsl) [__unsafeForceInlineEarly][__readNone] matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> value) { return asfloat16(asuint16(value)); }
+__target_intrinsic(hlsl)
+[__unsafeForceInlineEarly]
+[__readNone]
+vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value) { return asfloat16(asuint16(value)); }
+
+__target_intrinsic(hlsl)
+[__unsafeForceInlineEarly]
+[__readNone]
+[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> value) { return asfloat16(asuint16(value)); }
 
 // Inverse tangent (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>
@@ -4224,6 +4541,7 @@ __target_intrinsic(cuda, "$P_atan($0)")
 __target_intrinsic(cpp, "$P_atan($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Atan _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T atan(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -4231,6 +4549,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Atan _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> atan(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, atan, x);
@@ -4239,6 +4558,7 @@ vector<T, N> atan(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> atan(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, atan, x);
@@ -4251,6 +4571,7 @@ __target_intrinsic(cuda, "$P_atan2($0, $1)")
 __target_intrinsic(cpp, "$P_atan2($0, $1)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Atan2 _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T atan2(T y, T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -4258,6 +4579,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"atan($0,$1)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Atan2 _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 {
     VECTOR_MAP_BINARY(T, N, atan2, y, x);
@@ -4266,6 +4588,7 @@ vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
 {
     MATRIX_MAP_BINARY(T, N, M, atan2, y, x);
@@ -4279,6 +4602,7 @@ __target_intrinsic(cuda, "$P_ceil($0)")
 __target_intrinsic(cpp, "$P_ceil($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Ceil _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T ceil(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -4286,6 +4610,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Ceil _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> ceil(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, ceil, x);
@@ -4294,6 +4619,7 @@ vector<T, N> ceil(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> ceil(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, ceil, x);
@@ -4309,6 +4635,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T clamp(T x, T minBound, T maxBound)
 {
     return min(max(x, minBound), maxBound);
@@ -4319,6 +4646,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
     return min(max(x, minBound), maxBound);
@@ -4327,6 +4655,7 @@ vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
     return min(max(x, minBound), maxBound);
@@ -4337,6 +4666,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T clamp(T x, T minBound, T maxBound)
 {
     return min(max(x, minBound), maxBound);
@@ -4347,6 +4677,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
     return min(max(x, minBound), maxBound);
@@ -4355,6 +4686,7 @@ vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
     return min(max(x, minBound), maxBound);
@@ -4363,6 +4695,7 @@ matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBo
 // Clip (discard) fragment conditionally
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
+[require(cpp_cuda_glsl_hlsl_spirv, fragment)]
 void clip(T x)
 {
     if(x < T(0)) discard;
@@ -4370,6 +4703,7 @@ void clip(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
+[require(cpp_cuda_glsl_hlsl_spirv, fragment)]
 void clip(vector<T,N> x)
 {
     if(any(x < T(0))) discard;
@@ -4377,6 +4711,7 @@ void clip(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+[require(cpp_cuda_glsl_hlsl_spirv, fragment)]
 void clip(matrix<T,N,M> x)
 {
     if(any(x < T(0))) discard;
@@ -4390,6 +4725,7 @@ __target_intrinsic(cuda, "$P_cos($0)")
 __target_intrinsic(cpp, "$P_cos($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Cos _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T cos(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -4440,6 +4776,7 @@ matrix<T, N, M> cosh(matrix<T, N, M> x)
 
 // Population count
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 uint countbits(uint value)
 {
     __target_switch
@@ -4463,6 +4800,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Cross _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 {
     return vector<T,3>(
@@ -4476,6 +4814,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Cross _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, 3> cross(vector<T, 3> left, vector<T, 3> right)
 {
     return vector<T, 3>(
@@ -4487,6 +4826,7 @@ vector<T, 3> cross(vector<T, 3> left, vector<T, 3> right)
 // Convert encoded color
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 int4 D3DCOLORtoUBYTE4(float4 color)
 {
     let scaled = color.zyxw * 255.001999f;
@@ -4500,6 +4840,7 @@ for (auto xOrY : diffDimensions) {
 }}}}
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, fragmentprocessing)]
 T dd$(xOrY)(T x)
 {
     __target_switch
@@ -4517,6 +4858,7 @@ T dd$(xOrY)(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, fragmentprocessing)]
 vector<T, N> dd$(xOrY)(vector<T, N> x)
 {
     __target_switch
@@ -4535,6 +4877,7 @@ vector<T, N> dd$(xOrY)(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, fragmentprocessing)]
 matrix<T, N, M> dd$(xOrY)(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, dd$(xOrY), x);
@@ -4543,6 +4886,7 @@ matrix<T, N, M> dd$(xOrY)(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 T dd$(xOrY)_coarse(T x)
 {
     __target_switch
@@ -4556,6 +4900,7 @@ T dd$(xOrY)_coarse(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 vector<T, N> dd$(xOrY)_coarse(vector<T, N> x)
 {
     __target_switch
@@ -4577,6 +4922,7 @@ matrix<T, N, M> dd$(xOrY)_coarse(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 T dd$(xOrY)_fine(T x)
 {
     __target_switch
@@ -4590,6 +4936,7 @@ T dd$(xOrY)_fine(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 vector<T, N> dd$(xOrY)_fine(vector<T, N> x)
 {
     __target_switch
@@ -4655,6 +5002,7 @@ T determinant(matrix<T,N,N> m);
 
 // Barrier for device memory
 __glsl_extension(GL_KHR_memory_scope_semantics)
+[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void DeviceMemoryBarrier()
 {
     __target_switch
@@ -4670,6 +5018,7 @@ void DeviceMemoryBarrier()
 }
 
 __glsl_extension(GL_KHR_memory_scope_semantics)
+[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void DeviceMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -4691,6 +5040,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Distance _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T distance(vector<T, N> x, vector<T, N> y)
 {
     return length(x - y);
@@ -4698,6 +5048,7 @@ T distance(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T distance(T x, T y)
 {
     return length(x - y);
@@ -4710,6 +5061,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T dot(T x, T y)
 {
     return x * y;
@@ -4720,6 +5072,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpDot resultType resultId _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
     T result = T(0);
@@ -4731,6 +5084,7 @@ T dot(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
     T result = T(0);
@@ -4770,12 +5124,14 @@ __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(glsl, interpolateAtCentroid)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InterpolateAtCentroid _0")
 [__readNone]
+[require(glsl_spirv, fragmentprocessing)]
 T EvaluateAttributeAtCentroid(T x);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(glsl, interpolateAtCentroid)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InterpolateAtCentroid _0")
 [__readNone]
+[require(glsl_spirv, fragmentprocessing)]
 vector<T,N> EvaluateAttributeAtCentroid(vector<T,N> x);
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
@@ -4790,17 +5146,20 @@ __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(glsl, "interpolateAtSample($0, int($1))")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InterpolateAtSample _0 _1")
 [__readNone]
+[require(glsl_spirv, fragmentprocessing)]
 T EvaluateAttributeAtSample(T x, uint sampleindex);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(glsl, "interpolateAtSample($0, int($1))")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InterpolateAtSample _0 _1")
 [__readNone]
+[require(glsl_spirv, fragmentprocessing)]
 vector<T,N> EvaluateAttributeAtSample(vector<T,N> x, uint sampleindex);
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(glsl, "interpolateAtSample($0, int($1))")
 [__readNone]
+[require(glsl_spirv, fragmentprocessing)]
 matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex)
 {
     matrix<T,N,M> result;
@@ -4815,12 +5174,14 @@ __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
 __target_intrinsic(spirv, "%foffset = OpConvertSToF _type(float2) resultId _1; %offsetdiv16 = 136 _type(float2) resultId %foffset const(float2, 16.0, 16.0); OpExtInst resultType resultId glsl450 78 _0 %offsetdiv16")
 [__readNone]
+[require(glsl_spirv, fragmentprocessing)]
 T EvaluateAttributeSnapped(T x, int2 offset);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
 __target_intrinsic(spirv, "%foffset = OpConvertSToF _type(float2) resultId _1; %offsetdiv16 = 136 _type(float2) resultId %foffset const(float2, 16.0, 16.0); OpExtInst resultType resultId glsl450 78 _0 %offsetdiv16")
 [__readNone]
+[require(glsl_spirv, fragmentprocessing)]
 vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset);
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
@@ -4845,6 +5206,7 @@ __target_intrinsic(cuda, "$P_exp($0)")
 __target_intrinsic(cpp, "$P_exp($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Exp _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T exp(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -4868,10 +5230,8 @@ matrix<T, N, M> exp(matrix<T, N, M> x)
 // Base-2 exponent
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__target_intrinsic(cuda, "$P_exp2($0)")
-__target_intrinsic(cpp, "$P_exp2($0)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T exp2(T x)
 {
     __target_switch
@@ -4892,7 +5252,14 @@ T exp2(T x)
                  result:$$float = OpExtInst glsl450 Exp2 $xf
             });
         }
+    case hlsl:
+        __intrinsic_asm "exp2($0)";
+    case cpp: 
+        __intrinsic_asm "$P_exp2($0)";
+    case cuda: 
+        __intrinsic_asm "$P_exp2($0)";
     }
+        
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -4914,17 +5281,28 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
 
 
 // Convert 16-bit float stored in low bits of integer
-__target_intrinsic(glsl, "unpackHalf2x16($0).x")
 __glsl_version(420)
-__target_intrinsic(hlsl)
 __cuda_sm_version(6.0)
-__target_intrinsic(cuda, "__half2float(__ushort_as_half($0))")
-__target_intrinsic(spirv, R"(
-                    %lowBits = OpUConvert _type(uint16_t) resultId _0;
-                    %half = OpBitcast _type(half) resultId %lowBits;
-                    OpFConvert resultType resultId %half)")
 [__readNone]
-float f16tof32(uint value);
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+float f16tof32(uint value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackHalf2x16($0).x";
+    case hlsl: __intrinsic_asm "f16tof32($0)";
+    case cuda: __intrinsic_asm "__half2float(__ushort_as_half($0))";
+    case cpp: __intrinsic_asm "f16tof32($0)";
+    case spirv:
+    {
+        return spirv_asm {
+            %lowBits = OpUConvert $$uint16_t $value;
+            %half = OpBitcast $$half %lowBits;
+            result:$$float = OpFConvert %half
+        };
+    }
+    }
+}
 
 __generic<let N : int>
 __target_intrinsic(hlsl)
@@ -4937,17 +5315,28 @@ vector<float, N> f16tof32(vector<uint, N> value)
 
 
 // Convert to 16-bit float stored in low bits of integer
-__target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
 __glsl_version(420)
-__target_intrinsic(hlsl)
 __cuda_sm_version(6.0)
-__target_intrinsic(cuda, "__half_as_ushort(__float2half($0))")
-__target_intrinsic(spirv, R"(
-                    %half = OpFConvert _type(half) resultId _0;
-                    %lowBits = OpBitcast _type(uint16_t) resultId %half;
-                    OpUConvert resultType resultId %lowBits)")
 [__readNone]
-uint f32tof16(float value);
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+uint f32tof16(float value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packHalf2x16(vec2($0,0.0))";
+    case hlsl: __intrinsic_asm "f32tof16($0)";
+    case cuda: __intrinsic_asm "__half_as_ushort(__float2half($0))";
+    case cpp: __intrinsic_asm "f32tof16($0)";
+    case spirv:
+    {
+        return spirv_asm {
+            %half = OpFConvert $$half $value;
+            %lowBits = OpBitcast $$uint16_t %half;
+            result:$$uint = OpUConvert %lowBits
+        };
+    }
+    }
+}
 
 __generic<let N : int>
 __target_intrinsic(hlsl)
@@ -4962,12 +5351,25 @@ vector<uint, N> f32tof16(vector<float, N> value)
 // It's not clear what happens with float16 time in HLSL -> can the float16 coerce to uint for example? If so that would
 // give the wrong result
 
-__target_intrinsic(glsl, "unpackHalf2x16($0).x")
-__target_intrinsic(cuda, "__half2float")
-__target_intrinsic(spirv, "OpFConvert resultType resultId _0")
 __glsl_version(420)
 [__readNone]
-float f16tof32(float16_t value);
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+float f16tof32(float16_t value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackHalf2x16($0).x";
+    case hlsl: __intrinsic_asm "f16tof32($0)";
+    case cuda: __intrinsic_asm "__half2float($0)";
+    case cpp: __intrinsic_asm "f16tof32($0)";
+    case spirv:
+    {
+        return spirv_asm {
+            result:$$float = OpFConvert $value
+        };
+    }
+    }
+}
 
 __generic<let N : int>
 __target_intrinsic(hlsl)
@@ -4985,6 +5387,7 @@ __glsl_version(420)
 __target_intrinsic(cuda, "__float2half")
 __target_intrinsic(spirv, "OpFConvert resultType resultId _0")
 [__readNone]
+[require(cuda_glsl_spirv, shader5_sm_5_0)]
 float16_t f32tof16_(float value);
 
 __generic<let N : int>
@@ -5004,6 +5407,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FaceForward _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_400)]
 vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 {
     return dot(ng, i) < T(0.0f) ? n : -n;
@@ -5016,6 +5420,7 @@ __target_intrinsic(cuda, "$P_firstbithigh($0)")
 __target_intrinsic(cpp, "$P_firstbithigh($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindSMsb _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 int firstbithigh(int value);
 
 __target_intrinsic(hlsl)
@@ -5034,6 +5439,7 @@ __target_intrinsic(cuda, "$P_firstbithigh($0)")
 __target_intrinsic(cpp, "$P_firstbithigh($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindUMsb _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 uint firstbithigh(uint value);
 
 __target_intrinsic(hlsl)
@@ -5053,6 +5459,7 @@ __target_intrinsic(cuda, "$P_firstbitlow($0)")
 __target_intrinsic(cpp, "$P_firstbitlow($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindILsb _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 int firstbitlow(int value);
 
 __target_intrinsic(hlsl)
@@ -5071,6 +5478,7 @@ __target_intrinsic(cuda, "$P_firstbitlow($0)")
 __target_intrinsic(cpp, "$P_firstbitlow($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindILsb _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 uint firstbitlow(uint value);
 
 __target_intrinsic(hlsl)
@@ -5092,6 +5500,7 @@ __target_intrinsic(cuda, "$P_floor($0)")
 __target_intrinsic(cpp, "$P_floor($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Floor _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T floor(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -5119,6 +5528,7 @@ __target_intrinsic(cuda, "$P_fma($0, $1, $2)")
 __target_intrinsic(cpp, "$P_fma($0, $1, $2)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 T fma(T a, T b, T c)
 {
     __target_switch
@@ -5128,6 +5538,8 @@ T fma(T a, T b, T c)
             return mad(a, b, c);
         else
             __intrinsic_asm "fma($0, $1, $2)";
+    default:
+        return a*b + c;
     }
 }
 
@@ -5136,6 +5548,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
 {
     VECTOR_MAP_TRINARY(T, N, fma, a, b, c);
@@ -5144,6 +5557,7 @@ vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
 {
     MATRIX_MAP_TRINARY(T, N, M, fma, a, b, c);
@@ -5155,6 +5569,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "$P_fmod($0, $1)")
 __target_intrinsic(cpp, "$P_fmod($0, $1)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T fmod(T x, T y)
 {
     return x - y * trunc(x/y);
@@ -5184,6 +5599,7 @@ __target_intrinsic(cuda, "$P_frac($0)")
 __target_intrinsic(cpp, "$P_frac($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fract _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T frac(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -5211,6 +5627,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Frexp _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T frexp(T x, out int exp);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -5237,6 +5654,7 @@ __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpFwidth resultType resultId _0")
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 T fwidth(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -5272,6 +5690,7 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
 __generic<T : __BuiltinType>
 [__readNone]
 __glsl_version(450)
+[require(glsl_hlsl_spirv, getattributeatvertex)]
 T GetAttributeAtVertex(T attribute, uint vertexIndex)
 {
     __target_switch
@@ -5304,6 +5723,7 @@ T GetAttributeAtVertex(T attribute, uint vertexIndex)
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
 __glsl_version(450)
+[require(glsl_hlsl_spirv, getattributeatvertex)]
 vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex)
 {
     __target_switch
@@ -5336,6 +5756,7 @@ vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex)
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
 __glsl_version(450)
+[require(glsl_hlsl_spirv, getattributeatvertex)]
 matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex)
 {
     __target_switch
@@ -5355,14 +5776,17 @@ matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex)
 
 // Get number of samples in render target
 [__readNone]
+[require(sm_4_0)]
 uint GetRenderTargetSampleCount();
 
 // Get position of given sample
 [__readNone]
+[require(sm_4_0)]
 float2 GetRenderTargetSamplePosition(int Index);
 
 // Group memory barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
+[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void GroupMemoryBarrier()
 {
     __target_switch
@@ -5378,6 +5802,7 @@ void GroupMemoryBarrier()
     }
 }
 
+[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void __subgroupBarrier()
 {
     __target_switch
@@ -5394,6 +5819,7 @@ void __subgroupBarrier()
 }
 
 __glsl_extension(GL_KHR_memory_scope_semantics)
+[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void GroupMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -5413,6 +5839,7 @@ void GroupMemoryBarrierWithGroupSync()
 
 [ForceInline]
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref  int dest,  int value)
 {
     __target_switch
@@ -5430,6 +5857,7 @@ void InterlockedAdd(__ref  int dest,  int value)
 
 [ForceInline]
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref uint dest, uint value)
 {
     __target_switch
@@ -5453,6 +5881,7 @@ void InterlockedAdd(__ref uint dest, int value)
 
 [ForceInline]
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
 {
     __target_switch
@@ -5471,6 +5900,7 @@ void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
 
 [ForceInline]
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -5524,6 +5954,7 @@ void InterlockedAdd(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref  int dest,  int value)
 {
     __target_switch
@@ -5540,6 +5971,7 @@ void InterlockedAnd(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref uint dest, uint value)
 {
     __target_switch
@@ -5556,6 +5988,7 @@ void InterlockedAnd(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref  int dest,  int value, out  int original_value)
 {
     __target_switch
@@ -5573,6 +6006,7 @@ void InterlockedAnd(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -5608,6 +6042,7 @@ void InterlockedAnd(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value, out  int original_value)
 {
     __target_switch
@@ -5625,6 +6060,7 @@ void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value,
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value, out uint original_value)
 {
     __target_switch
@@ -5696,6 +6132,7 @@ void InterlockedCompareExchange(__ref  uint64_t dest,  uint64_t compare_value,  
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareStore(__ref int dest,  int compare_value,  int value)
 {
     __target_switch
@@ -5712,6 +6149,7 @@ void InterlockedCompareStore(__ref int dest,  int compare_value,  int value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value)
 {
     __target_switch
@@ -5755,6 +6193,7 @@ void InterlockedCompareStore(__ref uint64_t dest, uint64_t compare_value, uint64
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
 {
     __target_switch
@@ -5772,6 +6211,7 @@ void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedExchange(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -5843,6 +6283,7 @@ void InterlockedExchange(__ref  uint64_t dest,  uint64_t value, out  uint64_t or
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref  int dest,  int value)
 {
     __target_switch
@@ -5859,6 +6300,7 @@ void InterlockedMax(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref uint dest, uint value)
 {
     __target_switch
@@ -5875,6 +6317,7 @@ void InterlockedMax(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref  int dest,  int value, out  int original_value)
 {
     __target_switch
@@ -5892,6 +6335,7 @@ void InterlockedMax(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -5945,6 +6389,7 @@ void InterlockedMax(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref  int dest,  int value)
 {
     __target_switch
@@ -5961,6 +6406,7 @@ void InterlockedMin(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref uint dest, uint value)
 {
     __target_switch
@@ -5977,6 +6423,7 @@ void InterlockedMin(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref  int dest,  int value, out  int original_value)
 {
     __target_switch
@@ -5994,6 +6441,7 @@ void InterlockedMin(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -6047,6 +6495,7 @@ void InterlockedMin(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref  int dest,  int value)
 {
     __target_switch
@@ -6063,6 +6512,7 @@ void InterlockedOr(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref uint dest, uint value)
 {
     __target_switch
@@ -6079,6 +6529,7 @@ void InterlockedOr(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref  int dest,  int value, out  int original_value)
 {
      __target_switch
@@ -6096,6 +6547,7 @@ void InterlockedOr(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref uint dest, uint value, out uint original_value)
 {
      __target_switch
@@ -6131,6 +6583,7 @@ void InterlockedOr(__ref  uint64_t dest,  uint64_t value, out  uint64_t original
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref  int dest,  int value)
 {
     __target_switch
@@ -6147,6 +6600,7 @@ void InterlockedXor(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref uint dest, uint value)
 {
     __target_switch
@@ -6163,6 +6617,7 @@ void InterlockedXor(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref  int dest,  int value, out  int original_value)
 {
      __target_switch
@@ -6180,6 +6635,7 @@ void InterlockedXor(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref uint dest, uint value, out uint original_value)
 {
      __target_switch
@@ -6220,6 +6676,7 @@ void InterlockedXor(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 bool isfinite(T x)
 {
     __target_switch
@@ -6235,6 +6692,7 @@ bool isfinite(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<bool, N> isfinite(vector<T, N> x)
 {
     __target_switch
@@ -6248,6 +6706,7 @@ vector<bool, N> isfinite(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<bool, N, M> isfinite(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(bool, N, M, isfinite, x);
@@ -6256,6 +6715,7 @@ matrix<bool, N, M> isfinite(matrix<T, N, M> x)
 // Is floating-point value infinite?
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 bool isinf(T x)
 {
     __target_switch
@@ -6273,6 +6733,7 @@ bool isinf(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<bool, N> isinf(vector<T, N> x)
 {
     __target_switch
@@ -6290,6 +6751,7 @@ vector<bool, N> isinf(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<bool, N, M> isinf(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(bool, N, M, isinf, x);
@@ -6298,6 +6760,7 @@ matrix<bool, N, M> isinf(matrix<T, N, M> x)
 // Is floating-point value not-a-number?
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 bool isnan(T x)
 {
     __target_switch
@@ -6315,6 +6778,7 @@ bool isnan(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<bool, N> isnan(vector<T, N> x)
 {
     __target_switch
@@ -6332,6 +6796,7 @@ vector<bool, N> isnan(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<bool, N, M> isnan(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(bool, N, M, isnan, x);
@@ -6342,6 +6807,7 @@ matrix<bool, N, M> isnan(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T ldexp(T x, T exp)
 {
     return x * exp2(exp);
@@ -6350,6 +6816,7 @@ T ldexp(T x, T exp)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 {
     return x * exp2(exp);
@@ -6358,6 +6825,7 @@ vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
 {
     MATRIX_MAP_BINARY(T, N, M, ldexp, x, exp);
@@ -6369,6 +6837,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Length _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T length(vector<T, N> x)
 {
     return sqrt(dot(x, x));
@@ -6376,6 +6845,7 @@ T length(vector<T, N> x)
 
 // Scalar float length
 __generic<T : __BuiltinFloatingPointType>
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T length(T x)
 {
     return abs(x);
@@ -6387,6 +6857,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, mix)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FMix _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T lerp(T x, T y, T s)
 {
     return x * (T(1.0f) - s) + y * s;
@@ -6397,6 +6868,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, mix)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FMix _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> lerp(vector<T, N> x, vector<T, N> y, vector<T, N> s)
 {
     return x * (T(1.0f) - s) + y * s;
@@ -6405,6 +6877,7 @@ vector<T, N> lerp(vector<T, N> x, vector<T, N> y, vector<T, N> s)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
 {
     MATRIX_MAP_TRINARY(T, N, M, lerp, x, y, s);
@@ -6413,6 +6886,7 @@ matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
 // Legacy lighting function (obsolete)
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 float4 lit(float n_dot_l, float n_dot_h, float m)
 {
     let ambient = 1.0f;
@@ -6429,6 +6903,7 @@ __target_intrinsic(cuda, "$P_log($0)")
 __target_intrinsic(cpp, "$P_log($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Log _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T log(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -6436,6 +6911,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Log _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> log(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, log, x);
@@ -6444,6 +6920,7 @@ vector<T, N> log(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> log(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, log, x);
@@ -6457,6 +6934,7 @@ __target_intrinsic(cuda, "$P_log10($0)")
 __target_intrinsic(cpp, "$P_log10($0)")
 __target_intrinsic(spirv, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpFMul resultType resultId %baseElog const(_p,0.43429448190325182765112891891661)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T log10(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -6464,6 +6942,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "(log( $0 ) * $S0(0.43429448190325182765112891891661) )" )
 __target_intrinsic(spirv, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpVectorTimesScalar resultType resultId %baseElog const(_p,0.43429448190325182765112891891661)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> log10(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, log10, x);
@@ -6472,6 +6951,7 @@ vector<T,N> log10(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> log10(matrix<T,N,M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, log10, x);
@@ -6485,6 +6965,7 @@ __target_intrinsic(cuda, "$P_log2($0)")
 __target_intrinsic(cpp, "$P_log2($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Log2 _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T log2(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -6492,6 +6973,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Log2 _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> log2(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, log2, x);
@@ -6500,6 +6982,7 @@ vector<T,N> log2(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> log2(matrix<T,N,M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, log2, x);
@@ -6514,6 +6997,7 @@ __target_intrinsic(cuda, "$P_fma($0, $1, $2)")
 __target_intrinsic(cpp, "$P_fma($0, $1, $2)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 T mad(T mvalue, T avalue, T bvalue);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -6521,6 +7005,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, fma)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
     VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
@@ -6529,6 +7014,7 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N, M> bvalue)
 {
     MATRIX_MAP_TRINARY(T, N, M, mad, mvalue, avalue, bvalue);
@@ -6541,6 +7027,7 @@ __target_intrinsic(cuda, "$P_fma($0, $1, $2)")
 __target_intrinsic(cpp, "$P_fma($0, $1, $2)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 T mad(T mvalue, T avalue, T bvalue);
 
 __generic<T : __BuiltinIntegerType, let N : int>
@@ -6548,6 +7035,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, fma)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
     VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
@@ -6556,6 +7044,7 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N, M> bvalue)
 {
     MATRIX_MAP_TRINARY(T, N, M, mad, mvalue, avalue, bvalue);
@@ -6570,6 +7059,7 @@ __target_intrinsic(cuda, "$P_max($0, $1)")
 __target_intrinsic(cpp, "$P_max($0, $1)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T max(T x, T y);
 // Note: a stdlib implementation of `max` (or `min`) will require splitting
 // floating-point and integer cases apart, because the floating-point
@@ -6581,6 +7071,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
     VECTOR_MAP_BINARY(T, N, max, x, y);
@@ -6589,6 +7080,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     MATRIX_MAP_BINARY(T, N, M, max, x, y);
@@ -6601,6 +7093,7 @@ __target_intrinsic(cuda, "$P_max($0, $1)")
 __target_intrinsic(cpp, "$P_max($0, $1)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T max(T x, T y);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -6608,6 +7101,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
     VECTOR_MAP_BINARY(T, N, max, x, y);
@@ -6616,6 +7110,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     MATRIX_MAP_BINARY(T, N, M, max, x, y);
@@ -6629,6 +7124,7 @@ __target_intrinsic(cuda, "$P_min($0, $1)")
 __target_intrinsic(cpp, "$P_min($0, $1)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T min(T x, T y);
 
 __generic<T : __BuiltinIntegerType, let N : int>
@@ -6636,6 +7132,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
     VECTOR_MAP_BINARY(T, N, min, x, y);
@@ -6644,6 +7141,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     MATRIX_MAP_BINARY(T, N, M, min, x, y);
@@ -6656,6 +7154,7 @@ __target_intrinsic(cuda, "$P_min($0, $1)")
 __target_intrinsic(cpp, "$P_min($0, $1)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T min(T x, T y);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -6663,6 +7162,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
     VECTOR_MAP_BINARY(T, N, min, x, y);
@@ -6671,6 +7171,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     MATRIX_MAP_BINARY(T, N, M, min, x, y);
@@ -6682,12 +7183,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Modf _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T modf(T x, out T ip);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
 {
     VECTOR_MAP_BINARY(T, N, modf, x, ip);
@@ -6696,6 +7199,7 @@ vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 {
     MATRIX_MAP_BINARY(T, N, M, modf, x, ip);
@@ -6704,6 +7208,7 @@ matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 // msad4 (whatever that is)
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 uint4 msad4(uint reference, uint2 source, uint4 accum)
 {
     int4 bytesRef = (reference >> uint4(24, 16, 8, 0)) & 0xFF;
@@ -6726,28 +7231,33 @@ uint4 msad4(uint reference, uint2 source, uint4 accum)
 __generic<T : __BuiltinArithmeticType>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T mul(T x, T y);
 
 // scalar-vector and vector-scalar
 __generic<T : __BuiltinArithmeticType, let N : int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> mul(vector<T, N> x, T y);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> mul(T x, vector<T, N> y);
 
 // scalar-matrix and matrix-scalar
 __generic<T : __BuiltinArithmeticType, let N : int, let M :int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> mul(matrix<T, N, M> x, T y);
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M :int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> mul(T x, matrix<T, N, M> y);
 
 // vector-vector (dot product)
@@ -6755,6 +7265,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "dot")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T mul(vector<T, N> x, vector<T, N> y)
 {
     return dot(x, y);
@@ -6762,6 +7273,7 @@ T mul(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T mul(vector<T, N> x, vector<T, N> y)
 {
     return dot(x, y);
@@ -6773,6 +7285,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 __target_intrinsic(spirv, "OpMatrixTimesVector resultType resultId _1 _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
     vector<T,M> result;
@@ -6791,6 +7304,7 @@ __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
     vector<T,M> result;
@@ -6809,6 +7323,7 @@ __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
     vector<T,M> result;
@@ -6830,6 +7345,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 __target_intrinsic(spirv, "OpVectorTimesMatrix resultType resultId _1 _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
     vector<T,N> result;
@@ -6848,6 +7364,7 @@ __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
     vector<T,N> result;
@@ -6866,6 +7383,7 @@ __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
     vector<T,N> result;
@@ -6887,6 +7405,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 __target_intrinsic(spirv, "OpMatrixTimesMatrix resultType resultId _1 _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     matrix<T,R,C> result;
@@ -6906,6 +7425,7 @@ __generic<T : __BuiltinIntegerType, let R : int, let N : int, let C : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     matrix<T,R,C> result;
@@ -6925,6 +7445,7 @@ __generic<T : __BuiltinLogicalType, let R : int, let N : int, let C : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     matrix<T,R,C> result;
@@ -6976,6 +7497,7 @@ __generic<let N : int> float noise(vector<float, N> x)
 /// the user's responsibility, so that the default behavior of the language
 /// is more semantically "correct."
 [ForceInline]
+[require(spirv)]
 T __copyObject<T>(T v)
 {
     __target_switch {
@@ -6986,55 +7508,12 @@ T __copyObject<T>(T v)
    }
 }
 
-
-__glsl_extension(GL_EXT_nonuniform_qualifier)
-[__readNone]
-[ForceInline]
-uint NonUniformResourceIndex(uint index)
-{
-    __target_switch
-    {
-    case hlsl:
-        __intrinsic_asm "NonUniformResourceIndex";
-    case glsl:
-        __intrinsic_asm "nonuniformEXT";
-    case spirv:
-        var indexCopy = __copyObject(index);
-        spirv_asm
-        {
-            OpCapability ShaderNonUniform;
-            OpDecorate $indexCopy NonUniform;
-        };
-        return indexCopy;
-    default:
-        return index;
-    }
-}
-
-__glsl_extension(GL_EXT_nonuniform_qualifier)
-[__readNone]
-[ForceInline]
-[NonUniformReturn]
-int NonUniformResourceIndex(int index)
-{
-    __target_switch
-    {
-    case hlsl:
-        __intrinsic_asm "NonUniformResourceIndex";
-    case glsl:
-        __intrinsic_asm "nonuniformEXT";
-    case spirv:
-        var indexCopy = __copyObject(index);
-        spirv_asm
-        {
-            OpCapability ShaderNonUniform;
-            OpDecorate $indexCopy NonUniform;
-        };
-        return indexCopy;
-    default:
-        return index;
-    }
-}
+/// `NonUniformResourceIndex` function is used to indicate if the resource index is
+/// divergent, and ensure scalarization happens correctly for each divergent lane.
+__generic<T:__BuiltinArithmeticType>
+__intrinsic_op($(kIROp_NonUniformResourceIndex))
+[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
+T NonUniformResourceIndex(T index);
 
 /// HLSL allows NonUniformResourceIndex around non int/uint types.
 /// It's effect is presumably to ignore it, which the following implementation does.
@@ -7049,6 +7528,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Normalize _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> normalize(vector<T,N> x)
 {
     return x / length(x);
@@ -7059,6 +7539,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Normalize _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T normalize(T x)
 {
     return x / length(x);
@@ -7072,6 +7553,7 @@ __target_intrinsic(cuda, "$P_pow($0, $1)")
 __target_intrinsic(cpp, "$P_pow($0, $1)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Pow _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T pow(T x, T y);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -7079,6 +7561,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Pow _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 {
     VECTOR_MAP_BINARY(T, N, pow, x, y);
@@ -7087,6 +7570,7 @@ vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     MATRIX_MAP_BINARY(T, N, M, pow, x, y);
@@ -7121,6 +7605,7 @@ for (int argCount = 0; argCount < 12; argCount++)
     auto spirvArgs = spirvArgList.toString();
 }}}}
 __glsl_extension(GL_EXT_debug_printf)
+[require(cpp_cuda_glsl_hlsl_spirv, printf)]
 void printf$(genericParamList.toString())(NativeString format $(paramList))
 {
     __target_switch
@@ -7144,6 +7629,7 @@ ${{{{
 
 // Tessellation factor fixup routines
 
+[require(hlsl, sm_5_0)]
 void Process2DQuadTessFactorsAvg(
     in  float4 RawEdgeFactors,
     in  float2 InsideScale,
@@ -7151,6 +7637,7 @@ void Process2DQuadTessFactorsAvg(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+[require(hlsl, sm_5_0)]
 void Process2DQuadTessFactorsMax(
     in  float4 RawEdgeFactors,
     in  float2 InsideScale,
@@ -7158,6 +7645,7 @@ void Process2DQuadTessFactorsMax(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+[require(hlsl, sm_5_0)]
 void Process2DQuadTessFactorsMin(
     in  float4 RawEdgeFactors,
     in  float2 InsideScale,
@@ -7165,12 +7653,14 @@ void Process2DQuadTessFactorsMin(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+[require(hlsl, sm_5_0)]
 void ProcessIsolineTessFactors(
     in  float RawDetailFactor,
     in  float RawDensityFactor,
     out float RoundedDetailFactor,
     out float RoundedDensityFactor);
 
+[require(hlsl, sm_5_0)]
 void ProcessQuadTessFactorsAvg(
     in  float4 RawEdgeFactors,
     in  float InsideScale,
@@ -7178,6 +7668,7 @@ void ProcessQuadTessFactorsAvg(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+[require(hlsl, sm_5_0)]
 void ProcessQuadTessFactorsMax(
     in  float4 RawEdgeFactors,
     in  float InsideScale,
@@ -7185,6 +7676,7 @@ void ProcessQuadTessFactorsMax(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+[require(hlsl, sm_5_0)]
 void ProcessQuadTessFactorsMin(
     in  float4 RawEdgeFactors,
     in  float InsideScale,
@@ -7192,6 +7684,7 @@ void ProcessQuadTessFactorsMin(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+[require(hlsl, sm_5_0)]
 void ProcessTriTessFactorsAvg(
     in  float3 RawEdgeFactors,
     in  float InsideScale,
@@ -7199,6 +7692,7 @@ void ProcessTriTessFactorsAvg(
     out float RoundedInsideTessFactor,
     out float UnroundedInsideTessFactor);
 
+[require(hlsl, sm_5_0)]
 void ProcessTriTessFactorsMax(
     in  float3 RawEdgeFactors,
     in  float InsideScale,
@@ -7206,6 +7700,7 @@ void ProcessTriTessFactorsMax(
     out float RoundedInsideTessFactor,
     out float UnroundedInsideTessFactor);
 
+[require(hlsl, sm_5_0)]
 void ProcessTriTessFactorsMin(
     in  float3 RawEdgeFactors,
     in  float InsideScale,
@@ -7219,6 +7714,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Radians _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T radians(T x)
 {
     return x * (T.getPi() / T(180.0f));
@@ -7229,6 +7725,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Radians _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> radians(vector<T, N> x)
 {
     return x * (T.getPi() / T(180.0f));
@@ -7237,6 +7734,7 @@ vector<T, N> radians(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> radians(matrix<T, N, M> x)
 {
     return x * (T.getPi() / T(180.0f));
@@ -7246,6 +7744,7 @@ matrix<T, N, M> radians(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T rcp(T x)
 {
     return T(1.0) / x;
@@ -7254,6 +7753,7 @@ T rcp(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> rcp(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, rcp, x);
@@ -7262,6 +7762,7 @@ vector<T, N> rcp(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> rcp(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, rcp, x);
@@ -7273,6 +7774,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Reflect _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T reflect(T i, T n)
 {
     return i - T(2) * dot(n,i) * n;
@@ -7283,6 +7785,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Reflect _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> reflect(vector<T,N> i, vector<T,N> n)
 {
     return i - T(2) * dot(n,i) * n;
@@ -7294,6 +7797,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Refract _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> refract(vector<T,N> i, vector<T,N> n, T eta)
 {
     let dotNI = dot(n,i);
@@ -7307,6 +7811,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Refract _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T refract(T i, T n, T eta)
 {
     let dotNI = dot(n,i);
@@ -7317,6 +7822,7 @@ T refract(T i, T n, T eta)
 
 // Reverse order of bits
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 uint reversebits(uint value)
 {
     __target_switch
@@ -7336,6 +7842,7 @@ uint reversebits(uint value)
 __target_intrinsic(glsl, "bitfieldReverse")
 __generic<let N : int>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<uint, N> reversebits(vector<uint, N> value)
 {
     __target_switch
@@ -7357,6 +7864,7 @@ __target_intrinsic(cuda, "$P_round($0)")
 __target_intrinsic(cpp, "$P_round($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Round _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T round(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -7364,6 +7872,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Round _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> round(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, round, x);
@@ -7372,6 +7881,7 @@ vector<T, N> round(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> round(matrix<T,N,M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, round, x);
@@ -7385,6 +7895,7 @@ __target_intrinsic(cuda, "$P_rsqrt($0)")
 __target_intrinsic(cpp, "$P_rsqrt($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InverseSqrt _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T rsqrt(T x)
 {
     return T(1.0) / sqrt(x);
@@ -7395,6 +7906,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "inversesqrt($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InverseSqrt _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> rsqrt(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, rsqrt, x);
@@ -7403,6 +7915,7 @@ vector<T, N> rsqrt(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> rsqrt(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, rsqrt, x);
@@ -7413,6 +7926,7 @@ matrix<T, N, M> rsqrt(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T saturate(T x)
 {
     return clamp<T>(x, T(0), T(1));
@@ -7421,6 +7935,7 @@ T saturate(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> saturate(vector<T,N> x)
 {
     return clamp<T,N>(x,
@@ -7431,6 +7946,7 @@ vector<T,N> saturate(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> saturate(matrix<T,N,M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, saturate, x);
@@ -7508,6 +8024,7 @@ __target_intrinsic(cuda, "$P_sin($0)")
 __target_intrinsic(cpp, "$P_sin($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sin _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T sin(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -7515,6 +8032,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sin _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> sin(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, sin, x);
@@ -7523,6 +8041,7 @@ vector<T, N> sin(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> sin(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, sin, x);
@@ -7533,6 +8052,7 @@ __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "$P_sincos($0, $1, $2)")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 void sincos(T x, out T s, out T c)
 {
     s = sin(x);
@@ -7542,6 +8062,7 @@ void sincos(T x, out T s, out T c)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
 {
     s = sin(x);
@@ -7551,6 +8072,7 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1: int, let L2 : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
 {
     s = sin(x);
@@ -7565,6 +8087,7 @@ __target_intrinsic(cuda, "$P_sinh($0)")
 __target_intrinsic(cpp, "$P_sinh($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sinh _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T sinh(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -7572,6 +8095,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sinh _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> sinh(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, sinh, x);
@@ -7580,6 +8104,7 @@ vector<T, N> sinh(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> sinh(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, sinh, x);
@@ -7591,6 +8116,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 SmoothStep _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T smoothstep(T min, T max, T x)
 {
     let t = saturate((x - min) / (max - min));
@@ -7602,6 +8128,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 SmoothStep _0 _1 _2")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> smoothstep(vector<T, N> min, vector<T, N> max, vector<T, N> x)
 {
     VECTOR_MAP_TRINARY(T, N, smoothstep, min, max, x);
@@ -7610,6 +8137,7 @@ vector<T, N> smoothstep(vector<T, N> min, vector<T, N> max, vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N, M> x)
 {
     MATRIX_MAP_TRINARY(T, N, M, smoothstep, min, max, x);
@@ -7623,6 +8151,7 @@ __target_intrinsic(cuda, "$P_sqrt($0)")
 __target_intrinsic(cpp, "$P_sqrt($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sqrt _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T sqrt(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -7630,6 +8159,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sqrt _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> sqrt(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, sqrt, x);
@@ -7638,6 +8168,7 @@ vector<T, N> sqrt(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> sqrt(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, sqrt, x);
@@ -7649,6 +8180,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Step _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T step(T y, T x)
 {
     return x < y ? T(0.0f) : T(1.0f);
@@ -7659,6 +8191,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Step _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> step(vector<T,N> y, vector<T,N> x)
 {
     VECTOR_MAP_BINARY(T, N, step, y, x);
@@ -7667,6 +8200,7 @@ vector<T,N> step(vector<T,N> y, vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
 {
     MATRIX_MAP_BINARY(T, N, M, step, y, x);
@@ -7680,6 +8214,7 @@ __target_intrinsic(cuda, "$P_tan($0)")
 __target_intrinsic(cpp, "$P_tan($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Tan _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T tan(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -7687,6 +8222,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Tan _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> tan(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, tan, x);
@@ -7695,6 +8231,7 @@ vector<T, N> tan(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> tan(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, tan, x);
@@ -7708,6 +8245,7 @@ __target_intrinsic(cuda, "$P_tanh($0)")
 __target_intrinsic(cpp, "$P_tanh($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Tanh _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T tanh(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -7715,6 +8253,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Tanh _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> tanh(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, tanh, x);
@@ -7723,6 +8262,7 @@ vector<T,N> tanh(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> tanh(matrix<T,N,M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, tanh, x);
@@ -7734,6 +8274,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpTranspose resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
@@ -7748,6 +8289,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpTranspose resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
@@ -7762,6 +8304,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpTranspose resultType resultId _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 [PreferRecompute]
 [OverloadRank(-1)]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
@@ -7781,6 +8324,7 @@ __target_intrinsic(cuda, "$P_trunc($0)")
 __target_intrinsic(cpp, "$P_trunc($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Trunc _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T trunc(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -7788,6 +8332,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Trunc _0")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> trunc(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, trunc, x);
@@ -7796,6 +8341,7 @@ vector<T, N> trunc(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> trunc(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, trunc, x);
@@ -7807,6 +8353,7 @@ typedef uint WaveMask;
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 WaveMask WaveGetConvergedMask()
 {
     __target_switch
@@ -7832,6 +8379,7 @@ WaveMask __WaveGetActiveMask();
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 WaveMask WaveGetActiveMask()
 {
     __target_switch
@@ -7847,13 +8395,14 @@ WaveMask WaveGetActiveMask()
             OpCapability GroupNonUniformBallot;
             OpGroupNonUniformBallot $$uint4 result Subgroup $_true
         }).x;
-    default:
+    case cuda:
         return __WaveGetActiveMask();
     }
 }
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
 bool WaveMaskIsFirstLane(WaveMask mask)
 {
     __target_switch
@@ -7870,13 +8419,12 @@ bool WaveMaskIsFirstLane(WaveMask mask)
             OpCapability GroupNonUniformBallot;
             OpGroupNonUniformElect $$bool result Subgroup
         };
-    default:
-        return false;
     }
 }
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveMaskAllTrue(WaveMask mask, bool condition)
 {
     __target_switch
@@ -7893,13 +8441,12 @@ bool WaveMaskAllTrue(WaveMask mask, bool condition)
             OpCapability GroupNonUniformBallot;
             OpGroupNonUniformAll $$bool result Subgroup $condition
         };
-    default:
-        return false;
     }
 }
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveMaskAnyTrue(WaveMask mask, bool condition)
 {
     __target_switch
@@ -7916,13 +8463,12 @@ bool WaveMaskAnyTrue(WaveMask mask, bool condition)
             OpCapability GroupNonUniformBallot;
             OpGroupNonUniformAny $$bool result Subgroup $condition
         };
-    default:
-        return false;
     }
 }
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 WaveMask WaveMaskBallot(WaveMask mask, bool condition)
 {
     __target_switch
@@ -7939,11 +8485,10 @@ WaveMask WaveMaskBallot(WaveMask mask, bool condition)
             OpCapability GroupNonUniformBallot;
             OpGroupNonUniformBallot $$uint4 result Subgroup $condition
         }).x;
-    default:
-        return 0;
     }
 }
 
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint WaveMaskCountBits(WaveMask mask, bool value)
 {
     __target_switch
@@ -7972,6 +8517,7 @@ uint WaveMaskCountBits(WaveMask mask, bool value)
 // It seems this can only mean the active threads are the "threads the program flow would lead to". This implies a lockstep
 // "straight SIMD" style interpretation. That being the case this op on HLSL is just a memory barrier without any Sync.
 
+[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
     __target_switch
@@ -8003,6 +8549,7 @@ void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 // aspect of HLSL seems to make everything in lock step - but that's not quite so, it only has to apparently be that way as far as the programmers
 // model appears - divergence could perhaps potentially still happen.
 
+[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
     __target_switch
@@ -8018,6 +8565,7 @@ void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
     }
 }
 
+[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void AllMemoryBarrierWithWaveSync()
 {
     __target_switch
@@ -8033,6 +8581,7 @@ void AllMemoryBarrierWithWaveSync()
     }
 }
 
+[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void GroupMemoryBarrierWithWaveSync()
 {
     __target_switch
@@ -8058,6 +8607,7 @@ void GroupMemoryBarrierWithWaveSync()
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 T WaveMaskBroadcastLaneAt(WaveMask mask, T value, constexpr int lane)
 {
     __target_switch
@@ -8077,6 +8627,7 @@ T WaveMaskBroadcastLaneAt(WaveMask mask, T value, constexpr int lane)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 vector<T,N> WaveMaskBroadcastLaneAt(WaveMask mask, vector<T,N> value, constexpr int lane)
 {
     __target_switch
@@ -8102,6 +8653,7 @@ matrix<T,N,M> WaveMaskBroadcastLaneAt(WaveMask mask, matrix<T,N,M> value, conste
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 T WaveMaskReadLaneAt(WaveMask mask, T value, int lane)
 {
     __target_switch
@@ -8118,8 +8670,9 @@ T WaveMaskReadLaneAt(WaveMask mask, T value, int lane)
     }
 }
 __generic<T : __BuiltinType, let N : int>
-__spirv_version(1.3)__glsl_extension(GL_KHR_shader_subgroup_shuffle)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 vector<T,N> WaveMaskReadLaneAt(WaveMask mask, vector<T,N> value, int lane)
 {
     __target_switch
@@ -8164,6 +8717,7 @@ matrix<T,N,M> WaveMaskShuffle(WaveMask mask, matrix<T,N,M> value, int lane)
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
 {
     __target_switch
@@ -8186,6 +8740,7 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskBitAnd(WaveMask mask, T expr)
 {
     __target_switch
@@ -8204,6 +8759,7 @@ T WaveMaskBitAnd(WaveMask mask, T expr)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskBitAnd(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8226,6 +8782,7 @@ matrix<T,N,M> WaveMaskBitAnd(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskBitOr(WaveMask mask, T expr)
 {
     __target_switch
@@ -8243,6 +8800,7 @@ T WaveMaskBitOr(WaveMask mask, T expr)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8265,6 +8823,7 @@ matrix<T,N,M> WaveMaskBitOr(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskBitXor(WaveMask mask, T expr)
 {
     __target_switch
@@ -8282,6 +8841,7 @@ T WaveMaskBitXor(WaveMask mask, T expr)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskBitXor(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8304,6 +8864,7 @@ matrix<T,N,M> WaveMaskBitXor(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskMax(WaveMask mask, T expr)
 {
     __target_switch
@@ -8324,6 +8885,7 @@ T WaveMaskMax(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskMax(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8350,6 +8912,7 @@ matrix<T,N,M> WaveMaskMax(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskMin(WaveMask mask, T expr)
 {
     __target_switch
@@ -8371,6 +8934,7 @@ T WaveMaskMin(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskMin(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8397,6 +8961,7 @@ matrix<T,N,M> WaveMaskMin(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskProduct(WaveMask mask, T expr)
 {
     __target_switch
@@ -8422,6 +8987,7 @@ T WaveMaskProduct(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskProduct(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8449,12 +9015,10 @@ __target_intrinsic(cuda, "_waveProductMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveActiveProduct($1)")
 matrix<T,N,M> WaveMaskProduct(WaveMask mask, matrix<T,N,M> expr);
 
-__intrinsic_op($(kIROp_RequireGLSLExtension))
-void __requireGLSLExtension(String extensionName);
-
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskSum(WaveMask mask, T expr)
 {
     __target_switch
@@ -8481,6 +9045,7 @@ T WaveMaskSum(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8513,6 +9078,7 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __cuda_sm_version(7.0)
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveMaskAllEqual(WaveMask mask, T value)
 {
     __target_switch
@@ -8530,14 +9096,13 @@ bool WaveMaskAllEqual(WaveMask mask, T value)
             OpCapability GroupNonUniformVote;
             OpGroupNonUniformAllEqual $$bool result Subgroup $value
         };
-    default:
-        return false;
     }
 }
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __cuda_sm_version(7.0)
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveMaskAllEqual(WaveMask mask, vector<T,N> value)
 {
     __target_switch
@@ -8555,8 +9120,6 @@ bool WaveMaskAllEqual(WaveMask mask, vector<T,N> value)
             OpCapability GroupNonUniformVote;
             OpGroupNonUniformAllEqual $$bool result Subgroup $value
         };
-    default:
-        return false;
     }
 }
 __generic<T : __BuiltinType, let N : int, let M : int>
@@ -8570,6 +9133,7 @@ bool WaveMaskAllEqual(WaveMask mask, matrix<T,N,M> value);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskPrefixProduct(WaveMask mask, T expr)
 {
     __target_switch
@@ -8596,6 +9160,7 @@ T WaveMaskPrefixProduct(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8627,6 +9192,7 @@ matrix<T,N,M> WaveMaskPrefixProduct(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskPrefixSum(WaveMask mask, T expr)
 {
     __target_switch
@@ -8654,6 +9220,7 @@ T WaveMaskPrefixSum(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8685,6 +9252,7 @@ matrix<T,N,M> WaveMaskPrefixSum(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 T WaveMaskReadLaneFirst(WaveMask mask, T expr)
 {
     __target_switch
@@ -8699,6 +9267,7 @@ T WaveMaskReadLaneFirst(WaveMask mask, T expr)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 vector<T,N> WaveMaskReadLaneFirst(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8723,6 +9292,7 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.1)
 __cuda_sm_version(7.0)
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 WaveMask WaveMaskMatch(WaveMask mask, T value)
 {
     __target_switch
@@ -8743,6 +9313,7 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.1)
 __cuda_sm_version(7.0)
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 WaveMask WaveMaskMatch(WaveMask mask, vector<T,N> value)
 {
     __target_switch
@@ -8772,6 +9343,7 @@ WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
 {
     __target_switch
@@ -8787,6 +9359,7 @@ T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8807,6 +9380,7 @@ matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskPrefixBitOr(WaveMask mask, T expr)
 {
     __target_switch
@@ -8822,6 +9396,7 @@ T WaveMaskPrefixBitOr(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8842,6 +9417,7 @@ matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskPrefixBitXor(WaveMask mask, T expr)
 {
     __target_switch
@@ -8857,6 +9433,7 @@ T WaveMaskPrefixBitXor(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -8882,6 +9459,7 @@ matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[require(glsl_hlsl_spirv, subgroup_quad)]
 T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 {
     __target_switch
@@ -8900,6 +9478,7 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[require(glsl_hlsl_spirv, subgroup_quad)]
 vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
 {
     __target_switch
@@ -8921,6 +9500,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLan
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[require(glsl_hlsl_spirv, subgroup_quad)]
 T QuadReadAcrossX(T localValue)
 {
     __target_switch
@@ -8941,6 +9521,7 @@ T QuadReadAcrossX(T localValue)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[require(glsl_hlsl_spirv, subgroup_quad)]
 vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
 {
     __target_switch
@@ -8962,6 +9543,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcr
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[require(glsl_hlsl_spirv, subgroup_quad)]
 T QuadReadAcrossY(T localValue)
 {
     __target_switch
@@ -8981,6 +9563,7 @@ T QuadReadAcrossY(T localValue)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[require(glsl_hlsl_spirv, subgroup_quad)]
 vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
 {
     __target_switch
@@ -9003,6 +9586,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcr
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[require(glsl_hlsl_spirv, subgroup_quad)]
 T QuadReadAcrossDiagonal(T localValue)
 {
     __target_switch
@@ -9022,6 +9606,7 @@ T QuadReadAcrossDiagonal(T localValue)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[require(glsl_hlsl_spirv, subgroup_quad)]
 vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 {
     __target_switch
@@ -9050,6 +9635,7 @@ for (auto opName : kWaveActiveBitOpEntries) {
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveActive$(opName.hlslName)(T expr)
 {
     __target_switch
@@ -9066,6 +9652,7 @@ T WaveActive$(opName.hlslName)(T expr)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
 {
     __target_switch
@@ -9098,6 +9685,7 @@ for (const char* opName : kWaveActiveMinMaxNames) {
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveActive$(opName)(T expr)
 {
     __target_switch
@@ -9119,6 +9707,7 @@ T WaveActive$(opName)(T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T, N> WaveActive$(opName)(vector<T, N> expr)
 {
     __target_switch
@@ -9158,6 +9747,7 @@ for (auto opName : kWaveActivProductSumNames) {
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveActive$(opName.hlslName)(T expr)
 {
     __target_switch
@@ -9190,6 +9780,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(hlsl)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
 {
     __target_switch
@@ -9231,6 +9822,7 @@ ${{{{
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveActiveAllEqual(T value)
 {
     __target_switch
@@ -9253,6 +9845,7 @@ bool WaveActiveAllEqual(T value)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveActiveAllEqual(vector<T,N> value)
 {
     __target_switch
@@ -9281,6 +9874,7 @@ bool WaveActiveAllEqual(matrix<T, N, M> value)
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveActiveAllTrue(bool condition)
 {
     __target_switch
@@ -9302,6 +9896,7 @@ bool WaveActiveAllTrue(bool condition)
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveActiveAnyTrue(bool condition)
 {
     __target_switch
@@ -9324,6 +9919,7 @@ bool WaveActiveAnyTrue(bool condition)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [NonUniformReturn]
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint4 WaveActiveBallot(bool condition)
 {
     __target_switch
@@ -9352,6 +9948,7 @@ uint WaveActiveCountBits(bool value)
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
 uint WaveGetLaneCount()
 {
     __target_switch
@@ -9371,6 +9968,7 @@ uint WaveGetLaneCount()
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
 uint WaveGetLaneIndex()
 {
     __target_switch
@@ -9390,6 +9988,7 @@ uint WaveGetLaneIndex()
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
 bool WaveIsFirstLane()
 {
     __target_switch
@@ -9411,6 +10010,8 @@ bool WaveIsFirstLane()
 
 // It's useful to have a wave uint4 version of countbits, because some wave functions return uint4.
 // This implementation tries to limit the amount of work required by the actual lane count.
+__spirv_version(1.3)
+[require(cpp_cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint _WaveCountBits(uint4 value)
 {
     __target_switch
@@ -9441,6 +10042,7 @@ uint _WaveCountBits(uint4 value)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WavePrefixProduct(T expr)
 {
     __target_switch
@@ -9473,6 +10075,7 @@ T WavePrefixProduct(T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WavePrefixProduct(vector<T,N> expr)
 {
     __target_switch
@@ -9500,6 +10103,7 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
 {
     return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
@@ -9508,6 +10112,7 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WavePrefixSum(T expr)
 {
     __target_switch
@@ -9536,6 +10141,7 @@ T WavePrefixSum(T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WavePrefixSum(vector<T,N> expr)
 {
     __target_switch
@@ -9571,6 +10177,7 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 T WaveReadLaneFirst(T expr)
 {
     __target_switch
@@ -9589,6 +10196,7 @@ T WaveReadLaneFirst(T expr)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 {
     __target_switch
@@ -9620,6 +10228,7 @@ matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 T WaveBroadcastLaneAt(T value, constexpr int lane)
 {
     __target_switch
@@ -9639,6 +10248,7 @@ T WaveBroadcastLaneAt(T value, constexpr int lane)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
 {
     __target_switch
@@ -9668,6 +10278,7 @@ matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 T WaveReadLaneAt(T value, int lane)
 {
     __target_switch
@@ -9687,6 +10298,7 @@ T WaveReadLaneAt(T value, int lane)
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
+[require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
 {
     __target_switch
@@ -9717,6 +10329,7 @@ matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 T WaveShuffle(T value, int lane)
 {
     __target_switch
@@ -9736,6 +10349,7 @@ T WaveShuffle(T value, int lane)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 vector<T,N> WaveShuffle(vector<T,N> value, int lane)
 {
     __target_switch
@@ -9761,6 +10375,7 @@ matrix<T, N, M> WaveShuffle(matrix<T, N, M> value, int lane)
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint WavePrefixCountBits(bool value)
 {
     __target_switch
@@ -9782,6 +10397,7 @@ uint WavePrefixCountBits(bool value)
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint4 WaveGetConvergedMulti()
 {
     __target_switch
@@ -9832,6 +10448,7 @@ uint4 WaveMatch(matrix<T,N,M> value)
 
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_popc(__ballot_sync(($1).x, $0) & _getLaneLtMask())")
+[require(cuda_hlsl, waveprefix)]
 uint WaveMultiPrefixCountBits(bool value, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType>
@@ -9840,6 +10457,7 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupExclusiveAnd($0)")
 __target_intrinsic(cuda, "_wavePrefixAnd(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_glsl_hlsl, waveprefix)]
 T WaveMultiPrefixBitAnd(T expr, uint4 mask);
 
 __target_intrinsic(hlsl)
@@ -9848,32 +10466,37 @@ __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupExclusiveAnd($0)")
 __target_intrinsic(cuda, "_wavePrefixAndMultiple(_getMultiPrefixMask(($1).x), $0)")
 __generic<T : __BuiltinArithmeticType, let N : int>
+[require(cuda_glsl_hlsl, waveprefix)]
 vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_wavePrefixAndMultiple(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_hlsl, waveprefix)]
 matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(hlsl)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-//__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
+__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
 __target_intrinsic(cuda, "_wavePrefixOr(, _getMultiPrefixMask(($1).x), $0)")
+[require(cuda_glsl_hlsl, waveprefix)]
 T WaveMultiPrefixBitOr(T expr, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(hlsl)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-//__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
+__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
 __target_intrinsic(cuda, "_wavePrefixOrMultiple(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_glsl_hlsl, waveprefix)]
 vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_wavePrefixOrMultiple(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_hlsl, waveprefix)]
 matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType>
@@ -9882,6 +10505,7 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupExclusiveXor($0)")
 __target_intrinsic(cuda, "_wavePrefixXor(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_glsl_hlsl, waveprefix)]
 T WaveMultiPrefixBitXor(T expr, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -9890,41 +10514,49 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupExclusiveXor($0)")
 __target_intrinsic(cuda, "_wavePrefixXorMultiple(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_glsl_hlsl, waveprefix)]
 vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_wavePrefixXorMultiple(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_hlsl, waveprefix)]
 matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_wavePrefixProduct(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_hlsl, waveprefix)]
 T WaveMultiPrefixProduct(T value, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_wavePrefixProductMultiple(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_hlsl, waveprefix)]
 vector<T,N> WaveMultiPrefixProduct(vector<T,N> value, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_wavePrefixProductMultiple(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_hlsl, waveprefix)]
 matrix<T,N,M> WaveMultiPrefixProduct(matrix<T,N,M> value, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_wavePrefixSum(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_hlsl, waveprefix)]
 T WaveMultiPrefixSum(T value, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_wavePrefixSumMultiple(_getMultiPrefixMask(($1).x), $0 )")
+[require(cuda_hlsl, waveprefix)]
 vector<T,N> WaveMultiPrefixSum(vector<T,N> value, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_wavePrefixSumMultiple(_getMultiPrefixMask(($1).x), $0)")
+[require(cuda_hlsl, waveprefix)]
 matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask);
 
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
@@ -9957,12 +10589,15 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     char const* glslTextureSizeFunc = (isReadOnly) ? "textureSize" : "imageSize";
     char const* glslLoadFuncName = (isReadOnly) ? "texelFetch" : "imageLoad";
     char const* spvLoadInstName = (isReadOnly) ? "OpImageFetch" : "OpImageRead";
+    char const* requireToSetQuery = (isReadOnly) ? "[require(glsl_hlsl_spirv, texture_size)]" : "[require(glsl_hlsl_spirv, image_size)]";
+    char const* requireToSet = (isReadOnly) ? "[require(glsl_hlsl_spirv, texture_sm_4_1)]" : "[require(glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]";
 }}}}
 
 __generic<T, let format:int>
 extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 {
     [__readNone]
+    $(requireToSetQuery)
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -9979,6 +10614,7 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     $(isReadOnly?"[__readNone] ":"")
+    $(requireToSet)
     T Load(int location)
     {
         __target_switch
@@ -9993,17 +10629,21 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
     }
 
     $(isReadOnly?"[__readNone] ":"")
+    $(requireToSet)
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T {
 
         $(isReadOnly?"[__readNone] ":"")
         [ForceInline]
+        $(requireToSet)
         get { return Load((int)index); }
 ${{{{
         if (access != SLANG_RESOURCE_ACCESS_READ) {
 }}}}
-            [nonmutating] set
+            [nonmutating] 
+            $(requireToSet)
+            set
             {
                 __target_switch
                 {
@@ -10093,6 +10733,7 @@ struct RaytracingAccelerationStructure {};
 // 10.1.5 - Intersection Attributes Structure
 
 __target_intrinsic(hlsl, BuiltInTriangleIntersectionAttributes)
+[require(cpp_cuda_glsl_hlsl_spirv, rayobject)]
 struct BuiltInTriangleIntersectionAttributes
 {
     __target_intrinsic(hlsl, barycentrics)
@@ -10111,8 +10752,8 @@ struct BuiltInTriangleIntersectionAttributes
 // `executeCallableNV` is the GLSL intrinsic that will be used to implement
 // `CallShader()` for GLSL-based targets.
 //
-__target_intrinsic(_GL_EXT_ray_tracing, "executeCallableEXT")
-[require(glsl, raytracing)]
+__target_intrinsic(glsl, "executeCallableEXT")
+[require(glsl, raytracing_raygen_closesthit_miss_callable)]
 void __executeCallable(uint shaderIndex, int payloadLocation);
 
 // Next is the custom intrinsic that will compute the payload location
@@ -10128,9 +10769,7 @@ int __callablePayloadLocation(__ref Payload payload);
 // GLSL equivalent.
 //
 __generic<Payload>
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
-[require(hlsl, raytracing)]
+[require(glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 void CallShader(uint shaderIndex, inout Payload payload)
 {
     __target_switch
@@ -10171,8 +10810,8 @@ __intrinsic_op($(kIROp_ForceVarIntoStructTemporarily))
 Ref<T> __forceVarIntoStructTemporarily(inout T maybeStruct);
 
 __target_intrinsic(hlsl, "TraceRay")
-[require(hlsl, raytracing)]
 __generic<payload_t>
+[require(hlsl, raytracing)]
 void __traceRayHLSL(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -10183,8 +10822,8 @@ void __traceRayHLSL(
         RayDesc Ray,
         inout payload_t Payload);
 
-__target_intrinsic(_GL_EXT_ray_tracing, "traceRayEXT")
-[require(glsl, raytracing)]
+__target_intrinsic(glsl, "traceRayEXT")
+[require(glsl, raytracing_raygen_closesthit_miss)]
 void __traceRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -10210,10 +10849,8 @@ __intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __rayPayloadLocation(__ref Payload payload);
 
 [ForceInline]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
-[require(hlsl, raytracing)]
 __generic<payload_t>
+[require(cuda_glsl_hlsl_spirv, raytracing_raygen_closesthit_miss)]
 void TraceRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -10295,8 +10932,8 @@ void TraceRay(
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_ray_tracing_motion_blur.txt
 
 __target_intrinsic(hlsl, "TraceMotionRay")
-[require(hlsl, raytracing_motionblur)]
 __generic<payload_t>
+[require(hlsl, raytracing_motionblur)]
 void __traceMotionRayHLSL(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -10310,7 +10947,7 @@ void __traceMotionRayHLSL(
 
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __target_intrinsic(glsl, "traceRayMotionNV")
-[require(glsl, raytracing_motionblur)]
+[require(glsl, raytracing_motionblur_raygen_closesthit_miss)]
 void __traceMotionRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -10326,9 +10963,7 @@ void __traceMotionRay(
     int                             PayloadLocation);
 
 [ForceInline]
-[require(glsl, raytracing_motionblur)]
-[require(spirv, raytracing_motionblur)]
-[require(hlsl, raytracing_motionblur)]
+[require(glsl_hlsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
 __generic<payload_t>
 void TraceMotionRay(
     RaytracingAccelerationStructure AccelerationStructure,
@@ -10412,17 +11047,13 @@ void TraceMotionRay(
 }
 
 // 10.3.3
-__target_intrinsic(hlsl)
-[require(hlsl, raytracing)]
-bool ReportHit<A>(float tHit, uint hitKind, A attributes);
 
-[require(spirv, raytracing)]
-[require(glsl, raytracing)]
+[require(glsl_spirv, raytracing_intersection)]
 bool __reportIntersection(float tHit, uint hitKind)
 {
     __target_switch
     {
-    case _GL_EXT_ray_tracing: __intrinsic_asm "reportIntersectionEXT";
+    case glsl: __intrinsic_asm "reportIntersectionEXT";
     case spirv:
         return spirv_asm 
         {
@@ -10432,27 +11063,31 @@ bool __reportIntersection(float tHit, uint hitKind)
 }
 
 __generic<A>
-__specialized_for_target(glsl)
-__specialized_for_target(spirv)
+[ForceInline]
+[require(glsl_hlsl_spirv, raytracing_intersection)]
 bool ReportHit(float tHit, uint hitKind, A attributes)
 {
-    [__vulkanHitAttributes]
-    static A a;
-
-    a = attributes;
-    return __reportIntersection(tHit, hitKind);
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "ReportHit($0, $1, $2)";
+    case glsl:
+    case spirv:
+        [__vulkanHitAttributes]
+        static A a;
+        a = attributes;
+        return __reportIntersection(tHit, hitKind);
+    }
 }
 
 // 10.3.4
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void IgnoreHit()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "IgnoreHit";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "ignoreIntersectionEXT;";
+    case glsl: __intrinsic_asm "ignoreIntersectionEXT;";
     case cuda: __intrinsic_asm "optixIgnoreIntersection";
     case spirv: 
         spirv_asm 
@@ -10463,15 +11098,13 @@ void IgnoreHit()
 }
 
 // 10.3.5
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void AcceptHitAndEndSearch()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "AcceptHitAndEndSearch";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "terminateRayEXT;";
+    case glsl: __intrinsic_asm "terminateRayEXT;";
     case cuda: __intrinsic_asm "optixTerminateRay";
     case spirv: 
         spirv_asm 
@@ -10489,15 +11122,13 @@ void AcceptHitAndEndSearch()
 // 10.4.1 - Ray Dispatch System Values
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
 uint3 DispatchRaysIndex()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "DispatchRaysIndex";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_LaunchIDEXT)";
+    case glsl: __intrinsic_asm "(gl_LaunchIDEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchIndex";
     case spirv:
         return spirv_asm 
@@ -10507,15 +11138,13 @@ uint3 DispatchRaysIndex()
     }
 }
 
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
 uint3 DispatchRaysDimensions()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "DispatchRaysDimensions";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_LaunchSizeEXT)";
+    case glsl: __intrinsic_asm "(gl_LaunchSizeEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchDimensions";
     case spirv:
         return spirv_asm 
@@ -10528,15 +11157,13 @@ uint3 DispatchRaysDimensions()
 // 10.4.2 - Ray System Values
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float3 WorldRayOrigin()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldRayOrigin";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldRayOriginEXT)";
+    case glsl: __intrinsic_asm "(gl_WorldRayOriginEXT)";
     case cuda: __intrinsic_asm "optixGetWorldRayOrigin";
     case spirv:
         return spirv_asm 
@@ -10547,15 +11174,13 @@ float3 WorldRayOrigin()
 }
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float3 WorldRayDirection()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldRayDirection";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldRayDirectionEXT)";
+    case glsl: __intrinsic_asm "(gl_WorldRayDirectionEXT)";
     case cuda: __intrinsic_asm "optixGetWorldRayDirection";
     case spirv:
         return spirv_asm 
@@ -10566,15 +11191,13 @@ float3 WorldRayDirection()
 }
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float RayTMin()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "RayTMin";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_RayTminEXT)";
+    case glsl: __intrinsic_asm "(gl_RayTminEXT)";
     case cuda: __intrinsic_asm "optixGetRayTmin";
     case spirv:
         return spirv_asm 
@@ -10595,15 +11218,13 @@ float RayTMin()
 // to the appropriate Vulkan stages.
 //
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float RayTCurrent()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "RayTCurrent";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_RayTmaxEXT)";
+    case glsl: __intrinsic_asm "(gl_RayTmaxEXT)";
     case cuda: __intrinsic_asm "optixGetRayTmax";
     case spirv:
         return spirv_asm 
@@ -10613,15 +11234,13 @@ float RayTCurrent()
     }
 }
 
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 uint RayFlags()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "RayFlags";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_IncomingRayFlagsEXT)";
+    case glsl: __intrinsic_asm "(gl_IncomingRayFlagsEXT)";
     case cuda: __intrinsic_asm "optixGetRayFlags";
     case spirv:
         return spirv_asm 
@@ -10634,15 +11253,13 @@ uint RayFlags()
 // 10.4.3 - Primitive/Object Space System Values
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint InstanceIndex()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "InstanceIndex";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_InstanceID)";
+    case glsl: __intrinsic_asm "(gl_InstanceID)";
     case cuda: __intrinsic_asm "optixGetInstanceIndex";
     case spirv:
         return spirv_asm 
@@ -10653,15 +11270,13 @@ uint InstanceIndex()
 }
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint InstanceID()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "InstanceID";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_InstanceCustomIndexEXT)";
+    case glsl: __intrinsic_asm "(gl_InstanceCustomIndexEXT)";
     case cuda: __intrinsic_asm "optixGetInstanceId";
     case spirv:
         return spirv_asm 
@@ -10672,15 +11287,13 @@ uint InstanceID()
 }
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint PrimitiveIndex()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "PrimitiveIndex";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_PrimitiveID)";
+    case glsl: __intrinsic_asm "(gl_PrimitiveID)";
     case cuda: __intrinsic_asm "optixGetPrimitiveIndex";
     case spirv:
         return spirv_asm 
@@ -10691,15 +11304,13 @@ uint PrimitiveIndex()
 }
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3 ObjectRayOrigin()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectRayOrigin";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectRayOriginEXT)";
+    case glsl: __intrinsic_asm "(gl_ObjectRayOriginEXT)";
     case cuda: __intrinsic_asm "optixGetObjectRayOrigin";
     case spirv:
         return spirv_asm 
@@ -10710,15 +11321,13 @@ float3 ObjectRayOrigin()
 }
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3 ObjectRayDirection()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectRayDirection";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectRayDirectionEXT)";
+    case glsl: __intrinsic_asm "(gl_ObjectRayDirectionEXT)";
     case cuda: __intrinsic_asm "optixGetObjectRayDirection";
     case spirv:
         return spirv_asm 
@@ -10731,15 +11340,13 @@ float3 ObjectRayDirection()
 // TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
 // floats by reference.
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 ObjectToWorld3x4()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld3x4";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "transpose(gl_ObjectToWorldEXT)";
+    case glsl: __intrinsic_asm "transpose(gl_ObjectToWorldEXT)";
     case spirv:
         return spirv_asm 
         {
@@ -10750,15 +11357,13 @@ float3x4 ObjectToWorld3x4()
 }
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 WorldToObject3x4()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject3x4";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "transpose(gl_WorldToObjectEXT)";
+    case glsl: __intrinsic_asm "transpose(gl_WorldToObjectEXT)";
     case spirv:
         return spirv_asm 
         {
@@ -10769,15 +11374,13 @@ float3x4 WorldToObject3x4()
 }
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 ObjectToWorld4x3()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld4x3";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectToWorldEXT)";
+    case glsl: __intrinsic_asm "(gl_ObjectToWorldEXT)";
     case spirv:
         return spirv_asm 
         {
@@ -10787,15 +11390,13 @@ float4x3 ObjectToWorld4x3()
 }
 
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 WorldToObject4x3()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject4x3";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldToObjectEXT)";
+    case glsl: __intrinsic_asm "(gl_WorldToObjectEXT)";
     case spirv:
         return spirv_asm 
         {
@@ -10811,9 +11412,7 @@ float4x3 WorldToObject4x3()
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(hlsl, raytracing_motionblur)]
-[require(glsl, raytracing_motionblur)]
-[require(spirv, raytracing_motionblur)]
+[require(glsl_hlsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
 float RayCurrentTime()
 {
     __target_switch
@@ -10842,15 +11441,13 @@ float RayCurrentTime()
 
 // 10.4.4 - Hit Specific System values
 [NonUniformReturn]
-[require(hlsl, raytracing)]
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit)]
 uint HitKind()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "HitKind";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_HitKindEXT)";
+    case glsl: __intrinsic_asm "(gl_HitKindEXT)";
     case cuda:  __intrinsic_asm "optixGetHitKind";
     case spirv:
         return spirv_asm 
@@ -10890,6 +11487,7 @@ float dot2add(float2 left, float2 right, float acc);
 // Set the number of output vertices and primitives for a mesh shader invocation.
 __glsl_extension(GL_EXT_mesh_shader)
 __glsl_version(450)
+[require(glsl_hlsl_spirv, meshshading)]
 void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 {
     __target_switch
@@ -10914,6 +11512,7 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 // This function doesn't return.
 //
 [KnownBuiltin("DispatchMesh")]
+[require(glsl_hlsl_spirv, meshshading)]
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
 {
     __target_switch
@@ -11043,10 +11642,8 @@ extension __TextureImpl<T,__Shape2D, 1, 0, 0, $(kStdlibResourceAccessFeedback), 
 
 // Get the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader
 __glsl_extension(GL_EXT_ray_tracing)
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
-[require(hlsl, raytracing)]
 [NonUniformReturn]
+[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint GeometryIndex()
 {
     __target_switch
@@ -11063,9 +11660,8 @@ uint GeometryIndex()
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GLSL_EXT_ray_tracing_position_fetch.txt
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_EXT_ray_tracing_position_fetch)
-[require(glsl, raytracing_pos)]
-[require(spirv, raytracing_pos)]
 [ForceInline]
+[require(glsl_spirv, raytracing_position)]
 float3 HitTriangleVertexPosition(uint index)
 {
     __target_switch
@@ -11163,8 +11759,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
     __target_intrinsic(glsl, "rayQueryInitializeEXT($0, $1, $2, $3, $4, $5, $6, $7)")
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
+    [require(glsl_spirv, rayquery)]
     [mutating]
     void __rayQueryInitializeEXT(
         RaytracingAccelerationStructure accelerationStructure,
@@ -11197,11 +11792,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // `RayQuery` to get the effective ray flags, which
     // must obey any API-imposed restrictions.
     //
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__unsafeForceInlineEarly]
     [mutating]
+    [require(glsl_hlsl_spirv, rayquery)]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,
@@ -11239,10 +11832,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // that was found.
     //
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [mutating]
+    [require(glsl_hlsl_spirv, rayquery)]
     bool Proceed()
     {
         __target_switch
@@ -11263,10 +11854,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // `Proceed()` calls will return `false`.
     //
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [mutating]
+    [require(glsl_hlsl_spirv, rayquery)]
     void Abort()
     {
         __target_switch
@@ -11279,11 +11868,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
     // Commit the current non-opaque triangle hit.
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [mutating]
+    [require(glsl_hlsl_spirv, rayquery)]
     void CommitNonOpaqueTriangleHit()
     {
         __target_switch
@@ -11296,11 +11883,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
     // Commit the current procedural primitive hit, with hit time `t`.
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [mutating]
+    [require(glsl_hlsl_spirv, rayquery)]
     void CommitProceduralPrimitiveHit(float t)
     {
         __target_switch
@@ -11321,11 +11906,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // user code.
     //
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     CANDIDATE_TYPE CandidateType()
     {
         __target_switch
@@ -11342,11 +11925,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
     // Get the status of the committed (closest) hit, if any.
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     COMMITTED_STATUS CommittedStatus()
     {
         __target_switch
@@ -11363,11 +11944,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     bool CandidateProceduralPrimitiveNonOpaque()
     {
         __target_switch
@@ -11385,11 +11964,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     float CandidateTriangleRayT()
     {
         __target_switch
@@ -11405,11 +11982,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     float CommittedRayT()
     {
         __target_switch
@@ -11427,9 +12002,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
 ///missing hlsl equivlent; only implemented for glsl & spirv
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     int CandidateRayInstanceCustomIndex()
     {
         __target_switch
@@ -11445,9 +12019,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     int CommittedRayInstanceCustomIndex()
     {
         __target_switch
@@ -11463,9 +12036,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     int CandidateRayInstanceId()
     {
         __target_switch
@@ -11481,9 +12053,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     int CommittedRayInstanceId()
     {
         __target_switch
@@ -11499,9 +12070,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     uint CandidateRayInstanceShaderBindingTableRecordOffset()
     {
         __target_switch
@@ -11517,9 +12087,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     uint CommittedRayInstanceShaderBindingTableRecordOffset()
     {
         __target_switch
@@ -11535,9 +12104,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     int CandidateRayGeometryIndex()
     {
         __target_switch
@@ -11553,9 +12121,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     int CommittedRayGeometryIndex()
     {
         __target_switch
@@ -11571,9 +12138,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     int CandidateRayPrimitiveIndex()
     {
         __target_switch
@@ -11589,9 +12155,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     int CommittedRayPrimitiveIndex()
     {
         __target_switch
@@ -11607,9 +12172,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     float2 CandidateRayBarycentrics()
     {
         __target_switch
@@ -11625,9 +12189,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     float2 CommittedRayBarycentrics()
     {
         __target_switch
@@ -11643,9 +12206,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     bool CandidateRayFrontFace()
     {
         __target_switch
@@ -11661,9 +12223,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     bool CommittedRayFrontFace()
     {
         __target_switch
@@ -11679,9 +12240,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     float3 CandidateRayObjectRayDirection()
     {
         __target_switch
@@ -11697,9 +12257,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     float3 CommittedRayObjectRayDirection()
     {
         __target_switch
@@ -11715,9 +12274,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     float3 CandidateRayObjectRayOrigin()
     {
         __target_switch
@@ -11733,9 +12291,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     float3 CommittedRayObjectRayOrigin()
     {
         __target_switch
@@ -11751,9 +12308,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     float4x3 CandidateRayObjectToWorld()
     {
         __target_switch
@@ -11769,9 +12325,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     float4x3 CommittedRayObjectToWorld()
     {
         __target_switch
@@ -11787,9 +12342,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     float4x3 CandidateRayWorldToObject()
     {
         __target_switch
@@ -11805,9 +12359,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
     [__NoSideEffect]
+    [require(glsl_spirv, rayquery)]
     float4x3 CommittedRayWorldToObject()
     {
         __target_switch
@@ -11835,7 +12388,7 @@ ${{{{
 
     __glsl_extension(GL_EXT_ray_query)
     __glsl_extension(GL_EXT_ray_tracing_position_fetch)
-    [require(glsl, rayquery_pos)]
+    [require(glsl, rayquery_position)]
     [__NoSideEffect]
     void __glslGetIntersectionTriangleVertexPositions$(ccName)(out float3 arr[3])
     {
@@ -11843,8 +12396,8 @@ ${{{{
     };
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery_pos)]
-    [require(spirv, rayquery_pos)]
+    [require(glsl, rayquery_position)]
+    [require(spirv, rayquery_position)]
     [__NoSideEffect]
     float3[3] $(ccName)GetIntersectionTriangleVertexPositions()
     {
@@ -11877,11 +12430,9 @@ ${{{{
     }}}}
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     float3x4 $(ccName)$(matName)3x4()
     {
         __target_switch
@@ -11899,11 +12450,9 @@ ${{{{
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__readNone]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     float4x3 $(ccName)$(matName)4x3()
     {
         __target_switch
@@ -11944,11 +12493,9 @@ ${{{{
 }}}}
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     $(method.type) $(ccName)$(method.hlslName)()
     {
         __target_switch
@@ -11971,11 +12518,9 @@ ${{{{
     // Access properties of the ray being traced.
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     uint RayFlags()
     {
         __target_switch
@@ -11991,11 +12536,9 @@ ${{{{
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     float3 WorldRayOrigin()
     {
         __target_switch
@@ -12011,11 +12554,9 @@ ${{{{
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     float3 WorldRayDirection()
     {
         __target_switch
@@ -12031,11 +12572,9 @@ ${{{{
     }
 
     __glsl_extension(GL_EXT_ray_query)
-    [require(glsl, rayquery)]
-    [require(spirv, rayquery)]
-    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
     float RayTMin()
     {
         __target_switch
@@ -12057,6 +12596,7 @@ ${{{{
 
 __magic_type(SubpassInputType)
 __intrinsic_type($(kIROp_SubpassInputType))
+[require(glsl_hlsl_spirv, subpass)]
 struct __SubpassImpl<T, let isMS:int>
 {
 }
@@ -12068,6 +12608,7 @@ __generic<T>
 extension __SubpassImpl<T, 0>
 {
     [ForceInline]
+    [require(hlsl_spirv, subpass)]
     T SubpassLoad()
     {
         __target_switch
@@ -12093,6 +12634,7 @@ __generic<T>
 extension __SubpassImpl<T, 1>
 {
     [ForceInline]
+    [require(hlsl_spirv, subpass)]
     T SubpassLoad(int sample)
     {
         __target_switch
@@ -12175,10 +12717,8 @@ struct HitObject
 
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject TraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -12271,9 +12811,7 @@ struct HitObject
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    [require(glsl, ser_motion)]
-    [require(spirv, ser_motion)]
-    [require(hlsl, ser_motion)]
+    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject TraceMotionRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -12371,10 +12909,8 @@ struct HitObject
         /// TraceRay. The computed index must reference a valid hit group record in the shader table. The
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -12458,10 +12994,8 @@ struct HitObject
 
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
-    [require(glsl, ser_motion)]
-    [require(spirv, ser_motion)]
-    [require(hlsl, ser_motion)]
-    [ForceInline]
+    [ForceInline]    
+    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
@@ -12542,10 +13076,8 @@ struct HitObject
         /// reference a valid hit group record in the shader table. The Attributes parameter must either be an
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -12622,9 +13154,8 @@ struct HitObject
     }
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
-    [require(glsl, ser_motion)]
-    [require(spirv, ser_motion)]
     [ForceInline]
+    [require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>( 
         uint HitGroupRecordIndex, 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -12694,10 +13225,8 @@ struct HitObject
         /// tracing a ray. The provided shader table index must reference a valid miss record in the shader
         /// table.
     [__requiresNVAPI]
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeMiss( 
         uint MissShaderIndex, 
         RayDesc Ray)
@@ -12731,10 +13260,8 @@ struct HitObject
 
         /// See MakeMiss but handles Motion 
         /// Currently only supported on VK
-    [require(glsl, ser_motion)]
-    [require(spirv, ser_motion)]
-    [require(hlsl, ser_motion)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionMiss( 
         uint MissShaderIndex, 
         RayDesc Ray,
@@ -12776,10 +13303,8 @@ struct HitObject
         /// scenarios where future control flow for some threads is known to process neither a hit nor a
         /// miss.
     [__requiresNVAPI]
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeNop()
     {
         __target_switch
@@ -12810,10 +13335,8 @@ struct HitObject
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
         /// shader is invoked.
     [__requiresNVAPI]
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
@@ -12864,10 +13387,8 @@ struct HitObject
 
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
     [__requiresNVAPI]
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsMiss()
     {
         __target_switch
@@ -12886,10 +13407,8 @@ struct HitObject
 
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
     [__requiresNVAPI]
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsHit()
     {
         __target_switch
@@ -12908,10 +13427,8 @@ struct HitObject
 
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
     [__requiresNVAPI]
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsNop()
     {
         __target_switch
@@ -12930,10 +13447,8 @@ struct HitObject
 
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
     [__requiresNVAPI]
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     RayDesc GetRayDesc()
     {
         __target_switch
@@ -12962,10 +13477,8 @@ struct HitObject
         /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetShaderTableIndex()
     {
         __target_switch
@@ -12985,10 +13498,8 @@ struct HitObject
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceIndex()
     {
         __target_switch
@@ -13008,10 +13519,8 @@ struct HitObject
         /// Returns the instance ID of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceID()
     {
         __target_switch
@@ -13031,10 +13540,8 @@ struct HitObject
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetGeometryIndex()
     {
         __target_switch
@@ -13054,10 +13561,8 @@ struct HitObject
         /// Returns the primitive index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetPrimitiveIndex()
     {
         __target_switch
@@ -13077,10 +13582,8 @@ struct HitObject
         /// Returns the hit kind. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetHitKind()
     {
         __target_switch
@@ -13099,10 +13602,8 @@ struct HitObject
 
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float4x3 GetWorldToObject()
     {
         __target_switch
@@ -13121,10 +13622,8 @@ struct HitObject
 
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float4x3 GetObjectToWorld()
     {
         __target_switch
@@ -13141,9 +13640,8 @@ struct HitObject
         }
     }
 
-    [require(glsl, ser)]
-    [require(spirv, ser)]
     [ForceInline]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float GetCurrentTime() {
         __target_switch
         {
@@ -13159,9 +13657,8 @@ struct HitObject
         }
     }
 
-    [require(glsl, ser)]
-    [require(spirv, ser)]
     [ForceInline]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayOrigin() {
         __target_switch
         {
@@ -13177,9 +13674,8 @@ struct HitObject
         }
     }
 
-    [require(glsl, ser)]
-    [require(spirv, ser)]
     [ForceInline]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayDirection() {
         __target_switch
         {
@@ -13195,9 +13691,8 @@ struct HitObject
         }
     }
 
-    [require(glsl, ser)]
-    [require(spirv, ser)]
     [ForceInline]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     uint2 GetShaderRecordBufferHandle() {
         __target_switch
         {
@@ -13214,10 +13709,8 @@ struct HitObject
     }
 
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
-    [require(glsl, ser)]
-    [require(spirv, ser)]
-    [require(hlsl, ser)]
     [ForceInline]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
     {
         __target_switch
@@ -13265,12 +13758,12 @@ struct HitObject
 
     __target_intrinsic(hlsl, "NvGetAttributesFromHitObject($0, $1)")
     [__requiresNVAPI]
-    [require(hlsl, ser)]
+    [require(hlsl, ser_raygen_closesthit_miss)]
     void __hlslGetAttributesFromHitObject<T>(out T t);
 
     __target_intrinsic(hlsl, "NvMakeHitWithRecordIndex")
     [__requiresNVAPI]
-    [require(hlsl, ser)]
+    [require(hlsl, ser_raygen_closesthit_miss)]
     static void __hlslMakeHitWithRecordIndex<attr_t>(
         uint HitGroupRecordIndex, 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -13284,7 +13777,7 @@ struct HitObject
 
     __target_intrinsic(hlsl, "NvMakeHit")
     [__requiresNVAPI]
-    [require(hlsl, ser)]
+    [require(hlsl, ser_raygen_closesthit_miss)]
     static void __hlslMakeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
         uint GeometryIndex, 
@@ -13298,7 +13791,7 @@ struct HitObject
 
     __target_intrinsic(hlsl, "NvTraceRayHitObject")
     [__requiresNVAPI]
-    [require(hlsl, ser)]
+    [require(hlsl, ser_raygen_closesthit_miss)]
     static void __hlslTraceRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -13316,8 +13809,8 @@ struct HitObject
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectRecordMissNV")
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeMiss(
         out HitObject hitObj,
         uint MissShaderIndex,
@@ -13330,8 +13823,8 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)    
-    [require(glsl, ser_motion)]
     __target_intrinsic(glsl, "hitObjectRecordMissMotionNV")
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionMiss(
         out HitObject hitObj,
         uint MissShaderIndex,
@@ -13343,45 +13836,45 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectRecordEmptyNV")
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeNop(out HitObject hitObj);
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetObjectRayDirectionNV($0)")
+    [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayDirection();
     
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetWorldRayDirectionNV($0)")
+    [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldDirection();
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetWorldRayOriginNV($0)")
+    [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldOrigin();
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetRayTMaxNV($0)")
+    [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMax();
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetRayTMinNV($0)")
+    [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMin();
 
     // "void hitObjectRecordHitWithIndexNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectRecordHitWithIndexNV")
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeHitWithIndex(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13400,8 +13893,8 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    [require(glsl, ser_motion)]
     __target_intrinsic(glsl, "hitObjectRecordHitWithIndexMotionNV")
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHitWithIndex(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13420,8 +13913,8 @@ struct HitObject
     // "void hitObjectRecordHitNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectRecordHitNV")
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeHit(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13441,8 +13934,8 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    [require(glsl, ser_motion)]
     __target_intrinsic(glsl, "hitObjectRecordHitMotionNV")
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHit(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13462,14 +13955,14 @@ struct HitObject
     
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetAttributesNV($0, $1)")
+    [require(glsl, ser_raygen_closesthit_miss)]
     void __glslGetAttributes(int attributeLocation);
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectTraceRayNV")
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslTraceRay(
         out HitObject hitObject,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13487,8 +13980,8 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    [require(glsl, ser_motion)]
     __target_intrinsic(glsl, "hitObjectTraceRayMotionNV")
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRay(
         out HitObject hitObject,
         RaytracingAccelerationStructure accelerationStructure,
@@ -13506,8 +13999,8 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectExecuteShaderNV")
+    [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslInvoke(
         HitObject hitObj,
         int payload);
@@ -13523,9 +14016,8 @@ struct HitObject
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
-[require(glsl, ser)]
-[require(spirv, ser)]
-[require(hlsl, ser)]
+[ForceInline]
+[require(glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
@@ -13561,9 +14053,8 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
-[require(glsl, ser)]
-[require(spirv, ser)]
-[require(hlsl, ser)]
+[ForceInline]
+[require(glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
@@ -13589,9 +14080,8 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
-[require(glsl, ser)]
-[require(spirv, ser)]
-[require(hlsl, ser)]
+[ForceInline]
+[require(glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch
@@ -13613,14 +14103,26 @@ void ReorderThread( HitObject HitOrMiss )
 ///
 /// There doesn't appear to be an equivalent for debugBreak for HLSL
 
-__target_intrinsic(hlsl, "/* debugBreak() not currently supported for HLSL */")
-__target_intrinsic(cuda,"__brkpt()")
-__target_intrinsic(cpp, "SLANG_BREAKPOINT(0)")
-void debugBreak();
 
 __specialized_for_target(glsl)
 [[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]
-void debugBreak();
+void __glslDebugBreak();
+
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl, breakpoint)]
+void debugBreak() 
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "/* debugBreak() not currently supported for HLSL */";
+    case cuda: __intrinsic_asm "__brkpt()";
+    case cpp: __intrinsic_asm "SLANG_BREAKPOINT(0)";
+    case glsl:
+        __glslDebugBreak();
+        return;
+    }
+}
+
 
 // 
 // Realtime Clock support
@@ -13630,8 +14132,8 @@ void debugBreak();
 
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
-[require(shaderclock)]
 [NonUniformReturn]
+[require(cpp_cuda_glsl_hlsl_spirv, shaderclock)]
 uint getRealtimeClockLow()
 {
     __target_switch
@@ -13650,14 +14152,15 @@ uint getRealtimeClockLow()
 }
 
 __target_intrinsic(cpp, "std::chrono::high_resolution_clock::now().time_since_epoch().count()")
-    __target_intrinsic(cuda, "clock64")
+__target_intrinsic(cuda, "clock64")
 [NonUniformReturn]
+[require(cpp_cuda, shaderclock)]
 int64_t __cudaCppGetRealtimeClock();
 
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
-[require(shaderclock)]
 [NonUniformReturn]
+[require(cpp_cuda_glsl_hlsl_spirv, shaderclock)]
 uint2 getRealtimeClock()
 {
     __target_switch
@@ -13687,16 +14190,19 @@ uint2 getRealtimeClock()
 __target_intrinsic(cuda, "(threadIdx)")
 [__readNone]
 [NonUniformReturn]
+[require(cuda)]
 uint3 cudaThreadIdx();
 
 __target_intrinsic(cuda, "(blockIdx)")
 [__readNone]
 [NonUniformReturn]
+[require(cuda)]
 uint3 cudaBlockIdx();
 
 __target_intrinsic(cuda, "(blockDim)")
 [__readNone]
 [NonUniformReturn]
+[require(cuda)]
 uint3 cudaBlockDim();
 
 //
@@ -13871,6 +14377,7 @@ ${{{{
 
 [__NoSideEffect]
 [__requiresNVAPI]
+[require(glsl_hlsl_spirv, texturefootprint)]
 vector<uint, ND> __textureFootprintGetAnchor<let ND:int>(__TextureFootprintData<ND> data, int nd)
 {
     __target_switch
@@ -13888,6 +14395,7 @@ vector<uint, ND> __textureFootprintGetAnchor<let ND:int>(__TextureFootprintData<
 
 [__NoSideEffect]
 [__requiresNVAPI]
+[require(glsl_hlsl_spirv, texturefootprint)]
 vector<uint, ND> __textureFootprintGetOffset<let ND:int>(__TextureFootprintData<ND> data, int nd)
 {
     __target_switch
@@ -13904,6 +14412,7 @@ vector<uint, ND> __textureFootprintGetOffset<let ND:int>(__TextureFootprintData<
 }
 
 __intrinsic_type($(kIROp_TextureFootprintType))
+[require(glsl_hlsl_spirv, texturefootprint)]
 struct __TextureFootprintData<let ND:int>
 {
     typealias Anchor        = vector<uint, ND>;
@@ -14050,6 +14559,7 @@ ${
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
+    [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintGLSL(
             SamplerState    sampler,
             Coords          coords,
@@ -14076,6 +14586,7 @@ ${
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
+    [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintGLSL(
             SamplerState    sampler,
             Coords          coords,
@@ -14104,8 +14615,7 @@ ${
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    __target_intrinsic(glsl,
-        "textureFootprintClampNV($p, $*2)")
+    [require(glsl_spirv, texturefootprintclamp)]
     bool __queryFootprintClampGLSL(
             SamplerState    sampler,
             Coords          coords,
@@ -14135,6 +14645,7 @@ ${
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(glsl_spirv, texturefootprintclamp)]
     bool __queryFootprintClampGLSL(
             SamplerState    sampler,
             Coords          coords,
@@ -14165,6 +14676,7 @@ ${
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     [__requiresNVAPI]
+    [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintLodGLSL(
             SamplerState            sampler,
             Coords                  coords,
@@ -14197,6 +14709,7 @@ ${{{
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     [__requiresNVAPI]
+    [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintGradGLSL(
             SamplerState    sampler,
             Coords          coords,
@@ -14226,6 +14739,7 @@ ${{{
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(glsl_spirv, texturefootprintclamp)]
     bool __queryFootprintGradClampGLSL(
             SamplerState    sampler,
             Coords          coords,
@@ -14295,6 +14809,7 @@ for(auto levelChoice : kLevelChoices)
     [__requiresNVAPI]
     __target_intrinsic(hlsl,
         "NvFootprint$(CoarseOrFine)($1, $2, $3, $4, NV_EXTN_TEXTURE_$!0D, $*5)")
+    [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)NVAPI(
         int                     nd,
         uint                    textureSpace,
@@ -14309,6 +14824,7 @@ for(auto levelChoice : kLevelChoices)
     [__requiresNVAPI]
     __target_intrinsic(hlsl,
         "NvFootprint$(CoarseOrFine)Bias($1, $2, $3, $4, NV_EXTN_TEXTURE_$!0D, $*5)")
+    [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)BiasNVAPI(
         int                     nd,
         uint                    textureSpace,
@@ -14324,6 +14840,7 @@ for(auto levelChoice : kLevelChoices)
     [__requiresNVAPI]
     __target_intrinsic(hlsl,
         "NvFootprint$(CoarseOrFine)Level($1, $2, $3, $4, NV_EXTN_TEXTURE_$!0D, $*5)")
+    [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)LevelNVAPI(
         int                     nd,
         uint                    textureSpace,
@@ -14339,6 +14856,7 @@ for(auto levelChoice : kLevelChoices)
     [__requiresNVAPI]
     __target_intrinsic(hlsl,
         "NvFootprint$(CoarseOrFine)Grad($1, $2, $3, $4, NV_EXTN_TEXTURE_$!0D, $*5)")
+    [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)GradNVAPI(
         int                     nd,
         uint                    textureSpace,
@@ -14603,6 +15121,7 @@ extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite)
     [__requiresNVAPI]
     [ForceInline]
     __glsl_extension(GL_EXT_shader_atomic_float)
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_float1)]
     void InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value, out float originalValue)
     {
         __target_switch
@@ -14667,6 +15186,7 @@ __generic<T, let Alignment : int = 16>
 __intrinsic_type($(kIROp_HLSLConstBufferPointerType))
 __glsl_extension(GL_EXT_buffer_reference)
 __magic_type(ConstBufferPointerType)
+[require(glsl_spirv, bufferreference)]
 struct ConstBufferPointer
 {
     __glsl_version(450)
@@ -14696,6 +15216,7 @@ struct ConstBufferPointer
     __glsl_version(450)
     __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
     __glsl_extension(GL_EXT_buffer_reference)
+    [require(glsl_spirv, bufferreference_int64)]
     static ConstBufferPointer<T> fromUInt(uint64_t val)
     {
         __target_switch
@@ -14712,6 +15233,7 @@ struct ConstBufferPointer
     __glsl_version(450)
     __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
     __glsl_extension(GL_EXT_buffer_reference)
+    [require(glsl_spirv, bufferreference_int64)]
     uint64_t toUInt()
     {
         __target_switch
@@ -14730,6 +15252,7 @@ struct ConstBufferPointer
     __glsl_extension(GL_EXT_buffer_reference)
     [__NoSideEffect]
     [ForceInline]
+    [require(glsl_spirv, bufferreference_int64)]
     bool isValid()
     {
         __target_switch

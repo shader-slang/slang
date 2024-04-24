@@ -1468,6 +1468,8 @@ static bool doesTargetAllowUnresolvedFuncSymbol(TargetRequest* req)
     {
     case CodeGenTarget::HLSL:
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
     case CodeGenTarget::DXIL:
     case CodeGenTarget::DXILAssembly:
     case CodeGenTarget::HostCPPSource:

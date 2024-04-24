@@ -93,6 +93,8 @@ namespace Slang
         ObjectCode          = SLANG_OBJECT_CODE,
         HostHostCallable    = SLANG_HOST_HOST_CALLABLE,
         Metal               = SLANG_METAL,
+        MetalLib            = SLANG_METAL_LIB,
+        MetalLibAssembly    = SLANG_METAL_LIB_ASM,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 

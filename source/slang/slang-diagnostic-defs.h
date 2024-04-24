@@ -744,6 +744,10 @@ DIAGNOSTIC(45001, Error, unresolvedSymbol, "unresolved external symbol '$0'.")
 DIAGNOSTIC(41201, Warning, expectDynamicUniformArgument, "argument for '$0' might not be a dynamic uniform, use `asDynamicUniform()` to silence this warning.")
 DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this location must be dynamic uniform, use `asDynamicUniform()` to silence this warning.")
 
+
+DIAGNOSTIC(41202, Error, notEqualBitCastSize, "invalid to bit_cast differently sized types: '$0' with size '$1' casted into '$2' with size '$3'")
+DIAGNOSTIC(41203, Warning, notEqualReinterpretCastSize, "reinterpret<> into not equally sized types: '$0' with size '$1' casted into '$2' with size '$3'")
+
 //
 // 5xxxx - Target code generation.
 //

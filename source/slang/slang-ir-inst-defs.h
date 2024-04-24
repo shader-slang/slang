@@ -480,6 +480,9 @@ INST(StructuredBufferAppend, StructuredBufferAppend, 1, 0)
 INST(StructuredBufferConsume, StructuredBufferConsume, 1, 0)
 INST(StructuredBufferGetDimensions, StructuredBufferGetDimensions, 1, 0)
 
+// Resource qualifiers for dynamically varying index
+INST(NonUniformResourceIndex, nonUniformResourceIndex, 1, 0)
+
 INST(AtomicCounterIncrement, AtomicCounterIncrement, 1, 0)
 INST(AtomicCounterDecrement, AtomicCounterDecrement, 1, 0)
 
@@ -690,7 +693,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
 /* Decoration */
 
-INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
+    INST(HighLevelDeclDecoration,           highLevelDecl,          1, 0)
     INST(LayoutDecoration,                  layout,                 1, 0)
     INST(BranchDecoration,                  branch,                 0, 0)
     INST(FlattenDecoration,                 flatten,                0, 0)
@@ -1005,6 +1008,13 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
     INST(SPIRVBlockDecoration, spvBlock, 0, 0)
 
+        /// Decorates a SPIRV-inst as `NonUniformResource` to guarantee non-uniform index lookup of
+        /// - a resource within an array of resources via IRGetElement.
+        /// - an IRLoad that takes a pointer within a memory buffer via IRGetElementPtr.
+        /// - an IRIntCast to a resource that is casted from signed to unsigned or viceversa.
+        /// - an IRGetElementPtr itself when using the pointer on an intrinsic operation.
+    INST(SPIRVNonUniformResourceDecoration, NonUniformResource, 0, 0)
+
         // Stores flag bits of which memory qualifiers an object has
     INST(MemoryQualifierSetDecoration, MemoryQualifierSetDecoration, 1, 0)
 
@@ -1012,7 +1022,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// backing value key, width and offset
     INST(BitFieldAccessorDecoration, BitFieldAccessorDecoration, 3, 0)
 
-    INST_RANGE(Decoration, HighLevelDeclDecoration, BitFieldAccessorDecoration)
+ INST_RANGE(Decoration, HighLevelDeclDecoration, BitFieldAccessorDecoration)
 
     //
 

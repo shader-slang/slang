@@ -74,6 +74,8 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
         case CodeGenTarget::DXBytecodeAssembly:
         case CodeGenTarget::DXIL:
         case CodeGenTarget::DXILAssembly:
+        case CodeGenTarget::MetalLib:
+        case CodeGenTarget::MetalLibAssembly:
         {
             return SourceLanguage::Unknown;
         }
@@ -1300,6 +1302,9 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 
     case kIROp_GetVulkanRayTracingPayloadLocation:
         return true;
+
+    case kIROp_NonUniformResourceIndex:
+        return true;
     }
 
     // Layouts and attributes are only present to annotate other
@@ -2061,6 +2066,21 @@ bool CLikeSourceEmitter::isSingleElementConstantBuffer(IRInst* cbufferType)
     return true;
 }
 
+bool CLikeSourceEmitter::shouldForceUnpackConstantBufferElements(IRInst* cbufferType)
+{
+    if (getTargetReq()->getTarget() != CodeGenTarget::HLSL)
+        return false;
+    if (!getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::NoHLSLPackConstantBufferElements))
+        return false;
+    auto type = as<IRUniformParameterGroupType>(cbufferType);
+    if (!type)
+        return false;
+    auto structType = as<IRStructType>(type->getElementType());
+    if (!structType)
+        return false;
+    return true;
+}
+
 void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
@@ -2190,8 +2210,9 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
-            auto skipBase = isD3DTarget(getTargetReq()) &&
-                hasExplicitConstantBufferOffset(ii->getBase()->getDataType());
+            bool skipBase = (isD3DTarget(getTargetReq()) &&
+                hasExplicitConstantBufferOffset(ii->getBase()->getDataType())) ||
+                shouldForceUnpackConstantBufferElements(ii->getBase()->getDataType());
             if (!skipBase)
             {
                 auto base = ii->getBase();
@@ -2369,6 +2390,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_GroupMemoryBarrierWithGroupSync:
         m_writer->emit("GroupMemoryBarrierWithGroupSync()");
+        break;
+
+    case kIROp_NonUniformResourceIndex:
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General)); // Directly emit NonUniformResourceIndex Operand0;
         break;
 
     case kIROp_getNativeStr:

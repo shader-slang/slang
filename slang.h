@@ -610,6 +610,8 @@ extern "C"
         SLANG_HOST_HOST_CALLABLE,       ///< Host callable host code (ie non kernel/shader) 
         SLANG_CPP_PYTORCH_BINDING,      ///< C++ PyTorch binding code.
         SLANG_METAL,                    ///< Metal shading language
+        SLANG_METAL_LIB,                ///< Metal library
+        SLANG_METAL_LIB_ASM,            ///< Metal library assembly
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -842,6 +844,7 @@ extern "C"
             Language,
             MatrixLayoutColumn, // bool
             MatrixLayoutRow,    // bool
+            IgnoreCapabilities, // bool
             ModuleName,         // stringValue0: module name.
             Output,
             Profile,            // intValue0: profile
@@ -929,6 +932,7 @@ extern "C"
             Heterogeneous,
             NoMangle,
             NoHLSLBinding,
+            NoHLSLPackConstantBufferElements,
             ValidateUniformity,
             AllowGLSL,
 
