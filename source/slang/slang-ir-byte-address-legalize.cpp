@@ -369,9 +369,9 @@ struct ByteAddressBufferLegalizationContext
             // array load.
             //
             auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
-            if( m_options.scalarizeVectorLoadStore && elementCountInst)
+            if(elementCountInst)
             {
-                return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue());
+                return emitVectorizedLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue());
             }
 
             // If we aren't scalarizing a vetor load then we next need
@@ -478,6 +478,26 @@ struct ByteAddressBufferLegalizationContext
         return m_builder.emitIntrinsicInst(type, op, elementVals.getCount(), elementVals.getBuffer());
     }
 
+    IRInst* emitVectorizedLoad(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IROp op, IRType* elementType, IRIntegerValue elementCount)
+    {
+        // Check for alignment and elementCount, elementCount must be divisible by alignment.
+
+        IRSizeAndAlignment elementLayout;
+        SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
+        IRIntegerValue elementStride = elementLayout.getStride();
+        auto indexType = m_builder.getIntType();
+        if (m_options.scalarizeVectorLoadStore ||
+            immediateOffset % (elementStride * elementCount))
+        {
+            // generate sequence load
+            return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, op, elementType, elementCount);
+        }
+        else
+        {
+            // generate single vector load
+            return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
+        }
+    }
     // All of the loading operations above eventually bottom out at `emitSimpleLoad`,
     // which is meant to handle the base case where we do *not* want to
     // recurse on the structure of `type`.
@@ -649,6 +669,10 @@ struct ByteAddressBufferLegalizationContext
 
     IRInst* getEquivalentStructuredBuffer(IRType* elementType, IRInst* byteAddressBuffer)
     {
+        if (!elementType)
+        {
+            return nullptr;
+        }
         // The simple case for replacement is when the byte-address buffer to
         // be replaced is a global shader parameter. That path will get its
         // own routine.
@@ -921,9 +945,10 @@ struct ByteAddressBufferLegalizationContext
         else if( auto vecType = as<IRVectorType>(type) )
         {
             auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
-            if( m_options.scalarizeVectorLoadStore && elementCountInst)
+
+            if (elementCountInst)
             {
-                return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
+                return emitVectorizedStore(type, buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
             }
 
             if(m_options.useBitCastFromUInt)
@@ -956,9 +981,9 @@ struct ByteAddressBufferLegalizationContext
         return emitSimpleStore(type, buffer, baseOffset, immediateOffset, value);
     }
 
-    Result emitSimpleStore(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOfset, IRInst* value)
+    Result emitSimpleStore(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value)
     {
-        IRInst* offset = emitOffsetAddIfNeeded(baseOffset, immediateOfset);
+        IRInst* offset = emitOffsetAddIfNeeded(baseOffset, immediateOffset);
         if( m_options.translateToStructuredBufferOps )
         {
             if( auto structuredBuffer = getEquivalentStructuredBuffer(type, buffer) )
@@ -989,6 +1014,27 @@ struct ByteAddressBufferLegalizationContext
             IRInst* storeArgs[] = { buffer, offset, value };
             m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeArgs);
             return SLANG_OK;
+        }
+    }
+
+    Result emitVectorizedStore(IRInst* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount)
+    {
+        // Check for alignment and elementCount, elementCount must be divisible by alignment.
+
+        IRSizeAndAlignment elementLayout;
+        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
+        IRIntegerValue elementStride = elementLayout.getStride();
+        auto indexType = m_builder.getIntType();
+        if (m_options.scalarizeVectorLoadStore ||
+            immediateOffset % (elementStride * elementCount))
+        {
+            // generate sequence store
+            return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, elementType, elementCount);
+        }
+        else
+        {
+            // generate single vector store
+            return emitSimpleStore(value->getDataType(), buffer, baseOffset, immediateOffset, value);
         }
     }
 

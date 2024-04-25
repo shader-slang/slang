@@ -722,7 +722,7 @@ Result linkAndOptimizeIR(
             // operand, or instead as something like a `Load4Aligned<T>` operation
             // that returns a `vector<4,T>` and assumes `4*sizeof(T)` alignemtn.
             //
-            byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            byteAddressBufferOptions.scalarizeVectorLoadStore = false;
 
             // For GLSL targets, there really isn't a low-level concept
             // of a byte-address buffer at all, and the standard "shader storage
