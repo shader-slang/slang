@@ -15,7 +15,6 @@ jobs:
         os: [linux, macos, windows]
         compiler: [gcc, clang, cl]
         config: [debug, release]
-        platform: [x64]
         full-gpu-tests: [false]
         exclude:
           # Exclude invalid or undesired os/compiler
@@ -30,6 +29,7 @@ jobs:
           - { os: linux, runs-on: ubuntu-20.04 }
           - { os: windows, runs-on: windows-latest }
           - { os: macos, runs-on: macos-latest }
+          # Default to x64, but aarch64 on osx
           - platform: x64
           - { os: macos, platform: aarch64 }
           # Set a test category depending on the config, smoke by default,
