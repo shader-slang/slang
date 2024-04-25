@@ -1,5 +1,5 @@
 ### Derivatives In Compute 
-A entry point may be decorated with `[DerivativeGroupQuad]` or `[DerivativeGroupLinear]` to specifiy how to use derivatives in compute shaders. 
+An entry point may be decorated with `[DerivativeGroupQuad]` or `[DerivativeGroupLinear]` to specifiy how to use derivatives in compute shaders. 
 
 GLSL syntax may also be used, but is not reccomended (`derivative_group_quadsNV`/`derivative_group_linearNV`).
 
