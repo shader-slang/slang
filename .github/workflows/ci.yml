@@ -29,7 +29,7 @@ jobs:
         include:
           - { os: linux, runs-on: ubuntu-20.04 }
           - { os: windows, runs-on: windows-latest }
-          - { os: macos, runs-on: macos-latest }
+          - { os: macos, runs-on: macos-latest, platform: aarch64 }
           # Set a test category depending on the config, smoke by default,
           # quick or full conditionally otherwise
           - test-category: smoke
