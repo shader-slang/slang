@@ -476,6 +476,8 @@ public:
         /// the appropriate generated declarations occur.
     virtual void emitPreModuleImpl();
 
+    virtual void beforeComputeEmitActions(IRModule* module) { SLANG_UNUSED(module); };
+
     virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace) { SLANG_UNUSED(rate); SLANG_UNUSED(addressSpace); }
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout) { SLANG_UNUSED(inst); SLANG_UNUSED(allowOffsetLayout); }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
@@ -558,7 +560,6 @@ public:
     // should map to GLSL.
     //
     Stage m_entryPointStage = Stage::Unknown;
-    Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints;
 
     // The target language we want to generate code for
     CodeGenTarget m_target;

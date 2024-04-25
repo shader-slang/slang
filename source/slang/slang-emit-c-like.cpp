@@ -4351,9 +4351,6 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     ctx.actions = &ioActions;
     ctx.openInsts = InstHashSet(module);
 
-    
-    buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
-
     for(auto inst : module->getGlobalInsts())
     {
         // Emit all resource-typed objects first. This is to avoid an odd scenario in HLSL
@@ -4459,6 +4456,7 @@ void CLikeSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 
     List<EmitAction> actions;
 
+    beforeComputeEmitActions(module);
     computeEmitActions(module, actions);
     executeEmitActions(actions);
 }

@@ -338,10 +338,6 @@ void verifyComputeDerivativeGroupModifiers(
     bool linearAttr,
     IRNumThreadsDecoration* numThreadsDecor);
 
-void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints, IRModule* module);
-
-HashSet<IRFunc*>* getReferencingEntryPoints(Dictionary<IRInst*, HashSet<IRFunc*>>& m_referencingEntryPoints, IRInst* inst);
-
 }
 
 #endif

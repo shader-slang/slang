@@ -7,6 +7,7 @@
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-call-graph.h"
 #include "slang-emit-base.h"
 #include "slang-glsl-extension-tracker.h"
 #include "slang-ir-lower-buffer-element-type.h"

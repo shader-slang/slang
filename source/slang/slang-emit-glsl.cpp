@@ -10,6 +10,7 @@
 #include "slang-legalize-types.h"
 #include "slang-ir-layout.h"
 #include "slang/slang-ir.h"
+#include "slang-ir-call-graph.h"
 
 #include <assert.h>
 
@@ -24,6 +25,11 @@ GLSLSourceEmitter::GLSLSourceEmitter(const Desc& desc) :
 {
     m_glslExtensionTracker = dynamicCast<GLSLExtensionTracker>(desc.codeGenContext->getExtensionTracker());
     SLANG_ASSERT(m_glslExtensionTracker);
+}
+
+void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
+{
+    buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
 }
 
 SlangResult GLSLSourceEmitter::init()

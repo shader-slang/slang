@@ -4,6 +4,7 @@
 #include "slang-emit-base.h"
 
 #include "slang-ir-util.h"
+#include "slang-ir-call-graph.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
