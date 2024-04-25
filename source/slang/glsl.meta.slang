@@ -3236,7 +3236,6 @@ ${{{{
         StringBuilder SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder;
 
         SPV_PREFIX_IMAGE_PARAMSBuilder << "$image $P";
-        SPV_SUFFIX_IMAGE_PARAMSBuilder;
         if (targetShape.isMS)
         {
             SPV_SUFFIX_IMAGE_PARAMSBuilder << " Sample $sample";

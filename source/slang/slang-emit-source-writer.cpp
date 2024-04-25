@@ -3,10 +3,6 @@
 
 #include "../core/slang-char-encode.h"
 
-// Disable warnings about sprintf
-#ifdef _WIN32
-#   pragma warning(disable:4996)
-#endif
 
 // Note: using C++ stdio just to get a locale-independent
 // way to format floating-point values.
@@ -199,28 +195,28 @@ void SourceWriter::emitInt64(int64_t value)
 void SourceWriter::emit(Int32 value)
 {
     char buffer[16];
-    sprintf(buffer, "%" PRId32, value);
+    snprintf(buffer, sizeof(buffer), "%" PRId32, value);
     emit(buffer);
 }
 
 void SourceWriter::emit(Int64 value)
 {
     char buffer[32];
-    sprintf(buffer, "%" PRId64, value);
+    snprintf(buffer, sizeof(buffer), "%" PRId64, value);
     emit(buffer);
 }
 
 void SourceWriter::emit(UInt32 value)
 {
     char buffer[32];
-    sprintf(buffer, "%" PRIu32, value);
+    snprintf(buffer, sizeof(buffer), "%" PRIu32, value);
     emit(buffer);
 }
 
 void SourceWriter::emit(UInt64 value)
 {
     char buffer[32];
-    sprintf(buffer, "%" PRIu64, value);
+    snprintf(buffer, sizeof(buffer), "%" PRIu64, value);
     emit(buffer);
 }
 
@@ -463,7 +459,7 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
     emitRawText("\n#line ");
 
     char buffer[16];
-    sprintf(buffer, "%llu", (unsigned long long)sourceLocation.line);
+    snprintf(buffer, sizeof(buffer), "%llu", (unsigned long long)sourceLocation.line);
     emitRawText(buffer);
 
     // Only emit the path part of a `#line` directive if needed
@@ -497,7 +493,7 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
                     m_mapGLSLSourcePathToID.add(path, id);
                 }
 
-                sprintf(buffer, "%d", id);
+                snprintf(buffer, sizeof(buffer), "%d", id);
                 emitRawText(buffer);
                 break;
             }

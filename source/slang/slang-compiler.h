@@ -1688,6 +1688,9 @@ namespace Slang
     /// Are we generating code for a D3D API?
     bool isD3DTarget(TargetRequest* targetReq);
 
+    // Are we generating code for Metal?
+    bool isMetalTarget(TargetRequest* targetReq);
+
     /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
     bool isKhronosTarget(TargetRequest* targetReq);
 
