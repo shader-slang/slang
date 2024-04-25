@@ -353,9 +353,9 @@ void writeInfo(
         line("static bool lookupQualifiedEnum(const QualifiedEnumName& k, SpvWord& v)");
         line("{");
         line("    static_assert(sizeof(k.kind.index) == 1);");
-        w.print("    if(k.name.getLength() > %ld)\n", maxNameLength);
+        w.print("    if(k.name.getLength() > %d)\n", (int)maxNameLength);
         line("        return false;");
-        w.print("    char name[%ld];\n", maxNameLength + 2);
+        w.print("    char name[%d];\n", (int)maxNameLength + 2);
         line("    name[0] = char((k.kind.index >> 4) + 'a');");
         line("    name[1] = char((k.kind.index & 0xf) + 'a');");
         line("    memcpy(name+2, k.name.begin(), k.name.getLength());");

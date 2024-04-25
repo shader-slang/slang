@@ -650,6 +650,14 @@ void propagateConstExpr(
         default:
             break;
 
+        case kIROp_Generic:
+            {
+                auto gen = as<IRGeneric>(gv);
+                gv = as<IRFunc>(findGenericReturnVal(gen));
+                if (nullptr == gv)
+                    break;
+            }
+            [[fallthrough]];
         case kIROp_Func:
         case kIROp_GlobalVar:
             {

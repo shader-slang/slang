@@ -37,44 +37,6 @@ void MetalSourceEmitter::_emitHLSLDecorationSingleInt(const char* name, IRFunc* 
     m_writer->emit(")]]\n");
 }
 
-void MetalSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling)
-{
-    // Metal does not use explicit binding.
-    SLANG_UNUSED(kind);
-    SLANG_UNUSED(chain);
-    SLANG_UNUSED(inst);
-    SLANG_UNUSED(uniformSemanticSpelling);
-}
-
-void MetalSourceEmitter::_emitHLSLRegisterSemantics(EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling)
-{
-    // TODO: implement.
-    SLANG_UNUSED(chain);
-    SLANG_UNUSED(inst);
-    SLANG_UNUSED(uniformSemanticSpelling);
-}
-
-void MetalSourceEmitter::_emitHLSLRegisterSemantics(IRVarLayout* varLayout, IRInst* inst, char const* uniformSemanticSpelling)
-{
-    // TODO: implement.
-    SLANG_UNUSED(varLayout);
-    SLANG_UNUSED(inst);
-    SLANG_UNUSED(uniformSemanticSpelling);
-}
-
-void MetalSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain)
-{
-    // TODO: implement.
-    SLANG_UNUSED(chain);
-}
-
-void MetalSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(IRVarLayout* fieldLayout, EmitVarChain* inChain)
-{
-    // TODO: implement.
-    SLANG_UNUSED(fieldLayout);
-    SLANG_UNUSED(inChain);
-}
-
 void MetalSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     // Metal does not allow shader parameters declared as global variables, so we shouldn't see this.
@@ -139,17 +101,34 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     m_writer->emit(">");
 }
 
-void MetalSourceEmitter::_emitHLSLSubpassInputType(IRSubpassInputType* subpassType)
+void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
-    SLANG_UNUSED(subpassType);
-}
-
-void MetalSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
-{
-    auto layout = getVarLayout(inst); 
-    if (layout)
+    auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecoration)
+        return;
+    auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
+    if (!layout)
+        return;
+    for (auto rr : layout->getOffsetAttrs())
     {
-        _emitHLSLRegisterSemantics(layout, inst, uniformSemanticSpelling);
+        switch (rr->getResourceKind())
+        {
+        case LayoutResourceKind::MetalTexture:
+            m_writer->emit(" [[texture(");
+            m_writer->emit(rr->getOffset());
+            m_writer->emit(")]]");
+            break;
+        case LayoutResourceKind::MetalBuffer:
+            m_writer->emit(" [[buffer(");
+            m_writer->emit(rr->getOffset());
+            m_writer->emit(")]]");
+            break;
+        case LayoutResourceKind::SamplerState:
+            m_writer->emit(" [[sampler(");
+            m_writer->emit(rr->getOffset());
+            m_writer->emit(")]]");
+            break;
+        }
     }
 }
 
@@ -160,7 +139,6 @@ void MetalSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUnifor
 
 void MetalSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
 {
-    auto profile = m_effectiveProfile;
     auto stage = entryPointDecor->getProfile().getStage();
 
     switch (stage)
@@ -283,7 +261,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             needClose = maybeEmitParens(outerPrec, prec);
             emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
             m_writer->emit("+");
-            emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
+            emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
             maybeCloseParens(needClose);
             return true;
         }
@@ -648,6 +626,7 @@ void MetalSourceEmitter::_emitStageAccessSemantic(IRStageAccessDecoration* decor
 void MetalSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
     Super::emitSimpleFuncParamImpl(param);
+    emitFuncParamLayoutImpl(param);
 }
 
 static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)

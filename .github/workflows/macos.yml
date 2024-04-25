@@ -17,8 +17,8 @@ jobs:
       matrix:
         configuration: ['release'] # 'debug'
         compiler: ['clang']
-        platform: ['x64'] 
-        targetPlatform: ['x64'] 
+        platform: ['aarch64'] 
+        targetPlatform: ['aarch64'] 
     steps:
     - uses: actions/checkout@v3
       with:
@@ -64,7 +64,7 @@ jobs:
         path: |
           ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE }}
     - name: test
-      if:  ${{ matrix.targetPlatform != 'aarch64' }}
+      if:  ${{ matrix.targetPlatform != 'x64' }}
       run: 
         CONFIGURATION=${{matrix.configuration}}
         CC=${{matrix.compiler}}

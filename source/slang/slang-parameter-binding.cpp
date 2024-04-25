@@ -973,7 +973,7 @@ static void addExplicitParameterBindings_HLSL(
     RefPtr<VarLayout>           varLayout)
 {
     // We only want to apply D3D `register` modifiers when compiling for
-    // D3D targets.
+    // D3D and Metal targets.
     //
     // TODO: Nominally, the `register` keyword allows for a shader
     // profile to be specified, so that a given binding only
@@ -989,7 +989,7 @@ static void addExplicitParameterBindings_HLSL(
     //
     // For now we do the filtering on target in a very direct fashion:
     //
-    if(!isD3DTarget(context->getTargetRequest()))
+    if(!isD3DTarget(context->getTargetRequest()) && !isMetalTarget(context->getTargetRequest()))
         return;
 
     auto typeLayout = varLayout->typeLayout;

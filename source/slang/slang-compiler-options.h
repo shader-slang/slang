@@ -336,7 +336,9 @@ namespace Slang
 
         bool shouldEmitSPIRVDirectly()
         {
-            return getBoolOption(CompilerOptionName::EmitSpirvDirectly);
+            if (getBoolOption(CompilerOptionName::EmitSpirvViaGLSL))
+                return false;
+            return true;
         }
 
         bool shouldUseScalarLayout()

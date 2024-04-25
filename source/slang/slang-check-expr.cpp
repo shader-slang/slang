@@ -4415,6 +4415,7 @@ namespace Slang
                         || operand.flavor == SPIRVAsmOperand::SlangValueAddr
                         || operand.flavor == SPIRVAsmOperand::ImageType
                         || operand.flavor == SPIRVAsmOperand::SampledImageType
+                        || operand.flavor == SPIRVAsmOperand::ConvertTexel
                         || operand.flavor == SPIRVAsmOperand::RayPayloadFromLocation
                         || operand.flavor == SPIRVAsmOperand::RayAttributeFromLocation
                         || operand.flavor == SPIRVAsmOperand::RayCallableFromLocation)
