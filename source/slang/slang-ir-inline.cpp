@@ -709,11 +709,11 @@ void performMandatoryEarlyInlining(IRModule* module)
 namespace { // anonymous
 
 // Inlines calls that involve String types
-struct StringInliningPass : InliningPassBase
+struct TypeInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
 
-    StringInliningPass(IRModule* module)
+    TypeInliningPass(IRModule* module)
         : Super(module)
     {}
 
@@ -729,6 +729,7 @@ struct StringInliningPass : InliningPassBase
         {
             case kIROp_StringType:
             case kIROp_NativeStringType:
+            case kIROp_RefType:
             {
                 return true;
             }
@@ -762,7 +763,7 @@ struct StringInliningPass : InliningPassBase
 
 } // anonymous
 
-Result performStringInlining(IRModule* module, DiagnosticSink* sink)
+Result performTypeInlining(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
 
@@ -780,7 +781,7 @@ Result performStringInlining(IRModule* module, DiagnosticSink* sink)
     // 
     while(true)
     {
-        StringInliningPass pass(module);
+        TypeInliningPass pass(module);
         if (pass.considerAllCallSites())
         {
             // If there was a change try inlining again

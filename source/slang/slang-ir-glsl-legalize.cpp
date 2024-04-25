@@ -2725,19 +2725,18 @@ void legalizeEntryPointParameterForGLSL(
             codeGenContext,
             builder, paramType, paramLayout, LayoutResourceKind::VaryingInput, stage, pp);
 
-        // Next we need to replace uses of the parameter with
-        // references to the variable(s). We are going to do that
-        // somewhat naively, by simply materializing the
-        // variables at the start.
+        // we have a simple struct which represents all materialized GlobalParams, this
+        // struct will replace the no longer needed global variable which proxied as a 
+        // GlobalParam.
         IRInst* materialized = materializeValue(builder, globalValue);
 
+        // We next need to replace all uses of the proxy variable with the actual GlobalParam
         pp->replaceUsesWith(materialized);
 
-        // We finally need to replace all global variable references of a global 
-        // parameter with the actual global parameter for all function calls. 
-        // Global parameters are used with a OpStore to copy its data into a global 
-        // variable intermediary. We will follow the uses of a global parameter until 
-        // we find this OpStore, then we will replace uses of the intermediary object. 
+        // GlobalParams use use a OpStore to copy its data into a global 
+        // variable intermediary. We will follow the uses of this intermediary 
+        // and replace all some of the uses (function calls and SPIRV Operands)
+        Dictionary<IRBlock*, IRInst*> blockToMaterialized;
         IRBuilder replaceBuilder(materialized);
         for (auto dec : pp->getDecorations())
         {
@@ -2747,27 +2746,48 @@ void legalizeEntryPointParameterForGLSL(
             auto globalVarType = cast<IRPtrTypeBase>(globalVar->getDataType())->getValueType();
             auto key = dec->getOperand(1);
 
-            // we will be replacing uses of `globalVarToReplace`, we need globalVarToReplaceNextUse 
-            // to catch the next use before it is removed from the list of uses
+            // we will be replacing uses of `globalVarToReplace`. We need globalVarToReplaceNextUse 
+            // to catch the next use before it is removed from the list of uses.
             IRUse* globalVarToReplaceNextUse;
             for (auto globalVarUse = globalVar->firstUse; globalVarUse; globalVarUse = globalVarToReplaceNextUse)
             {
                 globalVarToReplaceNextUse = globalVarUse->nextUse;
                 auto user = globalVarUse->getUser();
-                if (user->getOp() != kIROp_Call)
-                    continue;
-                for (Slang::UInt operandIndex = 0; operandIndex < user->getOperandCount();
-                    operandIndex++)
+                switch (user->getOp())
                 {
-                    auto operand = user->getOperand(operandIndex);
-                    auto operandUse = user->getOperands() + operandIndex;
-                    if (operand != globalVar)
-                        continue;
-                    replaceBuilder.setInsertBefore(user);
-                    auto field = replaceBuilder.emitFieldExtract(globalVarType, materialized, key);
-                    replaceBuilder.replaceOperand(operandUse, field);
+                case kIROp_SPIRVAsmOperandInst:
+                case kIROp_Call:
+                {
+                    for (Slang::UInt operandIndex = 0; operandIndex < user->getOperandCount();
+                        operandIndex++)
+                    {
+                        auto operand = user->getOperand(operandIndex);
+                        auto operandUse = user->getOperands() + operandIndex;
+                        if (operand != globalVar)
+                            continue;
+
+                        // a GlobalParam may be used across functions/blocks, we need to 
+                        // materialize at a minimum 1 struct per block.
+                        auto callingBlock = getBlock(user);
+                        bool found = blockToMaterialized.tryGetValue(callingBlock, materialized);
+                        if (!found)
+                        {
+                            replaceBuilder.setInsertBefore(callingBlock->getFirstInst());
+                            materialized = materializeValue(&replaceBuilder, globalValue);
+                            blockToMaterialized.set(callingBlock, materialized);
+                        }
+
+                        replaceBuilder.setInsertBefore(user);
+                        auto field = replaceBuilder.emitFieldExtract(globalVarType, materialized, key);
+                        replaceBuilder.replaceOperand(operandUse, field);
+                        break;
+                    }
                     break;
                 }
+                default:
+                    break;
+                }
+                continue;
             }
         }
     }
