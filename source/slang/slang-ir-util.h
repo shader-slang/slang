@@ -6,7 +6,6 @@
 //
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
-
 namespace Slang
 {
 struct GenericChildrenMigrationContextImpl;
@@ -313,10 +312,6 @@ static void overAllBlocks(IRModule* module, F f)
 
 void hoistInstOutOfASMBlocks(IRBlock* block);
 
-IRType* getSPIRVSampledElementType(IRInst* sampledType);
-
-IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
-
 inline bool isCompositeType(IRType* type)
 {
     switch (type->getOp())
@@ -330,7 +325,18 @@ inline bool isCompositeType(IRType* type)
     }
 }
 
+IRType* getSPIRVSampledElementType(IRInst* sampledType);
+
+IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
+
 IRParam* getParamAt(IRBlock* block, UIndex ii);
+
+void verifyComputeDerivativeGroupModifiers(
+    DiagnosticSink* sink,
+    SourceLoc errorLoc,
+    bool quadAttr,
+    bool linearAttr,
+    IRNumThreadsDecoration* numThreadsDecor);
 
 }
 

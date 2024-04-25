@@ -8036,6 +8036,8 @@ namespace Slang
         ModifierListBuilder listBuilder;
 
         GLSLLayoutLocalSizeAttribute* numThreadsAttrib = nullptr;
+        GLSLLayoutDerivativeGroupQuadAttribute* derivativeGroupQuadAttrib = nullptr;
+        GLSLLayoutDerivativeGroupLinearAttribute* derivativeGroupLinearAttrib = nullptr; 
 
         ImageFormat format;
 
@@ -8081,6 +8083,14 @@ namespace Slang
 
                     numThreadsAttrib->args[localSizeIndex] = expr;
                 }
+            }
+            else if (nameText == "derivative_group_quadsNV")
+            {
+                derivativeGroupQuadAttrib = parser->astBuilder->create<GLSLLayoutDerivativeGroupQuadAttribute>();
+            }
+            else if (nameText == "derivative_group_linearNV")
+            {
+                derivativeGroupLinearAttrib = parser->astBuilder->create<GLSLLayoutDerivativeGroupLinearAttribute>();
             }
             else if (nameText == "binding" ||
                 nameText == "set")
@@ -8189,9 +8199,11 @@ namespace Slang
 #undef CASE
 
         if (numThreadsAttrib)
-        {
             listBuilder.add(numThreadsAttrib);
-        }
+        if(derivativeGroupQuadAttrib)
+            listBuilder.add(derivativeGroupQuadAttrib);
+        if(derivativeGroupLinearAttrib)
+            listBuilder.add(derivativeGroupLinearAttrib);
 
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupEnd>());
 

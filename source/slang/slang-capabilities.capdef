@@ -120,6 +120,7 @@ alias pixel = fragment;
 alias raygeneration = raygen;
 alias tesscontrol = hull;
 alias tesseval = domain;
+alias amplification_mesh = amplification | mesh;
 alias raytracing_stages = raygen | intersection | anyhit | closesthit | miss | callable;
 alias raytracing_stages_intersection = intersection;
 alias raytracing_stages_raygen = raygen;
@@ -134,6 +135,7 @@ alias shader_stages_compute_fragment_geometry_vertex = compute | fragment | geom
 alias shader_stages_domain_hull = domain | hull;
 alias raytracing_stages_fragment = raytracing_stages | fragment;
 alias raytracing_stages_compute = raytracing_stages | compute;
+alias raytracing_stages_compute_amplification_mesh = raytracing_stages_compute | amplification_mesh;
 alias raytracing_stages_compute_fragment = raytracing_stages | shader_stages_compute_fragment;
 alias raytracing_stages_compute_fragment_geometry_vertex = raytracing_stages | shader_stages_compute_fragment_geometry_vertex;
 
@@ -197,6 +199,7 @@ def SPV_NV_shader_invocation_reorder : spirv_1_5 + SPV_KHR_ray_tracing;
 def SPV_KHR_shader_clock : spirv_1_0;
 def SPV_NV_shader_image_footprint : spirv_1_0;
 def SPV_GOOGLE_user_type : spirv_1_0;
+def SPV_NV_compute_shader_derivatives : spirv_1_0;
 
 // SPIRV Capabilities.
 
@@ -326,7 +329,7 @@ alias GL_KHR_shader_subgroup_shuffle = _GL_KHR_shader_subgroup_shuffle | spvGrou
 alias GL_KHR_shader_subgroup_shuffle_relative = _GL_KHR_shader_subgroup_shuffle_relative | spvGroupNonUniformShuffle;
 alias GL_KHR_shader_subgroup_vote = _GL_KHR_shader_subgroup_vote | spvGroupNonUniformVote;
 alias GL_KHR_shader_subgroup_quad = _GL_KHR_shader_subgroup_quad | spvGroupNonUniformQuad;
-alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SOURCE_EXT_GL_NV_compute_shader_derivatives;
+alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SOURCE_EXT_GL_NV_compute_shader_derivatives | SPV_NV_compute_shader_derivatives | _sm_6_6;
 alias GL_ARB_shader_image_size = _GL_ARB_shader_image_size | spvImageQuery;
 alias GL_ARB_shader_texture_image_samples = _GL_ARB_shader_texture_image_samples | spvImageQuery;
 alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | spirv_1_0;
@@ -589,15 +592,13 @@ alias atomic_hlsl_sm_6_6 = _sm_6_6;
 alias byteaddressbuffer = sm_4_0;
 alias byteaddressbuffer_rw = sm_4_0 + raytracing_stages_compute_fragment;
 alias consumestructuredbuffer = sm_5_0 + raytracing_stages_compute_fragment;
-alias fragmentprocessing = raytracing_stages_compute_fragment + _sm_5_0
+alias fragmentprocessing = fragment + _sm_5_0
                          | fragment + glsl_spirv
-                         | raytracing_stages_compute + GL_NV_compute_shader_derivatives
-                         | raytracing_stages_compute_fragment + GLSL_460
+                         | raytracing_stages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
                          ;
-alias fragmentprocessing_derivativecontrol = raytracing_stages_compute_fragment + _sm_5_0
+alias fragmentprocessing_derivativecontrol = fragment + _sm_5_0
                                            | fragment + GL_ARB_derivative_control
-                                           | compute + GL_NV_compute_shader_derivatives
-                                           | raytracing_stages_compute_fragment + GLSL_460
+                                           | raytracing_stages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
                                            ;
 alias getattributeatvertex = fragment + _sm_6_1 | fragment + GL_EXT_fragment_shader_barycentric;
 alias memorybarrier_compute = raytracing_stages_compute + sm_5_0;
@@ -633,7 +634,9 @@ alias texture_querylod = texture_sm_4_1 + GL_EXT_texture_query_lod;
 alias texture_querylevels = texture_sm_4_1 + GL_ARB_texture_query_levels;
 alias texture_shadowlod = texture_sm_4_1 + GL_EXT_texture_shadow_lod + _GLSL_400
                         | texture_sm_4_1 + GL_EXT_texture_shadow_lod;
-alias texture_shadowlod_cube = texture_shadowlod + GL_ARB_texture_cube_map;
+alias texture_shadowlod_cube = texture_shadowlod | texture_shadowlod + GL_ARB_texture_cube_map;
+alias texture_cube = texture_sm_4_1 + GL_ARB_texture_cube_map | texture_sm_4_1;
+alias texture_querylevels_cube = texture_querylevels + GL_ARB_texture_cube_map | texture_querylevels;
 
 alias atomic_glsl_float1 = GL_EXT_shader_atomic_float;
 alias atomic_glsl_float2 = GL_EXT_shader_atomic_float2;
@@ -646,7 +649,7 @@ alias nonuniformqualifier = sm_5_1;
 alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp;
 alias texturefootprint = GL_NV_shader_texture_footprint + GLSL_450 | hlsl_nvapi + _sm_4_0;
 alias texturefootprintclamp = texturefootprint + GL_ARB_sparse_texture_clamp;
-alias texture_cube = GL_ARB_texture_cube_map;
+
 alias shader5_sm_4_0 = GL_ARB_gpu_shader5 | sm_4_0;
 alias shader5_sm_5_0 = GL_ARB_gpu_shader5 | sm_5_0;
 

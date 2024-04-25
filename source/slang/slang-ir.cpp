@@ -60,6 +60,8 @@ namespace Slang
             case kIROp_LineAdjInputPrimitiveTypeDecoration: 
             case kIROp_LineInputPrimitiveTypeDecoration: 
             case kIROp_NoInlineDecoration: 
+            case kIROp_DerivativeGroupQuadDecoration:
+            case kIROp_DerivativeGroupLinearDecoration:
             case kIROp_PointInputPrimitiveTypeDecoration: 
             case kIROp_PreciseDecoration: 
             case kIROp_PublicDecoration: 

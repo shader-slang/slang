@@ -129,6 +129,11 @@ void CLikeSourceEmitter::emitPreModuleImpl()
         m_writer->emit(prelude->getStringSlice());
         m_writer->emit("\n");
     }
+    for (auto prelude : m_requiredPreludesRaw)
+    {
+        m_writer->emit(prelude);
+        m_writer->emit("\n");
+    }
 }
 
 //
@@ -2747,6 +2752,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     {
         break; //should already have set requirement; case covered for empty intrinsic block
     }
+    case kIROp_RequireComputeDerivative:
+    {
+        break; //should already have been parsed and used.
+    }
     default:
         diagnoseUnhandledInst(inst);
         break;
@@ -3358,7 +3367,8 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 
     // Deal with decorations that need
     // to be emitted as attributes
-    if ( IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>())
+    IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+    if (entryPointDecor)
     {
         emitEntryPointAttributes(func, entryPointDecor);
     }
@@ -4446,6 +4456,7 @@ void CLikeSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 
     List<EmitAction> actions;
 
+    beforeComputeEmitActions(module);
     computeEmitActions(module, actions);
     executeEmitActions(actions);
 }

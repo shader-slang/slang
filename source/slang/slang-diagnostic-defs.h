@@ -451,6 +451,9 @@ DIAGNOSTIC(31205, Error, incompleteTypeCannotBeUsedInUniformParameter, "incomple
 DIAGNOSTIC(31206, Error, memoryQualifierNotAllowedOnANonImageTypeParameter, "modifier $0 is not allowed on a non image type parameter.")
 DIAGNOSTIC(31207, Error, InputAttachmentIndexOnlyAllowedOnSubpass, "input_attachment_index is only allowed on subpass images.")
 DIAGNOSTIC(31208, Error, requireInputDecoratedVarForParameter, "$0 expects for argument $1 a type which is a shader input (`in`) variable.")
+DIAGNOSTIC(31210, Error, derivativeGroupQuadMustBeMultiple2ForXYThreads, "compute derivative group quad requires thread dispatch count of X and Y to each be at a multiple of 2")
+DIAGNOSTIC(31211, Error, derivativeGroupLinearMustBeMultiple4ForTotalThreadCount, "compute derivative group linear requires total thread dispatch count to be at a multiple of 4")
+DIAGNOSTIC(31212, Error, onlyOneOfDerivativeGroupLinearOrQuadCanBeSet, "cannot set compute derivative group linear and compute derivative group quad at the same time")
 
 // Enums
 
