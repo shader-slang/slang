@@ -21,7 +21,7 @@ jobs:
           # Exclude invalid or undesired os/compiler
           - { os: linux, compiler: cl }
           - { os: macos, compiler: cl }
-          - { os: macos, compiler: gcc }
+          # - { os: macos, compiler: gcc }
           - { os: windows, compiler: gcc }
           - { os: windows, compiler: clang }
           # or os/config combinations
