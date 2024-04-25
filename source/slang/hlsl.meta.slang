@@ -11582,8 +11582,7 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 //
 [KnownBuiltin("DispatchMesh")]
 [require(glsl_hlsl_spirv, meshshading)]
-[noinline]
-void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
+void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __constref P meshPayload)
 {
     __target_switch
     {
