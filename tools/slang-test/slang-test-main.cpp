@@ -2643,6 +2643,7 @@ static TestResult generateExpectedOutput(TestContext* const context, const TestI
             default:
             {
                 expectedCmdLine.addArg(filePath + ".glsl");
+                expectedCmdLine.addArg("-emit-spirv-via-glsl");
                 expectedCmdLine.addArg("-pass-through");
                 expectedCmdLine.addArg("glslang");
                 break;
@@ -2688,6 +2689,7 @@ TestResult generateActualOutput(TestContext* const context, const TestInput& inp
     CommandLine actualCmdLine;
     _initSlangCompiler(context, actualCmdLine);
     actualCmdLine.addArg(filePath);
+    actualCmdLine.addArg("-emit-spirv-via-glsl");
 
     const auto& args = input.testOptions->args;
 
@@ -3029,9 +3031,9 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-adapter");
         ioCmdLine.addArg(options.adapter);
     }
-    if (options.emitSPIRVDirectly)
+    if (!options.emitSPIRVDirectly)
     {
-        ioCmdLine.addArg("-emit-spirv-directly");
+        ioCmdLine.addArg("-emit-spirv-via-glsl");
     }
 }
 

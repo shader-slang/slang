@@ -2815,7 +2815,7 @@ void getAllNullLocationRayObjectsAndUsedLocations(
     for (auto inst : module->getGlobalInsts())
     {
         auto instOp = inst->getOp();
-        IRIntegerValue intLitVal = NULL;
+        IRIntegerValue intLitVal = 0;
         if (instOp != kIROp_GlobalParam && instOp != kIROp_GlobalVar) continue;
         for (auto decor : inst->getDecorations())
         {
@@ -2859,7 +2859,7 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
     for (auto inst : nullRayObjects)
     {
         IRInst* location = nullptr;
-        IRIntegerValue intLitVal = NULL;
+        IRIntegerValue intLitVal = 0;
         for (auto decor : inst->getDecorations())
         {
             switch (decor->getOp())

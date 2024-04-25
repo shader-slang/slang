@@ -407,21 +407,15 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EnableEffectAnnotations,
          "-enable-effect-annotations", nullptr, 
          "Enables support for legacy effect annotation syntax."},
-#if defined(SLANG_CONFIG_DEFAULT_SPIRV_DIRECT)
         { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
         "Generate SPIR-V output by compiling generated GLSL with glslang" },
         { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
         "Generate SPIR-V output direclty (default)" },
-#else
-        { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
-        "Generate SPIR-V output by compiling generated GLSL with glslang (default)" },
-        { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
-        "Generate SPIR-V output direclty rather than by compiling generated GLSL with glslang" },
         { OptionKind::SPIRVCoreGrammarJSON, "-spirv-core-grammar", nullptr,
         "A path to a specific spirv.core.grammar.json to use when generating SPIR-V output" },
         { OptionKind::IncompleteLibrary, "-incomplete-library", nullptr,
         "Allow generating code from incomplete libraries with unresolved external functions" },
-#endif
+
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);

@@ -1346,7 +1346,7 @@ namespace Slang
             char const* name,
             SlangStage stage,
             slang::IEntryPoint** outEntryPoint,
-            ISlangBlob** outDiagnostics)
+            ISlangBlob** outDiagnostics) override
         {
             ComPtr<slang::IEntryPoint> entryPoint(findAndCheckEntryPoint(UnownedStringSlice(name), stage, outDiagnostics));
             if ((!entryPoint))
@@ -1687,6 +1687,9 @@ namespace Slang
 
     /// Are we generating code for a D3D API?
     bool isD3DTarget(TargetRequest* targetReq);
+
+    // Are we generating code for Metal?
+    bool isMetalTarget(TargetRequest* targetReq);
 
     /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
     bool isKhronosTarget(TargetRequest* targetReq);
@@ -2401,6 +2404,11 @@ namespace Slang
         CompilerOptionSet& getOptionSet() { return m_optionSet; }
 
         HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions() { return m_targetReq->getHLSLToVulkanLayoutOptions(); }
+
+        bool shouldEmitSPIRVDirectly()
+        {
+            return isKhronosTarget(m_targetReq) && getOptionSet().shouldEmitSPIRVDirectly();
+        }
 
     private:
         RefPtr<IRModule> createIRModuleForLayout(DiagnosticSink* sink);

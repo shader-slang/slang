@@ -3236,7 +3236,6 @@ ${{{{
         StringBuilder SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder;
 
         SPV_PREFIX_IMAGE_PARAMSBuilder << "$image $P";
-        SPV_SUFFIX_IMAGE_PARAMSBuilder;
         if (targetShape.isMS)
         {
             SPV_SUFFIX_IMAGE_PARAMSBuilder << " Sample $sample";
@@ -7781,6 +7780,7 @@ public vector<float, N> dFdyCoarse(vector<float, N> p)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthFine(float p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7804,6 +7804,7 @@ __generic<let N : int>
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthFine(vector<float, N> p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7827,6 +7828,7 @@ public vector<float, N> fwidthFine(vector<float, N> p)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthCoarse(float p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7850,6 +7852,7 @@ __generic<let N : int>
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthCoarse(vector<float, N> p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:

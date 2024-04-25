@@ -1930,6 +1930,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_SPIRVAsmOperandBuiltinVar:
     case kIROp_SPIRVAsmOperandGLSL450Set:
     case kIROp_SPIRVAsmOperandDebugPrintfSet:
+    case kIROp_SPIRVAsmOperandConvertTexel:
     case kIROp_SPIRVAsmOperandId:
     case kIROp_SPIRVAsmOperandResult:
     case kIROp_SPIRVAsmOperandTruncate:

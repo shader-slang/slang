@@ -1141,6 +1141,15 @@ namespace Slang
         return 0;
     }
 
+    int getExportRank(DeclRef<Decl> left, DeclRef<Decl> right)
+    {
+        if (left.getDecl() && left.getDecl()->hasModifier<ExternModifier>())
+        {
+            return (right.getDecl() && right.getDecl()->hasModifier<HLSLExportModifier>()) ? -1 : 0;
+        }
+        return 0;
+    }
+
     int SemanticsVisitor::CompareOverloadCandidates(
         OverloadCandidate*	left,
         OverloadCandidate*	right)
@@ -1213,6 +1222,11 @@ namespace Slang
             auto specificityDiff = compareOverloadCandidateSpecificity(left->item, right->item);
             if(specificityDiff)
                 return specificityDiff;
+
+            // `export` function is more flavored than `extern` function. But other modifiers are not considered.
+            auto externExportDiff = getExportRank(left->item.declRef, right->item.declRef);
+            if (externExportDiff)
+                return externExportDiff;
 
             // If we reach here, we will attempt to use overload rank to break the ties.
             auto overloadRankDiff = getOverloadRank(right->item.declRef) - getOverloadRank(left->item.declRef);

@@ -683,6 +683,7 @@ public:
         SampledType, // __sampledType(T), this becomes a 4 vector of the component type of T
         ImageType, // __imageType(texture), returns the equivalaent OpTypeImage of a given texture typed value.
         SampledImageType, // __sampledImageType(texture), returns the equivalent OpTypeSampledImage of a given texture typed value.
+        ConvertTexel, // __convertTexel(value), converts `value` to the native texel type of a texture.
         TruncateMarker, // __truncate, an invented instruction which coerces to the result type by truncating the element count
         EntryPoint, // __entryPoint, a placeholder for the id of a referencing entryPoint.
         BuiltinVar,

@@ -14,7 +14,7 @@ jobs:
       matrix:
         configuration: ['release'] # 'debug'
         compiler: ['clang']
-        platform: ['x64'] 
+        platform: ['aarch64'] 
         targetPlatform: ['x64', 'aarch64'] 
     steps:
       - name: Checkout code
