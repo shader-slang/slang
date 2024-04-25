@@ -87,6 +87,7 @@ option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
+option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
@@ -385,7 +386,7 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
     endif()
 
     set(slang_llvm_dest_object
-        ${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${slang_llvm_filename}
+        ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${slang_llvm_filename}
     )
     add_custom_command(
         OUTPUT ${slang_llvm_dest_object}
@@ -443,6 +444,18 @@ elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
     # directive for libLLVM-13.so, it's almost certainly going to break at
     # runtime in surprising ways when linked alongside Mesa (or anything else
     # pulling in libLLVM.so)
+endif()
+
+if(SLANG_ENABLE_PREBUILT_BINARIES)
+    if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+        add_custom_target(
+            copy-prebuilt-binaries ALL
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_SOURCE_DIR}/external/slang-binaries/bin/windows-x64
+                ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}
+            VERBATIM
+        )
+    endif()
 endif()
 
 if(SLANG_ENABLE_GFX)

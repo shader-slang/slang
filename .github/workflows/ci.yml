@@ -13,9 +13,9 @@ jobs:
     strategy:
       matrix:
         os: [linux, macos, windows]
-        compiler: ['gcc', 'clang', 'cl']
-        config: ['debug', 'release']
-        platform: ['x64']
+        compiler: [gcc, clang, cl]
+        config: [debug, release]
+        platform: [x64]
         full-gpu-tests: [false]
         exclude:
           # Exclude invalid or undesired os/compiler
