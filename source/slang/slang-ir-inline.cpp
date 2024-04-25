@@ -717,7 +717,7 @@ struct TypeInliningPass : InliningPassBase
         : Super(module)
     {}
 
-    bool doesTypeRequireInline(IRType* type)
+    bool doesTypeRequireInline(IRType* type, IRFunc* callee)
     {
         // TODO(JS):
         // I guess there is a question here about what type around string requires
@@ -727,9 +727,14 @@ struct TypeInliningPass : InliningPassBase
         const auto op = type->getOp();
         switch (op)
         {
+            case kIROp_RefType:
+            {
+                if(callee->findDecoration<IRNoRefInlineDecoration>())
+                    return false;
+                return true;
+            }
             case kIROp_StringType:
             case kIROp_NativeStringType:
-            case kIROp_RefType:
             {
                 return true;
             }
@@ -743,7 +748,7 @@ struct TypeInliningPass : InliningPassBase
     {
         auto callee = info.callee;
 
-        if (doesTypeRequireInline(callee->getResultType()))
+        if (doesTypeRequireInline(callee->getResultType(), callee))
         {
             return true;
         }
@@ -751,7 +756,7 @@ struct TypeInliningPass : InliningPassBase
         const auto count = Count(callee->getParamCount());
         for (Index i = 0; i < count; ++i)
         {
-            if (doesTypeRequireInline(callee->getParamType(UInt(i))))
+            if (doesTypeRequireInline(callee->getParamType(UInt(i)), callee))
             {
                 return true;
             }
