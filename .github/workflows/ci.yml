@@ -25,7 +25,7 @@ jobs:
           - { os: windows, compiler: gcc }
           - { os: windows, compiler: clang }
           # or os/config combinations
-          - { os: macos, config: debug }
+          # - { os: macos, config: debug }
           # Default to x64, but aarch64 on osx
           - { os: linux, platform: aarch64 }
           - { os: windows, platform: aarch64 }
