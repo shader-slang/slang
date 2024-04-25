@@ -246,6 +246,9 @@ struct InliningPassBase
         //
         outCallSite.callee = calleeFunc;
 
+        if(calleeFunc->findDecoration<IRNoInlineDecoration>())
+            return false;
+
         for (auto decor : callee->getDecorations())
         {
             switch (decor->getOp())
