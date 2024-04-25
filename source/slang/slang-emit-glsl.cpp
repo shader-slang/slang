@@ -2186,6 +2186,7 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
         }
         else if (auto requireComputeDerivative = as<IRRequireComputeDerivative>(childInst))
         {
+            // only allowed 1 of derivative_group_quadsNV or derivative_group_linearNV
             if (m_entryPointStage != Stage::Compute
                 || m_requiredPreludesRaw.contains("layout(derivative_group_quadsNV) in;")
                 || m_requiredPreludesRaw.contains("layout(derivative_group_linearNV) in;")
@@ -2195,27 +2196,22 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
             _requireGLSLExtension(UnownedStringSlice("GL_NV_compute_shader_derivatives"));
 
             // This will only run once per program.
-            IRInst* entryPoint = nullptr;
-            for (auto i : this->m_irModule->getGlobalInsts())
-            {
-                if (i->findDecoration<IREntryPointDecoration>())
-                {
-                    entryPoint = i;
-                    break;
-                }
-            }
+            HashSet<IRFunc*>* entryPointsUsingInst = getReferencingEntryPoints(m_referencingEntryPoints, func);
 
-            bool isQuad = !entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>();
-            auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
-            if (isQuad)
+            for (auto entryPoint : *entryPointsUsingInst)
             {
-                verifyComputeDerivativeGroupModifiers(getSink(), inst->sourceLoc, true, false, numThreadsDecor);
-                m_requiredPreludesRaw.add("layout(derivative_group_quadsNV) in;");
-            }
-            else
-            {
-                verifyComputeDerivativeGroupModifiers(getSink(), inst->sourceLoc, false, true, numThreadsDecor);
-                m_requiredPreludesRaw.add("layout(derivative_group_linearNV) in;");
+                bool isQuad = !entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>();
+                auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
+                if (isQuad)
+                {
+                    verifyComputeDerivativeGroupModifiers(getSink(), inst->sourceLoc, true, false, numThreadsDecor);
+                    m_requiredPreludesRaw.add("layout(derivative_group_quadsNV) in;");
+                }
+                else
+                {
+                    verifyComputeDerivativeGroupModifiers(getSink(), inst->sourceLoc, false, true, numThreadsDecor);
+                    m_requiredPreludesRaw.add("layout(derivative_group_linearNV) in;");
+                }
             }
         }
     }

@@ -6,8 +6,6 @@
 
 namespace Slang
 {
-    void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints, IRModule* module);
-
     struct GlobalVarTranslationContext
     {
         CodeGenContext* context;

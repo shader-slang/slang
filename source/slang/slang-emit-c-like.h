@@ -558,6 +558,7 @@ public:
     // should map to GLSL.
     //
     Stage m_entryPointStage = Stage::Unknown;
+    Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints;
 
     // The target language we want to generate code for
     CodeGenTarget m_target;

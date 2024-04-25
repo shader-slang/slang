@@ -437,9 +437,6 @@ constexpr bool isPlural<IRUse*> = true;
 template<typename T>
 constexpr bool isSingular = !isPlural<T>;
 
-struct SPIRVEmitContext;
-bool isInstUsedInStage(SPIRVEmitContext& context, IRInst* inst, Stage s);
-HashSet<IRFunc*>* EntryPointsUsingInst(SPIRVEmitContext& context, IRInst* inst);
 
 // Now that we've defined the intermediate data structures we will
 // use to represent SPIR-V code during emission, we will move on
@@ -2744,10 +2741,8 @@ struct SPIRVEmitContext
         case kIROp_RequireComputeDerivative:
             {
                 auto parentFunc = getParentFunc(inst);
-                if (hasExtensionDeclaration(UnownedStringSlice("SPV_NV_compute_shader_derivatives")))
-                    break;
 
-                HashSet<IRFunc*>* entryPointsUsingInst = EntryPointsUsingInst(*this, parentFunc);
+                HashSet<IRFunc*>* entryPointsUsingInst = getReferencingEntryPoints(m_referencingEntryPoints, parentFunc);
                 for (IRFunc* entryPoint : *entryPointsUsingInst)
                 {
                     bool isQuad = true;
@@ -2772,7 +2767,8 @@ struct SPIRVEmitContext
                     }
                     else
                     {
-                        verifyComputeDerivativeGroupModifiers(this->m_sink, inst->sourceLoc, false, true, numThreadsDecor);                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, entryPoint, SpvExecutionModeDerivativeGroupLinearNV);
+                        verifyComputeDerivativeGroupModifiers(this->m_sink, inst->sourceLoc, false, true, numThreadsDecor);
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, entryPoint, SpvExecutionModeDerivativeGroupLinearNV);
                         emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, SpvCapabilityComputeDerivativeGroupLinearNV);
                     }
                 }
@@ -6129,14 +6125,6 @@ struct SPIRVEmitContext
     {
     }
 };
-
-HashSet<IRFunc*>* EntryPointsUsingInst(SPIRVEmitContext& context, IRInst* inst)
-{
-    auto* referencingEntryPoints = context.m_referencingEntryPoints.tryGetValue(inst);
-    if (!referencingEntryPoints)
-        return nullptr;
-    return referencingEntryPoints;
-}
 
 bool isInstUsedInStage(SPIRVEmitContext& context, IRInst* inst, Stage s)
 {

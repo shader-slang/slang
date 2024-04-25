@@ -6,7 +6,6 @@
 //
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
-
 namespace Slang
 {
 struct GenericChildrenMigrationContextImpl;
@@ -313,10 +312,6 @@ static void overAllBlocks(IRModule* module, F f)
 
 void hoistInstOutOfASMBlocks(IRBlock* block);
 
-IRType* getSPIRVSampledElementType(IRInst* sampledType);
-
-IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
-
 inline bool isCompositeType(IRType* type)
 {
     switch (type->getOp())
@@ -330,44 +325,22 @@ inline bool isCompositeType(IRType* type)
     }
 }
 
+IRType* getSPIRVSampledElementType(IRInst* sampledType);
+
+IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
+
 IRParam* getParamAt(IRBlock* block, UIndex ii);
 
-static inline void verifyComputeDerivativeGroupModifiers(
+void verifyComputeDerivativeGroupModifiers(
     DiagnosticSink* sink,
     SourceLoc errorLoc,
     bool quadAttr,
     bool linearAttr,
-    IRNumThreadsDecoration* numThreadsDecor)
-{   
-    if (!numThreadsDecor)
-        return;
+    IRNumThreadsDecoration* numThreadsDecor);
 
-    if(quadAttr && linearAttr)
-    {
-        sink->diagnose(errorLoc, Diagnostics::onlyOneOfDerivativeGroupLinearOrQuadCanBeSet);
-    }
+void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints, IRModule* module);
 
-    IRIntegerValue x = 1;
-    IRIntegerValue y = 1;
-    IRIntegerValue z = 1;
-    if(numThreadsDecor->getX())
-        x = numThreadsDecor->getX()->getValue();
-    if(numThreadsDecor->getY())
-        y = numThreadsDecor->getY()->getValue();
-    if(numThreadsDecor->getZ())
-        z = numThreadsDecor->getZ()->getValue();
-
-    if(quadAttr)
-    {
-        if(x %2 != 0 || y %2 != 0)
-            sink->diagnose(errorLoc, Diagnostics::derivativeGroupQuadMustBeMultiple2ForXYThreads);
-    }
-    else if(linearAttr)
-    {
-        if ((x * y * z) % 4 != 0)
-            sink->diagnose(errorLoc, Diagnostics::derivativeGroupLinearMustBeMultiple4ForTotalThreadCount);
-    }
-}
+HashSet<IRFunc*>* getReferencingEntryPoints(Dictionary<IRInst*, HashSet<IRFunc*>>& m_referencingEntryPoints, IRInst* inst);
 
 }
 
