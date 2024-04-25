@@ -29,7 +29,7 @@ jobs:
           # Default to x64, but aarch64 on osx
           - { os: linux, platform: aarch64 }
           - { os: windows, platform: aarch64 }
-          - { os: macos, platform: x64 }
+          # - { os: macos, platform: x64 }
         include:
           - { os: linux, runs-on: ubuntu-20.04 }
           - { os: windows, runs-on: windows-latest }
