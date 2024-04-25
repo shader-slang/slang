@@ -1,7 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target glsl -allow-glsl
 //TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target glsl -allow-glsl -DUSE_GENERIC
 
-//#define USE_GENERIC
+// This tests an issue that "const" variable was losing the
+// const-ness when they are in a generic function
 
 uniform sampler2D uniform_sampler2D;
 RWStructuredBuffer<float> outputBuffer;
