@@ -20,6 +20,10 @@ if [[ "aarch64" == "${TARGETARCH}"  && "release" == "${CONFIGURATION}" ]]; then
     glslangBuildFlag="--build-glslang=true"
 fi
 
+if [[ ! -z ${GLIBC_COMPATIBLE} ]]; then
+    glibcCompatible="--glibc-forward-compatible=true"
+fi
+
 if [[ "${ARCH}" != "${TARGETARCH}" ]]; then
 
 # Create the makefile
@@ -35,7 +39,7 @@ rm -rf ./bin
 
 else
 # Create the makefile
-./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true ${glslangBuildFlag}
+./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true ${glslangBuildFlag} ${glibcCompatible}
 fi
 
 # Build the configuration

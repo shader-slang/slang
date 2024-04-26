@@ -16,6 +16,13 @@ bool isPointerOfType(IRInst* type, IROp opCode)
     return false;
 }
 
+IRType* getVectorElementType(IRType* type)
+{
+    if (auto vectorType = as<IRVectorType>(type))
+        return vectorType->getElementType();
+    return type;
+}
+
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType)
 {
     Dictionary<IRInst*, IRInst*> result;
@@ -1537,6 +1544,27 @@ void hoistInstOutOfASMBlocks(IRBlock* block)
     }
 }
 
+IRType* getSPIRVSampledElementType(IRInst* sampledType)
+{
+    auto sampledElementType = getVectorElementType((IRType*)sampledType);
+    if (sampledElementType->getOp() == kIROp_HalfType)
+    {
+        IRBuilder builder(sampledType);
+        sampledElementType = builder.getBasicType(BaseType::Float);
+    }
+    return sampledElementType;
+}
+
+IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t)
+{
+    if (auto orignalVectorType = as<IRVectorType>(originalVectorType))
+    {
+        IRBuilder builder(originalVectorType);
+        return builder.getVectorType(t, orignalVectorType->getElementCount());
+    }
+    return t;
+}
+
 IRParam* getParamAt(IRBlock* block, UIndex ii)
 {
     UIndex index = 0;
@@ -1715,5 +1743,41 @@ IRType* dropNormAttributes(IRType* const t)
     return t;
 }
 
+void verifyComputeDerivativeGroupModifiers(
+    DiagnosticSink* sink,
+    SourceLoc errorLoc,
+    bool quadAttr,
+    bool linearAttr,
+    IRNumThreadsDecoration* numThreadsDecor)
+{
+    if (!numThreadsDecor)
+        return;
+
+    if (quadAttr && linearAttr)
+    {
+        sink->diagnose(errorLoc, Diagnostics::onlyOneOfDerivativeGroupLinearOrQuadCanBeSet);
+    }
+
+    IRIntegerValue x = 1;
+    IRIntegerValue y = 1;
+    IRIntegerValue z = 1;
+    if (numThreadsDecor->getX())
+        x = numThreadsDecor->getX()->getValue();
+    if (numThreadsDecor->getY())
+        y = numThreadsDecor->getY()->getValue();
+    if (numThreadsDecor->getZ())
+        z = numThreadsDecor->getZ()->getValue();
+
+    if (quadAttr)
+    {
+        if (x % 2 != 0 || y % 2 != 0)
+            sink->diagnose(errorLoc, Diagnostics::derivativeGroupQuadMustBeMultiple2ForXYThreads);
+    }
+    else if (linearAttr)
+    {
+        if ((x * y * z) % 4 != 0)
+            sink->diagnose(errorLoc, Diagnostics::derivativeGroupLinearMustBeMultiple4ForTotalThreadCount);
+    }
+}
 
 }

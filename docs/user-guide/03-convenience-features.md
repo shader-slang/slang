@@ -13,7 +13,7 @@ Slang supports automatic variable type inference:
 var a = 1; // OK, `a` is an `int`.
 var b = float3(0, 1, 2); // OK, `b` is a `float3`.
 ```
-Automatic type inference require an initialization expression to present. Without an initial value, the compiler is not able to infer the type of the variable. The following code will result a compiler error:
+Automatic type inference require an initialization expression to present. Without an initial value, the compiler is not able to infer the type of the variable. The following code will result in a compiler error:
 ```csharp
 var a; // Error, cannot infer the type of `a`.
 ```
@@ -25,7 +25,7 @@ var b : int; // OK.
 ```
 
 ## Immutable Values
-The `var` syntax and the traditional C-style variable definition introduces a _mutable_ variable whose value can be changed after its definition. If you wish to introduce an immutable or constant value, you may use the `let` keyword:
+The `var` syntax and the traditional C-style variable definition introduce a _mutable_ variable whose value can be changed after its definition. If you wish to introduce an immutable or constant value, you may use the `let` keyword:
 ```rust
 let a = 5; // OK, `a` is `int`.
 let b : int = 5; // OK.
@@ -68,7 +68,7 @@ namespace ns1
 }
 ```
 
-To access symbols defined in a namespace, you can use its qualified name with namespace prefixes:
+To access symbols defined in a namespace, you can use their qualified name with namespace prefixes:
 ```csharp
 void test()
 {
@@ -218,7 +218,7 @@ property uint highBits
 
 ## Initializers
 > #### Note ####
-> The syntax for defining initializers are subject to future change.
+> The syntax for defining initializers is subject to future change.
 
 
 Slang supports defining initializers in `struct` types. You can write:
@@ -415,7 +415,7 @@ If a base type is marked as `[sealed]`, then inheritance from the type is not al
 
 ### Limitations
 
-Please note that the support for inheritance is currently very limited. Common features that comes with inheritance, such as `virtual` functions and multiple inheritance are not supported by the Slang compiler. Implicit down-casting to the base type and use the result as a `mutable` argument in a function call is also not supported.
+Please note that the support for inheritance is currently very limited. Common features that come with inheritance, such as `virtual` functions and multiple inheritance are not supported by the Slang compiler. Implicit down-casting to the base type and use the result as a `mutable` argument in a function call is also not supported.
 
 Extensions
 --------------------
@@ -450,7 +450,7 @@ void test()
 This feature is similar to extensions in Swift and partial classes in C#.
 
 > #### Note:
-> You can only extend a type with additional methods. Extending with additiional data fields is not allowed.
+> You can only extend a type with additional methods. Extending with additional data fields is not allowed.
 
 Multi-level break
 -------------------

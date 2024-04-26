@@ -345,6 +345,8 @@ INST(GetOptionalValue, getOptionalValue, 1, 0)
 INST(OptionalHasValue, optionalHasValue, 1, 0)
 INST(MakeOptionalValue, makeOptionalValue, 1, 0)
 INST(MakeOptionalNone, makeOptionalNone, 1, 0)
+INST(CombinedTextureSamplerGetTexture, CombinedTextureSamplerGetTexture, 1, 0)
+INST(CombinedTextureSamplerGetSampler, CombinedTextureSamplerGetSampler, 1, 0)
 INST(Call, call, 1, 0)
 
 INST(RTTIObject, rtti_object, 0, 0)
@@ -478,6 +480,9 @@ INST(StructuredBufferAppend, StructuredBufferAppend, 1, 0)
 INST(StructuredBufferConsume, StructuredBufferConsume, 1, 0)
 INST(StructuredBufferGetDimensions, StructuredBufferGetDimensions, 1, 0)
 
+// Resource qualifiers for dynamically varying index
+INST(NonUniformResourceIndex, nonUniformResourceIndex, 1, 0)
+
 INST(AtomicCounterIncrement, AtomicCounterIncrement, 1, 0)
 INST(AtomicCounterDecrement, AtomicCounterDecrement, 1, 0)
 
@@ -589,6 +594,7 @@ INST_RANGE(TerminatorInst, Return, Unreachable)
 
 INST(RequirePrelude, RequirePrelude, 1, 0)
 INST(RequireGLSLExtension, RequireGLSLExtension, 1, 0)
+INST(RequireComputeDerivative, RequireComputeDerivative, 0, 0)
 
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point
@@ -688,7 +694,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
 /* Decoration */
 
-INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
+    INST(HighLevelDeclDecoration,           highLevelDecl,          1, 0)
     INST(LayoutDecoration,                  layout,                 1, 0)
     INST(BranchDecoration,                  branch,                 0, 0)
     INST(FlattenDecoration,                 flatten,                0, 0)
@@ -856,6 +862,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
         /// Applie to an IR function and signals that inlining should not be performed unless unavoidable.
     INST(NoInlineDecoration, noInline, 0, 0)
+    INST(NoRefInlineDecoration, noRefInline, 0, 0)
+
+    INST(DerivativeGroupQuadDecoration, DerivativeGroupQuad, 0, 0)
+    INST(DerivativeGroupLinearDecoration, DerivativeGroupLinear, 0, 0)
 
         // Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
     INST(NonCopyableTypeDecoration, nonCopyable, 0, 0)
@@ -1003,6 +1013,13 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
     INST(SPIRVBlockDecoration, spvBlock, 0, 0)
 
+        /// Decorates a SPIRV-inst as `NonUniformResource` to guarantee non-uniform index lookup of
+        /// - a resource within an array of resources via IRGetElement.
+        /// - an IRLoad that takes a pointer within a memory buffer via IRGetElementPtr.
+        /// - an IRIntCast to a resource that is casted from signed to unsigned or viceversa.
+        /// - an IRGetElementPtr itself when using the pointer on an intrinsic operation.
+    INST(SPIRVNonUniformResourceDecoration, NonUniformResource, 0, 0)
+
         // Stores flag bits of which memory qualifiers an object has
     INST(MemoryQualifierSetDecoration, MemoryQualifierSetDecoration, 1, 0)
 
@@ -1010,7 +1027,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// backing value key, width and offset
     INST(BitFieldAccessorDecoration, BitFieldAccessorDecoration, 3, 0)
 
-    INST_RANGE(Decoration, HighLevelDeclDecoration, BitFieldAccessorDecoration)
+ INST_RANGE(Decoration, HighLevelDeclDecoration, BitFieldAccessorDecoration)
 
     //
 
@@ -1171,6 +1188,7 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // This isn't hoistable, as we sometimes need to change the used value and
     // instructions around the specific asm block
     INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, 0)    
+    INST(SPIRVAsmOperandConvertTexel, SPIRVAsmOperandConvertTexel, 1, 0)
     //a late resolving type to handle the case of ray objects (resolving late due to constexpr data requirment)
     INST(SPIRVAsmOperandRayPayloadFromLocation, SPIRVAsmOperandRayPayloadFromLocation, 1, 0)
     INST(SPIRVAsmOperandRayAttributeFromLocation, SPIRVAsmOperandRayAttributeFromLocation, 1, 0)
@@ -1184,7 +1202,6 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A reference to the glsl450 instruction set.
     INST(SPIRVAsmOperandGLSL450Set, SPIRVAsmOperandGLSL450Set, 0, HOISTABLE)
     INST(SPIRVAsmOperandDebugPrintfSet, SPIRVAsmOperandDebugPrintfSet, 0, HOISTABLE)
-
     // A string which is given a unique ID in the backend, used to refer to
     // results of other instrucions in the same asm block
     INST(SPIRVAsmOperandId, SPIRVAsmOperandId, 1, HOISTABLE)

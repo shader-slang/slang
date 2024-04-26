@@ -213,6 +213,7 @@ namespace Slang
 
             /// Validate that the target type of an extension `decl` is valid.
         void _validateExtensionDeclTargetType(ExtensionDecl* decl);
+        void _validateExtensionDeclMembers(ExtensionDecl* decl);
 
         void visitExtensionDecl(ExtensionDecl* decl);
     };
@@ -353,6 +354,8 @@ namespace Slang
 
         virtual void processReferencedDecl(Decl* decl) = 0;
 
+        virtual void processDeclModifiers(Decl* decl) = 0;
+
         void dispatchIfNotNull(Stmt* stmt)
         {
             if (!stmt)
@@ -461,6 +464,7 @@ namespace Slang
         {
             dispatchIfNotNull(expr->type.type);
             dispatchIfNotNull(expr->declRef.declRefBase);
+            processDeclModifiers(expr->declRef.getDecl());
         }
         void visitStaticMemberExpr(StaticMemberExpr* expr)
         {
@@ -1329,6 +1333,16 @@ namespace Slang
         return arrayType->isUnsized();
     }
 
+    bool isInterfaceType(Type* type)
+    {
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+                return true;
+        }
+        return false;
+    }
+
     EnumDecl* isEnumType(Type* type)
     {
         if (auto declRefType = as<DeclRefType>(type))
@@ -1804,6 +1818,85 @@ namespace Slang
             addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
         }
         checkVisibility(varDecl);
+    }
+
+    static ConstructorDecl* _createCtor(SemanticsDeclVisitorBase* visitor, ASTBuilder* m_astBuilder, AggTypeDecl* decl)
+    {
+        auto ctor = m_astBuilder->create<ConstructorDecl>();
+        auto ctorName = visitor->getName("$init");
+        ctor->ownedScope = m_astBuilder->create<Scope>();
+        ctor->ownedScope->containerDecl = ctor;
+        ctor->ownedScope->parent = visitor->getScope(decl);
+        ctor->parentDecl = decl;
+        ctor->loc = decl->loc;
+        ctor->closingSourceLoc = ctor->loc;
+        ctor->nameAndLoc.name = ctorName;
+        ctor->nameAndLoc.loc = ctor->loc;
+        ctor->returnType.type = visitor->calcThisType(makeDeclRef(decl));
+        auto body = m_astBuilder->create<BlockStmt>();
+        body->scopeDecl = m_astBuilder->create<ScopeDecl>();
+        body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
+        body->scopeDecl->ownedScope->parent = visitor->getScope(ctor);
+        body->scopeDecl->parentDecl = ctor;
+        body->scopeDecl->loc = ctor->loc;
+        body->scopeDecl->closingSourceLoc = ctor->loc;
+        body->closingSourceLoc = ctor->closingSourceLoc;
+        ctor->body = body;
+        body->body = m_astBuilder->create<SeqStmt>();
+        decl->addMember(ctor);
+        return ctor;
+    }
+
+    static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
+    {
+        for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+        {
+            if (!ctor->body || ctor->members.getCount() != 0)
+                continue;
+            return ctor;
+        }
+        return nullptr;
+    }
+
+
+    static List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut)
+    {
+        List<ConstructorDecl*> ctorList;
+
+        auto ctorLookupResult = lookUpMember(
+            m_astBuilder,
+            visitor,
+            visitor->getName("$init"),
+            DeclRefType::create(m_astBuilder, structDecl),
+            structDecl->ownedScope,
+            LookupMask::Function,
+            LookupOptions::IgnoreInheritance);
+
+        if (!ctorLookupResult.isValid())
+            return ctorList;
+
+        auto lookupResultHandle = [&](LookupResultItem& item)
+        {
+            auto ctor = as<ConstructorDecl>(item.declRef.getDecl());
+            if (!ctor || !ctor->body)
+                return;
+            ctorList.add(ctor);
+            if (ctor->members.getCount() != 0)
+                return;
+            *defaultCtorOut = ctor;
+        };
+        if (ctorLookupResult.items.getCount() == 0)
+        {
+            lookupResultHandle(ctorLookupResult.item);
+            return ctorList;
+        }
+
+        for (auto m : ctorLookupResult.items)
+        {
+            lookupResultHandle(m);
+        }
+
+        return ctorList;
     }
 
     void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
@@ -2290,8 +2383,15 @@ namespace Slang
     {
         // check the type being inherited from
         auto base = inheritanceDecl->base;
-        CheckConstraintSubType(base);
-        base = TranslateTypeNode(base);
+        Decl* toExclude = nullptr;
+        Decl* parent = getParentDecl(inheritanceDecl);
+        // We exclude in the case that a circular reference is possible. This is when a parent is a transparent decl.
+        // If we just blanket "block" all ensure's of a parent a generic may fail when trying to fetch a parent
+        if (parent->findModifier<TransparentModifier>())
+            toExclude = parent;
+        SemanticsDeclVisitorBase baseVistor(this->withDeclToExcludeFromLookup(toExclude));
+        baseVistor.CheckConstraintSubType(base);
+        base = baseVistor.TranslateTypeNode(base);
         inheritanceDecl->base = base;
 
         // Note: we do not check whether the type being inherited from
@@ -6844,6 +6944,13 @@ namespace Slang
         if (!doFunctionSignaturesMatch(newDeclRef, oldDeclRef))
             return SLANG_OK;
 
+        // If the declatation is declared by 'extern', and new definition is with 'export', then
+        // we should let overload resolution to handle it.
+        if (oldDecl->hasModifier<ExternModifier>() && newDecl->hasModifier<HLSLExportModifier>())
+        {
+            return SLANG_OK;
+        }
+
         // If we get this far, then we've got two declarations in the same
         // scope, with the same name and signature, so they appear
         // to be redeclarations.
@@ -7261,11 +7368,167 @@ namespace Slang
         }
     }
 
+
+    static SeqStmt* _ensureCtorBodyIsSeqStmt(ASTBuilder* m_astBuilder, ConstructorDecl* decl)
+    {
+        // It is possible BlockStmt has a child with the type of
+        // `ExpressionStmt` if an existing constructor has only 1
+        // expression. This would be a senario we need to
+        // put the `ExpressionStmt` inside a `SeqStmt`.
+        auto stmt = as<BlockStmt>(decl->body);
+        if (!as<SeqStmt>(stmt->body))
+        {
+            auto tmpExpr = stmt->body;
+            auto seqStmt = m_astBuilder->create<SeqStmt>();
+            seqStmt->stmts.add(tmpExpr);
+            stmt->body = seqStmt;
+            return seqStmt;
+        }
+        return as<SeqStmt>(stmt->body);
+    }
+
     void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     {
         if (aggTypeDecl->hasTag(TypeTag::Incomplete) && aggTypeDecl->hasModifier<HLSLExportModifier>())
         {
             getSink()->diagnose(aggTypeDecl->loc, Diagnostics::cannotExportIncompleteType, aggTypeDecl);
+        }
+    
+        auto structDecl = as<StructDecl>(aggTypeDecl);
+        if (!structDecl)
+            return;
+
+        struct DeclAndCtorInfo
+        {
+            StructDecl* parent = nullptr;
+            ConstructorDecl* defaultCtor = nullptr;
+            List<ConstructorDecl*> ctorList;
+            DeclAndCtorInfo()
+            {
+            }
+            DeclAndCtorInfo(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* parent, const bool getOnlyDefault)
+            {
+                if (getOnlyDefault)
+                    defaultCtor = _getDefaultCtor(parent);
+                else
+                    ctorList = _getCtorList(m_astBuilder, visitor, parent, &defaultCtor);
+            }
+        };
+        List<DeclAndCtorInfo> inheritanceDefaultCtorList{};
+        for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
+        {
+            auto declRefType = as<DeclRefType>(inheritanceMember->base.type);
+            if (!declRefType)
+                continue;
+            auto structOfInheritance = as<StructDecl>(declRefType->getDeclRef().getDecl());
+            if (!structOfInheritance)
+                continue;
+            inheritanceDefaultCtorList.add(DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, true));
+        }
+        DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, false);
+
+        Index insertOffset = 0;
+        Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
+        for (auto ctor : structDeclInfo.ctorList)
+        {
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+            seqStmtChild->stmts.reserve(inheritanceDefaultCtorList.getCount());
+            for (auto& declInfo : inheritanceDefaultCtorList)
+            {
+                if (!declInfo.defaultCtor)
+                    continue;
+
+                auto ctorToInvoke = m_astBuilder->create<VarExpr>();
+                ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
+                ctorToInvoke->name = declInfo.defaultCtor->getName();
+                ctorToInvoke->loc = declInfo.defaultCtor->loc;
+                ctorToInvoke->type = structDeclInfo.defaultCtor->returnType.type;
+
+                auto invoke = m_astBuilder->create<InvokeExpr>();
+                invoke->functionExpr = ctorToInvoke;
+
+                ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+                thisExpr->scope = ctor->ownedScope;
+                thisExpr->type = ctor->returnType.type;
+
+                auto assign = m_astBuilder->create<AssignExpr>();
+                assign->left = coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
+                assign->right = invoke;
+                auto stmt = m_astBuilder->create<ExpressionStmt>();
+                stmt->expression = assign;
+                stmt->loc = ctor->loc;
+
+                seqStmtChild->stmts.add(stmt);
+            }
+
+            if (seqStmtChild->stmts.getCount() == 0)
+                continue;
+
+            seqStmt->stmts.insert(0, seqStmtChild);
+            insertOffset = 1;
+        }
+
+        for (auto ctor : structDeclInfo.ctorList)
+        {
+            ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+            thisExpr->scope = ctor->ownedScope;
+            thisExpr->type = ctor->returnType.type;
+
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+            seqStmtChild->stmts.reserve(structDecl->members.getCount());
+            for (auto& m : structDecl->members)
+            {
+                auto varDeclBase = as<VarDeclBase>(m);
+                if (!varDeclBase
+                    || !varDeclBase->initExpr)
+                    continue;
+
+                MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
+                memberExpr->baseExpression = thisExpr;
+                memberExpr->declRef = m->getDefaultDeclRef();
+                memberExpr->scope = ctor->ownedScope;
+                memberExpr->loc = m->loc;
+                memberExpr->name = m->getName();
+                memberExpr->type = DeclRefType::create(getASTBuilder(), m->getDefaultDeclRef());
+
+                auto assign = m_astBuilder->create<AssignExpr>();
+                assign->left = memberExpr;
+                assign->right = varDeclBase->initExpr;
+                assign->loc = m->loc;
+
+                auto stmt = m_astBuilder->create<ExpressionStmt>();
+                stmt->expression = assign;
+                stmt->loc = m->loc;
+
+                Expr* checkedMemberVarExpr;
+                if (cachedDeclToCheckedVar.containsKey(m))
+                    checkedMemberVarExpr = cachedDeclToCheckedVar[m];
+                else
+                {
+                    checkedMemberVarExpr = CheckTerm(memberExpr);
+                    cachedDeclToCheckedVar.add({ m, checkedMemberVarExpr });
+                }
+                if (!checkedMemberVarExpr->type.isLeftValue)
+                    continue;
+
+                seqStmtChild->stmts.add(stmt);
+            }
+            if (seqStmtChild->stmts.getCount() == 0)
+                continue;
+            seqStmt->stmts.insert(insertOffset, seqStmtChild);
+        }
+
+        if (structDeclInfo.defaultCtor)
+        {
+            auto seqStmt = as<SeqStmt>(as<BlockStmt>(structDeclInfo.defaultCtor->body)->body);
+            if (seqStmt && seqStmt->stmts.getCount() == 0)
+            {
+                structDecl->members.remove(structDeclInfo.defaultCtor);
+                structDecl->invalidateMemberDictionary();
+                structDecl->buildMemberDictionary();
+            }
         }
     }
 
@@ -7545,14 +7808,27 @@ namespace Slang
         }
     }
 
+    void SemanticsDeclBasesVisitor::_validateExtensionDeclMembers(ExtensionDecl* decl)
+    {
+        for (auto m : decl->members)
+        {
+            auto ctor = as<ConstructorDecl>(m);
+            if (!ctor || !ctor->body || ctor->members.getCount() != 0)
+                continue;
+            getSink()->diagnose(m->loc, Diagnostics::invalidMemberTypeInExtension, m->astNodeType);
+        }
+    }
+
     void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
     {
-        // We check the target type expression, and then validate
+        // We check the target type expression and members, and then validate
         // that the type it names is one that it makes sense
         // to extend.
         //
         decl->targetType = CheckProperType(decl->targetType);
         _validateExtensionDeclTargetType(decl);
+
+        _validateExtensionDeclMembers(decl);
 
         for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
@@ -9310,6 +9586,12 @@ namespace Slang
 
     void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
     {
+        // add a empty deault CTor if missing; checking in attributes 
+        // to avoid circular checking logic
+        auto defaultCtor = _getDefaultCtor(structDecl);
+        if (!defaultCtor)
+            _createCtor(this, m_astBuilder, structDecl);
+
         int backingWidth = 0;
         [[maybe_unused]]
         int totalWidth = 0;
@@ -9496,7 +9778,9 @@ namespace Slang
             // then the decl is using things that require conflicting set of capabilities, and we should diagnose an error.
             if (referencedDecl && decl)
             {
-                visitor->getSink()->diagnose(
+                diagnoseCapabilityErrors(
+                    visitor->getSink(),
+                    visitor->getOptionSet(),
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToUseOfDecl,
                     referencedDecl,
@@ -9506,7 +9790,9 @@ namespace Slang
             }
             else if (decl)
             {
-                visitor->getSink()->diagnose(
+                diagnoseCapabilityErrors(
+                    visitor->getSink(),
+                    visitor->getOptionSet(),
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToStatement,
                     nodeCaps,
@@ -9515,7 +9801,9 @@ namespace Slang
             }
             else
             {
-                visitor->getSink()->diagnose(
+                diagnoseCapabilityErrors(
+                    visitor->getSink(),
+                    visitor->getOptionSet(),
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToStatementEnclosingFunc,
                     nodeCaps,
@@ -9543,8 +9831,12 @@ namespace Slang
         typedef SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc>> Base;
 
         const ProcessFunc& handleReferenceFunc;
-        CapabilityDeclReferenceVisitor(const ProcessFunc& processFunc, SemanticsContext const& outer)
+        RequireCapabilityAttribute* maybeRequireCapability;
+        SemanticsContext& outerContext;
+        CapabilityDeclReferenceVisitor(const ProcessFunc& processFunc, RequireCapabilityAttribute* maybeRequireCapability, SemanticsContext& outer)
             : handleReferenceFunc(processFunc)
+            , maybeRequireCapability(maybeRequireCapability)
+            , outerContext(outer)
             , SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc>>(outer)
         {
         }
@@ -9555,6 +9847,11 @@ namespace Slang
                 loc = Base::sourceLocStack.getLast();
             handleReferenceFunc(decl, decl->inferredCapabilityRequirements, loc);
         }
+        virtual void processDeclModifiers(Decl* decl) override
+        {
+            if (decl)
+                handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+        }
         void visitDiscardStmt(DiscardStmt* stmt)
         {
             handleReferenceFunc(stmt, CapabilitySet(CapabilityName::fragment), stmt->loc);
@@ -9562,15 +9859,48 @@ namespace Slang
         void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
         {
             CapabilitySet set;
-            for (auto targetCase : stmt->targetCases)
+            auto targetCaseCount = stmt->targetCases.getCount();
+            for (Index targetCaseIndex = 0; targetCaseIndex < targetCaseCount; targetCaseIndex++)
             {
-                auto targetCap = CapabilitySet(CapabilityName(targetCase->capability));
+                // We may recieve a `default:` case for a `__target_switch`. If this is the case,
+                // we must resolve the target capability for a non empty set of `calling_functions_targets`: 
+                //      ``` default_target = calling_functions_targets-{other_case_targets} ```
+                // 
+                // * `calling_functions_capability` = `requirement attribute` of the calling function; if missing
+                //    we can assume it is `any_target` 
+                //
+                // * `{other_case_targets}` = set of all capabilities all `case` statments target inside the `__target_switch`
+
+                // If we do not handle `default:`, the codegen will fail when trying to find a specific
+                // codegen target not handled explicitly by a `case` statment.
+                // We must also ensure the `default` case is last so we have priority to hit `case` statments and can preprocess
+                // `case` statments before the `default` case.
+                CapabilitySet targetCap;
+                if (CapabilityName(stmt->targetCases[targetCaseIndex]->capability) == CapabilityName::Invalid)
+                {
+                    if (targetCaseCount - 1 != targetCaseIndex)
+                    {
+                        for (Index i = targetCaseIndex; i < targetCaseCount - 1; i++)
+                            std::swap(stmt->targetCases[i], stmt->targetCases[i + 1]);
+                        continue;
+                    }
+
+                    if (!maybeRequireCapability)
+                        targetCap = (CapabilitySet(CapabilityName::any_target).getTargetsThisIsMissingFromOther(set));
+                    else 
+                        targetCap = (maybeRequireCapability->capabilitySet.getTargetsThisIsMissingFromOther(set));
+                }
+                else
+                {
+                    targetCap = CapabilitySet(CapabilityName(stmt->targetCases[targetCaseIndex]->capability));
+                }
+                auto targetCase = stmt->targetCases[targetCaseIndex];
                 auto oldCap = targetCap;
                 auto bodyCap = getStatementCapabilityUsage(this, targetCase->body);
                 targetCap.join(bodyCap);
                 if (targetCap.isInvalid())
                 {
-                    Base::getSink()->diagnose(targetCase->body->loc, Diagnostics::conflictingCapabilityDueToStatement, bodyCap, "target_switch", oldCap);
+                    diagnoseCapabilityErrors(Base::getSink(), outerContext.getOptionSet(), targetCase->body->loc, Diagnostics::conflictingCapabilityDueToStatement, bodyCap, "target_switch", oldCap);
                 }
                 for (auto& conjunction : targetCap.getExpandedAtoms())
                     set.unionWith(conjunction);
@@ -9578,6 +9908,7 @@ namespace Slang
             set.canonicalize();
             handleReferenceFunc(stmt, set, stmt->loc);
         }
+
         void visitRequireCapabilityDecl(RequireCapabilityDecl* decl)
         {
             handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
@@ -9585,9 +9916,9 @@ namespace Slang
     };
 
     template<typename ProcessFunc>
-    void visitReferencedDecls(SemanticsContext& context, NodeBase* node, SourceLoc initialLoc, const ProcessFunc& func)
+    void visitReferencedDecls(SemanticsContext& context, NodeBase* node, SourceLoc initialLoc, RequireCapabilityAttribute* maybeRequireCapability, const ProcessFunc& func)
     {
-        CapabilityDeclReferenceVisitor<ProcessFunc> visitor(func, context);
+        CapabilityDeclReferenceVisitor<ProcessFunc> visitor(func, maybeRequireCapability, context);
         visitor.sourceLocStack.add(initialLoc);
 
         if (auto val = as<Val>(node))
@@ -9606,7 +9937,7 @@ namespace Slang
             return CapabilitySet();
 
         CapabilitySet inferredRequirements;
-        visitReferencedDecls(*visitor, stmt, stmt->loc, [&](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+        visitReferencedDecls(*visitor, stmt, stmt->loc, nullptr, [&](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
             {
                 _propagateRequirement(visitor, inferredRequirements, stmt, node, nodeCaps, refLoc);
             });
@@ -9615,11 +9946,7 @@ namespace Slang
 
     void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
-        visitReferencedDecls(*this, varDecl->type.type, varDecl->loc, [this, varDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
-            {
-                _propagateRequirement(this, varDecl->inferredCapabilityRequirements, varDecl, node, nodeCaps, refLoc);
-            });
-        visitReferencedDecls(*this, varDecl->initExpr, varDecl->loc, [this, varDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+        visitReferencedDecls(*this, varDecl->type.type, varDecl->loc, varDecl->findModifier<RequireCapabilityAttribute>(), [this, varDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
             {
                 _propagateRequirement(this, varDecl->inferredCapabilityRequirements, varDecl, node, nodeCaps, refLoc);
             });
@@ -9685,7 +10012,7 @@ namespace Slang
             ensureDecl(member, DeclCheckState::CapabilityChecked);
             _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, member, member->inferredCapabilityRequirements, member->loc);
         }
-        visitReferencedDecls(*this, funcDecl->body, funcDecl->loc, [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+        visitReferencedDecls(*this, funcDecl->body, funcDecl->loc, funcDecl->findModifier<RequireCapabilityAttribute>(), [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
             {
                 _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, node, nodeCaps, refLoc);
             });
@@ -9699,7 +10026,7 @@ namespace Slang
                 _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, parentAggTypeDecl, parentAggTypeDecl->inferredCapabilityRequirements, funcDecl->loc);
             }
         }
-        
+
         auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
 
         if (!declaredCaps.isEmpty())
@@ -9710,7 +10037,7 @@ namespace Slang
                 auto stageCaps = CapabilitySet(Profile(entryPointAttr->stage).getCapabilityName());
                 if (declaredCaps.isIncompatibleWith(stageCaps))
                 {
-                    getSink()->diagnose(funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
+                    diagnoseCapabilityErrors(getSink(), this->getOptionSet(), funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
                 }
                 else
                 {
@@ -9723,14 +10050,17 @@ namespace Slang
         if (declaredCaps.isEmpty())
         {
             // If the user has not declared any capabilities,
-            // we should diagnose an error if this is a public symbol.
+            // we should diagnose a warning if any_target is not
+            // a super-set by exact atoms. 
             if (vis == DeclVisibility::Public && !funcDecl->inferredCapabilityRequirements.isEmpty())
             {
                 if (!getModuleDecl(funcDecl)->isInLegacyLanguage)
                 {
-                    if (funcDecl->inferredCapabilityRequirements != getAnyPlatformCapabilitySet())
+                    if (!funcDecl->inferredCapabilityRequirements.isExactSubset(getAnyPlatformCapabilitySet()))
                     {
-                        getSink()->diagnose(
+                        diagnoseCapabilityErrors(
+                            getSink(),
+                            this->getOptionSet(),
                             funcDecl->loc,
                             Diagnostics::missingCapabilityRequirementOnPublicDecl,
                             funcDecl, funcDecl->inferredCapabilityRequirements);
@@ -9744,6 +10074,9 @@ namespace Slang
             {
                 // For public decls, we need to enforce that the function
                 // only uses capabilities that it declares.
+                // At a minimum we will propagate shader requirements to our 
+                // function from calling children in all cases so the parent
+                // can enforce shader targets correctly and propagate to `main`
                 const CapabilityConjunctionSet* failedAvailableCapabilityConjunction = nullptr;
                 if (!CapabilitySet::checkCapabilityRequirement(
                     declaredCaps,
@@ -9753,6 +10086,8 @@ namespace Slang
                     diagnoseUndeclaredCapability(funcDecl, Diagnostics::useOfUndeclaredCapability, failedAvailableCapabilityConjunction);
                     funcDecl->inferredCapabilityRequirements = declaredCaps;
                 }
+                else
+                    funcDecl->inferredCapabilityRequirements.simpleJoinWithSetMask(declaredCaps, CapabilityName::stage);
             }
             else
             {
@@ -9846,7 +10181,7 @@ namespace Slang
         return defaultVis;
     }
 
-    void diagnoseCapabilityProvenance(DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom)
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom)
     {
         HashSet<Decl*> printedDecls;
         auto thisModule = getModuleDecl(decl);
@@ -9877,7 +10212,7 @@ namespace Slang
         }
         if (declToPrint)
         {
-            sink->diagnose(declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
+            diagnoseCapabilityErrors(sink, optionSet, declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
         }
     }
 
@@ -9890,7 +10225,7 @@ namespace Slang
         while (traceLevels > 0)
         {
             refDecl = nullptr;
-            visitReferencedDecls(*visitor, decl, decl->loc, [&](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+            visitReferencedDecls(*visitor, decl, decl->loc, decl->findModifier<RequireCapabilityAttribute>(), [&](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
                 {
                     if (nodeCaps.isIncompatibleWith(incompatibleAtom))
                     {
@@ -9900,14 +10235,14 @@ namespace Slang
                             loc = refLoc;
                         }
                         else
-                            sink->diagnose(refLoc, Diagnostics::seeDefinitionOf, "statement");
+                            diagnoseCapabilityErrors(sink, visitor->getOptionSet(), refLoc, Diagnostics::seeDefinitionOf, "statement");
                     }
                 });
             if (!refDecl)
                 break;
             if (printedDecls.add(refDecl))
             {
-                sink->diagnose(loc, Diagnostics::seeUsingOf, refDecl);
+                diagnoseCapabilityErrors(sink, visitor->getOptionSet(), loc, Diagnostics::seeUsingOf, refDecl);
                 decl = refDecl;
             }
             else
@@ -9921,6 +10256,8 @@ namespace Slang
     void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const CapabilityConjunctionSet* failedAvailableSet)
     {
         if (decl->inferredCapabilityRequirements.getExpandedAtoms().getCount() == 0)
+            return;
+        if(!failedAvailableSet)
             return;
 
         // There are two causes for why type checking failed on failedAvailableSet.
@@ -9956,7 +10293,7 @@ namespace Slang
                     continue;
                 if (decl->inferredCapabilityRequirements.isIncompatibleWith(atom))
                 {
-                    getSink()->diagnose(decl->loc, Diagnostics::declHasDependenciesNotDefinedOnTarget, decl, atom);
+                    diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, Diagnostics::declHasDependenciesNotDefinedOnTarget, decl, atom);
                     diagnoseIncompatibleAtomProvenance(this, getSink(), decl, atom);
                     return;
                 }
@@ -10015,10 +10352,10 @@ namespace Slang
             }
         }
 
-        getSink()->diagnose(decl->loc, diagnosticInfo, decl, missingAtom);
+        diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, diagnosticInfo, decl, missingAtom);
         
         // Print provenances.
-        diagnoseCapabilityProvenance(getSink(), decl, missingAtom);
+        diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, missingAtom);
     }
 
 }

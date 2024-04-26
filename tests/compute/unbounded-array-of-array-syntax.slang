@@ -1,7 +1,7 @@
 //IGNORE_TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //TEST:CROSS_COMPILE:-target dxbc-assembly -entry computeMain -profile cs_5_1
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry computeMain -profile cs_5_1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry computeMain -profile cs_5_1 -emit-spirv-via-glsl
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
@@ -16,6 +16,23 @@ RWStructuredBuffer<int> g_aoa[];
 [numthreads(8, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    // CHECK: OpCapability {{(ShaderNonUniform|StorageBufferArrayNonUniformIndexing)}}
+    // CHECK: OpCapability {{(ShaderNonUniform|StorageBufferArrayNonUniformIndexing)}}
+    // CHECK-DAG: OpDecorate %[[N1:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK-DAG: OpDecorate %[[N2:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK-DAG: OpDecorate %[[N3:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK-DAG: OpDecorate %[[N4:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK-DAG: OpDecorate %[[B0:[a-zA-Z0-9_]+]] Binding 0
+    // CHECK-DAG: OpDecorate %[[B1:[a-zA-Z0-9_]+]] Binding 1
+    // CHECK-DAG: %[[P1:[a-zA-Z0-9_]+]] = OpTypePointer Uniform %int
+    // CHECK-DAG: %[[P2:[a-zA-Z0-9_]+]] = OpTypePointer Uniform %StructuredBuffer_int_t_0
+    // CHECK: %[[N1]] = OpCopyObject %int
+    // CHECK: %{{.*}} = OpAccessChain %[[P2]] %[[B1]] %[[N1]]
+    // CHECK: %[[N2]] = OpCopyObject %int
+    // CHECK: %[[N3]] = OpAccessChain %[[P1]] %[[B1]] %[[N2]]
+    // CHECK: %[[N4]] = OpLoad %int %[[N3]]
+    // CHECK: %{{.*}} = OpAccessChain %[[P1]] %[[B0]] %int_{{.*}}
+    // CHECK: OpStore %{{.*}} %[[N4]]
     int index = int(dispatchThreadID.x);
     
     int baseIndex = index >> 2;

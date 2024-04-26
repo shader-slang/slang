@@ -143,7 +143,7 @@ SLANG_INLINE EmitOpInfo leftSide(EmitOpInfo const& outerPrec, EmitOpInfo const& 
     return result;
 }
 
-SLANG_INLINE EmitOpInfo rightSide(EmitOpInfo const& prec, EmitOpInfo const& outerPrec)
+SLANG_INLINE EmitOpInfo rightSide(EmitOpInfo const& outerPrec, EmitOpInfo const& prec)
 {
     EmitOpInfo result;
     result.op = nullptr;

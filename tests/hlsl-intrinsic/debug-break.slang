@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-stage compute -entry computeMain -target glsl -line-directive-mode none
+//TEST:SIMPLE(filecheck=CHECK_GLSL):-stage compute -entry computeMain -target glsl -line-directive-mode none
 // We can't enable because output source includes path to prelude.
 //DISABLE_TEST:SIMPLE:-stage compute -entry computeMain -target cpp -line-directive-mode none
 //DISABLE_TEST:SIMPLE:-stage compute -entry computeMain -target cuda -line-directive-mode none
@@ -10,10 +10,10 @@
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 
-// CHECK: spirv_instruction(id = 1, set = "NonSemantic.DebugBreak")
-// CHECK: void debugBreak{{.*}}();
-// CHECK: void main
-// CHECK: debugBreak{{.*}}();
+// CHECK_GLSL: spirv_instruction(id = 1, set = "NonSemantic.DebugBreak")
+// CHECK_GLSL: glslDebugBreak{{.*}}();
+// CHECK_GLSL: void main
+// CHECK_GLSL: glslDebugBreak{{.*}}();
 
 RWStructuredBuffer<int> outputBuffer;
 

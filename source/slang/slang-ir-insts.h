@@ -327,6 +327,18 @@ struct IRRequireGLSLVersionDecoration : IRDecoration
     }
 };
 
+struct IRSPIRVNonUniformResourceDecoration : IRDecoration
+{
+    enum { kOp = kIROp_SPIRVNonUniformResourceDecoration };
+    IR_LEAF_ISA(RequireGLSLVersionDecoration)
+
+    IRConstant* getSPIRVNonUniformResourceOperand() { return cast<IRConstant>(getOperand(0)); }
+    IntegerLiteralValue getSPIRVNonUniformResource()
+    {
+        return getSPIRVNonUniformResourceOperand()->value.intVal;
+    }
+};
+
 struct IRRequireSPIRVVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireSPIRVVersionDecoration };
@@ -381,6 +393,9 @@ IR_SIMPLE_DECORATION(HLSLExportDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
+IR_SIMPLE_DECORATION(NoRefInlineDecoration)
+IR_SIMPLE_DECORATION(DerivativeGroupQuadDecoration)
+IR_SIMPLE_DECORATION(DerivativeGroupLinearDecoration)
 IR_SIMPLE_DECORATION(AlwaysFoldIntoUseSiteDecoration)
 IR_SIMPLE_DECORATION(StaticRequirementDecoration)
 IR_SIMPLE_DECORATION(NonCopyableTypeDecoration)
@@ -1222,6 +1237,7 @@ struct IRSpecialize : IRInst
     // after the generic value come the arguments
     UInt getArgCount() { return getOperandCount() - 1; }
     IRInst* getArg(UInt index) { return getOperand(index + 1); }
+    IRUse* getArgOperand(Index i) { return getOperands() + 1 + i; }
 
     IR_LEAF_ISA(Specialize)
 };
@@ -2336,6 +2352,11 @@ struct IRStructuredBufferGetDimensions : IRInst
     IRInst* getBuffer() { return getOperand(0); }
 };
 
+struct IRNonUniformResourceIndex : IRInst
+{
+    IR_LEAF_ISA(NonUniformResourceIndex);
+};
+
 struct IRLoadReverseGradient : IRInst
 {
     IR_LEAF_ISA(LoadReverseGradient)
@@ -3188,6 +3209,11 @@ struct IRRequireGLSLExtension : IRInst
 {
     IR_LEAF_ISA(RequireGLSLExtension)
     UnownedStringSlice getExtensionName() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
+};
+
+struct IRRequireComputeDerivative : IRInst
+{
+    IR_LEAF_ISA(RequireComputeDerivative)
 };
 
 struct IRBuilderSourceLocRAII;
@@ -4209,6 +4235,7 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);
     IRSPIRVAsmOperand* createSPIRVAsmOperandInst(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandConvertTexel(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandRayPayloadFromLocation(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandRayAttributeFromLocation(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandRayCallableFromLocation(IRInst* inst);
@@ -4229,6 +4256,8 @@ public:
     IRInst* emitGenericAsm(UnownedStringSlice asmText);
 
     IRInst* emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index);
+
+    IRInst* emitNonUniformResourceIndexInst(IRInst* val);
     //
     // Decorations
     //
@@ -4264,9 +4293,9 @@ public:
     }
 
     template<typename T>
-    void addSimpleDecoration(IRInst* value)
+    IRDecoration* addSimpleDecoration(IRInst* value)
     {
-        addDecoration(value, IROp(T::kOp), (IRInst* const*) nullptr, 0);
+        return addDecoration(value, IROp(T::kOp), (IRInst* const*) nullptr, 0);
     }
 
     void addHighLevelDeclDecoration(IRInst* value, Decl* decl);
@@ -4453,6 +4482,11 @@ public:
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
         addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
+    }
+
+    void addSPIRVNonUniformResourceDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_SPIRVNonUniformResourceDecoration);
     }
 
     void addRequireCUDASMVersionDecoration(IRInst* value, const SemanticVersion& version)

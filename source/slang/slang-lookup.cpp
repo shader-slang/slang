@@ -224,13 +224,13 @@ static void _lookUpDirectAndTransparentMembers(
         }
     }
 
-    // TODO(tfoley): should we look up in the transparent decls
-    // if we already has a hit in the current container?
     for(auto transparentInfo : containerDecl->getTransparentMembers())
     {
         // The reference to the transparent member should use the same
         // path as we used in referring to its parent.
         DeclRef<Decl> transparentMemberDeclRef = astBuilder->getMemberDeclRef(parentDeclRef, transparentInfo.decl);
+        if (transparentMemberDeclRef.getDecl() == request.declToExclude)
+            continue;
 
         // We need to leave a breadcrumb so that we know that the result
         // of lookup involves a member lookup step here
@@ -416,6 +416,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     // With semantics context, we can do a comprehensive lookup by scanning through
     // the linearized inheritance list.
 
+    auto selfType = DeclRefType::create(astBuilder, declRef);
     InheritanceInfo inheritanceInfo;
     if (auto extDeclRef = declRef.as<ExtensionDecl>())
     {
@@ -423,7 +424,6 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     }
     else
     {
-        auto selfType = DeclRefType::create(astBuilder, declRef);
         selfType = selfType->getCanonicalType();
         inheritanceInfo = semantics->getShared()->getInheritanceInfo(selfType);
     }
@@ -442,11 +442,20 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             continue;
         }
 
+        auto extensionFacet = as<ExtensionDecl>(facet.getImpl()->getDeclRef().getDecl());
         // If we are looking up in an interface, and the lookup request told us
         // to skip interfaces, we should do so here.
         if (auto baseInterfaceDeclRef = containerDeclRef.as<InterfaceDecl>())
         {
             if (int(request.options) & int(LookupOptions::IgnoreBaseInterfaces))
+                continue;
+        }
+        // If we are looking up only immediate members, ignore non "Self" facets or extension to "Self"
+        else if (int(request.options) & int(LookupOptions::IgnoreInheritance) 
+            && (facet.getImpl()->directness != Facet::Directness::Self
+                && (!extensionFacet || !extensionFacet->targetType.type->equals(selfType))
+                ))
+        {
                 continue;
         }
 

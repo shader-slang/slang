@@ -221,9 +221,10 @@ void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     _emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain, varDecl);
 
     auto elementType = type->getElementType();
-    if (hasExplicitConstantBufferOffset(type))
+    if (shouldForceUnpackConstantBufferElements(type) || hasExplicitConstantBufferOffset(type))
     {
         // If the user has provided any explicit `packoffset` modifiers,
+        // or the user has explicitly requested for cbuffer fields to be unpacked,
         // we have to unwrap the struct and emit the fields directly.
         emitStructDeclarationsBlock(as<IRStructType>(elementType), true);
         m_writer->emit("\n");
@@ -723,6 +724,18 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // Otherwise we fall back to the base case, which
             // is already handled by the base `CLikeSourceEmitter`
             return false;
+        }
+        break;
+        case kIROp_NonUniformResourceIndex:
+        {
+            // Need to emit as a Function call for HLSL
+            m_writer->emit("NonUniformResourceIndex");
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+
+            // Handled
+            return true;
         }
         break;
 

@@ -45,6 +45,7 @@
 #include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-bit-cast.h"
+#include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-size-of.h"
 #include "slang-ir-lower-reinterpret.h"
@@ -68,6 +69,7 @@
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-wrap-structured-buffers.h"
+#include "slang-ir-wrap-global-context.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-translate-glsl-global-var.h"
@@ -94,6 +96,7 @@
 
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
+#include "slang-emit-metal.h"
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
 #include "slang-emit-torch.h"
@@ -489,7 +492,7 @@ Result linkAndOptimizeIR(
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
-        SLANG_RETURN_ON_FAIL(performStringInlining(irModule, sink));
+        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, sink));
     }
 
     lowerReinterpret(targetProgram, irModule, sink);
@@ -544,6 +547,11 @@ Result linkAndOptimizeIR(
         lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
     }
 
+    if (target == CodeGenTarget::HLSL || ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    {
+        lowerCombinedTextureSamplers(irModule, sink);
+    }
+
     addUserTypeHintDecorations(irModule);
 
     // We don't need the legalize pass for C/C++ based types
@@ -575,6 +583,7 @@ Result linkAndOptimizeIR(
         //  will have (more) legal shader code.
         //
         legalizeExistentialTypeLayout(
+            targetProgram,
             irModule,
             sink);
 
@@ -595,6 +604,7 @@ Result linkAndOptimizeIR(
         // then become multiple variables/parameters/arguments/etc.
         //
         legalizeResourceTypes(
+            targetProgram,
             irModule,
             sink);
 
@@ -609,6 +619,7 @@ Result linkAndOptimizeIR(
         // On CPU/CUDA targets, we simply elminate any empty types if
         // they are not part of public interface.
         legalizeEmptyTypes(
+            targetProgram,
             irModule,
             sink);
     }
@@ -868,6 +879,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
+    case CodeGenTarget::Metal:
         moveGlobalVarInitializationToEntryPoints(irModule);
         break;
     case CodeGenTarget::CPPSource:
@@ -933,9 +945,12 @@ Result linkAndOptimizeIR(
 
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
-        // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
-        // a simple storage type that has target independent layout based on the kind of buffer resource.
-        lowerBufferElementTypeToStorageType(targetProgram, irModule);
+        if (!isMetalTarget(targetRequest))
+        {
+            // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
+            // a simple storage type that has target independent layout based on the kind of buffer resource.
+            lowerBufferElementTypeToStorageType(targetProgram, irModule);
+        }
     }
 
     // Rewrite functions that return arrays to return them via `out` parameter,
@@ -957,11 +972,11 @@ Result linkAndOptimizeIR(
 
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
-    lowerBitCast(targetProgram, irModule);
+    lowerBitCast(targetProgram, irModule, sink);
 
-    bool emitSpirvDirectly = targetProgram->getOptionSet().shouldEmitSPIRVDirectly();
+    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
 
-    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
         eliminateDeadCode(irModule);
@@ -1075,6 +1090,12 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
 
+    // Metal does not allow global variables and global parameters, so
+    // we need to convert them into an explicit global context parameter
+    // passed around through a function parameter.
+    if (target == CodeGenTarget::Metal)
+        wrapGlobalScopeInContextType(irModule);
+
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
 
@@ -1169,6 +1190,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             case SourceLanguage::CUDA:
             {
                 sourceEmitter = new CUDASourceEmitter(desc);
+                break;
+            }
+            case SourceLanguage::Metal:
+            {
+                sourceEmitter = new MetalSourceEmitter(desc);
                 break;
             }
             default: break;

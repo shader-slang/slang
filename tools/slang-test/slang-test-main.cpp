@@ -967,6 +967,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         case SLANG_CPP_PYTORCH_BINDING:
         case SLANG_HOST_CPP_SOURCE:
         case SLANG_CUDA_SOURCE:
+        case SLANG_METAL:
         {
             return 0;
         }
@@ -984,6 +985,12 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         case SLANG_DXIL_ASM:
         {
             return PassThroughFlag::Dxc;
+        }
+
+        case SLANG_METAL_LIB:
+        case SLANG_METAL_LIB_ASM:
+        {
+            return PassThroughFlag::Metal;
         }
 
         case SLANG_SHADER_HOST_CALLABLE:
@@ -2636,6 +2643,7 @@ static TestResult generateExpectedOutput(TestContext* const context, const TestI
             default:
             {
                 expectedCmdLine.addArg(filePath + ".glsl");
+                expectedCmdLine.addArg("-emit-spirv-via-glsl");
                 expectedCmdLine.addArg("-pass-through");
                 expectedCmdLine.addArg("glslang");
                 break;
@@ -2681,6 +2689,7 @@ TestResult generateActualOutput(TestContext* const context, const TestInput& inp
     CommandLine actualCmdLine;
     _initSlangCompiler(context, actualCmdLine);
     actualCmdLine.addArg(filePath);
+    actualCmdLine.addArg("-emit-spirv-via-glsl");
 
     const auto& args = input.testOptions->args;
 
@@ -3022,9 +3031,9 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-adapter");
         ioCmdLine.addArg(options.adapter);
     }
-    if (options.emitSPIRVDirectly)
+    if (!options.emitSPIRVDirectly)
     {
-        ioCmdLine.addArg("-emit-spirv-directly");
+        ioCmdLine.addArg("-emit-spirv-via-glsl");
     }
 }
 

@@ -987,6 +987,8 @@ namespace Slang
         // directly (it is only visible through the requirement witness
         // information for inheritance declarations).
         //
+        auto leftDeclRefParent = left.declRef.getParent();
+        auto rightDeclRefParent = right.declRef.getParent();
         bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
         bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
         if(leftIsInterfaceRequirement != rightIsInterfaceRequirement)
@@ -998,11 +1000,11 @@ namespace Slang
         if(leftIsModule != rightIsModule)
             return int(rightIsModule) - int(leftIsModule);
 
-        // If both are interface requirements, prefer to more derived interface.
+        // If both are interface requirements, prefer the more derived interface.
         if (leftIsInterfaceRequirement && rightIsInterfaceRequirement)
         {
-            auto leftType = DeclRefType::create(m_astBuilder, left.declRef.getParent());
-            auto rightType = DeclRefType::create(m_astBuilder, right.declRef.getParent());
+            auto leftType = DeclRefType::create(m_astBuilder, leftDeclRefParent);
+            auto rightType = DeclRefType::create(m_astBuilder, rightDeclRefParent);
 
             if (!leftType->equals(rightType))
             {
@@ -1011,6 +1013,27 @@ namespace Slang
                 if (isSubtype(rightType, leftType))
                     return 1;
             }
+        }
+
+        // If both parents are the same we have ambiguity
+        if(left.declRef.getParent() == right.declRef.getParent())
+            return 0;
+
+        auto leftAggType = leftDeclRefParent.as<AggTypeDeclBase>();
+        auto rightAggType = rightDeclRefParent.as<AggTypeDeclBase>();
+        if (leftAggType && rightAggType)
+        {
+            auto leftType = DeclRefType::create(m_astBuilder, leftDeclRefParent);
+            auto rightType = DeclRefType::create(m_astBuilder, rightDeclRefParent);
+
+            auto inheritanceInfo = getShared()->getInheritanceInfo(rightType);
+            for (auto facet : inheritanceInfo.facets)
+                if (facet.getImpl()->getDeclRef().equals(leftDeclRefParent))
+                    return 1;
+            inheritanceInfo = getShared()->getInheritanceInfo(leftType);
+            for (auto facet : inheritanceInfo.facets)
+                if (facet.getImpl()->getDeclRef().equals(rightDeclRefParent))
+                    return -1;
         }
 
         // TODO: We should generalize above rules such that in a tie a declaration
@@ -1118,6 +1141,15 @@ namespace Slang
         return 0;
     }
 
+    int getExportRank(DeclRef<Decl> left, DeclRef<Decl> right)
+    {
+        if (left.getDecl() && left.getDecl()->hasModifier<ExternModifier>())
+        {
+            return (right.getDecl() && right.getDecl()->hasModifier<HLSLExportModifier>()) ? -1 : 0;
+        }
+        return 0;
+    }
+
     int SemanticsVisitor::CompareOverloadCandidates(
         OverloadCandidate*	left,
         OverloadCandidate*	right)
@@ -1190,6 +1222,11 @@ namespace Slang
             auto specificityDiff = compareOverloadCandidateSpecificity(left->item, right->item);
             if(specificityDiff)
                 return specificityDiff;
+
+            // `export` function is more flavored than `extern` function. But other modifiers are not considered.
+            auto externExportDiff = getExportRank(left->item.declRef, right->item.declRef);
+            if (externExportDiff)
+                return externExportDiff;
 
             // If we reach here, we will attempt to use overload rank to break the ties.
             auto overloadRankDiff = getOverloadRank(right->item.declRef) - getOverloadRank(left->item.declRef);

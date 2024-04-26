@@ -609,6 +609,9 @@ extern "C"
         SLANG_HOST_CPP_SOURCE,          ///< C++ code for host library or executable.
         SLANG_HOST_HOST_CALLABLE,       ///< Host callable host code (ie non kernel/shader) 
         SLANG_CPP_PYTORCH_BINDING,      ///< C++ PyTorch binding code.
+        SLANG_METAL,                    ///< Metal shading language
+        SLANG_METAL_LIB,                ///< Metal library
+        SLANG_METAL_LIB_ASM,            ///< Metal library assembly
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -641,6 +644,7 @@ extern "C"
         SLANG_PASS_THROUGH_NVRTC,                   ///< NVRTC Cuda compiler
         SLANG_PASS_THROUGH_LLVM,                    ///< LLVM 'compiler' - includes LLVM and Clang
         SLANG_PASS_THROUGH_SPIRV_OPT,               ///< SPIRV-opt
+        SLANG_PASS_THROUGH_METAL,                   ///< Metal compiler
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
@@ -702,11 +706,7 @@ extern "C"
         /* When set, will generate SPIRV directly rather than via glslang. */
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
-#if defined(SLANG_CONFIG_DEFAULT_SPIRV_DIRECT)
     constexpr static SlangTargetFlags kDefaultTargetFlags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
-#else
-    constexpr static SlangTargetFlags kDefaultTargetFlags = 0;
-#endif
 
     /*!
     @brief Options to control floating-point precision guarantees for a target.
@@ -743,6 +743,7 @@ extern "C"
         SLANG_SOURCE_LANGUAGE_CPP,
         SLANG_SOURCE_LANGUAGE_CUDA,
         SLANG_SOURCE_LANGUAGE_SPIRV,
+        SLANG_SOURCE_LANGUAGE_METAL,
         SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
@@ -839,6 +840,7 @@ extern "C"
             Language,
             MatrixLayoutColumn, // bool
             MatrixLayoutRow,    // bool
+            IgnoreCapabilities, // bool
             ModuleName,         // stringValue0: module name.
             Output,
             Profile,            // intValue0: profile
@@ -926,6 +928,7 @@ extern "C"
             Heterogeneous,
             NoMangle,
             NoHLSLBinding,
+            NoHLSLPackConstantBufferElements,
             ValidateUniformity,
             AllowGLSL,
 
@@ -2256,9 +2259,16 @@ extern "C"
         // The input_attachment_index subpass occupancy tracker
         SLANG_PARAMETER_CATEGORY_SUBPASS,
 
+        // Metal resource binding points.
+        SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
+
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
 
+        // Aliases for Metal-specific categories.
+        SLANG_PARAMETER_CATEGORY_METAL_BUFFER = SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER,
+        SLANG_PARAMETER_CATEGORY_METAL_TEXTURE = SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE,
+        SLANG_PARAMETER_CATEGORY_METAL_SAMPLER = SLANG_PARAMETER_CATEGORY_SAMPLER_STATE,
 
         // DEPRECATED:
         SLANG_PARAMETER_CATEGORY_VERTEX_INPUT = SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
@@ -2390,6 +2400,7 @@ extern "C"
     SLANG_API size_t spReflectionTypeLayout_GetStride(SlangReflectionTypeLayout* type, SlangParameterCategory category);
     SLANG_API int32_t spReflectionTypeLayout_getAlignment(SlangReflectionTypeLayout* type, SlangParameterCategory category);
 
+    SLANG_API uint32_t spReflectionTypeLayout_GetFieldCount(SlangReflectionTypeLayout* type);
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(SlangReflectionTypeLayout* type, unsigned index);
 
     SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(SlangReflectionTypeLayout* typeLayout, const char* nameBegin, const char* nameEnd);
@@ -2821,6 +2832,10 @@ namespace slang
 
         InputAttachmentIndex = SLANG_PARAMETER_CATEGORY_SUBPASS,
 
+        MetalBuffer = SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER,
+        MetalTexture = SLANG_PARAMETER_CATEGORY_METAL_TEXTURE,
+        MetalArgumentBufferElement = SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
+
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,
         FragmentOutput = SLANG_PARAMETER_CATEGORY_FRAGMENT_OUTPUT,
@@ -2884,7 +2899,7 @@ namespace slang
 
         unsigned int getFieldCount()
         {
-            return getType()->getFieldCount();
+            return spReflectionTypeLayout_GetFieldCount((SlangReflectionTypeLayout*)this);
         }
 
         VariableLayoutReflection* getFieldByIndex(unsigned int index)

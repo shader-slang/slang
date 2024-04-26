@@ -272,7 +272,11 @@ typedef slang::ParameterCategory LayoutResourceKind;
     x(SubElementRegisterSpace) \
     x(VertexInput) \
     x(FragmentOutput) \
-    x(InputAttachmentIndex)
+    x(InputAttachmentIndex) \
+    \
+    x(MetalBuffer) \
+    x(MetalTexture) \
+    x(MetalArgumentBufferElement)
 
 #define SLANG_PARAMETER_CATEGORY_FLAG(x) x = ParameterCategoryFlags(1) << int(slang::x), 
 
@@ -358,6 +362,21 @@ struct SimpleArrayLayoutInfo : SimpleLayoutInfo
         {
             return UniformArrayLayoutInfo(0, 1, 0);
         }
+    }
+};
+
+struct ObjectLayoutInfo
+{
+    ShortList<SimpleLayoutInfo, 2> layoutInfos;
+    ObjectLayoutInfo() = default;
+    ObjectLayoutInfo(SimpleLayoutInfo layoutInfo)
+    {
+        layoutInfos.add(layoutInfo);
+    }
+    SimpleLayoutInfo getSimple()
+    {
+        SLANG_ASSERT(layoutInfos.getCount() == 1);
+        return layoutInfos[0];
     }
 };
 
@@ -514,8 +533,8 @@ class VarLayout : public Layout
 {
 public:
     // The variable we are laying out
-    DeclRef<VarDeclBase>          varDecl;
-    VarDeclBase* getVariable() { return varDecl.getDecl(); }
+    DeclRef<Decl>          varDecl;
+    VarDeclBase* getVariable() { return varDecl.as<VarDeclBase>().getDecl(); }
 
     Name* getName() { return getVariable()->getName(); }
 
@@ -721,7 +740,7 @@ public:
     // TODO: This should map from a declaration to the *index*
     // in the array above, rather than to the actual pointer,
     // so that we 
-    Dictionary<VarDeclBase*, RefPtr<VarLayout>> mapVarToLayout;
+    Dictionary<Decl*, RefPtr<VarLayout>> mapVarToLayout;
 };
 
 class GenericParamTypeLayout : public TypeLayout
@@ -988,7 +1007,7 @@ struct ObjectLayoutRulesImpl
     };
 
     // Compute layout info for an object type
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& options) = 0;
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& options) = 0;
 };
 
 struct LayoutRulesImpl
@@ -1046,7 +1065,7 @@ struct LayoutRulesImpl
 
     // Forward `ObjectLayoutRulesImpl` interface
 
-    SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const ObjectLayoutRulesImpl::Options& options)
+    ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const ObjectLayoutRulesImpl::Options& options)
     {
         return objectRules->GetObjectLayout(kind, options);
     }
@@ -1207,7 +1226,7 @@ public:
         /// One of the `beginLayout*()` functions must have been called previously.
         ///
     RefPtr<VarLayout> addField(
-        DeclRef<VarDeclBase>    field,
+        DeclRef<Decl>    field,
         TypeLayoutResult        fieldResult);
 
     RefPtr<VarLayout> addExplicitUniformField(

@@ -1018,17 +1018,17 @@ DifferentialPair<vector<T, 3>> __d_cross(DifferentialPair<vector<T, 3>> a, Diffe
     T aybz = a.p.y * b.p.z;
     T azby = a.p.z * b.p.y;
     T px = aybz - azby;
-    T dx = (b.p.z - azby) * a.d.y + (a.p.y - azby) * b.d.z + (aybz - b.p.y) * a.d.z + (aybz - a.p.z) * b.d.y;
+    T dx = a.d.y * b.p.z + a.p.y * b.d.z - a.d.z * b.p.y - a.p.z * b.d.y;
 
     T azbx = a.p.z * b.p.x;
     T axbz = a.p.x * b.p.z;
     T py = azbx - axbz;
-    T dy = (b.p.x - axbz) * a.d.z + (a.p.z - axbz) * b.d.x + (azbx - b.p.z) * a.d.x + (azbx - a.p.x) * b.d.z;
+    T dy = a.d.z * b.p.x + a.p.z * b.d.x - a.d.x * b.p.z - a.p.x * b.d.z;
 
     T axby = a.p.x * b.p.y;
     T aybx = a.p.y * b.p.x;
     T pz = axby - aybx;
-    T dz = (b.p.y - aybx) * a.d.x + (a.p.x - aybx) * b.d.y + (axby - b.p.x) * a.d.y + (axby - a.p.y) * b.d.x;
+    T dz = a.d.x * b.p.y + a.p.x * b.d.y - a.d.y * b.p.x - a.p.y * b.d.x;
     
     return DifferentialPair<vector<T, 3>>(vector<T, 3>(px, py, pz), vector<T, 3>.Differential(dx, dy, dz));
 }

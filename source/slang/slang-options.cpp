@@ -289,6 +289,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Language,     "-lang", "-lang <language>", "Set the language for the following input files."},
         { OptionKind::MatrixLayoutColumn, "-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major."},
         { OptionKind::MatrixLayoutRow,"-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major."},
+        { OptionKind::IgnoreCapabilities,"-ignore-capabilities", nullptr, "Do not warn or error if capabilities are violated"},
         { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
         "Set the module name to use when compiling multiple .slang source files into a single module."},
         { OptionKind::Output, "-o", "-o <path>", 
@@ -406,21 +407,15 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EnableEffectAnnotations,
          "-enable-effect-annotations", nullptr, 
          "Enables support for legacy effect annotation syntax."},
-#if defined(SLANG_CONFIG_DEFAULT_SPIRV_DIRECT)
         { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
         "Generate SPIR-V output by compiling generated GLSL with glslang" },
         { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
         "Generate SPIR-V output direclty (default)" },
-#else
-        { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
-        "Generate SPIR-V output by compiling generated GLSL with glslang (default)" },
-        { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
-        "Generate SPIR-V output direclty rather than by compiling generated GLSL with glslang" },
         { OptionKind::SPIRVCoreGrammarJSON, "-spirv-core-grammar", nullptr,
         "A path to a specific spirv.core.grammar.json to use when generating SPIR-V output" },
         { OptionKind::IncompleteLibrary, "-incomplete-library", nullptr,
         "Allow generating code from incomplete libraries with unresolved external functions" },
-#endif
+
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
@@ -519,6 +514,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::NoMangle, "-no-mangle", nullptr, "Do as little mangling of names as possible." },
         { OptionKind::NoHLSLBinding, "-no-hlsl-binding", nullptr, "Do not include explicit parameter binding semantics in the output HLSL code,"
                                                                   "except for parameters that has explicit bindings in the input source." },
+        { OptionKind::NoHLSLPackConstantBufferElements, "-no-hlsl-pack-constant-buffer-elements", nullptr,
+        "Do not pack elements of constant buffers into structs in the output HLSL code." },
         { OptionKind::ValidateUniformity, "-validate-uniformity", nullptr, "Perform uniformity validation analysis." },
         { OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language." },
     };
@@ -1682,8 +1679,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::VulkanUseEntryPointName:
             case OptionKind::VulkanUseGLLayout:
             case OptionKind::VulkanEmitReflection:
-            case OptionKind::MatrixLayoutRow:
-            case OptionKind::MatrixLayoutColumn:
+            case OptionKind::IgnoreCapabilities:
             case OptionKind::DefaultImageFormatUnknown:
             case OptionKind::Obfuscate:
             case OptionKind::OutputIncludes:
@@ -1691,7 +1687,12 @@ SlangResult OptionsParser::_parse(
             case OptionKind::DumpAst:
             case OptionKind::IncompleteLibrary:
             case OptionKind::NoHLSLBinding:
+            case OptionKind::NoHLSLPackConstantBufferElements:
                 linkage->m_optionSet.set(optionKind, true); break;
+                break;
+            case OptionKind::MatrixLayoutRow:
+            case OptionKind::MatrixLayoutColumn:
+                linkage->m_optionSet.setMatrixLayoutMode((optionKind == OptionKind::MatrixLayoutRow) ? MatrixLayoutMode::kMatrixLayoutMode_RowMajor : MatrixLayoutMode::kMatrixLayoutMode_ColumnMajor);
                 break;
             case OptionKind::NoCodeGen:
                 linkage->m_optionSet.set(OptionKind::SkipCodeGen, true); break;
@@ -2812,6 +2813,9 @@ SlangResult OptionsParser::_parse(
                     case CodeGenTarget::ShaderSharedLibrary:
                     case CodeGenTarget::PyTorchCppBinding:
                     case CodeGenTarget::DXIL:
+                    case CodeGenTarget::MetalLib:
+                    case CodeGenTarget::MetalLibAssembly:
+                    case CodeGenTarget::Metal:
                         rawOutput.isWholeProgram = true;
                         break;
                     case CodeGenTarget::SPIRV:

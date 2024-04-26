@@ -328,6 +328,7 @@ void main()
         && testRecordMissCalls()
         && testRecordEmptyCalls()
         && testTraceRayMotion()
-        && testReadWriteOfObjects();    
+        && testReadWriteOfObjects()
+        ;    
     //BUF: 1
 }
