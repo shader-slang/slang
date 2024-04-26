@@ -2095,7 +2095,7 @@ namespace Slang
         }
 
         // If absolutely no viable candidates were extracted from the overloaded expression,
-        // we may be dealing with a composity type or an overloaded expression with composite types.
+        // we may be dealing with a composite type or an overloaded expression with composite types.
         // 
 
         auto typeExpr = funcExpr;
