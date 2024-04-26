@@ -3,6 +3,7 @@
 #include "slang-ir-insts.h"
 #include "slang-diagnostics.h"
 #include "slang-ir-autodiff.h"
+#include "slang-ir-lower-cuda-builtin-types.h"
 
 namespace Slang
 {
@@ -858,6 +859,99 @@ IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
     return hostFunc;
 }
 
+void lowerBuiltinTypesForKernelEntryPoints(IRModule* module, DiagnosticSink*)
+{
+    List<IRFunc*> cudaKernels;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(globalInst))
+        {
+            if (func->findDecoration<IRCudaKernelDecoration>())
+            {
+                cudaKernels.add(func);
+            }
+        }
+    }
+
+    Dictionary<IRType*, LoweredBuiltinTypeInfo> typeMap;
+    IRBuilder builder(module);
+    for (auto func : cudaKernels)
+    {
+        // Go through parameters and replace any built-in types with their equivalent.
+        List<IRParam*> params;
+        for (auto param : func->getFirstBlock()->getParams())
+        {
+            params.add(param);
+        }
+
+        bool changed = false;
+        for (auto param : params)
+        {
+            LoweredBuiltinTypeInfo info = LoweredBuiltinTypeInfo();
+
+            if (typeMap.containsKey(param->getDataType()))
+                info = typeMap[param->getDataType()];
+            else
+            {
+                if (auto vectorType = as<IRVectorType>(param->getDataType()))
+                {   
+                    info = lowerVectorType(&builder, vectorType);
+                    typeMap[vectorType] = info;
+                }
+                else if (auto matrixType = as<IRMatrixType>(param->getDataType()))
+                {
+                    info = lowerMatrixType(&builder, matrixType);
+                    typeMap[matrixType] = info;
+                }
+            }
+
+            if (info.convertLoweredToOriginal != nullptr)
+            {
+
+                // Replace parameter with the lowered type.
+                auto originalType = param->getDataType();
+                param->setFullType(info.loweredType);
+
+                // Call the conversion function to convert the lowered parameter to the original parameter.
+                List<IRInst*> args;
+                args.add(param);
+
+                setInsertAfterOrdinaryInst(&builder, param);
+                auto convertedParam = builder.emitCallInst(originalType, info.convertLoweredToOriginal, args);
+
+                // Replace all uses of the lowered parameter with the converted parameter, except for the call instruction.
+                for (auto use = param->firstUse; use;)
+                {
+                    auto nextUse = use->nextUse;
+
+                    if (use->getUser() == convertedParam)
+                    {
+                        use = nextUse;
+                        continue;
+                    }
+
+                    use->set(convertedParam);
+                    use = nextUse;
+                }
+                
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            // Rebuild func-type
+            List<IRType*> paramTypes;
+            for (auto param : func->getFirstBlock()->getParams())
+            {
+                paramTypes.add(param->getDataType());
+            }
+            auto funcType = builder.getFuncType(paramTypes, func->getResultType());
+            func->setFullType(funcType);
+        }
+    }
+}
+
 void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
 {
     List<IRFunc*> workList;
@@ -894,6 +988,11 @@ void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
             }
         }
     }
+
+    // Before we start generating the bindings, we need to lower built-in types such as float3/matrix3x3 etc..
+    // This is because vector types in the CUDA target and vector types in CPP target are different & will not link correctly.
+    // 
+    
 
     // Generate CUDA wrappers for all functions that have the auto-bind decoration.
     for (auto func : autoBindRequests)
@@ -967,7 +1066,6 @@ void handleAutoBindNames(IRModule* module)
                 nameBuilder << "__kernel__" << externCppHint->getName();
                 externCppHint->removeAndDeallocate();
                 builder.addExternCppDecoration(globalInst, nameBuilder.getUnownedSlice());
-                builder.addExternCDecoration(globalInst);
             }
         }
     }

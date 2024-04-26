@@ -366,6 +366,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-combined-texture-sampler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-cuda-builtin-types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-error-handling.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1053,6 +1056,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-combined-texture-sampler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-cuda-builtin-types.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-error-handling.cpp">
