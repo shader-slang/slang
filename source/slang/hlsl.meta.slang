@@ -145,6 +145,7 @@ struct ByteAddressBuffer
     uint4 Load4(int location, out uint status);
 
     [__readNone]
+    [ForceInline]
     T Load<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location);
@@ -325,11 +326,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
     SamplerComparisonState __getComparisonSampler();
 
-    [ForceInline]
     [__readNone]
+    [ForceInline]
     [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetail(TextureCoord location)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case hlsl:
@@ -346,11 +348,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
-    [ForceInline]
     [__readNone]
+    [ForceInline]
     [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetailUnclamped(TextureCoord location)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case hlsl:
@@ -368,9 +371,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location)
     {
+        __requireComputeDerivative();
         __target_switch
         {
             case cpp:
@@ -417,10 +422,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp)
     {
+        __requireComputeDerivative();
         __target_switch
         {
             case cpp:
@@ -439,6 +446,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
     __target_intrinsic(hlsl)
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
@@ -448,9 +456,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias)
     {
+        __requireComputeDerivative();
         __target_switch
         {
             case cpp:
@@ -469,22 +479,24 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        __requireComputeDerivative();
         __target_switch
         {
             case cpp:
             case hlsl:
                 return __getTexture().SampleBias(__getSampler(), location, bias, offset);
             case glsl:
-            __intrinsic_asm "$ctextureOffset($0, $1, $3, $2)$z";
+                __intrinsic_asm "$ctextureOffset($0, $1, $3, $2)$z";
             case spirv:
-            return spirv_asm
-            {
-                %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset $bias $offset;
-                __truncate $$T result __sampledType(T) %sampled;
-            };
+                return spirv_asm
+                {
+                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset $bias $offset;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
         }
     }
 
@@ -599,6 +611,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
@@ -620,6 +633,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
     {
@@ -639,8 +653,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
-    __glsl_extension(GL_ARB_sparse_texture_clamp)
     [__readNone]
+    [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
     {
@@ -747,6 +762,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
     [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetail(SamplerState s, TextureCoord location)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case hlsl:
@@ -766,6 +782,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
     [require(glsl_hlsl_spirv, texture_querylod)]
     float CalculateLevelOfDetailUnclamped(SamplerState s, TextureCoord location)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case hlsl:
@@ -785,9 +802,11 @@ __generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let s
 extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     [__readNone]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
     {
+        __requireComputeDerivative();
         __target_switch
         {
             case cpp:
@@ -837,9 +856,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        __requireComputeDerivative();
         __target_switch
         {
             case cpp:
@@ -858,10 +879,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
+        __requireComputeDerivative();
         __target_switch
         {
             case cpp:
@@ -880,8 +903,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    [__readNone]
     __target_intrinsic(hlsl)
+    [__readNone]
+    [ForceInline]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         status = 0;
@@ -889,9 +913,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias)
     {
+        __requireComputeDerivative();
         __target_switch
         {
             case cpp:
@@ -910,9 +936,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        __requireComputeDerivative();
         __target_switch
         {
             case cpp:
@@ -930,7 +958,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    [__readNone] [ForceInline]
+    [__readNone]
+    [ForceInline]
     [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
@@ -960,7 +989,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    [__readNone] [ForceInline]
+    [__readNone]
+    [ForceInline]
     [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
@@ -987,7 +1017,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    [__readNone] [ForceInline]
+    [__readNone]
+    [ForceInline]
     [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
@@ -1013,7 +1044,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    [__readNone] [ForceInline]
+    [__readNone]
+    [ForceInline]
     [require(glsl_hlsl_spirv, texture_shadowlod)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
@@ -1041,6 +1073,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
@@ -1062,6 +1095,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 
     [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
     {
@@ -1083,8 +1117,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
-    __glsl_extension(GL_ARB_sparse_texture_clamp)
     [__readNone]
+    [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
     {
@@ -1939,7 +1974,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                 case spirv:
                     return spirv_asm
                     {
-                        OpImageWrite $this $location $newValue;
+                        OpImageWrite $this $location __convertTexel(newValue);
                     };
             }
         }
@@ -2051,7 +2086,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
                 case spirv:
                     return spirv_asm
                     {
-                        OpImageWrite $this $location $newValue Sample $sampleIndex;
+                        OpImageWrite $this $location __convertTexel(newValue) Sample $sampleIndex;
                     };
             }
         }
@@ -2813,7 +2848,6 @@ ${{{{
     [__requiresNVAPI]
     [ForceInline]
     __cuda_sm_version(2.0)
-    [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
@@ -2834,7 +2868,6 @@ ${{{{
     // Int64 Add
     [ForceInline]
     __cuda_sm_version(6.0)
-    [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda6_int64)]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue)
     {
@@ -2858,7 +2891,6 @@ ${{{{
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda6_int64)]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd);
 
-    [ForceInline]
     __specialized_for_target(hlsl)
     [ForceInline]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
@@ -2866,7 +2898,6 @@ ${{{{
         __atomicAdd(this, byteAddress, __asuint2(valueToAdd));
     }
 
-    [ForceInline]
     __specialized_for_target(glsl)
     __specialized_for_target(spirv)
     [ForceInline]
@@ -2906,6 +2937,7 @@ ${{{{
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicMax(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -2965,6 +2997,7 @@ ${{{{
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicMin(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -3024,6 +3057,7 @@ ${{{{
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicAnd(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -3063,6 +3097,7 @@ ${{{{
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicOr(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -3102,6 +3137,7 @@ ${{{{
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicXor(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -3140,6 +3176,7 @@ ${{{{
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
+    [ForceInline]
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicExchange(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
@@ -3255,6 +3292,7 @@ ${{{{
             return;
         }
     }
+
     [ForceInline]
     void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
@@ -4818,6 +4856,7 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv, fragmentprocessing)]
 T dd$(xOrY)(T x)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -4836,6 +4875,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_spirv, fragmentprocessing)]
 vector<T, N> dd$(xOrY)(vector<T, N> x)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -4855,7 +4895,14 @@ __target_intrinsic(hlsl)
 [require(cpp_cuda_glsl_hlsl_spirv, fragmentprocessing)]
 matrix<T, N, M> dd$(xOrY)(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, dd$(xOrY), x);
+    __requireComputeDerivative();    
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "dd$(xOrY)";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, dd$(xOrY), x);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType>
@@ -4864,6 +4911,7 @@ __glsl_extension(GL_ARB_derivative_control)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 T dd$(xOrY)_coarse(T x)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl: __intrinsic_asm "dd$(xOrY)_coarse";
@@ -4878,6 +4926,7 @@ __glsl_extension(GL_ARB_derivative_control)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 vector<T, N> dd$(xOrY)_coarse(vector<T, N> x)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl: __intrinsic_asm "dd$(xOrY)_coarse";
@@ -4887,11 +4936,18 @@ vector<T, N> dd$(xOrY)_coarse(vector<T, N> x)
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(hlsl)
 [__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 matrix<T, N, M> dd$(xOrY)_coarse(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, dd$(xOrY)_coarse, x);
+    __requireComputeDerivative();    
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "dd$(xOrY)_coarse";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, dd$(xOrY)_coarse, x);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType>
@@ -4900,6 +4956,7 @@ __glsl_extension(GL_ARB_derivative_control)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 T dd$(xOrY)_fine(T x)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl: __intrinsic_asm "dd$(xOrY)_fine";
@@ -4914,6 +4971,7 @@ __glsl_extension(GL_ARB_derivative_control)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 vector<T, N> dd$(xOrY)_fine(vector<T, N> x)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl: __intrinsic_asm "dd$(xOrY)_fine";
@@ -4923,11 +4981,18 @@ vector<T, N> dd$(xOrY)_fine(vector<T, N> x)
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(hlsl)
 [__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 matrix<T, N, M> dd$(xOrY)_fine(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, dd$(xOrY)_fine, x);
+    __requireComputeDerivative();    
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "dd$(xOrY)_fine";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, dd$(xOrY)_fine, x);
+    }
 }
 
 ${{{{
@@ -5626,28 +5691,57 @@ matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 // Texture filter width
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpFwidth resultType resultId _0")
 [require(glsl_hlsl_spirv, fragmentprocessing)]
-T fwidth(T x);
+T fwidth(T x)
+{
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "fwidth($0)";
+    case glsl:
+        __intrinsic_asm "fwidth($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpFwidth $$T result $x;
+        };
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpFwidth resultType resultId _0")
 [__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 vector<T, N> fwidth(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(T, N, fwidth, x);
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "fwidth($0)";
+    case glsl:
+        __intrinsic_asm "fwidth($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpFwidth $$vector<T, N> result $x;
+        };
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 matrix<T, N, M> fwidth(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, fwidth, x);
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "fwidth($0)";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, fwidth, x);
+    }
 }
 
 /// Get the value of a vertex attribute at a specific vertex.
@@ -10625,7 +10719,7 @@ ${{{{
                 case hlsl: __intrinsic_asm "($0)[$1] = $2";
                 case glsl: __intrinsic_asm "imageStore($0, int($1), $V2)";
                 case spirv: spirv_asm {
-                        OpImageWrite $this $index $newValue;
+                        OpImageWrite $this $index __convertTexel(newValue);
                     };
                 }
             }
@@ -11486,8 +11580,11 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 //
 // This function doesn't return.
 //
+// This function cannot be inlined due to a legalization pass happening mid-way through processing
+// and later more processing happening to the function which requires eventual inlining.
 [KnownBuiltin("DispatchMesh")]
 [require(glsl_hlsl_spirv, meshshading)]
+[noRefInline]
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
 {
     __target_switch

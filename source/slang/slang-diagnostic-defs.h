@@ -451,6 +451,9 @@ DIAGNOSTIC(31205, Error, incompleteTypeCannotBeUsedInUniformParameter, "incomple
 DIAGNOSTIC(31206, Error, memoryQualifierNotAllowedOnANonImageTypeParameter, "modifier $0 is not allowed on a non image type parameter.")
 DIAGNOSTIC(31207, Error, InputAttachmentIndexOnlyAllowedOnSubpass, "input_attachment_index is only allowed on subpass images.")
 DIAGNOSTIC(31208, Error, requireInputDecoratedVarForParameter, "$0 expects for argument $1 a type which is a shader input (`in`) variable.")
+DIAGNOSTIC(31210, Error, derivativeGroupQuadMustBeMultiple2ForXYThreads, "compute derivative group quad requires thread dispatch count of X and Y to each be at a multiple of 2")
+DIAGNOSTIC(31211, Error, derivativeGroupLinearMustBeMultiple4ForTotalThreadCount, "compute derivative group linear requires total thread dispatch count to be at a multiple of 4")
+DIAGNOSTIC(31212, Error, onlyOneOfDerivativeGroupLinearOrQuadCanBeSet, "cannot set compute derivative group linear and compute derivative group quad at the same time")
 
 // Enums
 
@@ -743,6 +746,10 @@ DIAGNOSTIC(45001, Error, unresolvedSymbol, "unresolved external symbol '$0'.")
 
 DIAGNOSTIC(41201, Warning, expectDynamicUniformArgument, "argument for '$0' might not be a dynamic uniform, use `asDynamicUniform()` to silence this warning.")
 DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this location must be dynamic uniform, use `asDynamicUniform()` to silence this warning.")
+
+
+DIAGNOSTIC(41202, Error, notEqualBitCastSize, "invalid to bit_cast differently sized types: '$0' with size '$1' casted into '$2' with size '$3'")
+DIAGNOSTIC(41203, Warning, notEqualReinterpretCastSize, "reinterpret<> into not equally sized types: '$0' with size '$1' casted into '$2' with size '$3'")
 
 //
 // 5xxxx - Target code generation.

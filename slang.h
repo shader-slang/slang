@@ -706,11 +706,7 @@ extern "C"
         /* When set, will generate SPIRV directly rather than via glslang. */
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
-#if defined(SLANG_CONFIG_DEFAULT_SPIRV_DIRECT)
     constexpr static SlangTargetFlags kDefaultTargetFlags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
-#else
-    constexpr static SlangTargetFlags kDefaultTargetFlags = 0;
-#endif
 
     /*!
     @brief Options to control floating-point precision guarantees for a target.
@@ -2264,9 +2260,16 @@ extern "C"
         // The input_attachment_index subpass occupancy tracker
         SLANG_PARAMETER_CATEGORY_SUBPASS,
 
+        // Metal resource binding points.
+        SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
+
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
 
+        // Aliases for Metal-specific categories.
+        SLANG_PARAMETER_CATEGORY_METAL_BUFFER = SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER,
+        SLANG_PARAMETER_CATEGORY_METAL_TEXTURE = SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE,
+        SLANG_PARAMETER_CATEGORY_METAL_SAMPLER = SLANG_PARAMETER_CATEGORY_SAMPLER_STATE,
 
         // DEPRECATED:
         SLANG_PARAMETER_CATEGORY_VERTEX_INPUT = SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
@@ -2829,6 +2832,10 @@ namespace slang
         SubElementRegisterSpace = SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE,
 
         InputAttachmentIndex = SLANG_PARAMETER_CATEGORY_SUBPASS,
+
+        MetalBuffer = SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER,
+        MetalTexture = SLANG_PARAMETER_CATEGORY_METAL_TEXTURE,
+        MetalArgumentBufferElement = SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
 
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,

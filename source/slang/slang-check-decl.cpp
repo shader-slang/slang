@@ -6965,6 +6965,13 @@ namespace Slang
         if (!doFunctionSignaturesMatch(newDeclRef, oldDeclRef))
             return SLANG_OK;
 
+        // If the declatation is declared by 'extern', and new definition is with 'export', then
+        // we should let overload resolution to handle it.
+        if (oldDecl->hasModifier<ExternModifier>() && newDecl->hasModifier<HLSLExportModifier>())
+        {
+            return SLANG_OK;
+        }
+
         // If we get this far, then we've got two declarations in the same
         // scope, with the same name and signature, so they appear
         // to be redeclarations.
@@ -7485,6 +7492,10 @@ namespace Slang
 
         for (auto ctor : structDeclInfo.ctorList)
         {
+            ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+            thisExpr->scope = ctor->ownedScope;
+            thisExpr->type = ctor->returnType.type;
+
             auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
             auto seqStmtChild = m_astBuilder->create<SeqStmt>();
             seqStmtChild->stmts.reserve(structDecl->members.getCount());
@@ -7495,12 +7506,16 @@ namespace Slang
                     || !varDeclBase->initExpr)
                     continue;
 
-                VarExpr* memberVarExpr = m_astBuilder->create<VarExpr>();
-                memberVarExpr->scope = ctor->ownedScope;
-                memberVarExpr->name = m->getName();
+                MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
+                memberExpr->baseExpression = thisExpr;
+                memberExpr->declRef = m->getDefaultDeclRef();
+                memberExpr->scope = ctor->ownedScope;
+                memberExpr->loc = m->loc;
+                memberExpr->name = m->getName();
+                memberExpr->type = DeclRefType::create(getASTBuilder(), m->getDefaultDeclRef());
 
                 auto assign = m_astBuilder->create<AssignExpr>();
-                assign->left = memberVarExpr;
+                assign->left = memberExpr;
                 assign->right = varDeclBase->initExpr;
                 assign->loc = m->loc;
 
@@ -7513,7 +7528,7 @@ namespace Slang
                     checkedMemberVarExpr = cachedDeclToCheckedVar[m];
                 else
                 {
-                    checkedMemberVarExpr = CheckTerm(memberVarExpr);
+                    checkedMemberVarExpr = CheckTerm(memberExpr);
                     cachedDeclToCheckedVar.add({ m, checkedMemberVarExpr });
                 }
                 if (!checkedMemberVarExpr->type.isLeftValue)
@@ -9853,7 +9868,7 @@ namespace Slang
                 loc = Base::sourceLocStack.getLast();
             handleReferenceFunc(decl, decl->inferredCapabilityRequirements, loc);
         }
-        virtual void processDeclModifiers(Decl* decl)
+        virtual void processDeclModifiers(Decl* decl) override
         {
             if (decl)
                 handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);

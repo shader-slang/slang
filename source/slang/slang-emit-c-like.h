@@ -476,6 +476,8 @@ public:
         /// the appropriate generated declarations occur.
     virtual void emitPreModuleImpl();
 
+    virtual void beforeComputeEmitActions(IRModule* module) { SLANG_UNUSED(module); };
+
     virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace) { SLANG_UNUSED(rate); SLANG_UNUSED(addressSpace); }
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout) { SLANG_UNUSED(inst); SLANG_UNUSED(allowOffsetLayout); }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
@@ -587,6 +589,7 @@ public:
     // to use for it when emitting code.
     Dictionary<IRInst*, String> m_mapInstToName;
 
+    OrderedHashSet<String> m_requiredPreludesRaw;
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
 };
 

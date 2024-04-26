@@ -492,7 +492,7 @@ Result linkAndOptimizeIR(
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
-        SLANG_RETURN_ON_FAIL(performStringInlining(irModule, sink));
+        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, sink));
     }
 
     lowerReinterpret(targetProgram, irModule, sink);
@@ -583,6 +583,7 @@ Result linkAndOptimizeIR(
         //  will have (more) legal shader code.
         //
         legalizeExistentialTypeLayout(
+            targetProgram,
             irModule,
             sink);
 
@@ -603,6 +604,7 @@ Result linkAndOptimizeIR(
         // then become multiple variables/parameters/arguments/etc.
         //
         legalizeResourceTypes(
+            targetProgram,
             irModule,
             sink);
 
@@ -617,6 +619,7 @@ Result linkAndOptimizeIR(
         // On CPU/CUDA targets, we simply elminate any empty types if
         // they are not part of public interface.
         legalizeEmptyTypes(
+            targetProgram,
             irModule,
             sink);
     }
@@ -876,6 +879,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
+    case CodeGenTarget::Metal:
         moveGlobalVarInitializationToEntryPoints(irModule);
         break;
     case CodeGenTarget::CPPSource:
@@ -941,9 +945,12 @@ Result linkAndOptimizeIR(
 
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
-        // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
-        // a simple storage type that has target independent layout based on the kind of buffer resource.
-        lowerBufferElementTypeToStorageType(targetProgram, irModule);
+        if (!isMetalTarget(targetRequest))
+        {
+            // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
+            // a simple storage type that has target independent layout based on the kind of buffer resource.
+            lowerBufferElementTypeToStorageType(targetProgram, irModule);
+        }
     }
 
     // Rewrite functions that return arrays to return them via `out` parameter,
@@ -965,11 +972,11 @@ Result linkAndOptimizeIR(
 
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
-    lowerBitCast(targetProgram, irModule);
+    lowerBitCast(targetProgram, irModule, sink);
 
-    bool emitSpirvDirectly = targetProgram->getOptionSet().shouldEmitSPIRVDirectly();
+    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
 
-    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
         eliminateDeadCode(irModule);

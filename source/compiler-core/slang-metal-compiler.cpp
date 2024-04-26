@@ -26,7 +26,7 @@ namespace Slang
 
         virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() override { return true; }
 
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact)
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) override
         {
             // All compile requests should be routed directly to the inner compiler.
             return cppCompiler->compile(options, outArtifact);

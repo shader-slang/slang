@@ -2365,6 +2365,9 @@ __generic<T>
 __intrinsic_op($(kIROp_GetLegalizedSPIRVGlobalParamAddr))
 Ptr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 
+__intrinsic_op($(kIROp_RequireComputeDerivative))
+void __requireComputeDerivative();
+
 // Binding Attributes
 
 __attributeTarget(DeclBase)
@@ -2628,3 +2631,12 @@ attribute_syntax [NonUniformReturn] : NonDynamicUniformAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__GLSLRequireShaderInputParameter(parameterNumber:int)] : GLSLRequireShaderInputParameterAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [DerivativeGroupQuad] : DerivativeGroupQuadAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [noRefInline] : NoRefInlineAttribute;

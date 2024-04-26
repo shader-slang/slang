@@ -633,28 +633,34 @@ uint packSnorm1x8(float c)
 [ForceInline]
 float unpackUnorm1x16(uint p)
 {
-    return float(p) / 65535.0;
+    const uint wordMask = 0xffff;
+    return float(p & wordMask) / 65535.0;
 }
 
 [__readNone]
 [ForceInline]
 float unpackSnorm1x16(uint p)
 {
-    return clamp((float(p) - 32767.0) / 32767.0, -1.0, 1.0);
+    const uint wordMask = 0xffff;
+    return clamp((float(p & wordMask) - 32767.0) / 32767.0, -1.0, 1.0);
 }
 
+__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 float unpackUnorm1x8(uint p)
 {
-    return float(p) / 255.0;
+    const uint byteMask = 0xff;
+    return float(p & byteMask) / 255.0;
 }
 
+__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 float unpackSnorm1x8(uint p)
 {
-    return clamp((float(p) - 127.0) / 127.0, -1.0, 1.0);
+    const uint byteMask = 0xff;
+    return clamp((float(p & byteMask) - 127.0) / 127.0, -1.0, 1.0);
 }
 
 [__readNone]
@@ -733,7 +739,11 @@ __target_intrinsic(glsl)
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec4 unpackUnorm4x8(highp uint p)
 {
-    return vec4(unpackUnorm1x8(p & uint(0xffff)), unpackUnorm1x8(p >> uint(8)), unpackUnorm1x8(p >> uint(16)), unpackUnorm1x8(p >> uint(24)));
+    return vec4(
+        unpackUnorm1x8(p),
+        unpackUnorm1x8(p >> 8),
+        unpackUnorm1x8(p >> 16),
+        unpackUnorm1x8(p >> 24));
 }
 
 __target_intrinsic(glsl)
@@ -742,7 +752,11 @@ __target_intrinsic(glsl)
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec4 unpackSnorm4x8(highp uint p)
 {
-    return vec4(unpackSnorm1x8(p & uint(0xffff)), unpackSnorm1x8(p >> uint(8)), unpackSnorm1x8(p >> uint(16)), unpackSnorm1x8(p >> uint(24)));
+    return vec4(
+        unpackSnorm1x8(p),
+        unpackSnorm1x8(p >> 8),
+        unpackSnorm1x8(p >> 16),
+        unpackSnorm1x8(p >> 24));
 }
 
 __target_intrinsic(glsl)
@@ -3236,7 +3250,6 @@ ${{{{
         StringBuilder SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder;
 
         SPV_PREFIX_IMAGE_PARAMSBuilder << "$image $P";
-        SPV_SUFFIX_IMAGE_PARAMSBuilder;
         if (targetShape.isMS)
         {
             SPV_SUFFIX_IMAGE_PARAMSBuilder << " Sample $sample";
@@ -7781,6 +7794,7 @@ public vector<float, N> dFdyCoarse(vector<float, N> p)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthFine(float p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7804,6 +7818,7 @@ __generic<let N : int>
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthFine(vector<float, N> p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7827,6 +7842,7 @@ public vector<float, N> fwidthFine(vector<float, N> p)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthCoarse(float p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7850,6 +7866,7 @@ __generic<let N : int>
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthCoarse(vector<float, N> p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
