@@ -2749,9 +2749,6 @@ SlangResult OptionsParser::_parse(
             m_rawTargets[0].format == CodeGenTarget::Metal ||
             m_rawTargets[0].format == CodeGenTarget::MetalLib ||
             m_rawTargets[0].format == CodeGenTarget::MetalLibAssembly ||
-            m_rawTargets[0].format == CodeGenTarget::HLSL ||
-            m_rawTargets[0].format == CodeGenTarget::DXIL ||
-            m_rawTargets[0].format == CodeGenTarget::DXILAssembly ||
             ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind == ArtifactKind::HostCallable))
     {
         RawOutput rawOutput;

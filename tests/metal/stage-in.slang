@@ -73,7 +73,7 @@ struct FragOut
 }
 
 [shader("fragment")]
-FragOut main_fragment1(VOut fragmentIn) : SV_Target
+FragOut main_fragment1(VOut fragmentIn)
 {
     FragOut fragOut;
     fragOut.color = fragmentIn.vertexColor;
