@@ -9738,6 +9738,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 derivativeGroupLinearDecor = getBuilder()->addSimpleDecoration<IRDerivativeGroupLinearDecoration>(irFunc);
             }
+            else if (auto noRefInlineAttribute = as<NoRefInlineAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRNoRefInlineDecoration>(irFunc);
+            }
             else if (auto instanceAttr = as<InstanceAttribute>(modifier))
             {
                 IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), instanceAttr);

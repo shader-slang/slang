@@ -31,7 +31,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     let f = myFunc0(2.0);
     // CHECK: 4.0
-    // GLSL: void myFunc1_0(float y{{.*}}, spirv_by_reference MyType_0 {{.*}})
-    // GLSL: void myFunc0_0(float x{{.*}}, spirv_by_reference MyType_0 {{.*}})
+    // GLSL: main(
+    // GLSL-NOT: MyType {{.*}} =
     outputBuffer[0] = f.x;
 }
