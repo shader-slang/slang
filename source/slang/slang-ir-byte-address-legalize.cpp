@@ -371,7 +371,7 @@ struct ByteAddressBufferLegalizationContext
             auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
             if(elementCountInst)
             {
-                return emitVectorizedLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue());
+                return emitLoadWithKnownOffset(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue());
             }
 
             // If we aren't scalarizing a vetor load then we next need
@@ -478,7 +478,7 @@ struct ByteAddressBufferLegalizationContext
         return m_builder.emitIntrinsicInst(type, op, elementVals.getCount(), elementVals.getBuffer());
     }
 
-    IRInst* emitVectorizedLoad(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IROp op, IRType* elementType, IRIntegerValue elementCount)
+    IRInst* emitLoadWithKnownOffset(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IROp op, IRType* elementType, IRIntegerValue elementCount)
     {
         // Check for alignment and elementCount, elementCount must be divisible by alignment.
 
@@ -948,7 +948,7 @@ struct ByteAddressBufferLegalizationContext
 
             if (elementCountInst)
             {
-                return emitVectorizedStore(type, buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
+                return emitStoreWithKnownOffset(type, buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
             }
 
             if(m_options.useBitCastFromUInt)
@@ -1017,7 +1017,7 @@ struct ByteAddressBufferLegalizationContext
         }
     }
 
-    Result emitVectorizedStore(IRInst* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount)
+    Result emitStoreWithKnownOffset(IRInst* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount)
     {
         // Check for alignment and elementCount, elementCount must be divisible by alignment.
 
