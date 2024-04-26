@@ -1447,6 +1447,13 @@ class NoInlineAttribute : public Attribute
     SLANG_AST_CLASS(NoInlineAttribute)
 };
 
+    /// A `[noRefInline]` attribute represents a request to not force inline a 
+    /// function specifically due to a refType parameter.
+class NoRefInlineAttribute : public Attribute
+{
+    SLANG_AST_CLASS(NoRefInlineAttribute)
+};
+
 class DerivativeGroupQuadAttribute : public Attribute
 {
     SLANG_AST_CLASS(DerivativeGroupQuadAttribute)

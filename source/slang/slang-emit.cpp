@@ -492,7 +492,7 @@ Result linkAndOptimizeIR(
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
-        SLANG_RETURN_ON_FAIL(performStringInlining(irModule, sink));
+        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, sink));
     }
 
     lowerReinterpret(targetProgram, irModule, sink);

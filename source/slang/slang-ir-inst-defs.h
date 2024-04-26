@@ -862,6 +862,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
         /// Applie to an IR function and signals that inlining should not be performed unless unavoidable.
     INST(NoInlineDecoration, noInline, 0, 0)
+    INST(NoRefInlineDecoration, noRefInline, 0, 0)
 
     INST(DerivativeGroupQuadDecoration, DerivativeGroupQuad, 0, 0)
     INST(DerivativeGroupLinearDecoration, DerivativeGroupLinear, 0, 0)
