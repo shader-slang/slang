@@ -68,4 +68,4 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install gspread oauth2client
-        python ${{ github.workspace }}\extras\process_vk_cts_nightly_results.py --passinglist=${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt --archive_dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --testlist=${{ github.workspace }}\extras\temp-list.txt
+        python ${{ github.workspace }}\extras\process_vk_cts_weekly_results.py --passinglist=${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt --archive_dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --testlist=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\all-tests.txt
