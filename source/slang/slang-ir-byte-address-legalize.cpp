@@ -486,8 +486,9 @@ struct ByteAddressBufferLegalizationContext
         SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
         auto indexType = m_builder.getIntType();
+        auto baseOffsetVal = as<IRIntLit>(baseOffset);
         if (m_options.scalarizeVectorLoadStore ||
-            immediateOffset % (elementStride * elementCount))
+            !(baseOffsetVal && (immediateOffset % (elementStride * elementCount))))
         {
             // generate sequence load
             return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, op, elementType, elementCount);
@@ -948,7 +949,7 @@ struct ByteAddressBufferLegalizationContext
 
             if (elementCountInst)
             {
-                return emitStoreWithKnownOffset(type, buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
+                return emitStoreWithKnownOffset(buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
             }
 
             if(m_options.useBitCastFromUInt)
@@ -1017,16 +1018,17 @@ struct ByteAddressBufferLegalizationContext
         }
     }
 
-    Result emitStoreWithKnownOffset(IRInst* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount)
+    Result emitStoreWithKnownOffset(IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount)
     {
         // Check for alignment and elementCount, elementCount must be divisible by alignment.
 
         IRSizeAndAlignment elementLayout;
         SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
-        auto indexType = m_builder.getIntType();
+
+        auto baseOffsetVal = as<IRIntLit>(baseOffset);
         if (m_options.scalarizeVectorLoadStore ||
-            immediateOffset % (elementStride * elementCount))
+            !(baseOffsetVal && (immediateOffset % (elementStride * elementCount))))
         {
             // generate sequence store
             return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, elementType, elementCount);
