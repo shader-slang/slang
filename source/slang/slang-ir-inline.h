@@ -10,8 +10,8 @@ namespace Slang
     struct IRGlobalValueWithCode;
     class DiagnosticSink;
 
-        /// Any call to a function that takes or returns a string parameter is inlined
-    Result performStringInlining(IRModule* module, DiagnosticSink* sink);
+        /// Any call to a function that takes or returns a string/RefType parameter is inlined
+    Result performTypeInlining(IRModule* module, DiagnosticSink* sink);
 
         /// Inline any call sites to functions marked `[unsafeForceInlineEarly]`
     void performMandatoryEarlyInlining(IRModule* module);

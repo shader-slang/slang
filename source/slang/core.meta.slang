@@ -2637,3 +2637,6 @@ attribute_syntax [DerivativeGroupQuad] : DerivativeGroupQuadAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [noRefInline] : NoRefInlineAttribute;
