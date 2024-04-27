@@ -137,6 +137,9 @@ namespace Slang
             paramsToPack.add(param);
         }
 
+        if (paramsToPack.getCount() == 0)
+            return;
+
         IRBuilder builder(func);
         builder.setInsertBefore(func);
         IRStructType* structType = builder.createStructType();
