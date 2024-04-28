@@ -3719,11 +3719,8 @@ namespace Slang
         }
         case kIROp_StructType:
         {
-            auto structType = as<IRStructType>(actualType);
-            if (structType->defaultCtor)
-                return emitCallInst(actualType, structType->defaultCtor, 0, nullptr);
-            
             List<IRInst*> elements;
+            auto structType = as<IRStructType>(actualType);
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();

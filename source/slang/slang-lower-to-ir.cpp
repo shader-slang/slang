@@ -499,9 +499,6 @@ struct SharedIRGenContext
     Dictionary<Stmt*, IRBlock*> breakLabels;
     Dictionary<Stmt*, IRBlock*> continueLabels;
 
-    // A reference manager to a ctor's parent
-    Dictionary<FunctionDeclBase*, IRType*> ctorBaseToParentStruct;
-
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
@@ -8477,11 +8474,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        bool isStruct = false;
         IRType* irAggType = nullptr;
         if (as<StructDecl>(decl))
         {
-            isStruct = true;
             irAggType = subBuilder->createStructType();
         }
         else if (as<ClassDecl>(decl))
@@ -8597,16 +8592,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     subBuilder->addDynamicUniformDecoration(fieldKey);
                 }
-            }
-        }
-
-        // Add modifier to constructors so they are aware of the parent IRType.
-        // This follows the lowering logic of ensureAllDeclsRec->{visitAggTypeDecl, visitFunctionDeclBase}
-        if(isStruct)
-        {
-            for (auto ctor : decl->getMembersOfType<ConstructorDecl>())
-            {
-                context->shared->ctorBaseToParentStruct[as<FunctionDeclBase>(ctor)] = irAggType;
             }
         }
 
@@ -10036,13 +10021,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         NestedContext nestedContextFunc(this);
         auto subBuilder = nestedContextFunc.getBuilder();
         auto subContext = nestedContextFunc.getContext();
-        auto lowered = lowerFuncDeclInContext(subContext, subBuilder, decl);
-
-        IRType** maybeParentStruct = this->context->shared->ctorBaseToParentStruct.tryGetValue(decl);
-        if (maybeParentStruct && decl->members.getCount() == 0)
-            as<IRStructType>(*maybeParentStruct)->defaultCtor = as<IRFunc>(lowered.val);
-
-        return lowered;
+        return lowerFuncDeclInContext(subContext, subBuilder, decl);
     }
 
     LoweredValInfo visitGenericDecl(GenericDecl * genDecl)

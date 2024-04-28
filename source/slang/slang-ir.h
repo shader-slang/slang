@@ -1856,10 +1856,8 @@ struct IRStructField : IRInst
 struct IRStructType : IRType
 {
     IRFilteredInstList<IRStructField> getFields() { return IRFilteredInstList<IRStructField>(getChildren()); }
-    
-    IR_LEAF_ISA(StructType)
 
-    IRFunc* defaultCtor = nullptr;
+    IR_LEAF_ISA(StructType)
 };
 
 struct IRClassType : IRType

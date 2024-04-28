@@ -1953,20 +1953,48 @@ namespace Slang
         if (!varDecl->initExpr &&
             getOptionSet().hasOption(CompilerOptionName::ZeroInitialize))
         {
-            auto* defaultCall = m_astBuilder->create<VarExpr>();
-            defaultCall->type = QualType();
-            defaultCall->name = getName("__default");
-            defaultCall->scope = varDecl->parentDecl->ownedScope;
+            ConstructorDecl* defaultCtor = nullptr;
 
-            auto* defaultFunction = m_astBuilder->create<GenericAppExpr>();
-            defaultFunction->functionExpr = defaultCall;
-            defaultFunction->arguments.add(varDecl->type.exp);
+            if (auto declRefType = as<DeclRefType>(varDecl->getType()))
+            {
+                if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
+                {
+                    defaultCtor = _getDefaultCtor(structDecl);
+                }
+            }
+            // TODO: check if IDefault, if you have it, set to defaultCtor of type --> else set __default as we currently do
 
-            auto* defaultExpr = m_astBuilder->create<InvokeExpr>();
-            defaultExpr->functionExpr = defaultFunction;
-            varDecl->initExpr = defaultExpr;
+            if(!defaultCtor)
+            {
+                auto* defaultCall = m_astBuilder->create<VarExpr>();
+                defaultCall->type = QualType();
+                defaultCall->name = getName("__default");
+                defaultCall->scope = varDecl->parentDecl->ownedScope;
+
+                auto* defaultFunction = m_astBuilder->create<GenericAppExpr>();
+                defaultFunction->functionExpr = defaultCall;
+                defaultFunction->arguments.add(varDecl->type.exp);
+
+                auto* invoke = m_astBuilder->create<InvokeExpr>();
+                invoke->functionExpr = defaultFunction;
+
+                varDecl->initExpr = invoke;
+            }
+            else
+            {
+                auto ctorToInvoke = m_astBuilder->create<VarExpr>();
+                ctorToInvoke->declRef = defaultCtor->getDefaultDeclRef();
+                ctorToInvoke->name = defaultCtor->getName();
+                ctorToInvoke->loc = defaultCtor->loc;
+                ctorToInvoke->type = defaultCtor->returnType.type;
+
+                auto invoke = m_astBuilder->create<InvokeExpr>();
+                invoke->functionExpr = ctorToInvoke;
+
+                varDecl->initExpr = invoke;
+            }
         }
-
+        
         if (auto initExpr = varDecl->initExpr)
         {
             // Disable the short-circuiting for static const variable init expression
