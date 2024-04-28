@@ -1639,27 +1639,6 @@ namespace Slang
             }
         }
 
-        // We must keep zero-initialize for struct fields in 
-        // SemanticsDeclHeaderVisitor.
-        // This is done because else a ctor will be initialized before
-        // we can set struct fields to `__default`.
-        if (!varDecl->initExpr &&
-            getOptionSet().hasOption(CompilerOptionName::ZeroInitialize))
-        {
-            auto* defaultCall = m_astBuilder->create<VarExpr>();
-            defaultCall->type = QualType();
-            defaultCall->name = getName("__default");
-            defaultCall->scope = varDecl->parentDecl->ownedScope;
-
-            auto* defaultFunction = m_astBuilder->create<GenericAppExpr>();
-            defaultFunction->functionExpr = defaultCall;
-            defaultFunction->arguments.add(varDecl->type.exp);
-
-            auto* defaultExpr = m_astBuilder->create<InvokeExpr>();
-            defaultExpr->functionExpr = defaultFunction;
-            varDecl->initExpr = defaultExpr;
-        }
-        
         if (varDecl->initExpr)
         {
             if (as<BasicExpressionType>(varDecl->type.type))
@@ -1971,6 +1950,23 @@ namespace Slang
 
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
+        if (!varDecl->initExpr &&
+            getOptionSet().hasOption(CompilerOptionName::ZeroInitialize))
+        {
+            auto* defaultCall = m_astBuilder->create<VarExpr>();
+            defaultCall->type = QualType();
+            defaultCall->name = getName("__default");
+            defaultCall->scope = varDecl->parentDecl->ownedScope;
+
+            auto* defaultFunction = m_astBuilder->create<GenericAppExpr>();
+            defaultFunction->functionExpr = defaultCall;
+            defaultFunction->arguments.add(varDecl->type.exp);
+
+            auto* defaultExpr = m_astBuilder->create<InvokeExpr>();
+            defaultExpr->functionExpr = defaultFunction;
+            varDecl->initExpr = defaultExpr;
+        }
+
         if (auto initExpr = varDecl->initExpr)
         {
             // Disable the short-circuiting for static const variable init expression
@@ -7447,6 +7443,11 @@ namespace Slang
             inheritanceDefaultCtorList.add(DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, true));
         }
         DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, false);
+
+        // ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if init expressions 
+        // of members are to be synthisised, they are.
+        for (auto m : structDecl->members)
+            if(as<VarDeclBase>(m)) ensureDecl(m->getDefaultDeclRef(), DeclCheckState::DefinitionChecked);
 
         Index insertOffset = 0;
         Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;

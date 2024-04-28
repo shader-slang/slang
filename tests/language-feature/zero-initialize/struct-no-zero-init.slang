@@ -1,6 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain -DFAIL
 
 // CHECK-NOT: {{.* }}= 0;
 
@@ -24,9 +23,6 @@ MyStruct getStruct()
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     MyStruct myStruct = getStruct();
-#ifdef fail
-    myStruct.
-#endif
 
 // BUF: 1
     outputBuffer[0] = true
