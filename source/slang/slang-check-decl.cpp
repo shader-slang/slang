@@ -2013,7 +2013,7 @@ namespace Slang
             varDecl->setCheckState(DeclCheckState::DefinitionChecked);
             _validateCircularVarDefinition(varDecl);
         }
-        else if(!as<DeclRefType>(varDecl->type.type)->getDeclRef().getDecl()->modifiers.findModifier<OnlyAutoInitIfForcedAttribute>())
+        else if(as<DeclRefType>(varDecl->type.type) && !as<DeclRefType>(varDecl->type.type)->getDeclRef().getDecl()->modifiers.findModifier<OnlyAutoInitIfForcedAttribute>())
         {
             // If a variable doesn't have an explicit initial-value
             // expression, it is still possible that it should
