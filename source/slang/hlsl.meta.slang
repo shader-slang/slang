@@ -4009,6 +4009,7 @@ bool all(matrix<T,N,M> x)
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
+[ForceInline]
 void AllMemoryBarrier()
 {
     __target_switch
@@ -4026,6 +4027,7 @@ void AllMemoryBarrier()
 // Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
+[ForceInline]
 void AllMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -4049,6 +4051,7 @@ int3 WorkgroupSize();
 
 __generic<T : __BuiltinType>
 [__readNone]
+[ForceInline]
 bool any(T x)
 {
     __target_switch
@@ -4077,6 +4080,7 @@ bool any(T x)
 
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
+[ForceInline]
 bool any(vector<T, N> x)
 {
     __target_switch
@@ -4138,6 +4142,7 @@ __target_intrinsic(cuda, "$P_asdouble($0, $1)")
 __target_intrinsic(spirv, "%v = OpCompositeConstruct _type(uint2) resultId _0 _1; OpExtInst resultType resultId glsl450 59 %v")
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 double asdouble(uint lowbits, uint highbits);
 
@@ -4149,6 +4154,7 @@ __target_intrinsic(cpp, "$P_asfloat($0)")
 __target_intrinsic(cuda, "$P_asfloat($0)")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 float asfloat(int x);
 
@@ -4158,6 +4164,7 @@ __target_intrinsic(cpp, "$P_asfloat($0)")
 __target_intrinsic(cuda, "$P_asfloat($0)")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 float asfloat(uint x);
 
@@ -4166,6 +4173,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "intBitsToFloat")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 vector<float, N> asfloat(vector< int, N> x)
 {
@@ -4177,6 +4185,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uintBitsToFloat")
 __target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 vector<float,N> asfloat(vector<uint,N> x)
 {
@@ -4186,6 +4195,7 @@ vector<float,N> asfloat(vector<uint,N> x)
 __generic<let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 matrix<float,N,M> asfloat(matrix< int,N,M> x)
 {
@@ -4195,6 +4205,7 @@ matrix<float,N,M> asfloat(matrix< int,N,M> x)
 __generic<let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 matrix<float,N,M> asfloat(matrix<uint,N,M> x)
 {
@@ -5042,6 +5053,7 @@ T determinant(matrix<T,N,N> m);
 
 // Barrier for device memory
 __glsl_extension(GL_KHR_memory_scope_semantics)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void DeviceMemoryBarrier()
 {
@@ -5058,6 +5070,7 @@ void DeviceMemoryBarrier()
 }
 
 __glsl_extension(GL_KHR_memory_scope_semantics)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void DeviceMemoryBarrierWithGroupSync()
 {
@@ -5757,8 +5770,8 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
 /// built-in scalar types.
 ///
 __generic<T : __BuiltinType>
-[__readNone]
 __glsl_version(450)
+[__readNone]
 [require(glsl_hlsl_spirv, getattributeatvertex)]
 T GetAttributeAtVertex(T attribute, uint vertexIndex)
 {
@@ -5790,8 +5803,8 @@ T GetAttributeAtVertex(T attribute, uint vertexIndex)
 /// built-in scalar types.
 ///
 __generic<T : __BuiltinType, let N : int>
-[__readNone]
 __glsl_version(450)
+[__readNone]
 [require(glsl_hlsl_spirv, getattributeatvertex)]
 vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex)
 {
@@ -5823,8 +5836,8 @@ vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex)
 /// built-in scalar types.
 ///
 __generic<T : __BuiltinType, let N : int, let M : int>
-[__readNone]
 __glsl_version(450)
+[__readNone]
 [require(glsl_hlsl_spirv, getattributeatvertex)]
 matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex)
 {
@@ -5855,6 +5868,7 @@ float2 GetRenderTargetSamplePosition(int Index);
 
 // Group memory barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void GroupMemoryBarrier()
 {
@@ -5871,6 +5885,7 @@ void GroupMemoryBarrier()
     }
 }
 
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void __subgroupBarrier()
 {
@@ -5888,6 +5903,7 @@ void __subgroupBarrier()
 }
 
 __glsl_extension(GL_KHR_memory_scope_semantics)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void GroupMemoryBarrierWithGroupSync()
 {
@@ -5906,8 +5922,8 @@ void GroupMemoryBarrierWithGroupSync()
 
 // Atomics
 
-[ForceInline]
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref  int dest,  int value)
 {
@@ -5924,8 +5940,8 @@ void InterlockedAdd(__ref  int dest,  int value)
     }
 }
 
-[ForceInline]
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref uint dest, uint value)
 {
@@ -5948,8 +5964,8 @@ void InterlockedAdd(__ref uint dest, int value)
     InterlockedAdd(dest, (uint)value);
 }
 
-[ForceInline]
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
 {
@@ -5967,8 +5983,8 @@ void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
     }
 }
 
-[ForceInline]
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
 {
@@ -6023,6 +6039,7 @@ void InterlockedAdd(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref  int dest,  int value)
 {
@@ -6040,6 +6057,7 @@ void InterlockedAnd(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref uint dest, uint value)
 {
@@ -6057,6 +6075,7 @@ void InterlockedAnd(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref  int dest,  int value, out  int original_value)
 {
@@ -6075,6 +6094,7 @@ void InterlockedAnd(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref uint dest, uint value, out uint original_value)
 {
@@ -6111,6 +6131,7 @@ void InterlockedAnd(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value, out  int original_value)
 {
@@ -6129,6 +6150,7 @@ void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value,
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value, out uint original_value)
 {
@@ -6201,6 +6223,7 @@ void InterlockedCompareExchange(__ref  uint64_t dest,  uint64_t compare_value,  
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareStore(__ref int dest,  int compare_value,  int value)
 {
@@ -6218,6 +6241,7 @@ void InterlockedCompareStore(__ref int dest,  int compare_value,  int value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value)
 {
@@ -6262,6 +6286,7 @@ void InterlockedCompareStore(__ref uint64_t dest, uint64_t compare_value, uint64
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
 {
@@ -6280,6 +6305,7 @@ void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedExchange(__ref uint dest, uint value, out uint original_value)
 {
@@ -6352,6 +6378,7 @@ void InterlockedExchange(__ref  uint64_t dest,  uint64_t value, out  uint64_t or
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref  int dest,  int value)
 {
@@ -6369,6 +6396,7 @@ void InterlockedMax(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref uint dest, uint value)
 {
@@ -6386,6 +6414,7 @@ void InterlockedMax(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref  int dest,  int value, out  int original_value)
 {
@@ -6404,6 +6433,7 @@ void InterlockedMax(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref uint dest, uint value, out uint original_value)
 {
@@ -6458,6 +6488,7 @@ void InterlockedMax(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref  int dest,  int value)
 {
@@ -6475,6 +6506,7 @@ void InterlockedMin(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref uint dest, uint value)
 {
@@ -6492,6 +6524,7 @@ void InterlockedMin(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref  int dest,  int value, out  int original_value)
 {
@@ -6510,6 +6543,7 @@ void InterlockedMin(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref uint dest, uint value, out uint original_value)
 {
@@ -6564,6 +6598,7 @@ void InterlockedMin(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref  int dest,  int value)
 {
@@ -6581,6 +6616,7 @@ void InterlockedOr(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref uint dest, uint value)
 {
@@ -6598,6 +6634,7 @@ void InterlockedOr(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref  int dest,  int value, out  int original_value)
 {
@@ -6616,6 +6653,7 @@ void InterlockedOr(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref uint dest, uint value, out uint original_value)
 {
@@ -6652,6 +6690,7 @@ void InterlockedOr(__ref  uint64_t dest,  uint64_t value, out  uint64_t original
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref  int dest,  int value)
 {
@@ -6669,6 +6708,7 @@ void InterlockedXor(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref uint dest, uint value)
 {
@@ -6686,6 +6726,7 @@ void InterlockedXor(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref  int dest,  int value, out  int original_value)
 {
@@ -6704,6 +6745,7 @@ void InterlockedXor(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref uint dest, uint value, out uint original_value)
 {
@@ -8422,6 +8464,7 @@ typedef uint WaveMask;
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 WaveMask WaveGetConvergedMask()
 {
@@ -8448,6 +8491,7 @@ WaveMask __WaveGetActiveMask();
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 WaveMask WaveGetActiveMask()
 {
@@ -8471,6 +8515,7 @@ WaveMask WaveGetActiveMask()
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_basic)]
 bool WaveMaskIsFirstLane(WaveMask mask)
 {
@@ -8493,6 +8538,7 @@ bool WaveMaskIsFirstLane(WaveMask mask)
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveMaskAllTrue(WaveMask mask, bool condition)
 {
@@ -8515,6 +8561,7 @@ bool WaveMaskAllTrue(WaveMask mask, bool condition)
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveMaskAnyTrue(WaveMask mask, bool condition)
 {
@@ -8537,6 +8584,7 @@ bool WaveMaskAnyTrue(WaveMask mask, bool condition)
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 WaveMask WaveMaskBallot(WaveMask mask, bool condition)
 {
@@ -8557,6 +8605,7 @@ WaveMask WaveMaskBallot(WaveMask mask, bool condition)
     }
 }
 
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint WaveMaskCountBits(WaveMask mask, bool value)
 {
@@ -8586,6 +8635,7 @@ uint WaveMaskCountBits(WaveMask mask, bool value)
 // It seems this can only mean the active threads are the "threads the program flow would lead to". This implies a lockstep
 // "straight SIMD" style interpretation. That being the case this op on HLSL is just a memory barrier without any Sync.
 
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
@@ -8618,6 +8668,7 @@ void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 // aspect of HLSL seems to make everything in lock step - but that's not quite so, it only has to apparently be that way as far as the programmers
 // model appears - divergence could perhaps potentially still happen.
 
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
@@ -8634,6 +8685,7 @@ void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
     }
 }
 
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void AllMemoryBarrierWithWaveSync()
 {
@@ -8650,6 +8702,7 @@ void AllMemoryBarrierWithWaveSync()
     }
 }
 
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
 void GroupMemoryBarrierWithWaveSync()
 {
@@ -8676,6 +8729,7 @@ void GroupMemoryBarrierWithWaveSync()
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 T WaveMaskBroadcastLaneAt(WaveMask mask, T value, constexpr int lane)
 {
@@ -8696,6 +8750,7 @@ T WaveMaskBroadcastLaneAt(WaveMask mask, T value, constexpr int lane)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 vector<T,N> WaveMaskBroadcastLaneAt(WaveMask mask, vector<T,N> value, constexpr int lane)
 {
@@ -8722,6 +8777,7 @@ matrix<T,N,M> WaveMaskBroadcastLaneAt(WaveMask mask, matrix<T,N,M> value, conste
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 T WaveMaskReadLaneAt(WaveMask mask, T value, int lane)
 {
@@ -8741,6 +8797,7 @@ T WaveMaskReadLaneAt(WaveMask mask, T value, int lane)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 vector<T,N> WaveMaskReadLaneAt(WaveMask mask, vector<T,N> value, int lane)
 {
@@ -8786,6 +8843,7 @@ matrix<T,N,M> WaveMaskShuffle(WaveMask mask, matrix<T,N,M> value, int lane)
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
 {
@@ -8809,6 +8867,7 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskBitAnd(WaveMask mask, T expr)
 {
@@ -8828,6 +8887,7 @@ T WaveMaskBitAnd(WaveMask mask, T expr)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskBitAnd(WaveMask mask, vector<T,N> expr)
 {
@@ -8851,6 +8911,7 @@ matrix<T,N,M> WaveMaskBitAnd(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskBitOr(WaveMask mask, T expr)
 {
@@ -8869,6 +8930,7 @@ T WaveMaskBitOr(WaveMask mask, T expr)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr)
 {
@@ -8892,6 +8954,7 @@ matrix<T,N,M> WaveMaskBitOr(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskBitXor(WaveMask mask, T expr)
 {
@@ -8910,6 +8973,7 @@ T WaveMaskBitXor(WaveMask mask, T expr)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskBitXor(WaveMask mask, vector<T,N> expr)
 {
@@ -8933,6 +8997,7 @@ matrix<T,N,M> WaveMaskBitXor(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskMax(WaveMask mask, T expr)
 {
@@ -8954,6 +9019,7 @@ T WaveMaskMax(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskMax(WaveMask mask, vector<T,N> expr)
 {
@@ -8981,6 +9047,7 @@ matrix<T,N,M> WaveMaskMax(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskMin(WaveMask mask, T expr)
 {
@@ -9003,6 +9070,7 @@ T WaveMaskMin(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskMin(WaveMask mask, vector<T,N> expr)
 {
@@ -9030,6 +9098,7 @@ matrix<T,N,M> WaveMaskMin(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskProduct(WaveMask mask, T expr)
 {
@@ -9056,6 +9125,7 @@ T WaveMaskProduct(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskProduct(WaveMask mask, vector<T,N> expr)
 {
@@ -9087,6 +9157,7 @@ matrix<T,N,M> WaveMaskProduct(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskSum(WaveMask mask, T expr)
 {
@@ -9114,6 +9185,7 @@ T WaveMaskSum(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
 {
@@ -9147,6 +9219,7 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __cuda_sm_version(7.0)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveMaskAllEqual(WaveMask mask, T value)
 {
@@ -9171,6 +9244,7 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __cuda_sm_version(7.0)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveMaskAllEqual(WaveMask mask, vector<T,N> value)
 {
@@ -9202,6 +9276,7 @@ bool WaveMaskAllEqual(WaveMask mask, matrix<T,N,M> value);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskPrefixProduct(WaveMask mask, T expr)
 {
@@ -9229,6 +9304,7 @@ T WaveMaskPrefixProduct(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
 {
@@ -9261,6 +9337,7 @@ matrix<T,N,M> WaveMaskPrefixProduct(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskPrefixSum(WaveMask mask, T expr)
 {
@@ -9289,6 +9366,7 @@ T WaveMaskPrefixSum(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
 {
@@ -9321,6 +9399,7 @@ matrix<T,N,M> WaveMaskPrefixSum(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 T WaveMaskReadLaneFirst(WaveMask mask, T expr)
 {
@@ -9361,6 +9440,7 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.1)
 __cuda_sm_version(7.0)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 WaveMask WaveMaskMatch(WaveMask mask, T value)
 {
@@ -9382,6 +9462,7 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.1)
 __cuda_sm_version(7.0)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 WaveMask WaveMaskMatch(WaveMask mask, vector<T,N> value)
 {
@@ -9412,6 +9493,7 @@ WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
 {
@@ -9428,6 +9510,7 @@ T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
 {
@@ -9449,6 +9532,7 @@ matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskPrefixBitOr(WaveMask mask, T expr)
 {
@@ -9465,6 +9549,7 @@ T WaveMaskPrefixBitOr(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
 {
@@ -9486,6 +9571,7 @@ matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveMaskPrefixBitXor(WaveMask mask, T expr)
 {
@@ -9502,6 +9588,7 @@ T WaveMaskPrefixBitXor(WaveMask mask, T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
 {
@@ -9528,6 +9615,7 @@ matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr);
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[ForceInline]
 [require(glsl_hlsl_spirv, subgroup_quad)]
 T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 {
@@ -9547,6 +9635,7 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[ForceInline]
 [require(glsl_hlsl_spirv, subgroup_quad)]
 vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
 {
@@ -9569,6 +9658,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLan
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[ForceInline]
 [require(glsl_hlsl_spirv, subgroup_quad)]
 T QuadReadAcrossX(T localValue)
 {
@@ -9590,6 +9680,7 @@ T QuadReadAcrossX(T localValue)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[ForceInline]
 [require(glsl_hlsl_spirv, subgroup_quad)]
 vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
 {
@@ -9612,6 +9703,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcr
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[ForceInline]
 [require(glsl_hlsl_spirv, subgroup_quad)]
 T QuadReadAcrossY(T localValue)
 {
@@ -9632,6 +9724,7 @@ T QuadReadAcrossY(T localValue)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[ForceInline]
 [require(glsl_hlsl_spirv, subgroup_quad)]
 vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
 {
@@ -9655,6 +9748,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcr
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[ForceInline]
 [require(glsl_hlsl_spirv, subgroup_quad)]
 T QuadReadAcrossDiagonal(T localValue)
 {
@@ -9675,6 +9769,7 @@ T QuadReadAcrossDiagonal(T localValue)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+[ForceInline]
 [require(glsl_hlsl_spirv, subgroup_quad)]
 vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 {
@@ -9704,6 +9799,7 @@ for (auto opName : kWaveActiveBitOpEntries) {
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveActive$(opName.hlslName)(T expr)
 {
@@ -9721,6 +9817,7 @@ T WaveActive$(opName.hlslName)(T expr)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
 {
@@ -9737,6 +9834,7 @@ vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+[ForceInline]
 matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
 {
     return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
@@ -9754,6 +9852,7 @@ for (const char* opName : kWaveActiveMinMaxNames) {
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveActive$(opName)(T expr)
 {
@@ -9776,6 +9875,7 @@ T WaveActive$(opName)(T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T, N> WaveActive$(opName)(vector<T, N> expr)
 {
@@ -9797,6 +9897,7 @@ vector<T, N> WaveActive$(opName)(vector<T, N> expr)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+[ForceInline]
 matrix<T, N, M> WaveActive$(opName)(matrix<T, N, M> expr)
 {
     return WaveMask$(opName)(WaveGetActiveMask(), expr);
@@ -9816,6 +9917,7 @@ for (auto opName : kWaveActivProductSumNames) {
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WaveActive$(opName.hlslName)(T expr)
 {
@@ -9849,6 +9951,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(hlsl)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
 {
@@ -9880,6 +9983,7 @@ vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+[ForceInline]
 matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
 {
     return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
@@ -9891,6 +9995,7 @@ ${{{{
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveActiveAllEqual(T value)
 {
@@ -9914,6 +10019,7 @@ bool WaveActiveAllEqual(T value)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveActiveAllEqual(vector<T,N> value)
 {
@@ -9936,6 +10042,7 @@ bool WaveActiveAllEqual(vector<T,N> value)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+[ForceInline]
 bool WaveActiveAllEqual(matrix<T, N, M> value)
 {
     return WaveMaskAllEqual(WaveGetActiveMask(), value);
@@ -9943,6 +10050,7 @@ bool WaveActiveAllEqual(matrix<T, N, M> value)
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveActiveAllTrue(bool condition)
 {
@@ -9965,6 +10073,7 @@ bool WaveActiveAllTrue(bool condition)
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
 bool WaveActiveAnyTrue(bool condition)
 {
@@ -9988,6 +10097,7 @@ bool WaveActiveAnyTrue(bool condition)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint4 WaveActiveBallot(bool condition)
 {
@@ -10009,6 +10119,7 @@ uint4 WaveActiveBallot(bool condition)
 }
 
 __target_intrinsic(hlsl)
+[ForceInline]
 uint WaveActiveCountBits(bool value)
 {
     return WaveMaskCountBits(WaveGetActiveMask(), value);
@@ -10017,6 +10128,7 @@ uint WaveActiveCountBits(bool value)
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_basic)]
 uint WaveGetLaneCount()
 {
@@ -10037,6 +10149,7 @@ uint WaveGetLaneCount()
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_basic)]
 uint WaveGetLaneIndex()
 {
@@ -10057,6 +10170,7 @@ uint WaveGetLaneIndex()
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_basic)]
 bool WaveIsFirstLane()
 {
@@ -10080,6 +10194,7 @@ bool WaveIsFirstLane()
 // It's useful to have a wave uint4 version of countbits, because some wave functions return uint4.
 // This implementation tries to limit the amount of work required by the actual lane count.
 __spirv_version(1.3)
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint _WaveCountBits(uint4 value)
 {
@@ -10111,6 +10226,7 @@ uint _WaveCountBits(uint4 value)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WavePrefixProduct(T expr)
 {
@@ -10144,6 +10260,7 @@ T WavePrefixProduct(T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WavePrefixProduct(vector<T,N> expr)
 {
@@ -10172,6 +10289,7 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
 {
@@ -10181,6 +10299,7 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 T WavePrefixSum(T expr)
 {
@@ -10210,6 +10329,7 @@ T WavePrefixSum(T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 vector<T,N> WavePrefixSum(vector<T,N> expr)
 {
@@ -10238,6 +10358,7 @@ vector<T,N> WavePrefixSum(vector<T,N> expr)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+[ForceInline]
 matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
 {
     return WaveMaskPrefixSum(WaveGetActiveMask(), expr);
@@ -10246,6 +10367,7 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 T WaveReadLaneFirst(T expr)
 {
@@ -10265,6 +10387,7 @@ T WaveReadLaneFirst(T expr)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 {
@@ -10283,6 +10406,7 @@ vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+[ForceInline]
 matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 {
     return WaveMaskReadLaneFirst(WaveGetActiveMask(), expr);
@@ -10297,6 +10421,7 @@ matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 T WaveBroadcastLaneAt(T value, constexpr int lane)
 {
@@ -10317,6 +10442,7 @@ T WaveBroadcastLaneAt(T value, constexpr int lane)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
 {
@@ -10337,6 +10463,7 @@ vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(cuda, "_waveShuffleMultiple(_getActiveMask(), $0, $1)")
 __target_intrinsic(hlsl, "WaveReadLaneAt")
+[ForceInline]
 matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
 {
     return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, lane);
@@ -10347,6 +10474,7 @@ matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 T WaveReadLaneAt(T value, int lane)
 {
@@ -10367,6 +10495,7 @@ T WaveReadLaneAt(T value, int lane)
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
 {
@@ -10387,6 +10516,7 @@ vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(cuda, "_waveShuffleMultiple(_getActiveMask(), $0, $1)")
 __target_intrinsic(hlsl)
+[ForceInline]
 matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
 {
     return WaveMaskReadLaneAt(WaveGetActiveMask(), value, lane);
@@ -10398,6 +10528,7 @@ matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 T WaveShuffle(T value, int lane)
 {
@@ -10418,6 +10549,7 @@ T WaveShuffle(T value, int lane)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 vector<T,N> WaveShuffle(vector<T,N> value, int lane)
 {
@@ -10444,6 +10576,7 @@ matrix<T, N, M> WaveShuffle(matrix<T, N, M> value, int lane)
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint WavePrefixCountBits(bool value)
 {
@@ -10466,6 +10599,7 @@ uint WavePrefixCountBits(bool value)
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 uint4 WaveGetConvergedMulti()
 {
@@ -10496,6 +10630,7 @@ uint4 WaveGetActiveMulti()
 
 __generic<T : __BuiltinType>
 __target_intrinsic(hlsl)
+[ForceInline]
 uint4 WaveMatch(T value)
 {
     return WaveMaskMatch(WaveGetActiveMask(), value);
@@ -10503,6 +10638,7 @@ uint4 WaveMatch(T value)
 
 __generic<T : __BuiltinType, let N : int>
 __target_intrinsic(hlsl)
+[ForceInline]
 uint4 WaveMatch(vector<T,N> value)
 {
     return WaveMaskMatch(WaveGetActiveMask(), value);
@@ -10510,6 +10646,7 @@ uint4 WaveMatch(vector<T,N> value)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+[ForceInline]
 uint4 WaveMatch(matrix<T,N,M> value)
 {
     return WaveMaskMatch(WaveGetActiveMask(), value);
@@ -10517,6 +10654,7 @@ uint4 WaveMatch(matrix<T,N,M> value)
 
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_popc(__ballot_sync(($1).x, $0) & _getLaneLtMask())")
+[ForceInline]
 [require(cuda_hlsl, waveprefix)]
 uint WaveMultiPrefixCountBits(bool value, uint4 mask);
 
@@ -10838,6 +10976,7 @@ int __callablePayloadLocation(__ref Payload payload);
 // GLSL equivalent.
 //
 __generic<Payload>
+[ForceInline]
 [require(glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 void CallShader(uint shaderIndex, inout Payload payload)
 {
@@ -11117,6 +11256,7 @@ void TraceMotionRay(
 
 // 10.3.3
 
+[ForceInline]
 [require(glsl_spirv, raytracing_intersection)]
 bool __reportIntersection(float tHit, uint hitKind)
 {
@@ -11150,6 +11290,7 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
 }
 
 // 10.3.4
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void IgnoreHit()
 {
@@ -11167,6 +11308,7 @@ void IgnoreHit()
 }
 
 // 10.3.5
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void AcceptHitAndEndSearch()
 {
@@ -11191,6 +11333,7 @@ void AcceptHitAndEndSearch()
 // 10.4.1 - Ray Dispatch System Values
 
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
 uint3 DispatchRaysIndex()
 {
@@ -11207,6 +11350,7 @@ uint3 DispatchRaysIndex()
     }
 }
 
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
 uint3 DispatchRaysDimensions()
 {
@@ -11226,6 +11370,7 @@ uint3 DispatchRaysDimensions()
 // 10.4.2 - Ray System Values
 
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float3 WorldRayOrigin()
 {
@@ -11243,6 +11388,7 @@ float3 WorldRayOrigin()
 }
 
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float3 WorldRayDirection()
 {
@@ -11260,6 +11406,7 @@ float3 WorldRayDirection()
 }
 
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float RayTMin()
 {
@@ -11287,6 +11434,7 @@ float RayTMin()
 // to the appropriate Vulkan stages.
 //
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float RayTCurrent()
 {
@@ -11303,6 +11451,7 @@ float RayTCurrent()
     }
 }
 
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 uint RayFlags()
 {
@@ -11322,6 +11471,7 @@ uint RayFlags()
 // 10.4.3 - Primitive/Object Space System Values
 
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint InstanceIndex()
 {
@@ -11339,6 +11489,7 @@ uint InstanceIndex()
 }
 
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint InstanceID()
 {
@@ -11356,6 +11507,7 @@ uint InstanceID()
 }
 
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint PrimitiveIndex()
 {
@@ -11373,6 +11525,7 @@ uint PrimitiveIndex()
 }
 
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3 ObjectRayOrigin()
 {
@@ -11390,6 +11543,7 @@ float3 ObjectRayOrigin()
 }
 
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3 ObjectRayDirection()
 {
@@ -11409,6 +11563,7 @@ float3 ObjectRayDirection()
 // TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
 // floats by reference.
 [NonUniformReturn]
+[ForceInline]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 ObjectToWorld3x4()
 {
@@ -11426,6 +11581,7 @@ float3x4 ObjectToWorld3x4()
 }
 
 [NonUniformReturn]
+[ForceInline]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 WorldToObject3x4()
 {
@@ -11443,6 +11599,7 @@ float3x4 WorldToObject3x4()
 }
 
 [NonUniformReturn]
+[ForceInline]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 ObjectToWorld4x3()
 {
@@ -11459,6 +11616,7 @@ float4x3 ObjectToWorld4x3()
 }
 
 [NonUniformReturn]
+[ForceInline]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 WorldToObject4x3()
 {
@@ -11481,6 +11639,7 @@ float4x3 WorldToObject4x3()
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
+[ForceInline]
 [require(glsl_hlsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
 float RayCurrentTime()
 {
@@ -11510,6 +11669,7 @@ float RayCurrentTime()
 
 // 10.4.4 - Hit Specific System values
 [NonUniformReturn]
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit)]
 uint HitKind()
 {
@@ -11556,6 +11716,7 @@ float dot2add(float2 left, float2 right, float acc);
 // Set the number of output vertices and primitives for a mesh shader invocation.
 __glsl_extension(GL_EXT_mesh_shader)
 __glsl_version(450)
+[ForceInline]
 [require(glsl_hlsl_spirv, meshshading)]
 void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 {
@@ -11583,6 +11744,7 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 // This function cannot be inlined due to a legalization pass happening mid-way through processing
 // and later more processing happening to the function which requires eventual inlining.
 [KnownBuiltin("DispatchMesh")]
+[ForceInline]
 [require(glsl_hlsl_spirv, meshshading)]
 [noRefInline]
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
@@ -11715,6 +11877,7 @@ extension __TextureImpl<T,__Shape2D, 1, 0, 0, $(kStdlibResourceAccessFeedback), 
 // Get the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
+[ForceInline]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint GeometryIndex()
 {
@@ -12462,6 +12625,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_tracing_position_fetch)
     [require(glsl, rayquery_position)]
     [__NoSideEffect]
+    [ForceInline]
     void __glslGetIntersectionTriangleVertexPositions$(ccName)(out float3 arr[3])
     {
         __intrinsic_asm "rayQueryGetIntersectionTriangleVertexPositionsEXT($0, $(ccTF), $1)";
@@ -12471,6 +12635,7 @@ ${{{{
     [require(glsl, rayquery_position)]
     [require(spirv, rayquery_position)]
     [__NoSideEffect]
+    [ForceInline]
     float3[3] $(ccName)GetIntersectionTriangleVertexPositions()
     {
         typedef float3[3] float3Arr3;
@@ -12504,6 +12669,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
+    [ForceInline]
     [require(glsl_hlsl_spirv, rayquery)]
     float3x4 $(ccName)$(matName)3x4()
     {
@@ -12524,6 +12690,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [__readNone]
     [NonUniformReturn]
+    [ForceInline]
     [require(glsl_hlsl_spirv, rayquery)]
     float4x3 $(ccName)$(matName)4x3()
     {
@@ -12567,6 +12734,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
+    [ForceInline]
     [require(glsl_hlsl_spirv, rayquery)]
     $(method.type) $(ccName)$(method.hlslName)()
     {
@@ -12592,6 +12760,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
+    [ForceInline]
     [require(glsl_hlsl_spirv, rayquery)]
     uint RayFlags()
     {
@@ -12610,6 +12779,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
+    [ForceInline]
     [require(glsl_hlsl_spirv, rayquery)]
     float3 WorldRayOrigin()
     {
@@ -12628,6 +12798,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
+    [ForceInline]
     [require(glsl_hlsl_spirv, rayquery)]
     float3 WorldRayDirection()
     {
@@ -12646,6 +12817,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
+    [ForceInline]
     [require(glsl_hlsl_spirv, rayquery)]
     float RayTMin()
     {
@@ -14205,6 +14377,7 @@ void debugBreak()
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
 [NonUniformReturn]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shaderclock)]
 uint getRealtimeClockLow()
 {
@@ -14232,6 +14405,7 @@ int64_t __cudaCppGetRealtimeClock();
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
 [NonUniformReturn]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shaderclock)]
 uint2 getRealtimeClock()
 {
@@ -14449,6 +14623,7 @@ ${{{{
 
 [__NoSideEffect]
 [__requiresNVAPI]
+[ForceInline]
 [require(glsl_hlsl_spirv, texturefootprint)]
 vector<uint, ND> __textureFootprintGetAnchor<let ND:int>(__TextureFootprintData<ND> data, int nd)
 {
@@ -14467,6 +14642,7 @@ vector<uint, ND> __textureFootprintGetAnchor<let ND:int>(__TextureFootprintData<
 
 [__NoSideEffect]
 [__requiresNVAPI]
+[ForceInline]
 [require(glsl_hlsl_spirv, texturefootprint)]
 vector<uint, ND> __textureFootprintGetOffset<let ND:int>(__TextureFootprintData<ND> data, int nd)
 {
@@ -14631,6 +14807,7 @@ ${
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
+    [ForceInline]
     [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintGLSL(
             SamplerState    sampler,
@@ -14658,6 +14835,7 @@ ${
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
+    [ForceInline]
     [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintGLSL(
             SamplerState    sampler,
@@ -14687,6 +14865,7 @@ ${
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [ForceInline]
     [require(glsl_spirv, texturefootprintclamp)]
     bool __queryFootprintClampGLSL(
             SamplerState    sampler,
@@ -14717,6 +14896,7 @@ ${
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [ForceInline]
     [require(glsl_spirv, texturefootprintclamp)]
     bool __queryFootprintClampGLSL(
             SamplerState    sampler,
@@ -14748,6 +14928,7 @@ ${
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     [__requiresNVAPI]
+    [ForceInline]
     [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintLodGLSL(
             SamplerState            sampler,
@@ -14781,6 +14962,7 @@ ${{{
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     [__requiresNVAPI]
+    [ForceInline]
     [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintGradGLSL(
             SamplerState    sampler,
@@ -14811,6 +14993,7 @@ ${{{
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [ForceInline]
     [require(glsl_spirv, texturefootprintclamp)]
     bool __queryFootprintGradClampGLSL(
             SamplerState    sampler,
@@ -14879,6 +15062,7 @@ for(auto levelChoice : kLevelChoices)
 
     [__NoSideEffect]
     [__requiresNVAPI]
+    [ForceInline]
     __target_intrinsic(hlsl,
         "NvFootprint$(CoarseOrFine)($1, $2, $3, $4, NV_EXTN_TEXTURE_$!0D, $*5)")
     [require(hlsl, texturefootprint)]
@@ -14894,6 +15078,7 @@ for(auto levelChoice : kLevelChoices)
 
     [__NoSideEffect]
     [__requiresNVAPI]
+    [ForceInline]
     __target_intrinsic(hlsl,
         "NvFootprint$(CoarseOrFine)Bias($1, $2, $3, $4, NV_EXTN_TEXTURE_$!0D, $*5)")
     [require(hlsl, texturefootprint)]
@@ -14910,6 +15095,7 @@ for(auto levelChoice : kLevelChoices)
 
     [__NoSideEffect]
     [__requiresNVAPI]
+    [ForceInline]
     __target_intrinsic(hlsl,
         "NvFootprint$(CoarseOrFine)Level($1, $2, $3, $4, NV_EXTN_TEXTURE_$!0D, $*5)")
     [require(hlsl, texturefootprint)]
@@ -14926,6 +15112,7 @@ for(auto levelChoice : kLevelChoices)
 
     [__NoSideEffect]
     [__requiresNVAPI]
+    [ForceInline]
     __target_intrinsic(hlsl,
         "NvFootprint$(CoarseOrFine)Grad($1, $2, $3, $4, NV_EXTN_TEXTURE_$!0D, $*5)")
     [require(hlsl, texturefootprint)]
@@ -15121,7 +15308,7 @@ ${{{
     ///
     ///     t.SampleGrad(sampler, coords, dx, dy);
     ///
-    [__NoSideEffect] [ForceInline]
+    [__NoSideEffect]
     Footprint queryFootprint$(CoarseOrFine)Grad(
             FootprintGranularity    granularity,
             SamplerState            sampler,
@@ -15156,7 +15343,7 @@ ${{{
     ///
     ///     t.SampleGradClamp(sampler, coords, dx, dy, lodClamp);
     ///
-    [__NoSideEffect][ForceInline]
+    [__NoSideEffect]
     Footprint queryFootprint$(CoarseOrFine)GradClamp(
             FootprintGranularity    granularity,
             SamplerState            sampler,
@@ -15288,6 +15475,7 @@ struct ConstBufferPointer
     __glsl_version(450)
     __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
     __glsl_extension(GL_EXT_buffer_reference)
+    [ForceInline]
     [require(glsl_spirv, bufferreference_int64)]
     static ConstBufferPointer<T> fromUInt(uint64_t val)
     {
@@ -15305,6 +15493,7 @@ struct ConstBufferPointer
     __glsl_version(450)
     __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
     __glsl_extension(GL_EXT_buffer_reference)
+    [ForceInline]
     [require(glsl_spirv, bufferreference_int64)]
     uint64_t toUInt()
     {
