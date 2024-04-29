@@ -50,15 +50,16 @@ for test_line in stdout.splitlines():
             test_found = False
             passing.append(test_name)
 
-    if test_line.startswith("  Passed:"):
+    summary_match = re.search(r'\s*Passed:', test_line)
+    if re.search(r'\s*Passed:', test_line):
         summary += test_line + "\n"
-    elif test_line.startswith("  Failed:"):
+    elif re.search(r'\s*Failed:', test_line):
         summary += test_line + "\n"
-    elif test_line.startswith("  Not supported:"):
+    elif re.search(r'\s*Not\ssupported:', test_line):
         summary += test_line + "\n"
-    elif test_line.startswith("  Warnings:"):
+    elif re.search(r'\s*Warnings:', test_line):
         summary += test_line + "\n"
-    elif test_line.startswith("  Waived:"):
+    elif re.search(r'\s*Waived:', test_line):
         summary += test_line + "\n"
 
 print(summary)
