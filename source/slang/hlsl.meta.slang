@@ -11744,7 +11744,6 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 // This function cannot be inlined due to a legalization pass happening mid-way through processing
 // and later more processing happening to the function which requires eventual inlining.
 [KnownBuiltin("DispatchMesh")]
-[ForceInline]
 [require(glsl_hlsl_spirv, meshshading)]
 [noRefInline]
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
