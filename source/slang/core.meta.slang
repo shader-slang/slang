@@ -2000,16 +2000,11 @@ int __SyntaxError()
 /// For downstream compilers that allow sizeof/alignof/offsetof
 /// Can't be called in the C/C++ style. Need to use __size_of<some_type>() as opposed to sizeof(some_type).
 __generic<T>
+__target_intrinsic(cpp, "sizeof($G0)")
+__target_intrinsic(cuda, "sizeof($G0)")
 [__readNone]
 [require(cpp_cuda)]
-int __sizeOf()
-{
-    __target_switch
-    {
-    case cpp: __intrinsic_asm "sizeof($G0)";
-    case cuda: __intrinsic_asm "sizeof($G0)";
-    }
-}
+int __sizeOf();
 
 __generic<T>
 [__readNone]
