@@ -57,15 +57,18 @@ struct TensorView
 {
     __target_intrinsic(cuda, "$0.data_ptr<$G0>()")
     [__NoSideEffect]
+    [require(cuda)]
     Ptr<T> data_ptr();
 
     __target_intrinsic(cuda, "$0.data_ptr_at<$G0>($1)")
     [__NoSideEffect]
+    [require(cuda)]
     Ptr<T> data_ptr_at(uint index);
 
     __generic<let N: int>
     __target_intrinsic(cuda, "$0.data_ptr_at<$G0>($1)")
     [__NoSideEffect]
+    [require(cuda)]
     Ptr<T> data_ptr_at(vector<uint, N> index);
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
@@ -74,58 +77,108 @@ struct TensorView
 
     __target_intrinsic(cuda, "$0.load<$G0>($1)")
     [__NoSideEffect]
+    [require(cuda)]
     T load(uint x);
+
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2)")
     [__NoSideEffect]
+    [require(cuda)]
     T load(uint x, uint y);
+
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3)")
     [__NoSideEffect]
+    [require(cuda)]
     T load(uint x, uint y, uint z);
+
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4)")
     [__NoSideEffect]
+    [require(cuda)]
     T load(uint x, uint y, uint z, uint w);
+
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4, $5)")
     [__NoSideEffect]
+    [require(cuda)]
     T load(uint i0, uint i1, uint i2, uint i3, uint i4);
 
-    [__NoSideEffect]
     __generic<let N : int>
     __target_intrinsic(cuda, "$0.load<$TR>($1)")
+    [__NoSideEffect]
+    [require(cuda)]
     T load(vector<uint, N> index);
 
     __target_intrinsic(cuda, "$0.store<$G0>($1, $2)")
+    [require(cuda)]
     void store(uint x, T val);
+
     __target_intrinsic(cuda, "$0.store<$G0>($1, $2, $3)")
+    [require(cuda)]
     void store(uint x, uint y, T val);
+
     __target_intrinsic(cuda, "$0.store<$G0>($1, $2, $3, $4)")
+    [require(cuda)]
     void store(uint x, uint y, uint z, T val);
+
     __target_intrinsic(cuda, "$0.store<$G0>($1, $2, $3, $4, $5)")
+    [require(cuda)]
     void store(uint x, uint y, uint z, uint w, T val);
+
     __target_intrinsic(cuda, "$0.store<$G0>($1, $2, $3, $4, $5, $6)")
+    [require(cuda)]
     void store(uint i0, uint i1, uint i2, uint i3, uint i4, T val);
 
     __generic<let N : int>
     __target_intrinsic(cuda, "$0.store<$T2>($1, $2)")
+    [require(cuda)]
     void store(vector<uint, N> index, T val);
 
-    __target_intrinsic(cuda, "*($3) = atomicAdd($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedAdd(uint index, T val, out T oldVal);
+    [require(cuda)]
+    void InterlockedAdd(uint index, T val, out T oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicAdd($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
     
     __generic<let N:int>
-    __target_intrinsic(cuda, "*($3) = atomicAdd($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedAdd(vector<uint, N> index, T val, out T oldVal);
+    [require(cuda)]
+    void InterlockedAdd(vector<uint, N> index, T val, out T oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicAdd($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
 
-    __target_intrinsic(cuda, "$0.dimensionCount")
     [__readNone]
-    uint dims();
+    [require(cuda)]
+    uint dims()
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "$0.dimensionCount";
+        }
+    }
 
-    __target_intrinsic(cuda, "$0.sizes[$1]")
     [__readNone]
-    uint size(uint i);
+    [require(cuda)]
+    uint size(uint i)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "$0.sizes[$1]";
+        }
+    }
 
-    __target_intrinsic(cuda, "$0.strides[$1]")
     [__readNone]
-    uint stride(uint i);
+    [require(cuda)]
+    uint stride(uint i)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "$0.strides[$1]";
+        }
+    }
 
     __subscript(uint index) -> T
     {
@@ -202,54 +255,138 @@ extension TensorView<$(atomicIntegerTypeName)>
 {
     typealias __Element = $(atomicIntegerTypeName);
 
-    __target_intrinsic(cuda, "*($3) = atomicMin($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedMin(uint index, __Element val, out __Element oldVal);
+    [require(cuda)]
+    void InterlockedMin(uint index, __Element val, out __Element oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicMin($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
 
     __generic<let N : int>
-    __target_intrinsic(cuda, "*($3) = atomicMin($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedMin(vector<uint, N> index, __Element val, out __Element oldVal);
+    [require(cuda)]
+    void InterlockedMin(vector<uint, N> index, __Element val, out __Element oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicMin($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
 
-    __target_intrinsic(cuda, "*($3) = atomicMax($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedMax<T>(uint index, __Element val, out __Element oldVal);
-
-    __generic<let N : int>
-    __target_intrinsic(cuda, "*($3) = atomicMax($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedMax(vector<uint, N> index, __Element val, out __Element oldVal);
-
-    __target_intrinsic(cuda, "*($3) = atomicAnd($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedAnd<T>(uint index, __Element val, out __Element oldVal);
-
-    __generic<let N : int>
-    __target_intrinsic(cuda, "*($3) = atomicAnd($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedAnd(vector<uint, N> index, __Element val, out __Element oldVal);
-
-    __target_intrinsic(cuda, "*($3) = atomicOr($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedOr<T>(uint index, __Element val, out __Element oldVal);
+    [require(cuda)]
+    void InterlockedMax<T>(uint index, __Element val, out __Element oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicMax($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
 
     __generic<let N : int>
-    __target_intrinsic(cuda, "*($3) = atomicOr($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedOr(vector<uint, N> index, __Element val, out __Element oldVal);
+    [require(cuda)]
+    void InterlockedMax(vector<uint, N> index, __Element val, out __Element oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicMax($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
 
-    __target_intrinsic(cuda, "*($3) = atomicXor($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedXor<T>(uint index, __Element val, out __Element oldVal);
+    [require(cuda)]
+    void InterlockedAnd<T>(uint index, __Element val, out __Element oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicAnd($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
 
     __generic<let N : int>
-    __target_intrinsic(cuda, "*($3) = atomicXor($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedXor(vector<uint, N> index, __Element val, out __Element oldVal);
+    [require(cuda)]
+    void InterlockedAnd(vector<uint, N> index, __Element val, out __Element oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicAnd($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
 
-    __target_intrinsic(cuda, "*($3) = atomicExch($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedExchange(uint index, __Element va, out __Element oldVall);
+    [require(cuda)]
+    void InterlockedOr<T>(uint index, __Element val, out __Element oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicOr($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
+
+    __generic<let N : int>
+    [require(cuda)]
+    void InterlockedOr(vector<uint, N> index, __Element val, out __Element oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicOr($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
+
+    [require(cuda)]
+    void InterlockedXor<T>(uint index, __Element val, out __Element oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicXor($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
+
+    __generic<let N : int>
+    [require(cuda)]
+    void InterlockedXor(vector<uint, N> index, __Element val, out __Element oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicXor($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
+
+    [require(cuda)]
+    void InterlockedExchange(uint index, __Element va, out __Element oldVall)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicExch($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
     
     __generic<let N:int>
-    __target_intrinsic(cuda, "*($3) = atomicExch($0.data_ptr_at<$T2>($1), $2)")
-    void InterlockedExchange(vector<uint, N> index, __Element val, out __Element oldVal);
+    [require(cuda)]
+    void InterlockedExchange(vector<uint, N> index, __Element val, out __Element oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicExch($0.data_ptr_at<$T2>($1), $2)";
+        }
+    }
 
-    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<$T2>($1), $2, $3)")
-    void InterlockedCompareExchange(uint index, __Element compare, __Element val);
+    [require(cuda)]
+    void InterlockedCompareExchange(uint index, __Element compare, __Element val)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "atomicCAS($0.data_ptr_at<$T2>($1), $2, $3)";
+        }
+    }
     
     __generic<let N:int>
-    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<$T2>($1), $2, $3)")
-    void InterlockedCompareExchange(vector<uint, N> index, __Element compare, __Element val);
+    [require(cuda)]
+    void InterlockedCompareExchange(vector<uint, N> index, __Element compare, __Element val)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "atomicCAS($0.data_ptr_at<$T2>($1), $2, $3)";
+        }
+    }
 }
 
 ${{{{
@@ -258,19 +395,43 @@ ${{{{
 
 extension TensorView<float>
 {
-    __target_intrinsic(cuda, "*($3) = atomicExch($0.data_ptr_at<float>($1), $2)")
-    float InterlockedExchange(uint index, float val, out float oldVal);
+    [require(cuda)]
+    float InterlockedExchange(uint index, float val, out float oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicExch($0.data_ptr_at<float>($1), $2)";
+        }
+    }
     
     __generic<let N:int>
-    __target_intrinsic(cuda, "*($3) = atomicExch($0.data_ptr_at<float>($1), $2)")
-    float InterlockedExchange(vector<uint, N> index, float val, out float oldVal);
+    [require(cuda)]
+    float InterlockedExchange(vector<uint, N> index, float val, out float oldVal)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "*($3) = atomicExch($0.data_ptr_at<float>($1), $2)";
+        }
+    }
 
-    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<uint32_t>($1), slang_bit_cast<uint32_t>($2), slang_bit_cast<uint32_t>($3))")
-    void InterlockedCompareExchange(uint index, float compare, float val);
+    [require(cuda)]
+    void InterlockedCompareExchange(uint index, float compare, float val)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "atomicCAS($0.data_ptr_at<uint32_t>($1), slang_bit_cast<uint32_t>($2), slang_bit_cast<uint32_t>($3))";
+        }
+    }
 
     __generic<let N : int>
-    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<uint32_t>($1), slang_bit_cast<uint32_t>($2), slang_bit_cast<uint32_t>($3))")
-    void InterlockedCompareExchange(vector<uint, N> index, float compare, float val);
+    [require(cuda)]
+    void InterlockedCompareExchange(vector<uint, N> index, float compare, float val)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "atomicCAS($0.data_ptr_at<uint32_t>($1), slang_bit_cast<uint32_t>($2), slang_bit_cast<uint32_t>($3))";
+        }
+    }
 }
 
 interface IDiffTensorWrapper
@@ -685,29 +846,53 @@ struct TorchTensor
     [CudaHost]
     TensorView<T> getView();
 
-    __target_intrinsic(cuda, "$0.dims()")
-    __target_intrinsic(cpp, "$0.dims()")
     [__readNone]
     [CudaHost]
-    uint dims();
+    [require(cpp_cuda)]
+    uint dims()
+    {
+        __target_switch
+        {
+        case cpp: __intrinsic_asm "$0.dims()";
+        case cuda: __intrinsic_asm "$0.dims()";
+        }
+    }
 
-    __target_intrinsic(cuda, "$0.size($1)")
-    __target_intrinsic(cpp, "$0.size($1)")
     [__readNone]
     [CudaHost]
-    uint size(uint i);
+    [require(cpp_cuda)]
+    uint size(uint i)
+    {
+        __target_switch
+        {
+        case cpp: __intrinsic_asm "$0.size($1)";
+        case cuda: __intrinsic_asm "$0.size($1)";
+        }
+    }
 
-    __target_intrinsic(cuda, "$0.stride($1)")
-    __target_intrinsic(cpp, "$0.stride($1)")
     [__readNone]
     [CudaHost]
-    uint stride(uint i);
+    [require(cpp_cuda)]
+    uint stride(uint i)
+    {
+        __target_switch
+        {
+        case cpp: __intrinsic_asm "$0.stride($1)";
+        case cuda: __intrinsic_asm "$0.stride($1)";
+        }
+    }
 
-    __target_intrinsic(cuda, "$0.data_ptr<$G0>()")
-    __target_intrinsic(cpp, "$0.data_ptr<$G0>()")
     [__readNone]
     [CudaHost]
-    Ptr<T> data_ptr();
+    [require(cpp_cuda)]
+    Ptr<T> data_ptr()
+    {
+        __target_switch
+        {
+        case cpp: __intrinsic_asm "$0.data_ptr<$G0>()";
+        case cuda: __intrinsic_asm "$0.data_ptr<$G0>()";
+        }
+    }
 
     __intrinsic_op($(kIROp_AllocateTorchTensor))
     [CudaHost]
@@ -733,13 +918,25 @@ struct TorchTensor
     [CudaHost]
     static TorchTensor<T> emptyLike(TorchTensor<T> other);
 
-    __target_intrinsic(cpp, "$0.zero_()")
     [CudaHost]
-    void fillZero();
+    [require(cpp)]
+    void fillZero()
+    {
+        __target_switch
+        {
+        case cpp: __intrinsic_asm "$0.zero_()";
+        }
+    }
 
-    __target_intrinsic(cpp, "$0.fill_($1)")
     [CudaHost]
-    void fillValue(T val);
+    [require(cpp)]
+    void fillValue(T val)
+    {
+        __target_switch
+        {
+        case cpp: __intrinsic_asm "$0.fill_($1)";
+        }
+    }
 
     [CudaHost]
     static TorchTensor<T> zerosLike(TorchTensor<T> other)
@@ -751,8 +948,14 @@ struct TorchTensor
 
 }
 
-__target_intrinsic(cpp, "AT_CUDA_CHECK(cudaStreamSynchronize(at::cuda::getCurrentCUDAStream()))")
-void syncTorchCudaStream();
+[require(cpp)]
+void syncTorchCudaStream()
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "AT_CUDA_CHECK(cudaStreamSynchronize(at::cuda::getCurrentCUDAStream()))";
+    }
+}
 
 /// Constructs a `DifferentialPair` value from a primal value and a differential value.
 __generic<T: IDifferentiable>
