@@ -283,6 +283,10 @@ struct VulkanExtendedFeatureProperties
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_INVOCATION_REORDER_FEATURES_NV
     };
 
+    VkPhysicalDeviceVariablePointerFeaturesKHR variablePointersFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTER_FEATURES_KHR
+    };
+
     // Clock features
     VkPhysicalDeviceShaderClockFeaturesKHR clockFeatures = { 
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR

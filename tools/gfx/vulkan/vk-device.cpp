@@ -460,6 +460,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.accelerationStructureFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.accelerationStructureFeatures;
 
+        // Variable pointer features.
+        extendedFeatures.variablePointersFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.variablePointersFeatures;
+        
         // Extended dynamic states
         extendedFeatures.extendedDynamicStateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.extendedDynamicStateFeatures;
@@ -673,6 +677,13 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             rayTracingInvocationReorder,
             VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME,
             "shader-execution-reorder"
+        );
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.variablePointersFeatures,
+            variablePointers,
+            VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME,
+            "variable-pointer"
         );
 
 #undef SIMPLE_EXTENSION_FEATURE
