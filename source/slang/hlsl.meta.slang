@@ -4795,8 +4795,8 @@ int16_t asint16(float16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$int16_t result $value
     };
-    default:
-     return asuint16(value); }
+    default: return asuint16(value);
+    }
 }
 
 [__unsafeForceInlineEarly]
@@ -4807,8 +4807,8 @@ vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "asint16";
-    default:
-     return asuint16(value); }
+    default: return asuint16(value);
+    }
 }
 
 [__unsafeForceInlineEarly]
@@ -4819,8 +4819,8 @@ matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> valu
     __target_switch
     {
     case hlsl: __intrinsic_asm "asint16";
-    default:
-     return asuint16(value); }
+    default: return asuint16(value);
+    }
 }
 
 [__readNone]
@@ -4835,8 +4835,8 @@ float16_t asfloat16(int16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$float16_t result $value
     };
-    default:
-     return asfloat16(asuint16(value)); }
+    default: return asfloat16(asuint16(value));
+    }
 }
 
 [__unsafeForceInlineEarly]
@@ -4847,8 +4847,8 @@ vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat16";
-    default:
-     return asfloat16(asuint16(value)); }
+    default: return asfloat16(asuint16(value));
+    }
 }
 
 [__unsafeForceInlineEarly]
@@ -4859,8 +4859,8 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> va
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat16";
-    default:
-     return asfloat16(asuint16(value)); }
+    default: return asfloat16(asuint16(value));
+    }
 }
 
 // Inverse tangent (HLSL SM 1.0)
