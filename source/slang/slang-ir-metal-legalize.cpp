@@ -2,6 +2,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-ir-clone.h"
 
 namespace Slang
 {
@@ -55,8 +56,10 @@ namespace Slang
             for (auto field : structType->getFields())
             {
                 auto fieldParam = builder.emitParam(field->getFieldType());
-                if (auto nameHintDecor = field->getKey()->findDecoration<IRNameHintDecoration>())
-                    builder.addNameHintDecoration(fieldParam, nameHintDecor->getName());
+                
+                IRCloneEnv cloneEnv;
+                cloneInstDecorationsAndChildren(&cloneEnv, builder.getModule(), field->getKey(), fieldParam);
+
                 IRVarLayout* fieldLayout = structTypeLayout ? structTypeLayout->getFieldLayout(fieldIndex) : nullptr;
                 if (varLayout)
                 {
@@ -149,11 +152,18 @@ namespace Slang
         IRStructTypeLayout::Builder layoutBuilder(&builder);
         for (auto param : paramsToPack)
         {
-            auto key = builder.createStructKey();
-            if (auto nameHintDecor = param->findDecoration<IRNameHintDecoration>())
-                builder.addNameHintDecoration(key, nameHintDecor->getName());
-            builder.createStructField(structType, key, param->getDataType());
             auto paramVarLayout = findVarLayout(param);
+            auto key = builder.createStructKey();
+            param->transferDecorationsTo(key);
+            builder.createStructField(structType, key, param->getDataType());
+            if (auto varyingInOffsetAttr = paramVarLayout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+            {
+                if (!key->findDecoration<IRSemanticDecoration>() && !paramVarLayout->findAttr<IRSemanticAttr>())
+                {
+                    // If the parameter doesn't have a semantic, we need to add one for semantic matching.
+                    builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)varyingInOffsetAttr->getOffset());
+                }
+            }
             if (isGeometryStage)
             {
                 // For geometric stages, we need to translate VaryingInput offsets to MetalAttribute offsets.
@@ -200,6 +210,37 @@ namespace Slang
         fixUpFuncType(func);
     }
 
+
+    void ensureResultStructHasUserSemantic(IRStructType* structType, IRVarLayout* varLayout)
+    {
+        // Ensure each field in an output struct type has either a system semantic or a user semantic,
+        // so that signature matching can happen correctly.
+        auto typeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
+        Index index = 0;
+        IRBuilder builder(structType);
+        for (auto field : structType->getFields())
+        {
+            auto key = field->getKey();
+            if (key->findDecoration<IRSemanticDecoration>())
+            {
+                index++;
+                continue;
+            }
+            typeLayout->getFieldLayout(index);
+            auto fieldLayout = typeLayout->getFieldLayout(index);
+            if (auto offsetAttr = fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+            {
+                UInt varOffset = 0;
+                if (auto varOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                    varOffset = varOffsetAttr->getOffset();
+                varOffset += offsetAttr->getOffset();
+                builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)varOffset);
+            }
+            index++;
+        }
+    }
+
+
     void wrapReturnValueInStruct(EntryPointInfo entryPoint)
     {
         // Wrap return value into a struct if it is not already a struct.
@@ -219,8 +260,22 @@ namespace Slang
         auto returnType = func->getResultType();
         if (as<IRVoidType>(returnType))
             return;
-        if (as<IRStructType>(returnType))
+        auto entryPointLayoutDecor = func->findDecoration<IRLayoutDecoration>();
+        if (!entryPointLayoutDecor)
             return;
+        auto entryPointLayout = as<IREntryPointLayout>(entryPointLayoutDecor->getLayout());
+        if (!entryPointLayout)
+            return;
+        auto resultLayout = entryPointLayout->getResultLayout();
+
+        // If return type is already a struct, just make sure every field has a semantic.
+        if (auto returnStructType = as<IRStructType>(returnType))
+        {
+            ensureResultStructHasUserSemantic(returnStructType, resultLayout);
+            return;
+        }
+
+        // If not, we need to wrap the result into a struct type.
         IRBuilder builder(func);
         builder.setInsertBefore(func);
         IRStructType* structType = builder.createStructType();
@@ -228,15 +283,15 @@ namespace Slang
         builder.addNameHintDecoration(structType, (String(stageText) + toSlice("Output")).getUnownedSlice());
         auto key = builder.createStructKey();
         builder.addNameHintDecoration(key, toSlice("output"));
+        builder.addLayoutDecoration(key, resultLayout);
         builder.createStructField(structType, key, returnType);
-        if (auto entryPointLayoutDecor = func->findDecoration<IRLayoutDecoration>())
-        {
-            if (auto entryPointLayout = as<IREntryPointLayout>(entryPointLayoutDecor->getLayout()))
-            {
-                auto resultLayout = entryPointLayout->getResultLayout();
-                builder.addLayoutDecoration(key, resultLayout);
-            }
-        }
+        IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
+        structTypeLayoutBuilder.addField(key, resultLayout);
+        auto typeLayout = structTypeLayoutBuilder.build();
+        IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
+        auto varLayout = varLayoutBuilder.build();
+        ensureResultStructHasUserSemantic(structType, varLayout);
+
         for (auto block : func->getBlocks())
         {
             if (auto returnInst = as<IRReturn>(block->getTerminator()))

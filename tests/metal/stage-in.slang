@@ -4,13 +4,15 @@
 // CHECK:     struct VOut{{.*}}
 // CHECK-NEXT:{
 // CHECK-NEXT:    float4 position{{.*}} {{\[\[}}position{{\]\]}};
-// CHECK-NEXT:    float4 vertexColor{{.*}};
+// CHECK-NEXT:    float4 vertexColor{{.*}} {{\[\[}}user(_slang_attr){{\]\]}};
+// CHECK-NEXT:    float2 vertexUV{{.*}} {{\[\[}}user(_slang_attr_1){{\]\]}};
+// CHECK-NEXT:    float3 vertexNormal{{.*}} {{\[\[}}user(NORMAL){{\]\]}};
 // CHECK-NEXT:};
 
 // CHECK:     struct vertexInput{{.*}}
 // CHECK-NEXT:{
-// CHECK-NEXT:    float4 position{{.*}} {{\[\[}}attribute(0){{\]\]}};
-// CHECK-NEXT:    float4 color{{.*}} {{\[\[}}attribute(1){{\]\]}};
+// CHECK-NEXT:    float4 position{{.*}} {{\[\[}}attribute(0){{\]\]}} {{\[\[}}user(POSITION){{\]\]}};
+// CHECK-NEXT:    float4 color{{.*}} {{\[\[}}attribute(1){{\]\]}} {{\[\[}}user(COLOR){{\]\]}};
 // CHECK-NEXT:};
 
 // CHECK: {{\[\[}}vertex{{\]\]}} VOut{{.*}} main_vertex(vertexInput{{.*}}{{\[\[}}stage_in{{\]\]}}, uint vid{{.*}}{{\[\[}}vertex_id{{\]\]}}, uint instanceID{{.*}} {{\[\[}}instance_id{{\]\]}})
@@ -22,7 +24,9 @@
 
 // CHECK:     struct pixelInput{{.*}}
 // CHECK-NEXT:{
-// CHECK-NEXT:    float4 vertexColor{{.*}};
+// CHECK-NEXT:    float4 vertexColor{{.*}}  {{\[\[}}user(_slang_attr){{\]\]}};
+// CHECK-NEXT:    float2 vertexUV{{.*}} {{\[\[}}user(_slang_attr_1){{\]\]}};
+// CHECK-NEXT:    float3 vertexNormal{{.*}} {{\[\[}}user(NORMAL){{\]\]}};
 // CHECK-NEXT:};
 
 // CHECK: {{\[\[}}fragment{{\]\]}} pixelOutput{{.*}} main_fragment(pixelInput{{.*}} {{\[\[}}stage_in{{\]\]}}, float4 position{{.*}} {{\[\[}}position{{\]\]}})
@@ -49,6 +53,8 @@ struct VOut
 {
     float4 position : SV_Position;
     float4 vertexColor;
+    float2 vertexUV;
+    float3 vertexNormal : NORMAL;
 }
 
 [shader("vertex")]
@@ -57,6 +63,7 @@ VOut main_vertex(VIn vertexIn)
     VOut vertexOut;
     vertexOut.position = vertexIn.position;
     vertexOut.vertexColor = vertexIn.color;
+    vertexOut.vertexUV = float2(0.0, 1.0);
     return vertexOut;
 }
 

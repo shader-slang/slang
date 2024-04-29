@@ -689,6 +689,17 @@ void MetalSourceEmitter::_emitSystemSemantic(UnownedStringSlice semanticName, IR
     {
         m_writer->emit(" [[stencil]]");
     }
+    else
+    {
+        m_writer->emit(" [[user(");
+        m_writer->emit(semanticName);
+        if (semanticIndex != 0)
+        {
+            m_writer->emit("_");
+            m_writer->emit(semanticIndex);
+        }
+        m_writer->emit(")]]");
+    }
 }
 
 void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
@@ -697,23 +708,35 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
     if (inst->getOp() == kIROp_StructKey)
     {
         // Only emit [[attribute(n)]] on struct keys.
+        bool hasSemanticFromLayout = false;
         if (auto varLayout = findVarLayout(inst))
         {
-            if (auto offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::MetalAttribute))
+            for (auto attr : varLayout->getAllAttrs())
             {
-                m_writer->emit(" [[attribute(");
-                m_writer->emit(offsetAttr->getOffset());
-                m_writer->emit(")]]");
+                if (auto offsetAttr = as<IRVarOffsetAttr>(attr))
+                {
+                    if (offsetAttr->getResourceKind() == LayoutResourceKind::MetalAttribute)
+                    {
+                        m_writer->emit(" [[attribute(");
+                        m_writer->emit(offsetAttr->getOffset());
+                        m_writer->emit(")]]");
+                    }
+                }
+                else if (auto semanticAttr = as<IRSemanticAttr>(attr))
+                {
+                    auto semanticName = String(semanticAttr->getName()).toUpper();
+                    _emitSystemSemantic(semanticAttr->getName(), semanticAttr->getIndex());
+                    hasSemanticFromLayout = true;
+                }
             }
-            else if (auto semanticAttr = varLayout->findSystemValueSemanticAttr())
-            {
-                auto semanticName = String(semanticAttr->getName()).toUpper();
-                _emitSystemSemantic(semanticAttr->getName(), semanticAttr->getIndex());
-            }
+
         }
-        if (auto semanticDecor = inst->findDecoration<IRSemanticDecoration>())
+        if (!hasSemanticFromLayout)
         {
-            _emitSystemSemantic(semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
+            if (auto semanticDecor = inst->findDecoration<IRSemanticDecoration>())
+            {
+                _emitSystemSemantic(semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
+            }
         }
     }
 }
