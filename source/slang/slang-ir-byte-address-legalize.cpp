@@ -485,7 +485,7 @@ struct ByteAddressBufferLegalizationContext
         IRSizeAndAlignment elementLayout;
         SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
-        auto indexType = m_builder.getIntType();
+
         auto baseOffsetVal = as<IRIntLit>(baseOffset);
         if (m_options.scalarizeVectorLoadStore ||
             !(baseOffsetVal && (immediateOffset % (elementStride * elementCount))))
