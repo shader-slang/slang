@@ -716,7 +716,7 @@ Result linkAndOptimizeIR(
             // of vectors need only be aligned based on their element type).
             //
             // Slang IR supports a variant of `Load<T>` on byte-address buffers
-            // that will have greater alignment than required by D3D. The 
+            // that will have greater alignment than required by D3D. The
             // alignment information is inferred from the operation like a
             // `Load4Aligned<T>` that returns a `vector<4,T>` that assumes a
             // `4*sizeof(T)` alignment. We may choose to disable that in favor
