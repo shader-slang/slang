@@ -2093,7 +2093,21 @@ namespace Slang
                 typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
             return CompleteOverloadCandidate(context, *context.bestCandidate);
         }
-        else if (auto typetype = as<TypeType>(funcExprType))
+
+        // If absolutely no viable candidates were extracted from the overloaded expression,
+        // we may be dealing with a composite type or an overloaded expression with composite types.
+        // 
+
+        auto typeExpr = funcExpr;
+        if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
+        {
+            if (overloadedExpr->lookupResult2.isValid() && overloadedExpr->lookupResult2.isOverloaded())
+            {
+                typeExpr = maybeResolveOverloadedExpr(overloadedExpr, LookupMask::type, nullptr);
+            }
+        }
+
+        if (auto typetype = as<TypeType>(typeExpr->type))
         {
             // We allow a special case when `funcExpr` represents a composite type,
             // in which case we will try to construct the type via memberwise assignment from the arguments.
