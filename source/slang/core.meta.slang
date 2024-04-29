@@ -74,6 +74,12 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
+__magic_type(IDefaultInitializable)
+interface IDefaultInitializable
+{
+    __init();
+}
+
 interface IComparable
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::Equals))
@@ -187,7 +193,7 @@ interface IFloat : IArithmetic, IDifferentiable
 /// A type that can be used as an operand for builtins
 [sealed]
 [builtin]
-interface __BuiltinType {}
+interface __BuiltinType : IDefaultInitializable {}
 
 /// A type that can be used for arithmetic operations
 [sealed]
@@ -373,25 +379,11 @@ interface __EnumType : ILogical
 };
 
 
-interface IArray<T>
+interface IArray<T> : IDefaultInitializable
 {
     int getCount();
     __subscript(int index) -> T
     {
-        get;
-    }
-}
-
-__generic<T, let N:int>
-__magic_type(ArrayExpressionType)
-struct Array : IArray<T>
-{
-    [ForceInline]
-    int getCount() { return N; }
-
-    __subscript(int index) -> T
-    {
-        __intrinsic_op($(kIROp_GetElement))
         get;
     }
 }
@@ -431,6 +423,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 {
 }}}}
 
+[OnlyAutoInitIfForced]
 __builtin_type($(int(kBaseTypes[tt].tag)))
 struct $(kBaseTypes[tt].name)
     : __BuiltinType
@@ -478,6 +471,16 @@ ${{{{
     }
 }}}}
 {
+
+    typedef $(kBaseTypes[tt].name) ThisType;
+
+    // Declare initializer of `This` type for default initialization
+    [ForceInline]
+    __init()
+    { 
+        this = __default<ThisType>();
+    }
+    
 ${{{{
     // Declare initializers to convert from various other types
     for (int ss = 0; ss < kBaseTypeCount; ++ss)
@@ -512,7 +515,6 @@ ${{{{
     __intrinsic_op($(intrinsicOpCode))
     __implicit_conversion($(conversionCost), $(builtinConversionKind))
     __init($(kBaseTypes[ss].name) value);
-
 ${{{{
     }
 
@@ -654,6 +656,7 @@ ${{{{
         __intrinsic_op($(kIROp_CastToVoid))
         __init(T value)
         {}
+        
 ${{{{
     }
 
@@ -1014,9 +1017,33 @@ extension int16_t : IRangedValue
     static const int16_t minValue = -32768;
 }
 
+__generic<T, let N:int>
+__magic_type(ArrayExpressionType)
+[OnlyAutoInitIfForced]
+struct Array : IArray<T>
+{
+    [ForceInline]
+    int getCount() { return N; }
+
+    __subscript(int index) -> T
+    {
+        __intrinsic_op($(kIROp_GetElement))
+        get;
+    }
+    
+    [ForceInline]
+    [TreatAsDifferentiable]
+    __init()
+    {
+        for(int i = 0; i < N; ++i)
+            this[i] = T();
+    }
+}
+
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
 __magic_type(VectorExpressionType)
+[OnlyAutoInitIfForced]
 struct vector : IArray<T>
 {
         /// The element type of the vector
@@ -1039,6 +1066,14 @@ struct vector : IArray<T>
     int getCount() { return N; }
 
     __subscript(int index) -> T { __intrinsic_op($(kIROp_GetElement)) get; }
+
+    [ForceInline]
+    [TreatAsDifferentiable]
+    __init()
+    {
+        for(int i = 0; i < N; ++i)
+            this[i] = Element();
+    }
 }
 
 const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
@@ -1047,6 +1082,7 @@ const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
     /// A matrix with `R` rows and `C` columns, with elements of type `T`.
 __generic<T = float, let R : int = 4, let C : int = 4, let L : int = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)>
 __magic_type(MatrixExpressionType)
+[OnlyAutoInitIfForced]
 struct matrix : IArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
@@ -1064,6 +1100,15 @@ struct matrix : IArray<vector<T,C>>
     int getCount() { return R; }
 
     __subscript(int index) -> vector<T,C> { __intrinsic_op($(kIROp_GetElement)) get; }
+
+    [ForceInline]
+    [TreatAsDifferentiable]
+    __init()
+    {
+        for (int c = 0; c < C; ++c)
+            for(int r = 0; r < R; ++r)
+                this[c][r] = T();
+    }
 }
 
 __intrinsic_op($(kIROp_Eql))
@@ -2640,3 +2685,6 @@ attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [noRefInline] : NoRefInlineAttribute;
+
+__attributeTarget(StructDecl)
+attribute_syntax [OnlyAutoInitIfForced] : OnlyAutoInitIfForcedAttribute;

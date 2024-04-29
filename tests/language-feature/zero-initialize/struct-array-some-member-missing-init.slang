@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -xslang -zero-initialize
+//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain -xslang -zero-initialize
 
 // CHECK-NOT: {{.* }}= 0;
 
@@ -16,10 +16,16 @@ struct MyStruct : MyStruct_base
     int d;
 };
 
+Array<MyStruct,2> getStructs()
+{
+    Array<MyStruct, 2> outData;
+    return outData;
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    vector<MyStruct,2> myStruct;
+    Array<MyStruct,2> myStruct = getStructs();
 
 // BUF: 1
     outputBuffer[0] = true

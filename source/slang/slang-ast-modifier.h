@@ -1454,6 +1454,13 @@ class NoRefInlineAttribute : public Attribute
     SLANG_AST_CLASS(NoRefInlineAttribute)
 };
 
+    /// A `[OnlyAutoInitIfForced]` attribute represents a request to not automatically
+    /// init any variable of this type unless forced to init (`zeroInit) 
+class OnlyAutoInitIfForcedAttribute : public Attribute
+{
+    SLANG_AST_CLASS(OnlyAutoInitIfForcedAttribute)
+};
+
 class DerivativeGroupQuadAttribute : public Attribute
 {
     SLANG_AST_CLASS(DerivativeGroupQuadAttribute)

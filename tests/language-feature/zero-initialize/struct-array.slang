@@ -19,7 +19,7 @@ struct MyStruct : MyStruct_base
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     
-    vector<MyStruct, 3> myStructs;
+    Array<MyStruct, 3> myStructs;
 
 // BUF: 1
     outputBuffer[0] = true

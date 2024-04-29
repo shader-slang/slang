@@ -290,8 +290,9 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::MatrixLayoutColumn, "-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major."},
         { OptionKind::MatrixLayoutRow,"-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major."},
         { OptionKind::ZeroInitialize, "-zero-initialize", nullptr, 
-        "Set all variables which lack an init expression to zero."
-        "Structs will only default struct-fields to 0 if the field lacks an init expression and assignment in default constructor."},
+        "Set all variables to zero."
+        "Structs will set all struct-fields without an init expression to 0."
+        "All variables will call their default constructor if not explicitly initialized."},
         { OptionKind::IgnoreCapabilities,"-ignore-capabilities", nullptr, "Do not warn or error if capabilities are violated"},
         { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
         "Set the module name to use when compiling multiple .slang source files into a single module."},

@@ -1954,15 +1954,13 @@ namespace Slang
             getOptionSet().hasOption(CompilerOptionName::ZeroInitialize))
         {
             ConstructorDecl* defaultCtor = nullptr;
-
-            if (auto declRefType = as<DeclRefType>(varDecl->getType()))
+            if (auto declRefType = as<DeclRefType>(varDecl->type.type))
             {
                 if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
                 {
                     defaultCtor = _getDefaultCtor(structDecl);
                 }
             }
-            // TODO: check if IDefault, if you have it, set to defaultCtor of type --> else set __default as we currently do
 
             if(!defaultCtor)
             {
@@ -1982,14 +1980,9 @@ namespace Slang
             }
             else
             {
-                auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-                ctorToInvoke->declRef = defaultCtor->getDefaultDeclRef();
-                ctorToInvoke->name = defaultCtor->getName();
-                ctorToInvoke->loc = defaultCtor->loc;
-                ctorToInvoke->type = defaultCtor->returnType.type;
-
-                auto invoke = m_astBuilder->create<InvokeExpr>();
-                invoke->functionExpr = ctorToInvoke;
+                auto* invoke = m_astBuilder->create<InvokeExpr>();
+                auto member = m_astBuilder->getMemberDeclRef(as<DeclRefType>(varDecl->type.type)->getDeclRef(), defaultCtor);
+                invoke->functionExpr = ConstructDeclRefExpr(member, NULL, defaultCtor->loc, nullptr);
 
                 varDecl->initExpr = invoke;
             }
@@ -2020,7 +2013,7 @@ namespace Slang
             varDecl->setCheckState(DeclCheckState::DefinitionChecked);
             _validateCircularVarDefinition(varDecl);
         }
-        else
+        else if(!as<DeclRefType>(varDecl->type.type)->getDeclRef().getDecl()->modifiers.findModifier<OnlyAutoInitIfForcedAttribute>())
         {
             // If a variable doesn't have an explicit initial-value
             // expression, it is still possible that it should
