@@ -891,26 +891,31 @@ __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String
 {
-    __target_intrinsic(cpp)
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(int val);
-    __target_intrinsic(cpp)
+
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(uint val);
-    __target_intrinsic(cpp)
+
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(int64_t val);
-    __target_intrinsic(cpp)
+
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(uint64_t val);
-    __target_intrinsic(cpp)
+
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(float val);
-    __target_intrinsic(cpp)
+
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(double val);
 
-    __target_intrinsic(cpp)
+    [require(cpp)]
     int64_t getLength();
 
     property int length
@@ -925,11 +930,23 @@ __magic_type(NativeStringType)
 __intrinsic_type($(kIROp_NativeStringType))
 struct NativeString
 {
-    __target_intrinsic(cpp, "int(strlen($0))")
-    int getLength();
+    [require(cpp)]
+    int getLength()
+    {
+        __target_switch
+        {
+        case cpp: __intrinsic_asm "int(strlen($0))";
+        }
+    }
 
-    __target_intrinsic(cpp, "(void*)((const char*)($0))")
-    Ptr<void> getBuffer();
+    [require(cpp)]
+    Ptr<void> getBuffer()
+    {
+        __target_switch
+        {
+        case cpp: __intrinsic_asm "(void*)((const char*)($0))";
+        }
+    }
 
     property int length { [__unsafeForceInlineEarly] get{return getLength();} }
 
@@ -1968,45 +1985,71 @@ int getStringHash(String string);
 /// Use will produce a syntax error in downstream compiler
 /// Useful for testing diagnostics around compilation errors of downstream compiler
 /// It 'returns' an int so can be used in expressions without the front end complaining.
-__target_intrinsic(hlsl, " @ ")
-__target_intrinsic(glsl, " @ ")
-__target_intrinsic(cuda, " @ ")
-__target_intrinsic(cpp, " @ ")
-int __SyntaxError();
+[require(cpp_cuda_glsl_hlsl)]
+int __SyntaxError()
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm " @ ";
+    case cuda: __intrinsic_asm " @ ";
+    case glsl: __intrinsic_asm " @ ";
+    case hlsl: __intrinsic_asm " @ ";
+    }
+}
 
 /// For downstream compilers that allow sizeof/alignof/offsetof
 /// Can't be called in the C/C++ style. Need to use __size_of<some_type>() as opposed to sizeof(some_type).
 __generic<T>
-__target_intrinsic(cuda, "sizeof($G0)")
 __target_intrinsic(cpp, "sizeof($G0)")
+__target_intrinsic(cuda, "sizeof($G0)")
 [__readNone]
+[require(cpp_cuda)]
 int __sizeOf();
 
 __generic<T>
-__target_intrinsic(cuda, "sizeof($T0)")
-__target_intrinsic(cpp, "sizeof($T0)")
 [__readNone]
-int __sizeOf(T v);
+[require(cpp_cuda)]
+int __sizeOf(T v)
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "sizeof($T0)";
+    case cuda: __intrinsic_asm "sizeof($T0)";
+    }
+}
 
 __generic<T>
 __target_intrinsic(cuda, "SLANG_ALIGN_OF($G0)")
 __target_intrinsic(cpp, "SLANG_ALIGN_OF($G0)")
 [__readNone]
+[require(cpp_cuda)]
 int __alignOf();
 
 __generic<T>
-__target_intrinsic(cuda, "SLANG_ALIGN_OF($T0)")
-__target_intrinsic(cpp, "SLANG_ALIGN_OF($T0)")
 [__readNone]
-int __alignOf(T v);
+[require(cpp_cuda)]
+int __alignOf(T v)
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "SLANG_ALIGN_OF($T0)";
+    case cuda: __intrinsic_asm "SLANG_ALIGN_OF($T0)";
+    }
+}
 
 // It would be nice to have offsetof equivalent, but it's not clear how that would work in terms of the Slang language.
 // Here we allow calculating the offset of a field in bytes from an *instance* of the type.
 __generic<T,F>
-__target_intrinsic(cuda, "int(((char*)&($1)) - ((char*)&($0)))")
-__target_intrinsic(cpp, "int(((char*)&($1)) - ((char*)&($0))")
 [__readNone]
-int __offsetOf(in T t, in F field);
+[require(cpp_cuda)]
+int __offsetOf(in T t, in F field)
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "int(((char*)&($1)) - ((char*)&($0))";
+    case cuda: __intrinsic_asm "int(((char*)&($1)) - ((char*)&($0)))";
+    }
+}
 
 /// Mark beginning of "interlocked" operations in a fragment shader.
 __glsl_extension(GL_ARB_fragment_shader_interlock)
