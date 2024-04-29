@@ -882,17 +882,12 @@ struct TorchTensor
         }
     }
 
+    __target_intrinsic(cpp, "$0.data_ptr<$G0>()")
+    __target_intrinsic(cuda, "$0.data_ptr<$G0>()")
     [__readNone]
     [CudaHost]
     [require(cpp_cuda)]
-    Ptr<T> data_ptr()
-    {
-        __target_switch
-        {
-        case cpp: __intrinsic_asm "$0.data_ptr<$G0>()";
-        case cuda: __intrinsic_asm "$0.data_ptr<$G0>()";
-        }
-    }
+    Ptr<T> data_ptr();
 
     __intrinsic_op($(kIROp_AllocateTorchTensor))
     [CudaHost]
