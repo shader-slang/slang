@@ -471,10 +471,13 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::PyTorchCppBinding:
+        generateHostFunctionsForAutoBindCuda(irModule, sink);
+        lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
         generatePyTorchCppBinding(irModule, sink);
         handleAutoBindNames(irModule);
         break;
     case CodeGenTarget::CUDASource:
+        lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
         removeTorchKernels(irModule);
         handleAutoBindNames(irModule);
         break;
