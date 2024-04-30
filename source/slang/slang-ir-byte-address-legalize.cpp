@@ -488,7 +488,7 @@ struct ByteAddressBufferLegalizationContext
 
         auto baseOffsetVal = as<IRIntLit>(baseOffset);
         if (m_options.scalarizeVectorLoadStore ||
-            !(baseOffsetVal && (immediateOffset % (elementStride * elementCount))))
+            ((baseOffsetVal->getValue() + immediateOffset) % (elementStride * elementCount)))
         {
             // generate sequence load
             return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, op, elementType, elementCount);
@@ -1028,7 +1028,7 @@ struct ByteAddressBufferLegalizationContext
 
         auto baseOffsetVal = as<IRIntLit>(baseOffset);
         if (m_options.scalarizeVectorLoadStore ||
-            !(baseOffsetVal && (immediateOffset % (elementStride * elementCount))))
+            ((baseOffsetVal->getValue() + immediateOffset) % (elementStride * elementCount)))
         {
             // generate sequence store
             return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, elementType, elementCount);
