@@ -74,7 +74,6 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
-__magic_type(IDefaultInitializableType)
 interface IDefaultInitializableType
 {
     __init();
