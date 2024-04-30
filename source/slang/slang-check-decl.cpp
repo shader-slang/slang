@@ -2165,37 +2165,19 @@ namespace Slang
                     substSet = SubstitutionSet(declRefType->getDeclRef());
                 }
             }
-            auto satisfyingType = DeclRefType::create(m_astBuilder, m_astBuilder->getMemberDeclRef(substSet.declRef, context->parentDecl));
             
             auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
             assocTypeDef->nameAndLoc.name = getName("Differential");
-            assocTypeDef->type.type = satisfyingType;
+            assocTypeDef->type.type = context->conformingType;
             assocTypeDef->parentDecl = context->parentDecl;
             assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
             context->parentDecl->members.add(assocTypeDef);
             
-            // Add derivative member attributes to all the fields pointing to themselves.
-            for (auto member : context->parentDecl->getMembersOfType<VarDeclBase>())
-            {   
-                auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
-                auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
-                fieldLookupExpr->type.type = member->getType();
+            markSelfDifferentialMembersOfType(as<AggTypeDecl>(context->parentDecl), context->conformingType);
 
-                auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
-                baseTypeExpr->base.type = satisfyingType;
-                auto baseTypeType = m_astBuilder->getOrCreate<TypeType>(satisfyingType);
-                baseTypeExpr->type.type = baseTypeType;
-                fieldLookupExpr->baseExpression = baseTypeExpr;
-
-                fieldLookupExpr->declRef = makeDeclRef(member);
-
-                derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
-                addModifier(member, derivativeMemberModifier);
-            }
-
-            if (doesTypeSatisfyAssociatedTypeConstraintRequirement(satisfyingType, requirementDeclRef, witnessTable))
+            if (doesTypeSatisfyAssociatedTypeConstraintRequirement(context->conformingType, requirementDeclRef, witnessTable))
             {
-                witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(satisfyingType));
+                witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(context->conformingType));
 
                 // Increase the epoch so that future calls to Type::getCanonicalType will return the up-to-date folded types.
                 m_astBuilder->incrementEpoch();

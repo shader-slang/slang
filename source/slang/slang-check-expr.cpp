@@ -640,27 +640,18 @@ namespace Slang
                     typeDef->parentDecl = parent;
                     typeDef->type.type = subType;
                     
-                    synthesizedDecl = typeDef;
+                    synthesizedDecl = parent;
 
-                    parent->members.add(synthesizedDecl);
+                    parent->members.add(typeDef);
                     parent->invalidateMemberDictionary();
+
+                    markSelfDifferentialMembersOfType(parent, subType);
                 }
             }
             break;
         default:
             return nullptr;
         }
-
-        synthesizedDecl->parentDecl = parent;
-        synthesizedDecl->nameAndLoc.name = item.declRef.getName();
-        synthesizedDecl->loc = parent->loc;
-        parent->members.add(synthesizedDecl);
-        parent->invalidateMemberDictionary();
-
-        // Mark the newly synthesized decl as `ToBeSynthesized` so future checking can differentiate it
-        // from user-provided definitions, and proceed to fill in its definition.
-        auto toBeSynthesized = m_astBuilder->create<ToBeSynthesizedModifier>();
-        addModifier(synthesizedDecl, toBeSynthesized);
 
         auto synthDeclMemberRef = m_astBuilder->getMemberDeclRef(subType->getDeclRef(), synthesizedDecl);
         return ConstructDeclRefExpr(
@@ -1187,15 +1178,9 @@ namespace Slang
         {
             if (auto varDecl = as<VarDecl>(member))
             {
-                if (!isTypeDifferentiable(varDecl->getType()))
-                {
-                    canBeUsed = false;
-                    break;
-                }
-
-                // Get the differential type of the member.
+                // Try to get the differential type of the member.
                 Type* diffType = tryGetDifferentialType(getASTBuilder(), varDecl->getType());
-                if (!diffType->equals(varDecl->getType()))
+                if (!diffType || !diffType->equals(varDecl->getType()))
                 {
                     canBeUsed = false;
                     break;
@@ -1203,6 +1188,29 @@ namespace Slang
             }
         }
         return canBeUsed;
+    }
+
+    void SemanticsVisitor::markSelfDifferentialMembersOfType(AggTypeDecl *parent, Type* type)
+    {
+        // TODO: Handle extensions.
+        // Add derivative member attributes to all the fields pointing to themselves.
+        for (auto member : parent->getMembersOfType<VarDeclBase>())
+        {   
+            auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
+            auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
+            fieldLookupExpr->type.type = member->getType();
+
+            auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+            baseTypeExpr->base.type = type;
+            auto baseTypeType = m_astBuilder->getOrCreate<TypeType>(type);
+            baseTypeExpr->type.type = baseTypeType;
+            fieldLookupExpr->baseExpression = baseTypeExpr;
+
+            fieldLookupExpr->declRef = makeDeclRef(member);
+
+            derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
+            addModifier(member, derivativeMemberModifier);
+        }
     }
 
     Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc)
