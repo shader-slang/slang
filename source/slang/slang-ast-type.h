@@ -97,10 +97,6 @@ class BasicExpressionType : public ArithmeticExpressionType
     }
 };
 
-class IDefaultInitializable : public DeclRefType
-{
-    SLANG_AST_CLASS(IDefaultInitializable)
-};
 
 // Base type for things that are built in to the compiler,
 // and will usually have special behavior or a custom

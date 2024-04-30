@@ -74,8 +74,8 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
-__magic_type(IDefaultInitializable)
-interface IDefaultInitializable
+__magic_type(IDefaultInitializableType)
+interface IDefaultInitializableType
 {
     __init();
 }
@@ -193,7 +193,9 @@ interface IFloat : IArithmetic, IDifferentiable
 /// A type that can be used as an operand for builtins
 [sealed]
 [builtin]
-interface __BuiltinType : IDefaultInitializable {}
+interface __BuiltinType 
+{
+}
 
 /// A type that can be used for arithmetic operations
 [sealed]
@@ -379,7 +381,7 @@ interface __EnumType : ILogical
 };
 
 
-interface IArray<T> : IDefaultInitializable
+interface IArray<T>
 {
     int getCount();
     __subscript(int index) -> T
@@ -1088,8 +1090,7 @@ struct vector : IArray<T>
     [TreatAsDifferentiable]
     __init()
     {
-        for(int i = 0; i < N; ++i)
-            this[i] = Element();
+        vector<Element,N>(Element());
     }
 }
 
@@ -1122,9 +1123,7 @@ struct matrix : IArray<vector<T,C>>
     [TreatAsDifferentiable]
     __init()
     {
-        for (int c = 0; c < C; ++c)
-            for(int r = 0; r < R; ++r)
-                this[c][r] = T();
+        matrix<T,R,C,L>(T());
     }
 }
 

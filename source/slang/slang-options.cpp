@@ -292,7 +292,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::ZeroInitialize, "-zero-initialize", nullptr, 
         "Set all variables to zero."
         "Structs will set all struct-fields without an init expression to 0."
-        "All variables will call their default constructor if not explicitly initialized."},
+        "All variables will call their default constructor if not explicitly initialized as usual."},
         { OptionKind::IgnoreCapabilities,"-ignore-capabilities", nullptr, "Do not warn or error if capabilities are violated"},
         { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
         "Set the module name to use when compiling multiple .slang source files into a single module."},
