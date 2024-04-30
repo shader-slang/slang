@@ -52,7 +52,7 @@ for test_line in stdout.splitlines():
 
     if "Passed:" in test_line:
         summary += test_line + "\n"
-    elif "Failed" in test_line:
+    elif "Failed:" in test_line:
         summary += test_line + "\n"
     elif "Not supported:" in test_line:
         summary += test_line + "\n"
