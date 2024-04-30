@@ -170,6 +170,7 @@ void Session::init()
     // Built in linkage uses the built in builder
     m_builtinLinkage = new Linkage(this, builtinAstBuilder, nullptr);
     m_builtinLinkage->m_optionSet.set(CompilerOptionName::DebugInformation, DebugInfoLevel::None);
+    m_builtinLinkage->m_optionSet.set(CompilerOptionName::DisableShortCircuit, true);
 
     // Because the `Session` retains the builtin `Linkage`,
     // we need to make sure that the parent pointer inside
@@ -6444,6 +6445,9 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
     ComPtr<IArtifact> artifact;
     if (SLANG_FAILED(_getEntryPointResult(this, static_cast<int>(entryPointIndex), static_cast<int>(targetIndex), artifact)))
         return SLANG_E_INVALID_ARG;
+
+    if (!artifact)
+        return SLANG_E_NOT_AVAILABLE;
 
     // Find a rep
     auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
