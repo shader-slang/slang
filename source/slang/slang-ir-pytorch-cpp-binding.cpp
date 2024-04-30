@@ -218,7 +218,7 @@ static IRInst* makeValueFromTargetTuple(IRBuilder& builder, IRType* type, IRInst
         SLANG_ASSERT(rowCount && colCount);
 
         List<IRInst*> resultElements;
-        auto rowType = builder.getTargetTupleType((UInt)colCount->getValue(), List<IRType*>().makeRepeated(matrixType->getElementType(), colCount->getValue()).getBuffer());
+        auto rowType = builder.getTargetTupleType((UInt)colCount->getValue(), List<IRType*>().makeRepeated(matrixType->getElementType(), (Index)colCount->getValue()).getBuffer());
         for (IRIntegerValue i = 0; i < rowCount->getValue(); i++)
         {
             auto rowElement = builder.emitTargetTupleGetElement(rowType, val, builder.getIntValue(builder.getIntType(), i));
