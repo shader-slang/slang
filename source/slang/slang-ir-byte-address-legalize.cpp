@@ -384,7 +384,16 @@ struct ByteAddressBufferLegalizationContext
             auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
             if(elementCountInst)
             {
-                return emitLoadWithKnownOffset(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue());
+                // Emit an aligned vector load operation when the data (elementCount * elementSize) is divisible
+                // by the offset. Else, fallback to scalarizing the loads.
+                if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, vecType->getElementType(), elementCountInst->getValue()))
+                {
+                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue());
+                }
+                else
+                {
+                    return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
+                }
             }
 
             // If we aren't scalarizing a vetor load then we next need
@@ -491,22 +500,6 @@ struct ByteAddressBufferLegalizationContext
         return m_builder.emitIntrinsicInst(type, op, elementVals.getCount(), elementVals.getBuffer());
     }
 
-    // Loading of vectors, at a known offset location, that wraps around either
-    // sequence loads, or simple loads.
-    //
-    IRInst* emitLoadWithKnownOffset(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IROp op, IRType* elementType, IRIntegerValue elementCount)
-    {
-        // Emit an aligned vector load operation when the data (elementCount * elementSize) is divisible
-        // by the offset. Else, fallback to scalarizing the loads.
-        if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, elementType, elementCount))
-        {
-            return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, op, elementType, elementCount);
-        }
-        else
-        {
-            return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
-        }
-    }
     // All of the loading operations above eventually bottom out at `emitSimpleLoad`,
     // which is meant to handle the base case where we do *not* want to
     // recurse on the structure of `type`.
@@ -957,7 +950,16 @@ struct ByteAddressBufferLegalizationContext
 
             if (elementCountInst)
             {
-                return emitStoreWithKnownOffset(buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
+                // Emit an aligned vector store operation when the data (elementCount * elementSize) is divisible
+                // by the offset. Else, fallback to scalarizing the stores.
+                if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, vecType->getElementType(), elementCountInst->getValue()))
+                {
+                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
+                }
+                else
+                {
+                    return emitSimpleStore(value->getDataType(), buffer, baseOffset, immediateOffset, value);
+                }
             }
 
             if(m_options.useBitCastFromUInt)
@@ -1023,23 +1025,6 @@ struct ByteAddressBufferLegalizationContext
             IRInst* storeArgs[] = { buffer, offset, value };
             m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeArgs);
             return SLANG_OK;
-        }
-    }
-
-    // Storing of vectors, at a known offset location, that wraps around either
-    // sequence stores, or simple stores.
-    //
-    Result emitStoreWithKnownOffset(IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount)
-    {
-        // Emit an aligned vector store operation when the data (elementCount * elementSize) is divisible
-        // by the offset. Else, fallback to scalarizing the stores.
-        if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, elementType, elementCount))
-        {
-            return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, elementType, elementCount);
-        }
-        else
-        {
-            return emitSimpleStore(value->getDataType(), buffer, baseOffset, immediateOffset, value);
         }
     }
 
