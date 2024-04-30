@@ -598,27 +598,59 @@ namespace Slang
         {
         case BuiltinRequirementKind::DifferentialType:
             {
-                auto structDecl = m_astBuilder->create<StructDecl>();
-                auto conformanceDecl = m_astBuilder->create<InheritanceDecl>();
-                conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
-                conformanceDecl->parentDecl = structDecl;
-                structDecl->members.add(conformanceDecl);
-                structDecl->parentDecl = parent;
+                if (!canStructBeUsedAsSelfDifferentialType(parent))
+                {
+                    // Need to create a new struct type for the differential.
+                    //
+                    auto structDecl = m_astBuilder->create<StructDecl>();
+                    auto conformanceDecl = m_astBuilder->create<InheritanceDecl>();
+                    conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
+                    conformanceDecl->parentDecl = structDecl;
+                    structDecl->members.add(conformanceDecl);
+                    structDecl->parentDecl = parent;
 
-                synthesizedDecl = structDecl;
-                auto typeDef = m_astBuilder->create<TypeAliasDecl>();
-                typeDef->nameAndLoc.name = getName("Differential");
-                typeDef->parentDecl = structDecl;
+                    synthesizedDecl = structDecl;
+                    auto typeDef = m_astBuilder->create<TypeAliasDecl>();
+                    typeDef->nameAndLoc.name = getName("Differential");
+                    typeDef->parentDecl = structDecl;
 
-                auto synthDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
+                    auto synthDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
 
-                typeDef->type.type = DeclRefType::create(m_astBuilder, synthDeclRef);
-                structDecl->members.add(typeDef);
+                    typeDef->type.type = DeclRefType::create(m_astBuilder, synthDeclRef);
+                    structDecl->members.add(typeDef);
+
+                    synthesizedDecl->parentDecl = parent;
+                    synthesizedDecl->nameAndLoc.name = item.declRef.getName();
+                    synthesizedDecl->loc = parent->loc;
+                    parent->members.add(synthesizedDecl);
+                    parent->invalidateMemberDictionary();
+
+                    // Mark the newly synthesized decl as `ToBeSynthesized` so future checking can differentiate it
+                    // from user-provided definitions, and proceed to fill in its definition.
+                    auto toBeSynthesized = m_astBuilder->create<ToBeSynthesizedModifier>();
+                    addModifier(synthesizedDecl, toBeSynthesized);
+                }
+                else
+                {
+                    // There's no need for a new struct decl. 
+                    // We can simply add a typealias to the existing concrete type.
+                    //
+                    auto typeDef = m_astBuilder->create<TypeAliasDecl>();
+                    typeDef->nameAndLoc.name = item.declRef.getName();
+                    typeDef->parentDecl = parent;
+                    typeDef->type.type = subType;
+                    
+                    synthesizedDecl = typeDef;
+
+                    parent->members.add(synthesizedDecl);
+                    parent->invalidateMemberDictionary();
+                }
             }
             break;
         default:
             return nullptr;
         }
+
         synthesizedDecl->parentDecl = parent;
         synthesizedDecl->nameAndLoc.name = item.declRef.getName();
         synthesizedDecl->loc = parent->loc;
@@ -1143,6 +1175,34 @@ namespace Slang
         }
 
         return nullptr;
+    }
+
+    bool SemanticsVisitor::canStructBeUsedAsSelfDifferentialType(AggTypeDecl *aggTypeDecl)
+    {
+        // A struct can be used as its own differential type if all its members are differentiable
+        // and their differential types are the same as the original types. 
+        //
+        bool canBeUsed = true;
+        for (auto member : aggTypeDecl->members)
+        {
+            if (auto varDecl = as<VarDecl>(member))
+            {
+                if (!isTypeDifferentiable(varDecl->getType()))
+                {
+                    canBeUsed = false;
+                    break;
+                }
+
+                // Get the differential type of the member.
+                Type* diffType = tryGetDifferentialType(getASTBuilder(), varDecl->getType());
+                if (!diffType->equals(varDecl->getType()))
+                {
+                    canBeUsed = false;
+                    break;
+                }
+            }
+        }
+        return canBeUsed;
     }
 
     Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc)

@@ -1326,6 +1326,8 @@ namespace Slang
         Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
         Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
 
+        // Helper function to check if a struct can be used as its own differential type.
+        bool canStructBeUsedAsSelfDifferentialType(AggTypeDecl *aggTypeDecl);
         
     public:
 
