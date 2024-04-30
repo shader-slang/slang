@@ -798,7 +798,13 @@ namespace Slang
             : m_shared(shared)
             , m_sink(shared->getSink())
             , m_astBuilder(shared->getLinkage()->getASTBuilder())
-        {}
+        {
+            if (shared->getLinkage()->m_optionSet.hasOption(CompilerOptionName::DisableShortCircuit))
+            {
+                m_shouldShortCircuitLogicExpr =
+                    !shared->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DisableShortCircuit);
+            }
+        }
 
         SharedSemanticsContext* getShared() { return m_shared; }
         CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
