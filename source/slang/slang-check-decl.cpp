@@ -2173,6 +2173,25 @@ namespace Slang
             assocTypeDef->parentDecl = context->parentDecl;
             assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
             context->parentDecl->members.add(assocTypeDef);
+            
+            // Add derivative member attributes to all the fields pointing to themselves.
+            for (auto member : context->parentDecl->getMembersOfType<VarDeclBase>())
+            {   
+                auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
+                auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
+                fieldLookupExpr->type.type = member->getType();
+
+                auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+                baseTypeExpr->base.type = satisfyingType;
+                auto baseTypeType = m_astBuilder->getOrCreate<TypeType>(satisfyingType);
+                baseTypeExpr->type.type = baseTypeType;
+                fieldLookupExpr->baseExpression = baseTypeExpr;
+
+                fieldLookupExpr->declRef = makeDeclRef(member);
+
+                derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
+                addModifier(member, derivativeMemberModifier);
+            }
 
             if (doesTypeSatisfyAssociatedTypeConstraintRequirement(satisfyingType, requirementDeclRef, witnessTable))
             {
