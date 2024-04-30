@@ -205,6 +205,19 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
+    bool checkUnaligned(IRInst* baseOffset, IRIntegerValue immediateOffset, IRType* elementType, IRIntegerValue elementCount)
+    {
+        // Check whether the given composite resource type is aligned to the baseOffset
+        IRSizeAndAlignment elementLayout;
+        SLANG_RETURN_FALSE_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
+        IRIntegerValue elementStride = elementLayout.getStride();
+        bool isUnaligned = true;
+        if (auto baseOffsetVal = as<IRIntLit>(baseOffset)) {
+            isUnaligned = ((baseOffsetVal->getValue() + immediateOffset) % (elementStride * elementCount)) != 0;
+        }
+        return isUnaligned;
+    }
+
     SlangResult getOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
     {
         if (target->getHLSLToVulkanLayoutOptions() && target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
@@ -483,16 +496,9 @@ struct ByteAddressBufferLegalizationContext
     //
     IRInst* emitLoadWithKnownOffset(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IROp op, IRType* elementType, IRIntegerValue elementCount)
     {
-        IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
-        IRIntegerValue elementStride = elementLayout.getStride();
-
-        auto baseOffsetVal = as<IRIntLit>(baseOffset);
-
         // Emit an aligned vector load operation when the data (elementCount * elementSize) is divisible
         // by the offset. Else, fallback to scalarizing the loads.
-        if (m_options.scalarizeVectorLoadStore ||
-            ((baseOffsetVal->getValue() + immediateOffset) % (elementStride * elementCount)))
+        if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, elementType, elementCount))
         {
             return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, op, elementType, elementCount);
         }
@@ -1025,15 +1031,9 @@ struct ByteAddressBufferLegalizationContext
     //
     Result emitStoreWithKnownOffset(IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount)
     {
-        IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
-        IRIntegerValue elementStride = elementLayout.getStride();
-
-        auto baseOffsetVal = as<IRIntLit>(baseOffset);
         // Emit an aligned vector store operation when the data (elementCount * elementSize) is divisible
         // by the offset. Else, fallback to scalarizing the stores.
-        if (m_options.scalarizeVectorLoadStore ||
-            ((baseOffsetVal->getValue() + immediateOffset) % (elementStride * elementCount)))
+        if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, elementType, elementCount))
         {
             return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, elementType, elementCount);
         }
