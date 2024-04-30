@@ -1954,7 +1954,8 @@ namespace Slang
             getOptionSet().hasOption(CompilerOptionName::ZeroInitialize))
         {
             ConstructorDecl* defaultCtor = nullptr;
-            if (auto declRefType = as<DeclRefType>(varDecl->type.type))
+            auto declRefType = as<DeclRefType>(varDecl->type.type);
+            if (declRefType)
             {
                 if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
                 {
@@ -1981,7 +1982,7 @@ namespace Slang
             else
             {
                 auto* invoke = m_astBuilder->create<InvokeExpr>();
-                auto member = m_astBuilder->getMemberDeclRef(as<DeclRefType>(varDecl->type.type)->getDeclRef(), defaultCtor);
+                auto member = m_astBuilder->getMemberDeclRef(declRefType->getDeclRef(), defaultCtor);
                 invoke->functionExpr = ConstructDeclRefExpr(member, NULL, defaultCtor->loc, nullptr);
 
                 varDecl->initExpr = invoke;

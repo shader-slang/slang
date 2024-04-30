@@ -423,12 +423,12 @@ Result linkAndOptimizeIR(
     for (;;)
     {
         bool changed = false;
-        //dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
+        dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
         if (!codeGenContext->isSpecializationDisabled())
             changed |= specializeModule(targetProgram, irModule, codeGenContext->getSink());
         if (codeGenContext->getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
-        //dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
+        dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
 
         applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
         eliminateDeadCode(irModule);
@@ -453,11 +453,11 @@ Result linkAndOptimizeIR(
         // TODO: We should implement a proper defunctionalization pass
         changed |= specializeHigherOrderParameters(codeGenContext, irModule);
 
-        //dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
+        dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
         enableIRValidationAtInsert();
         changed |= processAutodiffCalls(targetProgram, irModule, sink);
         disableIRValidationAtInsert();
-        //dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
+        dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
 
         if (!changed)
             break;
@@ -517,7 +517,7 @@ Result linkAndOptimizeIR(
     // For targets that supports dynamic dispatch, we need to lower the
     // generics / interface types to ordinary functions and types using
     // function pointers.
-    //dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-LOWER-GENERICS");
+    dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-LOWER-GENERICS");
     lowerGenerics(targetProgram, irModule, sink);
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-LOWER-GENERICS");
 
@@ -1073,9 +1073,9 @@ Result linkAndOptimizeIR(
     // it after all of the optimization passes are complete. This should
     // reflect the IR that code is generated from as closely as possible.
     //
-//#if 0
+#if 0
     dumpIRIfEnabled(codeGenContext, irModule, "OPTIMIZED");
-//#endif
+#endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     if ( (target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly) )
