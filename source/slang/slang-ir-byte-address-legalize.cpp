@@ -312,7 +312,7 @@ struct ByteAddressBufferLegalizationContext
             //
             return m_builder.emitMakeStruct(type, fieldVals);
         }
-        else if( auto arrayType = as<IRArrayTypeBase>(type) )
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
         {
             // Loading a value of array type amounts to loading each
             // of its elements. There is shared logic between the
@@ -324,8 +324,7 @@ struct ByteAddressBufferLegalizationContext
             // legalization if the array type isn't in the right form
             // for us to proceed.
             //
-            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
-            if( elementCountInst )
+            if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
                 return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeArray, arrayType->getElementType(), elementCountInst->getValue());
             }
@@ -374,15 +373,14 @@ struct ByteAddressBufferLegalizationContext
                 return m_builder.emitMakeMatrix(matType, (UInt)args.getCount(), args.getBuffer());
             }
         }
-        else if( auto vecType = as<IRVectorType>(type) )
+        else if (auto vecType = as<IRVectorType>(type))
         {
             // One of the options that can vary per-target is whether to
             // scalarize vetor load/store operations. When that option
             // is turned on, we can treat a vector load just like an
             // array load.
             //
-            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
-            if(elementCountInst)
+            if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
                 // Emit an aligned vector load operation when the data (elementCount * elementSize) is divisible
                 // by the offset. Else, fallback to scalarizing the loads.
@@ -895,13 +893,12 @@ struct ByteAddressBufferLegalizationContext
             }
             return SLANG_OK;
         }
-        else if( auto arrayType = as<IRArrayTypeBase>(type) )
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
         {
             // Arrays and other sequences bottleneck through a helper
             // function, which we will cover later.
             //
-            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
-            if( elementCountInst )
+            if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
                 return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, arrayType->getElementType(), elementCountInst->getValue());
             }
@@ -944,11 +941,9 @@ struct ByteAddressBufferLegalizationContext
                 return SLANG_OK;
             }
         }
-        else if( auto vecType = as<IRVectorType>(type) )
+        else if (auto vecType = as<IRVectorType>(type))
         {
-            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
-
-            if (elementCountInst)
+            if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
                 // Emit an aligned vector store operation when the data (elementCount * elementSize) is divisible
                 // by the offset. Else, fallback to scalarizing the stores.
