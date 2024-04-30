@@ -7747,6 +7747,16 @@ namespace Slang
                 }
             }
         }
+
+        // If this method is intended to be a CUDA kernel, verify that the return type is void.
+        if (decl->findModifier<CudaKernelAttribute>())
+        {
+            if (decl->returnType.type && !decl->returnType.type->equals(m_astBuilder->getVoidType()))
+            {
+                getSink()->diagnose(decl, Diagnostics::cudaKernelMustReturnVoid);
+            }
+        }
+
         checkVisibility(decl);
     }
 
@@ -9594,6 +9604,30 @@ namespace Slang
         checkDerivativeAttributeImpl(visitor, funcDecl, attr, imaginaryArguments.args, imaginaryArguments.directions);
     }
 
+    static void checkCudaKernelAttribute(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, CudaKernelAttribute*)
+    {
+        // If the method is also marked differentiable, check that the data types are either non-differentiable
+        // or marked with no_diff.
+        //
+        // Note: This is a temporary restriction until we have a more complete story for differentiability.
+        //
+        if (funcDecl->findModifier<DifferentiableAttribute>())
+        {
+            for (auto paramDecl : funcDecl->getParameters())
+            {
+                auto paramType = paramDecl->type;
+                
+                if (visitor->isTypeDifferentiable(paramType))
+                {
+                    if (!paramDecl->hasModifier<NoDiffModifier>())
+                    {
+                        visitor->getSink()->diagnose(paramDecl, Diagnostics::differentiableKernelEntryPointCannotHaveDifferentiableParams);
+                    }
+                }
+            }
+        }
+    }
+
     template<typename TDerivativeAttr, typename TDerivativeOfAttr>
     bool tryCheckDerivativeOfAttributeImpl(
         SemanticsVisitor* visitor,
@@ -9794,6 +9828,8 @@ namespace Slang
                 checkDerivativeAttribute(this, decl, bwdDerivativeAttr);
             else if (auto primalAttr = as<PrimalSubstituteAttribute>(attr))
                 checkDerivativeAttribute(this, decl, primalAttr);
+            else if (auto cudaKernelAttr = as<CudaKernelAttribute>(attr))
+                checkCudaKernelAttribute(this, decl, cudaKernelAttr);
         }
     }
 

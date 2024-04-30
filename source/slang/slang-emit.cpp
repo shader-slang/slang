@@ -471,10 +471,13 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::PyTorchCppBinding:
+        generateHostFunctionsForAutoBindCuda(irModule, sink);
+        lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
         generatePyTorchCppBinding(irModule, sink);
         handleAutoBindNames(irModule);
         break;
     case CodeGenTarget::CUDASource:
+        lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
         removeTorchKernels(irModule);
         handleAutoBindNames(irModule);
         break;
@@ -716,14 +719,13 @@ Result linkAndOptimizeIR(
             // of a buffer need not be more than 4-byte aligned, and loads
             // of vectors need only be aligned based on their element type).
             //
-            // TODO: We should consider having an extended variant of `Load<T>`
-            // on byte-address buffers which expresses a programmer's knowledge
-            // that the load will have greater alignment than required by D3D.
-            // That could either come as an explicit guaranteed-alignment
-            // operand, or instead as something like a `Load4Aligned<T>` operation
-            // that returns a `vector<4,T>` and assumes `4*sizeof(T)` alignemtn.
-            //
-            byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            // Slang IR supports a variant of `Load<T>` on byte-address buffers
+            // that will have greater alignment than required by D3D. The
+            // alignment information is inferred from the operation like a
+            // `Load4Aligned<T>` that returns a `vector<4,T>` that assumes a
+            // `4*sizeof(T)` alignment. We may choose to disable that in favor
+            // of byte-address indexing by setting this flag to true.
+            byteAddressBufferOptions.scalarizeVectorLoadStore = false;
 
             // For GLSL targets, there really isn't a low-level concept
             // of a byte-address buffer at all, and the standard "shader storage

@@ -575,7 +575,7 @@ ${{{{
         __intrinsic_op($(kIROp_Rsh)) This shr(int other);
         __intrinsic_op($(kIROp_BitAnd)) This bitAnd(This other);
         __intrinsic_op($(kIROp_BitOr)) This bitOr(This other);
-        [__unsafeForceInlineEarly] This and(This other) {return __intCast<This>(__intCast<bool>(this) && __intCast<bool>(other)); }
+        [__unsafeForceInlineEarly] This and(This other) {return __intCast<This>(and(__intCast<bool>(this), __intCast<bool>(other))); }
         [__unsafeForceInlineEarly] This or(This other) {return __intCast<This>(__intCast<bool>(this) || __intCast<bool>(other)); }
         __intrinsic_op($(kIROp_BitXor)) This bitXor(This other);
         __intrinsic_op($(kIROp_BitNot)) This bitNot();
@@ -2271,6 +2271,14 @@ T operator &&(T v0, T v1)
 {
     return v0.and(v1);
 }
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+bool and(bool v0, bool v1)
+{
+    return __and(v0, v1);
+}
+
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
