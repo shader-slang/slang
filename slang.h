@@ -860,6 +860,7 @@ extern "C"
             SourceEmbedStyle,
             SourceEmbedName,
             SourceEmbedLanguage,
+            DisableShortCircuit,   // bool
 
             // Target
 

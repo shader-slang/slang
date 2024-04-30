@@ -343,6 +343,7 @@ void initCommandOptions(CommandOptions& options)
         "The name used as the basis for variables output for source embedding."},
         { OptionKind::SourceEmbedLanguage, "-source-embed-language", "-source-embed-language <language>",
         "The language to be used for source embedding. Defaults to C/C++. Currently only C/C++ are supported"},
+        { OptionKind::DisableShortCircuit, "-disable-short-circuit", nullptr, "Disable short-circuiting for \"&&\" and \"||\" operations" },
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
@@ -2296,6 +2297,11 @@ SlangResult OptionsParser::_parse(
                     return SLANG_FAIL;
                 }
 
+                break;
+            }
+            case OptionKind::DisableShortCircuit:
+            {
+                linkage->m_optionSet.add(OptionKind::DisableShortCircuit, true);
                 break;
             }
             default:
