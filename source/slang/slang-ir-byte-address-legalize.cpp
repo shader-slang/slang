@@ -478,24 +478,26 @@ struct ByteAddressBufferLegalizationContext
         return m_builder.emitIntrinsicInst(type, op, elementVals.getCount(), elementVals.getBuffer());
     }
 
+    // Loading of vectors, at a known offset location, that wraps around either
+    // sequence loads, or simple loads.
+    //
     IRInst* emitLoadWithKnownOffset(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IROp op, IRType* elementType, IRIntegerValue elementCount)
     {
-        // Check for alignment and elementCount, elementCount must be divisible by alignment.
-
         IRSizeAndAlignment elementLayout;
         SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         auto baseOffsetVal = as<IRIntLit>(baseOffset);
+
+        // Emit an aligned vector load operation when the data (elementCount * elementSize) is divisible
+        // by the offset. Else, fallback to scalarizing the loads.
         if (m_options.scalarizeVectorLoadStore ||
             ((baseOffsetVal->getValue() + immediateOffset) % (elementStride * elementCount)))
         {
-            // generate sequence load
             return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, op, elementType, elementCount);
         }
         else
         {
-            // generate single vector load
             return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
         }
     }
@@ -1018,24 +1020,25 @@ struct ByteAddressBufferLegalizationContext
         }
     }
 
+    // Storing of vectors, at a known offset location, that wraps around either
+    // sequence stores, or simple stores.
+    //
     Result emitStoreWithKnownOffset(IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount)
     {
-        // Check for alignment and elementCount, elementCount must be divisible by alignment.
-
         IRSizeAndAlignment elementLayout;
         SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         auto baseOffsetVal = as<IRIntLit>(baseOffset);
+        // Emit an aligned vector store operation when the data (elementCount * elementSize) is divisible
+        // by the offset. Else, fallback to scalarizing the stores.
         if (m_options.scalarizeVectorLoadStore ||
             ((baseOffsetVal->getValue() + immediateOffset) % (elementStride * elementCount)))
         {
-            // generate sequence store
             return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, elementType, elementCount);
         }
         else
         {
-            // generate single vector store
             return emitSimpleStore(value->getDataType(), buffer, baseOffset, immediateOffset, value);
         }
     }
