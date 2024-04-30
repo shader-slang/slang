@@ -2801,6 +2801,7 @@ struct $(item.name)
     }
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     uint Load(int location)
     {
@@ -2816,6 +2817,7 @@ struct $(item.name)
     uint Load(int location, out uint status);
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     uint2 Load2(int location)
     {
@@ -2831,6 +2833,7 @@ struct $(item.name)
     uint2 Load2(int location, out uint status);
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     uint3 Load3(int location)
     {
@@ -2846,6 +2849,7 @@ struct $(item.name)
     uint3 Load3(int location, out uint status);
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     uint4 Load4(int location)
     {
@@ -2862,6 +2866,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [ForceInline]
     T Load<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location);
@@ -3764,6 +3769,7 @@ ${{{{
         }
     }
 
+    [ForceInline]
     void Store<T>(int offset, T value)
     {
         __byteAddressBufferStore(this, offset, value);
