@@ -24,7 +24,10 @@ bool getValueVector()
     typealias gvec = vector<T, N>;
 
     gvec genericOut;
-    return genericOut == gvec(T(0));
+    for (int i = 0; i < N; ++i)
+        if (genericOut[i] != T(0))
+            return false;
+    return true;
 }
 __generic<let N : int>
 bool getValueVectorBoolean()
@@ -32,7 +35,10 @@ bool getValueVectorBoolean()
     typealias gvec = vector<bool, N>;
 
     gvec genericOut;
-    return genericOut == gvec(bool(0));
+    for (int i = 0; i < N; ++i)
+        if (genericOut[i] != bool(0))
+            return false;
+    return true;
 }
 
 [numthreads(1, 1, 1)]
