@@ -322,14 +322,18 @@ public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(cuda, "$P_asinh($0)")
-__target_intrinsic(cpp, "$P_asinh($0)")
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public T asinh(T x)
 {
-    return log(x + sqrt(x * x + T(1)));
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "$P_asinh($0)";
+    case cuda: __intrinsic_asm "$P_asinh($0)";
+    default:
+        return log(x + sqrt(x * x + T(1)));
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N:int>
@@ -342,14 +346,18 @@ public vector<T,N> asinh(vector<T,N> x)
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(cuda, "$P_acosh($0)")
-__target_intrinsic(cpp, "$P_acosh($0)")
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public T acosh(T x)
 {
-    return log(x + sqrt( x * x - T(1)));
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "$P_acosh($0)";
+    case cuda: __intrinsic_asm "$P_acosh($0)";
+    default:
+        return log(x + sqrt( x * x - T(1)));
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N:int>
@@ -362,14 +370,18 @@ public vector<T,N> acosh(vector<T,N> x)
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(cuda, "$P_atanh($0)")
-__target_intrinsic(cpp, "$P_atanh($0)")
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public T atanh(T x)
 {
-    return T(0.5) * log((T(1) + x) / (T(1) - x));
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "$P_atanh($0)";
+    case cuda: __intrinsic_asm "$P_atanh($0)";
+    default:
+        return T(0.5) * log((T(1) + x) / (T(1) - x));
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N:int>
@@ -645,7 +657,6 @@ float unpackSnorm1x16(uint p)
     return clamp((float(p & wordMask) - 32767.0) / 32767.0, -1.0, 1.0);
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 float unpackUnorm1x8(uint p)
@@ -654,7 +665,6 @@ float unpackUnorm1x8(uint p)
     return float(p & byteMask) / 255.0;
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 float unpackSnorm1x8(uint p)
@@ -679,140 +689,192 @@ uint float2half(float f)
     return (s | e | m);
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uint packUnorm2x16(vec2 v)
 {
-    return packUnorm1x16(v.x) | (packUnorm1x16(v.y) << uint(16));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packUnorm2x16";
+    default:
+        return packUnorm1x16(v.x) | (packUnorm1x16(v.y) << uint(16));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uint packSnorm2x16(vec2 v)
 {
-    return packSnorm1x16(v.x) | (packSnorm1x16(v.y) << uint(16));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packSnorm2x16";
+    default:
+        return packSnorm1x16(v.x) | (packSnorm1x16(v.y) << uint(16));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uint packUnorm4x8(vec4 v)
 {
-    return packUnorm1x8(v.x) | (packUnorm1x8(v.y) << uint(8)) | (packUnorm1x8(v.z) << uint(16)) | (packUnorm1x8(v.w) << uint(24));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packUnorm4x8";
+    default:
+        return packUnorm1x8(v.x) | (packUnorm1x8(v.y) << uint(8)) | (packUnorm1x8(v.z) << uint(16)) | (packUnorm1x8(v.w) << uint(24));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uint packSnorm4x8(vec4 v)
 {
-    return packSnorm1x8(v.x) | (packSnorm1x8(v.y) << uint(8)) | (packSnorm1x8(v.z) << uint(16)) | (packSnorm1x8(v.w) << uint(24));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packSnorm4x8";
+    default:
+        return packSnorm1x8(v.x) | (packSnorm1x8(v.y) << uint(8)) | (packSnorm1x8(v.z) << uint(16)) | (packSnorm1x8(v.w) << uint(24));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec2 unpackUnorm2x16(uint p)
 {
-    return vec2(unpackUnorm1x16(p & uint(0xffff)), unpackUnorm1x16(p >> uint(16)));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackUnorm2x16";
+    default:
+        return vec2(unpackUnorm1x16(p & uint(0xffff)), unpackUnorm1x16(p >> uint(16)));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec2 unpackSnorm2x16(uint p)
 {
-    return vec2(unpackSnorm1x16(p & uint(0xffff)), unpackSnorm1x16(p >> uint(16)));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackSnorm2x16";
+    default:
+        return vec2(unpackSnorm1x16(p & uint(0xffff)), unpackSnorm1x16(p >> uint(16)));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec4 unpackUnorm4x8(highp uint p)
 {
-    return vec4(
-        unpackUnorm1x8(p),
-        unpackUnorm1x8(p >> 8),
-        unpackUnorm1x8(p >> 16),
-        unpackUnorm1x8(p >> 24));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackUnorm4x8";
+    default:
+        return vec4(
+            unpackUnorm1x8(p),
+            unpackUnorm1x8(p >> 8),
+            unpackUnorm1x8(p >> 16),
+            unpackUnorm1x8(p >> 24));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec4 unpackSnorm4x8(highp uint p)
 {
-    return vec4(
-        unpackSnorm1x8(p),
-        unpackSnorm1x8(p >> 8),
-        unpackSnorm1x8(p >> 16),
-        unpackSnorm1x8(p >> 24));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackSnorm4x8";
+    default:
+        return vec4(
+            unpackSnorm1x8(p),
+            unpackSnorm1x8(p >> 8),
+            unpackSnorm1x8(p >> 16),
+            unpackSnorm1x8(p >> 24));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uint packHalf2x16(vec2 v)
 {
-    return float2half(v.x) | (float2half(v.y) << uint(16));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packHalf2x16";
+    default:
+        return float2half(v.x) | (float2half(v.y) << uint(16));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public float half2float(uint h)
 {
-    uint s = ((h & uint(0x8000)) << uint(16));
-    uint e = 0;
-    uint m = ((h & uint(0x03ff)) << uint(13));
-    if (m != 0)
+    __target_switch
     {
-        e = (((h & uint(0x7c00)) + uint(0x1c000)) << uint(13));
+    case glsl: __intrinsic_asm "half2float";
+    default:
+        uint s = ((h & uint(0x8000)) << uint(16));
+        uint e = 0;
+        uint m = ((h & uint(0x03ff)) << uint(13));
+        if (m != 0)
+        {
+            e = (((h & uint(0x7c00)) + uint(0x1c000)) << uint(13));
+        }
+        return uintBitsToFloat(s | e | m); 
     }
-    return uintBitsToFloat(s | e | m); 
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec2 unpackHalf2x16(uint p)
 {
-    return vec2(half2float(p & uint(0xffff)), half2float(p >> uint(16)));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackHalf2x16";
+    default:
+        return vec2(half2float(p & uint(0xffff)), half2float(p >> uint(16)));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public double packDouble2x32(uvec2 v)
 {
-    // TODO: there is no "asdouble()"
-    //return asdouble(uint64_t(v.x) | (uint64_t(v.y) << 32));
-    return 0.0;
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packDouble2x32";
+    default:
+        // TODO: there is no "asdouble()"
+        //return asdouble(uint64_t(v.x) | (uint64_t(v.y) << 32));
+        return 0.0;
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uvec2 unpackDouble2x32(double v)
 {
-    // TODO: there is no "asuint64()"
-    uint64_t u = 0; // asuint64(v);
-    return uvec2(uint(u & 0xFFFFFFFF), uint(u >> 32));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackDouble2x32";
+    default:
+        // TODO: there is no "asuint64()"
+        uint64_t u = 0; // asuint64(v);
+        return uvec2(uint(u & 0xFFFFFFFF), uint(u >> 32));
+    }
 }
 
 //
@@ -833,29 +895,39 @@ public T faceforward(T n, T i, T ng)
 //
 
 __generic<T : __BuiltinFloatingPointType, let C : int, let R : int>
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [OverloadRank(15)]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
 public matrix<T, C, R> outerProduct(vector<T, C> c, vector<T, R> r)
 {
-    // Column major matrix in GLSL
-    matrix<T, C, R> result;
-    for (int i = 0; i < C; ++i)
+    __target_switch
     {
-        for (int j = 0; j < R; ++j)
+    case glsl: __intrinsic_asm "outerProduct";
+    default:
+        // Column major matrix in GLSL
+        matrix<T, C, R> result;
+        for (int i = 0; i < C; ++i)
         {
-            result[i][j] = c[i] * r[j];
+            for (int j = 0; j < R; ++j)
+            {
+                result[i][j] = c[i] * r[j];
+            }
         }
+        return result;
     }
-    return result;
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 [require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
-matrix<T,N,N> inverse(matrix<T,N,N> m);
+matrix<T,N,N> inverse(matrix<T,N,N> m)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "inverse";
+    case hlsl: __intrinsic_asm "inverse";
+    }
+}
 
 //
 // Section 8.8. Integer Functions
