@@ -1950,8 +1950,8 @@ namespace Slang
 
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
-        if (!varDecl->initExpr &&
-            getOptionSet().hasOption(CompilerOptionName::ZeroInitialize))
+        if (!varDecl->initExpr
+            && getOptionSet().hasOption(CompilerOptionName::ZeroInitialize))
         {
             ConstructorDecl* defaultCtor = nullptr;
             auto declRefType = as<DeclRefType>(varDecl->type.type);
@@ -7525,8 +7525,11 @@ namespace Slang
             for (auto& m : structDecl->members)
             {
                 auto varDeclBase = as<VarDeclBase>(m);
+
+                // Static variables are initialized at start of runtime, not inside a constructor
                 if (!varDeclBase
-                    || !varDeclBase->initExpr)
+                    || !varDeclBase->initExpr
+                    || varDeclBase->hasModifier<HLSLStaticModifier>())
                     continue;
 
                 MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
