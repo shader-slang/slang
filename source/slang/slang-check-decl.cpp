@@ -2144,7 +2144,50 @@ namespace Slang
             SLANG_RELEASE_ASSERT(aggTypeDecl);
             synth.pushContainerScope(aggTypeDecl);
         }
-        else
+        
+        // If we did not find an existing empty struct, we may need to synthesize one. 
+        // But first, we check if the parent type can be used as its own differential type.
+        // 
+        if (!aggTypeDecl
+            && as<AggTypeDecl>(context->parentDecl)
+            && canStructBeUsedAsSelfDifferentialType(as<AggTypeDecl>(context->parentDecl)))
+        {
+            // If the parent type can be used as its own differential type, we will create a typealias
+            // to itself as the differential type.
+            //
+            SubstitutionSet substSet;
+            if (auto thisWitness = findThisTypeWitness(
+                SubstitutionSet(requirementDeclRef),
+                as<InterfaceDecl>(requirementDeclRef.getParent()).getDecl()))
+            {
+                if (auto declRefType = as<DeclRefType>(thisWitness->getSub()))
+                {
+                    substSet = SubstitutionSet(declRefType->getDeclRef());
+                }
+            }
+            auto satisfyingType = DeclRefType::create(m_astBuilder, m_astBuilder->getMemberDeclRef(substSet.declRef, context->parentDecl));
+            
+            auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
+            assocTypeDef->nameAndLoc.name = getName("Differential");
+            assocTypeDef->type.type = satisfyingType;
+            assocTypeDef->parentDecl = context->parentDecl;
+            assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
+            context->parentDecl->members.add(assocTypeDef);
+
+            if (doesTypeSatisfyAssociatedTypeConstraintRequirement(satisfyingType, requirementDeclRef, witnessTable))
+            {
+                witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(satisfyingType));
+
+                // Increase the epoch so that future calls to Type::getCanonicalType will return the up-to-date folded types.
+                m_astBuilder->incrementEpoch();
+                return true;
+            }
+
+            // Something went wrong.
+            return false;
+        }
+
+        if (!aggTypeDecl)
         {
             aggTypeDecl = m_astBuilder->create<StructDecl>();
             aggTypeDecl->parentDecl = context->parentDecl;
