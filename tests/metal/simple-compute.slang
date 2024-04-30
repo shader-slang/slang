@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal
 //TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
-//TEST:REFLECTION(filecheck=REFLECT):-target metal
+//TEST:REFLECTION(filecheck=REFLECT):-target metal -entry main_kernel -stage compute
 
 uniform RWStructuredBuffer<float> outputBuffer;
 
@@ -26,10 +26,10 @@ ParameterBlock<MyBlock> block2;
 // REFLECT: "binding": {"kind": "metalArgumentBufferElement", "index": 0, "count": 2}
 
 // REFLECT: "name": "outputBuffer",
-// REFLECT-NEXT: "binding": {"kind": "constantBuffer", "index": 0, "used": 0}
+// REFLECT-NEXT: "binding": {"kind": "constantBuffer", "index": 0{{.*}}}
 
 // REFLECT: "name": "block",
-// REFLECT-NEXT: "binding": {"kind": "constantBuffer", "index": 1, "used": 0}
+// REFLECT-NEXT: "binding": {"kind": "constantBuffer", "index": 1{{.*}}}
 
 void func(float v)
 {

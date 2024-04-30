@@ -53,7 +53,6 @@ protected:
     virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
     
     virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
-
     virtual bool doesTargetSupportPtrTypes() SLANG_OVERRIDE { return true; }
 
     void emitFuncParamLayoutImpl(IRInst* param);
@@ -68,6 +67,7 @@ protected:
     void _emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
 
     void _emitStageAccessSemantic(IRStageAccessDecoration* decoration, const char* name);
+    void _emitSystemSemantic(UnownedStringSlice semanticName, IRIntegerValue semanticIndex);
 };
 
 }
