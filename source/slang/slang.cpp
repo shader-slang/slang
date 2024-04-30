@@ -6445,6 +6445,9 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
     if (SLANG_FAILED(_getEntryPointResult(this, static_cast<int>(entryPointIndex), static_cast<int>(targetIndex), artifact)))
         return SLANG_E_INVALID_ARG;
 
+    if (!artifact)
+        return SLANG_E_NOT_AVAILABLE;
+
     // Find a rep
     auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
     if (!metadata)
