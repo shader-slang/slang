@@ -2865,8 +2865,8 @@ struct $(item.name)
     uint4 Load4(int location, out uint status);
 
     [__NoSideEffect]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     T Load<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location);
