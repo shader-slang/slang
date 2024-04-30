@@ -19,6 +19,11 @@ namespace Slang
         IRFunc* convertLoweredToOriginal = nullptr;
     };
 
+    struct BuiltinTypeLoweringEnv
+    {
+        Dictionary<IRType*, LoweredBuiltinTypeInfo> loweredTypes;
+    };
+
     LoweredBuiltinTypeInfo lowerMatrixType(
         IRBuilder* builder,
         IRMatrixType* matrixType,
@@ -27,6 +32,18 @@ namespace Slang
     LoweredBuiltinTypeInfo lowerVectorType(
         IRBuilder* builder,
         IRVectorType* vectorType,
+        String nameSuffix = "");
+
+    LoweredBuiltinTypeInfo lowerStructType(
+        BuiltinTypeLoweringEnv* env,
+        IRBuilder* builder,
+        IRStructType* structType,
+        String nameSuffix = "");
+
+    LoweredBuiltinTypeInfo lowerType(
+        BuiltinTypeLoweringEnv* env,
+        IRBuilder* builder,
+        IRType* type,
         String nameSuffix = "");
 
 } // namespace Slang

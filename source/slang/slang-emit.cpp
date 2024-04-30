@@ -470,6 +470,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::PyTorchCppBinding:
+        generateHostFunctionsForAutoBindCuda(irModule, sink);
         lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
         generatePyTorchCppBinding(irModule, sink);
         handleAutoBindNames(irModule);
