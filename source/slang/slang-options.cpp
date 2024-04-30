@@ -343,6 +343,7 @@ void initCommandOptions(CommandOptions& options)
         "The name used as the basis for variables output for source embedding."},
         { OptionKind::SourceEmbedLanguage, "-source-embed-language", "-source-embed-language <language>",
         "The language to be used for source embedding. Defaults to C/C++. Currently only C/C++ are supported"},
+        { OptionKind::DisableShortCircuit, "-disable-short-circuit", nullptr, "Disable short-circuiting for \"&&\" and \"||\" operations" },
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
@@ -2298,6 +2299,11 @@ SlangResult OptionsParser::_parse(
 
                 break;
             }
+            case OptionKind::DisableShortCircuit:
+            {
+                linkage->m_optionSet.add(OptionKind::DisableShortCircuit, true);
+                break;
+            }
             default:
             {
                 // Hmmm, we looked up and produced a valid enum, but it wasn't handled in the switch... 
@@ -2746,6 +2752,9 @@ SlangResult OptionsParser::_parse(
             m_rawTargets[0].format == CodeGenTarget::CUDASource ||
             m_rawTargets[0].format == CodeGenTarget::SPIRV ||
             m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
+            m_rawTargets[0].format == CodeGenTarget::Metal ||
+            m_rawTargets[0].format == CodeGenTarget::MetalLib ||
+            m_rawTargets[0].format == CodeGenTarget::MetalLibAssembly ||
             ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind == ArtifactKind::HostCallable))
     {
         RawOutput rawOutput;
