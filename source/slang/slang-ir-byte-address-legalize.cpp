@@ -124,7 +124,8 @@ struct ByteAddressBufferLegalizationContext
         //
         auto buffer = load->getOperand(0);
         auto offset = load->getOperand(1);
-        auto legalLoad = emitLegalLoad(type, buffer, offset, 0);
+        auto aligned = load->getOperand(2);
+        auto legalLoad = emitLegalLoad(type, buffer, offset, 0, aligned);
 
         // If it currently possible for the legalization
         // to fail (perhaps because of something else that
@@ -205,17 +206,13 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    bool checkUnaligned(IRInst* baseOffset, IRIntegerValue immediateOffset, IRType* elementType, IRIntegerValue elementCount)
+    bool checkUnaligned(IRInst* isAligned)
     {
         // Check whether the given composite resource type is aligned to the baseOffset
-        IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_FALSE_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
-        IRIntegerValue elementStride = elementLayout.getStride();
-        bool isUnaligned = true;
-        if (auto baseOffsetVal = as<IRIntLit>(baseOffset)) {
-            isUnaligned = ((baseOffsetVal->getValue() + immediateOffset) % (elementStride * elementCount)) != 0;
+        if (auto isAlignedVal = as<IRIntLit>(isAligned)) {
+            return !isAlignedVal->getValue();
         }
-        return isUnaligned;
+        return true;
     }
 
     SlangResult getOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
@@ -241,7 +238,7 @@ struct ByteAddressBufferLegalizationContext
     // given `type` from the given `buffer` at the required `baseOffset`
     // plus the `immediateOffset` if any.
     //
-    IRInst* emitLegalLoad(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset)
+    IRInst* emitLegalLoad(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* isAligned)
     {
         // The right way to load a value depends primarily
         // on the type, and secondarily on the options
@@ -299,7 +296,7 @@ struct ByteAddressBufferLegalizationContext
                 // for earlier fields will be left behind but can be eliminated
                 // as dead code.
                 //
-                auto fieldVal = emitLegalLoad(fieldType, buffer, baseOffset, immediateOffset + fieldOffset);
+                auto fieldVal = emitLegalLoad(fieldType, buffer, baseOffset, immediateOffset + fieldOffset, isAligned);
                 if(!fieldVal)
                     return nullptr;
 
@@ -326,7 +323,7 @@ struct ByteAddressBufferLegalizationContext
             //
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
-                return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeArray, arrayType->getElementType(), elementCountInst->getValue());
+                return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeArray, arrayType->getElementType(), elementCountInst->getValue(), isAligned);
             }
         }
         else if( auto matType = as<IRMatrixType>(type) )
@@ -341,7 +338,7 @@ struct ByteAddressBufferLegalizationContext
                 if( rowCountInst )
                 {
                     auto rowType = m_builder.getVectorType(matType->getElementType(), matType->getColumnCount());
-                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeMatrix, rowType, rowCountInst->getValue());
+                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeMatrix, rowType, rowCountInst->getValue(), isAligned);
                 }
             }
             else
@@ -354,7 +351,7 @@ struct ByteAddressBufferLegalizationContext
                 getSizeAndAlignment(m_targetProgram, colVectorType, &colVectorSizeAlignment);
                 for (Index c = 0; c < colCount; c++)
                 {
-                    auto colVector = emitLegalLoad(colVectorType, buffer, baseOffset, immediateOffset);
+                    auto colVector = emitLegalLoad(colVectorType, buffer, baseOffset, immediateOffset, isAligned);
                     for (Index r = 0; r < rowCount; r++)
                     {
                         elements.add(m_builder.emitElementExtract(colVector, (IRIntegerValue)r));
@@ -384,9 +381,9 @@ struct ByteAddressBufferLegalizationContext
             {
                 // Emit an aligned vector load operation when the data (elementCount * elementSize) is divisible
                 // by the offset. Else, fallback to scalarizing the loads.
-                if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, vecType->getElementType(), elementCountInst->getValue()))
+                if (m_options.scalarizeVectorLoadStore || checkUnaligned(isAligned))
                 {
-                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue());
+                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue(), isAligned);
                 }
                 else
                 {
@@ -464,7 +461,7 @@ struct ByteAddressBufferLegalizationContext
     // Loading of sequences for arrays, matrices, and vectors is
     // bottlenecked through a single function.
     //
-    IRInst* emitLegalSequenceLoad(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IROp op, IRType* elementType, IRIntegerValue elementCount)
+    IRInst* emitLegalSequenceLoad(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IROp op, IRType* elementType, IRIntegerValue elementCount, IRInst* isAligned)
     {
         // Or goal here is to produce a value of the given `type`, loaded from `buffer`
         // at `baseOffset` plus `immediateOffset`.
@@ -486,7 +483,7 @@ struct ByteAddressBufferLegalizationContext
         List<IRInst*> elementVals;
         for( IRIntegerValue ii = 0; ii < elementCount; ++ii )
         {
-            auto elementVal = emitLegalLoad(elementType, buffer, baseOffset, immediateOffset + ii*elementStride);
+            auto elementVal = emitLegalLoad(elementType, buffer, baseOffset, immediateOffset + ii*elementStride, isAligned);
             if(!elementVal)
                 return nullptr;
 
@@ -844,7 +841,7 @@ struct ByteAddressBufferLegalizationContext
         // the type of the store operation, but instead the operand
         // that represents the value to be stored.
         //
-        auto value = store->getOperand(2);
+        auto value = store->getOperand(3);
         auto type = value->getDataType();
 
         // Types that are already legal to use don't require any processing.
@@ -863,14 +860,14 @@ struct ByteAddressBufferLegalizationContext
         // performance issue, but we should still consider trying to
         // tighten this up and make all uhandled cases be hard errors).
         //
-        auto result = emitLegalStore(type, store->getOperand(0), store->getOperand(1), 0, value);
+        auto result = emitLegalStore(type, store->getOperand(0), store->getOperand(1), 0, store->getOperand(2), value);
         if(SLANG_FAILED(result))
             return;
 
         store->removeAndDeallocate();
     }
 
-    Result emitLegalStore(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value)
+    Result emitLegalStore(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* isAligned, IRInst* value)
     {
         // The flow for emitting a legal store is very similar to that for
         // legal loads; we will recurse on the structure of `type` and
@@ -889,7 +886,7 @@ struct ByteAddressBufferLegalizationContext
                 SLANG_RETURN_ON_FAIL(getOffset(m_targetProgram, field, &fieldOffset));
 
                 auto fieldVal = m_builder.emitFieldExtract(fieldType, value, field->getKey());
-                SLANG_RETURN_ON_FAIL(emitLegalStore(fieldType, buffer, baseOffset, immediateOffset + fieldOffset, fieldVal));
+                SLANG_RETURN_ON_FAIL(emitLegalStore(fieldType, buffer, baseOffset, immediateOffset + fieldOffset, isAligned, fieldVal));
             }
             return SLANG_OK;
         }
@@ -900,7 +897,7 @@ struct ByteAddressBufferLegalizationContext
             //
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
-                return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, arrayType->getElementType(), elementCountInst->getValue());
+                return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, arrayType->getElementType(), elementCountInst->getValue(), isAligned);
             }
         }
         else if( auto matType = as<IRMatrixType>(type) )
@@ -912,7 +909,7 @@ struct ByteAddressBufferLegalizationContext
                 if( rowCountInst )
                 {
                     auto rowType = m_builder.getVectorType(matType->getElementType(), matType->getColumnCount());
-                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, rowType, rowCountInst->getValue());
+                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, rowType, rowCountInst->getValue(), isAligned);
                 }
             }
             else
@@ -935,7 +932,7 @@ struct ByteAddressBufferLegalizationContext
                     auto colVector = m_builder.emitMakeVector(colVectorType, colVectorArgs);
                     IRSizeAndAlignment colVectorSizeAlignment;
                     getSizeAndAlignment(m_targetProgram, colVectorType, &colVectorSizeAlignment);
-                    emitLegalStore(colVectorType, buffer, baseOffset, immediateOffset, colVector);
+                    emitLegalStore(colVectorType, buffer, baseOffset, immediateOffset, isAligned, colVector);
                     immediateOffset += colVectorSizeAlignment.getStride();
                 }
                 return SLANG_OK;
@@ -947,9 +944,9 @@ struct ByteAddressBufferLegalizationContext
             {
                 // Emit an aligned vector store operation when the data (elementCount * elementSize) is divisible
                 // by the offset. Else, fallback to scalarizing the stores.
-                if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, vecType->getElementType(), elementCountInst->getValue()))
+                if (m_options.scalarizeVectorLoadStore || checkUnaligned(isAligned))
                 {
-                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
+                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue(), isAligned);
                 }
                 else
                 {
@@ -1023,7 +1020,7 @@ struct ByteAddressBufferLegalizationContext
         }
     }
 
-    Result emitLegalSequenceStore(IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount)
+    Result emitLegalSequenceStore(IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount, IRInst* isAligned)
     {
         // The store case for sequences is similar to the load case.
         //
@@ -1038,7 +1035,7 @@ struct ByteAddressBufferLegalizationContext
         {
             auto elementIndex = m_builder.getIntValue(indexType, ii);
             auto elementVal = m_builder.emitElementExtract(elementType, value, elementIndex);
-            SLANG_RETURN_ON_FAIL(emitLegalStore(elementType, buffer, baseOffset, immediateOffset + ii*elementStride, elementVal));
+            SLANG_RETURN_ON_FAIL(emitLegalStore(elementType, buffer, baseOffset, immediateOffset + ii*elementStride, isAligned, elementVal));
         }
 
         return SLANG_OK;
