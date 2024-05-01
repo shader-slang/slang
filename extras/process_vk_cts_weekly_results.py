@@ -62,6 +62,7 @@ for test_line in stdout.splitlines():
         summary += test_line + "\n"
 
 print(summary)
+print(stdout)
 
 with open(options.PASSINGLIST, 'r') as tl_f:
     for test_line in tl_f:
@@ -98,6 +99,8 @@ if len(newly_passing) > 0:
         i += 1
       
     raw_data_sheet.update_cells(cell_list)
+
+
 
 
 
