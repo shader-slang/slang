@@ -5785,6 +5785,15 @@ namespace Slang
             {
                 checkConformance(type, inheritanceDecl, decl);
             }
+
+            // Successful conformance checking may have created new witness tables.
+            // Increment epoch to invalidate the cache, so subsequent canonical types are
+            // re-calculated. 
+            //
+            // TODO: Is it really necessary to invalidate globally? Maybe there's a way to invalidate only the 
+            // types that are affected by these interface decls.
+            // 
+            astBuilder->incrementEpoch();
         }
     }
 
