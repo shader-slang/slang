@@ -839,7 +839,9 @@ struct IRInst
         ///
     void _insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent);
 
-   void dumps();
+    /// Print the IR to stdout for debugging purposes
+    ///
+    void dump();
 };
 
 enum class IRDynamicCastBehavior

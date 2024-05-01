@@ -8606,13 +8606,24 @@ namespace Slang
         }
     }
 
-    void IRInst::dumps()
+    void IRInst::dump()
     {
-        StringBuilder sb;
-        IRDumpOptions options;
-        StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
-        dumpIR(this, options, nullptr, &writer);
-        std::cout << sb.toString().begin();
+        if (auto intLit = as<IRIntLit>(this))
+        {
+            std::cout << intLit->getValue() << std::endl;
+        }
+        else if (auto stringLit = as<IRStringLit>(this))
+        {
+            std::cout << stringLit->getStringSlice().begin() << std::endl;
+        }
+        else
+        {
+            StringBuilder sb;
+            IRDumpOptions options;
+            StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
+            dumpIR(this, options, nullptr, &writer);
+            std::cout << sb.toString().begin() << std::endl;
+        }
     }
 } // namespace Slang
 
