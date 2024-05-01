@@ -872,18 +872,21 @@ IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IR
     IRBuilder loopBuilder = *builder;
     auto loopHeadBlock = loopBuilder.emitBlock();
     loopBodyBlock = loopBuilder.emitBlock();
+    auto ifBreakBlock = loopBuilder.emitBlock();
     loopBreakBlock = loopBuilder.emitBlock();
     auto loopContinueBlock = loopBuilder.emitBlock();
     builder->emitLoop(loopHeadBlock, loopBreakBlock, loopHeadBlock, 1, &initVal);
     loopBuilder.setInsertInto(loopHeadBlock);
     auto loopParam = loopBuilder.emitParam(initVal->getFullType());
     auto cmpResult = loopBuilder.emitLess(loopParam, finalVal);
-    loopBuilder.emitIfElse(cmpResult, loopBodyBlock, loopBreakBlock, loopBreakBlock);
+    loopBuilder.emitIfElse(cmpResult, loopBodyBlock, ifBreakBlock, ifBreakBlock);
     loopBuilder.setInsertInto(loopBodyBlock);
     loopBuilder.emitBranch(loopContinueBlock);
     loopBuilder.setInsertInto(loopContinueBlock);
     auto newParam = loopBuilder.emitAdd(loopParam->getFullType(), loopParam, loopBuilder.getIntValue(loopBuilder.getIntType(), 1));
     loopBuilder.emitBranch(loopHeadBlock, 1, &newParam);
+    loopBuilder.setInsertInto(ifBreakBlock);
+    loopBuilder.emitBranch(loopBreakBlock);
     return loopParam;
 }
 
