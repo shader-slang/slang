@@ -108,7 +108,20 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load";
         default:
-            return __byteAddressBufferLoad<uint>(this, location);
+            return __byteAddressBufferLoad<uint>(this, location, 0);
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    uint LoadAligned(int location)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load";
+        default:
+            return __byteAddressBufferLoad<uint>(this, location, 1);
         }
     }
 
@@ -124,7 +137,20 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location);
+            return __byteAddressBufferLoad<uint2>(this, location, 0);
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    uint2 Load2Aligned(int location)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load2";
+        default:
+            return __byteAddressBufferLoad<uint2>(this, location, 1);
         }
     }
 
@@ -140,7 +166,20 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location);
+            return __byteAddressBufferLoad<uint3>(this, location, 0);
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    uint3 Load3Aligned(int location)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load3";
+        default:
+            return __byteAddressBufferLoad<uint3>(this, location, 1);
         }
     }
 
@@ -156,7 +195,20 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location);
+            return __byteAddressBufferLoad<uint4>(this, location, 0);
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    uint4 Load4Aligned(int location)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load4";
+        default:
+            return __byteAddressBufferLoad<uint4>(this, location, 1);
         }
     }
 
@@ -167,7 +219,14 @@ struct ByteAddressBuffer
     [ForceInline]
     T Load<T>(int location)
     {
-        return __byteAddressBufferLoad<T>(this, location);
+        return __byteAddressBufferLoad<T>(this, location, 0);
+    }
+
+    [__readNone]
+    [ForceInline]
+    T LoadAligned<T>(int location)
+    {
+        return __byteAddressBufferLoad<T>(this, location, 1);
     }
 };
 
@@ -2765,23 +2824,23 @@ uint64_t __asuint64(uint2 i)
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset);
+T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset, int aligned);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, int offset);
+T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, int offset, int aligned);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, int offset);
+T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, int aligned);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, int offset, T value);
+void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, int offset, int aligned, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, T value);
+void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, int aligned, T value);
 
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLStructuredBufferType)
@@ -2898,7 +2957,20 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load";
         default:
-            return __byteAddressBufferLoad<uint>(this, location);
+            return __byteAddressBufferLoad<uint>(this, location, 0);
+        }
+    }
+
+    [__NoSideEffect]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    uint LoadAligned(int location)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load";
+        default:
+            return __byteAddressBufferLoad<uint>(this, location, 1);
         }
     }
 
@@ -2914,7 +2986,20 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location);
+            return __byteAddressBufferLoad<uint2>(this, location, 0);
+        }
+    }
+
+    [__NoSideEffect]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    uint2 Load2Aligned(int location)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load2";
+        default:
+            return __byteAddressBufferLoad<uint2>(this, location, 1);
         }
     }
 
@@ -2930,7 +3015,20 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location);
+            return __byteAddressBufferLoad<uint3>(this, location, 0);
+        }
+    }
+
+    [__NoSideEffect]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    uint3 Load3Aligned(int location)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load3";
+        default:
+            return __byteAddressBufferLoad<uint3>(this, location, 1);
         }
     }
 
@@ -2946,7 +3044,20 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location);
+            return __byteAddressBufferLoad<uint4>(this, location, 0);
+        }
+    }
+
+    [__NoSideEffect]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    uint4 Load4Aligned(int location)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load4";
+        default:
+            return __byteAddressBufferLoad<uint4>(this, location, 1);
         }
     }
 
@@ -2958,8 +3069,17 @@ struct $(item.name)
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     T Load<T>(int location)
     {
-        return __byteAddressBufferLoad<T>(this, location);
+        return __byteAddressBufferLoad<T>(this, location, 0);
     }
+
+    [__NoSideEffect]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    T LoadAligned<T>(int location)
+    {
+        return __byteAddressBufferLoad<T>(this, location, 1);
+    }
+
 ${{{{
     if (item.op == kIROp_HLSLRWByteAddressBufferType)
     {
@@ -3806,15 +3926,37 @@ ${{{{
 
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
-    void Store(
-        uint address,
-        uint value)
+    void Store(uint address, uint value)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Store";
         default:
-            __byteAddressBufferStore(this, address, value);
+            __byteAddressBufferStore(this, address, 0, value);
+        }
+    }
+
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    void StoreAligned(uint address, uint value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Store";
+        default:
+            __byteAddressBufferStore(this, address, 1, value);
+        }
+    }
+
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    void Store2Aligned(uint address, uint2 value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Store2";
+        default:
+            __byteAddressBufferStore(this, address, 1, value);
         }
     }
 
@@ -3826,42 +3968,68 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store2";
         default:
-            __byteAddressBufferStore(this, address, value);
+            __byteAddressBufferStore(this, address, 0, value);
         }
     }
 
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
-    void Store3(
-        uint address,
-        uint3 value)
+    void Store3Aligned(uint address, uint3 value)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Store3";
         default:
-            __byteAddressBufferStore(this, address, value);
+            __byteAddressBufferStore(this, address, 1, value);
         }
     }
 
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
-    void Store4(
-        uint address,
-        uint4 value)
+    void Store3(uint address, uint3 value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Store3";
+        default:
+            __byteAddressBufferStore(this, address, 0, value);
+        }
+    }
+
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    void Store4Aligned(uint address, uint4 value)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Store4";
         default:
-            __byteAddressBufferStore(this, address, value);
+            __byteAddressBufferStore(this, address, 1, value);
+        }
+    }
+
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    void Store4(uint address, uint4 value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Store4";
+        default:
+            __byteAddressBufferStore(this, address, 0, value);
         }
     }
 
     [ForceInline]
     void Store<T>(int offset, T value)
     {
-        __byteAddressBufferStore(this, offset, value);
+        __byteAddressBufferStore(this, offset, 0, value);
+    }
+
+    [ForceInline]
+    void StoreAligned<T>(int offset, T value)
+    {
+        __byteAddressBufferStore(this, offset, 1, value);
     }
 };
 
