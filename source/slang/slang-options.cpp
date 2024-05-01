@@ -1707,6 +1707,10 @@ SlangResult OptionsParser::_parse(
                 ScopedAllocation contents;
                 SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName.value, contents));
                 SLANG_RETURN_ON_FAIL(m_session->loadStdLib(contents.getData(), contents.getSizeInBytes()));
+                
+                // Ensure that the linkage's AST builder is up-to-date.
+                linkage->getASTBuilder()->m_cachedNodes = asInternal(m_session)->getGlobalASTBuilder()->m_cachedNodes;
+
                 break;
             }
             case OptionKind::CompileStdLib: m_compileStdLib = true; break;
