@@ -5530,6 +5530,7 @@ void EndToEndCompileRequest::_completeTargetRequest(UInt targetIndex)
     TargetRequest* targetRequest = linkage->targets[Index(targetIndex)];
 
     targetRequest->getOptionSet().inheritFrom(getLinkage()->m_optionSet);
+    targetRequest->getOptionSet().inheritFrom(m_optionSetForDefaultTarget);
 }
 
 void EndToEndCompileRequest::setCodeGenTarget(SlangCompileTarget target)
