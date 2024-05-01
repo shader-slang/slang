@@ -318,6 +318,11 @@ namespace Slang
             cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("FuncDecl"));
             return true;
         }
+        if (typeFlags == (int)UserDefinedAttributeTargets::Param)
+        {
+            cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("ParamDecl"));
+            return true;
+        }
         return false;
     }
 
