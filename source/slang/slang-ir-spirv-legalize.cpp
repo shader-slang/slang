@@ -182,6 +182,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRBuilder builder(cbParamInst);
         builder.setInsertBefore(cbParamInst);
         auto structType = builder.createStructType();
+        addToWorkList(structType);
         StringBuilder sb;
         sb << "cbuffer_";
         getTypeNameHint(sb, innerType);
