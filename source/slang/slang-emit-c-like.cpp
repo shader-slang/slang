@@ -3518,14 +3518,13 @@ bool CLikeSourceEmitter::isTargetIntrinsic(IRInst* inst)
     return findTargetIntrinsicDefinition(inst, intrinsicDef);
 }
 
-bool shouldWrappInExternCBlock(IRFunc* func)
+bool shouldWrapInExternCBlock(IRFunc* func)
 {
     for (auto decor : func->getDecorations())
     {
         switch (decor->getOp())
         {
         case kIROp_ExternCDecoration:
-        case kIROp_CudaKernelDecoration:
             return true;
         }
     }
@@ -3540,7 +3539,7 @@ void CLikeSourceEmitter::emitFunc(IRFunc* func)
     if (isTargetIntrinsic(func))
         return;
 
-    bool shouldCloseExternCBlock = shouldWrappInExternCBlock(func);
+    bool shouldCloseExternCBlock = shouldWrapInExternCBlock(func);
     if (shouldCloseExternCBlock)
     {
         // If this is a C++ `extern "C"` function, then we need to emit
