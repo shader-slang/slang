@@ -9,6 +9,19 @@ namespace Slang
     struct DebugValueStoreContext
     {
         Dictionary<IRType*, bool> m_mapTypeToDebugability;
+        bool isTypeKind(IRInst* inst)
+        {
+            if (!inst)
+                return true;
+            switch (inst->getOp())
+            {
+            case kIROp_TypeKind:
+            case kIROp_TypeType:
+                return true;
+            default:
+                return false;
+            }
+        }
         bool isDebuggableType(IRType* type)
         {
             if (bool* result = m_mapTypeToDebugability.tryGetValue(type))
@@ -46,6 +59,28 @@ namespace Slang
             case kIROp_PtrType:
                 debuggable = true;
                 break;
+            case kIROp_Param:
+                // Assume generic parameters are debuggable.
+                debuggable = true;
+                break;
+            case kIROp_Specialize:
+            {
+                auto specType = as<IRSpecialize>(type);
+                auto specTypeDebuggable = isDebuggableType((IRType*)getResolvedInstForDecorations(specType));
+                if (!specTypeDebuggable)
+                    break;
+                for (UInt i = 0; i < specType->getArgCount(); i++)
+                {
+                    auto arg = specType->getArg(i);
+                    if (isTypeKind(arg->getDataType()) && !isDebuggableType((IRType*)specType->getArg(i)))
+                    {
+                        specTypeDebuggable = false;
+                        break;
+                    }
+                }
+                debuggable = false;// specTypeDebuggable;
+                break;
+            }
             default:
                 if (as<IRBasicType>(type))
                     debuggable = true;
@@ -136,7 +171,9 @@ namespace Slang
             // Collect all stores and insert debug value insts to update debug vars.
 
             // Helper func to insert debugValue updates.
-            auto setDebugValue = [&](IRInst* debugVar, IRInst* rootVar, IRInst* newValue, ArrayView<IRInst*> accessChain)
+            auto setDebugValue = [&](
+                IRInst* debugVar, IRInst* rootVar, IRInst* newValue,
+                ArrayView<IRInst*> accessChain, ArrayView<IRInst*> types)
                 {
                     // SPIRV does not allow dynamic indices in DebugValue,
                     // so we need to stop the access chain at the first dynamic index.
@@ -162,7 +199,7 @@ namespace Slang
 
                     // Otherwise we need to load the entire composite value starting at the dynamic index access chain
                     // and set it.
-                    auto compositePtr = builder.emitElementAddress(rootVar, accessChain.head(i));
+                    auto compositePtr = builder.emitElementAddress(rootVar, accessChain.head(i), types.head(i));
                     auto compositeVal = builder.emitLoad(compositePtr);
                     builder.emitDebugValue(debugVar, compositeVal, accessChain.head(i));
                 };
@@ -176,24 +213,26 @@ namespace Slang
                     if (auto storeInst = as<IRStore>(inst))
                     {
                         List<IRInst*> accessChain;
-                        auto varInst = getRootAddr(storeInst->getPtr(), accessChain);
+                        List<IRInst*> types;
+                        auto varInst = getRootAddr(storeInst->getPtr(), accessChain, &types);
                         IRInst* debugVar = nullptr;
                         if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
                         {
                             builder.setInsertAfter(storeInst);
-                            setDebugValue(debugVar, varInst, storeInst->getVal(), accessChain.getArrayView());
+                            setDebugValue(debugVar, varInst, storeInst->getVal(), accessChain.getArrayView(), types.getArrayView());
                         }
                     }
                     else if (auto swizzledStore = as<IRSwizzledStore>(inst))
                     {
                         List<IRInst*> accessChain;
-                        auto varInst = getRootAddr(swizzledStore->getDest(), accessChain);
+                        List<IRInst*> types;
+                        auto varInst = getRootAddr(swizzledStore->getDest(), accessChain, &types);
                         IRInst* debugVar = nullptr;
                         if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
                         {
                             builder.setInsertAfter(swizzledStore);
                             auto loadVal = builder.emitLoad(swizzledStore->getDest());
-                            setDebugValue(debugVar, varInst, loadVal, accessChain.getArrayView());
+                            setDebugValue(debugVar, varInst, loadVal, accessChain.getArrayView(), types.getArrayView());
                         }
                     }
                     else if (auto callInst = as<IRCall>(inst))
@@ -207,13 +246,14 @@ namespace Slang
                             if (!as<IRPtrTypeBase>(arg->getDataType()))
                                 continue;
                             List<IRInst*> accessChain;
-                            auto varInst = getRootAddr(arg, accessChain);
+                            List<IRInst*> types;
+                            auto varInst = getRootAddr(arg, accessChain, &types);
                             IRInst* debugVar = nullptr;
                             if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
                             {
                                 builder.setInsertAfter(callInst);
                                 auto loadVal = builder.emitLoad(arg);
-                                setDebugValue(debugVar, varInst, loadVal, accessChain.getArrayView());
+                                setDebugValue(debugVar, varInst, loadVal, accessChain.getArrayView(), types.getArrayView());
                             }
                         }
                     }

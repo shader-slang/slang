@@ -3796,7 +3796,6 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(Module* module, TranslationUn
 
     IncludeSystem includeSystem;
     auto sourceFile = findFile(name, loc, includeSystem);
-
     if (!sourceFile)
     {
         sink->diagnose(loc, Diagnostics::cannotOpenFile, getText(name));

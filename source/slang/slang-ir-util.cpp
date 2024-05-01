@@ -652,7 +652,7 @@ IRInst* getRootAddr(IRInst* addr)
     return addr;
 }
 
-IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain)
+IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes)
 {
     for (;;)
     {
@@ -661,6 +661,8 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain)
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
             outAccessChain.add(addr->getOperand(1));
+            if (outTypes)
+                outTypes->add(addr->getFullType());
             addr = addr->getOperand(0);
             continue;
         default:
@@ -669,6 +671,8 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain)
         break;
     }
     outAccessChain.reverse();
+    if (outTypes)
+        outTypes->reverse();
     return addr;
 }
 
