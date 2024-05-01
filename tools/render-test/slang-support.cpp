@@ -211,6 +211,8 @@ void ShaderCompilerUtil::Output::reset()
 
         spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
     }
+    
+    spSetDebugInfoLevel(slangRequest, SLANG_DEBUG_INFO_LEVEL_STANDARD);
 
     const SlangResult res = spCompile(slangRequest);
 
