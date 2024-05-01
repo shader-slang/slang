@@ -4,6 +4,7 @@
 #include "slang-ir-util.h"
 
 #include "../core/slang-basic.h"
+#include "../core/slang-writer.h"
 
 #include "slang-ir-dominators.h"
 
@@ -8605,6 +8606,14 @@ namespace Slang
         }
     }
 
+    void IRInst::dumps()
+    {
+        StringBuilder sb;
+        IRDumpOptions options;
+        StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
+        dumpIR(this, options, nullptr, &writer);
+        std::cout << sb.toString().begin();
+    }
 } // namespace Slang
 
 #if SLANG_VC
