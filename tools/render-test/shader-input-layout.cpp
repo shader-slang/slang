@@ -222,6 +222,11 @@ namespace renderer_test
                 parser.Read("=");
                 val->bufferDesc.stride = parser.ReadInt();
             }
+            else if (word == "count")
+            {
+                parser.Read("=");
+                val->bufferDesc.elementCount = parser.ReadInt();
+            }
             else if (word == "counter")
             {
                 parser.Read("=");

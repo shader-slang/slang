@@ -207,7 +207,10 @@ struct AssignValsFromLayoutContext
     {
         const InputBufferDesc& srcBuffer = srcVal->bufferDesc;
         auto& bufferData = srcVal->bufferData;
-        const size_t bufferSize = bufferData.getCount() * sizeof(uint32_t);
+        const size_t bufferSize = Math::Max((size_t)bufferData.getCount() * sizeof(uint32_t), (size_t)(srcBuffer.elementCount * srcBuffer.stride));
+        bufferData.reserve(bufferSize / sizeof(uint32_t));
+        for (size_t i = bufferData.getCount(); i < bufferSize / sizeof(uint32_t); i++)
+            bufferData.add(0);
 
         ComPtr<IBufferResource> bufferResource;
         SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(srcBuffer, /*entry.isOutput,*/ bufferSize, bufferData.getBuffer(), device, bufferResource));
@@ -232,6 +235,7 @@ struct AssignValsFromLayoutContext
                 const InputBufferDesc& counterBufferDesc{
                     InputBufferType::StorageBuffer,
                     sizeof(uint32_t),
+                    1,
                     Format::Unknown,
                 };
                 SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(
