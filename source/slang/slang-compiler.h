@@ -1483,7 +1483,7 @@ namespace Slang
             ///
         void _collectShaderParams();
 
-        void _discoverEntryPoints(DiagnosticSink* sink);
+        void _discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets);
 
         class ModuleSpecializationInfo : public SpecializationInfo
         {
