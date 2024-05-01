@@ -68,6 +68,7 @@ struct InputBufferDesc
 {
     InputBufferType type = InputBufferType::StorageBuffer;
     int stride = 0; // stride == 0 indicates an unstructured buffer.
+    int elementCount = 1;
     Format format = Format::Unknown;
     // For RWStructuredBuffer, AppendStructuredBuffer, ConsumeStructuredBuffer
     // the default value of 0xffffffff indicates that a counter buffer should
