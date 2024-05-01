@@ -3883,10 +3883,9 @@ public property mat4x3 gl_ObjectToWorldEXT
         }
         case spirv:
         {
-            return spirv_asm 
+            return spirv_asm
             {
-                %mat:$$mat3x4 = OpLoad builtin(ObjectToWorldKHR:mat3x4);
-                result:$$mat4x3 = OpTranspose %mat
+                result:$$mat4x3 = OpLoad builtin(ObjectToWorldKHR:mat4x3);
             };
         }
         }
@@ -3909,7 +3908,8 @@ public property mat3x4 gl_ObjectToWorld3x4EXT
         {
             return spirv_asm 
             {
-                result:$$mat3x4 = OpLoad builtin(ObjectToWorldKHR:mat3x4)
+                %mat:$$mat4x3 = OpLoad builtin(ObjectToWorldKHR:mat4x3);
+                result:$$mat3x4 = OpTranspose %mat
             };
         }
         }
@@ -3932,8 +3932,7 @@ public property mat4x3 gl_WorldToObjectEXT
         {
             return spirv_asm 
             {
-                %mat:$$mat3x4 = OpLoad builtin(WorldToObjectKHR:mat3x4);
-                result:$$mat4x3 = OpTranspose %mat
+                result:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
             };
         }
         }
@@ -3956,7 +3955,8 @@ public property mat3x4 gl_WorldToObject3x4EXT
         {
             return spirv_asm 
             {
-                result:$$mat3x4 = OpLoad builtin(WorldToObjectKHR:mat3x4)
+                %mat:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
+                result:$$mat3x4 = OpTranspose %mat
             };
         }
         }
