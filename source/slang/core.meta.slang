@@ -2569,6 +2569,7 @@ enum _AttributeTargets
     Struct = $( (int) UserDefinedAttributeTargets::Struct),
     Var = $( (int) UserDefinedAttributeTargets::Var),
     Function = $( (int) UserDefinedAttributeTargets::Function),
+    Param = $( (int) UserDefinedAttributeTargets::Param),
 };
 __attributeTarget(StructDecl)
 attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;
