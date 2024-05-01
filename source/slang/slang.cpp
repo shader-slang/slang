@@ -5335,7 +5335,7 @@ void Linkage::prepareDeserializedModule(SerialContainerData::Module& moduleEntry
     module->setPathInfo(filePathInfo);
     module->setDigest(moduleEntry.digest);
     module->_collectShaderParams();
-    module->_discoverEntryPoints(sink);
+    module->_discoverEntryPoints(sink, targets);
 
     // Hook up fileDecl's scope to module's scope.
     auto moduleDecl = module->getModuleDecl();
