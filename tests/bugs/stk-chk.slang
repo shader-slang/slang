@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu 
+//TEST(compute):COMPARE_COMPUTE:-cpu -g0
 
 // Tests slang-llvm can deal with large items on stack. 
 // On some targets this requires special handling (_chkstk on windows for example) 
