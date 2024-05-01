@@ -383,6 +383,12 @@ namespace Slang
             }
         }
 
+        if (declRef.getDecl()->hasModifier<ExternCppModifier>())
+        {
+            emit(context, declRef.getDecl()->getName()->text);
+            return;
+        }
+
         auto parentDeclRef = declRef.getParent();
         if (as<FileDecl>(parentDeclRef))
             parentDeclRef = parentDeclRef.getParent();

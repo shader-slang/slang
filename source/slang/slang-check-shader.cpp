@@ -519,7 +519,7 @@ namespace Slang
             targetCaps.join(stageCapabilitySet);
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
-                sink->diagnose(entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
+                diagnoseCapabilityErrors(sink, linkage->m_optionSet, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
                 auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getExpandedAtoms();
 
                 // Find out what exactly is incompatible and print out a trace of provenance to
@@ -533,7 +533,7 @@ namespace Slang
                         {
                             if (CapabilityConjunctionSet(inferredAtom).isIncompatibleWith(atom))
                             {
-                                diagnoseCapabilityProvenance(sink, entryPointFuncDecl, inferredAtom);
+                                diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtom);
                                 goto breakLabel;
                             }
                         }
@@ -918,7 +918,7 @@ namespace Slang
             for (Index tt = 0; tt < translationUnitCount; ++tt)
             {
                 auto translationUnit = translationUnits[tt];
-                translationUnit->getModule()->_discoverEntryPoints(sink);
+                translationUnit->getModule()->_discoverEntryPoints(sink, this->getLinkage()->targets);
             }
         }
     }
@@ -1229,9 +1229,22 @@ namespace Slang
                 DeclRef<GenericTypeConstraintDecl> constraintDeclRef = astBuilder->getDirectDeclRef(constraintDecl.getDecl());
                 int argIndex = -1;
                 int ii = 0;
-                for (auto member : genericDeclRef.getDecl()->members)
+
+                // Find the generic parameter type (T) that this constraint (T:IFoo) is applying to.
+                auto genericParamType = getSub(astBuilder, constraintDeclRef);
+                auto genParamDeclRefType = as<DeclRefType>(genericParamType);
+                if (!genParamDeclRefType)
                 {
-                    if (member == constraintDeclRef.getDecl())
+                    continue;
+                }
+                auto genParamDeclRef = genParamDeclRefType->getDeclRef();
+
+                // Find the generic argument index of the corresponding generic parameter type in the
+                // generic parameter set.
+                //
+                for (auto member : genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDecl>())
+                {
+                    if (member == genParamDeclRef.getDecl())
                     {
                         argIndex = ii;
                         break;
@@ -1243,7 +1256,6 @@ namespace Slang
                     SLANG_ASSERT(!"generic parameter not found in generic decl");
                     continue;
                 }
-
                 auto sub = as<Type>(args[argIndex].val);
                 if (!sub)
                 {

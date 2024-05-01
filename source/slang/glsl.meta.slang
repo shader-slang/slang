@@ -9,8 +9,6 @@
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
     vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
-#define REQUIRE_KHRONOS [require(glsl)] [require(spirv)]
-
 //
 // OpenGL 4.60 spec
 //
@@ -107,11 +105,11 @@ public in uvec3 gl_WorkGroupID : SV_GroupID;
 public in uvec3 gl_LocalInvocationIndex : SV_GroupIndex;
 public in uvec3 gl_LocalInvocationID : SV_GroupThreadID;
 
-[require(glsl)]
-[require(spirv)]
 public property uint3 gl_NumWorkGroups {
 
-    get {
+    [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+    get 
+    {
         __target_switch
         {
         case glsl:
@@ -124,20 +122,14 @@ public property uint3 gl_NumWorkGroups {
     }
 }
 
-[require(glsl)]
-[require(spirv)]
-public property uint3 gl_WorkGroupSize {
-
-    get {
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_WorkGroupSize)";
-        case spirv:
-            return spirv_asm {
-                    result:$$uint3 = OpLoad builtin(WorkgroupSize:uint3);
-                };
-        }
+[require(compute)]
+public property uint3 gl_WorkGroupSize
+{
+    [__unsafeForceInlineEarly]
+    [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+    get
+    {
+        return WorkgroupSize();
     }
 }
 
@@ -160,6 +152,7 @@ public in int gl_ViewportIndex : SV_ViewportArrayIndex;
 
 [OverloadRank(15)]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<float, N, N> m2)
 {
     return mul(m2, m1);
@@ -167,6 +160,7 @@ public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<f
 
 [OverloadRank(15)]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<half, N, N> m2)
 {
     return mul(m2, m1);
@@ -174,6 +168,7 @@ public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<hal
 
 [OverloadRank(15)]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix<double, N, N> m2)
 {
     return mul(m2, m1);
@@ -181,6 +176,7 @@ public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix
 
 [ForceInline]
 [OverloadRank(15)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public matrix<T, R, L> operator*<T:__BuiltinFloatingPointType, let L : int, let C : int, let R : int>(matrix<T, C, L> m1, matrix<T, R, C> m2)
 {
     return mul(m2, m1);
@@ -188,6 +184,7 @@ public matrix<T, R, L> operator*<T:__BuiltinFloatingPointType, let L : int, let 
 
 [ForceInline]
 [OverloadRank(15)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T, R> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(vector<T, C> v, matrix<T, R, C> m)
 {
     return mul(m, v);
@@ -195,6 +192,7 @@ public vector<T, R> operator*<T:__BuiltinFloatingPointType, let C : int, let R :
 
 [ForceInline]
 [OverloadRank(15)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T, C> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(matrix<T, R, C> m, vector<T, R> v)
 {
     return mul(v, m);
@@ -231,6 +229,7 @@ public extension vector<T, 3>
 
 [ForceInline]
 [OverloadRank(15)]
+[require(cpp_cuda_glsl_hlsl_spirv)]
 public bool operator==<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -238,6 +237,7 @@ public bool operator==<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, 
 
 [ForceInline]
 [OverloadRank(15)]
+[require(cpp_cuda_glsl_hlsl_spirv)]
 public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -245,6 +245,7 @@ public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, 
 
 [ForceInline]
 [OverloadRank(14)]
+[require(cpp_cuda_glsl_hlsl_spirv)]
 public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -252,6 +253,7 @@ public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> lef
 
 [ForceInline]
 [OverloadRank(14)]
+[require(cpp_cuda_glsl_hlsl_spirv)]
 public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -259,6 +261,7 @@ public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> lef
 
 [ForceInline]
 [OverloadRank(14)]
+[require(cpp_cuda_glsl_hlsl_spirv)]
 public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -266,6 +269,7 @@ public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vec
 
 [ForceInline]
 [OverloadRank(14)]
+[require(cpp_cuda_glsl_hlsl_spirv)]
 public bool operator!=<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -278,6 +282,7 @@ for (auto type : kBaseTypes) {
 }}}}
 [ForceInline]
 [OverloadRank(15)]
+[require(cpp_cuda_glsl_hlsl_spirv)]
 public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
 {
     return all(equal(left, right));
@@ -285,6 +290,7 @@ public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName
 
 [ForceInline]
 [OverloadRank(15)]
+[require(cpp_cuda_glsl_hlsl_spirv)]
 public bool operator!=<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
 {
     return any(notEqual(left, right));
@@ -300,6 +306,7 @@ ${{{{
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public T atan(T y, T x)
 {
     return atan2(y, x);
@@ -308,60 +315,79 @@ public T atan(T y, T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
 {
     return atan2(y, x);
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(cuda, "$P_asinh($0)")
-__target_intrinsic(cpp, "$P_asinh($0)")
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public T asinh(T x)
 {
-    return log(x + sqrt(x * x + T(1)));
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "$P_asinh($0)";
+    case cuda: __intrinsic_asm "$P_asinh($0)";
+    default:
+        return log(x + sqrt(x * x + T(1)));
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public vector<T,N> asinh(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, asinh, x);
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(cuda, "$P_acosh($0)")
-__target_intrinsic(cpp, "$P_acosh($0)")
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public T acosh(T x)
 {
-    return log(x + sqrt( x * x - T(1)));
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "$P_acosh($0)";
+    case cuda: __intrinsic_asm "$P_acosh($0)";
+    default:
+        return log(x + sqrt( x * x - T(1)));
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public vector<T,N> acosh(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, acosh, x);
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(cuda, "$P_atanh($0)")
-__target_intrinsic(cpp, "$P_atanh($0)")
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public T atanh(T x)
 {
-    return T(0.5) * log((T(1) + x) / (T(1) - x));
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "$P_atanh($0)";
+    case cuda: __intrinsic_asm "$P_atanh($0)";
+    default:
+        return T(0.5) * log((T(1) + x) / (T(1) - x));
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T,N> atanh(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, atanh, x);
@@ -374,6 +400,7 @@ public vector<T,N> atanh(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public T inversesqrt(T x)
 {
     return rsqrt(x);
@@ -382,6 +409,7 @@ public T inversesqrt(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public vector<T, N> inversesqrt(vector<T, N> x)
 {
     return rsqrt(x);
@@ -394,6 +422,7 @@ public vector<T, N> inversesqrt(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public T roundEven(T x)
 {
     T i;
@@ -411,6 +440,7 @@ public T roundEven(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public vector<T,N> roundEven(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, roundEven, x);
@@ -419,6 +449,7 @@ public vector<T,N> roundEven(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public T fract(T x)
 {
     return frac(x);
@@ -427,6 +458,7 @@ public T fract(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T, N> fract(vector<T, N> x)
 {
     return frac(x);
@@ -435,6 +467,7 @@ public vector<T, N> fract(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public T mod(T x, T y)
 {
     return fmod(x, y);
@@ -443,6 +476,7 @@ public T mod(T x, T y)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T, N> mod(vector<T, N> x, T y)
 {
     return fmod(x, vector<T, N>(y));
@@ -451,6 +485,7 @@ public vector<T, N> mod(vector<T, N> x, T y)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
 {
     return fmod(x, y);
@@ -459,6 +494,7 @@ public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public T mix(T x, T y, T a)
 {
     return lerp(x, y, a);
@@ -467,6 +503,7 @@ public T mix(T x, T y, T a)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, T a)
 {
     return lerp(x, y, vector<T, N>(a));
@@ -475,6 +512,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, T a)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<T, N> a)
 {
     return lerp(x, y, a);
@@ -483,6 +521,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<T, N> a)
 __generic<T>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public T mix(T x, T y, bool a)
 {
     return (a ? y : x);
@@ -491,6 +530,7 @@ public T mix(T x, T y, bool a)
 __generic<T, let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
 {
     vector<T, N> result;
@@ -503,6 +543,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
 
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public int floatBitsToInt(highp float x)
 {
     return asint(x);
@@ -511,6 +552,7 @@ public int floatBitsToInt(highp float x)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vector<int, N> floatBitsToInt(highp vector<float, N> x)
 {
     return asint(x);
@@ -518,6 +560,7 @@ public vector<int, N> floatBitsToInt(highp vector<float, N> x)
 
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uint floatBitsToUint(highp float x)
 {
     return asuint(x);
@@ -526,6 +569,7 @@ public uint floatBitsToUint(highp float x)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vector<uint, N> floatBitsToUint(highp vector<float, N> x)
 {
     return asuint(x);
@@ -533,6 +577,7 @@ public vector<uint, N> floatBitsToUint(highp vector<float, N> x)
 
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public float intBitsToFloat(highp int x)
 {
     return asfloat(x);
@@ -541,6 +586,7 @@ public float intBitsToFloat(highp int x)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vector<float, N> intBitsToFloat(highp vector<int, N> x)
 {
     return asfloat(x);
@@ -548,6 +594,7 @@ public vector<float, N> intBitsToFloat(highp vector<int, N> x)
 
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public float uintBitsToFloat(highp uint x)
 {
     return asfloat(x);
@@ -556,6 +603,7 @@ public float uintBitsToFloat(highp uint x)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vector<float, N> uintBitsToFloat(highp vector<uint, N> x)
 {
     return asfloat(x);
@@ -597,32 +645,37 @@ uint packSnorm1x8(float c)
 [ForceInline]
 float unpackUnorm1x16(uint p)
 {
-    return float(p) / 65535.0;
+    const uint wordMask = 0xffff;
+    return float(p & wordMask) / 65535.0;
 }
 
 [__readNone]
 [ForceInline]
 float unpackSnorm1x16(uint p)
 {
-    return clamp((float(p) - 32767.0) / 32767.0, -1.0, 1.0);
+    const uint wordMask = 0xffff;
+    return clamp((float(p & wordMask) - 32767.0) / 32767.0, -1.0, 1.0);
 }
 
 [__readNone]
 [ForceInline]
 float unpackUnorm1x8(uint p)
 {
-    return float(p) / 255.0;
+    const uint byteMask = 0xff;
+    return float(p & byteMask) / 255.0;
 }
 
 [__readNone]
 [ForceInline]
 float unpackSnorm1x8(uint p)
 {
-    return clamp((float(p) - 127.0) / 127.0, -1.0, 1.0);
+    const uint byteMask = 0xff;
+    return clamp((float(p & byteMask) - 127.0) / 127.0, -1.0, 1.0);
 }
 
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 uint float2half(float f)
 {
     uint u = floatBitsToUint(f);
@@ -636,119 +689,192 @@ uint float2half(float f)
     return (s | e | m);
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uint packUnorm2x16(vec2 v)
 {
-    return packUnorm1x16(v.x) | (packUnorm1x16(v.y) << uint(16));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packUnorm2x16";
+    default:
+        return packUnorm1x16(v.x) | (packUnorm1x16(v.y) << uint(16));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uint packSnorm2x16(vec2 v)
 {
-    return packSnorm1x16(v.x) | (packSnorm1x16(v.y) << uint(16));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packSnorm2x16";
+    default:
+        return packSnorm1x16(v.x) | (packSnorm1x16(v.y) << uint(16));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uint packUnorm4x8(vec4 v)
 {
-    return packUnorm1x8(v.x) | (packUnorm1x8(v.y) << uint(8)) | (packUnorm1x8(v.z) << uint(16)) | (packUnorm1x8(v.w) << uint(24));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packUnorm4x8";
+    default:
+        return packUnorm1x8(v.x) | (packUnorm1x8(v.y) << uint(8)) | (packUnorm1x8(v.z) << uint(16)) | (packUnorm1x8(v.w) << uint(24));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uint packSnorm4x8(vec4 v)
 {
-    return packSnorm1x8(v.x) | (packSnorm1x8(v.y) << uint(8)) | (packSnorm1x8(v.z) << uint(16)) | (packSnorm1x8(v.w) << uint(24));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packSnorm4x8";
+    default:
+        return packSnorm1x8(v.x) | (packSnorm1x8(v.y) << uint(8)) | (packSnorm1x8(v.z) << uint(16)) | (packSnorm1x8(v.w) << uint(24));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec2 unpackUnorm2x16(uint p)
 {
-    return vec2(unpackUnorm1x16(p & uint(0xffff)), unpackUnorm1x16(p >> uint(16)));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackUnorm2x16";
+    default:
+        return vec2(unpackUnorm1x16(p & uint(0xffff)), unpackUnorm1x16(p >> uint(16)));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec2 unpackSnorm2x16(uint p)
 {
-    return vec2(unpackSnorm1x16(p & uint(0xffff)), unpackSnorm1x16(p >> uint(16)));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackSnorm2x16";
+    default:
+        return vec2(unpackSnorm1x16(p & uint(0xffff)), unpackSnorm1x16(p >> uint(16)));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec4 unpackUnorm4x8(highp uint p)
 {
-    return vec4(unpackUnorm1x8(p & uint(0xffff)), unpackUnorm1x8(p >> uint(8)), unpackUnorm1x8(p >> uint(16)), unpackUnorm1x8(p >> uint(24)));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackUnorm4x8";
+    default:
+        return vec4(
+            unpackUnorm1x8(p),
+            unpackUnorm1x8(p >> 8),
+            unpackUnorm1x8(p >> 16),
+            unpackUnorm1x8(p >> 24));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec4 unpackSnorm4x8(highp uint p)
 {
-    return vec4(unpackSnorm1x8(p & uint(0xffff)), unpackSnorm1x8(p >> uint(8)), unpackSnorm1x8(p >> uint(16)), unpackSnorm1x8(p >> uint(24)));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackSnorm4x8";
+    default:
+        return vec4(
+            unpackSnorm1x8(p),
+            unpackSnorm1x8(p >> 8),
+            unpackSnorm1x8(p >> 16),
+            unpackSnorm1x8(p >> 24));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uint packHalf2x16(vec2 v)
 {
-    return float2half(v.x) | (float2half(v.y) << uint(16));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packHalf2x16";
+    default:
+        return float2half(v.x) | (float2half(v.y) << uint(16));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public float half2float(uint h)
 {
-    uint s = ((h & uint(0x8000)) << uint(16));
-    uint e = 0;
-    uint m = ((h & uint(0x03ff)) << uint(13));
-    if (m != 0)
+    __target_switch
     {
-        e = (((h & uint(0x7c00)) + uint(0x1c000)) << uint(13));
+    case glsl: __intrinsic_asm "half2float";
+    default:
+        uint s = ((h & uint(0x8000)) << uint(16));
+        uint e = 0;
+        uint m = ((h & uint(0x03ff)) << uint(13));
+        if (m != 0)
+        {
+            e = (((h & uint(0x7c00)) + uint(0x1c000)) << uint(13));
+        }
+        return uintBitsToFloat(s | e | m); 
     }
-    return uintBitsToFloat(s | e | m); 
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public vec2 unpackHalf2x16(uint p)
 {
-    return vec2(half2float(p & uint(0xffff)), half2float(p >> uint(16)));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackHalf2x16";
+    default:
+        return vec2(half2float(p & uint(0xffff)), half2float(p >> uint(16)));
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public double packDouble2x32(uvec2 v)
 {
-    // TODO: there is no "asdouble()"
-    //return asdouble(uint64_t(v.x) | (uint64_t(v.y) << 32));
-    return 0.0;
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packDouble2x32";
+    default:
+        // TODO: there is no "asdouble()"
+        //return asdouble(uint64_t(v.x) | (uint64_t(v.y) << 32));
+        return 0.0;
+    }
 }
 
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 public uvec2 unpackDouble2x32(double v)
 {
-    // TODO: there is no "asuint64()"
-    uint64_t u = 0; // asuint64(v);
-    return uvec2(uint(u & 0xFFFFFFFF), uint(u >> 32));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackDouble2x32";
+    default:
+        // TODO: there is no "asuint64()"
+        uint64_t u = 0; // asuint64(v);
+        return uvec2(uint(u & 0xFFFFFFFF), uint(u >> 32));
+    }
 }
 
 //
@@ -758,6 +884,7 @@ public uvec2 unpackDouble2x32(double v)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
 public T faceforward(T n, T i, T ng)
 {
     return dot(ng, i) < T(0.0f) ? n : -n;
@@ -768,28 +895,39 @@ public T faceforward(T n, T i, T ng)
 //
 
 __generic<T : __BuiltinFloatingPointType, let C : int, let R : int>
-__target_intrinsic(glsl)
 [__readNone]
 [ForceInline]
 [OverloadRank(15)]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
 public matrix<T, C, R> outerProduct(vector<T, C> c, vector<T, R> r)
 {
-    // Column major matrix in GLSL
-    matrix<T, C, R> result;
-    for (int i = 0; i < C; ++i)
+    __target_switch
     {
-        for (int j = 0; j < R; ++j)
+    case glsl: __intrinsic_asm "outerProduct";
+    default:
+        // Column major matrix in GLSL
+        matrix<T, C, R> result;
+        for (int i = 0; i < C; ++i)
         {
-            result[i][j] = c[i] * r[j];
+            for (int j = 0; j < R; ++j)
+            {
+                result[i][j] = c[i] * r[j];
+            }
         }
+        return result;
     }
-    return result;
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-matrix<T,N,N> inverse(matrix<T,N,N> m);
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+matrix<T,N,N> inverse(matrix<T,N,N> m)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "inverse";
+    case hlsl: __intrinsic_asm "inverse";
+    }
+}
 
 //
 // Section 8.8. Integer Functions
@@ -994,27 +1132,35 @@ public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
     VECTOR_MAP_UNARY(int, N, bitfieldReverse, value);
 }
 
-[__readNone] [ForceInline] REQUIRE_KHRONOS
+[__readNone] 
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public uint bitCount(uint value)
 {
     return countbits(value);
 }
 
 __generic<let N:int>
-[__readNone] [ForceInline] REQUIRE_KHRONOS
+[__readNone] 
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public vector<uint,N> bitCount(vector<uint,N> value)
 {
     VECTOR_MAP_UNARY(uint, N, countbits, value);
 }
 
-[__readNone] [ForceInline] REQUIRE_KHRONOS
+[__readNone] 
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public int bitCount(int value)
 {
     return countbits(uint(value));
 }
     
 __generic<let N:int>
-[__readNone] [ForceInline] REQUIRE_KHRONOS
+[__readNone] 
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public vector<int,N> bitCount(vector<int,N> value)
 {
     VECTOR_MAP_UNARY(int, N, countbits, value);
@@ -1022,6 +1168,7 @@ public vector<int,N> bitCount(vector<int,N> value)
 
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public int findLSB(int v)
 {
     return firstbitlow(v);
@@ -1030,6 +1177,7 @@ public int findLSB(int v)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public vector<int,N> findLSB(vector<int,N> value)
 {
     return firstbitlow(value);
@@ -1037,6 +1185,7 @@ public vector<int,N> findLSB(vector<int,N> value)
 
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public uint findLSB(uint v)
 {
     return firstbitlow(v);
@@ -1045,6 +1194,7 @@ public uint findLSB(uint v)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public vector<uint,N> findLSB(vector<uint,N> value)
 {
     return firstbitlow(value);
@@ -1052,6 +1202,7 @@ public vector<uint,N> findLSB(vector<uint,N> value)
 
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public int findMSB(int value)
 {
     return firstbithigh(value);
@@ -1060,6 +1211,7 @@ public int findMSB(int value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public vector<int,N> findMSB(vector<int,N> value)
 {
     return firstbithigh(value);
@@ -1067,6 +1219,7 @@ public vector<int,N> findMSB(vector<int,N> value)
 
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public uint findMSB(uint value)
 {
     return firstbithigh(value);
@@ -1075,6 +1228,7 @@ public uint findMSB(uint value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public vector<uint,N> findMSB(vector<uint,N> value)
 {
     return firstbithigh(value);
@@ -1250,6 +1404,7 @@ public typealias usamplerBuffer = SamplerBuffer<uint4>;
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_size)]
 public int textureSize(Sampler1D<vector<T,N>> sampler, int lod)
 {
     int result;
@@ -1260,6 +1415,7 @@ public int textureSize(Sampler1D<vector<T,N>> sampler, int lod)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_size)]
 public ivec2 textureSize(Sampler2D<vector<T,N>> sampler, int lod)
 {
     vector<int,2> result;
@@ -1270,6 +1426,7 @@ public ivec2 textureSize(Sampler2D<vector<T,N>> sampler, int lod)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_size)]
 public ivec3 textureSize(Sampler3D<vector<T,N>> sampler, int lod)
 {
     vector<int,3> result;
@@ -1280,6 +1437,7 @@ public ivec3 textureSize(Sampler3D<vector<T,N>> sampler, int lod)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_size)]
 public ivec2 textureSize(SamplerCube<vector<T,N>> sampler, int lod)
 {
     vector<int,2> result;
@@ -1289,6 +1447,7 @@ public ivec2 textureSize(SamplerCube<vector<T,N>> sampler, int lod)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_size)]
 public int textureSize(sampler1DShadow sampler, int lod)
 {
     int result;
@@ -1298,6 +1457,7 @@ public int textureSize(sampler1DShadow sampler, int lod)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_size)]
 public ivec2 textureSize(sampler2DShadow sampler, int lod)
 {
     vector<int,2> result;
@@ -1307,6 +1467,7 @@ public ivec2 textureSize(sampler2DShadow sampler, int lod)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_size)]
 public ivec2 textureSize(samplerCubeShadow sampler, int lod)
 {
     vector<int,2> result;
@@ -1315,6 +1476,7 @@ public ivec2 textureSize(samplerCubeShadow sampler, int lod)
     return result;
 }
 
+[require(glsl_hlsl_spirv, texture_size)]
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 public ivec3 textureSize(SamplerCubeArray<vector<T,N>> sampler, int lod)
@@ -1326,6 +1488,7 @@ public ivec3 textureSize(SamplerCubeArray<vector<T,N>> sampler, int lod)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_size)]
 public ivec3 textureSize(samplerCubeArrayShadow sampler, int lod)
 {
     vector<int,3> result;
@@ -1334,6 +1497,7 @@ public ivec3 textureSize(samplerCubeArrayShadow sampler, int lod)
     return result;
 }
 
+[require(glsl_hlsl_spirv, texture_size)]
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 public ivec2 textureSize(Sampler2DRect<vector<T,N>> sampler)
@@ -1345,6 +1509,7 @@ public ivec2 textureSize(Sampler2DRect<vector<T,N>> sampler)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_size)]
 public ivec2 textureSize(sampler2DRectShadow sampler)
 {
     vector<int,2> result;
@@ -1353,6 +1518,7 @@ public ivec2 textureSize(sampler2DRectShadow sampler)
     return result;
 }
 
+[require(glsl_hlsl_spirv, texture_size)]
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 public ivec2 textureSize(Sampler1DArray<vector<T,N>> sampler, int lod)
@@ -1364,6 +1530,7 @@ public ivec2 textureSize(Sampler1DArray<vector<T,N>> sampler, int lod)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_size)]
 public ivec2 textureSize(sampler1DArrayShadow sampler, int lod)
 {
     vector<int,2> result;
@@ -1372,6 +1539,7 @@ public ivec2 textureSize(sampler1DArrayShadow sampler, int lod)
     return result;
 }
 
+[require(glsl_hlsl_spirv, texture_size)]
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 public ivec3 textureSize(Sampler2DArray<vector<T,N>> sampler, int lod)
@@ -1383,6 +1551,7 @@ public ivec3 textureSize(Sampler2DArray<vector<T,N>> sampler, int lod)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_size)]
 public ivec3 textureSize(sampler2DArrayShadow sampler, int lod)
 {
     vector<int,3> result;
@@ -1391,6 +1560,7 @@ public ivec3 textureSize(sampler2DArrayShadow sampler, int lod)
     return result;
 }
 
+[require(glsl_hlsl_spirv, texture_size)]
 __generic<T:__BuiltinArithmeticType, let N:int, let format:int>
 [ForceInline]
 public int textureSize(SamplerBuffer<vector<T,N>,format> sampler)
@@ -1400,6 +1570,7 @@ public int textureSize(SamplerBuffer<vector<T,N>,format> sampler)
     return int(result);
 }
 
+[require(glsl_hlsl_spirv, texture_size)]
 __generic<T:__BuiltinArithmeticType, let N:int, let sampleCount:int>
 [ForceInline]
 public ivec2 textureSize(Sampler2DMS<vector<T,N>,sampleCount> sampler)
@@ -1411,6 +1582,7 @@ public ivec2 textureSize(Sampler2DMS<vector<T,N>,sampleCount> sampler)
     return result;
 }
 
+[require(glsl_hlsl_spirv, texture_size)]
 __generic<T:__BuiltinArithmeticType, let N:int, let sampleCount:int>
 [ForceInline]
 public ivec3 textureSize(Sampler2DMSArray<vector<T,N>,sampleCount> sampler)
@@ -1426,8 +1598,9 @@ public ivec3 textureSize(Sampler2DMSArray<vector<T,N>,sampleCount> sampler)
 // textureQueryLod
 // -------------------
 
-__generic<T, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:IFloat, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylod)]
 public vec2 textureQueryLod(__TextureImpl<
         T,
         __Shape1D,
@@ -1446,8 +1619,9 @@ public vec2 textureQueryLod(__TextureImpl<
         );
 }
 
-__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylod)]
 public vec2 textureQueryLod(__TextureImpl<T,
         Shape,
         isArray,
@@ -1471,6 +1645,7 @@ public vec2 textureQueryLod(__TextureImpl<T,
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(Sampler1D<vector<T,N>> sampler)
 {
     int width;
@@ -1481,6 +1656,7 @@ public int textureQueryLevels(Sampler1D<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(Sampler2D<vector<T,N>> sampler)
 {
     vector<int,2> dim;
@@ -1491,6 +1667,7 @@ public int textureQueryLevels(Sampler2D<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(Sampler3D<vector<T,N>> sampler)
 {
     vector<int,3> dim;
@@ -1501,6 +1678,7 @@ public int textureQueryLevels(Sampler3D<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(SamplerCube<vector<T,N>> sampler)
 {
     vector<int,2> dim;
@@ -1511,6 +1689,7 @@ public int textureQueryLevels(SamplerCube<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(Sampler1DArray<vector<T,N>> sampler)
 {
     vector<int,2> dim;
@@ -1521,6 +1700,7 @@ public int textureQueryLevels(Sampler1DArray<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(Sampler2DArray<vector<T,N>> sampler)
 {
     vector<int,3> dim;
@@ -1531,6 +1711,7 @@ public int textureQueryLevels(Sampler2DArray<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(SamplerCubeArray<vector<T,N>> sampler)
 {
     vector<int,3> dim;
@@ -1540,6 +1721,7 @@ public int textureQueryLevels(SamplerCubeArray<vector<T,N>> sampler)
 }
 
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(sampler1DShadow sampler)
 {
     int dim;
@@ -1549,6 +1731,7 @@ public int textureQueryLevels(sampler1DShadow sampler)
 }
 
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(sampler2DShadow sampler)
 {
     vector<int,2> dim;
@@ -1558,6 +1741,7 @@ public int textureQueryLevels(sampler2DShadow sampler)
 }
 
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(samplerCubeShadow sampler)
 {
     vector<int,2> dim;
@@ -1567,6 +1751,7 @@ public int textureQueryLevels(samplerCubeShadow sampler)
 }
 
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(sampler1DArrayShadow sampler)
 {
     vector<int,2> dim;
@@ -1576,6 +1761,7 @@ public int textureQueryLevels(sampler1DArrayShadow sampler)
 }
 
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(sampler2DArrayShadow sampler)
 {
     vector<int,3> dim;
@@ -1585,6 +1771,7 @@ public int textureQueryLevels(sampler2DArrayShadow sampler)
 }
 
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
 public int textureQueryLevels(samplerCubeArrayShadow sampler)
 {
     vector<int,3> dim;
@@ -1599,6 +1786,7 @@ public int textureQueryLevels(samplerCubeArrayShadow sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int, let sampleCount:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, image_samples)]
 public int textureSamples(Sampler2DMS<vector<T,N>,sampleCount> sampler)
 {
     vector<int,2> dim;
@@ -1610,6 +1798,7 @@ public int textureSamples(Sampler2DMS<vector<T,N>,sampleCount> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int, let sampleCount:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, image_samples)]
 public int textureSamples(Sampler2DMSArray<vector<T,N>,sampleCount> sampler)
 {
     vector<int,3> dim;
@@ -1627,22 +1816,25 @@ public int textureSamples(Sampler2DMSArray<vector<T,N>,sampleCount> sampler)
 // texture
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> texture(Sampler1D<vector<T,N>> sampler, float p)
 {
     return __vectorReshape<4>(sampler.Sample(p));
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> texture(Sampler1D<vector<T,N>> sampler, float p, constexpr float bias)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias));
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinFloatingPointType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> texture(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -1658,8 +1850,9 @@ public vector<T,4> texture(__TextureImpl<
     return __vectorReshape<4>(sampler.Sample(p));
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinFloatingPointType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> texture(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -1676,12 +1869,14 @@ public vector<T,4> texture(__TextureImpl<
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DShadow sampler, vec3 p)
 {
     return sampler.SampleCmp(p.x, p.z);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DShadow sampler, vec3 p, float bias)
 {
     // TODO: Need to apply bias
@@ -1689,24 +1884,28 @@ public float texture(sampler1DShadow sampler, vec3 p, float bias)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler2DShadow sampler, vec3 p)
 {
     return sampler.SampleCmp(p.xy, p.z);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler2DShadow sampler, vec3 p, float bias)
 {
     // TODO: Need to apply bias
     return sampler.SampleCmp(p.xy, p.z);
 }
 
+[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p)
 {
     return sampler.SampleCmp(p.xyz, p.w);
 }
 
+[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p, float bias)
 {
@@ -1715,12 +1914,14 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DArrayShadow sampler, vec3 p)
 {
     return sampler.SampleCmp(p.xy, p.z);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
 {
     // TODO: Need to apply bias
@@ -1728,12 +1929,14 @@ public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler2DArrayShadow sampler, vec4 p)
 {
     return sampler.SampleCmp(p.xyz, p.w);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
 public float texture(samplerCubeArrayShadow sampler, vec4 p, float compare)
 {
     return sampler.SampleCmp(p, compare);
@@ -1743,95 +1946,109 @@ public float texture(samplerCubeArrayShadow sampler, vec4 p, float compare)
 // textureProj
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec2 p)
 {
     return texture(sampler, p.x / p.y);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec2 p, float bias)
 {
     return texture(sampler, p.x / p.y, bias);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec4 p)
 {
     return texture(sampler, p.x / p.w);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec4 p, float bias)
 {
     return texture(sampler, p.x / p.w, bias);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec3 p)
 {
     return texture(sampler, p.xy / p.z);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec3 p, float bias)
 {
     return texture(sampler, p.xy / p.z, bias);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec4 p)
 {
     return texture(sampler, p.xy / p.w);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec4 p, float bias)
 {
     return texture(sampler, p.xy / p.w, bias);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProj(Sampler3D<vector<T,N>> sampler, vec4 p)
 {
     return texture(sampler, p.xyz / p.w);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProj(Sampler3D<vector<T,N>> sampler, vec4 p, float bias)
 {
     return texture(sampler, p.xyz / p.w, bias);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler1DShadow sampler, vec4 p)
 {
     return texture(sampler, p.xyz / p.w);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler1DShadow sampler, vec4 p, float bias)
 {
     return texture(sampler, p.xyz / p.w, bias);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler2DShadow sampler, vec4 p)
 {
     return texture(sampler, p.xyz / p.w);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
 {
     return texture(sampler, p.xyz / p.w, bias);
@@ -1841,15 +2058,17 @@ public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
 // textureLod
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureLod(Sampler1D<vector<T,N>> sampler, float p, float lod)
 {
     return __vectorReshape<4>(sampler.SampleLevel(p, lod));
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinFloatingPointType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureLod(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -1866,6 +2085,7 @@ public vector<T,4> textureLod(__TextureImpl<
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 {
     // TODO: Need to apply lod
@@ -1873,6 +2093,7 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 {
     // TODO: Need to apply lod
@@ -1880,6 +2101,7 @@ public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
 {
     // TODO: Need to apply lod
@@ -1890,28 +2112,32 @@ public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
 // textureOffset
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureOffset(Sampler1D<vector<T,N>> sampler, float p, constexpr int offset, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureOffset(Sampler2D<vector<T,N>> sampler, vec2 p, constexpr ivec2 offset, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureOffset(Sampler3D<vector<T,N>> sampler, vec3 p, constexpr ivec3 offset, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
 {
     // TODO: Need to apply bias
@@ -1919,27 +2145,31 @@ public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offs
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset, float bias = 0.0)
 {
     // TODO: Need to apply bias
     return sampler.SampleCmp(p.x, p.z, offset);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureOffset(Sampler1DArray<vector<T,N>> sampler, vec2 p, constexpr int offset, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureOffset(Sampler2DArray<vector<T,N>> sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int offset, float bias = 0.0)
 {
     // TODO: Need to apply bias
@@ -1947,6 +2177,7 @@ public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int o
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2 offset)
 {
     return sampler.SampleCmp(p.xyz, p.w, offset);
@@ -1958,6 +2189,7 @@ public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
 public vector<T,4> texelFetch(Sampler1D<vector<T,N>> sampler, int p, int lod)
 {
     return __vectorReshape<4>(sampler.Load(int2(p, lod)));
@@ -1965,6 +2197,7 @@ public vector<T,4> texelFetch(Sampler1D<vector<T,N>> sampler, int p, int lod)
 
 __generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
 public vector<T,4> texelFetch(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -1982,6 +2215,7 @@ public vector<T,4> texelFetch(__TextureImpl<
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
 public vector<T,4> texelFetch(Sampler2DRect<vector<T,N>> sampler, ivec2 p)
 {
     return __vectorReshape<4>(sampler.Load(int3(p.xy,0)));
@@ -1989,6 +2223,7 @@ public vector<T,4> texelFetch(Sampler2DRect<vector<T,N>> sampler, ivec2 p)
 
 __generic<T:__BuiltinArithmeticType, let N:int, let format:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
 public vector<T,4> texelFetch(SamplerBuffer<vector<T,N>,format> sampler, int p)
 {
     return __vectorReshape<4>(sampler.Load(p));
@@ -1996,6 +2231,7 @@ public vector<T,4> texelFetch(SamplerBuffer<vector<T,N>,format> sampler, int p)
 
 __generic<T:__BuiltinArithmeticType, let N:int, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
 public vector<T,4> texelFetch(__TextureImpl<
         vector<T,N>,
         __Shape2D,
@@ -2017,6 +2253,7 @@ public vector<T,4> texelFetch(__TextureImpl<
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
 public vector<T,4> texelFetchOffset(Sampler1D<vector<T,N>> sampler, int p, int lod, constexpr int offset)
 {
     return texelFetch(sampler, p + offset, lod);
@@ -2024,6 +2261,7 @@ public vector<T,4> texelFetchOffset(Sampler1D<vector<T,N>> sampler, int p, int l
 
 __generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let sampleCount:int, let format:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
 public vector<T,4> texelFetchOffset(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -2041,6 +2279,7 @@ public vector<T,4> texelFetchOffset(__TextureImpl<
 
 __generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let sampleCount:int, let format:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
 public vector<T,4> texelFetchOffset(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -2058,6 +2297,7 @@ public vector<T,4> texelFetchOffset(__TextureImpl<
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
 public vector<T,4> texelFetchOffset(Sampler2DRect<vector<T,N>> sampler, ivec2 p, constexpr ivec2 offset)
 {
     return texelFetch(sampler, p + offset);
@@ -2067,48 +2307,55 @@ public vector<T,4> texelFetchOffset(Sampler2DRect<vector<T,N>> sampler, ivec2 p,
 // textureProjOffset
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec2 p, constexpr int offset, float bias = 0.0)
 {
     return textureOffset(sampler, p.x / p.y, offset, bias);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec4 p, constexpr int offset, float bias = 0.0)
 {
     return textureOffset(sampler, p.x / p.w, offset, bias);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
 {
     return textureOffset(sampler, p.xy / p.z, offset, bias);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec4 p, constexpr ivec2 offset, float bias = 0.0)
 {
     return textureOffset(sampler, p.xy / p.w, offset, bias);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjOffset(Sampler3D<vector<T,N>> sampler, vec4 p, constexpr ivec3 offset, float bias = 0.0)
 {
     return textureOffset(sampler, p.xyz / p.w, offset, bias);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int offset, float bias = 0.0)
 {
     return textureOffset(sampler, p.xyz / p.w, offset, bias);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 offset, float bias = 0.0)
 {
     return textureOffset(sampler, p.xyz / p.w, offset, bias);
@@ -2118,15 +2365,17 @@ public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 
 // textureLodOffset
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureLodOffset(Sampler1D<vector<T,N>> sampler, float p, float lod, constexpr int offset)
 {
     return __vectorReshape<4>(sampler.SampleLevel(p, lod, offset));
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinFloatingPointType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureLodOffset(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -2143,6 +2392,7 @@ public vector<T,4> textureLodOffset(__TextureImpl<
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, constexpr int offset)
 {
     // TODO: Need to apply lod
@@ -2150,6 +2400,7 @@ public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, conste
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, constexpr ivec2 offset)
 {
     // TODO: Need to apply lod
@@ -2157,6 +2408,7 @@ public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, conste
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, constexpr int offset)
 {
     // TODO: Need to apply lod
@@ -2167,48 +2419,55 @@ public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, c
 // textureProjLod
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLod(Sampler1D<vector<T,N>> sampler, vec2 p, float lod)
 {
     return textureLod(sampler, p.x / p.y, lod);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLod(Sampler1D<vector<T,N>> sampler, vec4 p, float lod)
 {
     return textureLod(sampler, p.x / p.w, lod);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLod(Sampler2D<vector<T,N>> sampler, vec3 p, float lod)
 {
     return textureLod(sampler, p.xy / p.z, lod);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLod(Sampler2D<vector<T,N>> sampler, vec4 p, float lod)
 {
     return textureLod(sampler, p.xy / p.w, lod);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLod(Sampler3D<vector<T,N>> sampler, vec4 p, float lod)
 {
     return textureLod(sampler, p.xyz / p.w, lod);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLod(sampler1DShadow sampler, vec4 p, float lod)
 {
     return textureLod(sampler, p.xyz / p.w, lod);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLod(sampler2DShadow sampler, vec4 p, float lod)
 {
     return textureLod(sampler, p.xyz / p.w, lod);
@@ -2218,48 +2477,55 @@ public float textureProjLod(sampler2DShadow sampler, vec4 p, float lod)
 // textureProjLodOffset
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler1D<vector<T,N>> sampler, vec2 p, float lod, constexpr int offset)
 {
     return textureLodOffset(sampler, p.x / p.y, lod, offset);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler1D<vector<T,N>> sampler, vec4 p, float lod, constexpr int offset)
 {
     return textureLodOffset(sampler, p.x / p.w, lod, offset);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler2D<vector<T,N>> sampler, vec3 p, float lod, constexpr ivec2 offset)
 {
     return textureLodOffset(sampler, p.xy / p.z, lod, offset);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler2D<vector<T,N>> sampler, vec4 p, float lod, constexpr ivec2 offset)
 {
     return textureLodOffset(sampler, p.xy / p.w, lod, offset);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler3D<vector<T,N>> sampler, vec4 p, float lod, constexpr ivec3 offset)
 {
     return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLodOffset(sampler1DShadow sampler, vec4 p, float lod, constexpr int offset)
 {
     return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
 }
 
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLodOffset(sampler2DShadow sampler, vec4 p, float lod, constexpr ivec2 offset)
 {
     return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
@@ -2269,15 +2535,18 @@ public float textureProjLodOffset(sampler2DShadow sampler, vec4 p, float lod, co
 // textureGrad
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureGrad(Sampler1D<vector<T,N>> sampler, float p, float dPdx, float dPdy)
 {
     return __vectorReshape<4>(sampler.SampleGrad(p, dPdx, dPdy));
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinFloatingPointType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureGrad(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -2294,6 +2563,7 @@ public vector<T,4> textureGrad(__TextureImpl<
 }
 
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy)
 {
     // TODO: Not implemented
@@ -2301,6 +2571,7 @@ public float textureGrad(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy
 }
 
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler1DArrayShadow sampler, vec3 p, float dPdx, float dPdy)
 {
     // TODO: Not implemented
@@ -2308,6 +2579,7 @@ public float textureGrad(sampler1DArrayShadow sampler, vec3 p, float dPdx, float
 }
 
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2315,6 +2587,7 @@ public float textureGrad(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
 }
 
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_shadowlod_cube)]
 public float textureGrad(samplerCubeShadow sampler, vec4 p, vec3 dPdx, vec3 dPdy)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2322,6 +2595,7 @@ public float textureGrad(samplerCubeShadow sampler, vec4 p, vec3 dPdx, vec3 dPdy
 }
 
 [ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2332,14 +2606,16 @@ public float textureGrad(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 d
 // textureGradOffset
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureGradOffset(Sampler1D<vector<T,N>> sampler, float p, float dPdx, float dPdy, constexpr int offset)
 {
     return __vectorReshape<4>(sampler.SampleGrad(p, dPdx, dPdy, offset));
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinFloatingPointType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 [ForceInline]
 public vector<T,4> textureGradOffset(__TextureImpl<
         vector<T,N>,
@@ -2357,6 +2633,7 @@ public vector<T,4> textureGradOffset(__TextureImpl<
 }
 
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy, constexpr int offset)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2364,6 +2641,7 @@ public float textureGradOffset(sampler1DShadow sampler, vec3 p, float dPdx, floa
 }
 
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2371,6 +2649,7 @@ public float textureGradOffset(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 
 }
 
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler1DArrayShadow sampler, vec3 p, float dPdx, float dPdy, constexpr int offset)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2378,6 +2657,7 @@ public float textureGradOffset(sampler1DArrayShadow sampler, vec3 p, float dPdx,
 }
 
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2388,48 +2668,55 @@ public float textureGradOffset(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, 
 // textureProjGrad
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler1D<vector<T,N>> sampler, vec2 p, float dPdx, float dPdy)
 {
     return textureGrad(sampler, p.x / p.y, dPdx, dPdy);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler1D<vector<T,N>> sampler, vec4 p, float dPdx, float dPdy)
 {
     return textureGrad(sampler, p.x / p.w, dPdx, dPdy);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler2D<vector<T,N>> sampler, vec3 p, vec2 dPdx, vec2 dPdy)
 {
     return textureGrad(sampler, p.xy / p.z, dPdx, dPdy);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler2D<vector<T,N>> sampler, vec4 p, vec2 dPdx, vec2 dPdy)
 {
     return textureGrad(sampler, p.xy / p.w, dPdx, dPdy);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 dPdx, vec3 dPdy)
 {
     return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
 }
 
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjGrad(sampler1DShadow sampler, vec4 p, float dPdx, float dPdy)
 {
     return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
 }
 
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjGrad(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy)
 {
     return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
@@ -2439,48 +2726,55 @@ public float textureProjGrad(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dP
 // textureProjGradOffset
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler1D<vector<T,N>> sampler, vec2 p, float dPdx, float dPdy, constexpr int offset)
 {
     return textureGradOffset(sampler, p.x / p.y, dPdx, dPdy, offset);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler1D<vector<T,N>> sampler, vec4 p, float dPdx, float dPdy, constexpr int offset)
 {
     return textureGradOffset(sampler, p.x / p.w, dPdx, dPdy, offset);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler2D<vector<T,N>> sampler, vec3 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
     return textureGradOffset(sampler, p.xy / p.z, dPdx, dPdy, offset);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler2D<vector<T,N>> sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
     return textureGradOffset(sampler, p.xy / p.w, dPdx, dPdy, offset);
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int>
+__generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 dPdx, vec3 dPdy, constexpr ivec3 offset)
 {
     return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
 }
 
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjGradOffset(sampler1DShadow sampler, vec4 p, float dPdx, float dPdy, constexpr int offset)
 {
     return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
 }
 
 [ForceInline]
+[require(cpp_glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjGradOffset(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
     return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
@@ -2496,6 +2790,7 @@ public float textureProjGradOffset(sampler2DShadow sampler, vec4 p, vec2 dPdx, v
 
 __generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_gather)]
 public vector<T,4> textureGather(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -2519,6 +2814,7 @@ public vector<T,4> textureGather(__TextureImpl<
 
 __generic<Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_gather)]
 public vec4 textureGather(__TextureImpl<
         float,
         Shape,
@@ -2540,6 +2836,7 @@ public vec4 textureGather(__TextureImpl<
 
 __generic<T:__BuiltinArithmeticType, let N:int, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_gather)]
 public vector<T,4> textureGatherOffset(__TextureImpl<
         vector<T,N>,
         __Shape2D,
@@ -2563,6 +2860,7 @@ public vector<T,4> textureGatherOffset(__TextureImpl<
 
 __generic<let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_gather)]
 public vec4 textureGatherOffset(__TextureImpl<
         float,
         __Shape2D,
@@ -2584,6 +2882,7 @@ public vec4 textureGatherOffset(__TextureImpl<
 
 __generic<T:__BuiltinArithmeticType, let N:int, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_gather)]
 public vector<T,4> textureGatherOffsets(__TextureImpl<
         vector<T,N>,
         __Shape2D,
@@ -2607,6 +2906,7 @@ public vector<T,4> textureGatherOffsets(__TextureImpl<
 
 __generic<let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
+[require(glsl_hlsl_spirv, texture_gather)]
 public vec4 textureGatherOffsets(__TextureImpl<
         float,
         __Shape2D,
@@ -2626,196 +2926,235 @@ public vec4 textureGatherOffsets(__TextureImpl<
 // Section 8.9.5. Compatibility Profile Texture Functions
 //
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture1D(sampler1D sampler, float coord)
 {
     return texture(sampler, coord);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture1D(sampler1D sampler, float coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec2 coord)
 {
     return textureProj(sampler, coord);
 }
 
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec2 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec4 coord)
 {
     return textureProj(sampler, coord);
 }
 
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture1DLod(sampler1D sampler, float coord, float lod)
 {
     return textureLod(sampler, coord, lod);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture1DProjLod(sampler1D sampler, vec2 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture1DProjLod(sampler1D sampler, vec4 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture2D(sampler2D sampler, vec2 coord)
 {
     return texture(sampler, coord);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture2D(sampler2D sampler, vec2 coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec3 coord)
 {
     return textureProj(sampler, coord);
 }
 
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec3 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec4 coord)
 {
     return textureProj(sampler, coord);
 }
 
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture2DLod(sampler2D sampler, vec2 coord, float lod)
 {
     return textureLod(sampler, coord, lod);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture2DProjLod(sampler2D sampler, vec3 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture2DProjLod(sampler2D sampler, vec4 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture3D(sampler3D sampler, vec3 coord)
 {
     return texture(sampler, coord);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture3D(sampler3D sampler, vec3 coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture3DProj(sampler3D sampler, vec4 coord)
 {
     return textureProj(sampler, coord);
 }
 
+[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture3DProj(sampler3D sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture3DLod(sampler3D sampler, vec3 coord, float lod)
 {
     return textureLod(sampler, coord, lod);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 texture3DProjLod(sampler3D sampler, vec4 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 textureCube(samplerCube sampler, vec3 coord)
 {
     return texture(sampler, coord);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 textureCube(samplerCube sampler, vec3 coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vec4 textureCubeLod(samplerCube sampler, vec3 coord, float lod)
 {
     return textureLod(sampler, coord, lod);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow1D(sampler1DShadow sampler, vec3 coord)
 {
     return texture(sampler, coord);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow1D(sampler1DShadow sampler, vec3 coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow2D(sampler2DShadow sampler, vec3 coord)
 {
     return texture(sampler, coord);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow2D(sampler2DShadow sampler, vec3 coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow1DProj(sampler1DShadow sampler, vec4 coord)
 {
     return textureProj(sampler, coord);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow1DProj(sampler1DShadow sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow2DProj(sampler2DShadow sampler, vec4 coord)
 {
     return textureProj(sampler, coord);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow2DProj(sampler2DShadow sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow1DLod(sampler1DShadow sampler, vec3 coord, float lod)
 {
     return textureLod(sampler, coord, lod);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow2DLod(sampler2DShadow sampler, vec3 coord, float lod)
 {
     return textureLod(sampler, coord, lod);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow1DProjLod(sampler1DShadow sampler, vec4 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
 }
 
+[require(glsl_spirv, texture_shadowlod)]
 public vec4 shadow2DProjLod(sampler2DShadow sampler, vec4 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
@@ -2983,7 +3322,6 @@ ${{{{
         StringBuilder SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder;
 
         SPV_PREFIX_IMAGE_PARAMSBuilder << "$image $P";
-        SPV_SUFFIX_IMAGE_PARAMSBuilder;
         if (targetShape.isMS)
         {
             SPV_SUFFIX_IMAGE_PARAMSBuilder << " Sample $sample";
@@ -3017,10 +3355,10 @@ ${{{{
 }}}}
 
         // readonly writeonly in GLSL means an object only allows information queries.
-        [require(spirv)]
-        [require(glsl)]
         [__readNone]
-        [ForceInline] public $(imageSizeIntOrIVec) imageSize(readonly writeonly $(fullTypeName) image)
+        [ForceInline]
+        [require(glsl_spirv, image_size)]
+        public $(imageSizeIntOrIVec) imageSize(readonly writeonly $(fullTypeName) image)
         {
             __target_switch
             {
@@ -3033,10 +3371,10 @@ ${{{{
                 };
             }
         }
-        [require(spirv)]
-        [require(glsl)]
         [__NoSideEffect]
-        [ForceInline] public $(targetType.prefix)vec4 imageLoad(readonly $(IMAGE_PARAMS))
+        [ForceInline]
+        [require(glsl_spirv, image_loadstore)]
+        public $(targetType.prefix)vec4 imageLoad(readonly $(IMAGE_PARAMS))
         {
             __target_switch
             {
@@ -3051,9 +3389,9 @@ ${{{{
             }
             }
         }
-        [require(spirv)]
-        [require(glsl)]
-        [ForceInline] public void imageStore(writeonly $(IMAGE_PARAMS), $(targetType.prefix)vec4 data)
+        [ForceInline]
+        [require(glsl_spirv, image_loadstore)]
+        public void imageStore(writeonly $(IMAGE_PARAMS), $(targetType.prefix)vec4 data)
         {
             __target_switch
             {
@@ -3074,10 +3412,10 @@ ${{{{
         {
 }}}}
             // readonly writeonly in GLSL means an object only allows information queries.
-            [require(spirv)]
-            [require(glsl)]
             [__readNone]
-            [ForceInline] public int imageSamples(readonly writeonly $(fullTypeName) image)
+            [ForceInline]
+            [require(glsl_spirv, image_samples)]
+            public int imageSamples(readonly writeonly $(fullTypeName) image)
             {
                 __target_switch
                 {
@@ -3093,9 +3431,9 @@ ${{{{
 ${{{{
         }
 }}}}
-        [require(spirv)]
-        [require(glsl)]
-        [ForceInline] public $(targetType.type) imageAtomicAdd($(IMAGE_PARAMS), $(targetType.type) data)
+        [ForceInline]
+        [require(glsl_spirv, image_loadstore)]
+        public $(targetType.type) imageAtomicAdd($(IMAGE_PARAMS), $(targetType.type) data)
         {
             typeRequireChecks_image_atomic_tier1<$(targetType.type)>();
             __target_switch
@@ -3116,9 +3454,9 @@ ${{{{
             }
             }
         }
-        [require(spirv)]
-        [require(glsl)]
-        [ForceInline] public $(targetType.type) imageAtomicExchange($(IMAGE_PARAMS), $(targetType.type) data)
+        [ForceInline]
+        [require(glsl_spirv, image_loadstore)]
+        public $(targetType.type) imageAtomicExchange($(IMAGE_PARAMS), $(targetType.type) data)
         {
             typeRequireChecks_image_atomic_tier1<$(targetType.type)>();
             __target_switch
@@ -3139,9 +3477,9 @@ ${{{{
             }
             }
         }
-        [require(spirv)]
-        [require(glsl)]
-        [ForceInline] public $(targetType.type) imageAtomicMin($(IMAGE_PARAMS), $(targetType.type) data)
+        [ForceInline]
+        [require(glsl_spirv, image_loadstore)]
+        public $(targetType.type) imageAtomicMin($(IMAGE_PARAMS), $(targetType.type) data)
         {
             typeRequireChecks_image_atomic_tier2<$(targetType.type)>();
             __target_switch
@@ -3162,9 +3500,9 @@ ${{{{
             }
             }
         }
-        [require(spirv)]
-        [require(glsl)]
-        [ForceInline] public $(targetType.type) imageAtomicMax($(IMAGE_PARAMS), $(targetType.type) data)
+        [ForceInline]
+        [require(glsl_spirv, image_loadstore)]
+        public $(targetType.type) imageAtomicMax($(IMAGE_PARAMS), $(targetType.type) data)
         {
             typeRequireChecks_image_atomic_tier2<$(targetType.type)>();
             __target_switch
@@ -3189,9 +3527,9 @@ ${{{{
         if (!targetType.isInt)
             continue;
 }}}}
-        [require(spirv)]
-        [require(glsl)]
-        [ForceInline] public $(targetType.type) imageAtomicAnd($(IMAGE_PARAMS), $(targetType.type) data)
+        [ForceInline]
+        [require(glsl_spirv, image_loadstore)]
+        public $(targetType.type) imageAtomicAnd($(IMAGE_PARAMS), $(targetType.type) data)
         {
             __target_switch
             {
@@ -3211,9 +3549,9 @@ ${{{{
             }
             }
         }
-        [require(spirv)]
-        [require(glsl)]
-        [ForceInline] public $(targetType.type) imageAtomicOr($(IMAGE_PARAMS), $(targetType.type) data)
+        [ForceInline]
+        [require(glsl_spirv, image_loadstore)]
+        public $(targetType.type) imageAtomicOr($(IMAGE_PARAMS), $(targetType.type) data)
         {
             __target_switch
             {
@@ -3233,9 +3571,10 @@ ${{{{
             }
             }
         }
-        [require(spirv)]
-        [require(glsl)]
-        [ForceInline] public $(targetType.type) imageAtomicXor($(IMAGE_PARAMS), $(targetType.type) data)
+        
+        [ForceInline]
+        [require(glsl_spirv, image_loadstore)]
+        public $(targetType.type) imageAtomicXor($(IMAGE_PARAMS), $(targetType.type) data)
         {
             __target_switch
             {
@@ -3255,9 +3594,9 @@ ${{{{
             }
             }
         }
-        [require(spirv)]
-        [require(glsl)]
-        [ForceInline] public $(targetType.type) imageAtomicCompSwap($(IMAGE_PARAMS), $(targetType.type) compare, $(targetType.type) data)
+        [ForceInline]
+        [require(glsl_spirv, image_loadstore)]
+        public $(targetType.type) imageAtomicCompSwap($(IMAGE_PARAMS), $(targetType.type) compare, $(targetType.type) data)
         {
             __target_switch
             {
@@ -3294,6 +3633,7 @@ public typealias hitObjectNV = HitObject;
 
 //GL_EXT_ray_tracing BuiltIn's 
 
+[require(any_target, raytracing_allstages)]
 void requireGLSLExtForRayTracingBuiltin() 
 {
     __target_switch
@@ -3301,25 +3641,27 @@ void requireGLSLExtForRayTracingBuiltin()
     case glsl:
         __requireGLSLExtension("GL_EXT_ray_tracing");
         __intrinsic_asm "";
+    default:
+        return;
     }
 }
 
 __spirv_version(1.4) 
+[require(any_target, raytracing_allstages)]
 void setupExtForRayTracingBuiltIn() 
 {
     __target_switch
     {
     case glsl:
         requireGLSLExtForRayTracingBuiltin();
-    case spirv:
+    default:
         return;
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property uint3 gl_LaunchIDNV 
 {
+    [require(glsl_spirv, raytracing_allstages)]
     get 
     {
         setupExtForRayTracingBuiltIn();
@@ -3340,10 +3682,9 @@ public property uint3 gl_LaunchIDNV
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property uint3 gl_LaunchIDEXT 
 {
+    [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
     get 
     {
         setupExtForRayTracingBuiltIn();
@@ -3351,10 +3692,9 @@ public property uint3 gl_LaunchIDEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property uint3 gl_LaunchSizeNV 
 {
+    [require(glsl_spirv, raytracing_allstages)]
     get 
     {
         setupExtForRayTracingBuiltIn();
@@ -3375,10 +3715,9 @@ public property uint3 gl_LaunchSizeNV
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property uint3 gl_LaunchSizeEXT 
 {
+    [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
     get 
     {
         setupExtForRayTracingBuiltIn();
@@ -3386,10 +3725,10 @@ public property uint3 gl_LaunchSizeEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+
 public property int gl_PrimitiveID 
 {
+    [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get 
     {
         setupExtForRayTracingBuiltIn();
@@ -3397,10 +3736,9 @@ public property int gl_PrimitiveID
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property int gl_InstanceID 
 {
+    [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get 
     {
         setupExtForRayTracingBuiltIn();
@@ -3408,10 +3746,9 @@ public property int gl_InstanceID
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property int gl_InstanceCustomIndexEXT 
 {
+    [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get 
     {
         setupExtForRayTracingBuiltIn();
@@ -3419,10 +3756,9 @@ public property int gl_InstanceCustomIndexEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property int gl_GeometryIndexEXT 
 {
+    [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3430,10 +3766,9 @@ public property int gl_GeometryIndexEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property vec3 gl_WorldRayOriginEXT 
 {
+    [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3441,10 +3776,9 @@ public property vec3 gl_WorldRayOriginEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property vec3 gl_WorldRayDirectionEXT 
 {
+    [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3452,10 +3786,9 @@ public property vec3 gl_WorldRayDirectionEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property vec3 gl_ObjectRayOriginEXT 
 {
+    [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3463,10 +3796,9 @@ public property vec3 gl_ObjectRayOriginEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property vec3 gl_ObjectRayDirectionEXT 
 {
+    [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3474,10 +3806,9 @@ public property vec3 gl_ObjectRayDirectionEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property float gl_RayTminEXT 
 {
+    [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3485,10 +3816,9 @@ public property float gl_RayTminEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property float gl_RayTmaxEXT 
 {
+    [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3496,10 +3826,9 @@ public property float gl_RayTmaxEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property uint gl_IncomingRayFlagsEXT 
 {
+    [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3507,10 +3836,9 @@ public property uint gl_IncomingRayFlagsEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property float gl_HitTEXT 
 {
+    [require(glsl_spirv, raytracing_anyhit_closesthit)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3531,10 +3859,10 @@ public property float gl_HitTEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property uint gl_HitKindEXT 
 {
+
+    [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3542,10 +3870,9 @@ public property uint gl_HitKindEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property mat4x3 gl_ObjectToWorldEXT 
 {
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3567,10 +3894,9 @@ public property mat4x3 gl_ObjectToWorldEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property mat3x4 gl_ObjectToWorld3x4EXT 
 {
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3591,10 +3917,9 @@ public property mat3x4 gl_ObjectToWorld3x4EXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property mat4x3 gl_WorldToObjectEXT 
 {
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3616,10 +3941,9 @@ public property mat4x3 gl_WorldToObjectEXT
     }
 }
 
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
 public property mat3x4 gl_WorldToObject3x4EXT 
 {
+    [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3642,9 +3966,8 @@ public property mat3x4 gl_WorldToObject3x4EXT
 
 // GL_EXT_ray_tracing functions
 
-__glsl_extension(GL_EXT_ray_query)
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+__glsl_extension(GL_EXT_ray_tracing)
+[require(glsl_spirv, raytracing_raygen_closesthit_miss)]
 public void traceRayEXT(
     accelerationStructureEXT topLevel,
     uint rayFlags,
@@ -3696,17 +4019,15 @@ public void traceRayEXT(
     }
 }
 
-__glsl_extension(GL_EXT_ray_query)
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+__glsl_extension(GL_EXT_ray_tracing)
+[require(glsl_spirv, raytracing_intersection)]
 public bool reportIntersectionEXT(float hitT, uint hitKind)
 {
     return __reportIntersection(hitT, hitKind);
 }
 
-__glsl_extension(GL_EXT_ray_query)
-[require(glsl, raytracing)]
-[require(spirv, raytracing)]
+__glsl_extension(GL_EXT_ray_tracing)
+[require(glsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 public void executeCallableEXT(
     uint sbtRecordIndex, 
     int callable /*callableDataEXT and callableDataInEXT*/)
@@ -3755,9 +4076,8 @@ public static const uint gl_RayQueryCandidateIntersectionAABBEXT = 1U;
 // GL_EXT_ray_query functions
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public void rayQueryInitializeEXT(
     inout rayQueryEXT q,
     accelerationStructureEXT topLevel,
@@ -3772,17 +4092,15 @@ public void rayQueryInitializeEXT(
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public bool rayQueryProceedEXT(inout rayQueryEXT q)
 {
     return q.Proceed();
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
+[require(glsl_spirv, rayquery)]
 [mutating]
 [ForceInline]
 public void rayQueryTerminateEXT(inout rayQueryEXT q)
@@ -3791,28 +4109,25 @@ public void rayQueryTerminateEXT(inout rayQueryEXT q)
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public void rayQueryGenerateIntersectionEXT(inout rayQueryEXT q, float tHit)
 {
     q.CommitProceduralPrimitiveHit(tHit);
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public void rayQueryConfirmIntersectionEXT(inout rayQueryEXT q)
 {
     q.CommitNonOpaqueTriangleHit();
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
 {
     if (committed)
@@ -3826,45 +4141,40 @@ public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public float rayQueryGetRayTMinEXT(rayQueryEXT q)
 {
     return q.RayTMin();
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public uint rayQueryGetRayFlagsEXT(rayQueryEXT q)
 {
     return q.RayFlags();
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public vec3 rayQueryGetWorldRayOriginEXT(rayQueryEXT q)
 {
     return q.WorldRayOrigin();
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public vec3 rayQueryGetWorldRayDirectionEXT(rayQueryEXT q)
 {
     return q.WorldRayDirection();
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public float rayQueryGetIntersectionTEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3878,9 +4188,8 @@ public float rayQueryGetIntersectionTEXT(rayQueryEXT q, bool committed)
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public int rayQueryGetIntersectionInstanceCustomIndexEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3894,9 +4203,8 @@ public int rayQueryGetIntersectionInstanceCustomIndexEXT(rayQueryEXT q, bool com
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public int rayQueryGetIntersectionInstanceIdEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3910,9 +4218,8 @@ public int rayQueryGetIntersectionInstanceIdEXT(rayQueryEXT q, bool committed)
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public uint rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3926,9 +4233,8 @@ public uint rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT(ray
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public int rayQueryGetIntersectionGeometryIndexEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3942,9 +4248,8 @@ public int rayQueryGetIntersectionGeometryIndexEXT(rayQueryEXT q, bool committed
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public int rayQueryGetIntersectionPrimitiveIndexEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3958,9 +4263,8 @@ public int rayQueryGetIntersectionPrimitiveIndexEXT(rayQueryEXT q, bool committe
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public vec2 rayQueryGetIntersectionBarycentricsEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3974,9 +4278,8 @@ public vec2 rayQueryGetIntersectionBarycentricsEXT(rayQueryEXT q, bool committed
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public bool rayQueryGetIntersectionFrontFaceEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3990,17 +4293,15 @@ public bool rayQueryGetIntersectionFrontFaceEXT(rayQueryEXT q, bool committed)
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public bool rayQueryGetIntersectionCandidateAABBOpaqueEXT(rayQueryEXT q) 
 {
     return q.CandidateProceduralPrimitiveNonOpaque();
 }
 
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public vec3 rayQueryGetIntersectionObjectRayDirectionEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -4014,9 +4315,8 @@ public vec3 rayQueryGetIntersectionObjectRayDirectionEXT(rayQueryEXT q, bool com
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public vec3 rayQueryGetIntersectionObjectRayOriginEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -4030,9 +4330,8 @@ public vec3 rayQueryGetIntersectionObjectRayOriginEXT(rayQueryEXT q, bool commit
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public mat4x3 rayQueryGetIntersectionObjectToWorldEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -4046,9 +4345,8 @@ public mat4x3 rayQueryGetIntersectionObjectToWorldEXT(rayQueryEXT q, bool commit
 }
 
 __glsl_extension(GL_EXT_ray_query)
-[require(glsl, rayquery)]
-[require(spirv, rayquery)]
 [ForceInline]
+[require(glsl_spirv, rayquery)]
 public mat4x3 rayQueryGetIntersectionWorldToObjectEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -4066,9 +4364,8 @@ public mat4x3 rayQueryGetIntersectionWorldToObjectEXT(rayQueryEXT q, bool commit
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectTraceRayNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -4127,9 +4424,8 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
-[require(glsl, ser_motion)]
-[require(spirv, ser_motion)]
 [ForceInline]
+[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectTraceRayMotionNV(
     inout hitObjectNV hitObject, 
     accelerationStructureEXT topLevel,
@@ -4192,9 +4488,8 @@ public void hitObjectTraceRayMotionNV(
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectRecordHitNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -4256,9 +4551,8 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
-[require(glsl, ser_motion)]
-[require(spirv, ser_motion)]
 [ForceInline]
+[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectRecordHitMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -4322,9 +4616,8 @@ public void hitObjectRecordHitMotionNV(
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectRecordHitWithIndexNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -4383,9 +4676,8 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
-[require(glsl, ser_motion)]
-[require(spirv, ser_motion)]
 [ForceInline]
+[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectRecordHitWithIndexMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -4448,9 +4740,8 @@ public void hitObjectRecordHitWithIndexMotionNV(
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectRecordMissNV(
     inout hitObjectNV hitObject, 
     uint sbtRecordIndex, 
@@ -4469,9 +4760,8 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
-[require(glsl, ser_motion)]
-[require(spirv, ser_motion)]
 [ForceInline]
+[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectRecordMissMotionNV(
     inout hitObjectNV hitObject, 
     uint sbtRecordIndex, 
@@ -4491,9 +4781,8 @@ public void hitObjectRecordMissMotionNV(
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectRecordEmptyNV(hitObjectNV hitObject)
 {
     hitObject = HitObject::MakeNop();
@@ -4502,9 +4791,8 @@ public void hitObjectRecordEmptyNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectExecuteShaderNV(
     inout hitObjectNV hitObject, 
     constexpr int payload)
@@ -4528,9 +4816,8 @@ public void hitObjectExecuteShaderNV(
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public bool hitObjectIsEmptyNV(hitObjectNV hitObject)
 {
     return hitObject.IsNop();
@@ -4539,9 +4826,8 @@ public bool hitObjectIsEmptyNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public bool hitObjectIsMissNV(hitObjectNV hitObject)
 {
     return hitObject.IsMiss();
@@ -4550,9 +4836,8 @@ public bool hitObjectIsMissNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public bool hitObjectIsHitNV(hitObjectNV hitObject)
 {
     return hitObject.IsHit();
@@ -4561,9 +4846,8 @@ public bool hitObjectIsHitNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public float hitObjectGetRayTMinNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().TMin;  
@@ -4572,9 +4856,8 @@ public float hitObjectGetRayTMinNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public float hitObjectGetRayTMaxNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().TMax; 
@@ -4583,9 +4866,8 @@ public float hitObjectGetRayTMaxNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public vec3 hitObjectGetWorldRayOriginNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().Origin;
@@ -4594,9 +4876,8 @@ public vec3 hitObjectGetWorldRayOriginNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public vec3 hitObjectGetWorldRayDirectionNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().Direction; 
@@ -4605,9 +4886,8 @@ public vec3 hitObjectGetWorldRayDirectionNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public vec3 hitObjectGetObjectRayOriginNV(hitObjectNV hitObject)
 {
     return hitObject.GetObjectRayOrigin();
@@ -4616,9 +4896,8 @@ public vec3 hitObjectGetObjectRayOriginNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public vec3 hitObjectGetObjectRayDirectionNV(hitObjectNV hitObject)
 {
     return hitObject.GetObjectRayDirection();
@@ -4627,9 +4906,8 @@ public vec3 hitObjectGetObjectRayDirectionNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public mat4x3 hitObjectGetObjectToWorldNV(hitObjectNV hitObject)
 {
     return transpose(hitObject.GetObjectToWorld());
@@ -4638,9 +4916,8 @@ public mat4x3 hitObjectGetObjectToWorldNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public mat4x3 hitObjectGetWorldToObjectNV(hitObjectNV hitObject)
 {
     return transpose(hitObject.GetWorldToObject()); 
@@ -4649,9 +4926,8 @@ public mat4x3 hitObjectGetWorldToObjectNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public int hitObjectGetInstanceCustomIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetInstanceID();
@@ -4660,17 +4936,18 @@ public int hitObjectGetInstanceCustomIndexNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public int hitObjectGetInstanceIdNV(hitObjectNV hitObject)
 {
     return hitObject.GetInstanceIndex();
 }
 
-[require(glsl, ser)]
-[require(spirv, ser)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public int hitObjectGetGeometryIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetGeometryIndex();
@@ -4679,9 +4956,8 @@ public int hitObjectGetGeometryIndexNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public int hitObjectGetPrimitiveIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetPrimitiveIndex();
@@ -4690,9 +4966,8 @@ public int hitObjectGetPrimitiveIndexNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public uint hitObjectGetHitKindNV(hitObjectNV hitObject)
 {
     return hitObject.GetHitKind();
@@ -4701,9 +4976,8 @@ public uint hitObjectGetHitKindNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectGetAttributesNV(
     inout hitObjectNV hitObject, 
     constexpr int attributeLocation)
@@ -4728,9 +5002,8 @@ public void hitObjectGetAttributesNV(
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public uvec2 hitObjectGetShaderRecordBufferHandleNV(hitObjectNV hitObject)
 {
     return hitObject.GetShaderRecordBufferHandle();
@@ -4739,9 +5012,8 @@ public uvec2 hitObjectGetShaderRecordBufferHandleNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public uint hitObjectGetShaderBindingTableRecordIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetShaderTableIndex();
@@ -4750,9 +5022,8 @@ public uint hitObjectGetShaderBindingTableRecordIndexNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen_closesthit_miss)]
 public float hitObjectGetCurrentTimeNV(hitObjectNV hitObject)
 {
     return hitObject.GetCurrentTime();
@@ -4761,9 +5032,8 @@ public float hitObjectGetCurrentTimeNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen)]
 public void reorderThreadNV(uint hint, uint bits)
 {
     ReorderThread(hint, bits);
@@ -4772,9 +5042,8 @@ public void reorderThreadNV(uint hint, uint bits)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen)]
 public void reorderThreadNV(hitObjectNV hitObject)
 {
     ReorderThread(hitObject);
@@ -4783,9 +5052,8 @@ public void reorderThreadNV(hitObjectNV hitObject)
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-[require(glsl, ser)]
-[require(spirv, ser)]
 [ForceInline]
+[require(glsl_spirv, ser_raygen)]
 public void reorderThreadNV(hitObjectNV hitObject, uint hint, uint bits)
 {
     ReorderThread(hitObject, hint, bits);
@@ -4793,10 +5061,9 @@ public void reorderThreadNV(hitObjectNV hitObject, uint hint, uint bits)
 
 /// GL_NV_ray_tracing_motion_blur
 
-[require(glsl, raytracing_motionblur)]
-[require(spirv, raytracing_motionblur)]
 public property float gl_CurrentRayTimeNV
 {
+    [require(glsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
     get
     {
         __target_switch
@@ -4816,9 +5083,8 @@ public property float gl_CurrentRayTimeNV
 
 __glsl_extension(GL_EXT_ray_tracing) 
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
-[require(glsl, raytracing_motionblur)]
-[require(spirv, raytracing_motionblur)]
 [ForceInline]
+[require(glsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
 public void traceRayMotionNV(
     accelerationStructureEXT topLevel,
     uint rayFlags,
@@ -4908,7 +5174,7 @@ void shader_subgroup_preamble() {
     {
     case glsl:
         typeRequireChecks_shader_subgroup_GLSL<T>();
-    case spirv:
+    default:
         return;
     }
 
@@ -4916,50 +5182,57 @@ void shader_subgroup_preamble() {
 
 // GL_KHR_shader_subgroup_basic Built-in Variables
 
+[require(cpp_cuda_glsl_hlsl_spirv, subgroup_basic)]
 void requireGLSLExtForSubgroupBasicBuiltin() {
     __target_switch
     {
     case glsl:
         __requireGLSLExtension("GL_KHR_shader_subgroup_basic");
         __intrinsic_asm "";
+    default:
+        return;
     }
 }
 
-__spirv_version(1.3) 
+[require(cpp_cuda_glsl_hlsl_spirv, subgroup_basic)]
 void setupExtForSubgroupBasicBuiltIn() {
     __target_switch
     {
     case glsl:
         requireGLSLExtForSubgroupBasicBuiltin();
-    case spirv:
+    default:
         return;
     }
 }
 
+__spirv_version(1.3)
+[require(cpp_cuda_glsl_hlsl_spirv, subgroup_ballot)]
 void requireGLSLExtForSubgroupBallotBuiltin() {
     __target_switch
     {
     case glsl:
         __requireGLSLExtension("GL_KHR_shader_subgroup_ballot");
         __intrinsic_asm "";
+    default:
+        return;
     }
 }
 
-__spirv_version(1.3) 
+__spirv_version(1.3)
+[require(cpp_cuda_glsl_hlsl_spirv, subgroup_ballot)]
 void setupExtForSubgroupBallotBuiltIn() {
     __target_switch
     {
     case glsl:
         requireGLSLExtForSubgroupBallotBuiltin();
-    case spirv:
+    default:
         return;
     }
 }
 
-[require(glsl)]
-[require(spirv)]
 public property uint gl_NumSubgroups {
     
+    [require(glsl_spirv, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         __target_switch
@@ -4976,10 +5249,9 @@ public property uint gl_NumSubgroups {
     }
 }
 
-[require(glsl)]
-[require(spirv)]
 public property uint gl_SubgroupID
 {
+    [require(glsl_spirv, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         __target_switch
@@ -4995,30 +5267,27 @@ public property uint gl_SubgroupID
     }
 }
 
-[require(glsl)]
-[require(spirv)]
 public property uint gl_SubgroupSize
 {
+    [require(cpp_cuda_glsl_hlsl_spirv, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         return WaveGetLaneCount();
     }
 }
 
-[require(glsl)]
-[require(spirv)]
 public property uint gl_SubgroupInvocationID
 {
+    [require(cpp_cuda_glsl_hlsl_spirv, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         return WaveGetLaneIndex();
     }
 }
 
-[require(glsl)]
-[require(spirv)]
 public property uvec4 gl_SubgroupEqMask
 {
+    [require(glsl_spirv, subgroup_basic_ballot)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         setupExtForSubgroupBallotBuiltIn();
@@ -5035,10 +5304,9 @@ public property uvec4 gl_SubgroupEqMask
     }
 }
 
-[require(glsl)]
-[require(spirv)]
 public property uvec4 gl_SubgroupGeMask
 {
+    [require(glsl_spirv, subgroup_basic_ballot)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         setupExtForSubgroupBallotBuiltIn();
@@ -5055,10 +5323,9 @@ public property uvec4 gl_SubgroupGeMask
     }
 }
 
-[require(glsl)]
-[require(spirv)]
 public property uvec4 gl_SubgroupGtMask
 {
+    [require(glsl_spirv, subgroup_basic_ballot)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         setupExtForSubgroupBallotBuiltIn();
@@ -5075,10 +5342,9 @@ public property uvec4 gl_SubgroupGtMask
     }
 }
 
-[require(glsl)]
-[require(spirv)]
 public property uvec4 gl_SubgroupLeMask
 {
+    [require(glsl_spirv, subgroup_basic_ballot)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         setupExtForSubgroupBallotBuiltIn();
@@ -5095,10 +5361,9 @@ public property uvec4 gl_SubgroupLeMask
     }
 }
 
-[require(glsl)]
-[require(spirv)]
 public property uvec4 gl_SubgroupLtMask
 {
+    [require(glsl_spirv, subgroup_basic_ballot)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         setupExtForSubgroupBallotBuiltIn();
@@ -5117,9 +5382,11 @@ public property uvec4 gl_SubgroupLtMask
 
 // GL_KHR_shader_subgroup_basic
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public void subgroupBarrier()
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+public void subgroupBarrier()
 {
     __target_switch
     {
@@ -5138,9 +5405,11 @@ __spirv_version(1.3) [require(spirv)]
     }
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public void subgroupMemoryBarrier()
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+public void subgroupMemoryBarrier()
 {
     __target_switch
     {
@@ -5159,9 +5428,11 @@ __spirv_version(1.3) [require(spirv)]
     }
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public void subgroupMemoryBarrierBuffer()
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+public void subgroupMemoryBarrierBuffer()
 {
     // the following implementation is NOT the same as DeviceMemoryBarrier
     // HLSL lacks the same granularity of blocking on subgroup memory within a subgroup
@@ -5182,9 +5453,11 @@ __spirv_version(1.3) [require(spirv)]
     }
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public void subgroupMemoryBarrierImage()
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+public void subgroupMemoryBarrierImage()
 {
     __target_switch
     {
@@ -5202,9 +5475,11 @@ __spirv_version(1.3) [require(spirv)]
     }
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public void subgroupMemoryBarrierShared()
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+public void subgroupMemoryBarrierShared()
 {
     __target_switch
     {
@@ -5224,9 +5499,11 @@ __spirv_version(1.3) [require(spirv)]
     }
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public bool subgroupElect()
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic) 
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+public bool subgroupElect()
 {
     __target_switch
     {
@@ -5242,36 +5519,41 @@ __spirv_version(1.3) [require(spirv)]
 
 // GL_KHR_shader_subgroup_vote
 
-__glsl_extension(GL_KHR_shader_subgroup_vote) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public bool subgroupAll(bool value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_vote)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+public bool subgroupAll(bool value)
 {
-
     return WaveActiveAllTrue(value);
-
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_vote) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public bool subgroupAny(bool value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_vote)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+public bool subgroupAny(bool value)
 {
     return WaveActiveAnyTrue(value);
-    
 }
 
 __generic<T : __BuiltinType>
-__glsl_extension(GL_KHR_shader_subgroup_vote) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public bool subgroupAllEqual(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_vote)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+public bool subgroupAllEqual(T value)
 {
     shader_subgroup_preamble<T>();
     return WaveActiveAllEqual(value);
 }
 
 __generic<T : __BuiltinType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_vote) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public bool subgroupAllEqual(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_vote)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+public bool subgroupAllEqual(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveActiveAllEqual(value);
@@ -5280,45 +5562,55 @@ __spirv_version(1.3) [require(spirv)]
 // GL_KHR_shader_subgroup_arithmetic
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupAdd(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public T subgroupAdd(T value)
 {
     shader_subgroup_preamble<T>();
     return WaveActiveSum(value);
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupMul(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public T subgroupMul(T value)
 {
     shader_subgroup_preamble<T>();
     return WaveActiveProduct(value);
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupMin(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public T subgroupMin(T value)
 {
     shader_subgroup_preamble<T>();
     return WaveActiveMin(value);
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupMax(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public T subgroupMax(T value)
 {
     shader_subgroup_preamble<T>();
     return WaveActiveMax(value);
 }
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupAnd(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupAnd(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5341,9 +5633,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupOr(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupOr(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5366,9 +5660,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupXor(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupXor(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5391,9 +5687,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupInclusiveAdd(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupInclusiveAdd(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5410,9 +5708,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupInclusiveMul(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupInclusiveMul(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5429,9 +5729,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupInclusiveMin(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupInclusiveMin(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5450,9 +5752,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupInclusiveMax(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupInclusiveMax(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5471,9 +5775,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupInclusiveAnd(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupInclusiveAnd(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5496,9 +5802,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupInclusiveOr(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupInclusiveOr(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5521,9 +5829,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupInclusiveXor(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupInclusiveXor(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5538,9 +5848,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupExclusiveAdd(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public T subgroupExclusiveAdd(T value)
 {
     shader_subgroup_preamble<T>();
     return WavePrefixSum(value);
@@ -5548,18 +5860,22 @@ __spirv_version(1.3) [require(spirv)]
 
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupExclusiveMul(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public T subgroupExclusiveMul(T value)
 {
     shader_subgroup_preamble<T>();
     return WavePrefixProduct(value);
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupExclusiveMin(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupExclusiveMin(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5578,9 +5894,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupExclusiveMax(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupExclusiveMax(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5599,9 +5917,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupExclusiveAnd(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupExclusiveAnd(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5614,9 +5934,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupExclusiveOr(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupExclusiveOr(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5629,9 +5951,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupExclusiveXor(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public T subgroupExclusiveXor(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5647,45 +5971,55 @@ __spirv_version(1.3) [require(spirv)]
 //note: this is a seperate section because it is so huge that the only reasonable way to implement this is to just regex replace code
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupAdd(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupAdd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveActiveSum(value);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupMul(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupMul(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveActiveProduct(value);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupMin(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupMin(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveActiveMin(value);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupMax(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupMax(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveActiveMax(value);
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupAnd(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupAnd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5709,9 +6043,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupOr(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupOr(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5735,9 +6071,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupXor(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupXor(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5760,9 +6098,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupInclusiveAdd(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupInclusiveAdd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5779,9 +6119,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupInclusiveMul(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupInclusiveMul(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5798,9 +6140,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupInclusiveMin(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupInclusiveMin(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5819,9 +6163,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupInclusiveMax(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupInclusiveMax(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5840,9 +6186,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupInclusiveAnd(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupInclusiveAnd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5856,9 +6204,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupInclusiveOr(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupInclusiveOr(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5872,9 +6222,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupInclusiveXor(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupInclusiveXor(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5888,9 +6240,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupExclusiveAdd(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupExclusiveAdd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WavePrefixSum(value);
@@ -5898,18 +6252,22 @@ __spirv_version(1.3) [require(spirv)]
 
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupExclusiveMul(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupExclusiveMul(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WavePrefixProduct(value);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupExclusiveMin(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupExclusiveMin(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5928,9 +6286,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupExclusiveMax(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupExclusiveMax(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5949,9 +6309,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupExclusiveAnd(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupExclusiveAnd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5964,9 +6326,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupExclusiveOr(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupExclusiveOr(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5979,9 +6343,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupExclusiveXor(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+[ForceInline]
+[require(glsl_spirv, subgroup_arithmetic)]
+public vector<T,N> subgroupExclusiveXor(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -5996,45 +6362,55 @@ __spirv_version(1.3) [require(spirv)]
 // GL_KHR_shader_subgroup_ballot
 
 __generic<T : __BuiltinType>
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupBroadcast(T value, uint id)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+public T subgroupBroadcast(T value, uint id)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, id);
 }
 
 __generic<T : __BuiltinType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupBroadcast(vector<T,N> value, uint id)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+public vector<T,N> subgroupBroadcast(vector<T,N> value, uint id)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, id);
 }
 
 __generic<T : __BuiltinType>
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupBroadcastFirst(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+public T subgroupBroadcastFirst(T value)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskReadLaneFirst(WaveGetActiveMask(), value);
 }
 
 __generic<T : __BuiltinType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupBroadcastFirst(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+public vector<T,N> subgroupBroadcastFirst(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskReadLaneFirst(WaveGetActiveMask(), value);
 }
 
 // WaveMaskBallot is not the same; it force trunc's
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public uvec4 subgroupBallot(bool value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+public uvec4 subgroupBallot(bool value)
 {
     return WaveActiveBallot(value);
 }
@@ -6049,9 +6425,11 @@ __spirv_version(1.3) [require(spirv)]
 // note 2: we have a waveLaneCount check because based on wave lane count we can determine if we can do a 
 // fast path or slow path (know index is 0 or non 0)
 // }
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public bool subgroupInverseBallot(uvec4 value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+public bool subgroupInverseBallot(uvec4 value)
 {
     __target_switch
     {
@@ -6082,9 +6460,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 // same logic as subgroupInverseBallot
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public bool subgroupBallotBitExtract(uvec4 value, uint index)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+public bool subgroupBallotBitExtract(uvec4 value, uint index)
 {
     __target_switch
     {
@@ -6114,9 +6494,11 @@ __spirv_version(1.3) [require(spirv)]
 
 
 // the count is only supposed to use uvec4 values within bottom bits of subgroup launched, not a simple countbits
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public uint subgroupBallotBitCount(uvec4 value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(glsl_spirv, subgroup_ballot)]
+public uint subgroupBallotBitCount(uvec4 value)
 {
     __target_switch
     {
@@ -6130,9 +6512,11 @@ __spirv_version(1.3) [require(spirv)]
     }
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public uint subgroupBallotInclusiveBitCount(uvec4 value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(glsl_spirv, subgroup_ballot)]
+public uint subgroupBallotInclusiveBitCount(uvec4 value)
 {
     __target_switch
     {
@@ -6146,9 +6530,11 @@ __spirv_version(1.3) [require(spirv)]
     }
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public uint subgroupBallotExclusiveBitCount(uvec4 value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(glsl_spirv, subgroup_ballot)]
+public uint subgroupBallotExclusiveBitCount(uvec4 value)
 {
     __target_switch
     {
@@ -6162,9 +6548,11 @@ __spirv_version(1.3) [require(spirv)]
     }
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public uint subgroupBallotFindLSB(uvec4 value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(glsl_spirv, subgroup_ballot)]
+public uint subgroupBallotFindLSB(uvec4 value)
 {
     __target_switch
     {
@@ -6178,9 +6566,11 @@ __spirv_version(1.3) [require(spirv)]
     }
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public uint subgroupBallotFindMSB(uvec4 value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+[ForceInline]
+[require(glsl_spirv, subgroup_ballot)]
+public uint subgroupBallotFindMSB(uvec4 value)
 {
     __target_switch
     {
@@ -6197,17 +6587,20 @@ __spirv_version(1.3) [require(spirv)]
 // GL_KHR_shader_subgroup_shuffle
 
 __generic<T : __BuiltinType>
-__glsl_extension(GL_KHR_shader_subgroup_shuffle) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupShuffle(T value, uint index)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
+public T subgroupShuffle(T value, uint index)
 {
     shader_subgroup_preamble<T>();
     return WaveShuffle(value, index);
 }
 
 __generic<T : __BuiltinType>
-__glsl_extension(GL_KHR_shader_subgroup_shuffle) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle)
+[require(glsl_spirv, subgroup_shuffle)]
 [ForceInline] public T subgroupShuffleXor(T value, uint mask)
 {
     shader_subgroup_preamble<T>();
@@ -6224,18 +6617,22 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_shuffle) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupShuffle(vector<T,N> value, uint index)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
+public vector<T,N> subgroupShuffle(vector<T,N> value, uint index)
 {
     shader_subgroup_preamble<T>();
     return WaveShuffle(value, index);
 }
 
 __generic<T : __BuiltinType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_shuffle) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupShuffleXor(vector<T,N> value, uint mask)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle)
+[ForceInline]
+[require(glsl_spirv, subgroup_shuffle)]
+public vector<T,N> subgroupShuffleXor(vector<T,N> value, uint mask)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6254,9 +6651,11 @@ __spirv_version(1.3) [require(spirv)]
 // GL_KHR_shader_subgroup_shuffle_relative
 
 __generic<T : __BuiltinType>
-__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupShuffleUp(T value, uint delta)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
+[ForceInline]
+[require(glsl_spirv, subgroup_shufflerelative)]
+public T subgroupShuffleUp(T value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6272,9 +6671,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinType>
-__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupShuffleDown(T value, uint delta)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
+[ForceInline]
+[require(glsl_spirv, subgroup_shufflerelative)]
+public T subgroupShuffleDown(T value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6291,9 +6692,11 @@ __spirv_version(1.3) [require(spirv)]
 
 
 __generic<T : __BuiltinType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupShuffleUp(vector<T,N> value, uint delta)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
+[ForceInline]
+[require(glsl_spirv, subgroup_shufflerelative)]
+public vector<T,N> subgroupShuffleUp(vector<T,N> value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6309,9 +6712,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupShuffleDown(vector<T,N> value, uint delta)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
+[ForceInline]
+[require(glsl_spirv, subgroup_shufflerelative)]
+public vector<T,N> subgroupShuffleDown(vector<T,N> value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6328,9 +6733,11 @@ __spirv_version(1.3) [require(spirv)]
 // GL_KHR_shader_subgroup_clustered
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupClusteredAdd(T value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T subgroupClusteredAdd(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6347,9 +6754,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupClusteredMul(T value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T subgroupClusteredMul(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6366,9 +6775,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupClusteredMin(T value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T subgroupClusteredMin(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6387,9 +6798,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupClusteredMax(T value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T subgroupClusteredMax(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6408,9 +6821,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupClusteredAnd(T value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T subgroupClusteredAnd(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6424,9 +6839,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupClusteredOr(T value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T subgroupClusteredOr(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6442,9 +6859,11 @@ __spirv_version(1.3) [require(spirv)]
 
 
 __generic<T : __BuiltinLogicalType>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupClusteredXor(T value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T subgroupClusteredXor(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6460,9 +6879,11 @@ __spirv_version(1.3) [require(spirv)]
 
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupClusteredAdd(vector<T,N> value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> subgroupClusteredAdd(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6480,9 +6901,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupClusteredMul(vector<T,N> value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> subgroupClusteredMul(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6499,9 +6922,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupClusteredMin(vector<T,N> value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> subgroupClusteredMin(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6520,9 +6945,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupClusteredMax(vector<T,N> value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> subgroupClusteredMax(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6541,9 +6968,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupClusteredAnd(vector<T,N> value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> subgroupClusteredAnd(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6557,9 +6986,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupClusteredOr(vector<T,N> value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> subgroupClusteredOr(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6573,9 +7004,11 @@ __spirv_version(1.3) [require(spirv)]
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupClusteredXor(vector<T,N> value, uint clusterSize)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> subgroupClusteredXor(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -6591,36 +7024,44 @@ __spirv_version(1.3) [require(spirv)]
 // GL_KHR_shader_subgroup_quad
 
 __generic<T : __BuiltinType>
-__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupQuadBroadcast(T value, uint id)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+[ForceInline]
+[require(glsl_hlsl_spirv, subgroup_quad)]
+public T subgroupQuadBroadcast(T value, uint id)
 {
     shader_subgroup_preamble<T>();
     return QuadReadLaneAt(value, id);
 }
 
 __generic<T : __BuiltinType>
-__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupQuadSwapHorizontal(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+[ForceInline]
+[require(glsl_hlsl_spirv, subgroup_quad)]
+public T subgroupQuadSwapHorizontal(T value)
 {
     shader_subgroup_preamble<T>();
     return QuadReadAcrossX(value);
 }
 
 __generic<T : __BuiltinType>
-__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupQuadSwapVertical(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+[ForceInline]
+[require(glsl_hlsl_spirv, subgroup_quad)]
+public T subgroupQuadSwapVertical(T value)
 {
     shader_subgroup_preamble<T>();
     return QuadReadAcrossY(value);
 }
 
 __generic<T : __BuiltinType>
-__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public T subgroupQuadSwapDiagonal(T value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+[ForceInline]
+[require(glsl_hlsl_spirv, subgroup_quad)]
+public T subgroupQuadSwapDiagonal(T value)
 {
     shader_subgroup_preamble<T>();
     return QuadReadAcrossDiagonal(value);
@@ -6628,36 +7069,44 @@ __spirv_version(1.3) [require(spirv)]
 
 
 __generic<T : __BuiltinType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupQuadBroadcast(vector<T,N> value, uint id)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+[ForceInline]
+[require(glsl_hlsl_spirv, subgroup_quad)]
+public vector<T,N> subgroupQuadBroadcast(vector<T,N> value, uint id)
 {
     shader_subgroup_preamble<T>();
     return QuadReadLaneAt(value, id);
 }
 
 __generic<T : __BuiltinType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupQuadSwapHorizontal(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+[ForceInline]
+[require(glsl_hlsl_spirv, subgroup_quad)]
+public vector<T,N> subgroupQuadSwapHorizontal(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return QuadReadAcrossX(value);
 }
 
 __generic<T : __BuiltinType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupQuadSwapVertical(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+[ForceInline]
+[require(glsl_hlsl_spirv, subgroup_quad)]
+public vector<T,N> subgroupQuadSwapVertical(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return QuadReadAcrossY(value);
 }
 
 __generic<T : __BuiltinType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
-__spirv_version(1.3) [require(spirv)]
-[ForceInline] public vector<T,N> subgroupQuadSwapDiagonal(vector<T,N> value)
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+[ForceInline]
+[require(glsl_hlsl_spirv, subgroup_quad)]
+public vector<T,N> subgroupQuadSwapDiagonal(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return QuadReadAcrossDiagonal(value);
@@ -6678,7 +7127,9 @@ public struct atomic_uint
 // types and operations to enable the according ext needed for these operations
 
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_atomic_using_float0_tier() 
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+void typeRequireChecks_atomic_using_float0_tier() 
 {
     __target_switch
     {
@@ -6692,7 +7143,9 @@ __generic<T : __BuiltinType>
     }
 }
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_atomic_using_float1_tier() 
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+void typeRequireChecks_atomic_using_float1_tier() 
 {
     __target_switch
     {
@@ -6715,7 +7168,9 @@ __generic<T : __BuiltinType>
     }
 }
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_atomic_using_float2_tier() 
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+void typeRequireChecks_atomic_using_float2_tier() 
 {
     __target_switch
     {
@@ -6739,6 +7194,7 @@ __generic<T : __BuiltinType>
 }
 
 __generic<T : __BuiltinType>
+[require(glsl_spirv, atomic_glsl)]
 void typeRequireChecks_atomic_using_add()
 {
     __target_switch
@@ -6784,6 +7240,7 @@ void typeRequireChecks_atomic_using_add()
     }
 }
 __generic<T : __BuiltinType>
+[require(glsl_spirv, atomic_glsl)]
 void typeRequireChecks_atomic_using_MinMax()
 {
     __target_switch
@@ -6829,7 +7286,9 @@ void typeRequireChecks_atomic_using_MinMax()
     }
 }
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_atomic_using_Logical_CAS() 
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+void typeRequireChecks_atomic_using_Logical_CAS() 
 {
     __target_switch
     {
@@ -6884,9 +7343,11 @@ for (const auto& item : atomics)
 {
 }}}}
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public $(item.name) atomicAdd(inout $(item.name) mem, $(item.name) data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public $(item.name) atomicAdd(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float1_tier<$(item.name)>();
     typeRequireChecks_atomic_using_add<$(item.name)>();
@@ -6901,9 +7362,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public $(item.name) atomicMin(inout $(item.name) mem, $(item.name) data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public $(item.name) atomicMin(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float2_tier<$(item.name)>();
     typeRequireChecks_atomic_using_MinMax<$(item.name)>();
@@ -6918,9 +7381,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public $(item.name) atomicMax(inout $(item.name) mem, $(item.name) data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public $(item.name) atomicMax(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float2_tier<$(item.name)>();
     typeRequireChecks_atomic_using_MinMax<$(item.name)>();
@@ -6935,9 +7400,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public $(item.name) atomicExchange(inout $(item.name) mem, $(item.name) data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public $(item.name) atomicExchange(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float1_tier<$(item.name)>();
     __target_switch
@@ -6956,9 +7423,11 @@ if(item.isFloat)
     continue;
 }}}}
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public $(item.name) atomicAnd(inout $(item.name) mem, $(item.name) data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public $(item.name) atomicAnd(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
@@ -6976,9 +7445,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public $(item.name) atomicOr(inout $(item.name) mem, $(item.name) data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public $(item.name) atomicOr(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
@@ -6993,9 +7464,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public $(item.name) atomicXor(inout $(item.name) mem, $(item.name) data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public $(item.name) atomicXor(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
@@ -7010,9 +7483,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public $(item.name) atomicCompSwap(inout $(item.name) mem, $(item.name) compare, $(item.name) data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public $(item.name) atomicCompSwap(inout $(item.name) mem, $(item.name) compare, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
@@ -7034,9 +7509,11 @@ ${{{{
 // all atomic_uint functions are mangled at compile time, 
 // all types are converted into a field address of a 'uint'
 // relative to the layout(offset) of the atomic_uint 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterIncrement(atomic_uint c)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounterIncrement(atomic_uint c)
 {
 
     __target_switch
@@ -7052,7 +7529,8 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__glsl_version(430) [require(glsl)]
+__glsl_version(430) 
+[require(glsl, atomic_glsl)]
 [ForceInline] public uint atomicCounterDecrement_GLSL_helper(atomic_uint c)
 {
     __target_switch
@@ -7064,9 +7542,10 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounter(atomic_uint c)
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounter(atomic_uint c)
 {
     __target_switch
     {
@@ -7084,9 +7563,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterDecrement(atomic_uint c)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounterDecrement(atomic_uint c)
 {
     __target_switch
     {
@@ -7108,9 +7589,11 @@ __glsl_version(430) [require(glsl)]
     }   
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterAdd(atomic_uint c, uint data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounterAdd(atomic_uint c, uint data)
 {
     __target_switch
     {
@@ -7125,9 +7608,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterSubtract(atomic_uint c, uint data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounterSubtract(atomic_uint c, uint data)
 {
     __target_switch
     {
@@ -7145,9 +7630,11 @@ __glsl_version(430) [require(glsl)]
     }   
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterMin(atomic_uint c, uint data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounterMin(atomic_uint c, uint data)
 {
     __target_switch
     {
@@ -7162,9 +7649,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterMax(atomic_uint c, uint data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounterMax(atomic_uint c, uint data)
 {
     __target_switch
     {
@@ -7179,9 +7668,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterAnd(atomic_uint c, uint data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounterAnd(atomic_uint c, uint data)
 {
     __target_switch
     {
@@ -7196,9 +7687,11 @@ __glsl_version(430) [require(glsl)]
     }   
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterOr(atomic_uint c, uint data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounterOr(atomic_uint c, uint data)
 {
     __target_switch
     {
@@ -7213,9 +7706,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterXor(atomic_uint c, uint data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounterXor(atomic_uint c, uint data)
 {
     __target_switch
     {
@@ -7230,9 +7725,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterExchange(atomic_uint c, uint data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounterExchange(atomic_uint c, uint data)
 {
     __target_switch
     {
@@ -7247,9 +7744,11 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
-__glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterCompSwap(atomic_uint c, uint compare, uint data)
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+public uint atomicCounterCompSwap(atomic_uint c, uint compare, uint data)
 {
     __target_switch
     {
@@ -7266,107 +7765,108 @@ __glsl_version(430) [require(glsl)]
 
 /// Section 8.14. Fragment Processing Functions
 
-[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 public float dFdx(float p)
 {
     return ddx(p);
 }
-[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 public vector<float, N> dFdx(vector<float, N> p)
 {
     return ddx(p);
 }
 
-[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 public float dFdy(float p)
 {
     return ddy(p);
 }
-[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 public vector<float, N> dFdy(vector<float, N> p)
 {
     return ddy(p);
 }
 
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float dFdxFine(float p)
 {
     return ddx_fine(p);
 }
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> dFdxFine(vector<float, N> p)
 {
     return ddx_fine(p);
 }
 
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float dFdyFine(float p)
 {
     return ddy_fine(p);
 }
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> dFdyFine(vector<float, N> p)
 {
     return ddy_fine(p);
 }
 
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float dFdxCoarse(float p)
 {
     return ddx_coarse(p);
 }
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> dFdxCoarse(vector<float, N> p)
 {
     return ddx_coarse(p);
 }
 
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float dFdyCoarse(float p)
 {
     return ddy_coarse(p);
 }
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> dFdyCoarse(vector<float, N> p)
 {
     return ddy_coarse(p);
 }
 
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthFine(float p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7384,12 +7884,13 @@ public float fwidthFine(float p)
     }
     }
 }
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthFine(vector<float, N> p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7408,11 +7909,12 @@ public vector<float, N> fwidthFine(vector<float, N> p)
     }
 }
 
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthCoarse(float p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7430,12 +7932,13 @@ public float fwidthCoarse(float p)
     }
     }
 }
-[require(any_gfx_target, fragmentprocessing_derivativecontrol)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthCoarse(vector<float, N> p)
 {
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
@@ -7454,17 +7957,13 @@ public vector<float, N> fwidthCoarse(vector<float, N> p)
     }
 }
 
-[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
+[require(glsl_spirv, fragmentprocessing)]
 public float interpolateAtCentroid(__ref float interpolant)
 {
     __target_switch
     {
-    case hlsl:
-    {
-        return EvaluateAttributeAtCentroid(interpolant);
-    }
     case glsl: __intrinsic_asm "interpolateAtCentroid($0)";
     case spirv:
     {
@@ -7476,18 +7975,14 @@ public float interpolateAtCentroid(__ref float interpolant)
     }
     }
 }
-[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
+[require(glsl_spirv, fragmentprocessing)]
 public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant)
 {
     __target_switch
     {
-    case hlsl:
-    {
-        return EvaluateAttributeAtCentroid(interpolant);
-    }
     case glsl: __intrinsic_asm "interpolateAtCentroid($0)";
     case spirv:
     {
@@ -7500,17 +7995,13 @@ public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant
     }
 }
 
-[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
+[require(glsl_spirv, fragmentprocessing)]
 public float interpolateAtSample(__ref float interpolant, int sample)
 {
     __target_switch
     {
-    case hlsl:
-    {
-        return EvaluateAttributeAtSample(interpolant, sample);
-    }
     case glsl: __intrinsic_asm "interpolateAtSample($0,$1)";
     case spirv:
     {
@@ -7522,18 +8013,14 @@ public float interpolateAtSample(__ref float interpolant, int sample)
     }
     }
 }
-[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
+[require(glsl_spirv, fragmentprocessing)]
 public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, int sample)
 {
     __target_switch
     {
-    case hlsl:
-    {
-        return EvaluateAttributeAtSample(interpolant, sample);
-    }
     case glsl: __intrinsic_asm "interpolateAtSample($0,$1)";
     case spirv:
     {
@@ -7546,9 +8033,9 @@ public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, 
     }
 }
 
-[require(glsl_spirv, fragmentprocessing)]
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
+[require(glsl_spirv, fragmentprocessing)]
 public float interpolateAtOffset(__ref float interpolant, vec2 offset)
 {
     __target_switch
@@ -7564,10 +8051,10 @@ public float interpolateAtOffset(__ref float interpolant, vec2 offset)
     }
     }
 }
-[require(glsl_spirv, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
+[require(glsl_spirv, fragmentprocessing)]
 public vector<float, N> interpolateAtOffset(__ref vector<float, N> interpolant, vec2 offset)
 {
     __target_switch
@@ -7657,8 +8144,8 @@ public vec4 noise4(vector<float, N> x)
 // control flow.
 // TODO: if called after a return, error.
 
-[require(any_gfx_target, compute_tess_gfx)]
 [ForceInline]
+[require(glsl_hlsl_spirv, shader_stages_compute_tesscontrol_tesseval)]
 public void barrier()
 {
     __target_switch
@@ -7680,8 +8167,8 @@ public void barrier()
 
 /// Section 8.17. Shader Memory Control Functions
 
-[require(shadermemorycontrol)]
 [ForceInline]
+[require(glsl_hlsl_spirv, shadermemorycontrol)]
 public void memoryBarrier()
 {
     __target_switch
@@ -7706,8 +8193,8 @@ public void memoryBarrier()
 // glslang will compile with `AtomicCounterMemory` since it does not use
 // the `AtomicStorage` OpCapability which is required for `AtomicCounterMemory`.
 // this is invalid/undefined spir-v for vulkan targets and should not be followed
-[require(any_gfx_target, shadermemorycontrol_compute)]
 [ForceInline]
+[require(glsl_hlsl_spirv, shadermemorycontrol_compute)]
 public void memoryBarrierAtomicCounter()
 {
     __target_switch
@@ -7724,8 +8211,8 @@ public void memoryBarrierAtomicCounter()
     }
     }
 }
-[require(shadermemorycontrol)]
 [ForceInline]
+[require(glsl_hlsl_spirv, shadermemorycontrol)]
 public void memoryBarrierBuffer()
 {
     __target_switch
@@ -7743,8 +8230,8 @@ public void memoryBarrierBuffer()
     }
 }
 
-[require(any_gfx_target, shadermemorycontrol_compute)]
 [ForceInline]
+[require(glsl_hlsl_spirv, shadermemorycontrol_compute)]
 public void memoryBarrierShared()
 {
     __target_switch
@@ -7761,8 +8248,8 @@ public void memoryBarrierShared()
     }
     }
 }
-[require(shadermemorycontrol)]
 [ForceInline]
+[require(glsl_hlsl_spirv, shadermemorycontrol)]
 public void memoryBarrierImage()
 {
     __target_switch
@@ -7778,8 +8265,8 @@ public void memoryBarrierImage()
     }
     }
 }
-[require(any_gfx_target, shadermemorycontrol_compute)]
 [ForceInline]
+[require(glsl_hlsl_spirv, shadermemorycontrol_compute)]
 public void groupMemoryBarrier()
 {
     __target_switch
@@ -7829,9 +8316,9 @@ ${{{{
 }}}}
 
     __generic<T>
-    [require(glsl_spirv, subpass)]
     [__NoSideEffect]
     [ForceInline]
+    [require(glsl_hlsl_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,0> subpass)
     {
         __target_switch
@@ -7850,9 +8337,9 @@ ${{{{
         }
     }
     __generic<T>
-    [require(glsl_spirv, subpass)]
     [__NoSideEffect]
     [ForceInline]
+    [require(glsl_hlsl_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,1> subpass, int sample)
     {
         __target_switch
@@ -7878,27 +8365,27 @@ ${{{{
 // alternatives
 __glsl_version(460)
 __spirv_version(1.3)
-[require(shaderinvocationgroup)]
 [NonUniformReturn]
 [ForceInline]
+[require(glsl_hlsl_spirv, shaderinvocationgroup)]
 public bool anyInvocation(bool value)
 {
     return WaveActiveAnyTrue(value);
 }
 __glsl_version(460)
 __spirv_version(1.3)
-[require(shaderinvocationgroup)]
 [NonUniformReturn]
 [ForceInline]
+[require(glsl_hlsl_spirv, shaderinvocationgroup)]
 public bool allInvocations(bool value)
 {
     return WaveActiveAllTrue(value);
 }
 __glsl_version(460)
 __spirv_version(1.3)
-[require(shaderinvocationgroup)]
 [NonUniformReturn]
 [ForceInline]
+[require(glsl_hlsl_spirv, shaderinvocationgroup)]
 public bool allInvocationsEqual(bool value)
 {
     return WaveActiveAllEqual(value);

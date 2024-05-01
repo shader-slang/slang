@@ -6,7 +6,6 @@
 //
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
-
 namespace Slang
 {
 struct GenericChildrenMigrationContextImpl;
@@ -75,6 +74,14 @@ Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* inte
 
 bool isComInterfaceType(IRType* type);
 
+// If `type` is a vector, returns its element type. Otherwise, return `type`.
+IRType* getVectorElementType(IRType* type);
+
+// True if type is a resource backing memory
+bool isResourceType(IRType* type);
+
+// True if type is a pointer to a resource
+bool isPointerToResourceType(IRType* type);
 
 IROp getTypeStyle(IROp op);
 IROp getTypeStyle(BaseType op);
@@ -318,7 +325,18 @@ inline bool isCompositeType(IRType* type)
     }
 }
 
+IRType* getSPIRVSampledElementType(IRInst* sampledType);
+
+IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
+
 IRParam* getParamAt(IRBlock* block, UIndex ii);
+
+void verifyComputeDerivativeGroupModifiers(
+    DiagnosticSink* sink,
+    SourceLoc errorLoc,
+    bool quadAttr,
+    bool linearAttr,
+    IRNumThreadsDecoration* numThreadsDecor);
 
 }
 

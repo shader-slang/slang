@@ -318,6 +318,11 @@ namespace Slang
             cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("FuncDecl"));
             return true;
         }
+        if (typeFlags == (int)UserDefinedAttributeTargets::Param)
+        {
+            cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("ParamDecl"));
+            return true;
+        }
         return false;
     }
 
@@ -348,8 +353,15 @@ namespace Slang
                             getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, constIntVal->getValue());
                             return false;
                         }
+                        if (intValue->getType() != m_astBuilder->getIntType())
+                        {
+                            intValue = m_astBuilder->getIntVal(m_astBuilder->getIntType(), constIntVal->getValue());
+                        }
                     }
+                    // Make sure we always canonicalize the type to int.
                     value = intValue;
+                    if (value->getType() != m_astBuilder->getIntType())
+                        value = m_astBuilder->getTypeCastIntVal(m_astBuilder->getIntType(), value);
                 }
                 else
                 {
@@ -1606,6 +1618,37 @@ namespace Slang
         }
     }
 
+    void postProcessingOnModifiers(Modifiers& modifiers)
+    {
+        // compress all `require` nodes into 1 `require` modifier
+        RequireCapabilityAttribute* firstRequire = nullptr;
+        Modifier* previous = nullptr;
+        Modifier* next = nullptr;
+        for (auto m = modifiers.first; m != nullptr; m = next)
+        {
+            next = m->next;
+            //
+
+            if (auto req = as<RequireCapabilityAttribute>(m))
+            {
+                if (!firstRequire)
+                {
+                    firstRequire = req;
+                    previous = m;
+                    continue;
+                }
+                for(auto& con : req->capabilitySet.getExpandedAtoms())
+                    firstRequire->capabilitySet.unionWith(con);
+                if(previous)
+                    previous->next = next;
+                continue;
+            }
+
+            //
+            previous = m;
+        }
+    }
+
     void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     {
         // TODO(tfoley): need to make sure this only
@@ -1678,6 +1721,8 @@ namespace Slang
         // Whether we actually re-wrote anything or note, lets
         // install the new list of modifiers on the declaration
         syntaxNode->modifiers.first = resultModifiers;
+
+        postProcessingOnModifiers(syntaxNode->modifiers);
     }
 
 

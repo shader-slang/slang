@@ -7,6 +7,7 @@
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-call-graph.h"
 #include "slang-emit-base.h"
 #include "slang-glsl-extension-tracker.h"
 #include "slang-ir-lower-buffer-element-type.h"
@@ -1168,6 +1169,127 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addUsersToWorkList(newStore);
     }
 
+    void processNonUniformResourceIndex(IRInst* nonUniformResourceIndexInst)
+    {
+        // implement the translation to spirv by walking up the use-def chain
+        // from nonUniformResource inst of an index to an array of buffer or
+        // texture def all the way to the leaf operations. To be precise:
+        // - go through GEP and see if it calls an intrinsic function,
+        //   then decorate the address itself (GetElementPtr)
+        // - go through GEP to identify the pointer access and the Loads that it
+        //   accesses (GetElementPtr -> Load), then decorate the load instruction.
+        // - go through IntCasts to deal with u32 -> i32 / vice-versa (IntCast)
+        List<IRInst*> resWorkList;
+
+        // Handle cases when `nonUniformResourceIndexInst` inst is wrapped around
+        // an index in a nested fashion, i.e. nonUniform(nonUniform(index)) by
+        // only adding the inner-most inst in the worklist, and work our way out.
+        auto insti = nonUniformResourceIndexInst;
+        while (insti->getOp() == kIROp_NonUniformResourceIndex)
+        {
+            if (resWorkList.getCount() != 0)
+                resWorkList.removeLast();
+            resWorkList.add(insti);
+            insti = insti->getOperand(0);
+        }
+
+        // For all the users of a `nonUniformResourceIndexInst`, make them directly
+        // use the underlying base inst that is wrapped by `nonUniformResourceIndex`
+        // and finally wrap them with a `nonUniformResourceIndex`, and add back to the
+        // worklist, and keep bubbling them up until it can.
+        for (Index i = 0; i < resWorkList.getCount(); i++)
+        {
+            auto inst = resWorkList[i];
+            traverseUses(inst, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                IRBuilder builder(user);
+                builder.setInsertBefore(user);
+
+                IRInst* newUser = nullptr;
+                switch (user->getOp())
+                {
+                case kIROp_IntCast:
+                    // Replace intCast(nonUniformRes(x)), into nonUniformRes(intCast(x))
+                    newUser = builder.emitCast(user->getFullType(), inst->getOperand(0));
+                    break;
+                case kIROp_GetElementPtr:
+                    // Ignore when `NonUniformResourceIndex` is not on the index
+                    if (user->getOperand(0)->getOp() != kIROp_NonUniformResourceIndex)
+                    {
+                        // Replace gep(pArray, nonUniformRes(x)), into nonUniformRes(gep(pArray, x))
+                        newUser = builder.emitElementAddress(user->getFullType(), user->getOperand(0), inst->getOperand(0));
+                    }
+                    break;
+                case kIROp_NonUniformResourceIndex:
+                    // Replace nonUniformRes(nonUniformRes(x)), into nonUniformRes(x)
+                    newUser = inst->getOperand(0);
+                    break;
+                case kIROp_Load:
+                    // Replace load(nonUniformRes(x)), into nonUniformRes(load(x))
+                    newUser = builder.emitLoad(user->getFullType(), inst->getOperand(0));
+                    break;
+                default:
+                    // Ignore for all other unknown insts.
+                    break;
+                };
+
+                // Early exit when we could not process the `NonUniformResourceIndex` inst.
+                if (!newUser)
+                    return;
+
+                auto nonuniformUser = builder.emitNonUniformResourceIndexInst(newUser);
+                user->replaceUsesWith(nonuniformUser);
+
+                // Update the worklist with the newly added `NonUniformResourceIndex` inst, based on
+                // the base inst it was constructed around, in case we need to further bubble up
+                // the `NonUniformResourceIndex` inst.
+                switch (user->getOp())
+                {
+                case kIROp_IntCast:
+                case kIROp_GetElementPtr:
+                case kIROp_Load:
+                case kIROp_NonUniformResourceIndex:
+                    resWorkList.add(nonuniformUser);
+                    break;
+                };
+
+                // Clean up the base inst from the IR module, to avoid duplicate decorations.
+                user->removeAndDeallocate();
+            });
+        }
+
+        // Once all the `NonUniformResourceIndex` insts are visited, and the inst type is bubbled up
+        // to the parent, a decoration is added to the operands of the insts.
+        for (int i = 0; i < resWorkList.getCount(); ++i)
+        {
+            // It is only required to decorate the base inst, if the `NonUniformResourceIndex` inst
+            // around it has any active uses.
+            auto inst = resWorkList[i];
+            if (!inst->hasUses())
+            {
+                inst->removeAndDeallocate();
+                continue;
+            }
+            // For each of the `NonUniformResourceIndex` inst that remain, decorate the base inst
+            // with a [NonUniformResource] decoration, which is the operand0 of the inst, only
+            // when the type is a resource type, or a pointer to a resource type, or a pointer
+            // in the Physical Storage buffer address space.
+            auto operand = inst->getOperand(0);
+            auto type = operand->getDataType();
+            if (isResourceType(type) ||
+                isPointerToResourceType(type))
+            {
+                IRBuilder builder(operand);
+                builder.addSPIRVNonUniformResourceDecoration(operand);
+                inst->replaceUsesWith(operand);
+                inst->removeAndDeallocate();
+            }
+        }
+        nonUniformResourceIndexInst->removeFromParent();
+        m_instsToRemove.add(nonUniformResourceIndexInst);
+    }
+
     void processImageSubscript(IRImageSubscript* subscript)
     {
         if (auto ptrType = as<IRPtrTypeBase>(subscript->getDataType()))
@@ -1478,6 +1600,33 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return (as<IRSPIRVAsmInst>(inst) || as<IRSPIRVAsmOperand>(inst));
     }
 
+    void processConvertTexel(IRInst* asmBlockInst, IRInst* inst)
+    {
+        // If we see `__convertTexel(x)`, we need to return a vector<__sampledElementType(x), 4>.
+        IRInst* operand = inst->getOperand(0);
+        auto elementType = getSPIRVSampledElementType(operand->getDataType());
+        auto valueElementType = getVectorElementType(operand->getDataType());
+        IRBuilder builder(inst);
+        builder.setInsertBefore(asmBlockInst);
+        if (elementType != valueElementType)
+        {
+            auto floatCastType = replaceVectorElementType(operand->getDataType(), elementType);
+            operand = builder.emitCast(floatCastType, operand);
+        }
+        auto vecType = builder.getVectorType(elementType, 4);
+        if (vecType != operand->getDataType())
+        {
+            if (!as<IRVectorType>(operand->getDataType()))
+                operand = builder.emitMakeVectorFromScalar(vecType, operand);
+            else
+                operand = builder.emitVectorReshape(vecType, operand);
+        }
+        builder.setInsertBefore(inst);
+        auto spvAsmOperand = builder.emitSPIRVAsmOperandInst(operand);
+        inst->replaceUsesWith(spvAsmOperand);
+        inst->removeAndDeallocate();
+    }
+
     void processSPIRVAsm(IRSPIRVAsm* inst)
     {
         // Move anything that is not an spirv instruction to the outer parent.
@@ -1485,6 +1634,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             if (!isAsmInst(child))
                 child->insertBefore(inst);
+            else if (child->getOp() == kIROp_SPIRVAsmOperandConvertTexel)
+                processConvertTexel(inst, child);
         }
     }
 
@@ -1823,6 +1974,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_RWStructuredBufferStore:
                 processRWStructuredBufferStore(inst);
                 break;
+            case kIROp_NonUniformResourceIndex:
+                processNonUniformResourceIndex(inst);
+                break;
             case kIROp_loop:
                 processLoop(as<IRLoop>(inst));
                 break;
@@ -2089,102 +2243,6 @@ void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module)
 {
     SPIRVLegalizationContext context(sharedContext, module);
     context.processModule();
-}
-
-void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints, IRModule* module)
-{
-    struct WorkItem
-    {
-        IRFunc* entryPoint; IRInst* inst; 
-    
-        HashCode getHashCode() const
-        {
-            return combineHash(Slang::getHashCode(entryPoint), Slang::getHashCode(inst));
-        }
-        bool operator == (const WorkItem& other) const
-        {
-            return entryPoint == other.entryPoint && inst == other.inst;
-        }
-    };
-    HashSet<WorkItem> workListSet;
-    List<WorkItem> workList;
-    auto addToWorkList = [&](WorkItem item)
-    {
-        if (workListSet.add(item))
-            workList.add(item);
-    };
-
-    auto registerEntryPointReference = [&](IRFunc* entryPoint, IRInst* inst)
-        {
-            if (auto set = referencingEntryPoints.tryGetValue(inst))
-                set->add(entryPoint);
-            else
-            {
-                HashSet<IRFunc*> newSet;
-                newSet.add(entryPoint);
-                referencingEntryPoints.add(inst, _Move(newSet));
-            }
-        };
-    auto visit = [&](IRFunc* entryPoint, IRInst* inst)
-        {
-            if (auto code = as<IRGlobalValueWithCode>(inst))
-            {
-                registerEntryPointReference(entryPoint, inst);
-                for (auto child : code->getChildren())
-                {
-                    addToWorkList({ entryPoint, child });
-                }
-                return;
-            }
-            switch (inst->getOp())
-            {
-            case kIROp_GlobalParam:
-            case kIROp_SPIRVAsmOperandBuiltinVar:
-                registerEntryPointReference(entryPoint, inst);
-                break;
-            case kIROp_Block:
-            case kIROp_SPIRVAsm:
-                for (auto child : inst->getChildren())
-                {
-                    addToWorkList({ entryPoint, child });
-                }
-                break;
-            case kIROp_Call:
-                {
-                    auto call = as<IRCall>(inst);
-                    addToWorkList({ entryPoint, call->getCallee() });
-                }
-                break;
-            case kIROp_SPIRVAsmOperandInst:
-                {
-                    auto operand = as<IRSPIRVAsmOperandInst>(inst);
-                    addToWorkList({ entryPoint, operand->getValue() });
-                }
-                break;
-            }
-            for (UInt i = 0; i < inst->getOperandCount(); i++)
-            {
-                auto operand = inst->getOperand(i);
-                switch (operand->getOp())
-                {
-                case kIROp_GlobalParam:
-                case kIROp_GlobalVar:
-                case kIROp_SPIRVAsmOperandBuiltinVar:
-                    addToWorkList({ entryPoint, operand });
-                    break;
-                }
-            }
-        };
-
-    for (auto globalInst : module->getGlobalInsts())
-    {
-        if (globalInst->getOp() == kIROp_Func && globalInst->findDecoration<IREntryPointDecoration>())
-        {
-            visit(as<IRFunc>(globalInst), globalInst);
-        }
-    }
-    for (Index i = 0; i < workList.getCount(); i++)
-        visit(workList[i].entryPoint, workList[i].inst);
 }
 
 void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink, IRModule* module)

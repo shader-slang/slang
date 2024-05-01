@@ -1,4 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS): -target spirv -emit-spirv-directly -entry main -stage compute -ignore-capabilities
+// CHECK_IGNORE_CAPS-NOT: error 36104
 module test;
 
 [require(spvAtomicFloat16AddEXT)]

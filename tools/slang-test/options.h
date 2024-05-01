@@ -115,7 +115,7 @@ struct Options
     // Maximum number of test servers to run.
     int serverCount = 1;
 
-    bool emitSPIRVDirectly = false;
+    bool emitSPIRVDirectly = true;
 
     Slang::HashSet<Slang::String> expectedFailureList;
 

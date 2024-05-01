@@ -68,8 +68,8 @@ Developers are encouraged to use this model because it directly documents intent
 
 ### Explicit Entry Point Options
 
-For compatibility with existing code, the Slang compiler also supports explicit specification of entry point functions using configuration optiosn external to shader source code.
-When these options are used the compiler will *ignore* all `[shader(...)]` attributes and only use the explicitly-specified entry points intead.
+For compatibility with existing code, the Slang compiler also supports explicit specification of entry point functions using configuration options external to shader source code.
+When these options are used the compiler will *ignore* all `[shader(...)]` attributes and only use the explicitly-specified entry points instead.
 
 ### Shader Parameters
 
@@ -139,7 +139,7 @@ at the linking step.
 
 Once a program is linked, the user can request generation of the _kernel_ code for an entry point.
 The same entry point can be used to generate many different kernels.
-First, and entry point can be compiled for different targets, resulting in different kernels in the appropriate format for each target.
+First, an entry point can be compiled for different targets, resulting in different kernels in the appropriate format for each target.
 Second, different compositions of shader code can result in different layouts, which leads to different kernels being required.
 
 ## Command-Line Compilation with `slangc`
@@ -294,7 +294,7 @@ Notable features that Slang supports which cannot be accessed from `slangc` incl
 
 * Slang allows applications to control the way that shader modules and entry points are composed (which in turn influences their layout); `slangc` currently implements a single default policy for how to generate a composition of shader code.
 
-Applications that more control over compilation are encouraged to use the C++ compilation API described in the next section.
+Applications that need more control over compilation are encouraged to use the C++ compilation API described in the next section.
 
 ## Using the Compilation API
 
@@ -488,7 +488,7 @@ Slang::ComPtr<IModule> module = session->loadModule("MyShaders", diagnostics.wri
 In this example, if any diagnostic messages were produced when loading `MyShaders`, then the `diagnostics` pointer will be set to a blob that contains the textual content of those diagnostics.
 
 The content of a blob can be accessed with `getBufferPointer()`, and the size of the content can be accessed with `getBufferSize()`.
-Diagnostic blobs produces by the Slang compiler are always null-terminated, so that they can be used with C-style sting APIs:
+Diagnostic blobs produces by the Slang compiler are always null-terminated, so that they can be used with C-style string APIs:
 
 ```c++
 if(diagnostics)

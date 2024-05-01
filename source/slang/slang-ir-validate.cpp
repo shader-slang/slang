@@ -66,6 +66,7 @@ namespace Slang
         State state = kState_Initial;
 
         IRInst* prevChild = nullptr;
+        bool hasSeenTerminatorInst = false;
         for(auto child : parent->getDecorationsAndChildren() )
         {
             // We need to check the integrity of the parent/next/prev links of
@@ -105,7 +106,11 @@ namespace Slang
                 validate(context, !as<IRTerminatorInst>(child), child, "terminator must be last instruction in a block");
             }
 
-
+            if (as<IRTerminatorInst>(child))
+            {
+                validate(context, !hasSeenTerminatorInst, child, "block must not contain more than one terminator");
+                hasSeenTerminatorInst = true;
+            }
             prevChild = child;
         }
     }

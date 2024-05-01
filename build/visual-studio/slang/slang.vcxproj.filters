@@ -114,6 +114,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-emit-hlsl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-emit-metal.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-emit-precedence.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -202,6 +205,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-byte-address-legalize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-call-graph.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-check-differentiability.h">
@@ -357,6 +363,12 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-com-methods.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-combined-texture-sampler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-cuda-builtin-types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-error-handling.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -403,6 +415,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-metadata.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-metal-legalize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h">
@@ -525,10 +540,16 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-validate.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-variable-scope-correction.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-vk-invert-y.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-wrap-global-context.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.h">
@@ -806,6 +827,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-emit-hlsl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-emit-metal.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-emit-precedence.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -879,6 +903,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-byte-address-legalize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-call-graph.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-check-differentiability.cpp">
@@ -1031,6 +1058,12 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-com-methods.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-combined-texture-sampler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-cuda-builtin-types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-error-handling.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1077,6 +1110,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-metadata.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-metal-legalize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp">
@@ -1199,10 +1235,16 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-validate.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-variable-scope-correction.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-vk-invert-y.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-wrap-global-context.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.cpp">

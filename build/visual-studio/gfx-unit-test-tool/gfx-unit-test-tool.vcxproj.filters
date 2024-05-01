@@ -125,6 +125,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\texture-types-tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\uint16-structured-buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -200,6 +203,9 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\uint16-buffer.slang">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>

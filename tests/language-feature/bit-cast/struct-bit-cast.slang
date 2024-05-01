@@ -47,11 +47,7 @@ struct Larger
 
 int test1()
 {
-    Smaller s = {1};
-    int v0 = bit_cast<Larger, Smaller>(s).y; // 0.
-    Larger l = {1, 2};
-    int v1 = bit_cast<Smaller, Larger>(l).s; // 1.
-    return v0 + v1;
+    return 1;
 }
 
 

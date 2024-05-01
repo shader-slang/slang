@@ -407,6 +407,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
             sb << "    __glsl_version(450)\n";
             sb << "    __glsl_extension(GL_EXT_samplerless_texture_functions)\n";
+            sb << "    [require(glsl_spirv, texture_sm_4_1)]\n";
             writeFunc(
                 "void",
                 "GetDimensions",

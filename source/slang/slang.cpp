@@ -257,11 +257,13 @@ void Session::_initCodeGenTransitionMap()
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXBytecode, PassThroughMode::Fxc);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXIL, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
-
+    map.addTransition(CodeGenTarget::Metal, CodeGenTarget::MetalLib, PassThroughMode::MetalC);
     // To assembly
     map.addTransition(CodeGenTarget::SPIRV, CodeGenTarget::SPIRVAssembly, PassThroughMode::Glslang);
     map.addTransition(CodeGenTarget::DXIL, CodeGenTarget::DXILAssembly, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::DXBytecode, CodeGenTarget::DXBytecodeAssembly, PassThroughMode::Fxc);
+    map.addTransition(CodeGenTarget::MetalLib, CodeGenTarget::MetalLibAssembly, PassThroughMode::MetalC);
+
 }
 
 void Session::addBuiltins(
@@ -928,6 +930,14 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         if(targetProfile.getFamily() != ProfileFamily::DX)
         {
             targetProfile.setVersion(ProfileVersion::DX_5_1);
+        }
+        break;
+    case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
+        if (targetProfile.getFamily() != ProfileFamily::METAL)
+        {
+            targetProfile.setVersion(ProfileVersion::METAL_2_3);
         }
         break;
     }
@@ -1709,6 +1719,12 @@ CapabilitySet TargetRequest::getTargetCaps()
         atoms.add(CapabilityName::cuda);
         break;
 
+    case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
+        atoms.add(CapabilityName::metal);
+        break;
+
     default:
         break;
     }
@@ -2224,6 +2240,8 @@ Dictionary<String, IntVal*>& ComponentType::getMangledNameToIntValMap()
 
 ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
 {
+    auto astBuilder = getLinkage()->getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
     return as<ConstantIntVal>(intVal->linkTimeResolve(getMangledNameToIntValMap()));
 }
 
@@ -5317,7 +5335,7 @@ void Linkage::prepareDeserializedModule(SerialContainerData::Module& moduleEntry
     module->setPathInfo(filePathInfo);
     module->setDigest(moduleEntry.digest);
     module->_collectShaderParams();
-    module->_discoverEntryPoints(sink);
+    module->_discoverEntryPoints(sink, targets);
 
     // Hook up fileDecl's scope to module's scope.
     auto moduleDecl = module->getModuleDecl();
@@ -6100,7 +6118,7 @@ char const* EndToEndCompileRequest::getDependencyFilePath(int index)
     auto frontEndReq = getFrontEndReq();
     auto program = frontEndReq->getGlobalAndEntryPointsComponentType();
     SourceFile* sourceFile = program->getFileDependencies()[index];
-    return sourceFile->getPathInfo().hasFileFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : "unknown";
+    return sourceFile->getPathInfo().hasFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : "unknown";
 }
 
 int EndToEndCompileRequest::getTranslationUnitCount()
@@ -6270,7 +6288,7 @@ ISlangMutableFileSystem* EndToEndCompileRequest::getCompileRequestResultAsFileSy
 
             // Filter the containerArtifact into things that can be written
             ComPtr<IArtifact> writeArtifact;
-            if (SLANG_SUCCEEDED(ArtifactContainerUtil::filter(m_containerArtifact, writeArtifact)))
+            if (SLANG_SUCCEEDED(ArtifactContainerUtil::filter(m_containerArtifact, writeArtifact)) && writeArtifact)
             {
                 if (SLANG_SUCCEEDED(ArtifactContainerUtil::writeContainer(writeArtifact, "", fileSystem)))
                 {
@@ -6426,6 +6444,9 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
     ComPtr<IArtifact> artifact;
     if (SLANG_FAILED(_getEntryPointResult(this, static_cast<int>(entryPointIndex), static_cast<int>(targetIndex), artifact)))
         return SLANG_E_INVALID_ARG;
+
+    if (!artifact)
+        return SLANG_E_NOT_AVAILABLE;
 
     // Find a rep
     auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);

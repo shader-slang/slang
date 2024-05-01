@@ -39,6 +39,15 @@ struct  IRModule;
 struct  IRStructField;
 struct  IRStructKey;
 
+enum class AddressSpace
+{
+    Generic = 0,
+    ThreadLocal = 1,
+    Global = 2,
+    GroupShared = 3,
+    Uniform = 4,
+};
+
 typedef unsigned int IROpFlags;
 enum : IROpFlags
 {
@@ -829,6 +838,10 @@ struct IRInst
         /// If both `inPrev` and `inNext` are null, then `inParent` must have no (raw) children.
         ///
     void _insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent);
+
+    /// Print the IR to stdout for debugging purposes
+    ///
+    void dump();
 };
 
 enum class IRDynamicCastBehavior

@@ -480,7 +480,10 @@ namespace Slang
             {
                 return SourceLanguage::SPIRV;
             }
-            
+            case PassThroughMode::MetalC:
+            {
+                return SourceLanguage::Metal;
+            }
             default: break;
         }
         SLANG_ASSERT(!"Unknown compiler");
@@ -499,6 +502,7 @@ namespace Slang
             case CodeGenTarget::HostCPPSource:
             case CodeGenTarget::PyTorchCppBinding:
             case CodeGenTarget::CSource:
+            case CodeGenTarget::Metal:
             {
                 return PassThroughMode::None;
             }
@@ -525,6 +529,11 @@ namespace Slang
             case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
                 return PassThroughMode::Glslang;
+            }
+            case CodeGenTarget::MetalLib:
+            case CodeGenTarget::MetalLibAssembly:
+            {
+                return PassThroughMode::MetalC;
             }
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
@@ -953,6 +962,7 @@ namespace Slang
             case CodeGenTarget::DXBytecode:         return CodeGenTarget::HLSL;
             case CodeGenTarget::DXIL:               return CodeGenTarget::HLSL;
             case CodeGenTarget::SPIRV:              return CodeGenTarget::GLSL;
+            case CodeGenTarget::MetalLib:           return CodeGenTarget::Metal;
             default: break;
         }
         return CodeGenTarget::Unknown;
@@ -1542,6 +1552,7 @@ namespace Slang
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::DXBytecodeAssembly:
             case CodeGenTarget::DXILAssembly:
+            case CodeGenTarget::MetalLibAssembly:
             {
                 // First compile to an intermediate target for the corresponding binary format.
                 const CodeGenTarget intermediateTarget = _getIntermediateTarget(target);
@@ -1569,6 +1580,7 @@ namespace Slang
                 [[fallthrough]];
             case CodeGenTarget::DXIL:
             case CodeGenTarget::DXBytecode:
+            case CodeGenTarget::MetalLib:
             case CodeGenTarget::PTX:
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
@@ -1598,6 +1610,8 @@ namespace Slang
         case CodeGenTarget::SPIRV:
         case CodeGenTarget::DXIL:
         case CodeGenTarget::DXBytecode:
+        case CodeGenTarget::MetalLib:
+        case CodeGenTarget::MetalLibAssembly:
         case CodeGenTarget::PTX:
         case CodeGenTarget::HostHostCallable:
         case CodeGenTarget::ShaderHostCallable:
@@ -1617,6 +1631,7 @@ namespace Slang
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::PyTorchCppBinding:
         case CodeGenTarget::CSource:
+        case CodeGenTarget::Metal:
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
                 
@@ -1948,7 +1963,7 @@ namespace Slang
         }
 
         // If IR emitting is enabled, add IR to the artifacts
-        if (m_emitIr)
+        if (m_emitIr && (m_containerFormat == ContainerFormat::SlangModule))
         {
             OwnedMemoryStream stream(FileAccess::Write);
             SlangResult res = writeContainerToStream(&stream);
@@ -2416,7 +2431,7 @@ namespace Slang
         EntryPoint* entryPoint,
         DiagnosticSink* sink);
 
-    void Module::_discoverEntryPoints(DiagnosticSink* sink)
+    void Module::_discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets)
     {
         for (auto globalDecl : m_moduleDecl->members)
         {
@@ -2451,12 +2466,30 @@ namespace Slang
             else
             {
                 // If there isn't a [shader] attribute, look for a [numthreads] attribute
-                // since that implicitly means a compute shader.
+                // since that implicitly means a compute shader. We'll not do this when compiling for
+                // CUDA/Torch since [numthreads] attributes are utilized differently for those targets.
+                // 
+
+                bool allTargetsCUDARelated = true;
+                for (auto target : targets)
+                {
+                    if (!isCUDATarget(target) && 
+                        target->getTarget() != CodeGenTarget::PyTorchCppBinding)
+                    {
+                        allTargetsCUDARelated = false;
+                        break;
+                    }
+                }
+
+                if (allTargetsCUDARelated && targets.getCount() > 0)
+                    continue;
+
                 auto numThreadsAttr = funcDecl->findModifier<NumThreadsAttribute>();
                 if (numThreadsAttr)
                     profile.setStage(Stage::Compute);
                 else
                     continue;
+                
             }
 
             RefPtr<EntryPoint> entryPoint = EntryPoint::create(

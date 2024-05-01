@@ -11,6 +11,14 @@
 
 namespace Slang
 {
+    template<typename P, typename... Args>
+    bool diagnoseCapabilityErrors(DiagnosticSink* sink, CompilerOptionSet& optionSet, P const& pos, DiagnosticInfo const& info, Args const&... args)
+    {
+        if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+            return false;
+        return sink->diagnose(pos, info, args...);
+    }
+
         /// Should the given `decl` be treated as a static rather than instance declaration?
     bool isEffectivelyStatic(
         Decl*           decl);
@@ -790,9 +798,16 @@ namespace Slang
             : m_shared(shared)
             , m_sink(shared->getSink())
             , m_astBuilder(shared->getLinkage()->getASTBuilder())
-        {}
+        {
+            if (shared->getLinkage()->m_optionSet.hasOption(CompilerOptionName::DisableShortCircuit))
+            {
+                m_shouldShortCircuitLogicExpr =
+                    !shared->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DisableShortCircuit);
+            }
+        }
 
         SharedSemanticsContext* getShared() { return m_shared; }
+        CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
         ASTBuilder* getASTBuilder() { return m_astBuilder; }
 
         DiagnosticSink* getSink() { return m_sink; }
@@ -2040,7 +2055,6 @@ namespace Slang
 
         SubtypeWitness* checkAndConstructSubtypeWitness(Type* subType, Type* superType);
 
-        bool isInterfaceType(Type* type);
         bool isValidGenericConstraintType(Type* type);
 
         bool isTypeDifferentiable(Type* type);
@@ -2630,7 +2644,6 @@ namespace Slang
         CASE(OverloadedExpr)
         CASE(OverloadedExpr2)
         CASE(AggTypeCtorExpr)
-        CASE(CastToSuperTypeExpr)
         CASE(ModifierCastExpr)
         CASE(LetExpr)
         CASE(ExtractExistentialValueExpr)
@@ -2648,6 +2661,7 @@ namespace Slang
 
         Expr* visitThisExpr(ThisExpr* expr);
         Expr* visitThisTypeExpr(ThisTypeExpr* expr);
+        Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr);
         Expr* visitReturnValExpr(ReturnValExpr* expr);
         Expr* visitAndTypeExpr(AndTypeExpr* expr);
         Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
@@ -2763,11 +2777,13 @@ namespace Slang
 
     bool isUnsizedArrayType(Type* type);
 
+    bool isInterfaceType(Type* type);
+
     EnumDecl* isEnumType(Type* type);
 
     DeclVisibility getDeclVisibility(Decl* decl);
 
-    void diagnoseCapabilityProvenance(DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom);
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom);
 
     void _ensureAllDeclsRec(
         SemanticsDeclVisitorBase* visitor,

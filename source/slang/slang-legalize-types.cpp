@@ -203,6 +203,21 @@ bool isResourceType(IRType* type)
     return false;
 }
 
+// Helper wrapper function around isResourceType that checks if the given
+// type is a pointer to a resource type or a physical storage buffer.
+bool isPointerToResourceType(IRType* type)
+{
+    while (auto ptrType = as<IRPtrTypeBase>(type))
+    {
+        if (ptrType->getAddressSpace() == SpvStorageClassStorageBuffer ||
+            ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBufferEXT)
+            return true;
+        type = ptrType->getValueType();
+    }
+
+    return isResourceType(type);
+}
+
 ModuleDecl* findModuleForDecl(
     Decl*   decl)
 {
@@ -1141,23 +1156,34 @@ LegalType legalizeTypeImpl(
         auto originalElementType = uniformBufferType->getElementType();
 
         // Legalize the element type to see what we are working with.
-        auto legalElementType = legalizeType(context,
-            originalElementType);
-
-        // As a bit of a corner case, if the user requested something
-        // like `ConstantBuffer<Texture2D>` the element type would
-        // legalize to a "simple" type, and that would be interpreted
-        // as an *ordinary* type, but we really need to notice the
-        // case when the element type is simple, but *special*.
-        //
-        if( context->isSpecialType(originalElementType) )
+        LegalType legalElementType;
+        
+        if (isMetalTarget(context->targetProgram->getTargetReq()) &&
+            as<IRParameterBlockType>(uniformBufferType))
         {
-            // Anything that has a special element type needs to
-            // be handled by the pass-specific logic in the context.
+            // On Metal, we do not need to legalize the element type of
+            // a parameter block because we can translate it directly into
+            // an argument buffer.
+            legalElementType = LegalType::simple(originalElementType);
+        }
+        else
+        {
+            legalElementType = legalizeType(context, originalElementType);
+            // As a bit of a corner case, if the user requested something
+            // like `ConstantBuffer<Texture2D>` the element type would
+            // legalize to a "simple" type, and that would be interpreted
+            // as an *ordinary* type, but we really need to notice the
+            // case when the element type is simple, but *special*.
             //
-            return context->createLegalUniformBufferType(
-                uniformBufferType->getOp(),
-                legalElementType);
+            if( context->isSpecialType(originalElementType) )
+            {
+                // Anything that has a special element type needs to
+                // be handled by the pass-specific logic in the context.
+                //
+                return context->createLegalUniformBufferType(
+                    uniformBufferType->getOp(),
+                    legalElementType);
+            }
         }
 
         // Note that even when legalElementType.flavor == Simple

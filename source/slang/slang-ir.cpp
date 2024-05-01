@@ -4,6 +4,7 @@
 #include "slang-ir-util.h"
 
 #include "../core/slang-basic.h"
+#include "../core/slang-writer.h"
 
 #include "slang-ir-dominators.h"
 
@@ -60,6 +61,8 @@ namespace Slang
             case kIROp_LineAdjInputPrimitiveTypeDecoration: 
             case kIROp_LineInputPrimitiveTypeDecoration: 
             case kIROp_NoInlineDecoration: 
+            case kIROp_DerivativeGroupQuadDecoration:
+            case kIROp_DerivativeGroupLinearDecoration:
             case kIROp_PointInputPrimitiveTypeDecoration: 
             case kIROp_PreciseDecoration: 
             case kIROp_PublicDecoration: 
@@ -3773,7 +3776,12 @@ namespace Slang
         return nullptr;
     }
 
-    static int _getTypeStyleId(IRType* type)
+    enum class TypeCastStyle
+    {
+        Unknown = -1, 
+        Int, Float, Bool, Ptr, Void
+    };
+    static TypeCastStyle _getTypeStyleId(IRType* type)
     {
         if (auto vectorType = as<IRVectorType>(type))
         {
@@ -3787,22 +3795,24 @@ namespace Slang
         switch (style)
         {
         case kIROp_IntType:
-            return 0;
+            return TypeCastStyle::Int;
         case kIROp_FloatType:
-            return 1;
+        case kIROp_HalfType:
+        case kIROp_DoubleType:
+            return TypeCastStyle::Float;
         case kIROp_BoolType:
-            return 2;
+            return TypeCastStyle::Bool;
         case kIROp_PtrType:
         case kIROp_InOutType:
         case kIROp_OutType:
         case kIROp_RawPointerType:
         case kIROp_RefType:
         case kIROp_ConstRefType:
-            return 3;
+            return TypeCastStyle::Ptr;
         case kIROp_VoidType:
-            return 4;
+            return TypeCastStyle::Void;
         default:
-            return -1;
+            return TypeCastStyle::Unknown;
         }
     }
 
@@ -3814,14 +3824,14 @@ namespace Slang
         auto toStyle = _getTypeStyleId(type);
         auto fromStyle = _getTypeStyleId(value->getDataType());
 
-        if (fromStyle == kIROp_VoidType)
+        if (fromStyle == TypeCastStyle::Void)
         {
             // We shouldn't be casting from void to other types.
             SLANG_UNREACHABLE("cast from void type");
         }
 
-        SLANG_RELEASE_ASSERT(toStyle != -1);
-        SLANG_RELEASE_ASSERT(fromStyle != -1);
+        SLANG_RELEASE_ASSERT(toStyle != TypeCastStyle::Unknown);
+        SLANG_RELEASE_ASSERT(fromStyle != TypeCastStyle::Unknown);
 
         struct OpSeq
         {
@@ -3845,7 +3855,7 @@ namespace Slang
             /* From Ptr   */ {kIROp_CastPtrToInt, {kIROp_CastPtrToInt, kIROp_CastIntToFloat}, kIROp_CastPtrToBool, kIROp_BitCast, kIROp_CastToVoid},
         };
 
-        auto op = opMap[fromStyle][toStyle];
+        auto op = opMap[(int)fromStyle][(int)toStyle];
         if (op.op0 == kIROp_Nop)
             return value;
         auto t = type;
@@ -5896,6 +5906,18 @@ namespace Slang
             );
         return i;
     }
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandConvertTexel(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandConvertTexel,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandRayPayloadFromLocation(IRInst* inst)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -6128,6 +6150,18 @@ namespace Slang
             2,
             operands
         );
+        addInst(i);
+        return i;
+    }
+
+    // IR emitter for a dedicated instruction to represent NonUniformResourceIndex qualifier.
+    IRInst* IRBuilder::emitNonUniformResourceIndexInst(IRInst* val)
+    {
+        const auto i = createInst<IRInst>(
+            this,
+            kIROp_NonUniformResourceIndex,
+            getTypeType(),
+            val);
         addInst(i);
         return i;
     }
@@ -8056,6 +8090,8 @@ namespace Slang
         case kIROp_StructuredBufferLoad:
         case kIROp_RWStructuredBufferLoad:
         case kIROp_RWStructuredBufferGetElementPtr:
+        case kIROp_CombinedTextureSamplerGetSampler:
+        case kIROp_CombinedTextureSamplerGetTexture:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
         case kIROp_LoadReverseGradient:
         case kIROp_ReverseGradientDiffPairRef:
@@ -8570,6 +8606,25 @@ namespace Slang
         }
     }
 
+    void IRInst::dump()
+    {
+        if (auto intLit = as<IRIntLit>(this))
+        {
+            std::cout << intLit->getValue() << std::endl;
+        }
+        else if (auto stringLit = as<IRStringLit>(this))
+        {
+            std::cout << stringLit->getStringSlice().begin() << std::endl;
+        }
+        else
+        {
+            StringBuilder sb;
+            IRDumpOptions options;
+            StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
+            dumpIR(this, options, nullptr, &writer);
+            std::cout << sb.toString().begin() << std::endl;
+        }
+    }
 } // namespace Slang
 
 #if SLANG_VC
