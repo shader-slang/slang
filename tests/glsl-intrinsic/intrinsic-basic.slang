@@ -516,8 +516,6 @@ __generic<let N : int>
 bool Test_VectorType()
 {
     // CHECK_GLSL-LABEL: bool Test_VectorType_0
-    // CHECK_GLSL-NOT: for{{ *}}(
-    // CHECK_GLSL-LABEL: bool Test_VectorType_1
 
     // The following type names are what OpenGL document
     // uses to refer variants of the vector types.
@@ -556,6 +554,7 @@ bool Test_VectorType()
     // 8.8. Integer Functions
 
     // CHECK_GLSL: umulExtended(
+    // CHECK_GLSL-NOT: umulExtended(
     // CHECK_SPIR: OpUMulExtended{{ }}
     // CHECK_SPIR-NOT: OpUMulExtended{{ }}
     umulExtended(genUType(zero), genUType(zero), outGenUType, outGenUType2);
@@ -563,6 +562,7 @@ bool Test_VectorType()
     voidResults = voidResults && genUType(0) == outGenUType2;
 
     // CHECK_GLSL: imulExtended(
+    // CHECK_GLSL-NOT: imulExtended(
     // CHECK_SPIR: OpSMulExtended{{ }}
     // CHECK_SPIR-NOT: OpSMulExtended{{ }}
     imulExtended(genIType(zero), genIType(zero), outGenIType, outGenIType2);
@@ -573,41 +573,49 @@ bool Test_VectorType()
         // 8.1. Angle and Trigonometry Functions
 
         // CHECK_GLSL: radians(
+        // CHECK_GLSL-NOT: radians(
         // CHECK_SPIR: Radians{{ }}
         // CHECK_SPIR-NOT: Radians{{ }}
         && genFType(0) == radians(genFType(zero))
 
         // CHECK_GLSL: degrees(
+        // CHECK_GLSL-NOT: degrees(
         // CHECK_SPIR: Degrees{{ }}
         // CHECK_SPIR-NOT: Degrees{{ }}
         && genFType(0) == degrees(genFType(zero))
 
         // CHECK_GLSL: sin(
+        // CHECK_GLSL-NOT: sin(
         // CHECK_SPIR: Sin{{ }}
         // CHECK_SPIR-NOT: Sin{{ }}
         && genFType(0) == sin(genFType(zero))
 
         // CHECK_GLSL: cos(
+        // CHECK_GLSL-NOT: cos(
         // CHECK_SPIR: Cos{{ }}
         // CHECK_SPIR-NOT: Cos{{ }}
         && genFType(1) == cos(genFType(zero))
 
         // CHECK_GLSL: tan(
+        // CHECK_GLSL-NOT: tan(
         // CHECK_SPIR: Tan{{ }}
         // CHECK_SPIR-NOT: Tan{{ }}
         && genFType(0) == tan(genFType(zero))
 
         // CHECK_GLSL: asin(
+        // CHECK_GLSL-NOT: asin(
         // CHECK_SPIR: Asin{{ }}
         // CHECK_SPIR-NOT: Asin{{ }}
         && genFType(0) == asin(genFType(zero))
 
         // CHECK_GLSL: acos(
+        // CHECK_GLSL-NOT: acos(
         // CHECK_SPIR: Acos{{ }}
         // CHECK_SPIR-NOT: Acos{{ }}
         && genFType(0) == acos(genFType(one))
 
         // CHECK_GLSL-COUNT-2: atan(
+        // CHECK_GLSL-NOT: atan(
         // CHECK_SPIR: Atan2{{ }}
         // CHECK_SPIR-NOT: Atan2{{ }}
         // CHECK_SPIR: Atan{{ }}
@@ -616,32 +624,38 @@ bool Test_VectorType()
         && genFType(0) == atan(genFType(zero))
 
         // CHECK_GLSL: sinh(
+        // CHECK_GLSL-NOT: sinh(
         // CHECK_SPIR: Sinh{{ }}
         // CHECK_SPIR-NOT: Sinh{{ }}
         && genFType(0) == sinh(genFType(zero))
 
         // CHECK_GLSL: cosh(
+        // CHECK_GLSL-NOT: cosh(
         // CHECK_SPIR: Cosh{{ }}
         // CHECK_SPIR-NOT: Cosh{{ }}
         && genFType(1) == cosh(genFType(zero))
 
         // CHECK_GLSL: tanh(
+        // CHECK_GLSL-NOT: tanh(
         // CHECK_SPIR: Tanh{{ }}
         // CHECK_SPIR-NOT: Tanh{{ }}
         && genFType(0) == tanh(genFType(zero))
 
 #if !defined(TARGET_CUDA)
         // CHECK_GLSL: asinh(
+        // CHECK_GLSL-NOT: asinh(
         // CHECK_SPIR: Asinh{{ }}
         // CHECK_SPIR-NOT: Asinh{{ }}
         && genFType(0) == asinh(genFType(zero))
 
         // CHECK_GLSL: acosh(
+        // CHECK_GLSL-NOT: acosh(
         // CHECK_SPIR: Acosh{{ }}
         // CHECK_SPIR-NOT: Acosh{{ }}
         && genFType(0) == acosh(genFType(one))
 
         // CHECK_GLSL: atanh(
+        // CHECK_GLSL-NOT: atanh(
         // CHECK_SPIR: Atanh{{ }}
         // CHECK_SPIR-NOT: Atanh{{ }}
         && genFType(0) == atanh(genFType(zero))
@@ -650,37 +664,44 @@ bool Test_VectorType()
         // 8.2. Exponential Functions
 
         // CHECK_GLSL: pow(
+        // CHECK_GLSL-NOT: pow(
         // CHECK_SPIR: Pow{{ }}
         // CHECK_SPIR-NOT: Pow{{ }}
         && genFType(1) == pow(genFType(one), genFType(zero))
 
         // CHECK_GLSL: exp(
+        // CHECK_GLSL-NOT: exp(
         // CHECK_SPIR: Exp{{ }}
         // CHECK_SPIR-NOT: Exp{{ }}
         && genFType(1) == exp(genFType(zero))
 
         // CHECK_GLSL: log(
+        // CHECK_GLSL-NOT: log(
         // CHECK_SPIR: Log{{ }}
         // CHECK_SPIR-NOT: Log{{ }}
         && genFType(0) == log(genFType(one))
 
         // CHECK_GLSL: exp2(
+        // CHECK_GLSL-NOT: exp2(
         // CHECK_SPIR: Exp2{{ }}
         // CHECK_SPIR-NOT: Exp2{{ }}
         && genFType(1) == exp2(genFType(zero))
 
         // CHECK_GLSL: log2(
+        // CHECK_GLSL-NOT: log2(
         // CHECK_SPIR: Log2{{ }}
         // CHECK_SPIR-NOT: Log2{{ }}
         && genFType(0) == log2(genFType(one))
 
         // CHECK_GLSL-COUNT-2: sqrt(
+        // CHECK_GLSL-NOT: sqrt(
         // CHECK_SPIR-COUNT-2: Sqrt{{ }}
         // CHECK_SPIR-NOT: Sqrt{{ }}
         && genFType(0) == sqrt(genFType(zero))
         && genDType(0) == sqrt(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: inversesqrt(
+        // CHECK_GLSL-NOT: inversesqrt(
         // CHECK_SPIR-COUNT-2: InverseSqrt{{ }}
         // CHECK_SPIR-NOT: InverseSqrt{{ }}
         && genFType(1) == inversesqrt(genFType(one))
@@ -689,6 +710,7 @@ bool Test_VectorType()
         // 8.3. Common Functions
 
         // CHECK_GLSL-COUNT-3: abs(
+        // CHECK_GLSL-NOT: abs(
         // CHECK_SPIR: FAbs{{ }}
         // CHECK_SPIR-NOT: FAbs{{ }}
         // CHECK_SPIR: SAbs{{ }}
@@ -700,6 +722,7 @@ bool Test_VectorType()
         && genDType(0) == abs(genDType(zero))
 
         // CHECK_GLSL-COUNT-3: sign(
+        // CHECK_GLSL-NOT: sign(
         // CHECK_SPIR: FSign{{ }}
         // CHECK_SPIR-NOT: FSign{{ }}
         // CHECK_SPIR: SSign{{ }}
@@ -713,42 +736,49 @@ bool Test_VectorType()
         && genDType(0) == sign(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: floor(
+        // CHECK_GLSL-NOT: floor(
         // CHECK_SPIR-COUNT-2: Floor{{ }}
         // CHECK_SPIR-NOT: Floor{{ }}
         && genFType(0) == floor(genFType(zero))
         && genDType(0) == floor(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: trunc(
+        // CHECK_GLSL-NOT: trunc(
         // CHECK_SPIR-COUNT-2: Trunc{{ }}
         // CHECK_SPIR-NOT: Trunc{{ }}
         && genFType(0) == trunc(genFType(zero))
         && genDType(0) == trunc(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: round(
+        // CHECK_GLSL-NOT: round(
         // CHECK_SPIR-COUNT-2: Round{{ }}
         // CHECK_SPIR-NOT: Round{{ }}
         && genFType(0) == round(genFType(zero))
         && genDType(0) == round(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: roundEven(
+        // CHECK_GLSL-NOT: roundEven(
         // CHECK_SPIR-COUNT-2: RoundEven{{ }}
         // CHECK_SPIR-NOT: RoundEven{{ }}
         && genFType(0) == roundEven(genFType(zero))
         && genDType(0) == roundEven(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: ceil(
+        // CHECK_GLSL-NOT: ceil(
         // CHECK_SPIR-COUNT-2: Ceil{{ }}
         // CHECK_SPIR-NOT: Ceil{{ }}
         && genFType(0) == ceil(genFType(zero))
         && genDType(0) == ceil(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: fract(
+        // CHECK_GLSL-NOT: fract(
         // CHECK_SPIR-COUNT-2: Fract{{ }}
         // CHECK_SPIR-NOT: Fract{{ }}
         && genFType(0) == fract(genFType(zero))
         && genDType(0) == fract(genDType(zero))
 
         // CHECK_GLSL-COUNT-4: mod(
+        // CHECK_GLSL-NOT: mod(
         // CHECK_SPIR-COUNT-4: Floor{{ }}
         // CHECK_SPIR-NOT: Floor{{ }}
         && genFType(0) == mod(genFType(zero), float(one))
@@ -757,12 +787,14 @@ bool Test_VectorType()
         && genDType(0) == mod(genDType(zero), genDType(one))
 
         // CHECK_GLSL-COUNT-2: modf(
+        // CHECK_GLSL-NOT: modf(
         // CHECK_SPIR-COUNT-2: Modf{{ }}
         // CHECK_SPIR-NOT: Modf{{ }}
         && genFType(0) == modf(genFType(zero), outGenFType) && genFType(0) == outGenFType
         && genDType(0) == modf(genDType(zero), outGenDType) && genDType(0) == outGenDType
 
         // CHECK_GLSL-COUNT-8: min(
+        // CHECK_GLSL-NOT: min(
         // CHECK_SPIR-COUNT-4: FMin{{ }}
         // CHECK_SPIR-NOT: FMin{{ }}
         // CHECK_SPIR-COUNT-2: SMin{{ }}
@@ -779,6 +811,7 @@ bool Test_VectorType()
         && genUType(0) == min(genUType(zero), uint(zero))
 
         // CHECK_GLSL-COUNT-8: max(
+        // CHECK_GLSL-NOT: max(
         // CHECK_SPIR-COUNT-4: FMax{{ }}
         // CHECK_SPIR-NOT: FMax{{ }}
         // CHECK_SPIR-COUNT-2: SMax{{ }}
@@ -795,6 +828,7 @@ bool Test_VectorType()
         && genUType(0) == max(genUType(zero), uint(zero))
 
         // CHECK_GLSL-COUNT-8: clamp(
+        // CHECK_GLSL-NOT: clamp(
         // CHECK_SPIR-COUNT-4: FClamp{{ }}
         // CHECK_SPIR-NOT: FClamp{{ }}
         // CHECK_SPIR-COUNT-2: SClamp{{ }}
@@ -811,6 +845,7 @@ bool Test_VectorType()
         && genUType(0) == clamp(genUType(zero), uint(zero), uint(zero))
 
         // CHECK_GLSL-COUNT-4: mix(
+        // CHECK_GLSL-NOT: mix(
         // CHECK_SPIR-COUNT-4: FMix{{ }}
         // CHECK_SPIR-NOT: FMix{{ }}
         && genFType(0) == mix(genFType(zero), genFType(zero), genFType(zero))
@@ -820,6 +855,7 @@ bool Test_VectorType()
 
 #if !defined(TARGET_CUDA)
         // CHECK_GLSL-COUNT-5: mix(
+        // CHECK_GLSL-NOT: mix(
         // C-HECK_SPIR-COUNT-5: OpSelect{{ }}
         && genFType(0) == mix(genFType(zero), genFType(zero), genBType(zero))
         && genDType(0) == mix(genDType(zero), genDType(zero), genBType(zero))
@@ -829,6 +865,7 @@ bool Test_VectorType()
 #endif // #if !defined(TARGET_CUDA)
 
         // CHECK_GLSL-COUNT-4: step(
+        // CHECK_GLSL-NOT: step(
         // CHECK_SPIR-COUNT-4: Step{{ }}
         // CHECK_SPIR-NOT: Step{{ }}
         && genFType(0) == step(genFType(one), genFType(zero))
@@ -837,6 +874,7 @@ bool Test_VectorType()
         && genDType(0) == step(double(one), genDType(zero))
 
         // CHECK_GLSL-COUNT-4: smoothstep(
+        // CHECK_GLSL-NOT: smoothstep(
         // CHECK_SPIR-COUNT-4: SmoothStep{{ }}
         // CHECK_SPIR-NOT: SmoothStep{{ }}
         && genFType(0) == smoothstep(genFType(zero), genFType(one), genFType(zero))
@@ -846,12 +884,14 @@ bool Test_VectorType()
 
 #if !defined(TARGET_CUDA)
         // CHECK_GLSL-COUNT-2: isnan(
+        // CHECK_GLSL-NOT: isnan(
         // CHECK_SPIR-COUNT-2: OpIsNan{{ }}
         // CHECK_SPIR-NOT: OpIsNan{{ }}
         && genBType(0) == isnan(genFType(zero))
         && genBType(0) == isnan(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: isinf(
+        // CHECK_GLSL-NOT: isinf(
         // CHECK_SPIR-COUNT-2: OpIsInf{{ }}
         // CHECK_SPIR-NOT: OpIsInf{{ }}
         && genBType(0) == isinf(genFType(zero))
@@ -859,38 +899,45 @@ bool Test_VectorType()
 #endif // #if !defined(TARGET_CUDA)
 
         // CHECK_GLSL: floatBitsToInt(
+        // CHECK_GLSL-NOT: floatBitsToInt(
         // CHECK_SPIR: OpBitcast{{ }}
         // CHECK_SPIR-NOT: OpBitcast{{ }}
         && genIType(0) == floatBitsToInt(genFType(zero))
 
         // CHECK_GLSL: floatBitsToUint(
+        // CHECK_GLSL-NOT: floatBitsToUint(
         // CHECK_SPIR: OpBitcast{{ }}
         // CHECK_SPIR-NOT: OpBitcast{{ }}
         && genUType(0) == floatBitsToUint(genFType(zero))
 
         // CHECK_GLSL: intBitsToFloat(
+        // CHECK_GLSL-NOT: intBitsToFloat(
         // CHECK_SPIR: OpBitcast{{ }}
         // CHECK_SPIR-NOT: OpBitcast{{ }}
         && genFType(0) == intBitsToFloat(genIType(zero))
 
         // CHECK_GLSL: uintBitsToFloat(
+        // CHECK_GLSL-NOT: uintBitsToFloat(
         // CHECK_SPIR: OpBitcast{{ }}
         // CHECK_SPIR-NOT: OpBitcast{{ }}
         && genFType(0) == uintBitsToFloat(genUType(zero))
 
         // CHECK_GLSL-COUNT-2: fma(
+        // CHECK_GLSL-NOT: fma(
         // CHECK_SPIR-COUNT-2: Fma{{ }}
         // CHECK_SPIR-NOT: Fma{{ }}
         && genFType(0) == fma(genFType(zero), genFType(zero), genFType(zero))
         && genDType(0) == fma(genDType(zero), genDType(zero), genDType(zero))
 
         // CHECK_GLSL-COUNT-2: frexp(
+        // CHECK_GLSL-NOT: frexp(
         // CHECK_SPIR-COUNT-2: Frexp{{ }}
         // CHECK_SPIR-NOT: Frexp{{ }}
         && genFType(0) == frexp(genFType(zero), outGenIType) && genIType(0) == outGenIType
         && genDType(0) == frexp(genDType(zero), outGenIType) && genIType(0) == outGenIType
 
         // CHECK_GLSL-COUNT-2: ldexp(
+        // CHECK_GLSL-NOT: ldexp(
         // CHECK_SPIR-COUNT-2: Ldexp{{ }}
         // CHECK_SPIR-NOT: Ldexp{{ }}
         && genFType(0) == ldexp(genFType(zero), genIType(zero))
@@ -899,40 +946,47 @@ bool Test_VectorType()
         // 8.5. Geometric Functions
 
         // CHECK_GLSL-COUNT-2: length(
+        // CHECK_GLSL-NOT: length(
         // CHECK_SPIR-COUNT-2: Length{{ }}
         // CHECK_SPIR-NOT: Length{{ }}
         && float(0) == length(genFType(zero))
         && double(0) == length(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: distance(
+        // CHECK_GLSL-NOT: distance(
         // CHECK_SPIR-COUNT-2: Distance{{ }}
         // CHECK_SPIR-NOT: Distance{{ }}
         && float(0) == distance(genFType(zero), genFType(zero))
         && double(0) == distance(genDType(zero), genDType(zero))
 
         // CHECK_GLSL-COUNT-2: dot(
+        // CHECK_GLSL-NOT: dot(
         && float(0) == dot(genFType(zero), genFType(zero))
         && double(0) == dot(genDType(zero), genDType(zero))
 
         // CHECK_GLSL-COUNT-2: normalize(
+        // CHECK_GLSL-NOT: normalize(
         // CHECK_SPIR-COUNT-2: Normalize{{ }}
         // CHECK_SPIR-NOT: Normalize{{ }}
         && (abs(float(1) - length(normalize(genFType(one)))) < epsilon)
         && (abs(double(1) - length(normalize(genDType(one)))) < double(epsilon))
 
         // CHECK_GLSL-COUNT-2: faceforward(
+        // CHECK_GLSL-NOT: faceforward(
         // CHECK_SPIR-COUNT-2: FaceForward{{ }}
         // CHECK_SPIR-NOT: FaceForward{{ }}
         && genFType(1) == faceforward(genFType(one), genFType(one), genFType(negaOne))
         && genDType(1) == faceforward(genDType(one), genDType(one), genDType(negaOne))
 
         // CHECK_GLSL-COUNT-2: reflect(
+        // CHECK_GLSL-NOT: reflect(
         // CHECK_SPIR-COUNT-2: Reflect{{ }}
         // CHECK_SPIR-NOT: Reflect{{ }}
         && genFType(0) == reflect(genFType(zero), genFType(zero))
         && genDType(0) == reflect(genDType(zero), genDType(zero))
 
         // CHECK_GLSL-COUNT-2: refract(
+        // CHECK_GLSL-NOT: refract(
         // CHECK_SPIR-COUNT-2: Refract{{ }}
         // CHECK_SPIR-NOT: Refract{{ }}
         && genFType(0) == refract(genFType(zero), genFType(zero), float(zero))
@@ -942,21 +996,25 @@ bool Test_VectorType()
 
 #if !defined(TARGET_CUDA)
         // CHECK_GLSL-COUNT-3: lessThan(
+        // CHECK_GLSL-NOT: lessThan(
         && bvec(1) == lessThan(vec(zero), vec(one))
         && bvec(1) == lessThan(ivec(zero), ivec(one))
         && bvec(1) == lessThan(uvec(zero), uvec(one))
 
         // CHECK_GLSL-COUNT-3: lessThanEqual(
+        // CHECK_GLSL-NOT: lessThanEqual(
         && bvec(1) == lessThanEqual(vec(zero), vec(one))
         && bvec(1) == lessThanEqual(ivec(zero), ivec(one))
         && bvec(1) == lessThanEqual(uvec(zero), uvec(one))
 
         // CHECK_GLSL-COUNT-3: greaterThan(
+        // CHECK_GLSL-NOT: greaterThan(
         && bvec(0) == greaterThan(vec(zero), vec(one))
         && bvec(0) == greaterThan(ivec(zero), ivec(one))
         && bvec(0) == greaterThan(uvec(zero), uvec(one))
 
         // CHECK_GLSL-COUNT-3: greaterThanEqual(
+        // CHECK_GLSL-NOT: greaterThanEqual(
         && bvec(0) == greaterThanEqual(vec(zero), vec(one))
         && bvec(0) == greaterThanEqual(ivec(zero), ivec(one))
         && bvec(0) == greaterThanEqual(uvec(zero), uvec(one))
@@ -968,34 +1026,40 @@ bool Test_VectorType()
         && bvec(1) == equal(bvec(zero), bvec(zero))
 
         // CHECK_GLSL-COUNT-4: notEqual(
+        // CHECK_GLSL-NOT: notEqual(
         && bvec(0) == notEqual(vec(zero), vec(zero))
         && bvec(0) == notEqual(ivec(zero), ivec(zero))
         && bvec(0) == notEqual(uvec(zero), uvec(zero))
         && bvec(0) == notEqual(bvec(zero), bvec(zero))
 
         // CHECK_GLSL: any(
+        // CHECK_GLSL-NOT: any(
         && bool(0) == any(bvec(zero))
 
         // CHECK_GLSL: all(
         && bool(0) == all(bvec(zero))
 
         // CHECK_GLSL: not(
+        // CHECK_GLSL-NOT: not(
         && bvec(1) == not(bvec(zero))
 #endif // #if !defined(TARGET_CUDA)
 
         // 8.8. Integer Functions
 
         // CHECK_GLSL: uaddCarry(
+        // CHECK_GLSL-NOT: uaddCarry(
         // CHECK_SPIR: OpIAddCarry{{ }}
         // CHECK_SPIR-NOT: OpIAddCarry{{ }}
         && genUType(0) == uaddCarry(genUType(zero), genUType(zero), outGenUType) && genUType(0) == outGenUType
 
         // CHECK_GLSL: usubBorrow(
+        // CHECK_GLSL-NOT: usubBorrow(
         // CHECK_SPIR: OpISubBorrow{{ }}
         // CHECK_SPIR-NOT: OpISubBorrow{{ }}
         && genUType(0) == usubBorrow(genUType(zero), genUType(zero), outGenUType) && genUType(0) == outGenUType
 
         // CHECK_GLSL-COUNT-2: bitfieldExtract(
+        // CHECK_GLSL-NOT: bitfieldExtract(
         // CHECK_SPIR: OpBitFieldSExtract{{ }}
         // CHECK_SPIR-NOT: OpBitFieldSExtract{{ }}
         // CHECK_SPIR: OpBitFieldUExtract{{ }}
@@ -1004,18 +1068,21 @@ bool Test_VectorType()
         && genUType(0) == bitfieldExtract(genUType(zero), int(zero), int(zero))
 
         // CHECK_GLSL-COUNT-2: bitfieldInsert(
+        // CHECK_GLSL-NOT: bitfieldInsert(
         // CHECK_SPIR-COUNT-2: OpBitFieldInsert{{ }}
         // CHECK_SPIR-NOT: OpBitFieldInsert{{ }}
         && genIType(0) == bitfieldInsert(genIType(zero), genIType(zero), int(zero), int(zero))
         && genUType(0) == bitfieldInsert(genUType(zero), genUType(zero), int(zero), int(zero))
 
         // CHECK_GLSL-COUNT-2: bitfieldReverse(
+        // CHECK_GLSL-NOT: bitfieldReverse(
         // CHECK_SPIR-COUNT-2: OpBitReverse{{ }}
         // CHECK_SPIR-NOT: OpBitReverse{{ }}
         && genIType(0) == bitfieldReverse(genIType(zero))
         && genUType(0) == bitfieldReverse(genUType(zero))
 
         // CHECK_GLSL-COUNT-2: bitCount(
+        // CHECK_GLSL-NOT: bitCount(
         // CHECK_SPIR-COUNT-2: OpBitCount{{ }}
         // CHECK_SPIR-NOT: OpBitCount{{ }}
         && genIType(0) == bitCount(genIType(zero))
@@ -1023,12 +1090,14 @@ bool Test_VectorType()
 
 #if !defined(TARGET_CUDA)
         // CHECK_GLSL-COUNT-2: findLSB(
+        // CHECK_GLSL-NOT: findLSB(
         // CHECK_SPIR-COUNT-2: FindILsb{{ }}
         // CHECK_SPIR-NOT: FindILsb{{ }}
         && genIType(-1) == findLSB(genIType(zero))
         && genIType(-1) == findLSB(genUType(zero))
 
         // CHECK_GLSL-COUNT-2: findMSB(
+        // CHECK_GLSL-NOT: findMSB(
         // CHECK_SPIR: FindSMsb{{ }}
         // CHECK_SPIR-NOT: FindSMsb{{ }}
         // CHECK_SPIR: FindUMsb{{ }}
@@ -1038,6 +1107,7 @@ bool Test_VectorType()
 #endif // #if !defined(TARGET_CUDA)
         ;
 
+    // CHECK_GLSL-LABEL: bool Test_VectorType_1
     // CHECK_SPIR-LABEL: OpAccessChain {{.*}} %inputBuffer
 }
 
