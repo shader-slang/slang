@@ -220,6 +220,46 @@ standard output = {
                 "kind": "scalar",
                 "scalarType": "int32"
             }
+        },
+        {
+            "name": "param3",
+            "binding": {"kind": "uniform", "offset": 16, "size": 4},
+            "type": {
+                "kind": "struct",
+                "name": "D",
+                "fields": [
+                    {
+                        "name": "a",
+                        "type": {
+                            "kind": "scalar",
+                            "scalarType": "int32"
+                        },
+                        "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                    }
+                ],
+                "userAttribs": [{
+                    "name": "StructVarParam",
+                    "arguments": [
+                        0
+                    ]
+                }
+                ]
+            }
+        },
+        {
+            "name": "globalInt2",
+            "userAttribs": [{
+                "name": "StructVarParam",
+                "arguments": [
+                    1
+                ]
+            }
+            ],
+            "binding": {"kind": "uniform", "offset": 20, "size": 4},
+            "type": {
+                "kind": "scalar",
+                "scalarType": "int32"
+            }
         }
     ],
     "entryPoints": [
@@ -242,7 +282,7 @@ standard output = {
                 {
                     "name": "a",
                     "userAttribs": [{
-                        "name": "DefaultFuncParam",
+                        "name": "DefaultValue",
                         "arguments": [
                             3
                         ]
@@ -250,6 +290,22 @@ standard output = {
                     ],
                     "stage": "compute",
                     "binding": {"kind": "varyingInput", "index": 0},
+                    "type": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                },
+                {
+                    "name": "b",
+                    "userAttribs": [{
+                        "name": "StructVarParam",
+                        "arguments": [
+                            2
+                        ]
+                    }
+                    ],
+                    "stage": "compute",
+                    "binding": {"kind": "varyingInput", "index": 1},
                     "type": {
                         "kind": "scalar",
                         "scalarType": "float32"
