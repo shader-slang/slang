@@ -5741,7 +5741,15 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T distance(T x, T y)
 {
-    return length(x - y);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "distance";
+    case spirv: return spirv_asm {
+        OpExtInst $$T result glsl450 Distance $x $y
+    };
+    default:
+        return length(x - y);
+    }
 }
 
 // Vector dot product
@@ -6028,9 +6036,7 @@ T exp2(T x)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>())
-            __intrinsic_asm "exp2($0)";
-        __intrinsic_asm "exp2(float($0))";
+        __intrinsic_asm "exp2($0)";
     case spirv:
         if (__isHalf<T>())
         {
@@ -6060,6 +6066,8 @@ vector<T,N> exp2(vector<T,N> x)
 {
     __target_switch
     {
+    case glsl:
+        __intrinsic_asm "exp2($0)";
     case hlsl: __intrinsic_asm "exp2";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T,N> result glsl450 Exp2 $x
@@ -7878,7 +7886,15 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T length(T x)
 {
-    return abs(x);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "length";
+    case spirv: return spirv_asm {
+        OpExtInst $$T result glsl450 Length $x
+    };
+    default:
+        return abs(x);
+    }
 }
 
 // Linear interpolation
