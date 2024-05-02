@@ -89,36 +89,17 @@ struct SerialTypeInfo<CapabilitySet>
         auto& src = *(const NativeType*)native;
         auto& dst = *(SerialType*)serial;
 
-        dst = writer->addArray(src.getExpandedAtoms().getBuffer(), src.getExpandedAtoms().getCount());
+        auto atomSets = src.getAtomSetsAsList();
+        dst = writer->addArray(atomSets.getBuffer(), atomSets.getCount());
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
         auto& dst = *(NativeType*)native;
         auto& src = *(const SerialType*)serial;
 
-        reader->getArray(src, dst.getExpandedAtoms());
-    }
-};
-
-template<>
-struct SerialTypeInfo<CapabilityConjunctionSet>
-{
-    typedef CapabilityConjunctionSet NativeType;
-    typedef SerialIndex SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& src = *(const NativeType*)native;
-        auto& dst = *(SerialType*)serial;
-
-        dst = writer->addArray(src.getExpandedAtoms().getBuffer(), src.getExpandedAtoms().getCount());
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& dst = *(NativeType*)native;
-        auto& src = *(const SerialType*)serial;
-
-        reader->getArray(src, dst.getExpandedAtoms());
+        List<List<CapabilityAtom>> atomList;
+        reader->getArray(src, atomList);
+        dst.addCapability(atomList);
     }
 };
 

@@ -1110,8 +1110,10 @@ bool isBetterForTarget(
     if(newCaps.isInvalid()) return false;
     if(oldCaps.isInvalid()) return true;
 
-    if(newCaps != oldCaps)
-        return newCaps.implies(oldCaps);
+    bool isEqual = false;
+    bool isNewBetter = newCaps.isBetterForTarget(oldCaps, targetCaps, isEqual);
+    if(!isEqual)
+        return isNewBetter;
 
     // All preceding factors being equal, an `[export]` is better
     // than an `[import]`.

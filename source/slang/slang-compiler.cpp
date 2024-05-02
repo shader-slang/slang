@@ -613,9 +613,9 @@ namespace Slang
         GLSLExtensionTracker*   extensionTracker,
         CapabilitySet const&    caps)
     {
-        for( auto conjunctions : caps.getExpandedAtoms() )
+        for( auto conjunctions : caps.getAtomSets() )
         {
-            for (auto atom : conjunctions.getExpandedAtoms())
+            for (auto atom : conjunctions->getElements<CapabilityAtom>())
             {
                 switch (atom)
                 {

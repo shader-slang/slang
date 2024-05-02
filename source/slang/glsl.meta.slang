@@ -387,7 +387,7 @@ public T atanh(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public vector<T,N> atanh(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, atanh, x);
@@ -8145,7 +8145,7 @@ public vec4 noise4(vector<float, N> x)
 // TODO: if called after a return, error.
 
 [ForceInline]
-[require(glsl_hlsl_spirv, shader_stages_compute_tesscontrol_tesseval)]
+[require(glsl_hlsl_spirv, glsl_barrier)]
 public void barrier()
 {
     __target_switch

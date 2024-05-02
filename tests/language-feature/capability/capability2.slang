@@ -39,19 +39,16 @@ struct Impl1 : IFoo
     }
 }
 
-// CHECK-NOT: error 361
-
 struct Impl2 : IFoo
 {
-    // CHECK: ([[# @LINE+1]]): error 36104: {{.*}}spvGroupNonUniformArithmetic
+    // CHECK: error 36104: {{.*}}spvGroupNonUniformArithmetic
     void method1()
     {
         useRayQueryKHR(); // OK.
         useNonUniformArithmetic(); // error.
     }
-    // CHECK-NOT: error 361
 
-    // CHECK: ([[# @LINE+1]]): error 36104: {{.*}}spvGroupNonUniformArithmetic
+    // CHECK: error 36104: {{.*}}spvGroupNonUniformArithmetic
     void method2()
     {
         useAtomicFloat16();

@@ -744,7 +744,7 @@ namespace Slang
 
         void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
-        void diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const CapabilityConjunctionSet* failedAvailableSet);
+        void diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const UIntSet& failedAvailableSet);
     };
 
 
@@ -9846,11 +9846,15 @@ namespace Slang
                     oldCaps);
             }
         }
+
+        // if stmt inside parent, set the provenance tracker to the calling function
+        if(!decl)
+            decl = visitor->getParentFuncOfVisitor();
         if (referencedDecl && decl)
         {
-            for (auto& capSet : nodeCaps.getExpandedAtoms())
+            for (auto& capSet : nodeCaps.getAtomSets())
             {
-                for (auto atom : capSet.getExpandedAtoms())
+                for (auto atom : capSet->getElements<CapabilityAtom>())
                 {
                     decl->capabilityRequirementProvenance.addIfNotExists(atom, DeclReferenceWithLoc{ referencedDecl, referenceLoc });
                 }
@@ -9922,9 +9926,9 @@ namespace Slang
                     }
 
                     if (!maybeRequireCapability)
-                        targetCap = (CapabilitySet(CapabilityName::any_target).getTargetsThisIsMissingFromOther(set));
+                        targetCap = (CapabilitySet(CapabilityName::any_target).getTargetsThisHasButOtherDoesNot(set));
                     else 
-                        targetCap = (maybeRequireCapability->capabilitySet.getTargetsThisIsMissingFromOther(set));
+                        targetCap = (maybeRequireCapability->capabilitySet.getTargetsThisHasButOtherDoesNot(set));
                 }
                 else
                 {
@@ -9938,10 +9942,9 @@ namespace Slang
                 {
                     diagnoseCapabilityErrors(Base::getSink(), outerContext.getOptionSet(), targetCase->body->loc, Diagnostics::conflictingCapabilityDueToStatement, bodyCap, "target_switch", oldCap);
                 }
-                for (auto& conjunction : targetCap.getExpandedAtoms())
-                    set.unionWith(conjunction);
+                set.unionWith(targetCap);
             }
-            set.canonicalize();
+            //set.canonicalize();
             handleReferenceFunc(stmt, set, stmt->loc);
         }
 
@@ -10006,8 +10009,7 @@ namespace Slang
             {
                 for (auto decoration : parent->getModifiersOfType<RequireCapabilityAttribute>())
                 {
-                    for (auto& set : decoration->capabilitySet.getExpandedAtoms())
-                        localDeclaredCaps.unionWith(set);
+                    localDeclaredCaps.unionWith(decoration->capabilitySet);
                 }
             }
             else
@@ -10016,13 +10018,8 @@ namespace Slang
                 shouldBreak = true;
             }
             // Merge decl's capability declaration with the parent.
-            for (auto& localConjunction : localDeclaredCaps.getExpandedAtoms())
-            {
-                if (declaredCaps.isIncompatibleWith(localConjunction))
-                    declaredCaps.unionWith(localConjunction);
-                else
-                    declaredCaps.join(localDeclaredCaps);
-            }
+            declaredCaps.nonDestructiveJoin(localDeclaredCaps);
+
             // If the parent already has inferred capability requirements, we should stop now
             // since that already covers transitive parents.
             if (shouldBreak)
@@ -10041,27 +10038,37 @@ namespace Slang
         decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
     }
 
-    void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
+    template<typename ProcessFunc>
+    static inline void _dispatchCapabilitiesVisitorOfFunctionDecl(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, ProcessFunc propegateFuncForReferences)
     {
+        visitor->setParentFuncOfVisitor(funcDecl);
+
         for (auto member : funcDecl->members)
         {
-            ensureDecl(member, DeclCheckState::CapabilityChecked);
-            _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, member, member->inferredCapabilityRequirements, member->loc);
+            visitor->ensureDecl(member, DeclCheckState::CapabilityChecked);
+            _propagateRequirement(visitor, funcDecl->inferredCapabilityRequirements, funcDecl, member, member->inferredCapabilityRequirements, member->loc);
         }
-        visitReferencedDecls(*this, funcDecl->body, funcDecl->loc, funcDecl->findModifier<RequireCapabilityAttribute>(), [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
-            {
-                _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, node, nodeCaps, refLoc);
-            });
+
+        visitReferencedDecls(*visitor, funcDecl->body, funcDecl->loc, funcDecl->findModifier<RequireCapabilityAttribute>(), propegateFuncForReferences);
 
         if (!isEffectivelyStatic(funcDecl))
         {
             auto parentAggTypeDecl = getParentAggTypeDecl(funcDecl);
             if (parentAggTypeDecl)
             {
-                ensureDecl(parentAggTypeDecl, DeclCheckState::CapabilityChecked);
-                _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, parentAggTypeDecl, parentAggTypeDecl->inferredCapabilityRequirements, funcDecl->loc);
+                visitor->ensureDecl(parentAggTypeDecl, DeclCheckState::CapabilityChecked);
+                _propagateRequirement(visitor, funcDecl->inferredCapabilityRequirements, funcDecl, parentAggTypeDecl, parentAggTypeDecl->inferredCapabilityRequirements, funcDecl->loc);
             }
         }
+    }
+
+    void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
+    {
+        _dispatchCapabilitiesVisitorOfFunctionDecl(this, funcDecl, 
+            [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+            {
+                _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, node, nodeCaps, refLoc);
+            });
 
         auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
 
@@ -10083,26 +10090,12 @@ namespace Slang
         }
 
         auto vis = getDeclVisibility(funcDecl);
+
+        // If 0 capabilities were annotated on a function, capabilities are inferred from the function body
         if (declaredCaps.isEmpty())
         {
-            // If the user has not declared any capabilities,
-            // we should diagnose a warning if any_target is not
-            // a super-set by exact atoms. 
-            if (vis == DeclVisibility::Public && !funcDecl->inferredCapabilityRequirements.isEmpty())
-            {
-                if (!getModuleDecl(funcDecl)->isInLegacyLanguage)
-                {
-                    if (!funcDecl->inferredCapabilityRequirements.isExactSubset(getAnyPlatformCapabilitySet()))
-                    {
-                        diagnoseCapabilityErrors(
-                            getSink(),
-                            this->getOptionSet(),
-                            funcDecl->loc,
-                            Diagnostics::missingCapabilityRequirementOnPublicDecl,
-                            funcDecl, funcDecl->inferredCapabilityRequirements);
-                    }
-                }
-            }
+            declaredCaps = funcDecl->inferredCapabilityRequirements;
+            return;
         }
         else
         {
@@ -10113,7 +10106,7 @@ namespace Slang
                 // At a minimum we will propagate shader requirements to our 
                 // function from calling children in all cases so the parent
                 // can enforce shader targets correctly and propagate to `main`
-                const CapabilityConjunctionSet* failedAvailableCapabilityConjunction = nullptr;
+                UIntSet failedAvailableCapabilityConjunction{};
                 if (!CapabilitySet::checkCapabilityRequirement(
                     declaredCaps,
                     funcDecl->inferredCapabilityRequirements,
@@ -10123,7 +10116,7 @@ namespace Slang
                     funcDecl->inferredCapabilityRequirements = declaredCaps;
                 }
                 else
-                    funcDecl->inferredCapabilityRequirements.simpleJoinWithSetMask(declaredCaps, CapabilityName::stage);
+                    funcDecl->inferredCapabilityRequirements.nonDestructiveJoin(declaredCaps);
             }
             else
             {
@@ -10155,7 +10148,7 @@ namespace Slang
                 ensureDecl(requirementDecl, DeclCheckState::CapabilityChecked);
                 ensureDecl(implDecl.declRefBase, DeclCheckState::CapabilityChecked);
                 
-                const CapabilityConjunctionSet* failedAvailableCapabilityConjunction = nullptr;
+                UIntSet failedAvailableCapabilityConjunction;
                 if (!CapabilitySet::checkCapabilityRequirement(
                     requirementDecl->inferredCapabilityRequirements,
                     implDecl.getDecl()->inferredCapabilityRequirements,
@@ -10217,7 +10210,7 @@ namespace Slang
         return defaultVis;
     }
 
-    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom)
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl)
     {
         HashSet<Decl*> printedDecls;
         auto thisModule = getModuleDecl(decl);
@@ -10225,9 +10218,9 @@ namespace Slang
         while (declToPrint)
         {
             printedDecls.add(declToPrint);
-            if (auto provenance = declToPrint->capabilityRequirementProvenance.tryGetValue(missingAtom))
+            if (auto provenance = declToPrint->capabilityRequirementProvenance.tryGetValue(atomToFind))
             {
-                sink->diagnose(provenance->referenceLoc, Diagnostics::seeUsingOf, provenance->referencedDecl);
+                diagnoseCapabilityErrors(sink, optionSet, provenance->referenceLoc, Diagnostics::seeUsingOf, provenance->referencedDecl);
                 declToPrint = provenance->referencedDecl;
                 if (printedDecls.contains(declToPrint))
                     break;
@@ -10246,152 +10239,73 @@ namespace Slang
                 break;
             }
         }
-        if (declToPrint)
+        if (declToPrint && !optionallyNeverPrintDecl)
         {
             diagnoseCapabilityErrors(sink, optionSet, declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
         }
     }
 
-    // Print diagnostics tracing which referenced decls are not compatible with the given atom.
-    void diagnoseIncompatibleAtomProvenance(SemanticsVisitor* visitor, DiagnosticSink* sink, Decl* decl, CapabilityAtom incompatibleAtom, int traceLevels = 10)
+    void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const UIntSet& failedAtomsInsideAvailableSet)
     {
-        Decl* refDecl = nullptr;
-        SourceLoc loc;
-        HashSet<Decl*> printedDecls;
-        while (traceLevels > 0)
+        if (decl->inferredCapabilityRequirements.isEmpty())
+            return;
+        if(failedAtomsInsideAvailableSet.isEmpty() || failedAtomsInsideAvailableSet.contains((UInt)CapabilityAtom::Invalid))
+            return;
+
+        //// There are two causes for why type checking failed on failedAvailableSet.
+        //// The first scenario is that failedAvailableSet defines a set of capabilities on a
+        //// compilation target (e.g. hlsl) that isn't defined by some callees, for example, if we have
+        //// a function:
+        ////    [require(hlsl)]  // <-- failedAvailableSet
+        ////    [require(cpp)]
+        ////    void caller()
+        ////    {
+        ////        printf(); // assume this is defined for (cpp | cuda).
+        ////    }
+        //// In this case we should diagnose error reporting printf isn't defined on a required target.
+        //// 
+        //// Now, we detect if we are case 1.
+
         {
-            refDecl = nullptr;
-            visitReferencedDecls(*visitor, decl, decl->loc, decl->findModifier<RequireCapabilityAttribute>(), [&](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
-                {
-                    if (nodeCaps.isIncompatibleWith(incompatibleAtom))
-                    {
-                        if (auto referencedDecl = as<Decl>(node))
-                        {
-                            refDecl = referencedDecl;
-                            loc = refLoc;
-                        }
-                        else
-                            diagnoseCapabilityErrors(sink, visitor->getOptionSet(), refLoc, Diagnostics::seeDefinitionOf, "statement");
-                    }
-                });
-            if (!refDecl)
-                break;
-            if (printedDecls.add(refDecl))
+            CapabilityAtom outFailedAtom;
+            if (hasTargetAtom(failedAtomsInsideAvailableSet, outFailedAtom))
             {
-                diagnoseCapabilityErrors(sink, visitor->getOptionSet(), loc, Diagnostics::seeUsingOf, refDecl);
-                decl = refDecl;
-            }
-            else
-            {
-                break;
-            }
-            traceLevels--;
-        }
-    }
-
-    void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const CapabilityConjunctionSet* failedAvailableSet)
-    {
-        if (decl->inferredCapabilityRequirements.getExpandedAtoms().getCount() == 0)
-            return;
-        if(!failedAvailableSet)
-            return;
-
-        // There are two causes for why type checking failed on failedAvailableSet.
-        // The first scenario is that failedAvailableSet defines a set of capabilities on a
-        // compilation target (e.g. hlsl) that isn't defined by some callees, for example, if we have
-        // a function:
-        //    [require(hlsl)]  // <-- failedAvailableSet
-        //    [require(cpp)]
-        //    void caller()
-        //    {
-        //        printf(); // assume this is defined for (cpp | cuda).
-        //    }
-        // In this case we should diagnose error reporting printf isn't defined on a required target.
-        // 
-        // The second scenario is when the callee is using a capability that is not provided by the requirement.
-        // For example:
-        //     [require(hlsl,b,c)]
-        //     void caller()
-        //     {
-        //         useD(); // require capability (hlsl,d)
-        //     }
-        // In this case we should report that useD() is using a capability that is not declared by caller.
-        //
-
-        // Now, we detect if we are case 1.
-        if (decl->inferredCapabilityRequirements.isIncompatibleWith(*failedAvailableSet))
-        {
-            // Find the most derived atom that is leading to the incompatiblity.
-            for (Index i = failedAvailableSet->getExpandedAtoms().getCount() - 1; i >= 0; i--)
-            {
-                auto atom = failedAvailableSet->getExpandedAtoms()[i];
-                if (!isDirectChildOfAbstractAtom(atom))
-                    continue;
-                if (decl->inferredCapabilityRequirements.isIncompatibleWith(atom))
-                {
-                    diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, Diagnostics::declHasDependenciesNotDefinedOnTarget, decl, atom);
-                    diagnoseIncompatibleAtomProvenance(this, getSink(), decl, atom);
-                    return;
-                }
-            }
-            return;
-        }
-
-        // If we reach here, we are case 2.
-
-        CapabilityConjunctionSet* matchingRequirement = &decl->inferredCapabilityRequirements.getExpandedAtoms().getFirst();
-        CapabilityAtom missingAtom = matchingRequirement->getExpandedAtoms().getFirst();
-        if (missingAtom == CapabilityAtom::Invalid)
-            return;
-
-        if (failedAvailableSet)
-        {
-            Int maxIntersectionCount = 0;
-            for (auto& usedSet : decl->inferredCapabilityRequirements.getExpandedAtoms())
-            {
-                auto intersection = usedSet.countIntersectionWith(*failedAvailableSet);
-                if (intersection > maxIntersectionCount)
-                {
-                    matchingRequirement = &usedSet;
-                    maxIntersectionCount = intersection;
-                }
-            }
-            Index pos = 0;
-            for (Index i = 0; i < matchingRequirement->getExpandedAtoms().getCount(); i++)
-            {
-                auto atom = matchingRequirement->getExpandedAtoms()[i];
-                while (pos < failedAvailableSet->getExpandedAtoms().getCount())
-                {
-                    if (failedAvailableSet->getExpandedAtoms()[pos] < atom)
-                        pos++;
-                    else
-                        break;
-                }
-
-                if (pos >= failedAvailableSet->getExpandedAtoms().getCount() ||
-                    failedAvailableSet->getExpandedAtoms()[pos] != atom)
-                {
-                    missingAtom = atom;
-                    break;
-                }
-            }
-
-            // Select the most derived atom of `missingAtom`.
-            for (Index i = matchingRequirement->getExpandedAtoms().getCount() - 1; i >= 0 ; i--)
-            {
-                auto atom = matchingRequirement->getExpandedAtoms()[i];
-                if (CapabilityConjunctionSet(atom).implies(missingAtom))
-                {
-                    missingAtom = atom;
-                    break;
-                }
+                diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, Diagnostics::declHasDependenciesNotCompatibleOnTarget, decl, outFailedAtom);
+                
+                // Anything defined on a non-failed target atom may be the culprit to why we fail having a target capability.
+                // Print out all possible culprits.
+                UIntSet failedAtomSet;
+                failedAtomSet.add((UInt)outFailedAtom);
+                UIntSet targetsNotUsedSet;
+                UIntSet::calcSubtract(targetsNotUsedSet, getUIntSetOfTargets(), failedAtomSet);
+                auto targetsNotUsedAtomList = targetsNotUsedSet.getElements<CapabilityAtom>();
+                
+                for (auto atom : targetsNotUsedAtomList)
+                    diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, atom, true);
+                return;
             }
         }
 
-        diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, diagnosticInfo, decl, missingAtom);
-        
-        // Print provenances.
-        diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, missingAtom);
+        //// The second scenario is when the callee is using a capability that is not provided by the requirement.
+        //// For example:
+        ////     [require(hlsl,b,c)]
+        ////     void caller()
+        ////     {
+        ////         useD(); // require capability (hlsl,d)
+        ////     }
+        //// In this case we should report that useD() is using a capability that is not declared by caller.
+        ////
+
+        //// If we reach here, we are case 2.
+
+        // We will produce all failed atoms. This is important since provenance of multiple atoms
+        // can come from multiple referenced items in a function body.
+        for (auto& i : failedAtomsInsideAvailableSet.getElements<CapabilityAtom>())
+        {
+            diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, diagnosticInfo, decl, i);
+            // Print provenances.
+            diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, i);
+        }
     }
 
 }

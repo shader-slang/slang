@@ -842,4 +842,83 @@
     <Type Name="Slang::BasicExpressionType">
         <DisplayString>BasicExpressionType ({*(DeclRefBase*)m_operands.m_buffer[0].values.nodeOperand})</DisplayString>
     </Type>
+
+	<Type Name="Slang::CapabilitySet">
+		<DisplayString>{m_targetSets.map.m_values}</DisplayString>
+		<Expand>
+			<CustomListItems>
+				<Size>3</Size>
+				<Item Name="m_targetSets">m_targetSets</Item>
+				<Item Name="m_targetSets.map.m_values">m_targetSets.map.m_values</Item>
+				<Item Name="m_conjunctions">m_conjunctions</Item>
+			</CustomListItems>
+		</Expand>
+	</Type>
+	<Type Name="Slang::CapabilityTargetSet">
+		<DisplayString>{{target={target}}}</DisplayString>
+		<Expand>
+			<CustomListItems>
+				<Item Name="target">target</Item>
+				<Item Name="shaderStageSets">shaderStageSets</Item>
+				<Item Name="shaderStageSets.map.m_values">shaderStageSets.map.m_values</Item>
+			</CustomListItems>
+		</Expand>
+	</Type>
+	<Type Name="Slang::CapabilityStageSet">
+		<DisplayString>{{size={disjointSets.count}}}</DisplayString>
+		<Expand>
+			<CustomListItems>
+				<Item Name="stage">stage</Item>
+				<Item Name="disjointSets">disjointSets</Item>
+			</CustomListItems>
+			<Synthetic Name="disjointSets.[data]">
+				<Expand>
+			        <LinkedListItems>
+				        <HeadPointer>disjointSets.head</HeadPointer>
+				        <NextPointer>next</NextPointer>
+				        <ValueNode>value</ValueNode>
+			        </LinkedListItems>
+				</Expand>
+			</Synthetic>
+		</Expand>
+	</Type>
+	<Type Name="Slang::UIntSet">
+		<DisplayString>{{max_size={m_buffer.m_count*Slang::UIntSet::kElementSize}}}</DisplayString>
+		<Expand>
+			<Synthetic Name="[CapabilityAtomView]">
+				<Expand>
+					<CustomListItems MaxItemsPerView="1000">
+					    <Variable Name="atomType" InitialValue="0"/>
+						<Variable Name="bitValue" InitialValue="0"/>
+						<Variable Name="boolRes" InitialValue="false"/>
+						<Variable Name="bitIter" InitialValue="0"/>
+						<Variable Name="totalBitIter" InitialValue="0"/>
+						<Variable Name="value" InitialValue="0"/>
+						<Variable Name="iter" InitialValue="0"/>
+						<Exec>iter = (Slang::UIntSet::Element)0</Exec>
+						<Exec>bitIter = (Slang::UIntSet::Element)0</Exec>
+						<Exec>totalBitIter = (Slang::UIntSet::Element)0</Exec>
+						<Exec>value = 0</Exec>
+						<Loop>
+							<If Condition="bitIter >= Slang::UIntSet::kElementMask">
+								<Exec>bitIter = 0</Exec>
+								<Exec>totalBitIter++</Exec>
+								<Exec>iter++</Exec>
+							</If>
+							<If Condition="iter >= m_buffer.m_count">
+								<Break/>
+							</If>
+							<Exec>bitValue = (m_buffer[iter]&gt;&gt;bitIter)&amp;1</Exec>
+							<If Condition="bitValue != 0">
+							    <Exec>value = totalBitIter</Exec>
+							    <Item>(CapabilityAtom)value</Item>
+							</If>
+							<Exec>bitIter++</Exec>
+							<Exec>totalBitIter++</Exec>
+						</Loop>
+					</CustomListItems>
+				</Expand>
+			</Synthetic>
+		</Expand>
+	</Type>
 </AutoVisualizer>

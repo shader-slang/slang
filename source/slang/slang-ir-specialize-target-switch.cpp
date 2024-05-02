@@ -14,6 +14,7 @@ namespace Slang
         {
             if (auto targetSwitch = as<IRTargetSwitch>(block->getTerminator()))
             {
+                bool isEqual;
                 CapabilitySet bestCapSet = CapabilitySet::makeInvalid();
                 IRBlock* targetBlock = nullptr;
                 for (UInt i = 0; i < targetSwitch->getCaseCount(); i++)
@@ -26,7 +27,7 @@ namespace Slang
                         capSet = CapabilitySet::makeEmpty();
                     else
                         capSet = CapabilitySet(cap);
-                    if (capSet.isBetterForTarget(bestCapSet, target->getTargetCaps()))
+                    if (capSet.isBetterForTarget(bestCapSet, target->getTargetCaps(), isEqual))
                     {
                         targetBlock = targetSwitch->getCaseBlock(i);
                         bestCapSet = capSet;

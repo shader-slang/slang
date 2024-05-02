@@ -381,6 +381,8 @@ namespace Slang
             m_count = count;
         }
 
+        void unsafeSetToCount(Index count) { m_count = count; }
+
         void unsafeShrinkToCount(Index count) { m_count = count; }
 
         void compress()

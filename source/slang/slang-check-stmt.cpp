@@ -340,7 +340,7 @@ namespace Slang
         }
 
         if (stmt->capabilityToken.getContentLength() != 0 &&
-            (set.getExpandedAtoms().getCount() != 1 || set.isInvalid() || set.isEmpty()))
+            (set.getCapabilityTargetSets().getCount() != 1 || set.isInvalid() || set.isEmpty()))
         {
             getSink()->diagnose(
                 stmt->capabilityToken.loc,

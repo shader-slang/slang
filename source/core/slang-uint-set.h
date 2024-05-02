@@ -11,13 +11,35 @@
 namespace Slang
 {
 
+template<typename T>
+constexpr static Index computeElementShift()
+{
+    Index currentShift = 0;
+    Index currentShiftValue = 1;
+
+    while (currentShiftValue != sizeof(T)*8)
+    {
+        currentShift++;
+        currentShiftValue *= 2;
+    }
+
+    return currentShift;
+}
+
 /* Hold a set of UInt values. Implementation works by storing as a bit per value */
+/// UIntSet is essentially a Element[], where each Element is `b` bits big.
+/// Each index has `b` number of integers. If the bit is 1, we have an element there. 
+/// Value of each element is equal to the binary offset from Element[0], bit 0.
 class UIntSet
 {
 public:
     typedef UIntSet ThisType;
-    typedef uint32_t Element;                                   ///< Type that holds the bits to say if value is present
+    typedef uint64_t Element;                                   ///< Type that holds the bits to say if value is present
     
+    constexpr static Index kElementSize = sizeof(Element) * 8; ///< The number of bits in an element. This also determines how many values a element can hold.
+    constexpr static Index kElementMask = kElementSize - 1; ///< Mask to get shift from an index
+    constexpr static Index kElementShift = computeElementShift<Element>(); ///< How many bits to shift to get Element index from an index. 5 for 2^5=32 elements in a uint32_t. 6 for 2^6=64 in a uint64_t.
+
     UIntSet() {}
     UIntSet(const UIntSet& other) { m_buffer = other.m_buffer; }
     UIntSet(UIntSet && other) { *this = (_Move(other)); }
@@ -38,6 +60,7 @@ public:
         /// Resize (but maintain contents) up to bit size.
         /// NOTE! That since storage is in Element blocks, it may mean some values after size are set (up to the Element boundary)
     void resize(UInt size);
+    void resizeBackingBufferDirectly(const Index& size);
 
         /// Clear all of the contents (by clearing the bits)
     void clear();
@@ -47,6 +70,8 @@ public:
 
         /// Add a value
     inline void add(UInt val);
+    inline void add(const UIntSet& val);
+
         /// Remove a value
     inline void remove(UInt val);
         /// Returns true if the value is present
@@ -59,16 +84,22 @@ public:
         /// !=
     bool operator!=(const UIntSet& set) const { return !(*this == set); }
 
-        /// Store the union between this and set in this
+        /// Store the union between this and set
     void unionWith(const UIntSet& set);
-        /// Store the intersection between this and set in this
+        /// Store the intersection between this and set
     void intersectWith(const UIntSet& set);
+        /// Store the subtraction between this and set
+    void subtractWith(const UIntSet& set);
 
         /// 
     bool isEmpty() const;
 
         /// Swap this with rhs
     void swapWith(ThisType& rhs) { m_buffer.swapWith(rhs.m_buffer); }
+
+    template<typename T>
+    List<T> getElements() const;
+    Index countElements() const;
 
         /// Store the union of set1 and set2 in outRs
     static void calcUnion(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2);
@@ -81,16 +112,6 @@ public:
     static bool hasIntersection(const UIntSet& set1, const UIntSet& set2);
 
 private:
-    enum
-    {
-        kElementShift = 5,                              ///< How many bits to shift to get Element index from an index
-        kElementSize = sizeof(Element) * 8,             ///< The number of bits in an element
-        kElementMask = kElementSize - 1,                ///< Mask to get shift from an index
-    };
-
-    // Make sure they are correct for the Element type
-    SLANG_COMPILE_TIME_ASSERT((1 << kElementShift) == kElementSize);
-
     List<Element> m_buffer;
 };
 
@@ -132,6 +153,18 @@ inline bool UIntSet::contains(const UIntSet& set) const
 }
 
 // --------------------------------------------------------------------------
+
+inline void UIntSet::resizeBackingBufferDirectly(const Index& newCount)
+{
+    const Index oldCount = m_buffer.getCount();
+    m_buffer.setCount(newCount);
+
+    if (newCount > oldCount)
+    {
+        ::memset(m_buffer.getBuffer() + oldCount, 0, (newCount - oldCount) * sizeof(Element));
+    }
+}
+
 inline void UIntSet::add(UInt val)
 {
     const Index idx = Index(val >> kElementShift);
@@ -142,6 +175,48 @@ inline void UIntSet::add(UInt val)
     m_buffer[idx] |= Element(1) << (val & kElementMask);
 }
 
+inline void UIntSet::add(const UIntSet& other)
+{
+    auto otherCount = other.m_buffer.getCount();
+    if (this->m_buffer.getCount() < otherCount)
+        resizeBackingBufferDirectly(otherCount);
+
+    for (auto i = 0; i < otherCount; i++)
+        m_buffer[i] |= other.m_buffer[i];
 }
 
+template<typename T>
+List<T> UIntSet::getElements() const
+{
+    // This is in the header to allow use with custom enums.
+    // This can be made faster likely by using a modified "Brian Kernighan"'s counting bits algorithm.
+    auto count = m_buffer.getCount();
+    if (count == 0)
+        return {};
+
+    List<T> elements;
+    elements.reserve(count);
+    Element totalBitCounter = 0;
+    Index localBitCounter = 0;
+    for (Index block = 0; block < count; block++)
+    {
+        if (m_buffer[block] == 0)
+        {
+            totalBitCounter += kElementSize;
+            continue;
+        }
+
+        localBitCounter = 0;
+        while (localBitCounter < kElementSize)
+        {
+            if (m_buffer[block] >> localBitCounter & 1LL)
+                elements.add((T)totalBitCounter);
+            totalBitCounter++;
+            localBitCounter++;
+        }
+    }
+    return elements;
+}
+
+}
 #endif

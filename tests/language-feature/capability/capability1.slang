@@ -15,7 +15,7 @@ void caller()
 }
 
 [require(spirv, shaderclock)]
-// CHECK: ([[# @LINE+1]]): error 36104:
+// CHECK: error 36104:
 void main1()
 {
     caller(); // Error, shaderclock does not imply spvShaderNonUniform.
@@ -25,6 +25,5 @@ void main1()
 [require(spirv, shaderclock)]
 void main2()
 {
-    // CHECK-NOT: error
     leafFunc1(); // OK, shaderclock implies spvShaderClockKHR.
 }

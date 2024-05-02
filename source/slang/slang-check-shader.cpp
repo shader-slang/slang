@@ -520,22 +520,21 @@ namespace Slang
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
                 diagnoseCapabilityErrors(sink, linkage->m_optionSet, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
-                auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getExpandedAtoms();
+                const auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getAtomSets();
 
                 // Find out what exactly is incompatible and print out a trace of provenance to
                 // help user diagnose their code.
-                auto& conjunctions = targetCaps.getExpandedAtoms();
+                const auto& conjunctions = targetCaps.getAtomSets();
                 if (conjunctions.getCount() == 1 && interredCapConjunctions.getCount() == 1)
                 {
-                    for (auto atom : conjunctions[0].getExpandedAtoms())
+                    auto compileCaps = conjunctions[0]->getElements<CapabilityAtom>();
+                    auto inferedAtomList = interredCapConjunctions[0]->getElements<CapabilityAtom>();
+                    for (auto inferredAtom : inferedAtomList)
                     {
-                        for (auto inferredAtom : interredCapConjunctions[0].getExpandedAtoms())
+                        if (!compileCaps.contains(inferredAtom))
                         {
-                            if (CapabilityConjunctionSet(inferredAtom).isIncompatibleWith(atom))
-                            {
-                                diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtom);
-                                goto breakLabel;
-                            }
+                            diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtom);
+                            goto breakLabel;
                         }
                     }
                 }
