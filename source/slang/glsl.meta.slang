@@ -461,16 +461,28 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public T roundEven(T x)
 {
-    T i;
-    if (T(0.5) <= fmod(x, i))
+    __target_switch
     {
-        bool evenInteger = (fmod(i, T(2)) == T(0));
-        if (!evenInteger)
+    case glsl: __intrinsic_asm "roundEven";
+    case spirv: return spirv_asm {
+        OpExtInst $$T result glsl450 RoundEven $x
+    };
+    default:
+        T nearest = round(x);
+
+        // Check if the value is exactly halfway between two integers
+        if (abs(x - nearest) == T(0.5))
         {
-            x += T(0.1);
+            // If halfway, choose the even number
+            if (mod(nearest, T(2)) != T(0))
+            {
+                // If the nearest number is odd,
+                // move to the closest even number
+                nearest -= ((x < nearest) ? T(1) : T(-1));
+            }
         }
+        return nearest;
     }
-    return round(x);
 }
 
 __generic<T : __BuiltinFloatingPointType, let N:int>
@@ -479,7 +491,15 @@ __generic<T : __BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
 public vector<T,N> roundEven(vector<T,N> x)
 {
-    VECTOR_MAP_UNARY(T, N, roundEven, x);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "roundEven";
+    case spirv: return spirv_asm {
+        OpExtInst $$vector<T,N> result glsl450 RoundEven $x
+    };
+    default:
+        VECTOR_MAP_UNARY(T, N, roundEven, x);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType>
@@ -506,7 +526,15 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public T mod(T x, T y)
 {
-    return fmod(x, y);
+    // SPIR-V doesn't have "modulus".
+    // All of Op?Mod and OpFRem are "remainder".
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "mod";
+    default:
+        return x - y * floor(x / y);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N:int>
@@ -515,7 +543,12 @@ __generic<T : __BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T, N> mod(vector<T, N> x, T y)
 {
-    return fmod(x, vector<T, N>(y));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "mod";
+    default:
+        return x - y * floor(x / y);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N:int>
@@ -524,7 +557,12 @@ __generic<T : __BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
 {
-    return fmod(x, y);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "mod";
+    default:
+        return x - y * floor(x / y);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
