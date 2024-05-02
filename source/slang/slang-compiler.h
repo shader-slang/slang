@@ -2835,6 +2835,8 @@ namespace Slang
         };
         Dictionary<TargetRequest*, RefPtr<TargetInfo>> m_targetInfos;
 
+        CompilerOptionSet m_optionSetForDefaultTarget;
+
         CompilerOptionSet& getTargetOptionSet(TargetRequest* req);
 
         CompilerOptionSet& getTargetOptionSet(Index targetIndex);
