@@ -8395,9 +8395,9 @@ T min(T x, T y)
 {
     __target_switch
     {
-#if 0
     case hlsl: __intrinsic_asm "min";
     case glsl: __intrinsic_asm "min";
+#if 0
     case cuda: __intrinsic_asm "$P_min($0, $1)";
     case cpp: __intrinsic_asm "$P_min($0, $1)";
     case spirv:
