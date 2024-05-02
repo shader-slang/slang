@@ -372,10 +372,30 @@ struct DiffUnzipPass
             }
             else
             {
-                // For non differentiable arguments, we can simply pass the argument as is
-                // if this isn't a `out` parameter, in which case it is removed from propagate call.
-                if (!as<IROutType>(arg->getDataType()))
-                    diffArgs.add(arg);
+                // Ignore `out` parameters since these are removed from propagate call.
+                if (!as<IROutType>(resolvedPrimalFuncType->getParamType(ii)))
+                {
+                    if (auto inOutType = as<IRInOutType>(resolvedPrimalFuncType->getParamType(ii)))
+                    {
+                        // For 'inout' parameter we need to create a temp var to hold the value
+                        // before the primal call.
+                        //
+                        auto tempPrimalVar = primalBuilder->emitVar(as<IRPtrTypeBase>(arg->getDataType())->getValueType());
+
+                        auto storeUse = findUniqueStoredVal(cast<IRVar>(arg));
+                        auto storeInst = cast<IRStore>(storeUse->getUser());
+                        auto storedVal = storeInst->getVal();
+
+                        primalBuilder->emitStore(tempPrimalVar, storedVal);
+
+                        diffArgs.add(tempPrimalVar);
+                    }
+                    else
+                    {
+                        // Pure 'in' type. Simply re-use the original argument inst.
+                        diffArgs.add(arg);
+                    }
+                }
             }
         }
         
