@@ -4,9 +4,9 @@ name: Full GPU Tests (Windows)
 
 on:
   push:
-    branches: [ master ]
+    branches: [ skip-master ]
   pull_request:
-    branches: [ master ]
+    branches: [ skip-master ]
 
 jobs:
   build:

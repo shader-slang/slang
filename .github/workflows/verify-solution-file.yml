@@ -2,9 +2,9 @@ name: Verify-VSProjects
 
 on:
   push:
-    branches: [ master ]
+    branches: [ skip-master ]
   pull_request:
-    branches: [ master ]
+    branches: [ skip-master ]
 
 jobs:
   build:

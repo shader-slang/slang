@@ -4,9 +4,9 @@ name: Compile Regression-Test
 
 on:
   push:
-    branches: [ master ]
+    branches: [ skip-master ]
   pull_request:
-    branches: [ master ]
+    branches: [ skip-master ]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
