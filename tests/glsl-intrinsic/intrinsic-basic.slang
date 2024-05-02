@@ -207,12 +207,10 @@ bool Test_ScalarType()
         && genFType(0) == round(genFType(zero))
         && genDType(0) == round(genDType(zero))
 
-#if 0
-        // C-HECK_GLSL-COUNT-2: roundEven(
-        // C-HECK_SPIR-COUNT-2: RoundEven{{ }}
+        // CHECK_GLSL-COUNT-2: roundEven(
+        // CHECK_SPIR-COUNT-2: RoundEven{{ }}
         && genFType(0) == roundEven(genFType(zero))
         && genDType(0) == roundEven(genDType(zero))
-#endif
 
         // CHECK_GLSL-COUNT-2: ceil(
         // CHECK_SPIR-COUNT-2: Ceil{{ }}
@@ -224,11 +222,10 @@ bool Test_ScalarType()
         && genFType(0) == fract(genFType(zero))
         && genDType(0) == fract(genDType(zero))
 
-#if 0
-        // C-HECK_GLSL-COUNT-2: mod(
+        // CHECK_GLSL-COUNT-2: mod(
+        // CHECK_SPIR-COUNT-2: Floor{{ }}
         && genFType(0) == mod(genFType(zero), genFType(one))
         && genDType(0) == mod(genDType(zero), genDType(one))
-#endif
 
         // CHECK_GLSL-COUNT-2: modf(
         // CHECK_SPIR-COUNT-2: Modf{{ }}
@@ -733,13 +730,11 @@ bool Test_VectorType()
         && genFType(0) == round(genFType(zero))
         && genDType(0) == round(genDType(zero))
 
-#if 0
-        // C-HECK_GLSL-COUNT-2: roundEven(
-        // C-HECK_SPIR-COUNT-2: RoundEven{{ }}
-        // C-HECK_SPIR-NOT: RoundEven{{ }}
+        // CHECK_GLSL-COUNT-2: roundEven(
+        // CHECK_SPIR-COUNT-2: RoundEven{{ }}
+        // CHECK_SPIR-NOT: RoundEven{{ }}
         && genFType(0) == roundEven(genFType(zero))
         && genDType(0) == roundEven(genDType(zero))
-#endif
 
         // CHECK_GLSL-COUNT-2: ceil(
         // CHECK_SPIR-COUNT-2: Ceil{{ }}
@@ -753,13 +748,13 @@ bool Test_VectorType()
         && genFType(0) == fract(genFType(zero))
         && genDType(0) == fract(genDType(zero))
 
-#if 0
-        // C-HECK_GLSL-COUNT-4: mod(
+        // CHECK_GLSL-COUNT-4: mod(
+        // CHECK_SPIR-COUNT-4: Floor{{ }}
+        // CHECK_SPIR-NOT: Floor{{ }}
         && genFType(0) == mod(genFType(zero), float(one))
         && genFType(0) == mod(genFType(zero), genFType(one))
         && genDType(0) == mod(genDType(zero), double(one))
         && genDType(0) == mod(genDType(zero), genDType(one))
-#endif
 
         // CHECK_GLSL-COUNT-2: modf(
         // CHECK_SPIR-COUNT-2: Modf{{ }}
