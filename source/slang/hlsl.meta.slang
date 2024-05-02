@@ -8389,14 +8389,31 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 
 // minimum
 __generic<T : __BuiltinIntegerType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(cuda, "$P_min($0, $1)")
-__target_intrinsic(cpp, "$P_min($0, $1)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-T min(T x, T y);
+T min(T x, T y)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "min";
+    case glsl: __intrinsic_asm "min";
+    case cuda: __intrinsic_asm "$P_min($0, $1)";
+    case cpp: __intrinsic_asm "$P_min($0, $1)";
+    default: return (x < y)?x:y;
+#if 0
+    case spirv:
+        if (__isSignedInt<T>())
+            return spirv_asm {
+                OpExtInst $$T result glsl450 SMin $x $y
+            };
+        else
+            return spirv_asm {
+                OpExtInst $$T result glsl450 UMin $x $y
+            };
+#endif
+    }
+}
+
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
