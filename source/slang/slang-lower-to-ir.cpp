@@ -8823,7 +8823,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGenContext*               subContext,
         GenericTypeConstraintDecl*  constraintDecl)
     {
-        auto supType = lowerType(context, constraintDecl->sup.type);
+        auto supType = lowerType(subContext, constraintDecl->sup.type);
         auto value = emitGenericConstraintValue(subContext, constraintDecl, supType);
         subContext->setValue(constraintDecl, LoweredValInfo::simple(value));
     }
@@ -8972,9 +8972,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto operand = value->getOperand(i);
                 markInstsToClone(valuesToClone, parentBlock, operand);
             }
+            if (value->getFullType())
+                markInstsToClone(valuesToClone, parentBlock, value->getFullType());
+            for (auto child : value->getDecorationsAndChildren())
+                markInstsToClone(valuesToClone, parentBlock, child);
         }
-        for (auto child : value->getChildren())
-            markInstsToClone(valuesToClone, parentBlock, child);
         auto parent = parentBlock->getParent();
         while (parent && parent != parentBlock)
         {
@@ -9025,7 +9027,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), returnType);
                 // For Function Types, we always clone all generic parameters regardless of whether
                 // the generic parameter appears in the function signature or not.
-                if (returnType->getOp() == kIROp_FuncType)
+                if (returnType->getOp() == kIROp_FuncType ||
+                    returnType->getOp() == kIROp_Generic)
                 {
                     for (auto genericParam : parentGeneric->getParams())
                     {
