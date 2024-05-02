@@ -6504,13 +6504,64 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T fmod(T x, T y)
 {
+    // In HLSL, fmod returns a remainder.
+    // Definition of `fmod` in HLSL is,
+    // "The floating-point remainder is calculated such that x = i * y + f,
+    // where i is an integer, f has the same sign as x, and the absolute value
+    // of f is less than the absolute value of y."
+    //
+    // In GLSL, mod is a Modulus function.
+    // OpenGL document defines "Modulus" as "Returns x - y * floor(x / y)".
+    // The use of "Floor()" makes the difference.
+    //
+    // The tricky ones are when x or y is a negative value.
+    //
+    //       | Remainder | Modulus
+    //  x  y | x= i*y +f | x-y*floor(x/y)
+    // ------+-----------+------------------------------
+    //  4  3 | 4= 1*3 +1 | 4-3*floor( 4/3) = 4-3* 1 = 1
+    //  3  3 | 3= 1*3 +0 | 3-3*floor( 3/3) = 3-3* 1 = 0
+    //  2  3 | 2= 0*3 +2 | 2-3*floor( 2/3) = 2-3* 0 = 2
+    //  1  3 | 1= 0*3 +1 | 1-3*floor( 1/3) = 1-3* 0 = 1
+    //  0  3 | 0= 0*3 +0 | 0-3*floor( 0/3) = 0-3* 0 = 0
+    // -1  3 |-1= 0*3 -1 |-1-3*floor(-1/3) =-1-3*-1 = 2
+    // -2  3 |-2= 0*3 -2 |-2-3*floor(-2/3) =-2-3*-1 = 1
+    // -3  3 |-3=-1*3  0 |-3-3*floor(-3/3) =-3-3*-1 = 0
+    // -4  3 |-4=-1*3 -1 |-4-3*floor(-4/3) =-4-3*-2 = 2
+    //
+    // When y is a negative value,
+    //
+    //       | Remainder | Modulus
+    //  x  y | x= i*y +f | x-y*floor(x/y)
+    // ------+-----------+------------------------------
+    //  4 -3 | 4=-1*-3+1 | 4+3*floor( 4/-3) = 4+3*-2 =-2
+    //  3 -3 | 3=-1*-3+0 | 3+3*floor( 3/-3) = 3+3*-1 = 0
+    //  2 -3 | 2= 0*-3+2 | 2+3*floor( 2/-3) = 2+3*-1 =-1
+    //  1 -3 | 1= 0*-3+1 | 1+3*floor( 1/-3) = 1+3*-1 =-2
+    //  0 -3 | 0= 0*-3+0 | 0+3*floor( 0/-3) = 0+3* 0 = 0
+    // -1 -3 |-1= 0*-3-1 |-1+3*floor(-1/-3) =-1+3* 0 =-1
+    // -2 -3 |-2= 0*-3-2 |-2+3*floor(-2/-3) =-2+3* 0 =-2
+    // -3 -3 |-3= 1*-3 0 |-3+3*floor(-3/-3) =-3+3* 1 = 0
+    // -4 -3 |-4= 1*-3-1 |-4+3*floor(-4/-3) =-4+3* 1 =-1
+
     __target_switch
     {
     case cpp: __intrinsic_asm "$P_fmod($0, $1)";
     case cuda: __intrinsic_asm "$P_fmod($0, $1)";
     case hlsl: __intrinsic_asm "fmod";
-    default:
-        return x - y * trunc(x/y);
+    case glsl:
+        // GLSL doesn't have a function for remainder.
+        if (x < T(0))
+            __intrinsic_asm "-mod(-$0,abs($1))";
+        else
+            __intrinsic_asm "mod($0,abs($1))";
+    case spirv:
+        // OpFRem return "The floating-point remainder whose sign
+        // matches the sign of Operand 1", where Operand 1 is "x".
+        return spirv_asm
+        {
+            result:$$T = OpFRem $x $y
+        };
     }
 }
 
@@ -6522,6 +6573,9 @@ vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
     __target_switch
     {
     case hlsl: __intrinsic_asm "fmod";
+    case spirv: return spirv_asm {
+        result:$$vector<T,N> = OpFRem $x $y
+    };
     default:
         VECTOR_MAP_BINARY(T, N, fmod, x, y);
     }
