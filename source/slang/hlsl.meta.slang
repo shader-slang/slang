@@ -8399,7 +8399,7 @@ T min(T x, T y)
     case glsl: __intrinsic_asm "min";
     case cuda: __intrinsic_asm "$P_min($0, $1)";
     case cpp: __intrinsic_asm "$P_min($0, $1)";
-#if 0
+#if 1||ENABLE_WHEN_THIS_WORKS_WITH_FALCOR_UNIT_TEST
     case spirv:
         if (__isSignedInt<T>())
             return spirv_asm {
