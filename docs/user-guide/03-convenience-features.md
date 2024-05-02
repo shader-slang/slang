@@ -361,7 +361,7 @@ float4 myPackedVector = reinterpret<float4>(myVal);
 
 `reinterpret` can pack any type into any other type as long as the target type is no smaller than the source type.
 
-## Pointers
+## Pointers (limited)
 
 Slang supports pointers when generating code for SPIRV, C++ and CUDA targets. The syntax for pointers is similar to C, with the exception that operator `.` can also be used to dereference a member from a pointer. For example:
 ```csharp
@@ -375,8 +375,15 @@ int test(MyType* pObj)
 
 Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is equivalent to `MyType*`.
 
-> #### Note
-> Slang currently does not support pointers to immutable values, i.e. `const T*`.
+### Limitations
+
+- Slang supports pointers to global memory, but not shared or local memory. For example, it is invalid to define a pointer to a local variable.
+
+- Coherent load/stores are unsupported
+
+- Custom alignment specification is unsupported.
+
+- Slang currently does not support pointers to immutable values, i.e. `const T*`.
 
 ## `struct` inheritance (limited)
 
