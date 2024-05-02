@@ -319,7 +319,7 @@ alias GL_EXT_shader_atomic_float_min_max = _GL_EXT_shader_atomic_float_min_max |
 alias GL_EXT_shader_explicit_arithmetic_types_int64 = _GL_EXT_shader_explicit_arithmetic_types_int64 | spirv_1_0;
 alias GL_EXT_shader_image_load_store = _GL_EXT_shader_image_load_store | spirv_1_0;
 alias GL_EXT_shader_realtime_clock = _GL_EXT_shader_realtime_clock | spvShaderClockKHR;
-alias GL_EXT_texture_shadow_lod = _GL_EXT_texture_shadow_lod | spirv_1_0;
+alias GL_EXT_texture_shadow_lod = _GL_EXT_texture_shadow_lod + _GLSL_400 | spirv_1_0;
 alias GL_KHR_memory_scope_semantics = _GL_KHR_memory_scope_semantics | spirv_1_0;
 alias GL_KHR_shader_subgroup_arithmetic = _GL_KHR_shader_subgroup_arithmetic | spvGroupNonUniformArithmetic;
 alias GL_KHR_shader_subgroup_basic = _GL_KHR_shader_subgroup_basic | spvGroupNonUniformBallot;
@@ -604,7 +604,7 @@ alias getattributeatvertex = fragment + _sm_6_1 | fragment + GL_EXT_fragment_sha
 alias memorybarrier_compute = raytracing_stages_compute + sm_5_0;
 alias structuredbuffer = sm_4_0;
 alias structuredbuffer_rw = sm_4_0 + raytracing_stages_compute_fragment;
-alias texture_sm_4_1 = sm_4_1 + _GLSL_150;
+alias texture_sm_4_1 = sm_4_1 + _GLSL_150 | sm_4_1;
 alias texture_sm_4_1_samplerless = texture_sm_4_1 + GL_EXT_samplerless_texture_functions;
 alias texture_sm_4_1_compute_fragment = cpp + texture_sm_4_1
                               | cuda + texture_sm_4_1
@@ -632,8 +632,8 @@ alias image_size = texture_sm_4_1_compute_fragment + GL_ARB_shader_image_size;
 alias texture_size = texture_sm_4_1 + GL_ARB_shader_image_size;
 alias texture_querylod = texture_sm_4_1 + GL_EXT_texture_query_lod;
 alias texture_querylevels = texture_sm_4_1 + GL_ARB_texture_query_levels;
-alias texture_shadowlod = texture_sm_4_1 + GL_EXT_texture_shadow_lod + _GLSL_400
-                        | texture_sm_4_1 + GL_EXT_texture_shadow_lod;
+alias texture_shadowlod = texture_sm_4_1 + GL_EXT_texture_shadow_lod
+                        | texture_sm_4_1;
 alias texture_shadowlod_cube = texture_shadowlod | texture_shadowlod + GL_ARB_texture_cube_map;
 alias texture_cube = texture_sm_4_1 + GL_ARB_texture_cube_map | texture_sm_4_1;
 alias texture_querylevels_cube = texture_querylevels + GL_ARB_texture_cube_map | texture_querylevels;
