@@ -8397,7 +8397,6 @@ T min(T x, T y)
     {
     case hlsl: __intrinsic_asm "min";
     case glsl: __intrinsic_asm "min";
-#if 0
     case cuda: __intrinsic_asm "$P_min($0, $1)";
     case cpp: __intrinsic_asm "$P_min($0, $1)";
     case spirv:
@@ -8409,6 +8408,7 @@ T min(T x, T y)
             return spirv_asm {
                 OpExtInst $$T result glsl450 UMin $x $y
             };
+#if 0
 #endif
     default: return (x < y)?x:y;
     }
