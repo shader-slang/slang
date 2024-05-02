@@ -372,29 +372,31 @@ struct DiffUnzipPass
             }
             else
             {
-                // Ignore `out` parameters since these are removed from propagate call.
-                if (!as<IROutType>(resolvedPrimalFuncType->getParamType(ii)))
+                if (auto inOutType = as<IRInOutType>(resolvedPrimalFuncType->getParamType(ii)))
                 {
-                    if (auto inOutType = as<IRInOutType>(resolvedPrimalFuncType->getParamType(ii)))
-                    {
-                        // For 'inout' parameter we need to create a temp var to hold the value
-                        // before the primal call.
-                        //
-                        auto tempPrimalVar = primalBuilder->emitVar(as<IRPtrTypeBase>(arg->getDataType())->getValueType());
+                    // For 'inout' parameter we need to create a temp var to hold the value
+                    // before the primal call. This logic is similar to the 'inout' case for differentiable params
+                    // only we don't need to deal with pair types.
+                    //
+                    auto tempPrimalVar = primalBuilder->emitVar(as<IRPtrTypeBase>(arg->getDataType())->getValueType());
 
-                        auto storeUse = findUniqueStoredVal(cast<IRVar>(arg));
-                        auto storeInst = cast<IRStore>(storeUse->getUser());
-                        auto storedVal = storeInst->getVal();
+                    auto storeUse = findUniqueStoredVal(cast<IRVar>(arg));
+                    auto storeInst = cast<IRStore>(storeUse->getUser());
+                    auto storedVal = storeInst->getVal();
 
-                        primalBuilder->emitStore(tempPrimalVar, storedVal);
+                    primalBuilder->emitStore(tempPrimalVar, storedVal);
 
-                        diffArgs.add(tempPrimalVar);
-                    }
-                    else
-                    {
-                        // Pure 'in' type. Simply re-use the original argument inst.
-                        diffArgs.add(arg);
-                    }
+                    diffArgs.add(tempPrimalVar);
+                }
+                else
+                {
+                    // For pure 'in' type. Simply re-use the original argument inst.
+                    //
+                    // For 'out' type parameters, it doesn't really matter what we pass in here, since
+                    // the tranposition logic will discard the argument anyway (we'll pass in the old arg, 
+                    // just to keep the number of arguments consistent)
+                    // 
+                    diffArgs.add(arg);
                 }
             }
         }
