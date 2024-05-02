@@ -66,15 +66,15 @@ public typealias mat3 = matrix<float, 3, 3>;
 public typealias mat4 = matrix<float, 4, 4>;
 
 public typealias mat2x2 = matrix<float, 2, 2>;
-public typealias mat2x3 = matrix<float, 3, 2>;
-public typealias mat2x4 = matrix<float, 4, 2>;
+public typealias mat2x3 = matrix<float, 2, 3>;
+public typealias mat2x4 = matrix<float, 2, 4>;
 
-public typealias mat3x2 = matrix<float, 2, 3>;
+public typealias mat3x2 = matrix<float, 3, 2>;
 public typealias mat3x3 = matrix<float, 3, 3>;
-public typealias mat3x4 = matrix<float, 4, 3>;
+public typealias mat3x4 = matrix<float, 3, 4>;
 
-public typealias mat4x2 = matrix<float, 2, 4>;
-public typealias mat4x3 = matrix<float, 3, 4>;
+public typealias mat4x2 = matrix<float, 4, 2>;
+public typealias mat4x3 = matrix<float, 4, 3>;
 public typealias mat4x4 = matrix<float, 4, 4>;
 
 public typealias dmat2 = matrix<double, 2, 2>;
@@ -82,15 +82,15 @@ public typealias dmat3 = matrix<double, 3, 3>;
 public typealias dmat4 = matrix<double, 4, 4>;
 
 public typealias dmat2x2 = matrix<double, 2, 2>;
-public typealias dmat2x3 = matrix<double, 3, 2>;
-public typealias dmat2x4 = matrix<double, 4, 2>;
+public typealias dmat2x3 = matrix<double, 2, 3>;
+public typealias dmat2x4 = matrix<double, 2, 4>;
 
-public typealias dmat3x2 = matrix<double, 2, 3>;
+public typealias dmat3x2 = matrix<double, 3, 2>;
 public typealias dmat3x3 = matrix<double, 3, 3>;
-public typealias dmat3x4 = matrix<double, 4, 3>;
+public typealias dmat3x4 = matrix<double, 3, 4>;
 
-public typealias dmat4x2 = matrix<double, 2, 4>;
-public typealias dmat4x3 = matrix<double, 3, 4>;
+public typealias dmat4x2 = matrix<double, 4, 2>;
+public typealias dmat4x3 = matrix<double, 4, 3>;
 public typealias dmat4x4 = matrix<double, 4, 4>;
 
 
@@ -899,19 +899,18 @@ __generic<T : __BuiltinFloatingPointType, let C : int, let R : int>
 [ForceInline]
 [OverloadRank(15)]
 [require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
-public matrix<T, C, R> outerProduct(vector<T, C> c, vector<T, R> r)
+public matrix<T, R, C> outerProduct(vector<T, C> c, vector<T, R> r)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "outerProduct";
     default:
-        // Column major matrix in GLSL
-        matrix<T, C, R> result;
-        for (int i = 0; i < C; ++i)
+        matrix<T, R, C> result;
+        for (int j = 0; j < R; ++j)
         {
-            for (int j = 0; j < R; ++j)
+            for (int i = 0; i < C; ++i)
             {
-                result[i][j] = c[i] * r[j];
+                result[j][i] = c[i] * r[j];
             }
         }
         return result;
@@ -3884,10 +3883,9 @@ public property mat4x3 gl_ObjectToWorldEXT
         }
         case spirv:
         {
-            return spirv_asm 
+            return spirv_asm
             {
-                %mat:$$mat3x4 = OpLoad builtin(ObjectToWorldKHR:mat3x4);
-                result:$$mat4x3 = OpTranspose %mat
+                result:$$mat4x3 = OpLoad builtin(ObjectToWorldKHR:mat4x3);
             };
         }
         }
@@ -3910,7 +3908,8 @@ public property mat3x4 gl_ObjectToWorld3x4EXT
         {
             return spirv_asm 
             {
-                result:$$mat3x4 = OpLoad builtin(ObjectToWorldKHR:mat3x4)
+                %mat:$$mat4x3 = OpLoad builtin(ObjectToWorldKHR:mat4x3);
+                result:$$mat3x4 = OpTranspose %mat
             };
         }
         }
@@ -3933,8 +3932,7 @@ public property mat4x3 gl_WorldToObjectEXT
         {
             return spirv_asm 
             {
-                %mat:$$mat3x4 = OpLoad builtin(WorldToObjectKHR:mat3x4);
-                result:$$mat4x3 = OpTranspose %mat
+                result:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
             };
         }
         }
@@ -3957,7 +3955,8 @@ public property mat3x4 gl_WorldToObject3x4EXT
         {
             return spirv_asm 
             {
-                result:$$mat3x4 = OpLoad builtin(WorldToObjectKHR:mat3x4)
+                %mat:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
+                result:$$mat3x4 = OpTranspose %mat
             };
         }
         }
@@ -4336,11 +4335,11 @@ public mat4x3 rayQueryGetIntersectionObjectToWorldEXT(rayQueryEXT q, bool commit
 {
     if (committed) 
     {
-        return transpose(q.CommittedRayObjectToWorld());
+        return q.CommittedRayObjectToWorld();
     }
     else 
     {
-        return transpose(q.CandidateRayObjectToWorld());
+        return q.CandidateRayObjectToWorld();
     }
 }
 
@@ -4351,11 +4350,11 @@ public mat4x3 rayQueryGetIntersectionWorldToObjectEXT(rayQueryEXT q, bool commit
 {
     if (committed) 
     {
-        return transpose(q.CommittedRayWorldToObject());
+        return q.CommittedRayWorldToObject();
     }
     else 
     {
-        return transpose(q.CandidateRayWorldToObject());
+        return q.CandidateRayWorldToObject();
     }
 }
 
@@ -4910,7 +4909,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [require(glsl_spirv, ser_raygen_closesthit_miss)]
 public mat4x3 hitObjectGetObjectToWorldNV(hitObjectNV hitObject)
 {
-    return transpose(hitObject.GetObjectToWorld());
+    return hitObject.GetObjectToWorld();
 }
 
 __glsl_extension(GL_EXT_ray_tracing)
@@ -4920,7 +4919,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [require(glsl_spirv, ser_raygen_closesthit_miss)]
 public mat4x3 hitObjectGetWorldToObjectNV(hitObjectNV hitObject)
 {
-    return transpose(hitObject.GetWorldToObject()); 
+    return hitObject.GetWorldToObject(); 
 }
 
 __glsl_extension(GL_EXT_ray_tracing)
