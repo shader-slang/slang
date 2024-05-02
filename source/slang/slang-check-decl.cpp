@@ -2155,17 +2155,6 @@ namespace Slang
             // If the parent type can be used as its own differential type, we will create a typealias
             // to itself as the differential type.
             //
-            SubstitutionSet substSet;
-            if (auto thisWitness = findThisTypeWitness(
-                SubstitutionSet(requirementDeclRef),
-                as<InterfaceDecl>(requirementDeclRef.getParent()).getDecl()))
-            {
-                if (auto declRefType = as<DeclRefType>(thisWitness->getSub()))
-                {
-                    substSet = SubstitutionSet(declRefType->getDeclRef());
-                }
-            }
-            
             auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
             assocTypeDef->nameAndLoc.name = getName("Differential");
             assocTypeDef->type.type = context->conformingType;
