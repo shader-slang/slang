@@ -6,7 +6,7 @@ standard output = {
     "parameters": [
         {
             "name": "param",
-            "binding": {"kind": "constantBuffer", "index": 0},
+            "binding": {"kind": "constantBuffer", "index": 1},
             "type": {
                 "kind": "parameterBlock",
                 "elementType": {
@@ -27,6 +27,13 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
+                            "userAttribs": [{
+                                "name": "DefaultValue",
+                                "arguments": [
+                                    1
+                                ]
+                            }
+                            ],
                             "binding": {"kind": "uniform", "offset": 4, "size": 4},
                             "userAttribs": [{
                                 "name": "DefaultValue",
@@ -68,6 +75,13 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
+                                "userAttribs": [{
+                                    "name": "DefaultValue",
+                                    "arguments": [
+                                        1
+                                    ]
+                                }
+                                ],
                                 "binding": {"kind": "uniform", "offset": 4, "size": 4},
                                 "userAttribs": [{
                                     "name": "DefaultValue",
@@ -93,7 +107,7 @@ standard output = {
         },
         {
             "name": "param2",
-            "binding": {"kind": "constantBuffer", "index": 1},
+            "binding": {"kind": "constantBuffer", "index": 2},
             "type": {
                 "kind": "parameterBlock",
                 "elementType": {
@@ -114,6 +128,13 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
+                            "userAttribs": [{
+                                "name": "DefaultValue",
+                                "arguments": [
+                                    2
+                                ]
+                            }
+                            ],
                             "binding": {"kind": "uniform", "offset": 4, "size": 4},
                             "userAttribs": [{
                                 "name": "DefaultValue",
@@ -155,6 +176,13 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
+                                "userAttribs": [{
+                                    "name": "DefaultValue",
+                                    "arguments": [
+                                        2
+                                    ]
+                                }
+                                ],
                                 "binding": {"kind": "uniform", "offset": 4, "size": 4},
                                 "userAttribs": [{
                                     "name": "DefaultValue",
@@ -177,6 +205,21 @@ standard output = {
                     "binding": {"kind": "uniform", "offset": 0, "size": 8}
                 }
             }
+        },
+        {
+            "name": "globalInt",
+            "userAttribs": [{
+                "name": "DefaultValue",
+                "arguments": [
+                    2
+                ]
+            }
+            ],
+            "binding": {"kind": "uniform", "offset": 0, "size": 4},
+            "type": {
+                "kind": "scalar",
+                "scalarType": "int32"
+            }
         }
     ],
     "entryPoints": [
@@ -194,6 +237,22 @@ standard output = {
                             "kind": "scalar",
                             "scalarType": "uint32"
                         }
+                    }
+                },
+                {
+                    "name": "a",
+                    "userAttribs": [{
+                        "name": "DefaultFuncParam",
+                        "arguments": [
+                            3
+                        ]
+                    }
+                    ],
+                    "stage": "compute",
+                    "binding": {"kind": "varyingInput", "index": 0},
+                    "type": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
                     }
                 }
             ],
