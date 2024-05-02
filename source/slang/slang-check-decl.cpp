@@ -2144,7 +2144,40 @@ namespace Slang
             SLANG_RELEASE_ASSERT(aggTypeDecl);
             synth.pushContainerScope(aggTypeDecl);
         }
-        else
+        
+        // If we did not find an existing empty struct, we may need to synthesize one. 
+        // But first, we check if the parent type can be used as its own differential type.
+        // 
+        if (!aggTypeDecl
+            && as<AggTypeDecl>(context->parentDecl)
+            && canStructBeUsedAsSelfDifferentialType(as<AggTypeDecl>(context->parentDecl)))
+        {
+            // If the parent type can be used as its own differential type, we will create a typealias
+            // to itself as the differential type.
+            //
+            auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
+            assocTypeDef->nameAndLoc.name = getName("Differential");
+            assocTypeDef->type.type = context->conformingType;
+            assocTypeDef->parentDecl = context->parentDecl;
+            assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
+            context->parentDecl->members.add(assocTypeDef);
+            
+            markSelfDifferentialMembersOfType(as<AggTypeDecl>(context->parentDecl), context->conformingType);
+
+            if (doesTypeSatisfyAssociatedTypeConstraintRequirement(context->conformingType, requirementDeclRef, witnessTable))
+            {
+                witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(context->conformingType));
+
+                // Increase the epoch so that future calls to Type::getCanonicalType will return the up-to-date folded types.
+                m_astBuilder->incrementEpoch();
+                return true;
+            }
+
+            // Something went wrong.
+            return false;
+        }
+
+        if (!aggTypeDecl)
         {
             aggTypeDecl = m_astBuilder->create<StructDecl>();
             aggTypeDecl->parentDecl = context->parentDecl;
@@ -5741,6 +5774,15 @@ namespace Slang
             {
                 checkConformance(type, inheritanceDecl, decl);
             }
+
+            // Successful conformance checking may have created new witness tables.
+            // Increment epoch to invalidate the cache, so subsequent canonical types are
+            // re-calculated. 
+            //
+            // TODO: Is it really necessary to invalidate globally? Maybe there's a way to invalidate only the 
+            // types that are affected by these interface decls.
+            // 
+            astBuilder->incrementEpoch();
         }
     }
 
