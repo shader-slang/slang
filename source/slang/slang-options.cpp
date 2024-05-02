@@ -2913,7 +2913,23 @@ SlangResult OptionsParser::_parse(
 
     // Copy all settings from linkage to targets.
     for (auto target : linkage->targets)
+    {
         target->getOptionSet().inheritFrom(linkage->m_optionSet);
+
+        // If there is no target specified in command line, we should inherit the default target options.
+        if(m_rawTargets.getCount() == 0)
+        {
+            target->getOptionSet().inheritFrom(m_defaultTarget.optionSet);
+        }
+    }
+
+    // If there are no targets specified in command line, and addCodeGenTarget() is not called
+    // yet, the options for the default target will be gone after option parsing. We
+    // should save the option for the future use when addCodeGenTarget() is called.
+    if ((linkage->targets.getCount() == 0) && (m_rawTargets.getCount() == 0))
+    {
+        m_requestImpl->m_optionSetForDefaultTarget = m_defaultTarget.optionSet;
+    }
     
     applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
 

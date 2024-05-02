@@ -3796,7 +3796,6 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(Module* module, TranslationUn
 
     IncludeSystem includeSystem;
     auto sourceFile = findFile(name, loc, includeSystem);
-
     if (!sourceFile)
     {
         sink->diagnose(loc, Diagnostics::cannotOpenFile, getText(name));
@@ -5530,6 +5529,7 @@ void EndToEndCompileRequest::_completeTargetRequest(UInt targetIndex)
     TargetRequest* targetRequest = linkage->targets[Index(targetIndex)];
 
     targetRequest->getOptionSet().inheritFrom(getLinkage()->m_optionSet);
+    targetRequest->getOptionSet().inheritFrom(m_optionSetForDefaultTarget);
 }
 
 void EndToEndCompileRequest::setCodeGenTarget(SlangCompileTarget target)

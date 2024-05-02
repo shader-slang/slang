@@ -5032,6 +5032,27 @@ namespace Slang
         return basePtr;
     }
 
+    IRInst* IRBuilder::emitElementAddress(
+        IRInst* basePtr,
+        const ArrayView<IRInst*>& accessChain,
+        const ArrayView<IRInst*>& types)
+    {
+        for (Index i = 0; i < accessChain.getCount(); i++)
+        {
+            auto access = accessChain[i];
+            auto type = (IRType*)types[i];
+            if (auto structKey = as<IRStructKey>(access))
+            {
+                basePtr = emitFieldAddress(type, basePtr, structKey);
+            }
+            else
+            {
+                basePtr = emitElementAddress(type, basePtr, access);
+            }
+        }
+        return basePtr;
+    }
+
     IRInst* IRBuilder::emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement)
     {
         auto inst = createInst<IRUpdateElement>(

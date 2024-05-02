@@ -4042,6 +4042,10 @@ public:
     IRInst* emitElementAddress(
         IRInst* basePtr,
         const ArrayView<IRInst*>& accessChain);
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
+        const ArrayView<IRInst*>& accessChain,
+        const ArrayView<IRInst*>& types);
 
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, IRIntegerValue index, IRInst* newElement);

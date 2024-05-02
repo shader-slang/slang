@@ -4456,8 +4456,6 @@ namespace Slang
         // Or add any modifiers
         if (as<NamespaceDecl>(decl) && decl->parentDecl)
         {
-            // Presumably we have no modifiers.
-            SLANG_ASSERT(modifiers.isEmpty());
             return;
         }
 
