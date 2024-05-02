@@ -6551,10 +6551,7 @@ T fmod(T x, T y)
     case hlsl: __intrinsic_asm "fmod";
     case glsl:
         // GLSL doesn't have a function for remainder.
-        if (x < T(0))
-            __intrinsic_asm "-mod(-$0,abs($1))";
-        else
-            __intrinsic_asm "mod($0,abs($1))";
+        __intrinsic_asm "(($0 < 0) ? -mod(-$0,abs($1)) : mod($0,abs($1)))";
     case spirv:
         // OpFRem return "The floating-point remainder whose sign
         // matches the sign of Operand 1", where Operand 1 is "x".

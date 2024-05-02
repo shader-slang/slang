@@ -478,10 +478,7 @@ public T roundEven(T x)
             {
                 // If the nearest number is odd,
                 // move to the closest even number
-                if (x < nearest)
-                    nearest -= T(1.0);
-                else
-                    nearest += T(1.0);
+                nearest -= ((x < nearest) ? T(1) : T(-1));
             }
         }
         return nearest;
@@ -529,6 +526,9 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public T mod(T x, T y)
 {
+    // SPIR-V doesn't have "modulus".
+    // All of Op?Mod and OpFRem are "remainder".
+
     __target_switch
     {
     case glsl: __intrinsic_asm "mod";
