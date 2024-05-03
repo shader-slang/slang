@@ -860,6 +860,7 @@ extern "C"
             SourceEmbedStyle,
             SourceEmbedName,
             SourceEmbedLanguage,
+            DisableShortCircuit,   // bool
 
             // Target
 
@@ -2262,6 +2263,9 @@ extern "C"
         // Metal resource binding points.
         SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
 
+        // Metal [[attribute]] inputs.
+        SLANG_PARAMETER_CATEGORY_METAL_ATTRIBUTE,
+
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
 
@@ -2835,6 +2839,7 @@ namespace slang
         MetalBuffer = SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER,
         MetalTexture = SLANG_PARAMETER_CATEGORY_METAL_TEXTURE,
         MetalArgumentBufferElement = SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
+        MetalAttribute = SLANG_PARAMETER_CATEGORY_METAL_ATTRIBUTE,
 
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,

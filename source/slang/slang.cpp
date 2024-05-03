@@ -3796,7 +3796,6 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(Module* module, TranslationUn
 
     IncludeSystem includeSystem;
     auto sourceFile = findFile(name, loc, includeSystem);
-
     if (!sourceFile)
     {
         sink->diagnose(loc, Diagnostics::cannotOpenFile, getText(name));
@@ -5335,7 +5334,7 @@ void Linkage::prepareDeserializedModule(SerialContainerData::Module& moduleEntry
     module->setPathInfo(filePathInfo);
     module->setDigest(moduleEntry.digest);
     module->_collectShaderParams();
-    module->_discoverEntryPoints(sink);
+    module->_discoverEntryPoints(sink, targets);
 
     // Hook up fileDecl's scope to module's scope.
     auto moduleDecl = module->getModuleDecl();
@@ -5530,6 +5529,7 @@ void EndToEndCompileRequest::_completeTargetRequest(UInt targetIndex)
     TargetRequest* targetRequest = linkage->targets[Index(targetIndex)];
 
     targetRequest->getOptionSet().inheritFrom(getLinkage()->m_optionSet);
+    targetRequest->getOptionSet().inheritFrom(m_optionSetForDefaultTarget);
 }
 
 void EndToEndCompileRequest::setCodeGenTarget(SlangCompileTarget target)
@@ -6444,6 +6444,9 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
     ComPtr<IArtifact> artifact;
     if (SLANG_FAILED(_getEntryPointResult(this, static_cast<int>(entryPointIndex), static_cast<int>(targetIndex), artifact)))
         return SLANG_E_INVALID_ARG;
+
+    if (!artifact)
+        return SLANG_E_NOT_AVAILABLE;
 
     // Find a rep
     auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);

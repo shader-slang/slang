@@ -798,7 +798,13 @@ namespace Slang
             : m_shared(shared)
             , m_sink(shared->getSink())
             , m_astBuilder(shared->getLinkage()->getASTBuilder())
-        {}
+        {
+            if (shared->getLinkage()->m_optionSet.hasOption(CompilerOptionName::DisableShortCircuit))
+            {
+                m_shouldShortCircuitLogicExpr =
+                    !shared->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DisableShortCircuit);
+            }
+        }
 
         SharedSemanticsContext* getShared() { return m_shared; }
         CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
@@ -1326,6 +1332,9 @@ namespace Slang
         Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
         Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
 
+        // Helper function to check if a struct can be used as its own differential type.
+        bool canStructBeUsedAsSelfDifferentialType(AggTypeDecl *aggTypeDecl);
+        void markSelfDifferentialMembersOfType(AggTypeDecl *parent, Type* type);
         
     public:
 

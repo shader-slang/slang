@@ -4,6 +4,7 @@
 #include "slang-ir-util.h"
 
 #include "../core/slang-basic.h"
+#include "../core/slang-writer.h"
 
 #include "slang-ir-dominators.h"
 
@@ -5031,6 +5032,27 @@ namespace Slang
         return basePtr;
     }
 
+    IRInst* IRBuilder::emitElementAddress(
+        IRInst* basePtr,
+        const ArrayView<IRInst*>& accessChain,
+        const ArrayView<IRInst*>& types)
+    {
+        for (Index i = 0; i < accessChain.getCount(); i++)
+        {
+            auto access = accessChain[i];
+            auto type = (IRType*)types[i];
+            if (auto structKey = as<IRStructKey>(access))
+            {
+                basePtr = emitFieldAddress(type, basePtr, structKey);
+            }
+            else
+            {
+                basePtr = emitElementAddress(type, basePtr, access);
+            }
+        }
+        return basePtr;
+    }
+
     IRInst* IRBuilder::emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement)
     {
         auto inst = createInst<IRUpdateElement>(
@@ -8605,6 +8627,25 @@ namespace Slang
         }
     }
 
+    void IRInst::dump()
+    {
+        if (auto intLit = as<IRIntLit>(this))
+        {
+            std::cout << intLit->getValue() << std::endl;
+        }
+        else if (auto stringLit = as<IRStringLit>(this))
+        {
+            std::cout << stringLit->getStringSlice().begin() << std::endl;
+        }
+        else
+        {
+            StringBuilder sb;
+            IRDumpOptions options;
+            StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
+            dumpIR(this, options, nullptr, &writer);
+            std::cout << sb.toString().begin() << std::endl;
+        }
+    }
 } // namespace Slang
 
 #if SLANG_VC

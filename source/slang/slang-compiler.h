@@ -1483,7 +1483,7 @@ namespace Slang
             ///
         void _collectShaderParams();
 
-        void _discoverEntryPoints(DiagnosticSink* sink);
+        void _discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets);
 
         class ModuleSpecializationInfo : public SpecializationInfo
         {
@@ -2834,6 +2834,8 @@ namespace Slang
             CompilerOptionSet targetOptions;
         };
         Dictionary<TargetRequest*, RefPtr<TargetInfo>> m_targetInfos;
+
+        CompilerOptionSet m_optionSetForDefaultTarget;
 
         CompilerOptionSet& getTargetOptionSet(TargetRequest* req);
 

@@ -212,10 +212,14 @@ namespace Slang
         attrDecl->nameAndLoc.loc = structDecl->nameAndLoc.loc;
         attrDecl->loc = structDecl->loc;
 
-        AttributeTargetModifier* targetModifier = m_astBuilder->create<AttributeTargetModifier>();
-        targetModifier->syntaxClass = attrUsageAttr->targetSyntaxClass;
-        targetModifier->loc = attrUsageAttr->loc;
-        addModifier(attrDecl, targetModifier);
+        while(attrUsageAttr)
+        {
+            AttributeTargetModifier* targetModifier = m_astBuilder->create<AttributeTargetModifier>();
+            targetModifier->syntaxClass = attrUsageAttr->targetSyntaxClass;
+            targetModifier->loc = attrUsageAttr->loc;
+            addModifier(attrDecl, targetModifier);
+            attrUsageAttr = as<AttributeUsageAttribute>(attrUsageAttr->next);
+        }
 
         // Every attribute declaration is associated with the type
         // of syntax nodes it constructs (via reflection/RTTI).
@@ -316,6 +320,11 @@ namespace Slang
         if (typeFlags == (int)UserDefinedAttributeTargets::Function)
         {
             cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("FuncDecl"));
+            return true;
+        }
+        if (typeFlags == (int)UserDefinedAttributeTargets::Param)
+        {
+            cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("ParamDecl"));
             return true;
         }
         return false;

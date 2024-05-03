@@ -18,8 +18,7 @@ Types
 Slang supports conventional shading language types including scalars, vectors, matrices, arrays, structures, enumerations, and resources.
 
 > #### Note ####
-> Slang does not currently support pointer types as in C/C++.
-> Pointers cannot be implemented robustly and completely on many of the target platforms Slang currently supports.
+> Slang has limited support for pointers when targeting platforms with native pointer support, including SPIRV, C++, and CUDA.
 
 ### Scalar Types
 

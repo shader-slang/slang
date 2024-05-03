@@ -838,6 +838,10 @@ struct IRInst
         /// If both `inPrev` and `inNext` are null, then `inParent` must have no (raw) children.
         ///
     void _insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent);
+
+    /// Print the IR to stdout for debugging purposes
+    ///
+    void dump();
 };
 
 enum class IRDynamicCastBehavior

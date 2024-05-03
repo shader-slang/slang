@@ -431,6 +431,8 @@ static void emitReflectionNameInfoJSON(
     writer.writeEscapedString(UnownedStringSlice(name));
 }
 
+static void emitUserAttributes(PrettyWriter& writer, slang::VariableReflection* var);
+
 static void emitReflectionModifierInfoJSON(
     PrettyWriter&               writer,
     slang::VariableReflection*  var)
@@ -440,6 +442,8 @@ static void emitReflectionModifierInfoJSON(
         writer.maybeComma();
         writer << "\"shared\": true";
     }
+
+    emitUserAttributes(writer, var);
 }
 
 static void emitUserAttributeJSON(PrettyWriter& writer, slang::UserAttribute* userAttribute)

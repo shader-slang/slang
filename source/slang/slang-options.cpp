@@ -343,6 +343,7 @@ void initCommandOptions(CommandOptions& options)
         "The name used as the basis for variables output for source embedding."},
         { OptionKind::SourceEmbedLanguage, "-source-embed-language", "-source-embed-language <language>",
         "The language to be used for source embedding. Defaults to C/C++. Currently only C/C++ are supported"},
+        { OptionKind::DisableShortCircuit, "-disable-short-circuit", nullptr, "Disable short-circuiting for \"&&\" and \"||\" operations" },
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
@@ -1706,6 +1707,10 @@ SlangResult OptionsParser::_parse(
                 ScopedAllocation contents;
                 SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName.value, contents));
                 SLANG_RETURN_ON_FAIL(m_session->loadStdLib(contents.getData(), contents.getSizeInBytes()));
+                
+                // Ensure that the linkage's AST builder is up-to-date.
+                linkage->getASTBuilder()->m_cachedNodes = asInternal(m_session)->getGlobalASTBuilder()->m_cachedNodes;
+
                 break;
             }
             case OptionKind::CompileStdLib: m_compileStdLib = true; break;
@@ -2298,6 +2303,11 @@ SlangResult OptionsParser::_parse(
 
                 break;
             }
+            case OptionKind::DisableShortCircuit:
+            {
+                linkage->m_optionSet.add(OptionKind::DisableShortCircuit, true);
+                break;
+            }
             default:
             {
                 // Hmmm, we looked up and produced a valid enum, but it wasn't handled in the switch... 
@@ -2746,6 +2756,9 @@ SlangResult OptionsParser::_parse(
             m_rawTargets[0].format == CodeGenTarget::CUDASource ||
             m_rawTargets[0].format == CodeGenTarget::SPIRV ||
             m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
+            m_rawTargets[0].format == CodeGenTarget::Metal ||
+            m_rawTargets[0].format == CodeGenTarget::MetalLib ||
+            m_rawTargets[0].format == CodeGenTarget::MetalLibAssembly ||
             ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind == ArtifactKind::HostCallable))
     {
         RawOutput rawOutput;
@@ -2900,7 +2913,23 @@ SlangResult OptionsParser::_parse(
 
     // Copy all settings from linkage to targets.
     for (auto target : linkage->targets)
+    {
         target->getOptionSet().inheritFrom(linkage->m_optionSet);
+
+        // If there is no target specified in command line, we should inherit the default target options.
+        if(m_rawTargets.getCount() == 0)
+        {
+            target->getOptionSet().inheritFrom(m_defaultTarget.optionSet);
+        }
+    }
+
+    // If there are no targets specified in command line, and addCodeGenTarget() is not called
+    // yet, the options for the default target will be gone after option parsing. We
+    // should save the option for the future use when addCodeGenTarget() is called.
+    if ((linkage->targets.getCount() == 0) && (m_rawTargets.getCount() == 0))
+    {
+        m_requestImpl->m_optionSetForDefaultTarget = m_defaultTarget.optionSet;
+    }
     
     applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
 

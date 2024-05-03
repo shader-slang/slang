@@ -746,6 +746,12 @@ void cloneGlobalValueWithCodeCommon(
     {
         IRBlock* ob = originalValue->getFirstBlock();
         IRBlock* cb = clonedValue->getFirstBlock();
+        struct ParamCloneInfo
+        {
+            IRParam* originalParam;
+            IRParam* clonedParam;
+        };
+        ShortList<ParamCloneInfo> paramCloneInfos;
         while (ob)
         {
             SLANG_ASSERT(cb);
@@ -753,9 +759,28 @@ void cloneGlobalValueWithCodeCommon(
             builder->setInsertInto(cb);
             for (auto oi = ob->getFirstInst(); oi; oi = oi->getNextInst())
             {
-                cloneInst(context, builder, oi);
+                if (oi->getOp() == kIROp_Param)
+                {
+                    // Params may have forward references in its type and
+                    // decorations, so we just create a placeholder for it
+                    // in this first pass.
+                    IRParam* clonedParam = builder->emitParam(nullptr);
+                    registerClonedValue(context, clonedParam, oi);
+                    paramCloneInfos.add({ (IRParam*)oi, clonedParam });
+                }
+                else
+                {
+                    cloneInst(context, builder, oi);
+                }
             }
-
+            // Clone the type and decorations of parameters after all instructs in the block
+            // have been cloned.
+            for (auto param : paramCloneInfos)
+            {
+                builder->setInsertInto(param.clonedParam);
+                param.clonedParam->setFullType((IRType*)cloneValue(context, param.originalParam->getFullType()));
+                cloneDecorations(context, param.clonedParam, param.originalParam);
+            }
             ob = ob->getNextBlock();
             cb = cb->getNextBlock();
         }
