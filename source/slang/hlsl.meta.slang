@@ -4019,22 +4019,22 @@ struct TriangleStream
 };
 
 #define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
-    vector<TYPE,COUNT> result; [ForceUnroll] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define MATRIX_MAP_UNARY(TYPE, ROWS, COLS, FUNC, VALUE) \
-    matrix<TYPE,ROWS,COLS> result; [ForceUnroll] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define VECTOR_MAP_BINARY(TYPE, COUNT, FUNC, LEFT, RIGHT) \
-    vector<TYPE,COUNT> result; [ForceUnroll] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define MATRIX_MAP_BINARY(TYPE, ROWS, COLS, FUNC, LEFT, RIGHT) \
-    matrix<TYPE,ROWS,COLS> result; [ForceUnroll] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
-    vector<TYPE,COUNT> result; [ForceUnroll] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 #define MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
-    matrix<TYPE,ROWS,COLS> result; [ForceUnroll] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 // Try to terminate the current draw or dispatch call (HLSL SM 4.0)
 void abort();
@@ -4893,7 +4893,7 @@ vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
     {
     case hlsl: __intrinsic_asm "asuint16";
     case spirv: return spirv_asm {
-        OpBitcast $$vector<uint16_t,N> result $value
+        result:$$vector<uint16_t,N> = OpBitcast $value
     };
     default:
         VECTOR_MAP_UNARY(uint16_t, N, asuint16, value);
@@ -4930,7 +4930,7 @@ vector<float16_t,N> asfloat16<let N : int>(vector<uint16_t,N> value)
     {
     case hlsl: __intrinsic_asm "asfloat16";
     case spirv: return spirv_asm {
-        OpBitcast $$vector<float16_t,N> result $value
+        result:$$vector<float16_t,N> = OpBitcast $value
     };
     default:
         VECTOR_MAP_UNARY(float16_t, N, asfloat16, value);
