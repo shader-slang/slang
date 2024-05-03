@@ -329,6 +329,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                 out << ">";
                 return SLANG_OK;
             }
+            return SLANG_FAIL;
         }
         case kIROp_IntLit:
         {
