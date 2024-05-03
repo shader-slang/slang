@@ -10050,6 +10050,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             return ensureDecl(context, typedefDecl);
         }
+        else if (auto subscriptDecl = as<SubscriptDecl>(genDecl->inner))
+        {
+            return ensureDecl(context, subscriptDecl);
+        }
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
     }
