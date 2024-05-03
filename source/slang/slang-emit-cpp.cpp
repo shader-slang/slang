@@ -1728,6 +1728,10 @@ void CPPSourceEmitter::emitPreModuleImpl()
         m_writer->emit("using namespace SLANG_PRELUDE_NAMESPACE;\n");
         m_writer->emit("#endif\n\n");
     }
+    else if (m_target == CodeGenTarget::HostCPPSource)
+    {
+        m_writer->emit("namespace Slang{ SLANG_RETURN_NEVER void handleSignal(SignalType, char const*) {} }\n");
+    }
     Super::emitPreModuleImpl();
 }
 

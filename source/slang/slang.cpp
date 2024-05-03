@@ -246,6 +246,7 @@ void Session::_initCodeGenTransitionMap()
             // is available. We prefer LLVM if that's available. If it's not we can use generic C/C++ compiler
 
             map.addTransition(source, CodeGenTarget::ShaderSharedLibrary, PassThroughMode::GenericCCpp);
+            map.addTransition(source, CodeGenTarget::HostSharedLibrary, PassThroughMode::GenericCCpp);
             map.addTransition(source, CodeGenTarget::HostExecutable, PassThroughMode::GenericCCpp);
             map.addTransition(source, CodeGenTarget::ObjectCode, PassThroughMode::GenericCCpp);
         }
@@ -1709,6 +1710,7 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::PyTorchCppBinding:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
         atoms.add(CapabilityName::cpp);

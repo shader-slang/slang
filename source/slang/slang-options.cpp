@@ -2824,6 +2824,7 @@ SlangResult OptionsParser::_parse(
                     case CodeGenTarget::ShaderHostCallable:
                     case CodeGenTarget::HostExecutable:
                     case CodeGenTarget::ShaderSharedLibrary:
+                    case CodeGenTarget::HostSharedLibrary:
                     case CodeGenTarget::PyTorchCppBinding:
                     case CodeGenTarget::DXIL:
                     case CodeGenTarget::MetalLib:
