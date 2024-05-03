@@ -4888,7 +4888,17 @@ uint16_t asuint16(float16_t value)
 [__readNone]
 [require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
-{ VECTOR_MAP_UNARY(uint16_t, N, asuint16, value); }
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "asuint16";
+    case spirv: return spirv_asm {
+        result:$$vector<uint16_t,N> = OpBitcast $value
+    };
+    default:
+        VECTOR_MAP_UNARY(uint16_t, N, asuint16, value);
+    }
+}
 
 [__readNone]
 [require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
@@ -4913,8 +4923,19 @@ float16_t asfloat16(uint16_t value)
 }
 
 [__readNone]
+[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<float16_t,N> asfloat16<let N : int>(vector<uint16_t,N> value)
-{ VECTOR_MAP_UNARY(float16_t, N, asfloat16, value); }
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "asfloat16";
+    case spirv: return spirv_asm {
+        result:$$vector<float16_t,N> = OpBitcast $value
+    };
+    default:
+        VECTOR_MAP_UNARY(float16_t, N, asfloat16, value);
+    }
+}
 
 [__readNone]
 matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<uint16_t,R,C> value)
@@ -4986,6 +5007,9 @@ vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat16";
+    case spirv: return spirv_asm {
+        OpBitcast $$vector<float16_t,N> result $value
+    };
     default: return asfloat16(asuint16(value));
     }
 }
@@ -6123,6 +6147,14 @@ vector<float, N> f16tof32(vector<uint, N> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "f16tof32";
+    case spirv:
+    {
+        return spirv_asm {
+            %lowBits = OpUConvert $$vector<uint16_t,N> $value;
+            %half = OpBitcast $$vector<half,N> %lowBits;
+            result:$$vector<float,N> = OpFConvert %half
+        };
+    }
     default:
         VECTOR_MAP_UNARY(float, N, f16tof32, value);
     }
@@ -6162,6 +6194,14 @@ vector<uint, N> f32tof16(vector<float, N> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "f32tof16";
+    case spirv:
+    {
+        return spirv_asm {
+            %half = OpFConvert $$vector<half,N> $value;
+            %lowBits = OpBitcast $$vector<uint16_t,N> %half;
+            result:$$vector<uint,N> = OpUConvert %lowBits
+        };
+    }
     default:
         VECTOR_MAP_UNARY(uint, N, f32tof16, value);
     }
@@ -7757,6 +7797,9 @@ vector<bool, N> isfinite(vector<T, N> x)
     __target_switch
     {
     case hlsl: __intrinsic_asm "isfinite";
+    case glsl:
+    case spirv:
+        return !(isinf(x) || isnan(x));
     default:
         VECTOR_MAP_UNARY(bool, N, isfinite, x);
     }
@@ -8508,6 +8551,9 @@ vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
     {
     case hlsl: __intrinsic_asm "modf";
     case glsl: __intrinsic_asm "modf";
+    case spirv: return spirv_asm {
+        result:$$vector<T,N> = OpExtInst glsl450 Modf $x &ip
+    };
     default:
         VECTOR_MAP_BINARY(T, N, modf, x, ip);
     }
@@ -9182,6 +9228,9 @@ vector<T, N> rcp(vector<T, N> x)
     __target_switch
     {
     case hlsl: __intrinsic_asm "rcp";
+    case glsl:
+    case spirv:
+        return T(1.0) / x;
     default:
         VECTOR_MAP_UNARY(T, N, rcp, x);
     }
