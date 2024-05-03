@@ -12359,8 +12359,7 @@ uint4 WaveMatch(T value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
-    case glsl: __intrinsic_asm "subgroupPartitionNV($1)";
-    case cuda: __intrinsic_asm "_waveMatchScalar($0, $1)";
+    case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
     case spirv:
         return spirv_asm
         {
@@ -12380,8 +12379,7 @@ uint4 WaveMatch(vector<T,N> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
-    case glsl: __intrinsic_asm "subgroupPartitionNV($1)";
-    case cuda: __intrinsic_asm "_waveMatchScalar($0, $1)";
+    case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
     case spirv:
         return spirv_asm
         {
