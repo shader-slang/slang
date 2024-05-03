@@ -109,9 +109,8 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // CHECK3-DAG: OpStore %[[V33]] %[[V28]]
     // CHECK3-DAG: %[[V34:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBf]] %[[BUF00]]
     // CHECK3-DAG: OpStore %[[V34]] %[[V30]]
-    buffer0.Store(32, buffer0.Load<float4>(32));
-	buffer0.Store(32, buffer0.Load<float4>(8));
-	buffer0.Store(8, buffer0.Load<float4>(32));
-	buffer0.Store(8, buffer0.Load<float4>(8));
     buffer0.StoreAligned(32, buffer0.LoadAligned<float4>(32));
+    buffer0.StoreAligned(32, buffer0.Load<float4>(8));
+    buffer0.Store(8, buffer0.LoadAligned<float4>(32));
+    buffer0.Store(8, buffer0.Load<float4>(8));
 }
