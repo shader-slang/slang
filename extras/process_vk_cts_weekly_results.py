@@ -31,8 +31,6 @@ parser.add_option( "-f", "--testlist", dest="TESTLIST", help="The test list used
 proc_env = os.environ.copy()
 proc_env["DISABLE_CTS_SLANG"] = "0"
 
-summary = "Test run totals:\n"
-
 cmd = ".\deqp-vk.exe --deqp-archive-dir=" + options.ARCHIVE_DIR + " --deqp-caselist-file=" + options.TESTLIST
 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=proc_env)
 stdout, stderr = proc.communicate()
@@ -50,18 +48,6 @@ for test_line in stdout.splitlines():
             test_found = False
             passing.append(test_name)
 
-    if "Passed:" in test_line:
-        summary += test_line + "\n"
-    elif "Failed:" in test_line:
-        summary += test_line + "\n"
-    elif "Not supported:" in test_line:
-        summary += test_line + "\n"
-    elif "Warnings:" in test_line:
-        summary += test_line + "\n"
-    elif "Waived:" in test_line:
-        summary += test_line + "\n"
-
-print(summary)
 print(stdout)
 
 with open(options.PASSINGLIST, 'r') as tl_f:
@@ -99,8 +85,3 @@ if len(newly_passing) > 0:
         i += 1
       
     raw_data_sheet.update_cells(cell_list)
-
-
-
-
-
