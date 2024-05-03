@@ -641,7 +641,7 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
     // Add the library paths
 
     if (options.libraryPaths.count &&
-        (options.targetType == SLANG_HOST_EXECUTABLE || options.targetType == SLANG_HOST_SHARED_LIBRARY))
+        (options.targetType == SLANG_HOST_EXECUTABLE))
     {
         if(PlatformUtil::isFamily(PlatformFamily::Apple, platformKind))
             cmdLine.addArg("-Wl,-rpath,@loader_path,-rpath,@loader_path/../lib");
