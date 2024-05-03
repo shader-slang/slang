@@ -322,9 +322,19 @@ struct ByteAddressBufferLegalizationContext
             // legalization if the array type isn't in the right form
             // for us to proceed.
             //
+
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
-                return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeArray, arrayType->getElementType(), elementCountInst->getValue(), aligned);
+                // Emit an aligned load operation on an array when using a LoadAligned inst.
+                // Else, fallback to scalarizing the loads.
+                if (!isValid(aligned))
+                {
+                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeArray, arrayType->getElementType(), elementCountInst->getValue(), aligned);
+                }
+                else
+                {
+                    return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
+                }
             }
         }
         else if( auto matType = as<IRMatrixType>(type) )
@@ -898,7 +908,16 @@ struct ByteAddressBufferLegalizationContext
             //
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
-                return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, arrayType->getElementType(), elementCountInst->getValue(), aligned);
+                // Emit an aligned store operation on an array when using a StoreAligned inst.
+                // Else, fallback to scalarizing the stores.
+                if (!isValid(aligned))
+                {
+                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, arrayType->getElementType(), elementCountInst->getValue(), aligned);
+                }
+                else
+                {
+                    return emitSimpleStore(value->getDataType(), buffer, baseOffset, immediateOffset, value);
+                }
             }
         }
         else if( auto matType = as<IRMatrixType>(type) )
