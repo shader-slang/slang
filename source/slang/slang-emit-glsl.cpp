@@ -2190,7 +2190,7 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
         {
             _requireGLSLExtension(requireGLSLExt->getExtensionName());
         }
-        else if (auto requireComputeDerivative = as<IRRequireComputeDerivative>(childInst))
+        else if (const auto requireComputeDerivative = as<IRRequireComputeDerivative>(childInst))
         {
             // only allowed 1 of derivative_group_quadsNV or derivative_group_linearNV
             if (m_entryPointStage != Stage::Compute

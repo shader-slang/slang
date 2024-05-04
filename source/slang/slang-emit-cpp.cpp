@@ -329,6 +329,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                 out << ">";
                 return SLANG_OK;
             }
+            return SLANG_FAIL;
         }
         case kIROp_IntLit:
         {
@@ -1727,6 +1728,10 @@ void CPPSourceEmitter::emitPreModuleImpl()
         m_writer->emit("#ifdef SLANG_PRELUDE_NAMESPACE\n");
         m_writer->emit("using namespace SLANG_PRELUDE_NAMESPACE;\n");
         m_writer->emit("#endif\n\n");
+    }
+    else if (m_target == CodeGenTarget::HostCPPSource)
+    {
+        m_writer->emit("namespace Slang{ inline void handleSignal(SignalType, char const*) {} }\n");
     }
     Super::emitPreModuleImpl();
 }

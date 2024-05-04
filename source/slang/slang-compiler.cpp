@@ -539,6 +539,7 @@ namespace Slang
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:
             case CodeGenTarget::HostHostCallable:
+            case CodeGenTarget::HostSharedLibrary:
             {
                 // We need some C/C++ compiler
                 return PassThroughMode::GenericCCpp;
@@ -955,6 +956,7 @@ namespace Slang
             }
             case CodeGenTarget::HostHostCallable:
             case CodeGenTarget::HostExecutable:
+            case CodeGenTarget::HostSharedLibrary:
             {
                 return CodeGenTarget::HostCPPSource;
             }
@@ -1279,8 +1281,14 @@ namespace Slang
         // Set the source type
         options.sourceLanguage = SlangSourceLanguage(sourceLanguage);
         
-        // Disable exceptions and security checks
-        options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
+        switch (target)
+        {
+        case CodeGenTarget::ShaderHostCallable:
+        case CodeGenTarget::ShaderSharedLibrary:
+            // Disable exceptions and security checks
+            options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
+            break;
+        }
 
         Profile profile;
 
@@ -1586,6 +1594,7 @@ namespace Slang
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:
             case CodeGenTarget::HostHostCallable:
+            case CodeGenTarget::HostSharedLibrary:
                 SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
                 return SLANG_OK;
 
@@ -1617,6 +1626,7 @@ namespace Slang
         case CodeGenTarget::ShaderHostCallable:
         case CodeGenTarget::ShaderSharedLibrary:
         case CodeGenTarget::HostExecutable:
+        case CodeGenTarget::HostSharedLibrary:
             {
                 SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 
