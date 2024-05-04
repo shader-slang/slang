@@ -12405,7 +12405,7 @@ uint4 WaveMatch(matrix<T,N,M> value)
         uint4 result = uint4(0xFFFFFFFF);
         [ForceUnroll]
         for (int i = 0; i < N; i++)
-            result &= WaveMatch(value[0]);
+            result &= WaveMatch(value[i]);
         return result;
     default:
         return WaveMaskMatch(WaveGetActiveMask(), value);
