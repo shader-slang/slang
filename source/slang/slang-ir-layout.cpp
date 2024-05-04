@@ -96,6 +96,7 @@ static Result _calcSizeAndAlignment(
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::HostSharedLibrary:
         kPointerSize = (int)sizeof(void*);
         break;
     }

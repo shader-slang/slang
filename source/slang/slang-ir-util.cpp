@@ -537,6 +537,7 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_GLSLAtomicUintType:
         sb << "AtomicCounter";
+        break;
     case kIROp_RaytracingAccelerationStructureType:
         sb << "RayTracingAccelerationStructure";
         break;
