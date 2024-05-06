@@ -70,7 +70,6 @@
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-wrap-structured-buffers.h"
-#include "slang-ir-wrap-global-context.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-translate-glsl-global-var.h"
