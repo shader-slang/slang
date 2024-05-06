@@ -492,8 +492,9 @@ Result linkAndOptimizeIR(
         handleAutoBindNames(irModule);
         break;
     case CodeGenTarget::CUDASource:
-    case CodeGenTarget::CUDAHeader:
+    // case CodeGenTarget::CUDAHeader: // TODO: fix handling of ExternCpp in lowerBuiltinTypesForKernelEntryPoints
         lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
+    case CodeGenTarget::CUDAHeader:
         removeTorchKernels(irModule);
         handleAutoBindNames(irModule);
         break;
