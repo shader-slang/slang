@@ -1957,6 +1957,7 @@ struct SPIRVEmitContext
                             format = SpvImageFormatRgba8;
                             break;
                         }
+                        break;
                     case kIROp_SNormAttr:
                         switch (vectorSize)
                         {
@@ -1973,6 +1974,7 @@ struct SPIRVEmitContext
                             format = SpvImageFormatRgba8Snorm;
                             break;
                         }
+                        break;
                     }
                 }
             }
