@@ -494,7 +494,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_ParameterBlockType:
         case kIROp_ConstantBufferType:
         {
-            emitType((IRType*)type->getOperand(0));
+            emitSimpleTypeImpl((IRType*)type->getOperand(0));
             m_writer->emit(" constant*");
             return;
         }
@@ -607,11 +607,17 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
 }
 
-void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] IRIntegerValue addressSpace)
+void MetalSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 {
-    if (as<IRGroupSharedRate>(rate))
+    switch (type->getOp())
     {
-        m_writer->emit("threadgroup ");
+    case kIROp_ArrayType:
+        emitSimpleType(type);
+        emitDeclarator(declarator);
+        break;
+    default:
+        Super::_emitType(type, declarator);
+        break;
     }
 }
 
@@ -795,6 +801,34 @@ void MetalSourceEmitter::emitPackOffsetModifier(IRInst* varInst, IRType* valueTy
     SLANG_UNUSED(layout);
     // We emit packoffset as a semantic in `emitSemantic`, so nothing to do here.
 }
+
+void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace)
+{
+    if (as<IRGroupSharedRate>(rate))
+    {
+        m_writer->emit("threadgroup ");
+        return;
+    }
+
+    switch ((AddressSpace)addressSpace)
+    {
+    case AddressSpace::GroupShared:
+        m_writer->emit("threadgroup ");
+        break;
+    case AddressSpace::Uniform:
+        m_writer->emit("constant ");
+        break;
+    case AddressSpace::Global:
+        m_writer->emit("device ");
+        break;
+    case AddressSpace::ThreadLocal:
+        m_writer->emit("thread ");
+        break;
+    default:
+        break;
+    }
+}
+
 
 void MetalSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
