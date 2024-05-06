@@ -886,9 +886,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-    case CodeGenTarget::Metal:
         moveGlobalVarInitializationToEntryPoints(irModule);
         break;
+    case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
         moveGlobalVarInitializationToEntryPoints(irModule);
@@ -1096,12 +1096,6 @@ Result linkAndOptimizeIR(
         applyVariableScopeCorrection(irModule, targetRequest);
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
-
-    // Metal does not allow global variables and global parameters, so
-    // we need to convert them into an explicit global context parameter
-    // passed around through a function parameter.
-    if (target == CodeGenTarget::Metal)
-        wrapGlobalScopeInContextType(irModule);
 
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
