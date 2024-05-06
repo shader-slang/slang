@@ -393,6 +393,9 @@ IR_SIMPLE_DECORATION(HLSLExportDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
+IR_SIMPLE_DECORATION(NoRefInlineDecoration)
+IR_SIMPLE_DECORATION(DerivativeGroupQuadDecoration)
+IR_SIMPLE_DECORATION(DerivativeGroupLinearDecoration)
 IR_SIMPLE_DECORATION(AlwaysFoldIntoUseSiteDecoration)
 IR_SIMPLE_DECORATION(StaticRequirementDecoration)
 IR_SIMPLE_DECORATION(NonCopyableTypeDecoration)
@@ -1186,6 +1189,10 @@ struct IRDispatchKernel : IRInst
     IRInst* getDispatchSize() { return getOperand(2); }
     UInt getArgCount() { return getOperandCount() - 3; }
     IRInst* getArg(UInt i) { return getOperand(3 + i); }
+    IROperandList<IRInst> getArgsList()
+    {
+        return IROperandList<IRInst>(getOperands() + 3, getOperands() + getOperandCount());
+    }
 
     IR_LEAF_ISA(DispatchKernel)
 };
@@ -3208,6 +3215,11 @@ struct IRRequireGLSLExtension : IRInst
     UnownedStringSlice getExtensionName() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
 };
 
+struct IRRequireComputeDerivative : IRInst
+{
+    IR_LEAF_ISA(RequireComputeDerivative)
+};
+
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder
@@ -4030,6 +4042,10 @@ public:
     IRInst* emitElementAddress(
         IRInst* basePtr,
         const ArrayView<IRInst*>& accessChain);
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
+        const ArrayView<IRInst*>& accessChain,
+        const ArrayView<IRInst*>& types);
 
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, IRIntegerValue index, IRInst* newElement);
@@ -4227,6 +4243,7 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);
     IRSPIRVAsmOperand* createSPIRVAsmOperandInst(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandConvertTexel(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandRayPayloadFromLocation(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandRayAttributeFromLocation(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandRayCallableFromLocation(IRInst* inst);
@@ -4284,9 +4301,9 @@ public:
     }
 
     template<typename T>
-    void addSimpleDecoration(IRInst* value)
+    IRDecoration* addSimpleDecoration(IRInst* value)
     {
-        addDecoration(value, IROp(T::kOp), (IRInst* const*) nullptr, 0);
+        return addDecoration(value, IROp(T::kOp), (IRInst* const*) nullptr, 0);
     }
 
     void addHighLevelDeclDecoration(IRInst* value, Decl* decl);

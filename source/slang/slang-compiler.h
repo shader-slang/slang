@@ -86,6 +86,7 @@ namespace Slang
         PyTorchCppBinding   = SLANG_CPP_PYTORCH_BINDING,
         HostCPPSource       = SLANG_HOST_CPP_SOURCE,
         HostExecutable      = SLANG_HOST_EXECUTABLE,
+        HostSharedLibrary   = SLANG_HOST_SHARED_LIBRARY,
         ShaderSharedLibrary = SLANG_SHADER_SHARED_LIBRARY,
         ShaderHostCallable  = SLANG_SHADER_HOST_CALLABLE,
         CUDASource          = SLANG_CUDA_SOURCE,
@@ -1348,7 +1349,7 @@ namespace Slang
             char const* name,
             SlangStage stage,
             slang::IEntryPoint** outEntryPoint,
-            ISlangBlob** outDiagnostics)
+            ISlangBlob** outDiagnostics) override
         {
             ComPtr<slang::IEntryPoint> entryPoint(findAndCheckEntryPoint(UnownedStringSlice(name), stage, outDiagnostics));
             if ((!entryPoint))
@@ -1485,7 +1486,7 @@ namespace Slang
             ///
         void _collectShaderParams();
 
-        void _discoverEntryPoints(DiagnosticSink* sink);
+        void _discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets);
 
         class ModuleSpecializationInfo : public SpecializationInfo
         {
@@ -1689,6 +1690,9 @@ namespace Slang
 
     /// Are we generating code for a D3D API?
     bool isD3DTarget(TargetRequest* targetReq);
+
+    // Are we generating code for Metal?
+    bool isMetalTarget(TargetRequest* targetReq);
 
     /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
     bool isKhronosTarget(TargetRequest* targetReq);
@@ -2404,6 +2408,11 @@ namespace Slang
 
         HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions() { return m_targetReq->getHLSLToVulkanLayoutOptions(); }
 
+        bool shouldEmitSPIRVDirectly()
+        {
+            return isKhronosTarget(m_targetReq) && getOptionSet().shouldEmitSPIRVDirectly();
+        }
+
     private:
         RefPtr<IRModule> createIRModuleForLayout(DiagnosticSink* sink);
 
@@ -2828,6 +2837,8 @@ namespace Slang
             CompilerOptionSet targetOptions;
         };
         Dictionary<TargetRequest*, RefPtr<TargetInfo>> m_targetInfos;
+
+        CompilerOptionSet m_optionSetForDefaultTarget;
 
         CompilerOptionSet& getTargetOptionSet(TargetRequest* req);
 

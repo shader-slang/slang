@@ -6,7 +6,6 @@
 //
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
-
 namespace Slang
 {
 struct GenericChildrenMigrationContextImpl;
@@ -181,7 +180,7 @@ IRType* dropNormAttributes(IRType* const t);
 void getTypeNameHint(StringBuilder& sb, IRInst* type);
 void copyNameHintAndDebugDecorations(IRInst* dest, IRInst* src);
 IRInst* getRootAddr(IRInst* addrInst);
-IRInst* getRootAddr(IRInst* addrInst, List<IRInst*>& outAccessChain);
+IRInst* getRootAddr(IRInst* addrInst, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes = nullptr);
 
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
@@ -326,7 +325,18 @@ inline bool isCompositeType(IRType* type)
     }
 }
 
+IRType* getSPIRVSampledElementType(IRInst* sampledType);
+
+IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
+
 IRParam* getParamAt(IRBlock* block, UIndex ii);
+
+void verifyComputeDerivativeGroupModifiers(
+    DiagnosticSink* sink,
+    SourceLoc errorLoc,
+    bool quadAttr,
+    bool linearAttr,
+    IRNumThreadsDecoration* numThreadsDecor);
 
 }
 

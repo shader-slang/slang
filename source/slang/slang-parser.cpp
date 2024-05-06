@@ -4311,6 +4311,7 @@ namespace Slang
             case ASTNodeType::TypeAliasDecl:
             case ASTNodeType::TypeDefDecl:
             case ASTNodeType::ExtensionDecl:
+            case ASTNodeType::SubscriptDecl:
                 return true;
             default:
                 return false;
@@ -4456,8 +4457,6 @@ namespace Slang
         // Or add any modifiers
         if (as<NamespaceDecl>(decl) && decl->parentDecl)
         {
-            // Presumably we have no modifiers.
-            SLANG_ASSERT(modifiers.isEmpty());
             return;
         }
 
@@ -5453,7 +5452,7 @@ namespace Slang
     bool lookAheadTokenAfterModifiers(Parser* parser, const char* token)
     {
         TokenReader tokenPreview = parser->tokenReader;
-        for (Index i = 0;; i++)
+        for (;;)
         {
             if (tokenPreview.peekToken().getContent() == token)
                 return true;
@@ -7248,6 +7247,13 @@ namespace Slang
             parser->ReadMatchingToken(TokenType::RParent);
             return SPIRVAsmOperand{ SPIRVAsmOperand::SampledImageType, Token{}, typeExpr };
         }
+        else if (AdvanceIf(parser, "__convertTexel"))
+        {
+            parser->ReadToken(TokenType::LParent);
+            const auto texelExpr = parser->ParseExpression();
+            parser->ReadMatchingToken(TokenType::RParent);
+            return SPIRVAsmOperand{ SPIRVAsmOperand::ConvertTexel, Token{}, texelExpr };
+        }
         // The pseudo-operand for component truncation
         else if(parser->LookAheadToken("__truncate"))
         {
@@ -8029,6 +8035,8 @@ namespace Slang
         ModifierListBuilder listBuilder;
 
         GLSLLayoutLocalSizeAttribute* numThreadsAttrib = nullptr;
+        GLSLLayoutDerivativeGroupQuadAttribute* derivativeGroupQuadAttrib = nullptr;
+        GLSLLayoutDerivativeGroupLinearAttribute* derivativeGroupLinearAttrib = nullptr; 
 
         ImageFormat format;
 
@@ -8074,6 +8082,14 @@ namespace Slang
 
                     numThreadsAttrib->args[localSizeIndex] = expr;
                 }
+            }
+            else if (nameText == "derivative_group_quadsNV")
+            {
+                derivativeGroupQuadAttrib = parser->astBuilder->create<GLSLLayoutDerivativeGroupQuadAttribute>();
+            }
+            else if (nameText == "derivative_group_linearNV")
+            {
+                derivativeGroupLinearAttrib = parser->astBuilder->create<GLSLLayoutDerivativeGroupLinearAttribute>();
             }
             else if (nameText == "binding" ||
                 nameText == "set")
@@ -8182,9 +8198,11 @@ namespace Slang
 #undef CASE
 
         if (numThreadsAttrib)
-        {
             listBuilder.add(numThreadsAttrib);
-        }
+        if(derivativeGroupQuadAttrib)
+            listBuilder.add(derivativeGroupQuadAttrib);
+        if(derivativeGroupLinearAttrib)
+            listBuilder.add(derivativeGroupLinearAttrib);
 
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupEnd>());
 

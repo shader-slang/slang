@@ -12,6 +12,7 @@
 #include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-loop-inversion.h"
 #include "slang-ir.h"
+#include "slang-ir-util.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
@@ -4118,6 +4119,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 {
                     return builder->emitSPIRVAsmOperandTruncate();
                 }
+            case SPIRVAsmOperand::ConvertTexel:
+                {
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitSPIRVAsmOperandConvertTexel(i);
+                }
             case SPIRVAsmOperand::EntryPoint:
                 {
                     return builder->emitSPIRVAsmOperandEntryPoint();
@@ -7254,26 +7265,61 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 #undef IGNORED_CASE
 
+    void getAllEntryPointsNoOverride(List<IRInst*>& entryPoints)
+    {
+        if(entryPoints.getCount() != 0 )
+            return;
+        for(const auto d : context->irBuilder->getModule()->getModuleInst()->getGlobalInsts())
+            if(d->findDecoration<IREntryPointDecoration>())
+                entryPoints.add(d);
+    }
+
     LoweredValInfo visitEmptyDecl(EmptyDecl* decl)
     {
+        bool verifyComputeDerivativeGroupModifier = false;
+        List<IRInst*> entryPoints {};
         for(const auto modifier : decl->modifiers)
         {
             if(const auto layoutLocalSizeAttr = as<GLSLLayoutLocalSizeAttribute>(modifier))
             {
-                for(const auto d : context->irBuilder->getModule()->getModuleInst()->getGlobalInsts())
-                {
-                    if(d->findDecoration<IREntryPointDecoration>())
-                    {
-                        getBuilder()->addNumThreadsDecoration(
+                verifyComputeDerivativeGroupModifier = true;
+                getAllEntryPointsNoOverride(entryPoints);
+                for(auto d : entryPoints)
+                    as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
                             d,
                             getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->x)),
                             getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->y)),
                             getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->z))
-                        );
-                    }
-                }
+                        ));
+            }
+            else if(as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
+            {
+                verifyComputeDerivativeGroupModifier = true;
+                getAllEntryPointsNoOverride(entryPoints);
+                for(auto d : entryPoints)
+                    getBuilder()->addSimpleDecoration<IRDerivativeGroupQuadDecoration>(d);
+            }
+            else if(as<GLSLLayoutDerivativeGroupLinearAttribute>(modifier))
+            {
+                verifyComputeDerivativeGroupModifier = true;
+                getAllEntryPointsNoOverride(entryPoints);
+                for(auto d : entryPoints)
+                    getBuilder()->addSimpleDecoration<IRDerivativeGroupLinearDecoration>(d);
             }
         }
+        
+        if(!verifyComputeDerivativeGroupModifier)
+            return LoweredValInfo();
+        for(auto d : entryPoints)
+        {
+            verifyComputeDerivativeGroupModifiers(
+                getSink(),
+                decl->loc,
+                d->findDecoration<IRDerivativeGroupQuadDecoration>(), 
+                d->findDecoration<IRDerivativeGroupLinearDecoration>(),
+                d->findDecoration<IRNumThreadsDecoration>());
+        }
+
         return LoweredValInfo();
     }
 
@@ -8777,7 +8823,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGenContext*               subContext,
         GenericTypeConstraintDecl*  constraintDecl)
     {
-        auto supType = lowerType(context, constraintDecl->sup.type);
+        auto supType = lowerType(subContext, constraintDecl->sup.type);
         auto value = emitGenericConstraintValue(subContext, constraintDecl, supType);
         subContext->setValue(constraintDecl, LoweredValInfo::simple(value));
     }
@@ -8926,9 +8972,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto operand = value->getOperand(i);
                 markInstsToClone(valuesToClone, parentBlock, operand);
             }
+            if (value->getFullType())
+                markInstsToClone(valuesToClone, parentBlock, value->getFullType());
+            for (auto child : value->getDecorationsAndChildren())
+                markInstsToClone(valuesToClone, parentBlock, child);
         }
-        for (auto child : value->getChildren())
-            markInstsToClone(valuesToClone, parentBlock, child);
         auto parent = parentBlock->getParent();
         while (parent && parent != parentBlock)
         {
@@ -8979,7 +9027,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), returnType);
                 // For Function Types, we always clone all generic parameters regardless of whether
                 // the generic parameter appears in the function signature or not.
-                if (returnType->getOp() == kIROp_FuncType)
+                if (returnType->getOp() == kIROp_FuncType ||
+                    returnType->getOp() == kIROp_Generic)
                 {
                     for (auto genericParam : parentGeneric->getParams())
                     {
@@ -9667,6 +9716,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         addBitFieldAccessorDecorations(irFunc, decl);
 
+        IRNumThreadsDecoration* numThreadsDecor = nullptr;
+        IRDecoration* derivativeGroupQuadDecor = nullptr;
+        IRDecoration* derivativeGroupLinearDecor = nullptr;
         for (auto modifier : decl->modifiers)
         {
             if (as<RequiresNVAPIAttribute>(modifier))
@@ -9681,6 +9733,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
             }
+            else if (auto derivativeGroupQuadMod = as<DerivativeGroupQuadAttribute>(modifier))
+            {
+                derivativeGroupQuadDecor = getBuilder()->addSimpleDecoration<IRDerivativeGroupQuadDecoration>(irFunc);
+            }
+            else if (auto derivativeGroupLinearMod = as<DerivativeGroupLinearAttribute>(modifier))
+            {
+                derivativeGroupLinearDecor = getBuilder()->addSimpleDecoration<IRDerivativeGroupLinearDecoration>(irFunc);
+            }
+            else if (auto noRefInlineAttribute = as<NoRefInlineAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRNoRefInlineDecoration>(irFunc);
+            }
             else if (auto instanceAttr = as<InstanceAttribute>(modifier))
             {
                 IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), instanceAttr);
@@ -9693,12 +9757,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
-                getBuilder()->addNumThreadsDecoration(
-                    irFunc,
-                    getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
-                    getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
-                    getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
-                );
+                numThreadsDecor = as<IRNumThreadsDecoration>(
+                    getBuilder()->addNumThreadsDecoration(
+                        irFunc,
+                        getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
+                        getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
+                        getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
+                    ));
             }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
@@ -9852,6 +9917,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addDecoration(irFunc, kIROp_NonDynamicUniformReturnDecoration);
         }
 
+        verifyComputeDerivativeGroupModifiers(
+            getSink(),
+            decl->loc,
+            derivativeGroupQuadDecor,
+            derivativeGroupLinearDecor,
+            numThreadsDecor);
+
         if (!isInline)
         {
             // If there are any constant expr rate parameters, we should inline this function.
@@ -9977,6 +10049,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         else if (auto typedefDecl = as<TypeDefDecl>(genDecl->inner))
         {
             return ensureDecl(context, typedefDecl);
+        }
+        else if (auto subscriptDecl = as<SubscriptDecl>(genDecl->inner))
+        {
+            return ensureDecl(context, subscriptDecl);
         }
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());

@@ -1141,6 +1141,15 @@ namespace Slang
         return 0;
     }
 
+    int getExportRank(DeclRef<Decl> left, DeclRef<Decl> right)
+    {
+        if (left.getDecl() && left.getDecl()->hasModifier<ExternModifier>())
+        {
+            return (right.getDecl() && right.getDecl()->hasModifier<HLSLExportModifier>()) ? -1 : 0;
+        }
+        return 0;
+    }
+
     int SemanticsVisitor::CompareOverloadCandidates(
         OverloadCandidate*	left,
         OverloadCandidate*	right)
@@ -1213,6 +1222,11 @@ namespace Slang
             auto specificityDiff = compareOverloadCandidateSpecificity(left->item, right->item);
             if(specificityDiff)
                 return specificityDiff;
+
+            // `export` function is more flavored than `extern` function. But other modifiers are not considered.
+            auto externExportDiff = getExportRank(left->item.declRef, right->item.declRef);
+            if (externExportDiff)
+                return externExportDiff;
 
             // If we reach here, we will attempt to use overload rank to break the ties.
             auto overloadRankDiff = getOverloadRank(right->item.declRef) - getOverloadRank(left->item.declRef);
@@ -2079,7 +2093,21 @@ namespace Slang
                 typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
             return CompleteOverloadCandidate(context, *context.bestCandidate);
         }
-        else if (auto typetype = as<TypeType>(funcExprType))
+
+        // If absolutely no viable candidates were extracted from the overloaded expression,
+        // we may be dealing with a composite type or an overloaded expression with composite types.
+        // 
+
+        auto typeExpr = funcExpr;
+        if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
+        {
+            if (overloadedExpr->lookupResult2.isValid() && overloadedExpr->lookupResult2.isOverloaded())
+            {
+                typeExpr = maybeResolveOverloadedExpr(overloadedExpr, LookupMask::type, nullptr);
+            }
+        }
+
+        if (auto typetype = as<TypeType>(typeExpr->type))
         {
             // We allow a special case when `funcExpr` represents a composite type,
             // in which case we will try to construct the type via memberwise assignment from the arguments.

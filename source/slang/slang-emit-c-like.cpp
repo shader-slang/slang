@@ -131,6 +131,11 @@ void CLikeSourceEmitter::emitPreModuleImpl()
         m_writer->emit(prelude->getStringSlice());
         m_writer->emit("\n");
     }
+    for (auto prelude : m_requiredPreludesRaw)
+    {
+        m_writer->emit(prelude);
+        m_writer->emit("\n");
+    }
 }
 
 //
@@ -640,6 +645,35 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
 {
     bool needParens = (prec.leftPrecedence <= outerPrec.leftPrecedence)
         || (prec.rightPrecedence <= outerPrec.rightPrecedence);
+
+    // While Slang correctly removes some of parentheses, DXC prints warnings
+    // for common mistakes when parentheses are not used with certain combinations
+    // of the operations. We emit parentheses to avoid the warnings.
+    //
+    // a | b & c => a | (b & c)
+    if (prec.leftPrecedence == EPrecedence::kEPrecedence_BitAnd_Left
+        && outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitOr_Right)
+    {
+        needParens = true;
+    }
+    // a & b | c => (a & b) | c
+    else if (prec.rightPrecedence == EPrecedence::kEPrecedence_BitAnd_Right
+        && outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitOr_Left)
+    {
+        needParens = true;
+    }
+    // a << b + c => a << (b + c)
+    else if (prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left
+        && outerPrec.leftPrecedence == EPrecedence::kEPrecedence_Shift_Right)
+    {
+        needParens = true;
+    }
+    // a + b << c => (a + b) << c
+    else if (prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right
+        && outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Shift_Left)
+    {
+        needParens = true;
+    }
 
     if (needParens)
     {
@@ -2081,6 +2115,21 @@ bool CLikeSourceEmitter::isSingleElementConstantBuffer(IRInst* cbufferType)
     return true;
 }
 
+bool CLikeSourceEmitter::shouldForceUnpackConstantBufferElements(IRInst* cbufferType)
+{
+    if (getTargetReq()->getTarget() != CodeGenTarget::HLSL)
+        return false;
+    if (!getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::NoHLSLPackConstantBufferElements))
+        return false;
+    auto type = as<IRUniformParameterGroupType>(cbufferType);
+    if (!type)
+        return false;
+    auto structType = as<IRStructType>(type->getElementType());
+    if (!structType)
+        return false;
+    return true;
+}
+
 void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
@@ -2210,8 +2259,9 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
-            auto skipBase = isD3DTarget(getTargetReq()) &&
-                hasExplicitConstantBufferOffset(ii->getBase()->getDataType());
+            bool skipBase = (isD3DTarget(getTargetReq()) &&
+                hasExplicitConstantBufferOffset(ii->getBase()->getDataType())) ||
+                shouldForceUnpackConstantBufferElements(ii->getBase()->getDataType());
             if (!skipBase)
             {
                 auto base = ii->getBase();
@@ -2304,7 +2354,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             }
         }
 
-        emitOperand(operand, rightSide(prec, outerPrec));
+        emitOperand(operand, rightSide(outerPrec, prec));
         break;
     }    
     case kIROp_Load:
@@ -2454,7 +2504,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         needClose = maybeEmitParens(outerPrec, prec);
         emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
         m_writer->emit(" + ");
-        emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
+        emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
         break;
     }
     case kIROp_GetElement:
@@ -2471,7 +2521,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("[");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
             m_writer->emit("].");
-            emitOperand(inst->getOperand(0), rightSide(prec, outerPrec));
+            emitOperand(inst->getOperand(0), rightSide(outerPrec, prec));
             break;
         }
         else
@@ -2557,7 +2607,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(" ? ");
             emitOperand(inst->getOperand(1), prec);
             m_writer->emit(" : ");
-            emitOperand(inst->getOperand(2), rightSide(prec, outerPrec));
+            emitOperand(inst->getOperand(2), rightSide(outerPrec, prec));
         }
         break;
 
@@ -2716,6 +2766,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_RequireGLSLExtension:
     {
         break; //should already have set requirement; case covered for empty intrinsic block
+    }
+    case kIROp_RequireComputeDerivative:
+    {
+        break; //should already have been parsed and used.
     }
     default:
         diagnoseUnhandledInst(inst);
@@ -3328,7 +3382,8 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 
     // Deal with decorations that need
     // to be emitted as attributes
-    if ( IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>())
+    IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+    if (entryPointDecor)
     {
         emitEntryPointAttributes(func, entryPointDecor);
     }
@@ -3478,14 +3533,13 @@ bool CLikeSourceEmitter::isTargetIntrinsic(IRInst* inst)
     return findTargetIntrinsicDefinition(inst, intrinsicDef);
 }
 
-bool shouldWrappInExternCBlock(IRFunc* func)
+bool shouldWrapInExternCBlock(IRFunc* func)
 {
     for (auto decor : func->getDecorations())
     {
         switch (decor->getOp())
         {
         case kIROp_ExternCDecoration:
-        case kIROp_CudaKernelDecoration:
             return true;
         }
     }
@@ -3505,7 +3559,7 @@ void CLikeSourceEmitter::emitFunc(IRFunc* func)
     if (isTargetIntrinsic(func))
         return;
 
-    bool shouldCloseExternCBlock = shouldWrappInExternCBlock(func);
+    bool shouldCloseExternCBlock = shouldWrapInExternCBlock(func);
     if (shouldCloseExternCBlock)
     {
         // If this is a C++ `extern "C"` function, then we need to emit
@@ -4435,6 +4489,7 @@ void CLikeSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 
     List<EmitAction> actions;
 
+    beforeComputeEmitActions(module);
     computeEmitActions(module, actions);
     executeEmitActions(actions);
 }

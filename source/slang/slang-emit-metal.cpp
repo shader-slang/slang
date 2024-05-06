@@ -37,44 +37,6 @@ void MetalSourceEmitter::_emitHLSLDecorationSingleInt(const char* name, IRFunc* 
     m_writer->emit(")]]\n");
 }
 
-void MetalSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling)
-{
-    // Metal does not use explicit binding.
-    SLANG_UNUSED(kind);
-    SLANG_UNUSED(chain);
-    SLANG_UNUSED(inst);
-    SLANG_UNUSED(uniformSemanticSpelling);
-}
-
-void MetalSourceEmitter::_emitHLSLRegisterSemantics(EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling)
-{
-    // TODO: implement.
-    SLANG_UNUSED(chain);
-    SLANG_UNUSED(inst);
-    SLANG_UNUSED(uniformSemanticSpelling);
-}
-
-void MetalSourceEmitter::_emitHLSLRegisterSemantics(IRVarLayout* varLayout, IRInst* inst, char const* uniformSemanticSpelling)
-{
-    // TODO: implement.
-    SLANG_UNUSED(varLayout);
-    SLANG_UNUSED(inst);
-    SLANG_UNUSED(uniformSemanticSpelling);
-}
-
-void MetalSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain)
-{
-    // TODO: implement.
-    SLANG_UNUSED(chain);
-}
-
-void MetalSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(IRVarLayout* fieldLayout, EmitVarChain* inChain)
-{
-    // TODO: implement.
-    SLANG_UNUSED(fieldLayout);
-    SLANG_UNUSED(inChain);
-}
-
 void MetalSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     // Metal does not allow shader parameters declared as global variables, so we shouldn't see this.
@@ -139,18 +101,40 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     m_writer->emit(">");
 }
 
-void MetalSourceEmitter::_emitHLSLSubpassInputType(IRSubpassInputType* subpassType)
+void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
-    SLANG_UNUSED(subpassType);
-}
-
-void MetalSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
-{
-    auto layout = getVarLayout(inst); 
-    if (layout)
+    auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecoration)
+        return;
+    auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
+    if (!layout)
+        return;
+    for (auto rr : layout->getOffsetAttrs())
     {
-        _emitHLSLRegisterSemantics(layout, inst, uniformSemanticSpelling);
+        switch (rr->getResourceKind())
+        {
+        case LayoutResourceKind::MetalTexture:
+            m_writer->emit(" [[texture(");
+            m_writer->emit(rr->getOffset());
+            m_writer->emit(")]]");
+            break;
+        case LayoutResourceKind::MetalBuffer:
+            m_writer->emit(" [[buffer(");
+            m_writer->emit(rr->getOffset());
+            m_writer->emit(")]]");
+            break;
+        case LayoutResourceKind::SamplerState:
+            m_writer->emit(" [[sampler(");
+            m_writer->emit(rr->getOffset());
+            m_writer->emit(")]]");
+            break;
+        case LayoutResourceKind::VaryingInput:
+            m_writer->emit(" [[stage_in]]");
+            break;
+        }
     }
+    if (auto sysSemanticAttr = layout->findSystemValueSemanticAttr())
+       _emitSystemSemantic(sysSemanticAttr->getName(), sysSemanticAttr->getIndex());
 }
 
 void MetalSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
@@ -160,7 +144,6 @@ void MetalSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUnifor
 
 void MetalSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
 {
-    auto profile = m_effectiveProfile;
     auto stage = entryPointDecor->getProfile().getStage();
 
     switch (stage)
@@ -283,7 +266,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             needClose = maybeEmitParens(outerPrec, prec);
             emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
             m_writer->emit("+");
-            emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
+            emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
             maybeCloseParens(needClose);
             return true;
         }
@@ -632,11 +615,130 @@ void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[m
     }
 }
 
+void MetalSourceEmitter::_emitSystemSemantic(UnownedStringSlice semanticName, IRIntegerValue semanticIndex)
+{
+    if (semanticName.caseInsensitiveEquals(toSlice("SV_POSITION")))
+    {
+        m_writer->emit(" [[position]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_VERTEXID")))
+    {
+        m_writer->emit(" [[vertex_id]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_INSTANCEID")))
+    {
+        m_writer->emit(" [[instance_id]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_Target")))
+    {
+        m_writer->emit(" [[color(");
+        m_writer->emit(semanticIndex);
+        m_writer->emit(")]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_PRIMITIVEID")))
+    {
+        m_writer->emit(" [[primitive_id]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_GROUPID")))
+    {
+        // TODO: not supported by metal.
+        // We need to implement the transformation logic in slang-ir-metal-legalize.cpp
+        // to convert SV_GroupID to something like METAL_threadgroup_position_in_grid.
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_GROUPINDEX")))
+    {
+        // TODO: not supported by metal.
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_DISPATCHTHREADID")))
+    {
+        m_writer->emit(" [[thread_position_in_grid]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_GROUPTHREADID")))
+    {
+        m_writer->emit(" [[thread_position_in_threadgroup]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_CLIPDISTANCE")))
+    {
+        m_writer->emit(" [[clip_distance]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_RENDERTARGETARRAYINDEX")))
+    {
+        m_writer->emit(" [[render_target_array_index]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_VIEWPORTARRAYINDEX")))
+    {
+        m_writer->emit(" [[viewport_array_index]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_Depth")))
+    {
+        m_writer->emit(" [[depth(any)]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_DepthGreaterEqual")))
+    {
+        m_writer->emit(" [[depth(greater)]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_DepthLessEqual")))
+    {
+        m_writer->emit(" [[depth(less)]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_Coverage")))
+    {
+        m_writer->emit(" [[sample_mask]]");
+    }
+    else if (semanticName.caseInsensitiveEquals(toSlice("SV_StencilRef")))
+    {
+        m_writer->emit(" [[stencil]]");
+    }
+    else
+    {
+        m_writer->emit(" [[user(");
+        m_writer->emit(semanticName);
+        if (semanticIndex != 0)
+        {
+            m_writer->emit("_");
+            m_writer->emit(semanticIndex);
+        }
+        m_writer->emit(")]]");
+    }
+}
+
 void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
 {
-    // Metal does not use semantics.
-    SLANG_UNUSED(inst);
     SLANG_UNUSED(allowOffsets);
+    if (inst->getOp() == kIROp_StructKey)
+    {
+        // Only emit [[attribute(n)]] on struct keys.
+        bool hasSemanticFromLayout = false;
+        if (auto varLayout = findVarLayout(inst))
+        {
+            for (auto attr : varLayout->getAllAttrs())
+            {
+                if (auto offsetAttr = as<IRVarOffsetAttr>(attr))
+                {
+                    if (offsetAttr->getResourceKind() == LayoutResourceKind::MetalAttribute)
+                    {
+                        m_writer->emit(" [[attribute(");
+                        m_writer->emit(offsetAttr->getOffset());
+                        m_writer->emit(")]]");
+                    }
+                }
+                else if (auto semanticAttr = as<IRSemanticAttr>(attr))
+                {
+                    auto semanticName = String(semanticAttr->getName()).toUpper();
+                    _emitSystemSemantic(semanticAttr->getName(), semanticAttr->getIndex());
+                    hasSemanticFromLayout = true;
+                }
+            }
+
+        }
+        if (!hasSemanticFromLayout)
+        {
+            if (auto semanticDecor = inst->findDecoration<IRSemanticDecoration>())
+            {
+                _emitSystemSemantic(semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
+            }
+        }
+    }
 }
 
 void MetalSourceEmitter::_emitStageAccessSemantic(IRStageAccessDecoration* decoration, const char* name)
@@ -648,6 +750,7 @@ void MetalSourceEmitter::_emitStageAccessSemantic(IRStageAccessDecoration* decor
 void MetalSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
     Super::emitSimpleFuncParamImpl(param);
+    emitFuncParamLayoutImpl(param);
 }
 
 static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)

@@ -189,6 +189,7 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifa
     switch (options.targetType)
     {
         case SLANG_SHADER_SHARED_LIBRARY:
+        case SLANG_HOST_SHARED_LIBRARY:
         {
             // Create dynamic link library
             if (options.debugInfoType == DebugInfoType::None)

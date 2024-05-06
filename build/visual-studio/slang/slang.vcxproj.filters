@@ -207,6 +207,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-byte-address-legalize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-call-graph.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-check-differentiability.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -363,6 +366,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-combined-texture-sampler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-cuda-builtin-types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-error-handling.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -409,6 +415,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-metadata.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-metal-legalize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h">
@@ -896,6 +905,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-byte-address-legalize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-call-graph.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-check-differentiability.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1049,6 +1061,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-combined-texture-sampler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-cuda-builtin-types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-error-handling.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1095,6 +1110,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-metadata.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-metal-legalize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp">

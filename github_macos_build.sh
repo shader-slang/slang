@@ -21,13 +21,12 @@ make config=${CONFIGURATION}_${ARCH} -j`sysctl -n hw.ncpu`
 
 rm -rf ./bin
 
-ARCH="arm64"
 # Create the makefile
 ./premake5 gmake2 --cc=${CC} --enable-xlib=false --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --build-glslang=true --no-progress=true  --skip-source-generation=true --deploy-slang-llvm=false --deploy-slang-glslang=false
 make config=${CONFIGURATION}_${TARGETARCH} -j`sysctl -n hw.ncpu`
 else
 # Create the makefile
-./premake5 gmake2 --cc=${CC} --enable-xlib=false --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true
+./premake5 gmake2 --cc=${CC} --enable-xlib=false --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --build-glslang=true --no-progress=true --deploy-slang-glslang=false
 # Build the configuration
 make config=${CONFIGURATION}_${TARGETARCH}  -j`sysctl -n hw.ncpu`
 fi

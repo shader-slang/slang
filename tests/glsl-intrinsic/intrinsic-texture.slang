@@ -1,17 +1,17 @@
 #version 450 core
 #extension GL_EXT_texture_shadow_lod : enable
 
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage fragment -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage fragment -entry computeMain -target spirv -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=CHECK_SPV_DIRECT): -allow-glsl -stage compute -entry computeMain -target spirv -DCOMPUTE
+//TEST:SIMPLE(filecheck=CHECK_SPV_DIRECT): -allow-glsl -stage fragment -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DCOMPUTE
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage fragment -entry computeMain -target cuda
 
 // Disabling following targets because they are currently causing compile errors.
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage fragment -entry computeMain -target hlsl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage fragment -entry computeMain -target cpp
-
-// "Offset" family of texture functions in GLSL requires offset parameter to be a constant value.
-// It appears that slangc removes the constant-ness of constant values.
-//#define TEST_when_constexpr_works
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DCOMPUTE
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DCOMPUTE
 
 // It appears that CUDA doesn't have implementations for multisampling samplers.
 // When targetting glsl and spirv, the DEBUG build of slangc encounters issues with "Array" variant
@@ -20,6 +20,11 @@
 
 //RWStructuredBuffer<float> outputBuffer;
 //layout(location = 0) out vec4 o_color;
+
+buffer MyBlockName
+{
+    int result;
+} outputBuffer;
 
 uniform sampler1DShadow uniform_sampler1DShadow;
 uniform sampler2DShadow uniform_sampler2DShadow;
@@ -345,17 +350,15 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), { __LINE__ })
         && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), { __LINE__ }, int(0))
         && vec4(0) == textureGatherOffset(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ })
-#if defined(TEST_when_constexpr_works)
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ }) // constexpr not working
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ }, int(0)) // constexpr not working
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ }) // constexpr not working
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ }, int(0)) // constexpr not working
-        && vec4(0) == textureGatherOffsets(uniform_sampler2DShadow, vec2(0), float(0), { __LINE__ }) // constexpr not working
-        && vec4(0) == textureGatherOffsets(uniform_sampler2DArrayShadow, vec3(0), float(0), { __LINE__ }) // constexpr not working
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }) // constexpr not working
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }, int(0)) // constexpr not working
-        && vec4(0) == textureGatherOffsets(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ }) // constexpr not working
-#endif // #if defined(TEST_when_constexpr_works)
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ }, int(0))
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ }, int(0))
+        && vec4(0) == textureGatherOffsets(uniform_sampler2DShadow, vec2(0), float(0), { __LINE__ })
+        && vec4(0) == textureGatherOffsets(uniform_sampler2DArrayShadow, vec3(0), float(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }, int(0))
+        && vec4(0) == textureGatherOffsets(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ })
 
         // 8.9.5. Compatibility Profile Texture Functions
         && vec4(0) == texture1D(uniform_sampler1D, float(0))
@@ -484,30 +487,31 @@ bool itextureFuncs(Sampler1D<vector<T, N>> gsampler1D
         && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), { __LINE__ })
         && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), { __LINE__ }, int(0))
         && vec4(0) == textureGatherOffset(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ })
-#if defined(TEST_when_constexpr_works)
-           && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ })         // constexpr not working
-           && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ }, int(0)) // constexpr not working
-           && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ })    // constexpr not working
-           && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ }, int(0)) // constexpr not working
-           && vec4(0) == textureGatherOffsets(uniform_sampler2DShadow, vec2(0), float(0), { __LINE__ }) // constexpr not working
-           && vec4(0) == textureGatherOffsets(uniform_sampler2DArrayShadow, vec3(0), float(0), { __LINE__ })                              // constexpr not working
-           && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }) // constexpr not working
-           && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }, int(0)) // constexpr not working
-           && vec4(0) == textureGatherOffsets(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ }) // constexpr not working
-#endif                                                      // #if defined(TEST_when_constexpr_works)
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ }, int(0))
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ }, int(0))
+        && vec4(0) == textureGatherOffsets(uniform_sampler2DShadow, vec2(0), float(0), { __LINE__ })
+        && vec4(0) == textureGatherOffsets(uniform_sampler2DArrayShadow, vec3(0), float(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ })
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }, int(0))
+        && vec4(0) == textureGatherOffsets(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ })
         ;
 }
 
-[numthreads(4, 1, 1)]
+#ifdef COMPUTE
+[numthreads(2, 2, 1)]
+#endif
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
+    // CHECK_SPV_DIRECT: OpEntryPoint
     // CHECK_HLSL: void computeMain(
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
 
-    bool r = true
+    outputBuffer.result = true
         && textureFuncs(
             uniform_sampler1D
             , uniform_sampler2D

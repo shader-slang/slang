@@ -820,6 +820,16 @@ class GLSLLayoutLocalSizeAttribute : public Attribute
     IntVal* z;
 };
 
+class GLSLLayoutDerivativeGroupQuadAttribute : public Attribute
+{
+    SLANG_AST_CLASS(GLSLLayoutDerivativeGroupQuadAttribute)
+};
+
+class GLSLLayoutDerivativeGroupLinearAttribute : public Attribute
+{
+    SLANG_AST_CLASS(GLSLLayoutDerivativeGroupLinearAttribute)
+};
+
 // TODO: for attributes that take arguments, the syntax node
 // classes should provide accessors for the values of those arguments.
 
@@ -1435,6 +1445,23 @@ class NVAPISlotModifier : public Modifier
 class NoInlineAttribute : public Attribute
 {
     SLANG_AST_CLASS(NoInlineAttribute)
+};
+
+    /// A `[noRefInline]` attribute represents a request to not force inline a 
+    /// function specifically due to a refType parameter.
+class NoRefInlineAttribute : public Attribute
+{
+    SLANG_AST_CLASS(NoRefInlineAttribute)
+};
+
+class DerivativeGroupQuadAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DerivativeGroupQuadAttribute)
+};
+
+class DerivativeGroupLinearAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DerivativeGroupLinearAttribute)
 };
 
     /// A `[payload]` attribute indicates that a `struct` type will be used as

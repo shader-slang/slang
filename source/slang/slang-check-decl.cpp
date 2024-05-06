@@ -2144,7 +2144,40 @@ namespace Slang
             SLANG_RELEASE_ASSERT(aggTypeDecl);
             synth.pushContainerScope(aggTypeDecl);
         }
-        else
+        
+        // If we did not find an existing empty struct, we may need to synthesize one. 
+        // But first, we check if the parent type can be used as its own differential type.
+        // 
+        if (!aggTypeDecl
+            && as<AggTypeDecl>(context->parentDecl)
+            && canStructBeUsedAsSelfDifferentialType(as<AggTypeDecl>(context->parentDecl)))
+        {
+            // If the parent type can be used as its own differential type, we will create a typealias
+            // to itself as the differential type.
+            //
+            auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
+            assocTypeDef->nameAndLoc.name = getName("Differential");
+            assocTypeDef->type.type = context->conformingType;
+            assocTypeDef->parentDecl = context->parentDecl;
+            assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
+            context->parentDecl->members.add(assocTypeDef);
+            
+            markSelfDifferentialMembersOfType(as<AggTypeDecl>(context->parentDecl), context->conformingType);
+
+            if (doesTypeSatisfyAssociatedTypeConstraintRequirement(context->conformingType, requirementDeclRef, witnessTable))
+            {
+                witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(context->conformingType));
+
+                // Increase the epoch so that future calls to Type::getCanonicalType will return the up-to-date folded types.
+                m_astBuilder->incrementEpoch();
+                return true;
+            }
+
+            // Something went wrong.
+            return false;
+        }
+
+        if (!aggTypeDecl)
         {
             aggTypeDecl = m_astBuilder->create<StructDecl>();
             aggTypeDecl->parentDecl = context->parentDecl;
@@ -5741,6 +5774,15 @@ namespace Slang
             {
                 checkConformance(type, inheritanceDecl, decl);
             }
+
+            // Successful conformance checking may have created new witness tables.
+            // Increment epoch to invalidate the cache, so subsequent canonical types are
+            // re-calculated. 
+            //
+            // TODO: Is it really necessary to invalidate globally? Maybe there's a way to invalidate only the 
+            // types that are affected by these interface decls.
+            // 
+            astBuilder->incrementEpoch();
         }
     }
 
@@ -6944,6 +6986,13 @@ namespace Slang
         if (!doFunctionSignaturesMatch(newDeclRef, oldDeclRef))
             return SLANG_OK;
 
+        // If the declatation is declared by 'extern', and new definition is with 'export', then
+        // we should let overload resolution to handle it.
+        if (oldDecl->hasModifier<ExternModifier>() && newDecl->hasModifier<HLSLExportModifier>())
+        {
+            return SLANG_OK;
+        }
+
         // If we get this far, then we've got two declarations in the same
         // scope, with the same name and signature, so they appear
         // to be redeclarations.
@@ -7464,6 +7513,10 @@ namespace Slang
 
         for (auto ctor : structDeclInfo.ctorList)
         {
+            ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+            thisExpr->scope = ctor->ownedScope;
+            thisExpr->type = ctor->returnType.type;
+
             auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
             auto seqStmtChild = m_astBuilder->create<SeqStmt>();
             seqStmtChild->stmts.reserve(structDecl->members.getCount());
@@ -7474,12 +7527,16 @@ namespace Slang
                     || !varDeclBase->initExpr)
                     continue;
 
-                VarExpr* memberVarExpr = m_astBuilder->create<VarExpr>();
-                memberVarExpr->scope = ctor->ownedScope;
-                memberVarExpr->name = m->getName();
+                MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
+                memberExpr->baseExpression = thisExpr;
+                memberExpr->declRef = m->getDefaultDeclRef();
+                memberExpr->scope = ctor->ownedScope;
+                memberExpr->loc = m->loc;
+                memberExpr->name = m->getName();
+                memberExpr->type = DeclRefType::create(getASTBuilder(), m->getDefaultDeclRef());
 
                 auto assign = m_astBuilder->create<AssignExpr>();
-                assign->left = memberVarExpr;
+                assign->left = memberExpr;
                 assign->right = varDeclBase->initExpr;
                 assign->loc = m->loc;
 
@@ -7492,7 +7549,7 @@ namespace Slang
                     checkedMemberVarExpr = cachedDeclToCheckedVar[m];
                 else
                 {
-                    checkedMemberVarExpr = CheckTerm(memberVarExpr);
+                    checkedMemberVarExpr = CheckTerm(memberExpr);
                     cachedDeclToCheckedVar.add({ m, checkedMemberVarExpr });
                 }
                 if (!checkedMemberVarExpr->type.isLeftValue)
@@ -7685,6 +7742,16 @@ namespace Slang
                 }
             }
         }
+
+        // If this method is intended to be a CUDA kernel, verify that the return type is void.
+        if (decl->findModifier<CudaKernelAttribute>())
+        {
+            if (decl->returnType.type && !decl->returnType.type->equals(m_astBuilder->getVoidType()))
+            {
+                getSink()->diagnose(decl, Diagnostics::cudaKernelMustReturnVoid);
+            }
+        }
+
         checkVisibility(decl);
     }
 
@@ -9532,6 +9599,30 @@ namespace Slang
         checkDerivativeAttributeImpl(visitor, funcDecl, attr, imaginaryArguments.args, imaginaryArguments.directions);
     }
 
+    static void checkCudaKernelAttribute(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, CudaKernelAttribute*)
+    {
+        // If the method is also marked differentiable, check that the data types are either non-differentiable
+        // or marked with no_diff.
+        //
+        // Note: This is a temporary restriction until we have a more complete story for differentiability.
+        //
+        if (funcDecl->findModifier<DifferentiableAttribute>())
+        {
+            for (auto paramDecl : funcDecl->getParameters())
+            {
+                auto paramType = paramDecl->type;
+                
+                if (visitor->isTypeDifferentiable(paramType))
+                {
+                    if (!paramDecl->hasModifier<NoDiffModifier>())
+                    {
+                        visitor->getSink()->diagnose(paramDecl, Diagnostics::differentiableKernelEntryPointCannotHaveDifferentiableParams);
+                    }
+                }
+            }
+        }
+    }
+
     template<typename TDerivativeAttr, typename TDerivativeOfAttr>
     bool tryCheckDerivativeOfAttributeImpl(
         SemanticsVisitor* visitor,
@@ -9732,6 +9823,8 @@ namespace Slang
                 checkDerivativeAttribute(this, decl, bwdDerivativeAttr);
             else if (auto primalAttr = as<PrimalSubstituteAttribute>(attr))
                 checkDerivativeAttribute(this, decl, primalAttr);
+            else if (auto cudaKernelAttr = as<CudaKernelAttribute>(attr))
+                checkCudaKernelAttribute(this, decl, cudaKernelAttr);
         }
     }
 
@@ -9832,7 +9925,7 @@ namespace Slang
                 loc = Base::sourceLocStack.getLast();
             handleReferenceFunc(decl, decl->inferredCapabilityRequirements, loc);
         }
-        virtual void processDeclModifiers(Decl* decl)
+        virtual void processDeclModifiers(Decl* decl) override
         {
             if (decl)
                 handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);

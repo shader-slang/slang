@@ -205,6 +205,19 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
+    bool checkUnaligned(IRInst* baseOffset, IRIntegerValue immediateOffset, IRType* elementType, IRIntegerValue elementCount)
+    {
+        // Check whether the given composite resource type is aligned to the baseOffset
+        IRSizeAndAlignment elementLayout;
+        SLANG_RETURN_FALSE_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
+        IRIntegerValue elementStride = elementLayout.getStride();
+        bool isUnaligned = true;
+        if (auto baseOffsetVal = as<IRIntLit>(baseOffset)) {
+            isUnaligned = ((baseOffsetVal->getValue() + immediateOffset) % (elementStride * elementCount)) != 0;
+        }
+        return isUnaligned;
+    }
+
     SlangResult getOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
     {
         if (target->getHLSLToVulkanLayoutOptions() && target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
@@ -299,7 +312,7 @@ struct ByteAddressBufferLegalizationContext
             //
             return m_builder.emitMakeStruct(type, fieldVals);
         }
-        else if( auto arrayType = as<IRArrayTypeBase>(type) )
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
         {
             // Loading a value of array type amounts to loading each
             // of its elements. There is shared logic between the
@@ -311,8 +324,7 @@ struct ByteAddressBufferLegalizationContext
             // legalization if the array type isn't in the right form
             // for us to proceed.
             //
-            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
-            if( elementCountInst )
+            if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
                 return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeArray, arrayType->getElementType(), elementCountInst->getValue());
             }
@@ -361,17 +373,25 @@ struct ByteAddressBufferLegalizationContext
                 return m_builder.emitMakeMatrix(matType, (UInt)args.getCount(), args.getBuffer());
             }
         }
-        else if( auto vecType = as<IRVectorType>(type) )
+        else if (auto vecType = as<IRVectorType>(type))
         {
             // One of the options that can vary per-target is whether to
             // scalarize vetor load/store operations. When that option
             // is turned on, we can treat a vector load just like an
             // array load.
             //
-            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
-            if( m_options.scalarizeVectorLoadStore && elementCountInst)
+            if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue());
+                // Emit an aligned vector load operation when the data (elementCount * elementSize) is divisible
+                // by the offset. Else, fallback to scalarizing the loads.
+                if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, vecType->getElementType(), elementCountInst->getValue()))
+                {
+                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue());
+                }
+                else
+                {
+                    return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
+                }
             }
 
             // If we aren't scalarizing a vetor load then we next need
@@ -649,6 +669,10 @@ struct ByteAddressBufferLegalizationContext
 
     IRInst* getEquivalentStructuredBuffer(IRType* elementType, IRInst* byteAddressBuffer)
     {
+        if (!elementType)
+        {
+            return nullptr;
+        }
         // The simple case for replacement is when the byte-address buffer to
         // be replaced is a global shader parameter. That path will get its
         // own routine.
@@ -869,13 +893,12 @@ struct ByteAddressBufferLegalizationContext
             }
             return SLANG_OK;
         }
-        else if( auto arrayType = as<IRArrayTypeBase>(type) )
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
         {
             // Arrays and other sequences bottleneck through a helper
             // function, which we will cover later.
             //
-            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
-            if( elementCountInst )
+            if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
                 return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, arrayType->getElementType(), elementCountInst->getValue());
             }
@@ -918,12 +941,20 @@ struct ByteAddressBufferLegalizationContext
                 return SLANG_OK;
             }
         }
-        else if( auto vecType = as<IRVectorType>(type) )
+        else if (auto vecType = as<IRVectorType>(type))
         {
-            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
-            if( m_options.scalarizeVectorLoadStore && elementCountInst)
+            if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
+                // Emit an aligned vector store operation when the data (elementCount * elementSize) is divisible
+                // by the offset. Else, fallback to scalarizing the stores.
+                if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, vecType->getElementType(), elementCountInst->getValue()))
+                {
+                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
+                }
+                else
+                {
+                    return emitSimpleStore(value->getDataType(), buffer, baseOffset, immediateOffset, value);
+                }
             }
 
             if(m_options.useBitCastFromUInt)
@@ -956,9 +987,9 @@ struct ByteAddressBufferLegalizationContext
         return emitSimpleStore(type, buffer, baseOffset, immediateOffset, value);
     }
 
-    Result emitSimpleStore(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOfset, IRInst* value)
+    Result emitSimpleStore(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value)
     {
-        IRInst* offset = emitOffsetAddIfNeeded(baseOffset, immediateOfset);
+        IRInst* offset = emitOffsetAddIfNeeded(baseOffset, immediateOffset);
         if( m_options.translateToStructuredBufferOps )
         {
             if( auto structuredBuffer = getEquivalentStructuredBuffer(type, buffer) )

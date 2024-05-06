@@ -30,6 +30,7 @@
 #include "slang-ir-fuse-satcoop.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-hlsl-legalize.h"
+#include "slang-ir-metal-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-legalize-array-return-type.h"
@@ -485,11 +486,14 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::PyTorchCppBinding:
+        generateHostFunctionsForAutoBindCuda(irModule, sink);
+        lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
         generatePyTorchCppBinding(irModule, sink);
         handleAutoBindNames(irModule);
         break;
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
+        lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
         removeTorchKernels(irModule);
         handleAutoBindNames(irModule);
         break;
@@ -508,7 +512,7 @@ Result linkAndOptimizeIR(
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
-        SLANG_RETURN_ON_FAIL(performStringInlining(irModule, sink));
+        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, sink));
     }
 
     lowerReinterpret(targetProgram, irModule, sink);
@@ -599,6 +603,7 @@ Result linkAndOptimizeIR(
         //  will have (more) legal shader code.
         //
         legalizeExistentialTypeLayout(
+            targetProgram,
             irModule,
             sink);
 
@@ -619,6 +624,7 @@ Result linkAndOptimizeIR(
         // then become multiple variables/parameters/arguments/etc.
         //
         legalizeResourceTypes(
+            targetProgram,
             irModule,
             sink);
 
@@ -633,6 +639,7 @@ Result linkAndOptimizeIR(
         // On CPU/CUDA targets, we simply elminate any empty types if
         // they are not part of public interface.
         legalizeEmptyTypes(
+            targetProgram,
             irModule,
             sink);
     }
@@ -728,14 +735,13 @@ Result linkAndOptimizeIR(
             // of a buffer need not be more than 4-byte aligned, and loads
             // of vectors need only be aligned based on their element type).
             //
-            // TODO: We should consider having an extended variant of `Load<T>`
-            // on byte-address buffers which expresses a programmer's knowledge
-            // that the load will have greater alignment than required by D3D.
-            // That could either come as an explicit guaranteed-alignment
-            // operand, or instead as something like a `Load4Aligned<T>` operation
-            // that returns a `vector<4,T>` and assumes `4*sizeof(T)` alignemtn.
-            //
-            byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            // Slang IR supports a variant of `Load<T>` on byte-address buffers
+            // that will have greater alignment than required by D3D. The
+            // alignment information is inferred from the operation like a
+            // `Load4Aligned<T>` that returns a `vector<4,T>` that assumes a
+            // `4*sizeof(T)` alignment. We may choose to disable that in favor
+            // of byte-address indexing by setting this flag to true.
+            byteAddressBufferOptions.scalarizeVectorLoadStore = false;
 
             // For GLSL targets, there really isn't a low-level concept
             // of a byte-address buffer at all, and the standard "shader storage
@@ -848,7 +854,11 @@ Result linkAndOptimizeIR(
             validateIRModuleIfEnabled(codeGenContext, irModule);
     }
     break;
-
+    case CodeGenTarget::Metal:
+    {
+        legalizeIRForMetal(irModule, sink);
+    }
+    break;
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
@@ -895,6 +905,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
+    case CodeGenTarget::Metal:
         moveGlobalVarInitializationToEntryPoints(irModule);
         break;
     case CodeGenTarget::CPPSource:
@@ -962,9 +973,12 @@ Result linkAndOptimizeIR(
 
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
-        // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
-        // a simple storage type that has target independent layout based on the kind of buffer resource.
-        lowerBufferElementTypeToStorageType(targetProgram, irModule);
+        if (!isMetalTarget(targetRequest))
+        {
+            // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
+            // a simple storage type that has target independent layout based on the kind of buffer resource.
+            lowerBufferElementTypeToStorageType(targetProgram, irModule);
+        }
     }
 
     // Rewrite functions that return arrays to return them via `out` parameter,
@@ -986,11 +1000,11 @@ Result linkAndOptimizeIR(
 
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
-    lowerBitCast(targetProgram, irModule);
+    lowerBitCast(targetProgram, irModule, sink);
 
-    bool emitSpirvDirectly = targetProgram->getOptionSet().shouldEmitSPIRVDirectly();
+    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
 
-    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
         eliminateDeadCode(irModule);

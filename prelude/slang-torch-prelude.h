@@ -136,13 +136,18 @@ TensorView make_tensor_view(torch::Tensor val, const char* name, torch::ScalarTy
     if (val.dim() > kSlangTorchTensorMaxDim)
         throw std::runtime_error(std::string(name).append(": number of dimensions exceeds limit (").append(std::to_string(kSlangTorchTensorMaxDim)).append(")").c_str());
 
+    bool isEmpty = true;
     for (int i = 0; i < val.dim(); ++i)
     {
         res.strides[i] = val.stride(i) * elementSize;
         res.sizes[i] = val.size(i);
+        if (res.sizes[i] > 0)
+            isEmpty = false;
     }
-    if (!res.data)
+
+    if (!res.data && !isEmpty)
         throw std::runtime_error(std::string(name).append(": data pointer is invalid.").c_str());
+
     return res;
 }
 

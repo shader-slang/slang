@@ -537,6 +537,7 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_GLSLAtomicUintType:
         sb << "AtomicCounter";
+        break;
     case kIROp_RaytracingAccelerationStructureType:
         sb << "RayTracingAccelerationStructure";
         break;
@@ -652,7 +653,7 @@ IRInst* getRootAddr(IRInst* addr)
     return addr;
 }
 
-IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain)
+IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes)
 {
     for (;;)
     {
@@ -661,6 +662,8 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain)
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
             outAccessChain.add(addr->getOperand(1));
+            if (outTypes)
+                outTypes->add(addr->getFullType());
             addr = addr->getOperand(0);
             continue;
         default:
@@ -669,6 +672,8 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain)
         break;
     }
     outAccessChain.reverse();
+    if (outTypes)
+        outTypes->reverse();
     return addr;
 }
 
@@ -872,18 +877,21 @@ IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IR
     IRBuilder loopBuilder = *builder;
     auto loopHeadBlock = loopBuilder.emitBlock();
     loopBodyBlock = loopBuilder.emitBlock();
+    auto ifBreakBlock = loopBuilder.emitBlock();
     loopBreakBlock = loopBuilder.emitBlock();
     auto loopContinueBlock = loopBuilder.emitBlock();
     builder->emitLoop(loopHeadBlock, loopBreakBlock, loopHeadBlock, 1, &initVal);
     loopBuilder.setInsertInto(loopHeadBlock);
     auto loopParam = loopBuilder.emitParam(initVal->getFullType());
     auto cmpResult = loopBuilder.emitLess(loopParam, finalVal);
-    loopBuilder.emitIfElse(cmpResult, loopBodyBlock, loopBreakBlock, loopBreakBlock);
+    loopBuilder.emitIfElse(cmpResult, loopBodyBlock, ifBreakBlock, ifBreakBlock);
     loopBuilder.setInsertInto(loopBodyBlock);
     loopBuilder.emitBranch(loopContinueBlock);
     loopBuilder.setInsertInto(loopContinueBlock);
     auto newParam = loopBuilder.emitAdd(loopParam->getFullType(), loopParam, loopBuilder.getIntValue(loopBuilder.getIntType(), 1));
     loopBuilder.emitBranch(loopHeadBlock, 1, &newParam);
+    loopBuilder.setInsertInto(ifBreakBlock);
+    loopBuilder.emitBranch(loopBreakBlock);
     return loopParam;
 }
 
@@ -1544,6 +1552,27 @@ void hoistInstOutOfASMBlocks(IRBlock* block)
     }
 }
 
+IRType* getSPIRVSampledElementType(IRInst* sampledType)
+{
+    auto sampledElementType = getVectorElementType((IRType*)sampledType);
+    if (sampledElementType->getOp() == kIROp_HalfType)
+    {
+        IRBuilder builder(sampledType);
+        sampledElementType = builder.getBasicType(BaseType::Float);
+    }
+    return sampledElementType;
+}
+
+IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t)
+{
+    if (auto orignalVectorType = as<IRVectorType>(originalVectorType))
+    {
+        IRBuilder builder(originalVectorType);
+        return builder.getVectorType(t, orignalVectorType->getElementCount());
+    }
+    return t;
+}
+
 IRParam* getParamAt(IRBlock* block, UIndex ii)
 {
     UIndex index = 0;
@@ -1722,5 +1751,41 @@ IRType* dropNormAttributes(IRType* const t)
     return t;
 }
 
+void verifyComputeDerivativeGroupModifiers(
+    DiagnosticSink* sink,
+    SourceLoc errorLoc,
+    bool quadAttr,
+    bool linearAttr,
+    IRNumThreadsDecoration* numThreadsDecor)
+{
+    if (!numThreadsDecor)
+        return;
+
+    if (quadAttr && linearAttr)
+    {
+        sink->diagnose(errorLoc, Diagnostics::onlyOneOfDerivativeGroupLinearOrQuadCanBeSet);
+    }
+
+    IRIntegerValue x = 1;
+    IRIntegerValue y = 1;
+    IRIntegerValue z = 1;
+    if (numThreadsDecor->getX())
+        x = numThreadsDecor->getX()->getValue();
+    if (numThreadsDecor->getY())
+        y = numThreadsDecor->getY()->getValue();
+    if (numThreadsDecor->getZ())
+        z = numThreadsDecor->getZ()->getValue();
+
+    if (quadAttr)
+    {
+        if (x % 2 != 0 || y % 2 != 0)
+            sink->diagnose(errorLoc, Diagnostics::derivativeGroupQuadMustBeMultiple2ForXYThreads);
+    }
+    else if (linearAttr)
+    {
+        if ((x * y * z) % 4 != 0)
+            sink->diagnose(errorLoc, Diagnostics::derivativeGroupLinearMustBeMultiple4ForTotalThreadCount);
+    }
+}
 
 }
