@@ -40,11 +40,11 @@ public:
 
     void uploadBufferDataImpl(IBufferResource* buffer, Offset offset, Size size, void* data);
 
-    Result bindRootShaderObjectImpl(VkPipelineBindPoint bindPoint);
+    Result bindRootShaderObjectImpl(RootShaderObjectImpl* rootShaderObject, VkPipelineBindPoint bindPoint);
 
     Result setPipelineStateImpl(IPipelineState* state, IShaderObject** outRootObject);
 
-    Result setPipelineStateWithRootObjectImpl(IPipelineState* state, IShaderObject* inObject);
+    Result setPipelineStateWithRootObjectImpl(IPipelineState* state, IShaderObject* rootObject);
 
     Result bindRenderState(VkPipelineBindPoint pipelineBindPoint);
 };

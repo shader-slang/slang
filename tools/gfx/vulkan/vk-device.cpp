@@ -2409,8 +2409,9 @@ Result DeviceImpl::createMutableShaderObject(
 
 Result DeviceImpl::createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
 {
-    RefPtr<MutableRootShaderObject> result =
-        new MutableRootShaderObject(this, static_cast<ShaderProgramBase*>(program));
+    RefPtr<MutableRootShaderObjectImpl> result = new MutableRootShaderObjectImpl();
+    auto programImpl = static_cast<ShaderProgramImpl*>(program);
+    SLANG_RETURN_ON_FAIL(result->init(this, programImpl->m_rootObjectLayout));
     returnComPtr(outObject, result);
     return SLANG_OK;
 }
