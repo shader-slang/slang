@@ -57,6 +57,8 @@ protected:
 
     void emitFuncParamLayoutImpl(IRInst* param);
 
+    virtual void _emitType(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
+
     void _emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
     void _emitHLSLTextureType(IRTextureTypeBase* texType);
