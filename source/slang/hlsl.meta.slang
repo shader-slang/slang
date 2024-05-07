@@ -6471,7 +6471,7 @@ T exp10(T x)
     {
     case metal: __intrinsic_asm "exp10";
     default:
-        const T ln10 = T(2.30258509299); // ln(10)
+        const T ln10 = T(2.302585092994045901); // ln(10)
         return exp(x * ln10);
     }
 }
@@ -7096,7 +7096,7 @@ T frexp(T x, out int exp)
     case cuda: __intrinsic_asm "$P_frexp($0, $1)";
     case glsl: __intrinsic_asm "frexp";
     case hlsl: __intrinsic_asm "frexp";
-    case metal: __intrinsic_asm "frexp($0, *$1)";
+    case metal: __intrinsic_asm "frexp($0, *($1))";
     case spirv: return spirv_asm {
         result:$$T = OpExtInst glsl450 Frexp $x &exp
     };
@@ -7112,7 +7112,7 @@ vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
     {
     case glsl: __intrinsic_asm "frexp";
     case hlsl: __intrinsic_asm "frexp";
-    case metal: __intrinsic_asm "frexp($0, *$1)";
+    case metal: __intrinsic_asm "frexp($0, *($1))";
     case spirv: return spirv_asm {
         result:$$vector<T, N> = OpExtInst glsl450 Frexp $x &exp
     };
@@ -9299,7 +9299,7 @@ T modf(T x, out T ip)
     case cuda: __intrinsic_asm "$P_modf($0, $1)";
     case hlsl: __intrinsic_asm "modf";
     case glsl: __intrinsic_asm "modf";
-    case metal: __intrinsic_asm "modf($0, *$1)";
+    case metal: __intrinsic_asm "modf($0, *($1))";
     case spirv: return spirv_asm {
         result:$$T = OpExtInst glsl450 Modf $x &ip
     };
@@ -9315,7 +9315,7 @@ vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
     {
     case hlsl: __intrinsic_asm "modf";
     case glsl: __intrinsic_asm "modf";
-    case metal: __intrinsic_asm "modf($0, *$1)";
+    case metal: __intrinsic_asm "modf($0, *($1))";
     case spirv: return spirv_asm {
         result:$$vector<T,N> = OpExtInst glsl450 Modf $x &ip
     };
@@ -9663,12 +9663,18 @@ T nextafter(T x, T y)
         if (isnan(x)) return x;
         if (isnan(y)) return y;
         if (x == y) return y;
-        T dir = ((x < y) ? T(1) : -T(1));
         if (T is half)
-            return x + dir * __realCast<T>(bit_cast<half>(uint16_t(1)));
+        {
+            T delta = __realCast<T>(bit_cast<half>(uint16_t(1)));
+            return x + ((x < y) ? delta : -delta);
+        }
         if (T is float)
-            return x + dir * __realCast<T>(bit_cast<float>(uint32_t(1)));
-        return x + dir * __realCast<T>(bit_cast<double>(uint64_t(1)));
+        {
+            T delta = __realCast<T>(bit_cast<float>(uint32_t(1)));
+            return x + ((x < y) ? delta : -delta);
+        }
+        T delta = __realCast<T>(bit_cast<double>(uint64_t(1)));
+        return x + ((x < y) ? delta : -delta);
     }
 }
 
@@ -10538,6 +10544,7 @@ void sincos(T x, out T s, out T c)
     case cuda: __intrinsic_asm "$P_sincos($0, $1, $2)";
     case hlsl: __intrinsic_asm "sincos";
     case metal:
+        //__intrinsic_asm "*($1) = sincos($0, *($2))";
         s = __sincos_metal(x, c);
         return;
     default:
@@ -10556,6 +10563,7 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
     {
     case hlsl: __intrinsic_asm "sincos";
     case metal:
+        //__intrinsic_asm "*($1) = sincos($0, *($2))";
         s = __sincos_metal(x, c);
         return;
     default:

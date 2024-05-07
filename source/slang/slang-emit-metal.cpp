@@ -298,24 +298,26 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
 void MetalSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
+    emitSimpleTypeImpl(elementType);
+
     switch (elementType->getOp())
     {
-    case kIROp_FloatType:  m_writer->emit("float");  break;
-    case kIROp_HalfType:   m_writer->emit("half");   break;
-    case kIROp_BoolType:   m_writer->emit("bool");   break;
-    case kIROp_Int8Type:   m_writer->emit("char");   break;
-    case kIROp_UInt8Type:  m_writer->emit("uchar");  break;
-    case kIROp_Int16Type:  m_writer->emit("short");  break;
-    case kIROp_UInt16Type: m_writer->emit("ushort"); break;
-    case kIROp_IntType:    m_writer->emit("int");    break;
-    case kIROp_UIntType:   m_writer->emit("uint");   break;
-    case kIROp_Int64Type:  m_writer->emit("long");   break;
-    case kIROp_UInt64Type: m_writer->emit("ulong");  break;
-    }
-
-    if (elementCount > 1)
-    {
-        m_writer->emit(elementCount);
+    case kIROp_FloatType:
+    case kIROp_HalfType:
+    case kIROp_BoolType:
+    case kIROp_Int8Type:
+    case kIROp_UInt8Type:
+    case kIROp_Int16Type:
+    case kIROp_UInt16Type:
+    case kIROp_IntType:
+    case kIROp_UIntType:
+    case kIROp_Int64Type:
+    case kIROp_UInt64Type:
+        if (elementCount > 1)
+        {
+            m_writer->emit(elementCount);
+        }
+        break;
     }
 }
 
