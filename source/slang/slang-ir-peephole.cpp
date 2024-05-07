@@ -18,6 +18,7 @@ struct PeepholeContext : InstPassBase
     bool removeOldInst = true;
     bool isInGeneric = false;
     bool isPrelinking = false;
+    bool isPostInlining = false;
 
     TargetProgram* targetProgram;
 
@@ -250,6 +251,22 @@ struct PeepholeContext : InstPassBase
 
         switch (inst->getOp())
         {
+        case kIROp_AlignOf:
+            if (isPostInlining && inst->getDataType()->getOp() == kIROp_IntType)
+            {
+                if (as<IRParam>(inst->getOperand(0)->getDataType()))
+                    break;
+                auto type = inst->getDataType();
+                IRSizeAndAlignment sizeAlignment;
+                getNaturalSizeAndAlignment(targetProgram->getOptionSet(), type, &sizeAlignment);
+                IRBuilder builder(module);
+                builder.setInsertBefore(inst);
+                auto stride = builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
+                inst->replaceUsesWith(stride);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
         case kIROp_GetResultError:
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultError)
             {
@@ -1123,6 +1140,7 @@ bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizat
     PeepholeContext context = PeepholeContext(module);
     context.targetProgram = target;
     context.isPrelinking = options.isPrelinking;
+    context.isPostInlining = options.isPostInlining;
     return context.processModule();
 }
 
