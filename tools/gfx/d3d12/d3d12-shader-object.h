@@ -285,8 +285,7 @@ protected:
 class MutableRootShaderObjectImpl : public RootShaderObjectImpl
 {
 public:
-    // Override default reference counting behavior to disable lifetime management via ComPtr.
-    // Root objects are managed by command buffer and does not need to be freed by the user.
+    // Enable reference counting.
     SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return ShaderObjectBase::addRef(); }
     SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return ShaderObjectBase::release(); }
 };
