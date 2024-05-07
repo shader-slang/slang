@@ -205,10 +205,6 @@ public:
     RefPtr<ShaderObjectLayoutImpl> m_specializedLayout;
 };
 
-class MutableShaderObjectImpl
-    : public MutableShaderObject<MutableShaderObjectImpl, ShaderObjectLayoutImpl>
-{};
-
 class EntryPointShaderObject : public ShaderObjectImpl
 {
     typedef ShaderObjectImpl Super;
@@ -274,8 +270,8 @@ class MutableRootShaderObjectImpl : public RootShaderObjectImpl
 {
 public:
     // Enable reference counting.
-    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return ShaderObjectBase::addRef(); }
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return ShaderObjectBase::release(); }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return ShaderObjectImpl::addRef(); }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return ShaderObjectImpl::release(); }
 };
 
 } // namespace vk

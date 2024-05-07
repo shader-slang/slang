@@ -2400,8 +2400,8 @@ Result DeviceImpl::createMutableShaderObject(
 {
     auto layoutImpl = static_cast<ShaderObjectLayoutImpl*>(layout);
 
-    RefPtr<MutableShaderObjectImpl> result = new MutableShaderObjectImpl();
-    SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
+    RefPtr<ShaderObjectImpl> result;
+    SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(this, layoutImpl, result.writeRef()));
     returnComPtr(outObject, result);
 
     return SLANG_OK;
