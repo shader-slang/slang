@@ -542,7 +542,7 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    peepholeOptimize(nullptr, irModule, PeepholeOptimizationOptions::getPostInlining());
+    peepholeOptimize(targetProgram, irModule, PeepholeOptimizationOptions::getPostInlining());
     // On non-HLSL targets, there isn't an implementation of `AppendStructuredBuffer`
     // and `ConsumeStructuredBuffer` types, so we lower them into normal struct types
     // of `RWStructuredBuffer` typed fields now.

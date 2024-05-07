@@ -254,11 +254,13 @@ struct PeepholeContext : InstPassBase
         case kIROp_AlignOf:
             if (isPostInlining && inst->getDataType()->getOp() == kIROp_IntType)
             {
-                if (as<IRParam>(inst->getOperand(0)->getDataType()))
+                auto alignOfInst = as<IRAlignOf>(inst);
+                auto baseType = alignOfInst->getBaseOp()->getDataType();
+                if (as<IRParam>(baseType))
                     break;
-                auto type = inst->getDataType();
+
                 IRSizeAndAlignment sizeAlignment;
-                getNaturalSizeAndAlignment(targetProgram->getOptionSet(), type, &sizeAlignment);
+                getNaturalSizeAndAlignment(targetProgram->getOptionSet(), baseType, &sizeAlignment);
                 IRBuilder builder(module);
                 builder.setInsertBefore(inst);
                 auto stride = builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
