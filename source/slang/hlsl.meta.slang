@@ -12486,6 +12486,13 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
+    case glsl:
+    case spirv:
+        matrix<T,N,M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveActive$(opName.hlslName)(expr[i]);
+        return result;
     default:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     }
@@ -12551,6 +12558,13 @@ matrix<T, N, M> WaveActive$(opName)(matrix<T, N, M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveActive$(opName)";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveActive$(opName)(expr[i]);
+        return result;
     default:
         return WaveMask$(opName)(WaveGetActiveMask(), expr);
     }
@@ -12638,6 +12652,13 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveActive$(opName.hlslName)(expr[i]);
+        return result;
     default:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     }
@@ -12777,6 +12798,9 @@ uint WaveActiveCountBits(bool value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveActiveCountBits";
+    case glsl:
+    case spirv:
+        return _WaveCountBits(WaveActiveBallot(value));
     default:
         return WaveMaskCountBits(WaveGetActiveMask(), value);
     }
@@ -12945,6 +12969,12 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WavePrefixProduct";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WavePrefixProduct(expr[i]);
+        return result;
     default:
         return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
     }
@@ -13015,6 +13045,12 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WavePrefixSum";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WavePrefixSum(expr[i]);
+        return result;
     default:
         return WaveMaskPrefixSum(WaveGetActiveMask(), expr);
     }
@@ -13065,6 +13101,12 @@ matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveReadLaneFirst(expr[i]);
+        return result;
     default:
         return WaveMaskReadLaneFirst(WaveGetActiveMask(), expr);
     }
@@ -13124,6 +13166,12 @@ matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
     {
     case cuda: __intrinsic_asm "_waveShuffleMultiple(_getActiveMask(), $0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveBroadcastLaneAt(value[i], lane);
+        return result;
     default:
         return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, lane);
     }
@@ -13179,6 +13227,12 @@ matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
     {
     case cuda: __intrinsic_asm "_waveShuffleMultiple(_getActiveMask(), $0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
+    case glsl:
+    case spirv:
+        matrix<T,N,M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveReadLaneAt(value[i], lane);
+        return result;
     default:
         return WaveMaskReadLaneAt(WaveGetActiveMask(), value, lane);
     }
@@ -13298,6 +13352,14 @@ uint4 WaveMatch(T value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
+    case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformPartitionedNV;
+            OpExtension "SPV_NV_shader_subgroup_partitioned";
+            OpGroupNonUniformPartitionNV $$uint4 result $value
+        };
     default:
         return WaveMaskMatch(WaveGetActiveMask(), value);
     }
@@ -13310,6 +13372,14 @@ uint4 WaveMatch(vector<T,N> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
+    case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformPartitionedNV;
+            OpExtension "SPV_NV_shader_subgroup_partitioned";
+            OpGroupNonUniformPartitionNV $$uint4 result $value
+        };
     default:
         return WaveMaskMatch(WaveGetActiveMask(), value);
     }
@@ -13322,6 +13392,14 @@ uint4 WaveMatch(matrix<T,N,M> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
+    case glsl:
+    case cuda:
+    case spirv:
+        uint4 result = uint4(0xFFFFFFFF);
+        [ForceUnroll]
+        for (int i = 0; i < N; i++)
+            result &= WaveMatch(value[i]);
+        return result;
     default:
         return WaveMaskMatch(WaveGetActiveMask(), value);
     }

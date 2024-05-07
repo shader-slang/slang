@@ -487,7 +487,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-variable-scope-correction.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-vk-invert-y.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-wrap-global-context.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir.h" />
     <ClInclude Include="..\..\..\source\slang\slang-language-server-ast-lookup.h" />
@@ -720,7 +719,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-variable-scope-correction.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-vk-invert-y.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-wrap-global-context.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-language-server-ast-lookup.cpp" />
