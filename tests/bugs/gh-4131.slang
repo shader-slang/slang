@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
+//CHECK: OpEntryPoint
+
 struct TypeA {
   float4 placeholder;
 };
