@@ -108,7 +108,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load";
         default:
-            return __byteAddressBufferLoad<uint>(this, location, 1);
+            return __byteAddressBufferLoad<uint>(this, location, 0);
         }
     }
 
@@ -137,7 +137,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, 1);
+            return __byteAddressBufferLoad<uint2>(this, location, 0);
         }
     }
 
@@ -166,7 +166,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, 1);
+            return __byteAddressBufferLoad<uint3>(this, location, 0);
         }
     }
 
@@ -195,7 +195,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, 1);
+            return __byteAddressBufferLoad<uint4>(this, location, 0);
         }
     }
 
@@ -219,7 +219,7 @@ struct ByteAddressBuffer
     [ForceInline]
     T Load<T>(int location)
     {
-        return __byteAddressBufferLoad<T>(this, location, 1);
+        return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
     [__readNone]
@@ -2957,7 +2957,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load";
         default:
-            return __byteAddressBufferLoad<uint>(this, location, 1);
+            return __byteAddressBufferLoad<uint>(this, location, 0);
         }
     }
 
@@ -2986,7 +2986,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, 1);
+            return __byteAddressBufferLoad<uint2>(this, location, 0);
         }
     }
 
@@ -3015,7 +3015,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, 1);
+            return __byteAddressBufferLoad<uint3>(this, location, 0);
         }
     }
 
@@ -3044,7 +3044,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, 1);
+            return __byteAddressBufferLoad<uint4>(this, location, 0);
         }
     }
 
@@ -3069,7 +3069,7 @@ struct $(item.name)
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     T Load<T>(int location)
     {
-        return __byteAddressBufferLoad<T>(this, location, 1);
+        return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
     [__NoSideEffect]
@@ -3932,7 +3932,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store";
         default:
-            __byteAddressBufferStore(this, address, 1, value);
+            __byteAddressBufferStore(this, address, 0, value);
         }
     }
 
@@ -3956,7 +3956,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store2";
         default:
-            __byteAddressBufferStore(this, address, 1, value);
+            __byteAddressBufferStore(this, address, 0, value);
         }
     }
 
@@ -3980,7 +3980,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store3";
         default:
-            __byteAddressBufferStore(this, address, 1, value);
+            __byteAddressBufferStore(this, address, 0, value);
         }
     }
 
@@ -4004,7 +4004,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store4";
         default:
-            __byteAddressBufferStore(this, address, 1, value);
+            __byteAddressBufferStore(this, address, 0, value);
         }
     }
 
@@ -4023,7 +4023,7 @@ ${{{{
     [ForceInline]
     void Store<T>(int offset, T value)
     {
-        __byteAddressBufferStore(this, offset, 1, value);
+        __byteAddressBufferStore(this, offset, 0, value);
     }
 
     [ForceInline]
