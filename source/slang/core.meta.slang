@@ -2561,6 +2561,9 @@ attribute_syntax [nonmutating] : NonmutatingAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [constref] : ConstRefAttribute;
 
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [__ref] : RefAttribute;
+
     /// Indicates that a function computes its result as a function of its arguments without loading/storing any memory or other state.
     ///
     /// This is equivalent to the LLVM `readnone` function attribute.
