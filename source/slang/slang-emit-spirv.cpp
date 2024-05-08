@@ -4077,12 +4077,31 @@ struct SPIRVEmitContext
             return;
         if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
         {
+            // If inst has a pointer type with PhysicalStorageBuffer address space,
+            // emit AliasedPointer decoration.
             emitOpDecorate(
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,
                 varInst,
                 (as<IRVar>(inst) ? SpvDecorationAliasedPointer : SpvDecorationAliased)
             );
+        }
+        else
+        {
+            // If the pointee type is a pointer with StorageBuffer address space,
+            // we also want to emit AliasedPointer decoration.
+            ptrType = as<IRPtrType>(ptrType->getValueType());
+            if (!ptrType)
+                return;
+            if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+            {
+                emitOpDecorate(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    varInst,
+                    (as<IRVar>(inst) ? SpvDecorationAliasedPointer : SpvDecorationAliased)
+                );
+            }
         }
     }
 
