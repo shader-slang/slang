@@ -1,7 +1,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 typedef DifferentialPair<float> dpfloat;
@@ -117,5 +117,65 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         outputBuffer[9] = res.d.x; // Expected: 0.1
         outputBuffer[10] = res.d.y; // Expected: 0.3
         outputBuffer[11] = res.d.z; // Expected: 0.2
+    }
+
+    // Reverse-mode tests.
+    
+    // x in between max and min
+    {
+        dpfloat dpx = dpfloat(2.0, 0.0);
+        dpfloat dpmax = dpfloat(3.0, 0.0);
+        dpfloat dpmin = dpfloat(1.0, 0.0);
+
+        bwd_diff(_clamp)(dpx, dpmin, dpmax, 1.0);
+        
+        outputBuffer[12] = dpx.d; // Expected: 1.0
+        outputBuffer[13] = dpmin.d; // Expected: 0.0
+        outputBuffer[14] = dpmax.d; // Expected: 0.0
+    }
+
+    // x less than min
+    {
+        dpfloat dpx = dpfloat(0.5, 0.0);
+        dpfloat dpmax = dpfloat(3.0, 0.0);
+        dpfloat dpmin = dpfloat(1.0, 0.0);
+
+        bwd_diff(_clamp)(dpx, dpmin, dpmax, 1.0);
+        
+        outputBuffer[15] = dpx.d; // Expected: 0.0
+        outputBuffer[16] = dpmin.d; // Expected: 1.0
+        outputBuffer[17] = dpmax.d; // Expected: 0.0
+    }
+
+    // x greater than max
+    {
+        dpfloat dpx = dpfloat(4.0, 0.0);
+        dpfloat dpmax = dpfloat(3.0, 0.0);
+        dpfloat dpmin = dpfloat(1.0, 0.0);
+
+        bwd_diff(_clamp)(dpx, dpmin, dpmax, 1.0);
+        
+        outputBuffer[18] = dpx.d; // Expected: 0.0
+        outputBuffer[19] = dpmin.d; // Expected: 0.0
+        outputBuffer[20] = dpmax.d; // Expected: 1.0
+    }
+
+    // float3 version with one in between, one below min and one above max.
+    {
+        dpfloat3 dpx = dpfloat3(float3(2.0, 0.5, 4.0), float3(0.0, 0.0, 0.0));
+        dpfloat3 dpmax = dpfloat3(float3(3.0, 3.0, 3.0), float3(0.0, 0.0, 0.0));
+        dpfloat3 dpmin = dpfloat3(float3(1.0, 1.0, 1.0), float3(0.0, 0.0, 0.0));
+
+        bwd_diff(_clamp3)(dpx, dpmin, dpmax, float3(0.1, 0.2, 0.3));
+        
+        outputBuffer[21] = dpx.d.x; // Expected: 0.1
+        outputBuffer[22] = dpx.d.y; // Expected: 0.0
+        outputBuffer[23] = dpx.d.z; // Expected: 0.0
+        outputBuffer[24] = dpmin.d.x; // Expected: 0.0
+        outputBuffer[25] = dpmin.d.y; // Expected: 0.2
+        outputBuffer[26] = dpmin.d.z; // Expected: 0.0
+        outputBuffer[27] = dpmax.d.x; // Expected: 0.0
+        outputBuffer[28] = dpmax.d.y; // Expected: 0.0
+        outputBuffer[29] = dpmax.d.z; // Expected: 0.3
     }
 }
