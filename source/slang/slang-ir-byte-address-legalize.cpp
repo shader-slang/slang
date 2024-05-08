@@ -132,15 +132,15 @@ struct ByteAddressBufferLegalizationContext
         // is invalid in the IR), so we will defensively
         // leave the code along in that case.
         //
-        if(!legalLoad)
-            return;
+if (!legalLoad)
+return;
 
-        // If we were able to generate a legal load operation,
-        // then the value it yields can be used to fully
-        // replace the previous illegal load.
-        //
-        load->replaceUsesWith(legalLoad);
-        load->removeAndDeallocate();
+// If we were able to generate a legal load operation,
+// then the value it yields can be used to fully
+// replace the previous illegal load.
+//
+load->replaceUsesWith(legalLoad);
+load->removeAndDeallocate();
     }
 
     bool isTypeLegalForByteAddressLoadStore(IRType* type)
@@ -155,21 +155,21 @@ struct ByteAddressBufferLegalizationContext
         // operations, then that means *no* type is
         // legal for byte-address load/store.
         //
-        if(m_options.translateToStructuredBufferOps)
+        if (m_options.translateToStructuredBufferOps)
             return false;
 
         // Basic types are usually legal to load/store
         // on all targets.
         //
-        if( auto basicType = as<IRBasicType>(type) )
+        if (auto basicType = as<IRBasicType>(type))
         {
             // On targets that require translation to
             // make all load/store use `uint` values,
             // any scalar type that isn't `uint` is
             // illegal.
             //
-            if( m_options.useBitCastFromUInt
-                && basicType->getBaseType() != BaseType::UInt )
+            if (m_options.useBitCastFromUInt
+                && basicType->getBaseType() != BaseType::UInt)
             {
                 return false;
             }
@@ -182,13 +182,13 @@ struct ByteAddressBufferLegalizationContext
 
         // Vector types also depend on the options.
         //
-        if( as<IRVectorType>(type) )
+        if (as<IRVectorType>(type))
         {
             // If we've been asked to scalarize all
             // vector load/store, then we need to
             // tread them as illegal.
             //
-            if(m_options.scalarizeVectorLoadStore)
+            if (m_options.scalarizeVectorLoadStore)
                 return false;
 
         }
@@ -207,20 +207,32 @@ struct ByteAddressBufferLegalizationContext
     }
 
     // Helper function to check if the alignment value passed is
-    // divisible by the offset + immediateOffset in order to ensure
-    // if the load or store can be vectorized.
-    bool isAligned(IRInst* offset, IRIntegerValue immediateOffset, IRInst* alignment)
+    // divisible by the offset at which the resource is indexed into
+    // in order to ensure if the load or store can be vectorized.
+    bool isAligned(IRInst* offset, IRInst* unknownOffsetAlignment, IRIntegerValue alignmentVal)
     {
-        // Check whether the given composite resource type is aligned to the baseOffset
-        if (auto alignInst = as<IRIntLit>(alignment))
+        if (auto baseOffsetVal = as<IRIntLit>(offset))
         {
-            // For normal `Load` / `Store` the alignment is set to 0, preventing the issue of
-            // wide vectorized `Load` / `Store` operations.
+            // If the offset is a constant known at compile time, simply check if it aligned to
+            // the elementsize of the underlying resource.
+            return (baseOffsetVal->getValue() % alignmentVal) == 0;
+        }
+        else if (auto alignInst = as<IRIntLit>(unknownOffsetAlignment))
+        {
+            // If the offset is not known during compile time, use the explicit align
+            // field of the overloaded `Load` or `Store` operation or vi `LoadAligned`
+            // or `StoreAligned` function.
+            //
+            // Unaligned `Load`s or `Store`s are identified with 0 alignment, to prevent
+            // accidentally issuing a wide vectorized operations.
             if (!alignInst->getValue())
                 return false;
 
-            if (auto baseOffsetVal = as<IRIntLit>(offset))
-                return ((baseOffsetVal->getValue() + immediateOffset) % (alignInst->getValue())) == 0;
+            if ((alignInst->getValue() % alignmentVal) == 0)
+            {
+                return true;
+            }
+            //TODO: Throw an error if this condition is not true.
         }
         return false;
     }
@@ -336,7 +348,11 @@ struct ByteAddressBufferLegalizationContext
             {
                 // Emit an aligned load operation on an array when using a LoadAligned inst.
                 // Else, fallback to scalarizing the loads.
-                if (!isAligned(baseOffset, immediateOffset, alignment))
+                IRSizeAndAlignment elementLayout;
+                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), arrayType->getElementType(), &elementLayout));
+                IRIntegerValue elementStride = elementLayout.getStride();
+                auto alignmentVal = elementStride * elementCountInst->getValue();
+                if (!isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
                 {
                     return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeArray, arrayType->getElementType(), elementCountInst->getValue(), alignment);
                 }
@@ -401,7 +417,11 @@ struct ByteAddressBufferLegalizationContext
             {
                 // Emit an aligned vector load operation when using a LoadAligned inst.
                 // Else, fallback to scalarizing the loads.
-                if (m_options.scalarizeVectorLoadStore || !isAligned(baseOffset, immediateOffset, alignment))
+                IRSizeAndAlignment elementLayout;
+                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), vecType->getElementType(), &elementLayout));
+                IRIntegerValue elementStride = elementLayout.getStride();
+                auto alignmentVal = elementStride * elementCountInst->getValue();
+                if (m_options.scalarizeVectorLoadStore || !isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
                 {
                     return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue(), alignment);
                 }
@@ -919,7 +939,11 @@ struct ByteAddressBufferLegalizationContext
             {
                 // Emit an aligned store operation on an array when using a StoreAligned inst.
                 // Else, fallback to scalarizing the stores.
-                if (!isAligned(baseOffset, immediateOffset, alignment))
+                IRSizeAndAlignment elementLayout;
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), arrayType->getElementType(), &elementLayout));
+                IRIntegerValue elementStride = elementLayout.getStride();
+                auto alignmentVal = elementStride * elementCountInst->getValue();
+                if (!isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
                 {
                     return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, arrayType->getElementType(), elementCountInst->getValue(), alignment);
                 }
@@ -973,7 +997,12 @@ struct ByteAddressBufferLegalizationContext
             {
                 // Emit an aligned vector store operation when using a StoreAligned inst.
                 // Else, fallback to scalarizing the stores.
-                if (m_options.scalarizeVectorLoadStore || !isAligned(baseOffset, immediateOffset, alignment))
+
+                IRSizeAndAlignment elementLayout;
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), vecType->getElementType(), &elementLayout));
+                IRIntegerValue elementStride = elementLayout.getStride();
+                auto alignmentVal = elementStride * elementCountInst->getValue();
+                if (m_options.scalarizeVectorLoadStore || !isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
                 {
                     return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue(), alignment);
                 }
