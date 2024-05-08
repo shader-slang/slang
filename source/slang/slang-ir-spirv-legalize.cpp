@@ -1215,7 +1215,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     break;
                 case kIROp_GetElementPtr:
                     // Ignore when `NonUniformResourceIndex` is not on the index
-                    if (user->getOperand(0)->getOp() != kIROp_NonUniformResourceIndex)
+                    if (user->getOperand(1) == inst)
                     {
                         // Replace gep(pArray, nonUniformRes(x)), into nonUniformRes(gep(pArray, x))
                         newUser = builder.emitElementAddress(user->getFullType(), user->getOperand(0), inst->getOperand(0));
@@ -1282,12 +1282,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 IRBuilder builder(operand);
                 builder.addSPIRVNonUniformResourceDecoration(operand);
-                inst->replaceUsesWith(operand);
-                inst->removeAndDeallocate();
             }
+            inst->replaceUsesWith(operand);
+            inst->removeAndDeallocate();
         }
-        nonUniformResourceIndexInst->removeFromParent();
-        m_instsToRemove.add(nonUniformResourceIndexInst);
     }
 
     void processImageSubscript(IRImageSubscript* subscript)
