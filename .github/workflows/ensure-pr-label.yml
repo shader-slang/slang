@@ -5,10 +5,11 @@ on:
     types: [opened, labeled, unlabeled, synchronize]
 
 jobs:
-  runs-on: ubuntu-latest
-  steps:
-  - uses: jesusvasquez333/verify-pr-label-action@v1.4.0
-    with:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
-      valid-labels: 'pr: non-breaking, pr: breaking change, pr: new feature'
-      pull-request-number: '${{ github.event.pull_request.number }}'
+  verify-pr-label:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: jesusvasquez333/verify-pr-label-action@v1.4.0
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        valid-labels: 'pr: non-breaking, pr: breaking change, pr: new feature'
+        pull-request-number: '${{ github.event.pull_request.number }}'
