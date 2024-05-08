@@ -3,6 +3,7 @@
 
 #include "../core/slang-com-object.h"
 #include "../../slang-com-helper.h"
+#include "../../slang-com-ptr.h"
 
 namespace SlangCapture
 {
@@ -24,48 +25,43 @@ namespace SlangCapture
         ISlangUnknown* getInterface(const Slang::Guid& guid);
 
         // ISlangCastable
-        virtual SLANG_NO_THROW void* castAs(const Slang::Guid& guid) override;
+        virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Slang::Guid& guid) override;
 
         // ISlangFileSystem
-        virtual SLANG_NO_THROW SlangResult loadFile(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
                 char const*     path,
                 ISlangBlob** outBlob) override;
 
         // ISlangFileSystemExt
-        virtual SLANG_NO_THROW SlangResult getFileUniqueIdentity(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(
             const char* path,
             ISlangBlob** outUniqueIdentity) override;
 
-        virtual SLANG_NO_THROW SlangResult calcCombinedPath(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
             SlangPathType fromPathType,
             const char* fromPath,
             const char* path,
             ISlangBlob** pathOut) override;
 
-        virtual SLANG_NO_THROW SlangResult getPathType(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
             const char* path,
             SlangPathType* pathTypeOut) override;
 
-        virtual SLANG_NO_THROW SlangResult getPath(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(
             PathKind kind,
             const char* path,
             ISlangBlob** outPath) override;
 
-        virtual SLANG_NO_THROW void clearCache() override;
+        virtual SLANG_NO_THROW void SLANG_MCALL clearCache() override;
 
-        virtual SLANG_NO_THROW SlangResult enumeratePathContents(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(
             const char* path,
             FileSystemContentsCallBack callback,
             void* userData) override;
 
-        virtual SLANG_NO_THROW OSPathKind getOSPathKind() override;
+        virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() override;
     private:
-        // We should release the actual file system, because if 1) the file
-        // system is provided by user, we will increment the ref-count;
-        // 2) if the file system is created by slang, we will transfer the ownership
-        // from Linkage to FileSystemCapture, in both cases, we should release the
-        // 'm_actualFileSystem'.
-        ISlangFileSystemExt* m_actualFileSystem = nullptr;
+        Slang::ComPtr<ISlangFileSystemExt> m_actualFileSystem;
 };
 
 }

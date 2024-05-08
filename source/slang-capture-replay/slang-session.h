@@ -19,80 +19,80 @@ namespace SlangCapture
         explicit SessionCapture(slang::ISession* session);
         ~SessionCapture();
 
-        SLANG_NO_THROW slang::IGlobalSession* getGlobalSession() override;
-        SLANG_NO_THROW slang::IModule* loadModule(
+        SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL getGlobalSession() override;
+        SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModule(
             const char* moduleName,
             slang::IBlob**     outDiagnostics = nullptr) override;
-        slang::IModule* loadModuleFromBlob(
+        slang::IModule* SLANG_MCALL loadModuleFromBlob(
             const char* moduleName,
             const char* path,
             slang::IBlob* source,
             ModuleBlobType blobType,
             slang::IBlob** outDiagnostics = nullptr);
-        SLANG_NO_THROW slang::IModule* loadModuleFromIRBlob(
+        SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromIRBlob(
             const char* moduleName,
             const char* path,
             slang::IBlob* source,
             slang::IBlob** outDiagnostics = nullptr) override;
-        SLANG_NO_THROW slang::IModule* loadModuleFromSource(
+        SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSource(
             const char* moduleName,
             const char* path,
             slang::IBlob* source,
             slang::IBlob** outDiagnostics = nullptr) override;
-        SLANG_NO_THROW slang::IModule* loadModuleFromSourceString(
+        SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSourceString(
             const char* moduleName,
             const char* path,
             const char* string,
             slang::IBlob** outDiagnostics = nullptr) override;
-        SLANG_NO_THROW SlangResult createCompositeComponentType(
+        SLANG_NO_THROW SlangResult SLANG_MCALL createCompositeComponentType(
             slang::IComponentType* const*   componentTypes,
             SlangInt                        componentTypeCount,
             slang::IComponentType**         outCompositeComponentType,
             ISlangBlob**                    outDiagnostics = nullptr) override;
-        SLANG_NO_THROW slang::TypeReflection* specializeType(
+        SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL specializeType(
             slang::TypeReflection*          type,
             slang::SpecializationArg const* specializationArgs,
             SlangInt                        specializationArgCount,
             ISlangBlob**                    outDiagnostics = nullptr) override;
-        SLANG_NO_THROW slang::TypeLayoutReflection* getTypeLayout(
+        SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getTypeLayout(
             slang::TypeReflection* type,
             SlangInt               targetIndex = 0,
             slang::LayoutRules     rules = slang::LayoutRules::Default,
             ISlangBlob**    outDiagnostics = nullptr) override;
-        SLANG_NO_THROW slang::TypeReflection* getContainerType(
+        SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL getContainerType(
             slang::TypeReflection* elementType,
             slang::ContainerType containerType,
             ISlangBlob** outDiagnostics = nullptr) override;
-        SLANG_NO_THROW slang::TypeReflection* getDynamicType() override;
-        SLANG_NO_THROW SlangResult getTypeRTTIMangledName(
+        SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL getDynamicType() override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTypeRTTIMangledName(
             slang::TypeReflection* type,
             ISlangBlob** outNameBlob) override;
-        SLANG_NO_THROW SlangResult getTypeConformanceWitnessMangledName(
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessMangledName(
             slang::TypeReflection* type,
             slang::TypeReflection* interfaceType,
             ISlangBlob** outNameBlob) override;
-        SLANG_NO_THROW SlangResult getTypeConformanceWitnessSequentialID(
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
             slang::TypeReflection* type,
             slang::TypeReflection* interfaceType,
             uint32_t*              outId) override;
-        SLANG_NO_THROW SlangResult createTypeConformanceComponentType(
+        SLANG_NO_THROW SlangResult SLANG_MCALL createTypeConformanceComponentType(
             slang::TypeReflection* type,
             slang::TypeReflection* interfaceType,
             slang::ITypeConformance** outConformance,
             SlangInt conformanceIdOverride,
             ISlangBlob** outDiagnostics) override;
-        SLANG_NO_THROW SlangResult createCompileRequest(
+        SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(
             SlangCompileRequest**   outCompileRequest) override;
-        SLANG_NO_THROW SlangInt getLoadedModuleCount() override;
-        SLANG_NO_THROW slang::IModule* getLoadedModule(SlangInt index) override;
-        SLANG_NO_THROW bool isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) override;
+        SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() override;
+        SLANG_NO_THROW slang::IModule* SLANG_MCALL getLoadedModule(SlangInt index) override;
+        SLANG_NO_THROW bool SLANG_MCALL isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) override;
 
     private:
         SLANG_FORCE_INLINE slang::ISession* asExternal(SessionCapture* session)
         {
             return static_cast<slang::ISession*>(session);
         }
-        slang::ISession* m_actualSession = nullptr;
+        Slang::ComPtr<slang::ISession> m_actualSession;
     };
 }
 

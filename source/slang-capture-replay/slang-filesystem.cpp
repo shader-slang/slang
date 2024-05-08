@@ -7,7 +7,7 @@ namespace SlangCapture
         : m_actualFileSystem(fileSystem)
     {
         assert(m_actualFileSystem);
-        slangCaptureLog(LogLevel::Verbose, "FileSystemCapture: %p\n", m_actualFileSystem);
+        slangCaptureLog(LogLevel::Verbose, "%s: %p\n", __func__, m_actualFileSystem.get());
     }
 
     FileSystemCapture::~FileSystemCapture()
@@ -31,7 +31,7 @@ namespace SlangCapture
                 char const*     path,
                 ISlangBlob** outBlob)
     {
-        slangCaptureLog(LogLevel::Verbose, "%p: %s, :%s\n", m_actualFileSystem, "FileSystemCapture:loadFile", path);
+        slangCaptureLog(LogLevel::Verbose, "%p: %s, :%s\n", m_actualFileSystem.get(), __func__, path);
         SlangResult res = m_actualFileSystem->loadFile(path, outBlob);
         return res;
     }
@@ -40,7 +40,7 @@ namespace SlangCapture
         const char* path,
         ISlangBlob** outUniqueIdentity)
     {
-        slangCaptureLog(LogLevel::Verbose, "%p: %s :\"%s\"\n", m_actualFileSystem, "FileSystemCapture:getFileUniqueIdentity", path);
+        slangCaptureLog(LogLevel::Verbose, "%p: %s :\"%s\"\n", m_actualFileSystem.get(), __func__, path);
         SlangResult res = m_actualFileSystem->getFileUniqueIdentity(path, outUniqueIdentity);
         return res;
     }
@@ -51,7 +51,7 @@ namespace SlangCapture
         const char* path,
         ISlangBlob** pathOut)
     {
-        slangCaptureLog(LogLevel::Verbose, "%p: %s, :%s\n", m_actualFileSystem, "FileSystemCapture:calcCombinedPath", path);
+        slangCaptureLog(LogLevel::Verbose, "%p: %s, :%s\n", m_actualFileSystem.get(), __func__, path);
         SlangResult res = m_actualFileSystem->calcCombinedPath(fromPathType, fromPath, path, pathOut);
         return res;
     }
@@ -60,7 +60,7 @@ namespace SlangCapture
         const char* path,
         SlangPathType* pathTypeOut)
     {
-        slangCaptureLog(LogLevel::Verbose, "%p: %s, :%s\n", m_actualFileSystem, "FileSystemCapture:getPathType", path);
+        slangCaptureLog(LogLevel::Verbose, "%p: %s, :%s\n", m_actualFileSystem.get(), __func__, path);
         SlangResult res = m_actualFileSystem->getPathType(path, pathTypeOut);
         return res;
     }
@@ -70,14 +70,14 @@ namespace SlangCapture
         const char* path,
         ISlangBlob** outPath)
     {
-        slangCaptureLog(LogLevel::Verbose, "%p: %s, :%s\n", m_actualFileSystem, "FileSystemCapture:getPath", path);
+        slangCaptureLog(LogLevel::Verbose, "%p: %s, :%s\n", m_actualFileSystem.get(), __func__, path);
         SlangResult res = m_actualFileSystem->getPath(kind, path, outPath);
         return res;
     }
 
     SLANG_NO_THROW void FileSystemCapture::clearCache()
     {
-        slangCaptureLog(LogLevel::Verbose, "%p: %s\n", m_actualFileSystem, "FileSystemCapture:clearCache");
+        slangCaptureLog(LogLevel::Verbose, "%p: %s\n", m_actualFileSystem.get(), __func__);
         m_actualFileSystem->clearCache();
     }
 
@@ -86,14 +86,14 @@ namespace SlangCapture
         FileSystemContentsCallBack callback,
         void* userData)
     {
-        slangCaptureLog(LogLevel::Verbose, "%p: %s, :%s\n", m_actualFileSystem, "FileSystemCapture:enumeratePathContents", path);
+        slangCaptureLog(LogLevel::Verbose, "%p: %s, :%s\n", m_actualFileSystem.get(), __func__, path);
         SlangResult res = m_actualFileSystem->enumeratePathContents(path, callback, userData);
         return res;
     }
 
     SLANG_NO_THROW OSPathKind FileSystemCapture::getOSPathKind()
     {
-        slangCaptureLog(LogLevel::Verbose, "%p: %s\n", m_actualFileSystem, "FileSystemCapture:getOSPathKind");
+        slangCaptureLog(LogLevel::Verbose, "%p: %s\n", m_actualFileSystem.get(), __func__);
         OSPathKind pathKind = m_actualFileSystem->getOSPathKind();
         return pathKind;
     }

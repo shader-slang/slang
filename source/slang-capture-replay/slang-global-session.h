@@ -64,7 +64,7 @@ namespace SlangCapture
                 return static_cast<slang::IGlobalSession*>(session);
             }
 
-            slang::IGlobalSession* m_actualGlobalSession = nullptr;
+            Slang::ComPtr<slang::IGlobalSession> m_actualGlobalSession;
     };
 } // namespace Slang
 

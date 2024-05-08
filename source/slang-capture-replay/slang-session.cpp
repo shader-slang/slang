@@ -26,7 +26,7 @@ namespace SlangCapture
 
     SLANG_NO_THROW slang::IGlobalSession* SessionCapture::getGlobalSession()
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::getGlobalSession");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         slang::IGlobalSession* pGlobalSession = m_actualSession->getGlobalSession();
         return pGlobalSession;
     }
@@ -35,7 +35,7 @@ namespace SlangCapture
         const char* moduleName,
         slang::IBlob**     outDiagnostics)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::loadModule");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         slang::IModule* pModule = m_actualSession->loadModule(moduleName, outDiagnostics);
         return pModule;
     }
@@ -46,7 +46,7 @@ namespace SlangCapture
         slang::IBlob* source,
         slang::IBlob** outDiagnostics)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::loadModuleFromIRBlob");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         slang::IModule* pModule = m_actualSession->loadModuleFromIRBlob(moduleName, path, source, outDiagnostics);
         return pModule;
     }
@@ -57,7 +57,7 @@ namespace SlangCapture
         slang::IBlob* source,
         slang::IBlob** outDiagnostics)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::loadModuleFromSource");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         slang::IModule* pModule = m_actualSession->loadModuleFromSource(moduleName, path, source, outDiagnostics);
         return pModule;
     }
@@ -68,7 +68,7 @@ namespace SlangCapture
         const char* string,
         slang::IBlob** outDiagnostics)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::loadModuleFromSourceString");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         slang::IModule* pModule = m_actualSession->loadModuleFromSourceString(moduleName, path, string, outDiagnostics);
         return pModule;
     }
@@ -79,7 +79,7 @@ namespace SlangCapture
         slang::IComponentType**         outCompositeComponentType,
         ISlangBlob**                    outDiagnostics)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::createCompositeComponentType");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         SlangResult result = m_actualSession->createCompositeComponentType(componentTypes, componentTypeCount, outCompositeComponentType, outDiagnostics);
         return result;
     }
@@ -90,7 +90,7 @@ namespace SlangCapture
         SlangInt                        specializationArgCount,
         ISlangBlob**                    outDiagnostics)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::specializeType");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         slang::TypeReflection* pTypeReflection = m_actualSession->specializeType(type, specializationArgs, specializationArgCount, outDiagnostics);
         return pTypeReflection;
     }
@@ -101,7 +101,7 @@ namespace SlangCapture
         slang::LayoutRules     rules,
         ISlangBlob**    outDiagnostics)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::getTypeLayout");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         slang::TypeLayoutReflection* pTypeLayoutReflection = m_actualSession->getTypeLayout(type, targetIndex, rules, outDiagnostics);
         return pTypeLayoutReflection;
     }
@@ -111,14 +111,14 @@ namespace SlangCapture
         slang::ContainerType containerType,
         ISlangBlob** outDiagnostics)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::getContainerType");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         slang::TypeReflection* pTypeReflection = m_actualSession->getContainerType(elementType, containerType, outDiagnostics);
         return pTypeReflection;
     }
 
     SLANG_NO_THROW slang::TypeReflection* SessionCapture::getDynamicType()
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::getDynamicType");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         slang::TypeReflection* pTypeReflection = m_actualSession->getDynamicType();
         return pTypeReflection;
     }
@@ -127,7 +127,7 @@ namespace SlangCapture
         slang::TypeReflection* type,
         ISlangBlob** outNameBlob)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::getTypeRTTIMangledName");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         SlangResult result = m_actualSession->getTypeRTTIMangledName(type, outNameBlob);
         return result;
     }
@@ -137,7 +137,7 @@ namespace SlangCapture
         slang::TypeReflection* interfaceType,
         ISlangBlob** outNameBlob)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::getTypeConformanceWitnessMangledName");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         SlangResult result = m_actualSession->getTypeConformanceWitnessMangledName(type, interfaceType, outNameBlob);
         return result;
     }
@@ -147,7 +147,7 @@ namespace SlangCapture
         slang::TypeReflection* interfaceType,
         uint32_t*              outId)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::getTypeConformanceWitnessSequentialID");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         SlangResult result = m_actualSession->getTypeConformanceWitnessSequentialID(type, interfaceType, outId);
         return result;
     }
@@ -159,7 +159,7 @@ namespace SlangCapture
         SlangInt conformanceIdOverride,
         ISlangBlob** outDiagnostics)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::createTypeConformanceComponentType");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         SlangResult result = m_actualSession->createTypeConformanceComponentType(type, interfaceType, outConformance, conformanceIdOverride, outDiagnostics);
         return result;
     }
@@ -167,28 +167,28 @@ namespace SlangCapture
     SLANG_NO_THROW SlangResult SessionCapture::createCompileRequest(
         SlangCompileRequest**   outCompileRequest)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::createCompileRequest");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         SlangResult result = m_actualSession->createCompileRequest(outCompileRequest);
         return result;
     }
 
     SLANG_NO_THROW SlangInt SessionCapture::getLoadedModuleCount()
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::getLoadedModuleCount");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         SlangInt count = m_actualSession->getLoadedModuleCount();
         return count;
     }
 
     SLANG_NO_THROW slang::IModule* SessionCapture::getLoadedModule(SlangInt index)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::getLoadedModule");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         slang::IModule* pModule = m_actualSession->getLoadedModule(index);
         return pModule;
     }
 
     SLANG_NO_THROW bool SessionCapture::isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob)
     {
-        slangCaptureLog(LogLevel::Verbose, "%s\n", "SessionCapture::isBinaryModuleUpToDate");
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __func__);
         bool result = m_actualSession->isBinaryModuleUpToDate(modulePath, binaryModuleBlob);
         return result;
     }
