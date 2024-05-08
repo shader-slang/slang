@@ -1,0 +1,121 @@
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<float> outputBuffer;
+
+typedef DifferentialPair<float> dpfloat;
+typedef DifferentialPair<float2> dpfloat2;
+typedef DifferentialPair<float3> dpfloat3;
+
+[Differentiable]
+float _clamp(float x, float min, float max)
+{
+    return clamp(x, min, max);
+}
+
+[Differentiable]
+float3 _clamp3(float3 x, float3 min, float3 max)
+{
+    return clamp(x, min, max);
+}
+
+[Differentiable]
+float _clamp_equiv(float x, float _min, float _max)
+{
+    return max(_min, min(_max, x));
+}
+
+[Differentiable]
+float3 _clamp_equiv(float3 x, float3 _min, float3 _max)
+{
+    return max(_min, min(_max, x));
+}
+
+[numthreads(1, 1, 1)]
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
+    // x in between max and min
+    {
+        dpfloat dpx = dpfloat(2.0, 0.1);
+        dpfloat dpmax = dpfloat(3.0, 0.2);
+        dpfloat dpmin = dpfloat(1.0, 0.3);
+
+        dpfloat res = fwd_diff(_clamp)(dpx, dpmin, dpmax);
+        outputBuffer[0] = res.d; // Expected: 0.1
+    }
+
+    // x less than min
+    {
+        dpfloat dpx = dpfloat(0.5, 0.1);
+        dpfloat dpmax = dpfloat(3.0, 0.2);
+        dpfloat dpmin = dpfloat(1.0, 0.3);
+
+        dpfloat res = fwd_diff(_clamp)(dpx, dpmin, dpmax);
+        outputBuffer[1] = res.d; // Expected: 0.3
+    }
+
+    // x greater than max
+    {
+        dpfloat dpx = dpfloat(4.0, 0.1);
+        dpfloat dpmax = dpfloat(3.0, 0.2);
+        dpfloat dpmin = dpfloat(1.0, 0.3);
+
+        dpfloat res = fwd_diff(_clamp)(dpx, dpmin, dpmax);
+        outputBuffer[2] = res.d; // Expected: 0.2
+    }
+
+    // float3 version with one in between, one below min and one above max.
+    {
+        dpfloat3 dpx = dpfloat3(float3(2.0, 0.5, 4.0), float3(0.1, 0.1, 0.1));
+        dpfloat3 dpmax = dpfloat3(float3(3.0, 3.0, 3.0), float3(0.2, 0.2, 0.2));
+        dpfloat3 dpmin = dpfloat3(float3(1.0, 1.0, 1.0), float3(0.3, 0.3, 0.3));
+
+        dpfloat3 res = fwd_diff(_clamp3)(dpx, dpmin, dpmax);
+        outputBuffer[3] = res.d.x; // Expected: 0.1
+        outputBuffer[4] = res.d.y; // Expected: 0.3
+        outputBuffer[5] = res.d.z; // Expected: 0.2
+    }
+
+    // Equivalent to the first test, but with a different implementation of clamp
+    {
+        dpfloat dpx = dpfloat(2.0, 0.1);
+        dpfloat dpmax = dpfloat(3.0, 0.2);
+        dpfloat dpmin = dpfloat(1.0, 0.3);
+
+        dpfloat res = fwd_diff(_clamp_equiv)(dpx, dpmin, dpmax);
+        outputBuffer[6] = res.d; // Expected: 0.1
+    }
+
+    // Equivalent to the second test, but with a different implementation of clamp
+    {
+        dpfloat dpx = dpfloat(0.5, 0.1);
+        dpfloat dpmax = dpfloat(3.0, 0.2);
+        dpfloat dpmin = dpfloat(1.0, 0.3);
+
+        dpfloat res = fwd_diff(_clamp_equiv)(dpx, dpmin, dpmax);
+        outputBuffer[7] = res.d; // Expected: 0.3
+    }
+
+    // Equivalent to the third test, but with a different implementation of clamp
+    {
+        dpfloat dpx = dpfloat(4.0, 0.1);
+        dpfloat dpmax = dpfloat(3.0, 0.2);
+        dpfloat dpmin = dpfloat(1.0, 0.3);
+
+        dpfloat res = fwd_diff(_clamp_equiv)(dpx, dpmin, dpmax);
+        outputBuffer[8] = res.d; // Expected: 0.2
+    }
+
+    // Equivalent to the fourth test, but with a different implementation of clamp
+    {
+        dpfloat3 dpx = dpfloat3(float3(2.0, 0.5, 4.0), float3(0.1, 0.1, 0.1));
+        dpfloat3 dpmax = dpfloat3(float3(3.0, 3.0, 3.0), float3(0.2, 0.2, 0.2));
+        dpfloat3 dpmin = dpfloat3(float3(1.0, 1.0, 1.0), float3(0.3, 0.3, 0.3));
+
+        dpfloat3 res = fwd_diff(_clamp_equiv)(dpx, dpmin, dpmax);
+        outputBuffer[9] = res.d.x; // Expected: 0.1
+        outputBuffer[10] = res.d.y; // Expected: 0.3
+        outputBuffer[11] = res.d.z; // Expected: 0.2
+    }
+}
