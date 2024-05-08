@@ -321,114 +321,6 @@ public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
     return atan2(y, x);
 }
 
-__generic<T : __BuiltinFloatingPointType>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
-public T asinh(T x)
-{
-    __target_switch
-    {
-    case cpp: __intrinsic_asm "$P_asinh($0)";
-    case cuda: __intrinsic_asm "$P_asinh($0)";
-    case glsl: __intrinsic_asm "asinh";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Asinh $x
-    };
-    default:
-        return log(x + sqrt(x * x + T(1)));
-    }
-}
-
-__generic<T : __BuiltinFloatingPointType, let N:int>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
-public vector<T,N> asinh(vector<T,N> x)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "asinh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 Asinh $x
-    };
-    default:
-        VECTOR_MAP_UNARY(T, N, asinh, x);
-    }
-}
-
-__generic<T : __BuiltinFloatingPointType>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
-public T acosh(T x)
-{
-    __target_switch
-    {
-    case cpp: __intrinsic_asm "$P_acosh($0)";
-    case cuda: __intrinsic_asm "$P_acosh($0)";
-    case glsl: __intrinsic_asm "acosh";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Acosh $x
-    };
-    default:
-        return log(x + sqrt( x * x - T(1)));
-    }
-}
-
-__generic<T : __BuiltinFloatingPointType, let N:int>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
-public vector<T,N> acosh(vector<T,N> x)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "acosh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 Acosh $x
-    };
-    default:
-        VECTOR_MAP_UNARY(T, N, acosh, x);
-    }
-}
-
-__generic<T : __BuiltinFloatingPointType>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
-public T atanh(T x)
-{
-    __target_switch
-    {
-    case cpp: __intrinsic_asm "$P_atanh($0)";
-    case cuda: __intrinsic_asm "$P_atanh($0)";
-    case glsl: __intrinsic_asm "atanh";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Atanh $x
-    };
-    default:
-        return T(0.5) * log((T(1) + x) / (T(1) - x));
-    }
-}
-
-__generic<T : __BuiltinFloatingPointType, let N:int>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-public vector<T,N> atanh(vector<T,N> x)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "atanh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 Atanh $x
-    };
-    default:
-        VECTOR_MAP_UNARY(T, N, atanh, x);
-    }
-}
-
 //
 // Section 8.2. Exponential Functions
 //
@@ -458,66 +350,19 @@ public vector<T, N> inversesqrt(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
 public T roundEven(T x)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "roundEven";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 RoundEven $x
-    };
-    default:
-        T nearest = round(x);
-
-        // Check if the value is exactly halfway between two integers
-        if (abs(x - nearest) == T(0.5))
-        {
-            // If halfway, choose the even number
-            if (mod(nearest, T(2)) != T(0))
-            {
-                // If the nearest number is odd,
-                // move to the closest even number
-                nearest -= ((x < nearest) ? T(1) : T(-1));
-            }
-        }
-        return nearest;
-    }
+    return rint(x);
 }
 
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
 public vector<T,N> roundEven(vector<T,N> x)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "roundEven";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 RoundEven $x
-    };
-    default:
-        VECTOR_MAP_UNARY(T, N, roundEven, x);
-    }
-}
-
-__generic<T : __BuiltinFloatingPointType>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-public T fract(T x)
-{
-    return frac(x);
-}
-
-__generic<T : __BuiltinFloatingPointType, let N:int>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-public vector<T, N> fract(vector<T, N> x)
-{
-    return frac(x);
+    return rint(x);
 }
 
 __generic<T : __BuiltinFloatingPointType>
@@ -822,44 +667,6 @@ uint float2half(float f)
         e = ((((u & uint(0x7f800000)) - uint(0x38000000)) >> uint(13)) & uint(0x7c00));
     }
     return (s | e | m);
-}
-
-__generic<T : __BuiltinFloatingPointType, E : __BuiltinIntegerType>
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-public T ldexp(T x, E exp)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "ldexp";
-    case glsl: __intrinsic_asm "ldexp";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Ldexp $x $exp
-    };
-    default:
-        return ldexp(x, __floatCast<T>(exp));
-    }
-}
-
-__generic<T : __BuiltinFloatingPointType, E : __BuiltinIntegerType, let N : int>
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-public vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "ldexp";
-    case glsl: __intrinsic_asm "ldexp";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 Ldexp $x $exp
-    };
-    default:
-        vector<T,N> temp;
-        [ForceUnroll]
-        for (int i = 0; i < N; ++i)
-            temp[i] = __floatCast<T>(exp[i]);
-        return ldexp(x, temp);
-    }
 }
 
 [__readNone]

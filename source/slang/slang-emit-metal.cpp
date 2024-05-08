@@ -298,35 +298,27 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
 void MetalSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    // In some cases we *need* to use the built-in syntax sugar for vector types,
-    // so we will try to emit those whenever possible.
-    //
-    if( elementCount >= 1 && elementCount <= 4 )
+    emitSimpleTypeImpl(elementType);
+
+    switch (elementType->getOp())
     {
-        switch( elementType->getOp() )
+    case kIROp_FloatType:
+    case kIROp_HalfType:
+    case kIROp_BoolType:
+    case kIROp_Int8Type:
+    case kIROp_UInt8Type:
+    case kIROp_Int16Type:
+    case kIROp_UInt16Type:
+    case kIROp_IntType:
+    case kIROp_UIntType:
+    case kIROp_Int64Type:
+    case kIROp_UInt64Type:
+        if (elementCount > 1)
         {
-        case kIROp_FloatType:
-        case kIROp_IntType:
-        case kIROp_UIntType:
-        // TODO: There are more types that need to be covered here
-            emitType(elementType);
             m_writer->emit(elementCount);
-            return;
-
-        default:
-            break;
         }
+        break;
     }
-
-    // As a fallback, we will use the `vector<...>` type constructor,
-    // although we should not expect to run into types that don't
-    // have a sugared form.
-    //
-    m_writer->emit("vector<");
-    emitType(elementType);
-    m_writer->emit(",");
-    m_writer->emit(elementCount);
-    m_writer->emit(">");
 }
 
 void MetalSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* decl)
@@ -494,7 +486,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_ParameterBlockType:
         case kIROp_ConstantBufferType:
         {
-            emitType((IRType*)type->getOperand(0));
+            emitSimpleTypeImpl((IRType*)type->getOperand(0));
             m_writer->emit(" constant*");
             return;
         }
@@ -607,11 +599,17 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
 }
 
-void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] IRIntegerValue addressSpace)
+void MetalSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 {
-    if (as<IRGroupSharedRate>(rate))
+    switch (type->getOp())
     {
-        m_writer->emit("threadgroup ");
+    case kIROp_ArrayType:
+        emitSimpleType(type);
+        emitDeclarator(declarator);
+        break;
+    default:
+        Super::_emitType(type, declarator);
+        break;
     }
 }
 
@@ -796,6 +794,34 @@ void MetalSourceEmitter::emitPackOffsetModifier(IRInst* varInst, IRType* valueTy
     // We emit packoffset as a semantic in `emitSemantic`, so nothing to do here.
 }
 
+void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace)
+{
+    if (as<IRGroupSharedRate>(rate))
+    {
+        m_writer->emit("threadgroup ");
+        return;
+    }
+
+    switch ((AddressSpace)addressSpace)
+    {
+    case AddressSpace::GroupShared:
+        m_writer->emit("threadgroup ");
+        break;
+    case AddressSpace::Uniform:
+        m_writer->emit("constant ");
+        break;
+    case AddressSpace::Global:
+        m_writer->emit("device ");
+        break;
+    case AddressSpace::ThreadLocal:
+        m_writer->emit("thread ");
+        break;
+    default:
+        break;
+    }
+}
+
+
 void MetalSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
     SLANG_UNUSED(varInst);
@@ -821,6 +847,7 @@ void MetalSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 void MetalSourceEmitter::emitFrontMatterImpl(TargetRequest*)
 {
     m_writer->emit("#include <metal_stdlib>\n");
+    m_writer->emit("#include <metal_math>\n");
     m_writer->emit("using namespace metal;\n");
 }
 

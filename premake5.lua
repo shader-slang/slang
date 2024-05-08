@@ -1609,6 +1609,8 @@ if enableEmbedStdLib then
             "source/slang/slang-lookup-glslstd450.cpp",
             "source/slang/slang-lookup-capability-defs.cpp"
         }
+        addSourceDir("source/slang-capture-replay")
+
         if not targetInfo.isWindows then
             links { "pthread" }
         end
@@ -1732,6 +1734,7 @@ standardProject("slang", "source/slang")
         "source/slang/slang-generated-capability-defs-impl.h",
     }
 
+    addSourceDir("source/slang-capture-replay")
     --
     -- The most challenging part of building `slang` is that we need
     -- to invoke generators such as slang-cpp-extractor and slang-generate
