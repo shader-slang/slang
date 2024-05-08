@@ -420,6 +420,11 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     Super::emitSimpleValueImpl(inst);
 }
 
+void MetalSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
+{
+    emitType(type, name);
+}
+
 void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->getOp())

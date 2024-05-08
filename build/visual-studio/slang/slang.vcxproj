@@ -461,6 +461,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-simplify-cfg.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-simplify-for-emit.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-single-return.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-address-space.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-arrays.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-dispatch.h" />
@@ -697,6 +698,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-simplify-cfg.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-simplify-for-emit.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-single-return.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-address-space.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-arrays.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-dispatch.cpp" />
