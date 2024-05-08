@@ -211,10 +211,15 @@ struct ByteAddressBufferLegalizationContext
     bool isAligned(IRInst* offset, IRIntegerValue immediateOffset, IRInst* alignment)
     {
         // Check whether the given composite resource type is aligned to the baseOffset
-        if (auto alignInst = as<IRIntLit>(alignment)) {
-            if (auto baseOffsetVal = as<IRIntLit>(offset)) {
+        if (auto alignInst = as<IRIntLit>(alignment))
+        {
+            // For normal load/ store the alignment is set to 0, preventing the issue of
+            // wide load / store operations.
+            if (!alignInst->getValue())
+                return false;
+
+            if (auto baseOffsetVal = as<IRIntLit>(offset))
                 return ((baseOffsetVal->getValue() + immediateOffset) % (alignInst->getValue())) == 0;
-            }
         }
         return false;
     }
