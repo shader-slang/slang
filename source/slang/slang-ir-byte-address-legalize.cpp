@@ -206,15 +206,16 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    // Helper function to check if an IRInst is an Integer Literal
-    // TODO: Is there a better place for this generic function?
+    // Helper function to check if the alignment value passed is
+    // divisible by the offset + immediateOffset in order to ensure
+    // if the load or store can be vectorized.
     bool isAligned(IRInst* offset, IRIntegerValue immediateOffset, IRInst* alignment)
     {
         // Check whether the given composite resource type is aligned to the baseOffset
         if (auto alignInst = as<IRIntLit>(alignment))
         {
-            // For normal load/ store the alignment is set to 0, preventing the issue of
-            // wide load / store operations.
+            // For normal `Load` / `Store` the alignment is set to 0, preventing the issue of
+            // wide vectorized `Load` / `Store` operations.
             if (!alignInst->getValue())
                 return false;
 
