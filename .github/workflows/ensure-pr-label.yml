@@ -1,7 +1,7 @@
 name: Verify PR Labels
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, labeled, unlabeled, synchronize]
 
 jobs:
@@ -12,4 +12,4 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         valid-labels: 'pr: non-breaking, pr: breaking change, pr: new feature'
-        pull-request-number: '${{ github.event.pull_request.number }}'
+        disable-reviews: true
