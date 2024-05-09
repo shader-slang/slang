@@ -428,24 +428,24 @@ INST(ImageStore, imageStore, 3, 0)
 
 // Load (almost) arbitrary-type data from a byte-address buffer
 //
-// %dst = byteAddressBufferLoad(%buffer, %offset, %aligned)
+// %dst = byteAddressBufferLoad(%buffer, %offset, %alignment)
 //
 // where
 // - `buffer` is a value of some `ByteAddressBufferTypeBase` type
 // - `offset` is an `int`
-// - `aligned` is a `bool`
+// - `alignment` is an `int`
 // - `dst` is a value of some type containing only ordinary data
 //
 INST(ByteAddressBufferLoad, byteAddressBufferLoad, 3, 0)
 
 // Store (almost) arbitrary-type data to a byte-address buffer
 //
-// byteAddressBufferLoad(%buffer, %offset, %aligned, %src)
+// byteAddressBufferLoad(%buffer, %offset, %alignment, %src)
 //
 // where
 // - `buffer` is a value of some `ByteAddressBufferTypeBase` type
 // - `offset` is an `int`
-// - `aligned` is a `bool`
+// - `alignment` is an `int`
 // - `src` is a value of some type containing only ordinary data
 //
 INST(ByteAddressBufferStore, byteAddressBufferStore, 4, 0)
