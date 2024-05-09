@@ -2709,6 +2709,10 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     {
         return kParameterDirection_ConstRef;
     }
+    else if (parentDecl->hasModifier<RefAttribute>())
+    {
+        return kParameterDirection_Ref;
+    }
 
     // A `set` accessor on a property or subscript declaration
     // defaults to a mutable `this` parameter, but the programmer

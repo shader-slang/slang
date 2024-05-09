@@ -862,6 +862,13 @@ static void _lookUpInScopes(
                     //
                     thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
                 }
+                else if (funcDeclRef.getDecl()->hasModifier<RefAttribute>())
+                {
+                    // In a non-`static` method marked `[ref]` there is
+                    // an implicit `this` parameter that is mutable.
+                    //
+                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
+                }
                 else
                 {
                     // In all other cases, there is an implicit `this` parameter
