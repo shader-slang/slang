@@ -267,7 +267,7 @@ namespace Slang
                     }
                 }
             }
-            else if (auto defaultStmt = as<DefaultStmt>(sStmt))
+            else if (as<DefaultStmt>(sStmt))
             {
                 // check that there is at most one `default` clause
                 if (hasDefaultStmt)

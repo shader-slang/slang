@@ -421,6 +421,8 @@ __generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,
 // Allow real-number types to be cast into each other
 __intrinsic_op($(kIROp_FloatCast))
     T __realCast<T : __BuiltinRealType, U : __BuiltinRealType>(U val);
+__intrinsic_op($(kIROp_CastIntToFloat))
+    T __realCast<T : __BuiltinRealType, U : __BuiltinIntegerType>(U val);
 __intrinsic_op($(kIROp_IntCast))
     T __intCast<T : __BuiltinType, U : __BuiltinType>(U val);
 ${{{{
@@ -694,7 +696,8 @@ struct Ptr
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(int64_t val);
 
-    __subscript(int index) -> T
+    __generic<TInt : __BuiltinIntegerType>
+    __subscript(TInt index) -> T
     {
         __intrinsic_op($(kIROp_GetOffsetPtr))
         ref;
@@ -2558,6 +2561,9 @@ attribute_syntax [nonmutating] : NonmutatingAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [constref] : ConstRefAttribute;
 
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [__ref] : RefAttribute;
+
     /// Indicates that a function computes its result as a function of its arguments without loading/storing any memory or other state.
     ///
     /// This is equivalent to the LLVM `readnone` function attribute.
@@ -2569,6 +2575,7 @@ enum _AttributeTargets
     Struct = $( (int) UserDefinedAttributeTargets::Struct),
     Var = $( (int) UserDefinedAttributeTargets::Var),
     Function = $( (int) UserDefinedAttributeTargets::Function),
+    Param = $( (int) UserDefinedAttributeTargets::Param),
 };
 __attributeTarget(StructDecl)
 attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;

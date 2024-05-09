@@ -120,6 +120,8 @@ void ShaderCompilerUtil::Output::reset()
         spSetTargetProfile(slangRequest, 0, spFindProfile(out.session, input.profile.getBuffer()));
         if (options.generateSPIRVDirectly)
             spSetTargetFlags(slangRequest, 0, SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY);
+        else
+            spSetTargetFlags(slangRequest, 0, 0);
 
         slangRequest->setAllowGLSLInput(options.allowGLSL);
 
@@ -210,6 +212,14 @@ void ShaderCompilerUtil::Output::reset()
         }
 
         spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
+    }
+
+    if (options.generateSPIRVDirectly)
+    {
+        if (options.disableDebugInfo)
+            spSetDebugInfoLevel(slangRequest, SLANG_DEBUG_INFO_LEVEL_NONE);
+        else
+            spSetDebugInfoLevel(slangRequest, SLANG_DEBUG_INFO_LEVEL_STANDARD);
     }
 
     const SlangResult res = spCompile(slangRequest);

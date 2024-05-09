@@ -37,6 +37,7 @@ protected:
 
     virtual void emitMeshShaderModifiersImpl(IRInst* varInst) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
+    virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
     virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
@@ -56,6 +57,8 @@ protected:
     virtual bool doesTargetSupportPtrTypes() SLANG_OVERRIDE { return true; }
 
     void emitFuncParamLayoutImpl(IRInst* param);
+
+    virtual void _emitType(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
 
     void _emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 

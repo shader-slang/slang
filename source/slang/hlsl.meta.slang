@@ -5,9 +5,6 @@ typedef uint UINT;
 __intrinsic_op($(kIROp_RequireGLSLExtension))
 void __requireGLSLExtension(String extensionName);
 
-__intrinsic_op($(kIROp_FloatCast))
-T __floatCast<T, U>(U v);
-
 [sealed]
 interface IBufferDataLayout
 {
@@ -255,44 +252,84 @@ float __glsl_texture<TSampler, TCoord>(TSampler s, TCoord value)
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "texture($0, $1)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value);
+float __glsl_texture_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture($0, $1)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "texture($0, $1, $2)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_3d_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare);
+float __glsl_texture_3d_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture($0, $1, $2)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "textureOffset($0, $1, $2)")
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_offset<TSampler, TCoord, TOffset>( TSampler s, TCoord value, constexpr TOffset offset);
+float __glsl_texture_offset<TSampler, TCoord, TOffset>( TSampler s, TCoord value, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset($0, $1, $2)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "textureOffset($0, $1, $2)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset);
+float __glsl_texture_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset($0, $1, $2)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "textureLod($0, $1, 0)")
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_level_zero<TSampler, TCoord>(TSampler s, TCoord value);
+float __glsl_texture_level_zero<TSampler, TCoord>(TSampler s, TCoord value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, 0)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "textureLod($0, $1, 0)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_level_zero_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value);
+float __glsl_texture_level_zero_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, 0)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "textureLodOffset($0, $1, 0, $2)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_offset_level_zero<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset);
+float __glsl_texture_offset_level_zero<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLodOffset($0, $1, 0, $2)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "textureLodOffset($0, $1, 0, $2)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_offset_level_zero_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset);
+float __glsl_texture_offset_level_zero_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLodOffset($0, $1, 0, $2)";
+    }
+}
 
 [require(glsl, texture_sm_4_1)]
 float __glsl_texture<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value)
@@ -304,42 +341,82 @@ float __glsl_texture<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCo
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "texture($p, $2)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_1d_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value);
+float __glsl_texture_1d_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture($p, $2)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "texture($p, $2, $3)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_3d_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare);
+float __glsl_texture_3d_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture($p, $2, $3)";
+    }
+}
 
-__target_intrinsic(glsl, "textureOffset($p, $2, $3)")
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset);
+float __glsl_texture_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset($p, $2, $3)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "textureOffset($p, $2, $3)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset);
+float __glsl_texture_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset($p, $2, $3)";
+    }
+}
 
-__target_intrinsic(glsl, "textureLod($p, $2, 0)")
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_level_zero<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value);
+float __glsl_texture_level_zero<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($p, $2, 0)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "textureLod($p, $2, 0)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_level_zero_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value);
+float __glsl_texture_level_zero_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($p, $2, 0)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "textureLodOffset($p, $2, 0, $3)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_offset_level_zero<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset);
+float __glsl_texture_offset_level_zero<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLodOffset($p, $2, 0, $3)";
+    }
+}
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-__target_intrinsic(glsl, "textureLodOffset($p, $2, 0, $3)")
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_offset_level_zero_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset);
+float __glsl_texture_offset_level_zero_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLodOffset($p, $2, 0, $3)";
+    }
+}
 
 
 __generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
@@ -2264,9 +2341,15 @@ void __atomicAdd(RWByteAddressBuffer buf, uint offset, int64_t value, out int64_
     case hlsl: __intrinsic_asm "$0.InterlockedAdd64($1, $2, $3)";
     }
 }
-__target_intrinsic(hlsl, "$0.InterlockedAdd64($1, $2, $3)")
+
 [require(hlsl, atomic_hlsl_sm_6_6)]
-void __atomicAdd(RWByteAddressBuffer buf, uint offset, uint64_t value, out uint64_t originalValue);
+void __atomicAdd(RWByteAddressBuffer buf, uint offset, uint64_t value, out uint64_t originalValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "$0.InterlockedAdd64($1, $2, $3)";
+    }
+}
 
 // Int versions require glsl 4.30
 // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/atomicAdd.xhtml
@@ -2362,9 +2445,15 @@ void __cas(RWByteAddressBuffer buf, uint offset, in int64_t compare_value, in in
     case hlsl: __intrinsic_asm "$0.InterlockedCompareExchange64($1, $2, $3, $4)";
     }
 }
-__target_intrinsic(hlsl, "$0.InterlockedCompareExchange64($1, $2, $3, $4)")
+
 [require(hlsl, atomic_hlsl_sm_6_6)]
-void __cas(RWByteAddressBuffer buf, uint offset, in uint64_t compare_value, in uint64_t value, out uint64_t original_value);
+void __cas(RWByteAddressBuffer buf, uint offset, in uint64_t compare_value, in uint64_t value, out uint64_t original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "$0.InterlockedCompareExchange64($1, $2, $3, $4)";
+    }
+}
 
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
@@ -3950,74 +4039,138 @@ void abort();
 // Absolute value (HLSL SM 1.0)
 
 __generic<T : __BuiltinIntegerType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(cuda, "$P_abs($0)")
-__target_intrinsic(cpp, "$P_abs($0)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-T abs(T x);
-/*{
+T abs(T x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "abs";
+    case glsl: __intrinsic_asm "abs";
+    case cuda: __intrinsic_asm "$P_abs($0)";
+    case cpp: __intrinsic_asm "$P_abs($0)";
+    case spirv: return spirv_asm {
+        result:$$T = OpExtInst glsl450 SAbs $x
+    };
+    //default:
     // Note: this simple definition may not be appropriate for floating-point inputs
-    return x < 0 ? -x : x;
-}*/
+    // return x < 0 ? -x : x;
+    }
+}
 
 __generic<T : __BuiltinIntegerType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> abs(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(T, N, abs, x);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "abs";
+    case glsl: __intrinsic_asm "abs";
+    case spirv: return spirv_asm {
+        result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
+    };
+    default:
+        VECTOR_MAP_UNARY(T, N, abs, x);
+    }
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
-__target_intrinsic(hlsl)
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, abs, x);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "abs";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, abs, x);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(cuda, "$P_abs($0)")
-__target_intrinsic(cpp, "$P_abs($0)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-T abs(T x);
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T abs(T x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "abs";
+    case metal: __intrinsic_asm "abs";
+    case glsl: __intrinsic_asm "abs";
+    case cuda: __intrinsic_asm "$P_abs($0)";
+    case cpp: __intrinsic_asm "$P_abs($0)";
+    case spirv: return spirv_asm {
+        result:$$T = OpExtInst glsl450 FAbs $x;
+    };
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> abs(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(T, N, abs, x);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "abs";
+    case metal: __intrinsic_asm "abs";
+    case glsl: __intrinsic_asm "abs";
+    case spirv: return spirv_asm {
+        result:$$vector<T,N> = OpExtInst glsl450 FAbs $x;
+    };
+    default:
+        VECTOR_MAP_UNARY(T, N, abs, x);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(hlsl)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, abs, x);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "abs";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, abs, x);
+    }
 }
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T fabs(T x)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fabs";
+    default:
+        return abs(x);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T, N> fabs(vector<T, N> x)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fabs";
+    default:
+        return abs(x);
+    }
+}
+
 
 // Inverse cosine (HLSL SM 1.0)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T acos(T x)
 {
     __target_switch
@@ -4026,6 +4179,7 @@ T acos(T x)
     case cuda: __intrinsic_asm "$P_acos($0)";
     case glsl: __intrinsic_asm "acos";
     case hlsl: __intrinsic_asm "acos";
+    case metal: __intrinsic_asm "acos";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Acos $x
     };
@@ -4034,13 +4188,14 @@ T acos(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> acos(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "acos";
     case hlsl: __intrinsic_asm "acos";
+    case metal: __intrinsic_asm "acos";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Acos $x
     };
@@ -4051,7 +4206,7 @@ vector<T, N> acos(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> acos(matrix<T, N, M> x)
 {
     __target_switch
@@ -4062,9 +4217,51 @@ matrix<T, N, M> acos(matrix<T, N, M> x)
     }
 }
 
+// Inverse hyperbolic cosine
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+T acosh(T x)
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "$P_acosh($0)";
+    case cuda: __intrinsic_asm "$P_acosh($0)";
+    case glsl: __intrinsic_asm "acosh";
+    case metal: __intrinsic_asm "acosh";
+    case spirv: return spirv_asm {
+        OpExtInst $$T result glsl450 Acosh $x
+    };
+    default:
+        return log(x + sqrt( x * x - T(1)));
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+vector<T,N> acosh(vector<T,N> x)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "acosh";
+    case metal: __intrinsic_asm "acosh";
+    case spirv: return spirv_asm {
+        OpExtInst $$vector<T,N> result glsl450 Acosh $x
+    };
+    default:
+        VECTOR_MAP_UNARY(T, N, acosh, x);
+    }
+}
+
+
 // Test if all components are non-zero (HLSL SM 1.0)
 __generic<T : __BuiltinType>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 bool all(T x)
 {
     __target_switch
@@ -4072,6 +4269,8 @@ bool all(T x)
     default:
         __intrinsic_asm "bool($0)";
     case hlsl:
+        __intrinsic_asm "all";
+    case metal:
         __intrinsic_asm "all";
     case spirv:
         let zero = __default<T>();
@@ -4094,11 +4293,14 @@ bool all(T x)
 
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 bool all(vector<T,N> x)
 {
     __target_switch
     {
     case hlsl:
+        __intrinsic_asm "all";
+    case metal:
         __intrinsic_asm "all";
     case glsl:
         __intrinsic_asm "all(bvec$N0($0))";
@@ -4136,7 +4338,7 @@ bool all(vector<T,N> x)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 bool all(matrix<T,N,M> x)
 {
     __target_switch
@@ -4193,6 +4395,7 @@ int3 WorkgroupSize();
 
 __generic<T : __BuiltinType>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 bool any(T x)
 {
     __target_switch
@@ -4200,6 +4403,8 @@ bool any(T x)
     default:
         __intrinsic_asm "bool($0)";
     case hlsl:
+        __intrinsic_asm "any";
+    case metal:
         __intrinsic_asm "any";
     case spirv:
         let zero = __default<T>();
@@ -4221,11 +4426,14 @@ bool any(T x)
 
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 bool any(vector<T, N> x)
 {
     __target_switch
     {
     case hlsl:
+        __intrinsic_asm "any";
+    case metal:
         __intrinsic_asm "any";
     case glsl:
         __intrinsic_asm "any(bvec$N0($0))";
@@ -4280,15 +4488,23 @@ bool any(matrix<T, N, M> x)
 
 // Reinterpret bits as a double (HLSL SM 5.0)
 
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, "packDouble2x32(uvec2($0, $1))")
-__target_intrinsic(cpp, "$P_asdouble($0, $1)")
-__target_intrinsic(cuda, "$P_asdouble($0, $1)")
-__target_intrinsic(spirv, "%v = OpCompositeConstruct _type(uint2) resultId _0 _1; OpExtInst resultType resultId glsl450 59 %v")
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
-double asdouble(uint lowbits, uint highbits);
+double asdouble(uint lowbits, uint highbits)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "asdouble";
+    case glsl: __intrinsic_asm "packDouble2x32(uvec2($0, $1))";
+    case cpp: __intrinsic_asm "$P_asdouble($0, $1)";
+    case cuda: __intrinsic_asm "$P_asdouble($0, $1)";
+    case spirv: return spirv_asm {
+        %v:$$uint2 = OpCompositeConstruct $lowbits $highbits;
+        result:$$double = OpExtInst glsl450 59 %v
+    };
+    }
+}
 
 // Reinterpret bits as a float (HLSL SM 4.0)
 
@@ -4408,7 +4624,7 @@ matrix<float,N,M> asfloat(matrix<float,N,M> x)
 // Inverse sine (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T asin(T x)
 {
     __target_switch
@@ -4417,6 +4633,7 @@ T asin(T x)
     case cuda: __intrinsic_asm "$P_asin($0)";
     case glsl: __intrinsic_asm "asin";
     case hlsl: __intrinsic_asm "asin";
+    case metal: __intrinsic_asm "asin";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Asin $x
     };
@@ -4425,13 +4642,14 @@ T asin(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> asin(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "asin";
     case hlsl: __intrinsic_asm "asin";
+    case metal: __intrinsic_asm "asin";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Asin $x
     };
@@ -4442,7 +4660,7 @@ vector<T, N> asin(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> asin(matrix<T, N, M> x)
 {
     __target_switch
@@ -4450,6 +4668,46 @@ matrix<T, N, M> asin(matrix<T, N, M> x)
     case hlsl: __intrinsic_asm "asin";
     default:
         MATRIX_MAP_UNARY(T,N,M,asin,x);
+    }
+}
+
+// Inverse hyperbolic sine
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+T asinh(T x)
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "$P_asinh($0)";
+    case cuda: __intrinsic_asm "$P_asinh($0)";
+    case glsl: __intrinsic_asm "asinh";
+    case metal: __intrinsic_asm "asinh";
+    case spirv: return spirv_asm {
+        OpExtInst $$T result glsl450 Asinh $x
+    };
+    default:
+        return log(x + sqrt(x * x + T(1)));
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+vector<T,N> asinh(vector<T,N> x)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "asinh";
+    case metal: __intrinsic_asm "asinh";
+    case spirv: return spirv_asm {
+        OpExtInst $$vector<T,N> result glsl450 Asinh $x
+    };
+    default:
+        VECTOR_MAP_UNARY(T, N, asinh, x);
     }
 }
 
@@ -4755,7 +5013,17 @@ uint16_t asuint16(float16_t value)
 [__readNone]
 [require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
-{ VECTOR_MAP_UNARY(uint16_t, N, asuint16, value); }
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "asuint16";
+    case spirv: return spirv_asm {
+        result:$$vector<uint16_t,N> = OpBitcast $value
+    };
+    default:
+        VECTOR_MAP_UNARY(uint16_t, N, asuint16, value);
+    }
+}
 
 [__readNone]
 [require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
@@ -4780,8 +5048,19 @@ float16_t asfloat16(uint16_t value)
 }
 
 [__readNone]
+[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<float16_t,N> asfloat16<let N : int>(vector<uint16_t,N> value)
-{ VECTOR_MAP_UNARY(float16_t, N, asfloat16, value); }
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "asfloat16";
+    case spirv: return spirv_asm {
+        result:$$vector<float16_t,N> = OpBitcast $value
+    };
+    default:
+        VECTOR_MAP_UNARY(float16_t, N, asfloat16, value);
+    }
+}
 
 [__readNone]
 matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<uint16_t,R,C> value)
@@ -4853,6 +5132,9 @@ vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat16";
+    case spirv: return spirv_asm {
+        OpBitcast $$vector<float16_t,N> result $value
+    };
     default: return asfloat16(asuint16(value));
     }
 }
@@ -4872,7 +5154,7 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> va
 // Inverse tangent (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T atan(T x)
 {
     __target_switch
@@ -4881,6 +5163,7 @@ T atan(T x)
     case cuda: __intrinsic_asm "$P_atan($0)";
     case glsl: __intrinsic_asm "atan";
     case hlsl: __intrinsic_asm "atan";
+    case metal: __intrinsic_asm "atan";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Atan $x
     };
@@ -4889,13 +5172,14 @@ T atan(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> atan(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "atan";
     case hlsl: __intrinsic_asm "atan";
+    case metal: __intrinsic_asm "atan";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Atan $x
     };
@@ -4906,7 +5190,7 @@ vector<T, N> atan(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> atan(matrix<T, N, M> x)
 {
     __target_switch
@@ -4919,7 +5203,7 @@ matrix<T, N, M> atan(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T atan2(T y, T x)
 {
     __target_switch
@@ -4928,6 +5212,7 @@ T atan2(T y, T x)
     case cuda: __intrinsic_asm "$P_atan2($0, $1)";
     case glsl: __intrinsic_asm "atan($0,$1)";
     case hlsl: __intrinsic_asm "atan2";
+    case metal: __intrinsic_asm "atan2";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Atan2 $y $x
     };
@@ -4936,13 +5221,14 @@ T atan2(T y, T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "atan($0,$1)";
     case hlsl: __intrinsic_asm "atan2";
+    case metal: __intrinsic_asm "atan2";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Atan2 $y $x
     };
@@ -4953,7 +5239,7 @@ vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
 {
     __target_switch
@@ -4964,10 +5250,50 @@ matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
     }
 }
 
+// Hyperbolic inverse tangent
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+T atanh(T x)
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "$P_atanh($0)";
+    case cuda: __intrinsic_asm "$P_atanh($0)";
+    case glsl: __intrinsic_asm "atanh";
+    case metal: __intrinsic_asm "atanh";
+    case spirv: return spirv_asm {
+        OpExtInst $$T result glsl450 Atanh $x
+    };
+    default:
+        return T(0.5) * log((T(1) + x) / (T(1) - x));
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> atanh(vector<T,N> x)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atanh";
+    case metal: __intrinsic_asm "atanh";
+    case spirv: return spirv_asm {
+        OpExtInst $$vector<T,N> result glsl450 Atanh $x
+    };
+    default:
+        VECTOR_MAP_UNARY(T, N, atanh, x);
+    }
+}
+
 // Ceiling (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T ceil(T x)
 {
     __target_switch
@@ -4976,6 +5302,7 @@ T ceil(T x)
     case cuda: __intrinsic_asm "$P_ceil($0)";
     case glsl: __intrinsic_asm "ceil";
     case hlsl: __intrinsic_asm "ceil";
+    case metal: __intrinsic_asm "ceil";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Ceil $x
     };
@@ -4984,13 +5311,14 @@ T ceil(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> ceil(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "ceil";
     case hlsl: __intrinsic_asm "ceil";
+    case metal: __intrinsic_asm "ceil";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Ceil $x
     };
@@ -5001,7 +5329,7 @@ vector<T, N> ceil(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> ceil(matrix<T, N, M> x)
 {
     __target_switch
@@ -5012,31 +5340,136 @@ matrix<T, N, M> ceil(matrix<T, N, M> x)
     }
 }
 
+// Copy-sign
+
+__generic<let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+vector<half,N> copysign_half(vector<half,N> x, vector<half,N> y)
+{
+    let ux = reinterpret<vector<uint16_t,N>>(x);
+    let uy = reinterpret<vector<uint16_t,N>>(y);
+    vector<uint16_t,N> signY = (uy & (uint16_t(1) << uint16_t(15)));
+    vector<uint16_t,N> newX = (ux & ((uint16_t(1) << uint16_t(15)) - uint16_t(1))) + signY;
+    return reinterpret<vector<half,N>>(newX);
+}
+
+__generic<let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+vector<float,N> copysign_float(vector<float,N> x, vector<float,N> y)
+{
+    let ux = reinterpret<vector<uint32_t,N>>(x);
+    let uy = reinterpret<vector<uint32_t,N>>(y);
+    vector<uint32_t,N> signY = (uy & (uint32_t(1) << uint32_t(31)));
+    vector<uint32_t,N> newX = (ux & ((uint32_t(1) << uint32_t(31)) - uint32_t(1))) + signY;
+    return reinterpret<vector<float,N>>(newX);
+}
+
+__generic<let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+vector<double,N> copysign_double(vector<double,N> x, vector<double,N> y)
+{
+    let ux = reinterpret<vector<uint64_t,N>>(x);
+    let uy = reinterpret<vector<uint64_t,N>>(y);
+    vector<uint64_t,N> signY = (uy & (uint64_t(1) << uint64_t(63)));
+    vector<uint64_t,N> newX = (ux & ((uint64_t(1) << uint64_t(63)) - uint64_t(1))) + signY;
+    return reinterpret<vector<double,N>>(newX);
+}
+
+__generic<T:__BuiltinFloatingPointType, U:__BuiltinFloatingPointType, let N : int>
+__intrinsic_op($(kIROp_FloatCast))
+vector<T,N> __real_cast(vector<U,N> val);
+
+__generic<T : __BuiltinFloatingPointType, let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "copysign";
+    default:
+    {
+        // sign of -0.0 needs to be respected.
+        if (T is half)
+            return __real_cast<T>(copysign_half(
+                    __real_cast<half>(x),
+                    __real_cast<half>(y)));
+        if (T is float)
+            return __real_cast<T>(copysign_float(
+                    __real_cast<float>(x),
+                    __real_cast<float>(y)));
+        return __real_cast<T>(copysign_double(
+                __real_cast<double>(x),
+                __real_cast<double>(y)));
+    }
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+T copysign(T x, T y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "copysign";
+    default:
+        return copysign(vector<T,1>(x), vector<T,1>(y))[0];
+    }
+}
+
 
 // Check access status to tiled resource
 bool CheckAccessFullyMapped(uint status);
 
 // Clamp (HLSL SM 1.0)
 __generic<T : __BuiltinIntegerType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T clamp(T x, T minBound, T maxBound)
 {
-    return min(max(x, minBound), maxBound);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "clamp";
+    case glsl: __intrinsic_asm "clamp";
+    case spirv:
+        if (__isSignedInt<T>())
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 SClamp $x $minBound $maxBound
+            };
+        else
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 UClamp $x $minBound $maxBound
+            };
+    default:
+        return min(max(x, minBound), maxBound);
+    }
 }
 
 __generic<T : __BuiltinIntegerType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
-    return min(max(x, minBound), maxBound);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "clamp";
+    case glsl: __intrinsic_asm "clamp";
+    case spirv:
+        if (__isSignedInt<T>())
+            return spirv_asm {
+                result:$$vector<T, N> = OpExtInst glsl450 SClamp $x $minBound $maxBound
+            };
+        else
+            return spirv_asm {
+                result:$$vector<T, N> = OpExtInst glsl450 UClamp $x $minBound $maxBound
+            };
+    default:
+        return min(max(x, minBound), maxBound);
+    }
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
@@ -5053,25 +5486,37 @@ matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBo
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T clamp(T x, T minBound, T maxBound)
 {
-    return min(max(x, minBound), maxBound);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "clamp";
+    case glsl: __intrinsic_asm "clamp";
+    case spirv: return spirv_asm {
+        result:$$T = OpExtInst glsl450 FClamp $x $minBound $maxBound
+    };
+    default:
+        return min(max(x, minBound), maxBound);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
-    return min(max(x, minBound), maxBound);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "clamp";
+    case glsl: __intrinsic_asm "clamp";
+    case spirv: return spirv_asm {
+        result:$$vector<T,N> = OpExtInst glsl450 FClamp $x $minBound $maxBound
+    };
+    default:
+        return min(max(x, minBound), maxBound);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -5127,7 +5572,7 @@ void clip(matrix<T,N,M> x)
 // Cosine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T cos(T x)
 {
     __target_switch
@@ -5136,6 +5581,7 @@ T cos(T x)
     case cuda: __intrinsic_asm "$P_cos($0)";
     case glsl: __intrinsic_asm "cos";
     case hlsl: __intrinsic_asm "cos";
+    case metal: __intrinsic_asm "cos";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Cos $x
     };
@@ -5144,13 +5590,14 @@ T cos(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> cos(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "cos";
     case hlsl: __intrinsic_asm "cos";
+    case metal: __intrinsic_asm "cos";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Cos $x
     };
@@ -5161,7 +5608,7 @@ vector<T, N> cos(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> cos(matrix<T, N, M> x)
 {
     __target_switch
@@ -5175,7 +5622,7 @@ matrix<T, N, M> cos(matrix<T, N, M> x)
 // Hyperbolic cosine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 T cosh(T x)
 {
     __target_switch
@@ -5184,6 +5631,7 @@ T cosh(T x)
     case cuda: __intrinsic_asm "$P_cosh($0)";
     case glsl: __intrinsic_asm "cosh";
     case hlsl: __intrinsic_asm "cosh";
+    case metal: __intrinsic_asm "cosh";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Cosh $x
     };
@@ -5192,13 +5640,14 @@ T cosh(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 vector<T,N> cosh(vector<T,N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "cosh";
     case hlsl: __intrinsic_asm "cosh";
+    case metal: __intrinsic_asm "cosh";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T,N> result glsl450 Cosh $x
     };
@@ -5209,7 +5658,7 @@ vector<T,N> cosh(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 matrix<T, N, M> cosh(matrix<T, N, M> x)
 {
     __target_switch
@@ -5219,6 +5668,35 @@ matrix<T, N, M> cosh(matrix<T, N, M> x)
         MATRIX_MAP_UNARY(T, N, M, cosh, x);
     }
 }
+
+// Cosine degree
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+T cospi(T x)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "cospi";
+    default:
+        return cos(T.getPi() * x);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+vector<T,N> cospi(vector<T,N> x)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "cospi";
+    default:
+        return cos(T.getPi() * x);
+    }
+}
+
 
 // Population count
 [__readNone]
@@ -5572,8 +6050,73 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T distance(T x, T y)
 {
-    return length(x - y);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "distance";
+    case spirv: return spirv_asm {
+        OpExtInst $$T result glsl450 Distance $x $y
+    };
+    default:
+        return length(x - y);
+    }
 }
+
+// fdim
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv)]
+T fdim(T x, T y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fdim";
+    default:
+        return max(T(0), x - y);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv)]
+vector<T,N> fdim(vector<T,N> x, vector<T,N> y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fdim";
+    default:
+        return max(T(0), x - y);
+    }
+}
+
+// divide
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+T divide(T x, T y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "divide";
+    default:
+        return x / y;
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+vector<T,N> divide(vector<T,N> x, vector<T,N> y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "divide";
+    default:
+        return x / y;
+    }
+}
+
 
 // Vector dot product
 
@@ -5743,18 +6286,44 @@ matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex)
 }
 
 __generic<T : __BuiltinArithmeticType>
-__target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
-__target_intrinsic(spirv, "%foffset = OpConvertSToF _type(float2) resultId _1; %offsetdiv16 = 136 _type(float2) resultId %foffset const(float2, 16.0, 16.0); OpExtInst resultType resultId glsl450 78 _0 %offsetdiv16")
 [__readNone]
 [require(glsl_spirv, fragmentprocessing)]
-T EvaluateAttributeSnapped(T x, int2 offset);
+T EvaluateAttributeSnapped(T x, int2 offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "interpolateAtOffset($0, vec2($1) / 16.0f)";
+    case spirv:
+    {
+        const float2 tmp = float2(16.f, 16.f);
+        return spirv_asm {
+            %foffset:$$float2 = OpConvertSToF $offset;
+            %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
+            result:$$T = OpExtInst glsl450 InterpolateAtOffset $x %offsetdiv16
+        };
+    }
+    }
+}
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
-__target_intrinsic(spirv, "%foffset = OpConvertSToF _type(float2) resultId _1; %offsetdiv16 = 136 _type(float2) resultId %foffset const(float2, 16.0, 16.0); OpExtInst resultType resultId glsl450 78 _0 %offsetdiv16")
 [__readNone]
 [require(glsl_spirv, fragmentprocessing)]
-vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset);
+vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "interpolateAtOffset($0, vec2($1) / 16.0f)";
+    case spirv:
+    {
+        const float2 tmp = float2(16.f, 16.f);
+        return spirv_asm {
+            %foffset:$$float2 = OpConvertSToF $offset;
+            %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
+            result:$$vector<T,N> = OpExtInst glsl450 InterpolateAtOffset $x %offsetdiv16
+        };
+    }
+    }
+}
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
@@ -5778,7 +6347,7 @@ matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T exp(T x)
 {
     __target_switch
@@ -5787,6 +6356,7 @@ T exp(T x)
     case cuda: __intrinsic_asm "$P_exp($0)";
     case glsl: __intrinsic_asm "exp";
     case hlsl: __intrinsic_asm "exp";
+    case metal: __intrinsic_asm "exp";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Exp $x
     };
@@ -5795,13 +6365,14 @@ T exp(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> exp(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "exp";
     case hlsl: __intrinsic_asm "exp";
+    case metal: __intrinsic_asm "exp";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Exp $x
     };
@@ -5812,7 +6383,7 @@ vector<T, N> exp(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> exp(matrix<T, N, M> x)
 {
     __target_switch
@@ -5827,15 +6398,13 @@ matrix<T, N, M> exp(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T exp2(T x)
 {
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>())
-            __intrinsic_asm "exp2($0)";
-        __intrinsic_asm "exp2(float($0))";
+        __intrinsic_asm "exp2($0)";
     case spirv:
         if (__isHalf<T>())
         {
@@ -5843,13 +6412,14 @@ T exp2(T x)
         }
         else
         {
-            float xf = __floatCast<float>(x);
+            float xf = __realCast<float>(x);
             return T(spirv_asm {
                  result:$$float = OpExtInst glsl450 Exp2 $xf
             });
         }
     case hlsl:
         __intrinsic_asm "exp2($0)";
+    case metal: __intrinsic_asm "exp2";
     case cpp: 
         __intrinsic_asm "$P_exp2($0)";
     case cuda: 
@@ -5860,12 +6430,15 @@ T exp2(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> exp2(vector<T,N> x)
 {
     __target_switch
     {
+    case glsl:
+        __intrinsic_asm "exp2($0)";
     case hlsl: __intrinsic_asm "exp2";
+    case metal: __intrinsic_asm "exp2";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T,N> result glsl450 Exp2 $x
     };
@@ -5876,7 +6449,7 @@ vector<T,N> exp2(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> exp2(matrix<T,N,M> x)
 {
     __target_switch
@@ -5884,6 +6457,36 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
     case hlsl: __intrinsic_asm "exp2";
     default:
         MATRIX_MAP_UNARY(T, N, M, exp2, x);
+    }
+}
+
+// Base-10 exponent
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T exp10(T x)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "exp10";
+    default:
+        const T ln10 = T(2.302585092994045901); // ln(10)
+        return exp(x * ln10);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> exp10(vector<T,N> x)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "exp10";
+    default:
+        const T ln10 = T(2.30258509299); // ln(10)
+        return exp(x * ln10);
     }
 }
 
@@ -5920,6 +6523,14 @@ vector<float, N> f16tof32(vector<uint, N> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "f16tof32";
+    case spirv:
+    {
+        return spirv_asm {
+            %lowBits = OpUConvert $$vector<uint16_t,N> $value;
+            %half = OpBitcast $$vector<half,N> %lowBits;
+            result:$$vector<float,N> = OpFConvert %half
+        };
+    }
     default:
         VECTOR_MAP_UNARY(float, N, f16tof32, value);
     }
@@ -5959,6 +6570,14 @@ vector<uint, N> f32tof16(vector<float, N> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "f32tof16";
+    case spirv:
+    {
+        return spirv_asm {
+            %half = OpFConvert $$vector<half,N> $value;
+            %lowBits = OpBitcast $$vector<uint16_t,N> %half;
+            result:$$vector<uint,N> = OpUConvert %lowBits
+        };
+    }
     default:
         VECTOR_MAP_UNARY(uint, N, f32tof16, value);
     }
@@ -6196,7 +6815,7 @@ vector<uint,N> firstbitlow(vector<uint,N> value)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T floor(T x)
 {
     __target_switch
@@ -6205,6 +6824,7 @@ T floor(T x)
     case cuda: __intrinsic_asm "$P_floor($0)";
     case glsl: __intrinsic_asm "floor";
     case hlsl: __intrinsic_asm "floor";
+    case metal: __intrinsic_asm "floor";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Floor $x
     };
@@ -6213,13 +6833,14 @@ T floor(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> floor(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "floor";
     case hlsl: __intrinsic_asm "floor";
+    case metal: __intrinsic_asm "floor";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Floor $x
     };
@@ -6230,7 +6851,7 @@ vector<T, N> floor(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> floor(matrix<T, N, M> x)
 {
     __target_switch
@@ -6244,7 +6865,7 @@ matrix<T, N, M> floor(matrix<T, N, M> x)
 // Fused multiply-add
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 T fma(T a, T b, T c)
 {
     __target_switch
@@ -6257,6 +6878,7 @@ T fma(T a, T b, T c)
             return mad(a, b, c);
         else
             __intrinsic_asm "fma($0, $1, $2)";
+    case metal: __intrinsic_asm "fma";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Fma $a $b $c
     };
@@ -6267,13 +6889,14 @@ T fma(T a, T b, T c)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "fma";
+    case metal: __intrinsic_asm "fma";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Fma $a $b $c
     };
@@ -6284,7 +6907,7 @@ vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
 {
     __target_switch
@@ -6298,27 +6921,87 @@ matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
 // Floating point remainder of x/y
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T fmod(T x, T y)
 {
+    // In HLSL, `fmod` returns a remainder.
+    // Definition of `fmod` in HLSL is,
+    // "The floating-point remainder is calculated such that x = i * y + f,
+    // where i is an integer, f has the same sign as x, and the absolute value
+    // of f is less than the absolute value of y."
+    //
+    // In GLSL, `mod` is a Modulus function.
+    // OpenGL document defines "Modulus" as "Returns x - y * floor(x / y)".
+    // The use of "Floor()" makes the difference.
+    //
+    // In Metal, `fmod` is Modulus function.
+    // Metal document defines it as "Returns x - y * trunc(x/y)".
+    // Note that the function name is same to HLSL but it behaves differently.
+    //
+    // The tricky ones are when x or y is a negative value.
+    //
+    //       | Remainder | Modulus
+    //  x  y | x= i*y +f | x-y*floor(x/y)
+    // ------+-----------+------------------------------
+    //  4  3 | 4= 1*3 +1 | 4-3*floor( 4/3) = 4-3* 1 = 1
+    //  3  3 | 3= 1*3 +0 | 3-3*floor( 3/3) = 3-3* 1 = 0
+    //  2  3 | 2= 0*3 +2 | 2-3*floor( 2/3) = 2-3* 0 = 2
+    //  1  3 | 1= 0*3 +1 | 1-3*floor( 1/3) = 1-3* 0 = 1
+    //  0  3 | 0= 0*3 +0 | 0-3*floor( 0/3) = 0-3* 0 = 0
+    // -1  3 |-1= 0*3 -1 |-1-3*floor(-1/3) =-1-3*-1 = 2
+    // -2  3 |-2= 0*3 -2 |-2-3*floor(-2/3) =-2-3*-1 = 1
+    // -3  3 |-3=-1*3  0 |-3-3*floor(-3/3) =-3-3*-1 = 0
+    // -4  3 |-4=-1*3 -1 |-4-3*floor(-4/3) =-4-3*-2 = 2
+    //
+    // When y is a negative value,
+    //
+    //       | Remainder | Modulus
+    //  x  y | x= i*y +f | x-y*floor(x/y)
+    // ------+-----------+------------------------------
+    //  4 -3 | 4=-1*-3+1 | 4+3*floor( 4/-3) = 4+3*-2 =-2
+    //  3 -3 | 3=-1*-3+0 | 3+3*floor( 3/-3) = 3+3*-1 = 0
+    //  2 -3 | 2= 0*-3+2 | 2+3*floor( 2/-3) = 2+3*-1 =-1
+    //  1 -3 | 1= 0*-3+1 | 1+3*floor( 1/-3) = 1+3*-1 =-2
+    //  0 -3 | 0= 0*-3+0 | 0+3*floor( 0/-3) = 0+3* 0 = 0
+    // -1 -3 |-1= 0*-3-1 |-1+3*floor(-1/-3) =-1+3* 0 =-1
+    // -2 -3 |-2= 0*-3-2 |-2+3*floor(-2/-3) =-2+3* 0 =-2
+    // -3 -3 |-3= 1*-3 0 |-3+3*floor(-3/-3) =-3+3* 1 = 0
+    // -4 -3 |-4= 1*-3-1 |-4+3*floor(-4/-3) =-4+3* 1 =-1
+
     __target_switch
     {
     case cpp: __intrinsic_asm "$P_fmod($0, $1)";
     case cuda: __intrinsic_asm "$P_fmod($0, $1)";
+    case glsl:
+        // GLSL doesn't have a function for remainder.
+        __intrinsic_asm "(($0 < 0.0) ? -mod(-$0,abs($1)) : mod($0,abs($1)))";
     case hlsl: __intrinsic_asm "fmod";
-    default:
-        return x - y * trunc(x/y);
+    case metal:
+        // Metal doesn't have a function for remainder.
+        __intrinsic_asm "(($0 < 0.0) ? -fmod(-$0,abs($1)) : fmod($0,abs($1)))";
+    case spirv:
+        // OpFRem return "The floating-point remainder whose sign
+        // matches the sign of Operand 1", where Operand 1 is "x".
+        return spirv_asm
+        {
+            result:$$T = OpFRem $x $y
+        };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "fmod";
+    case spirv: return spirv_asm {
+        result:$$vector<T,N> = OpFRem $x $y
+    };
     default:
         VECTOR_MAP_BINARY(T, N, fmod, x, y);
     }
@@ -6326,7 +7009,8 @@ vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     __target_switch
@@ -6340,7 +7024,7 @@ matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
 // Fractional part
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T frac(T x)
 {
     __target_switch
@@ -6349,6 +7033,7 @@ T frac(T x)
     case cuda: __intrinsic_asm "$P_frac($0)";
     case glsl: __intrinsic_asm "fract";
     case hlsl: __intrinsic_asm "frac";
+    case metal: __intrinsic_asm "fract";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Fract $x
     };
@@ -6357,13 +7042,14 @@ T frac(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> frac(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "fract";
     case hlsl: __intrinsic_asm "frac";
+    case metal: __intrinsic_asm "fract";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Fract $x
     };
@@ -6379,30 +7065,65 @@ matrix<T, N, M> frac(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, frac, x);
 }
 
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T fract(T x)
+{
+    return frac(x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T, N> fract(vector<T, N> x)
+{
+    return frac(x);
+}
+
+
 // Split float into mantissa and exponent
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(cpp, "$P_frexp($0, $1)")
-__target_intrinsic(cuda, "$P_frexp($0, $1)")
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Frexp _0 _1")
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-T frexp(T x, out int exp);
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T frexp(T x, out int exp)
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "$P_frexp($0, $1)";
+    case cuda: __intrinsic_asm "$P_frexp($0, $1)";
+    case glsl: __intrinsic_asm "frexp";
+    case hlsl: __intrinsic_asm "frexp";
+    case metal: __intrinsic_asm "frexp($0, *($1))";
+    case spirv: return spirv_asm {
+        result:$$T = OpExtInst glsl450 Frexp $x &exp
+    };
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Frexp _0 _1")
 [__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
 {
-    VECTOR_MAP_BINARY(T, N, frexp, x, exp);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "frexp";
+    case hlsl: __intrinsic_asm "frexp";
+    case metal: __intrinsic_asm "frexp($0, *($1))";
+    case spirv: return spirv_asm {
+        result:$$vector<T, N> = OpExtInst glsl450 Frexp $x &exp
+    };
+    default:
+        VECTOR_MAP_BINARY(T, N, frexp, x, exp);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 {
     __target_switch
@@ -6711,11 +7432,22 @@ void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
 }
 
 [ForceInline]
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref  int64_t dest,  int64_t value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "atomicAdd((uint64_t*)$0, $1)";
+    case glsl:
+        __requireGLSLExtension("GL_EXT_shader_atomic_int64");
+        __intrinsic_asm "$atomicAdd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$int64_t = OpAtomicIAdd &dest Device None $value;
+        };
     }
 }
 
@@ -6725,26 +7457,60 @@ void InterlockedAdd(__ref  int64_t dest,  int64_t value, out  int64_t original_v
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "atomicAdd((uint64_t*)$0, $1)";
+    case glsl:
+        __requireGLSLExtension("GL_EXT_shader_atomic_int64");
+        __intrinsic_asm "$atomicAdd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            OpCapability Int64Atomics;
+            %origin:$$int64_t = OpAtomicIAdd &dest Device None $value;
+            OpStore &original_value %origin
+        };
     }
 }
 
 [ForceInline]
-void InterlockedAdd(__ref  uint64_t dest,  uint64_t value)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+void InterlockedAdd(__ref uint64_t dest, uint64_t value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "atomicAdd($0, $1)";
+    case glsl:
+        __requireGLSLExtension("GL_EXT_shader_atomic_int64");
+        __intrinsic_asm "$atomicAdd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$uint64_t = OpAtomicIAdd &dest Device None $value;
+        };
     }
 }
 
 [ForceInline]
-void InterlockedAdd(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
+void InterlockedAdd(__ref uint64_t dest, uint64_t value, out uint64_t original_value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "atomicAdd($0, $1)";
+    case glsl:
+        __requireGLSLExtension("GL_EXT_shader_atomic_int64");
+        __intrinsic_asm "$atomicAdd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            OpCapability Int64Atomics;
+            %origin:$$uint64_t = OpAtomicIAdd &dest Device None $value;
+            OpStore &original_value %origin
+        };
     }
 }
+
 
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
@@ -7490,6 +8256,9 @@ vector<bool, N> isfinite(vector<T, N> x)
     __target_switch
     {
     case hlsl: __intrinsic_asm "isfinite";
+    case glsl:
+    case spirv:
+        return !(isinf(x) || isnan(x));
     default:
         VECTOR_MAP_UNARY(bool, N, isfinite, x);
     }
@@ -7610,7 +8379,7 @@ matrix<bool, N, M> isnan(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T ldexp(T x, T exp)
 {
     __target_switch
@@ -7623,7 +8392,7 @@ T ldexp(T x, T exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 {
     __target_switch
@@ -7636,7 +8405,7 @@ vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
 {
     __target_switch
@@ -7646,6 +8415,47 @@ matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
         MATRIX_MAP_BINARY(T, N, M, ldexp, x, exp);
     }
 }
+
+__generic<T : __BuiltinFloatingPointType, E : __BuiltinIntegerType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T ldexp(T x, E exp)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "ldexp";
+    case hlsl: __intrinsic_asm "ldexp";
+    case metal: __intrinsic_asm "ldexp";
+    case spirv: return spirv_asm {
+        OpExtInst $$T result glsl450 Ldexp $x $exp
+    };
+    default:
+        return ldexp(x, __realCast<T>(exp));
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, E : __BuiltinIntegerType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "ldexp";
+    case hlsl: __intrinsic_asm "ldexp";
+    case metal: __intrinsic_asm "ldexp";
+    case spirv: return spirv_asm {
+        OpExtInst $$vector<T,N> result glsl450 Ldexp $x $exp
+    };
+    default:
+        vector<T,N> temp;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            temp[i] = __realCast<T>(exp[i]);
+        return ldexp(x, temp);
+    }
+}
+
 
 // Vector length
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -7670,7 +8480,15 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T length(T x)
 {
-    return abs(x);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "length";
+    case spirv: return spirv_asm {
+        OpExtInst $$T result glsl450 Length $x
+    };
+    default:
+        return abs(x);
+    }
 }
 
 // Linear interpolation
@@ -7740,7 +8558,7 @@ float4 lit(float n_dot_l, float n_dot_h, float m)
 // Base-e logarithm
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T log(T x)
 {
     __target_switch
@@ -7749,6 +8567,7 @@ T log(T x)
     case cuda: __intrinsic_asm "$P_log($0)";
     case glsl: __intrinsic_asm "log";
     case hlsl: __intrinsic_asm "log";
+    case metal: __intrinsic_asm "log";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Log $x
     };
@@ -7757,13 +8576,14 @@ T log(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> log(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "log";
     case hlsl: __intrinsic_asm "log";
+    case metal: __intrinsic_asm "log";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Log $x
     };
@@ -7774,7 +8594,7 @@ vector<T, N> log(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> log(matrix<T, N, M> x)
 {
     __target_switch
@@ -7787,29 +8607,54 @@ matrix<T, N, M> log(matrix<T, N, M> x)
 
 // Base-10 logarithm
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )" )
-__target_intrinsic(cuda, "$P_log10($0)")
-__target_intrinsic(cpp, "$P_log10($0)")
-__target_intrinsic(spirv, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpFMul resultType resultId %baseElog const(_p,0.43429448190325182765112891891661)")
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-T log10(T x);
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T log10(T x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "log10";
+    case metal: __intrinsic_asm "log10";
+    case glsl: __intrinsic_asm "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )";
+    case cuda: __intrinsic_asm "$P_log10($0)";
+    case cpp: __intrinsic_asm "$P_log10($0)";
+    case spirv:
+    {
+        const T tmp = T(0.43429448190325182765112891891661);
+        return spirv_asm {
+            %baseElog:$$T = OpExtInst glsl450 Log $x;
+            result:$$T = OpFMul %baseElog $tmp
+        };
+    }
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, "(log( $0 ) * $S0(0.43429448190325182765112891891661) )" )
-__target_intrinsic(spirv, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpVectorTimesScalar resultType resultId %baseElog const(_p,0.43429448190325182765112891891661)")
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> log10(vector<T,N> x)
 {
-    VECTOR_MAP_UNARY(T, N, log10, x);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "log10";
+    case metal: __intrinsic_asm "log10";
+    case glsl: __intrinsic_asm "(log( $0 ) * $S0(0.43429448190325182765112891891661) )";
+    case spirv:
+    {
+        const T tmp = T(0.43429448190325182765112891891661);
+        return spirv_asm {
+            %baseElog:$$vector<T,N> = OpExtInst glsl450 Log $x;
+            result:$$vector<T,N> = OpVectorTimesScalar %baseElog $tmp
+        };
+    }
+    default:
+        VECTOR_MAP_UNARY(T, N, log10, x);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> log10(matrix<T,N,M> x)
 {
     __target_switch
@@ -7823,7 +8668,7 @@ matrix<T,N,M> log10(matrix<T,N,M> x)
 // Base-2 logarithm
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T log2(T x)
 {
     __target_switch
@@ -7832,6 +8677,7 @@ T log2(T x)
     case cuda: __intrinsic_asm "$P_log2($0)";
     case glsl: __intrinsic_asm "log2";
     case hlsl: __intrinsic_asm "log2";
+    case metal: __intrinsic_asm "log2";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Log2 $x
     };
@@ -7840,13 +8686,14 @@ T log2(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> log2(vector<T,N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "log2";
     case hlsl: __intrinsic_asm "log2";
+    case metal: __intrinsic_asm "log2";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T,N> result glsl450 Log2 $x
     };
@@ -7857,7 +8704,7 @@ vector<T,N> log2(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> log2(matrix<T,N,M> x)
 {
     __target_switch
@@ -7872,7 +8719,7 @@ matrix<T,N,M> log2(matrix<T,N,M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 T mad(T mvalue, T avalue, T bvalue)
 {
     __target_switch
@@ -7881,6 +8728,7 @@ T mad(T mvalue, T avalue, T bvalue)
     case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
     case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
+    case metal: __intrinsic_asm "fma";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Fma $mvalue $avalue $bvalue
     };
@@ -7889,13 +8737,14 @@ T mad(T mvalue, T avalue, T bvalue)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
+    case metal: __intrinsic_asm "fma";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Fma $mvalue $avalue $bvalue
     };
@@ -7906,7 +8755,7 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N, M> bvalue)
 {
     __target_switch
@@ -7967,28 +8816,66 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 
 // maximum
 __generic<T : __BuiltinIntegerType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(cuda, "$P_max($0, $1)")
-__target_intrinsic(cpp, "$P_max($0, $1)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-T max(T x, T y);
-// Note: a stdlib implementation of `max` (or `min`) will require splitting
-// floating-point and integer cases apart, because the floating-point
-// version needs to correctly handle the case where one of the inputs
-// is not-a-number.
+T max(T x, T y)
+{
+    // Note: a stdlib implementation of `max` (or `min`) will require splitting
+    // floating-point and integer cases apart, because the floating-point
+    // version needs to correctly handle the case where one of the inputs
+    // is not-a-number.
+
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "max";
+    case glsl: __intrinsic_asm "max";
+    case cuda: __intrinsic_asm "$P_max($0, $1)";
+    case cpp: __intrinsic_asm "$P_max($0, $1)";
+    case spirv:
+    {
+        if (__isSignedInt<T>())
+        {
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 SMax $x $y
+            };
+        }
+        else
+        {
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 UMax $x $y
+            };
+        }
+    }
+    }
+}
 
 __generic<T : __BuiltinIntegerType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
-    VECTOR_MAP_BINARY(T, N, max, x, y);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "max";
+    case glsl: __intrinsic_asm "max";
+    case spirv:
+    {
+        if (__isSignedInt<T>())
+        {
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 SMax $x $y
+            };
+        }
+        else
+        {
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 UMax $x $y
+            };
+        }
+    }
+    default:
+        VECTOR_MAP_BINARY(T, N, max, x, y);
+    }
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
@@ -8005,29 +8892,44 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(cuda, "$P_max($0, $1)")
-__target_intrinsic(cpp, "$P_max($0, $1)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-T max(T x, T y);
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T max(T x, T y)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "max";
+    case metal: __intrinsic_asm "max";
+    case glsl: __intrinsic_asm "max";
+    case cuda: __intrinsic_asm "$P_max($0, $1)";
+    case cpp: __intrinsic_asm "$P_max($0, $1)";
+    case spirv: return spirv_asm {
+        result:$$T = OpExtInst glsl450 FMax $x $y
+    };
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
-    VECTOR_MAP_BINARY(T, N, max, x, y);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "max";
+    case metal: __intrinsic_asm "max";
+    case glsl: __intrinsic_asm "max";
+    case spirv: return spirv_asm {
+        result:$$vector<T, N> = OpExtInst glsl450 FMax $x $y
+    };
+    default:
+        VECTOR_MAP_BINARY(T, N, max, x, y);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     __target_switch
@@ -8037,6 +8939,107 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
         MATRIX_MAP_BINARY(T, N, M, max, x, y);
     }
 }
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T max3(T x, T y, T z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "max3";
+    default:
+        return max(x, max(y, z));
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> max3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "max3";
+    default:
+        return max(x, max(y, z));
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T fmax(T x, T y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fmax";
+    default:
+        if (isnan(x)) return y;
+        return max(x, y);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> fmax(vector<T,N> x, vector<T,N> y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fmax";
+    default:
+        VECTOR_MAP_BINARY(T, N, fmax, x, y);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T fmax3(T x, T y, T z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fmax3";
+    default:
+    {
+        bool isnanX = isnan(x);
+        bool isnanY = isnan(y);
+        bool isnanZ = isnan(z);
+
+        if (isnanX)
+        {
+            return isnanY ? z : y;
+        }
+        else if (isnanY)
+        {
+            if (isnanZ)
+                return x;
+            return max(x, z);
+        }
+        else if (isnanZ)
+        {
+            return max(x, y);
+        }
+
+        return max(y, max(x, z));
+    }
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fmax3";
+    default:
+        VECTOR_MAP_TRINARY(T, N, fmax3, x, y, z);
+    }
+}
+
 
 // minimum
 __generic<T : __BuiltinIntegerType>
@@ -8045,15 +9048,33 @@ __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_min($0, $1)")
 __target_intrinsic(cpp, "$P_min($0, $1)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T min(T x, T y);
 
 __generic<T : __BuiltinIntegerType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
-    VECTOR_MAP_BINARY(T, N, min, x, y);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "min";
+    case glsl: __intrinsic_asm "min";
+    case spirv:
+    {
+        if (__isSignedInt<T>())
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 SMin $x $y
+            };
+        else
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 UMin $x $y
+            };
+    }
+    default:
+        VECTOR_MAP_BINARY(T, N, min, x, y);
+    }
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
@@ -8070,29 +9091,44 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(cuda, "$P_min($0, $1)")
-__target_intrinsic(cpp, "$P_min($0, $1)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-T min(T x, T y);
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T min(T x, T y)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "min";
+    case metal: __intrinsic_asm "min";
+    case glsl: __intrinsic_asm "min";
+    case cuda: __intrinsic_asm "$P_min($0, $1)";
+    case cpp: __intrinsic_asm "$P_min($0, $1)";
+    case spirv: return spirv_asm {
+        result:$$T = OpExtInst glsl450 FMin $x $y
+    };
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
-    VECTOR_MAP_BINARY(T, N, min, x, y);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "min";
+    case metal: __intrinsic_asm "min";
+    case glsl: __intrinsic_asm "min";
+    case spirv: return spirv_asm {
+        result:$$vector<T,N> = OpExtInst glsl450 FMin $x $y
+    };
+    default:
+        VECTOR_MAP_BINARY(T, N, min, x, y);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     __target_switch
@@ -8103,28 +9139,239 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
     }
 }
 
-// split into integer and fractional parts (both with same sign)
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Modf _0 _1")
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
-T modf(T x, out T ip);
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T min3(T x, T y, T z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "min3";
+    default:
+        return min(x, min(y, z));
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> min3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "min3";
+    default:
+        return min(x, min(y, z));
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T fmin(T x, T y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fmin";
+    default:
+        if (isnan(x)) return y;
+        return min(x, y);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> fmin(vector<T,N> x, vector<T,N> y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fmin";
+    default:
+        VECTOR_MAP_BINARY(T, N, fmin, x, y);
+    }
+}
+
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T fmin3(T x, T y, T z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fmin3";
+    default:
+    {
+        bool isnanX = isnan(x);
+        bool isnanY = isnan(y);
+        bool isnanZ = isnan(z);
+
+        if (isnan(x))
+        {
+            return isnanY ? z : y;
+        }
+        else if (isnanY)
+        {
+            if (isnanZ)
+                return x;
+            return min(x, z);
+        }
+        else if (isnanZ)
+        {
+            return min(x, y);
+        }
+
+        return min(x, min(y, z));
+    }
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> fmin3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fmin3";
+    default:
+        VECTOR_MAP_TRINARY(T, N, fmin3, x, y, z);
+    }
+}
+
+
+// Median
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T median3(T x, T y, T z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "median3";
+    default:
+    {
+        //           | a | b | c | m |
+        // ----------+---+---+---+---+
+        // x > y > z | z | y | x | y |
+        // x > z > y | y | z | x | z |
+        // y > x > z | z | y | x | x |
+        // y > z > x | z | y | z | z |
+        // z > x > y | y | z | x | x |
+        // z > y > x | y | z | y | y |
+
+        T a = min(y, z);
+        T b = max(y, z);
+        T c = max(x, a);
+        T m = min(b, c);
+        return m;
+    }
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> median3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "median3";
+    default:
+    {
+        vector<T,N> a = min(y, z);
+        vector<T,N> b = max(y, z);
+        vector<T,N> c = max(x, a);
+        vector<T,N> m = min(b, c);
+        return m;
+    }
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T fmedian3(T x, T y, T z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fmedian3";
+    default:
+    {
+        bool isnanX = isnan(x);
+        bool isnanY = isnan(y);
+        bool isnanZ = isnan(z);
+
+        if (isnanX)
+        {
+            return isnanY ? z : y;
+        }
+        else if (isnanY || isnanZ)
+        {
+            // "the function can return either non-NaN value"
+            return x;
+        }
+
+        return median3(x, y, z);
+    }
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N: int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> fmedian3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "fmedian3";
+    default:
+        VECTOR_MAP_TRINARY(T, N, fmedian3, x, y, z);
+    }
+}
+
+
+// split into integer and fractional parts (both with same sign)
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T modf(T x, out T ip)
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "$P_modf($0, $1)";
+    case cuda: __intrinsic_asm "$P_modf($0, $1)";
+    case hlsl: __intrinsic_asm "modf";
+    case glsl: __intrinsic_asm "modf";
+    case metal: __intrinsic_asm "modf($0, *($1))";
+    case spirv: return spirv_asm {
+        result:$$T = OpExtInst glsl450 Modf $x &ip
+    };
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
 {
-    VECTOR_MAP_BINARY(T, N, modf, x, ip);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "modf";
+    case glsl: __intrinsic_asm "modf";
+    case metal: __intrinsic_asm "modf($0, *($1))";
+    case spirv: return spirv_asm {
+        result:$$vector<T,N> = OpExtInst glsl450 Modf $x &ip
+    };
+    default:
+        VECTOR_MAP_BINARY(T, N, modf, x, ip);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 [__readNone]
-[require(glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 {
     __target_switch
@@ -8446,6 +9693,50 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
     }
 }
 
+// next-after: next representable floating-point value
+// after x in the direction of y
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+T nextafter(T x, T y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "nextafter";
+    default:
+        if (isnan(x)) return x;
+        if (isnan(y)) return y;
+        if (x == y) return y;
+        if (T is half)
+        {
+            T delta = __realCast<T>(bit_cast<half>(uint16_t(1)));
+            return x + ((x < y) ? delta : -delta);
+        }
+        if (T is float)
+        {
+            T delta = __realCast<T>(bit_cast<float>(uint32_t(1)));
+            return x + ((x < y) ? delta : -delta);
+        }
+        T delta = __realCast<T>(bit_cast<double>(uint64_t(1)));
+        return x + ((x < y) ? delta : -delta);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+vector<T,N> nextafter(vector<T,N> x, vector<T,N> y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "nextafter";
+    default:
+        VECTOR_MAP_BINARY(T, N, nextafter, x, y);
+    }
+}
+
+
 // noise (deprecated)
 
 [__readNone]
@@ -8544,7 +9835,7 @@ T normalize(T x)
 // Raise to a power
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T pow(T x, T y)
 {
     __target_switch
@@ -8553,6 +9844,7 @@ T pow(T x, T y)
     case cuda: __intrinsic_asm "$P_pow($0, $1)";
     case glsl: __intrinsic_asm "pow";
     case hlsl: __intrinsic_asm "pow";
+    case metal: __intrinsic_asm "pow";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Pow $x $y
     };
@@ -8561,13 +9853,14 @@ T pow(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "pow";
     case hlsl: __intrinsic_asm "pow";
+    case metal: __intrinsic_asm "pow";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Pow $x $y
     };
@@ -8578,7 +9871,7 @@ vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     __target_switch
@@ -8586,6 +9879,32 @@ matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
     case hlsl: __intrinsic_asm "pow";
     default:
         MATRIX_MAP_BINARY(T, N, M, pow, x, y);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T powr(T x, T y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "powr";
+    default:
+        return pow(abs(x), y);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T, N> powr(vector<T, N> x, vector<T, N> y)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "powr";
+    default:
+        return pow(abs(x), y);
     }
 }
 
@@ -8791,6 +10110,9 @@ vector<T, N> rcp(vector<T, N> x)
     __target_switch
     {
     case hlsl: __intrinsic_asm "rcp";
+    case glsl:
+    case spirv:
+        return T(1.0) / x;
     default:
         VECTOR_MAP_UNARY(T, N, rcp, x);
     }
@@ -8920,10 +10242,60 @@ vector<uint, N> reversebits(vector<uint, N> value)
     }
 }
 
+// round even
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+T rint(T x)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "roundEven";
+    case metal: __intrinsic_asm "rint";
+    case spirv: return spirv_asm {
+        OpExtInst $$T result glsl450 RoundEven $x
+    };
+    default:
+        T nearest = round(x);
+
+        // Check if the value is exactly halfway between two integers
+        if (abs(x - nearest) == T(0.5))
+        {
+            // If halfway, choose the even number
+            if ((nearest / T(2)) * T(2) != nearest)
+            {
+                // If the nearest number is odd,
+                // move to the closest even number
+                nearest -= ((x < nearest) ? T(1) : T(-1));
+            }
+        }
+        return nearest;
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+vector<T,N> rint(vector<T,N> x)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "roundEven";
+    case metal: __intrinsic_asm "rint";
+    case spirv: return spirv_asm {
+        OpExtInst $$vector<T,N> result glsl450 RoundEven $x
+    };
+    default:
+        VECTOR_MAP_UNARY(T, N, rint, x);
+    }
+}
+
 // Round-to-nearest
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T round(T x)
 {
     __target_switch
@@ -8932,6 +10304,7 @@ T round(T x)
     case cuda: __intrinsic_asm "$P_round($0)";
     case glsl: __intrinsic_asm "round";
     case hlsl: __intrinsic_asm "round";
+    case metal: __intrinsic_asm "round";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Round $x
     };
@@ -8940,13 +10313,14 @@ T round(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> round(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "round";
     case hlsl: __intrinsic_asm "round";
+    case metal: __intrinsic_asm "round";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Round $x
     };
@@ -8957,7 +10331,7 @@ vector<T, N> round(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> round(matrix<T,N,M> x)
 {
     __target_switch
@@ -8971,7 +10345,7 @@ matrix<T,N,M> round(matrix<T,N,M> x)
 // Reciprocal of square root
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T rsqrt(T x)
 {
     __target_switch
@@ -8980,6 +10354,7 @@ T rsqrt(T x)
     case cuda: __intrinsic_asm "$P_rsqrt($0)";
     case glsl: __intrinsic_asm "inversesqrt($0)";
     case hlsl: __intrinsic_asm "rsqrt";
+    case metal: __intrinsic_asm "rsqrt";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 InverseSqrt $x
     };
@@ -8990,13 +10365,14 @@ T rsqrt(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> rsqrt(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "inversesqrt($0)";
     case hlsl: __intrinsic_asm "rsqrt";
+    case metal: __intrinsic_asm "rsqrt";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 InverseSqrt $x
     };
@@ -9007,7 +10383,7 @@ vector<T, N> rsqrt(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> rsqrt(matrix<T, N, M> x)
 {
     __target_switch
@@ -9128,12 +10504,11 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
     }
 }
 
-
 // Sine
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T sin(T x)
 {
     __target_switch
@@ -9142,6 +10517,7 @@ T sin(T x)
     case cuda: __intrinsic_asm "$P_sin($0)";
     case glsl: __intrinsic_asm "sin";
     case hlsl: __intrinsic_asm "sin";
+    case metal: __intrinsic_asm "sin";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Sin $x
     };
@@ -9150,13 +10526,14 @@ T sin(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> sin(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "sin";
     case hlsl: __intrinsic_asm "sin";
+    case metal: __intrinsic_asm "sin";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Sin $x
     };
@@ -9167,7 +10544,7 @@ vector<T, N> sin(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> sin(matrix<T, N, M> x)
 {
     __target_switch
@@ -9181,13 +10558,40 @@ matrix<T, N, M> sin(matrix<T, N, M> x)
 // Sine and cosine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(metal)]
+T __sincos_metal(T x, out T c)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "sincos($0, *$1)";
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(metal)]
+vector<T,N> __sincos_metal(vector<T,N> x, out vector<T,N> c)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "sincos($0, *$1)";
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 void sincos(T x, out T s, out T c)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "$P_sincos($0, $1, $2)";
     case hlsl: __intrinsic_asm "sincos";
+    case metal:
+        //__intrinsic_asm "*($1) = sincos($0, *($2))";
+        s = __sincos_metal(x, c);
+        return;
     default:
         s = sin(x);
         c = cos(x);
@@ -9196,12 +10600,17 @@ void sincos(T x, out T s, out T c)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "sincos";
+    case metal:
+        //__intrinsic_asm "*($1) = sincos($0, *($2))";
+        s = __sincos_metal(x, c);
+        return;
     default:
         s = sin(x);
         c = cos(x);
@@ -9210,7 +10619,8 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1: int, let L2 : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
 {
     __target_switch
@@ -9225,7 +10635,7 @@ void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
 // Hyperbolic Sine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T sinh(T x)
 {
     __target_switch
@@ -9234,6 +10644,7 @@ T sinh(T x)
     case cuda: __intrinsic_asm "$P_sinh($0)";
     case glsl: __intrinsic_asm "sinh";
     case hlsl: __intrinsic_asm "sinh";
+    case metal: __intrinsic_asm "sinh";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Sinh $x
     };
@@ -9242,13 +10653,14 @@ T sinh(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> sinh(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "sinh";
     case hlsl: __intrinsic_asm "sinh";
+    case metal: __intrinsic_asm "sinh";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Sinh $x
     };
@@ -9259,7 +10671,7 @@ vector<T, N> sinh(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> sinh(matrix<T, N, M> x)
 {
     __target_switch
@@ -9269,6 +10681,35 @@ matrix<T, N, M> sinh(matrix<T, N, M> x)
         MATRIX_MAP_UNARY(T, N, M, sinh, x);
     }
 }
+
+// Sine degree
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T sinpi(T x)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "sinpi";
+    default:
+        return sin(T.getPi() * x);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> sinpi(vector<T,N> x)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "sinpi";
+    default:
+        return sin(T.getPi() * x);
+    }
+}
+
 
 // Smooth step (Hermite interpolation)
 __generic<T : __BuiltinFloatingPointType>
@@ -9322,7 +10763,7 @@ matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N
 // Square root
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T sqrt(T x)
 {
     __target_switch
@@ -9331,6 +10772,7 @@ T sqrt(T x)
     case cuda: __intrinsic_asm "$P_sqrt($0)";
     case glsl: __intrinsic_asm "sqrt";
     case hlsl: __intrinsic_asm "sqrt";
+    case metal: __intrinsic_asm "sqrt";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Sqrt $x
     };
@@ -9339,13 +10781,14 @@ T sqrt(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> sqrt(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "sqrt";
     case hlsl: __intrinsic_asm "sqrt";
+    case metal: __intrinsic_asm "sqrt";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Sqrt $x
     };
@@ -9356,7 +10799,7 @@ vector<T, N> sqrt(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> sqrt(matrix<T, N, M> x)
 {
     __target_switch
@@ -9418,7 +10861,7 @@ matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
 // Tangent
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T tan(T x)
 {
     __target_switch
@@ -9427,6 +10870,7 @@ T tan(T x)
     case cuda: __intrinsic_asm "$P_tan($0)";
     case glsl: __intrinsic_asm "tan";
     case hlsl: __intrinsic_asm "tan";
+    case metal: __intrinsic_asm "tan";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Tan $x
     };
@@ -9435,13 +10879,14 @@ T tan(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> tan(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "tan";
     case hlsl: __intrinsic_asm "tan";
+    case metal: __intrinsic_asm "tan";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Tan $x
     };
@@ -9452,7 +10897,7 @@ vector<T, N> tan(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> tan(matrix<T, N, M> x)
 {
     __target_switch
@@ -9466,7 +10911,7 @@ matrix<T, N, M> tan(matrix<T, N, M> x)
 // Hyperbolic tangent
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T tanh(T x)
 {
     __target_switch
@@ -9475,6 +10920,7 @@ T tanh(T x)
     case cuda: __intrinsic_asm "$P_tanh($0)";
     case glsl: __intrinsic_asm "tanh";
     case hlsl: __intrinsic_asm "tanh";
+    case metal: __intrinsic_asm "tanh";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Tanh $x
     };
@@ -9483,13 +10929,14 @@ T tanh(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> tanh(vector<T,N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "tanh";
     case hlsl: __intrinsic_asm "tanh";
+    case metal: __intrinsic_asm "tanh";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T,N> result glsl450 Tanh $x
     };
@@ -9500,7 +10947,7 @@ vector<T,N> tanh(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> tanh(matrix<T,N,M> x)
 {
     __target_switch
@@ -9510,6 +10957,35 @@ matrix<T,N,M> tanh(matrix<T,N,M> x)
         MATRIX_MAP_UNARY(T, N, M, tanh, x);
     }
 }
+
+// Tangent degree
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+T tanpi(T x)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "tanpi";
+    default:
+        return tan(T.getPi() * x);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+vector<T,N> tanpi(vector<T,N> x)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "tanpi";
+    default:
+        return tan(T.getPi() * x);
+    }
+}
+
 
 // Matrix transpose
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -9580,7 +11056,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 // Truncate to integer
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T trunc(T x)
 {
     __target_switch
@@ -9589,6 +11065,7 @@ T trunc(T x)
     case cuda: __intrinsic_asm "$P_trunc($0)";
     case glsl: __intrinsic_asm "trunc";
     case hlsl: __intrinsic_asm "trunc";
+    case metal: __intrinsic_asm "trunc";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Trunc $x
     };
@@ -9597,13 +11074,14 @@ T trunc(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> trunc(vector<T, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "trunc";
     case hlsl: __intrinsic_asm "trunc";
+    case metal: __intrinsic_asm "trunc";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Trunc $x
     };
@@ -9614,7 +11092,7 @@ vector<T, N> trunc(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> trunc(matrix<T, N, M> x)
 {
     __target_switch
@@ -11053,6 +12531,13 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
+    case glsl:
+    case spirv:
+        matrix<T,N,M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveActive$(opName.hlslName)(expr[i]);
+        return result;
     default:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     }
@@ -11118,6 +12603,13 @@ matrix<T, N, M> WaveActive$(opName)(matrix<T, N, M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveActive$(opName)";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveActive$(opName)(expr[i]);
+        return result;
     default:
         return WaveMask$(opName)(WaveGetActiveMask(), expr);
     }
@@ -11205,6 +12697,13 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveActive$(opName.hlslName)(expr[i]);
+        return result;
     default:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     }
@@ -11344,6 +12843,9 @@ uint WaveActiveCountBits(bool value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveActiveCountBits";
+    case glsl:
+    case spirv:
+        return _WaveCountBits(WaveActiveBallot(value));
     default:
         return WaveMaskCountBits(WaveGetActiveMask(), value);
     }
@@ -11512,6 +13014,12 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WavePrefixProduct";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WavePrefixProduct(expr[i]);
+        return result;
     default:
         return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
     }
@@ -11582,6 +13090,12 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WavePrefixSum";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WavePrefixSum(expr[i]);
+        return result;
     default:
         return WaveMaskPrefixSum(WaveGetActiveMask(), expr);
     }
@@ -11632,6 +13146,12 @@ matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveReadLaneFirst(expr[i]);
+        return result;
     default:
         return WaveMaskReadLaneFirst(WaveGetActiveMask(), expr);
     }
@@ -11691,6 +13211,12 @@ matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
     {
     case cuda: __intrinsic_asm "_waveShuffleMultiple(_getActiveMask(), $0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveBroadcastLaneAt(value[i], lane);
+        return result;
     default:
         return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, lane);
     }
@@ -11746,6 +13272,12 @@ matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
     {
     case cuda: __intrinsic_asm "_waveShuffleMultiple(_getActiveMask(), $0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
+    case glsl:
+    case spirv:
+        matrix<T,N,M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveReadLaneAt(value[i], lane);
+        return result;
     default:
         return WaveMaskReadLaneAt(WaveGetActiveMask(), value, lane);
     }
@@ -11865,6 +13397,14 @@ uint4 WaveMatch(T value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
+    case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformPartitionedNV;
+            OpExtension "SPV_NV_shader_subgroup_partitioned";
+            OpGroupNonUniformPartitionNV $$uint4 result $value
+        };
     default:
         return WaveMaskMatch(WaveGetActiveMask(), value);
     }
@@ -11877,6 +13417,14 @@ uint4 WaveMatch(vector<T,N> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
+    case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformPartitionedNV;
+            OpExtension "SPV_NV_shader_subgroup_partitioned";
+            OpGroupNonUniformPartitionNV $$uint4 result $value
+        };
     default:
         return WaveMaskMatch(WaveGetActiveMask(), value);
     }
@@ -11889,6 +13437,14 @@ uint4 WaveMatch(matrix<T,N,M> value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
+    case glsl:
+    case cuda:
+    case spirv:
+        uint4 result = uint4(0xFFFFFFFF);
+        [ForceUnroll]
+        for (int i = 0; i < N; i++)
+            result &= WaveMatch(value[i]);
+        return result;
     default:
         return WaveMaskMatch(WaveGetActiveMask(), value);
     }

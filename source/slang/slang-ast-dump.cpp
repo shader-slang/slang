@@ -677,6 +677,7 @@ struct ASTDumpContext
             break;
         case SPIRVAsmOperand::RayCallableFromLocation:
             m_writer->emit("__rayCallableFromLocation");
+            break;
         case SPIRVAsmOperand::BuiltinVar:
             m_writer->emit("builtin");
             break;

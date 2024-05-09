@@ -640,7 +640,8 @@ alias image_size = texture_sm_4_1_compute_fragment + GL_ARB_shader_image_size;
 alias texture_size = texture_sm_4_1 + GL_ARB_shader_image_size;
 alias texture_querylod = texture_sm_4_1 + GL_EXT_texture_query_lod;
 alias texture_querylevels = texture_sm_4_1 + GL_ARB_texture_query_levels;
-alias texture_shadowlod = texture_sm_4_1 + GL_EXT_texture_shadow_lod;
+alias texture_shadowlod = texture_sm_4_1 + GL_EXT_texture_shadow_lod
+                        | texture_sm_4_1;
 alias texture_shadowlod_cube = texture_shadowlod | texture_shadowlod + GL_ARB_texture_cube_map;
 alias texture_cube = texture_sm_4_1 + GL_ARB_texture_cube_map | texture_sm_4_1;
 alias texture_querylevels_cube = texture_querylevels + GL_ARB_texture_cube_map | texture_querylevels;

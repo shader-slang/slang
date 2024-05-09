@@ -539,6 +539,7 @@ namespace Slang
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:
             case CodeGenTarget::HostHostCallable:
+            case CodeGenTarget::HostSharedLibrary:
             {
                 // We need some C/C++ compiler
                 return PassThroughMode::GenericCCpp;
@@ -955,6 +956,7 @@ namespace Slang
             }
             case CodeGenTarget::HostHostCallable:
             case CodeGenTarget::HostExecutable:
+            case CodeGenTarget::HostSharedLibrary:
             {
                 return CodeGenTarget::HostCPPSource;
             }
@@ -1279,8 +1281,14 @@ namespace Slang
         // Set the source type
         options.sourceLanguage = SlangSourceLanguage(sourceLanguage);
         
-        // Disable exceptions and security checks
-        options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
+        switch (target)
+        {
+        case CodeGenTarget::ShaderHostCallable:
+        case CodeGenTarget::ShaderSharedLibrary:
+            // Disable exceptions and security checks
+            options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
+            break;
+        }
 
         Profile profile;
 
@@ -1586,6 +1594,7 @@ namespace Slang
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:
             case CodeGenTarget::HostHostCallable:
+            case CodeGenTarget::HostSharedLibrary:
                 SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
                 return SLANG_OK;
 
@@ -1617,6 +1626,7 @@ namespace Slang
         case CodeGenTarget::ShaderHostCallable:
         case CodeGenTarget::ShaderSharedLibrary:
         case CodeGenTarget::HostExecutable:
+        case CodeGenTarget::HostSharedLibrary:
             {
                 SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 
@@ -2431,7 +2441,7 @@ namespace Slang
         EntryPoint* entryPoint,
         DiagnosticSink* sink);
 
-    void Module::_discoverEntryPoints(DiagnosticSink* sink)
+    void Module::_discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets)
     {
         for (auto globalDecl : m_moduleDecl->members)
         {
@@ -2466,12 +2476,30 @@ namespace Slang
             else
             {
                 // If there isn't a [shader] attribute, look for a [numthreads] attribute
-                // since that implicitly means a compute shader.
+                // since that implicitly means a compute shader. We'll not do this when compiling for
+                // CUDA/Torch since [numthreads] attributes are utilized differently for those targets.
+                // 
+
+                bool allTargetsCUDARelated = true;
+                for (auto target : targets)
+                {
+                    if (!isCUDATarget(target) && 
+                        target->getTarget() != CodeGenTarget::PyTorchCppBinding)
+                    {
+                        allTargetsCUDARelated = false;
+                        break;
+                    }
+                }
+
+                if (allTargetsCUDARelated && targets.getCount() > 0)
+                    continue;
+
                 auto numThreadsAttr = funcDecl->findModifier<NumThreadsAttribute>();
                 if (numThreadsAttr)
                     profile.setStage(Stage::Compute);
                 else
                     continue;
+                
             }
 
             RefPtr<EntryPoint> entryPoint = EntryPoint::create(

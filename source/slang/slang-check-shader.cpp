@@ -917,7 +917,7 @@ namespace Slang
             for (Index tt = 0; tt < translationUnitCount; ++tt)
             {
                 auto translationUnit = translationUnits[tt];
-                translationUnit->getModule()->_discoverEntryPoints(sink);
+                translationUnit->getModule()->_discoverEntryPoints(sink, this->getLinkage()->targets);
             }
         }
     }

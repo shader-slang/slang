@@ -322,7 +322,8 @@ namespace Slang
         Struct = 1,
         Var = 2,
         Function = 4,
-        All = 7
+        Param = 8,
+        All = 0x0F
     };
 
     const int kUnsizedArrayMagicLength = 0x7FFFFFFF;

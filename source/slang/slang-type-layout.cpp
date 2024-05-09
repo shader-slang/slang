@@ -1756,6 +1756,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
     case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
@@ -2057,6 +2058,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
             return SourceLanguage::C;
         }
         case CodeGenTarget::ShaderSharedLibrary:
+        case CodeGenTarget::HostSharedLibrary:
         case CodeGenTarget::ObjectCode:
         case CodeGenTarget::HostExecutable:
         case CodeGenTarget::HostHostCallable:

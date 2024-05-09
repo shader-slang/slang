@@ -306,7 +306,7 @@ public:
 
     void emitArgs(IRInst* inst);
 
-    
+    void emitRateQualifiers(IRInst* value);
     void emitRateQualifiersAndAddressSpace(IRInst* value);
 
     void emitInstResultDecl(IRInst* inst);

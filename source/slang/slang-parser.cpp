@@ -4311,6 +4311,7 @@ namespace Slang
             case ASTNodeType::TypeAliasDecl:
             case ASTNodeType::TypeDefDecl:
             case ASTNodeType::ExtensionDecl:
+            case ASTNodeType::SubscriptDecl:
                 return true;
             default:
                 return false;
@@ -4456,8 +4457,6 @@ namespace Slang
         // Or add any modifiers
         if (as<NamespaceDecl>(decl) && decl->parentDecl)
         {
-            // Presumably we have no modifiers.
-            SLANG_ASSERT(modifiers.isEmpty());
             return;
         }
 
