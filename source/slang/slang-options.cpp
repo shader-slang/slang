@@ -386,8 +386,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Optimization, "-O...", "-O<optimization-level>", "Set the optimization level."},
         { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },
         { OptionKind::GLSLForceScalarLayout,
-         "-force-glsl-scalar-layout", nullptr,
-         "Force using scalar block layout for uniform and shader storage buffers in GLSL output."},
+         "-force-glsl-scalar-layout,-fvk-use-scalar-layout", nullptr,
+         "Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV."},
         { OptionKind::VulkanBindShift, vkShiftNames.getBuffer(), "-fvk-<vulkan-shift>-shift <N> <space>", 
         "For example '-fvk-b-shift <N> <space>' shifts by N the inferred binding numbers for all resources in 'b' registers of space <space>. "
         "For a resource attached with :register(bX, <space>) but not [vk::binding(...)], "

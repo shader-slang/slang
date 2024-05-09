@@ -7432,11 +7432,22 @@ void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
 }
 
 [ForceInline]
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref  int64_t dest,  int64_t value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "atomicAdd((uint64_t*)$0, $1)";
+    case glsl:
+        __requireGLSLExtension("GL_EXT_shader_atomic_int64");
+        __intrinsic_asm "$atomicAdd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$int64_t = OpAtomicIAdd &dest Device None $value;
+        };
     }
 }
 
@@ -7446,26 +7457,60 @@ void InterlockedAdd(__ref  int64_t dest,  int64_t value, out  int64_t original_v
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "atomicAdd((uint64_t*)$0, $1)";
+    case glsl:
+        __requireGLSLExtension("GL_EXT_shader_atomic_int64");
+        __intrinsic_asm "$atomicAdd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            OpCapability Int64Atomics;
+            %origin:$$int64_t = OpAtomicIAdd &dest Device None $value;
+            OpStore &original_value %origin
+        };
     }
 }
 
 [ForceInline]
-void InterlockedAdd(__ref  uint64_t dest,  uint64_t value)
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+void InterlockedAdd(__ref uint64_t dest, uint64_t value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "atomicAdd($0, $1)";
+    case glsl:
+        __requireGLSLExtension("GL_EXT_shader_atomic_int64");
+        __intrinsic_asm "$atomicAdd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$uint64_t = OpAtomicIAdd &dest Device None $value;
+        };
     }
 }
 
 [ForceInline]
-void InterlockedAdd(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
+void InterlockedAdd(__ref uint64_t dest, uint64_t value, out uint64_t original_value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "atomicAdd($0, $1)";
+    case glsl:
+        __requireGLSLExtension("GL_EXT_shader_atomic_int64");
+        __intrinsic_asm "$atomicAdd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            OpCapability Int64Atomics;
+            %origin:$$uint64_t = OpAtomicIAdd &dest Device None $value;
+            OpStore &original_value %origin
+        };
     }
 }
+
 
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
