@@ -246,8 +246,9 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
     case kIROp_discard:
         m_writer->emit("discard_fragment();\n");
-        break;
+        return true;
     }
+    return false;
 }
 
 bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
