@@ -188,8 +188,23 @@ inline void UIntSet::add(const UIntSet& other)
 template<typename T>
 List<T> UIntSet::getElements() const
 {
-    // This is in the header to allow use with custom enums.
-    // This can be made faster likely by using a modified "Brian Kernighan"'s counting bits algorithm.
+    // This can be made faster with c++20/__clz support:
+    /*
+        List<T> elements;
+    elements.reserve(count);
+    for (Index block = 0; block < count; block++)
+    {        
+        Index n = m_buffer[block];
+        while (n != 0)
+        {
+            Index bitUnset = n;
+            n &= n - 1;
+            bitUnset -= n;
+            elements.add(T((std::countr_zero(bitUnset)<<3) + kElementSize * block));
+        }
+    }
+    return elements;
+    */
     auto count = m_buffer.getCount();
     if (count == 0)
         return {};

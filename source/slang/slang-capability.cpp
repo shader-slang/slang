@@ -157,6 +157,7 @@ void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(const Capability
         auto count = canonicalRepresentation.getCount();
         newArr.setCount(count + 1);
         memcpy(newArr.getBuffer(), canonicalRepresentation.getBuffer(), count * sizeof(CapabilityName));
+        m_targetSets[asAtom(target)].shaderStageSets.reserve(info.canonicalRepresentation.getCount());
         for (auto i : info.canonicalRepresentation)
         {
             newArr[count] = i[0];
@@ -169,11 +170,12 @@ void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(const Capability
     auto targetAtom = asAtom(target);
     CapabilityTargetSet& targetSet = m_targetSets[targetAtom];
     targetSet.target = targetAtom;
+    targetSet.shaderStageSets.reserve(kCapabilityStageCount);
 
     auto& localStageSets = targetSet.shaderStageSets[stageAtom];
     localStageSets.stage = stageAtom;
 
-    UIntSet setToAdd = UIntSet();
+    UIntSet setToAdd = UIntSet((UInt)CapabilityAtom::Count);
     for(auto i : canonicalRepresentation)
         setToAdd.add(asAtomUInt(i));
 
@@ -288,6 +290,7 @@ CapabilitySet::CapabilitySet(Int atomCount, CapabilityName const* atoms)
 
 CapabilitySet::CapabilitySet(CapabilityName atom)
 {
+    this->m_targetSets.reserve(kCapabilityTargetCount);
     addUnexpandedCapabilites(atom);
 }
 
@@ -487,10 +490,12 @@ void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
 
 void CapabilitySet::unionWith(const CapabilitySet& other)
 {
+    this->m_targetSets.reserve(other.m_targetSets.getCount());
     for (auto otherTargetSet : other.m_targetSets)
     {
         CapabilityTargetSet& thisTargetSet = this->m_targetSets[otherTargetSet.first];
         thisTargetSet.target = otherTargetSet.first;
+        thisTargetSet.shaderStageSets.reserve(otherTargetSet.second.shaderStageSets.getCount());
         thisTargetSet.unionWith(otherTargetSet.second);
     }
 }
@@ -794,15 +799,11 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
 
 List<const UIntSet*> CapabilitySet::getAtomSets() const
 {
-    bool reserveGuess = false;
     List<const UIntSet*> set;
+    //reserve for worst case
+    set.reserve(kCapabilityTargetCount * kCapabilityStageCount);
     for (auto& targetSet : m_targetSets)
     {
-        if (!reserveGuess)
-        {
-            reserveGuess = true;
-            set.reserve(set.getCount() + m_targetSets.getCount() * targetSet.second.shaderStageSets.getCount());
-        }
         for (auto& stageSets : targetSet.second.shaderStageSets)
         {
             for (auto& stageSet : stageSets.second.disjointSets)
@@ -817,7 +818,9 @@ List<const UIntSet*> CapabilitySet::getAtomSets() const
 List<List<CapabilityAtom>> CapabilitySet::getAtomSetsAsList() const
 {
     List<List<CapabilityAtom>> atomList;
+    //reserve for worst case
     auto sets = getAtomSets();
+    atomList.reserve(sets.getCount());
     for (auto& i : sets)
         atomList.add(i->getElements<CapabilityAtom>());
 

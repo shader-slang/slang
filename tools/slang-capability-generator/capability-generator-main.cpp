@@ -389,8 +389,30 @@ void calcCanonicalRepresentations(const List<RefPtr<CapabilityDef>>& defs, const
         calcCanonicalRepresentation(def, mapEnumValueToDef);
 }
 
+const Index kUnusedEnumValue = -1;
+
+void searchForAbstractWithIDFallbackNameAndCount(CapabilityDef* def, Index& idOfAbstract, const String& name, Index& counter)
+{
+    if (def->getAbstractBase()
+        && (
+            (idOfAbstract == def->getAbstractBase()->enumValue)
+            || (idOfAbstract == kUnusedEnumValue && def->getAbstractBase() && def->getAbstractBase()->name.equals("target"))
+            )
+        )
+    {
+        counter++;
+        idOfAbstract = def->getAbstractBase()->enumValue;
+    }
+}
+
 SlangResult generateDefinitions(const List<RefPtr<CapabilityDef>>& defs, StringBuilder& sbHeader, StringBuilder& sbCpp)
 {
+    Index enumValueOfTarget = kUnusedEnumValue;
+    Index targetCount = 0;
+
+    Index enumValueOfStage = kUnusedEnumValue;
+    Index stageCount = 0;
+
     sbHeader << "enum class CapabilityAtom\n{\n";
     sbHeader << "    Invalid,\n";
     for (auto def : defs)
@@ -398,10 +420,19 @@ SlangResult generateDefinitions(const List<RefPtr<CapabilityDef>>& defs, StringB
         if (def->flavor == CapabilityFlavor::Normal)
         {
             sbHeader << "    " << def->name << ",\n";
+        
+            searchForAbstractWithIDFallbackNameAndCount(def.get(), enumValueOfTarget, "target", targetCount);
+            searchForAbstractWithIDFallbackNameAndCount(def.get(), enumValueOfStage, "stage", stageCount);
         }
     }
     sbHeader << "    Count\n";
     sbHeader << "};\n";
+    
+    sbHeader << "\nenum {\n";
+    sbHeader << "    kCapabilityTargetCount = " << targetCount <<",\n";
+    sbHeader << "    kCapabilityStageCount = " << stageCount <<",\n";
+    sbHeader << "};\n\n";
+
     CapabilityDef* firstAbstractDef = nullptr;
     CapabilityDef* firstAliasDef = nullptr;
     sbHeader << "enum class CapabilityName\n{\n";
