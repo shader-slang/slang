@@ -252,6 +252,9 @@ struct PeepholeContext : InstPassBase
         switch (inst->getOp())
         {
         case kIROp_AlignOf:
+            // Fold all calls to builtin functions that results in simple integer values.
+            // When postInlining flag is set, this happens for alignOf<T>() function, which
+            // infers the size of T and replaces the use with the IntLiteral.
             if (isPostInlining && inst->getDataType()->getOp() == kIROp_IntType)
             {
                 auto alignOfInst = as<IRAlignOf>(inst);

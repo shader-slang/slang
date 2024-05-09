@@ -133,8 +133,8 @@ struct ByteAddressBufferLegalizationContext
         // is invalid in the IR), so we will defensively
         // leave the code along in that case.
         //
-if (!legalLoad)
-return;
+		if (!legalLoad)
+			return;
 
 // If we were able to generate a legal load operation,
 // then the value it yields can be used to fully
