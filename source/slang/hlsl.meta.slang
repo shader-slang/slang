@@ -6011,7 +6011,7 @@ T determinant(matrix<T,N,N> m)
 
 // Barrier for device memory
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cpp_cuda_glsl_hlsl_metal_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier_compute)]
 void DeviceMemoryBarrier()
 {
     __target_switch
@@ -6141,7 +6141,7 @@ vector<T,N> divide(vector<T,N> x, vector<T,N> y)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T dot(T x, T y)
 {
     __target_switch
@@ -6155,13 +6155,14 @@ T dot(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "dot";
     case hlsl: __intrinsic_asm "dot";
+    case metal: __intrinsic_asm "dot";
     case spirv: return spirv_asm {
         OpDot $$T result $x $y
     };
@@ -6175,7 +6176,7 @@ T dot(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -7310,7 +7311,7 @@ matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex)
 
 // Get number of samples in render target
 [__readNone]
-[require(sm_4_0)]
+[require(hlsl, sm_4_0)]
 [require(metal)]
 uint GetRenderTargetSampleCount()
 {
@@ -7323,7 +7324,7 @@ uint GetRenderTargetSampleCount()
 
 // Get position of given sample
 [__readNone]
-[require(sm_4_0)]
+[require(hlsl, sm_4_0)]
 [require(metal)]
 float2 GetRenderTargetSamplePosition(int Index)
 {
@@ -8867,7 +8868,7 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 // maximum
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T max(T x, T y)
 {
     // Note: a stdlib implementation of `max` (or `min`) will require splitting
@@ -8901,7 +8902,7 @@ T max(T x, T y)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -8930,7 +8931,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     __target_switch
@@ -9095,22 +9096,24 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 __generic<T : __BuiltinIntegerType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
+__target_intrinsic(metal)
 __target_intrinsic(cuda, "$P_min($0, $1)")
 __target_intrinsic(cpp, "$P_min($0, $1)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T min(T x, T y);
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "min";
     case glsl: __intrinsic_asm "min";
+    case metal: __intrinsic_asm "min";
     case spirv:
     {
         if (__isSignedInt<T>())
@@ -9129,7 +9132,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     __target_switch
