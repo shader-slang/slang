@@ -847,10 +847,8 @@
 		<DisplayString>{m_targetSets.map.m_values}</DisplayString>
 		<Expand>
 			<CustomListItems>
-				<Size>3</Size>
 				<Item Name="m_targetSets">m_targetSets</Item>
 				<Item Name="m_targetSets.map.m_values">m_targetSets.map.m_values</Item>
-				<Item Name="m_conjunctions">m_conjunctions</Item>
 			</CustomListItems>
 		</Expand>
 	</Type>
