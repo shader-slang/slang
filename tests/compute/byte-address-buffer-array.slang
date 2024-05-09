@@ -9,37 +9,69 @@
 
 // Confirm compilation of `(RW)ByteAddressBuffer` with aligned load / stores to wider data types.
 
-[vk::binding(2, 3)] RWByteAddressBuffer buffer0;
-struct BoundingBoxBlock {
-    float qBox[4];
+[vk::binding(2, 3)] RWByteAddressBuffer buffer;
+struct Block {
+    float4 val[2];
 };
 [shader("compute")]
 [numthreads(1,1,1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
     // CHECK-NOT: warning
-    // CHECK1: _Array_std430_float4_0 packStorage_0(float {{.*}}[4])
-    // CHECK1: void unpackStorage_0(_Array_std430_float4_0 {{.*}}, out float {{.*}}[4])
-    // CHECK1: unpackStorage_0(buffer0_0._data[0], {{.*}});
-    // CHECK1: float {{.*}}[4] = buffer0_0._data[0] = packStorage_0({{.*}});
+    // CHECK1: _Array_std430_vector{{.*}} _data[]
+    // CHECK1: _Array_std430_vector{{.*}} packStorage_0(vec4 {{.*}}[2])
+    // CHECK1: vec4  {{.*}}[2] = { {{.*}}[0], {{.*}}[1] };
+    // CHECK1: _Array_std430_vector{{.*}} {{.*}} = { {{.*}} };
+    // CHECK1: void unpackStorage_0(_Array_std430_vector{{.*}}, out vec4 {{.*}}[2])
+    // CHECK1: {{.*}}[0] =  {{.*}}.data_0[0];
+    // CHECK1: {{.*}}[1] =  {{.*}}.data_0[1];
+    // CHECK1: vec4  {{.*}}[2];
+    // CHECK1: unpackStorage_0(buffer_0._data[0], {{.*}});
+    // CHECK1: vec4  {{.*}}[2] = buffer_0._data[0] = packStorage_0({{.*}});
+    // CHECK1: vec4 {{.*}} = buffer_2._data[1];
+    // CHECK1: vec4 {{.*}} = buffer_2._data[1] = vec4(buffer_1._data[1], buffer_1._data[2], buffer_1._data[3], buffer_1._data[4]);
 
-    // CHECK2: float  {{.*}}[int(4)] = (buffer0_0).Load<float [int(4)] >(int(0));
-    // CHECK2: buffer0_0.Store(int(0),{{.*}});
+    // CHECK2: float4 {{.*}}[int(2)] = (buffer_0).Load<float4 [int(2)] >(int(0));
+    // CHECK2: buffer_0.Store(int(0),{{.*}});
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(int(4));
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(int(8));
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(int(12));
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(int(16));
+    // CHECK2: float4 {{.*}} = float4({{.*}}, {{.*}}, {{.*}}, {{.*}});
+    // CHECK2: float4 {{.*}} = (buffer_0).Load<float4 >(int(20));
+    // CHECK2: buffer_0.Store(int(16),{{.*}});
+    // CHECK2: buffer_0.Store(int(32),{{.*}});
 
-    // CHECK3-DAG: %[[AI4:[a-zA-Z0-9_]+]] = OpTypeArray %float %int_4
-    // CHECK3-DAG: %[[ASF4:[a-zA-Z0-9_]+]] = OpTypeStruct %[[AI4]]
-    // CHECK3-DAG: %[[SBA:[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer %[[ASF4]]
-    // CHECK3-DAG: %[[V1:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBA]] %buffer0 %int_0 %int_0
-    // CHECK3-DAG: %[[V2:[a-zA-Z0-9_]+]] = OpLoad %[[ASF4]] %[[V1]]
-    // CHECK3-DAG: %[[V3:[a-zA-Z0-9_]+]] = OpCompositeExtract %[[AI4]] %[[V2]] 0
-    // CHECK3-DAG: %[[V4:[a-zA-Z0-9_]+]] = OpCompositeExtract %float %[[V3]] 0
-    // CHECK3-DAG: %[[V5:[a-zA-Z0-9_]+]] = OpCompositeExtract %float %[[V3]] 1
-    // CHECK3-DAG: %[[V6:[a-zA-Z0-9_]+]] = OpCompositeExtract %float %[[V3]] 2
-    // CHECK3-DAG: %[[V7:[a-zA-Z0-9_]+]] = OpCompositeExtract %float %[[V3]] 3
-    // CHECK3-DAG: %[[V8:[a-zA-Z0-9_]+]] = OpCompositeConstruct %[[AI4]] %[[V4]] %[[V5]] %[[V6]] %[[V7]]
-    // CHECK3-DAG: %[[V9:[a-zA-Z0-9_]+]] = OpCompositeConstruct %[[ASF4]] %[[V8]]
-    // CHECK3-DAG: %[[V10:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBA]] %buffer0 %int_0 %int_0
-    // CHECK3-DAG: OpStore %[[V10]] %[[V9]]
-    buffer0.StoreAligned(0, buffer0.LoadAligned<BoundingBoxBlock>(0));
+    // CHECK3-DAG: %[[ARRV4_2:[a-zA-Z0-9_]+]] = OpTypeArray %v4float %int_2
+    // CHECK3-DAG: %[[SARRV4_2:[a-zA-Z0-9_]+]] = OpTypeStruct %[[ARRV4_2]]
+    // CHECK3-DAG: %[[SBA:[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer %[[SARRV4_2]]
+    // CHECK3-DAG: %[[SBF:[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer %float
+    // CHECK3-DAG: %[[SBVF:[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer %v4float
+    // CHECK3-DAG: %[[V0:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBA]] %buffer {{.*}}
+    // CHECK3-DAG: %[[V1:[a-zA-Z0-9_]+]] = OpLoad %[[SARRV4_2]] %[[V0]]
+    // CHECK3-DAG: %[[V2:[a-zA-Z0-9_]+]] = OpCompositeExtract %[[ARRV4_2]] %[[V1]] 0
+    // CHECK3-DAG: %[[V3:[a-zA-Z0-9_]+]] = OpCompositeExtract %v4float %[[V2]] 0
+    // CHECK3-DAG: %[[V4:[a-zA-Z0-9_]+]] = OpCompositeExtract %v4float %[[V2]] 1
+    // CHECK3-DAG: %[[V5:[a-zA-Z0-9_]+]] = OpCompositeConstruct %[[ARRV4_2]] %[[V3]] %[[V4]]
+    // CHECK3-DAG: %[[V6:[a-zA-Z0-9_]+]] = OpCompositeConstruct %[[SARRV4_2]] %[[V5]]
+    // CHECK3-DAG: %[[V7:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBA]] %buffer {{.*}}
+    // CHECK3-DAG: OpStore %[[V7]] %[[V6]]
+    // CHECK3-DAG: %[[V8:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBF]] %buffer_0 {{.*}}
+    // CHECK3-DAG: %[[V9:[a-zA-Z0-9_]+]] = OpLoad %float %[[V8]]
+    // CHECK3-DAG: %[[V10:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBF]] %buffer_0 {{.*}}
+    // CHECK3-DAG: %[[V11:[a-zA-Z0-9_]+]] = OpLoad %float %[[V10]]
+    // CHECK3-DAG: %[[V12:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBF]] %buffer_0 {{.*}}
+    // CHECK3-DAG: %[[V13:[a-zA-Z0-9_]+]] = OpLoad %float %[[V12]]
+    // CHECK3-DAG: %[[V14:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBF]] %buffer_0 {{.*}}
+    // CHECK3-DAG: %[[V15:[a-zA-Z0-9_]+]] = OpLoad %float %[[V14]]
+    // CHECK3-DAG: %[[V16:[a-zA-Z0-9_]+]] = OpCompositeConstruct %v4float %[[V9]] %[[V11]] %[[V13]] %[[V15]]
+    // CHECK3-DAG: %[[V17:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBVF]] %buffer_1 {{.*}}
+    // CHECK3-DAG: %[[V18:[a-zA-Z0-9_]+]] = OpLoad %v4float %[[V17]]
+    // CHECK3-DAG: %[[V19:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBVF]] %buffer_1 {{.*}}
+    // CHECK3-DAG: OpStore %[[V19]] %[[V16]]
+    // CHECK3-DAG: %[[V20:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBVF]] %buffer_1 {{.*}}
+    // CHECK3-DAG: OpStore %[[V20]] %[[V18]]
+    buffer.Store(0, buffer.LoadAligned<Block>(0));
+    buffer.StoreAligned(16, buffer.Load<Block>(4, 16));
 }
 
