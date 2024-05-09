@@ -146,7 +146,7 @@ public:
     /// Expand all getAtomSets into list form. This is an expensive operation.
     List<List<CapabilityAtom>> getAtomSetsAsList() const;
 
-    void CapabilitySet::addCapability(List<List<CapabilityAtom>>& atomLists);
+    void addCapability(List<List<CapabilityAtom>>& atomLists);
     /// Calculate a list of "compacted" atoms, which excludes any atoms from the expanded list that are implies by another item in the list.
 
     bool isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const;
@@ -169,7 +169,7 @@ private:
 
     void addCapability(CapabilityName name);
 
-    bool CapabilitySet::hasSameTargets(const CapabilitySet& other) const;
+    bool hasSameTargets(const CapabilitySet& other) const;
 };
 
     /// Returns true if atom is derived from base
