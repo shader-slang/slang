@@ -4222,7 +4222,7 @@ matrix<T, N, M> acos(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T acosh(T x)
 {
     __target_switch
@@ -4242,7 +4242,7 @@ T acosh(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> acosh(vector<T,N> x)
 {
     __target_switch
@@ -4676,7 +4676,7 @@ matrix<T, N, M> asin(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T asinh(T x)
 {
     __target_switch
@@ -4696,7 +4696,7 @@ T asinh(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> asinh(vector<T,N> x)
 {
     __target_switch
@@ -5255,7 +5255,7 @@ matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T atanh(T x)
 {
     __target_switch
@@ -5622,7 +5622,7 @@ matrix<T, N, M> cos(matrix<T, N, M> x)
 // Hyperbolic cosine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T cosh(T x)
 {
     __target_switch
@@ -5640,7 +5640,7 @@ T cosh(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> cosh(vector<T,N> x)
 {
     __target_switch
@@ -5658,7 +5658,7 @@ vector<T,N> cosh(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 matrix<T, N, M> cosh(matrix<T, N, M> x)
 {
     __target_switch
@@ -5673,7 +5673,7 @@ matrix<T, N, M> cosh(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T cospi(T x)
 {
     __target_switch
@@ -5686,7 +5686,7 @@ T cospi(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> cospi(vector<T,N> x)
 {
     __target_switch
@@ -6065,7 +6065,7 @@ T distance(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 T fdim(T x, T y)
 {
     __target_switch
@@ -6078,7 +6078,7 @@ T fdim(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 vector<T,N> fdim(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -10246,7 +10246,7 @@ vector<uint, N> reversebits(vector<uint, N> value)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T rint(T x)
 {
     __target_switch
@@ -10277,7 +10277,7 @@ T rint(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> rint(vector<T,N> x)
 {
     __target_switch
