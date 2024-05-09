@@ -221,7 +221,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             if(user->getOp() == kIROp_GetLegalizedSPIRVGlobalParamAddr)
             {
-                user->replaceUsesWith(use->get());
+                user->replaceUsesWith(addr);
                 user->removeAndDeallocate();
             }
             else if((as<IRGetElement>(user) || as<IRFieldExtract>(user)) &&
@@ -251,10 +251,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 // Skip load's for referenced `Input` variables since a ref implies
                 // passing as is, which needs to be a pointer (pass as is).
-                if (user->getDataType() 
+                if (user->getDataType()
                     && user->getDataType()->getOp() == kIROp_RefType
                     && storageClass == SpvStorageClassInput)
+                {
+                    builder.replaceOperand(use, addr);
                     continue;
+                }
                 // If this is being used in an asm block, insert the load to
                 // just prior to the block.
                 const auto asmBlock = spirvAsmOperand->getAsmBlock();
@@ -276,7 +279,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
 
         for (auto i : instsToRemove)
+        {
             i->removeAndDeallocate();
+        }
     }
 
     // Returns true if the given type that should be decorated as in `UniformConstant` address space.

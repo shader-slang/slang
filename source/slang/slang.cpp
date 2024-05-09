@@ -316,6 +316,12 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
         return SLANG_FAIL;
     }
 
+#ifdef _DEBUG
+    // Print a message in debug builds to notice the user that compiling the stdlib
+    // can take a while.
+    fprintf(stderr, "Compiling stdlib on debug build, this can take a while.\n");
+#endif
+
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     StringBuilder stdLibSrcBuilder;
     stdLibSrcBuilder
