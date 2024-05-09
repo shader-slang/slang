@@ -8880,6 +8880,7 @@ T max(T x, T y)
     {
     case hlsl: __intrinsic_asm "max";
     case glsl: __intrinsic_asm "max";
+    case metal: __intrinsic_asm "max";
     case cuda: __intrinsic_asm "$P_max($0, $1)";
     case cpp: __intrinsic_asm "$P_max($0, $1)";
     case spirv:
@@ -8909,6 +8910,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     {
     case hlsl: __intrinsic_asm "max";
     case glsl: __intrinsic_asm "max";
+    case metal: __intrinsic_asm "max";
     case spirv:
     {
         if (__isSignedInt<T>())
