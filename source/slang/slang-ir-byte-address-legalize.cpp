@@ -28,6 +28,7 @@ struct ByteAddressBufferLegalizationContext
     TargetRequest* m_target = nullptr;
     ByteAddressBufferLegalizationOptions m_options;
 
+    DiagnosticSink* m_sink = nullptr;
     // We will also use a central IR builder when generating new
     // code as part of legalization (rather than create/destroy
     // IR builders on the fly).
@@ -232,7 +233,7 @@ load->removeAndDeallocate();
             {
                 return true;
             }
-            //TODO: Throw an error if this condition is not true.
+			m_sink->diagnose(offset->sourceLoc, Slang::Diagnostics::byteAddressBufferUnaligned, alignInst->getValue(), alignmentVal);
         }
         return false;
     }
@@ -1105,6 +1106,7 @@ void legalizeByteAddressBufferOps(
     Session*                                    session,
     TargetProgram*                              program,
     IRModule*                                   module,
+	DiagnosticSink*								sink,
     ByteAddressBufferLegalizationOptions const& options)
 {
     ByteAddressBufferLegalizationContext context;
@@ -1112,6 +1114,7 @@ void legalizeByteAddressBufferOps(
     context.m_target = program->getTargetReq();
     context.m_options = options;
     context.m_targetProgram = program;
+    context.m_sink = sink;
     context.processModule(module);
 }
 

@@ -781,7 +781,7 @@ Result linkAndOptimizeIR(
             break;
         }
 
-        legalizeByteAddressBufferOps(session, targetProgram, irModule, byteAddressBufferOptions);
+        legalizeByteAddressBufferOps(session, targetProgram, irModule, codeGenContext->getSink(), byteAddressBufferOptions);
     }
 
     // For CUDA targets only, we will need to turn operations
