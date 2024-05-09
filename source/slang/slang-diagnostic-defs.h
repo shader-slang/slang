@@ -753,7 +753,7 @@ DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this loca
 DIAGNOSTIC(41202, Error, notEqualBitCastSize, "invalid to bit_cast differently sized types: '$0' with size '$1' casted into '$2' with size '$3'")
 DIAGNOSTIC(41203, Warning, notEqualReinterpretCastSize, "reinterpret<> into not equally sized types: '$0' with size '$1' casted into '$2' with size '$3'")
 
-DIAGNOSTIC(41300, Error, byteAddressBufferUnaligned, "Base offset '$0' of the byteAddressBuffer access is not divisible by the explicitly defined alignment val `$1`")
+DIAGNOSTIC(41300, Error, byteAddressBufferUnaligned, "Unknown Base offset prevents us from performing an aligned byteAddressBuffer access since the explicit alignment '$0' is not divisible by the size of the base type `$1`")
 //
 // 5xxxx - Target code generation.
 //

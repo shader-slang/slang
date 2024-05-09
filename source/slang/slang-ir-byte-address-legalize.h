@@ -6,6 +6,7 @@ namespace Slang
 class Session;
 class TargetProgram;
 struct IRModule;
+class DiagnosticSink;
 
 struct ByteAddressBufferLegalizationOptions
 {
