@@ -2516,7 +2516,15 @@ void addArg(
             // pass in the actual pointer.
             //
             IRInst* argPtr = getAddress(context, argVal, loc);
-            addInArg(context, ioArgs, LoweredValInfo::simple(argPtr));
+            if (argPtr)
+                addInArg(context, ioArgs, LoweredValInfo::simple(argPtr));
+            else
+            {
+                // If arg can't be converted to a pointer, we have already
+                // reported an error, so just pass a null pointer to allow
+                // the remaining lowering steps to finish.
+                addInArg(context, ioArgs, LoweredValInfo::simple(context->irBuilder->getNullVoidPtrValue()));
+            }
         }
         break;
 
@@ -2708,6 +2716,10 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     else if (parentDecl->hasModifier<ConstRefAttribute>())
     {
         return kParameterDirection_ConstRef;
+    }
+    else if (parentDecl->hasModifier<RefAttribute>())
+    {
+        return kParameterDirection_Ref;
     }
 
     // A `set` accessor on a property or subscript declaration
@@ -6737,6 +6749,14 @@ LoweredValInfo tryGetAddress(
             UInt elementCount = originalSwizzleInfo->elementCount;
 
             auto newBase = tryGetAddress(context, originalBase, TryGetAddressMode::Aggressive);
+            if (newBase.flavor == LoweredValInfo::Flavor::Ptr && elementCount == 1)
+            {
+                // A special case is when we have a single element swizzle,
+                // we can just emit an element address.
+                auto elementPtr = context->irBuilder->emitElementAddress(newBase.val, originalSwizzleInfo->elementIndices[0]);
+                return LoweredValInfo::ptr(elementPtr);
+            }
+            
             RefPtr<SwizzledLValueInfo> newSwizzleInfo = new SwizzledLValueInfo();
             context->shared->extValues.add(newSwizzleInfo);
 

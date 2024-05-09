@@ -2753,6 +2753,15 @@ namespace Slang
             return false;
         }
 
+        if (satisfyingMemberDeclRef.getDecl()->hasModifier<RefAttribute>()
+            != requiredMemberDeclRef.getDecl()->hasModifier<RefAttribute>())
+        {
+            // A `[ref]` method can't satisfy a non-`[ref]` requirement.
+            // The opposite direction is okay, but we will need to synthesize a wrapper
+            // to ensure type matches, so we will return false here either way.
+            return false;
+        }
+
         if(satisfyingMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>()
             != requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
         {
@@ -3647,6 +3656,16 @@ namespace Slang
                 auto synConstRefAttr = m_astBuilder->create<ConstRefAttribute>();
                 addModifier(synthesized, synConstRefAttr);
             }
+            if (requiredMemberDeclRef.getDecl()->hasModifier<RefAttribute>())
+            {
+                // If the interface requirement is `[ref]` then our
+                // synthesized method should be too.
+                //
+                synThis->type.isLeftValue = true;
+
+                auto synConstRefAttr = m_astBuilder->create<RefAttribute>();
+                addModifier(synthesized, synConstRefAttr);
+            }
             if (requiredMemberDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
             {
                 auto noDiffThisAttr = m_astBuilder->create<NoDiffThisAttribute>();
@@ -4311,7 +4330,18 @@ namespace Slang
                 auto synAttr = m_astBuilder->create<MutatingAttribute>();
                 synAccessorDecl->modifiers.first = synAttr;
             }
+            else if (requiredAccessorDeclRef.getDecl()->hasModifier<RefAttribute>())
+            {
+                synThis->type.isLeftValue = true;
 
+                auto synAttr = m_astBuilder->create<RefAttribute>();
+                synAccessorDecl->modifiers.first = synAttr;
+            }
+            else if (requiredAccessorDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
+            {
+                auto synAttr = m_astBuilder->create<ConstRefAttribute>();
+                synAccessorDecl->modifiers.first = synAttr;
+            }
             // We are going to synthesize an expression and then perform
             // semantic checking on it, but if there are semantic errors
             // we do *not* want to report them to the user as such, and
@@ -7733,7 +7763,8 @@ namespace Slang
             if (!isEffectivelyStatic(decl))
             {
                 auto constrefAttr = decl->findModifier<ConstRefAttribute>();
-                if (constrefAttr)
+                auto refAttr = decl->findModifier<RefAttribute>();
+                if (constrefAttr || refAttr)
                 {
                     if (isTypeDifferentiable(calcThisType(getParentDecl(decl))))
                     {

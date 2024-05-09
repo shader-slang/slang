@@ -1748,6 +1748,15 @@ void CLikeSourceEmitter::emitArgs(IRInst* inst)
     m_writer->emit(")");
 }
 
+void CLikeSourceEmitter::emitRateQualifiers(IRInst* value)
+{
+    const auto rate = value->getRate();
+    if (rate)
+    {
+        emitRateQualifiersAndAddressSpaceImpl(rate, -1);
+    }
+}
+
 void CLikeSourceEmitter::emitRateQualifiersAndAddressSpace(IRInst* value)
 {
     const auto rate = value->getRate();
@@ -1770,7 +1779,7 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
 
     emitTempModifiers(inst);
 
-    emitRateQualifiersAndAddressSpace(inst);
+    emitRateQualifiers(inst);
 
     if(as<IRModuleInst>(inst->getParent()))
     {

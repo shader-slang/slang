@@ -4173,6 +4173,10 @@ namespace Slang
                 {
                     expr->type.isLeftValue = true;
                 }
+                else if (funcDeclBase->hasModifier<RefAttribute>())
+                {
+                    expr->type.isLeftValue = true;
+                }
             }
             else if( auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl) )
             {

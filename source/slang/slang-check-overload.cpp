@@ -522,7 +522,8 @@ namespace Slang
     {
         if(decl->hasModifier<MutatingAttribute>())
             return true;
-
+        if (decl->hasModifier<RefAttribute>())
+            return true;
         if(decl->hasModifier<NonmutatingAttribute>())
             return false;
 
