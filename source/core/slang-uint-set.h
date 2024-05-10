@@ -213,7 +213,7 @@ static inline T bitscanForward(const uint64_t& in)
         return T(out + bitsInType);        
     }
 #else
-    return T(__builtin_ctzll(&in);
+    return T(__builtin_ctzll(&in));
 #endif
 }
 
