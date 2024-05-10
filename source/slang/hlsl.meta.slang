@@ -4364,7 +4364,7 @@ void AllMemoryBarrier()
     case hlsl: __intrinsic_asm "AllMemoryBarrier";
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__threadfence()";
-    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock | mem_flags::mem_object_data)";
+    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
             OpMemoryBarrier Device AcquireRelease|UniformMemory|WorkgroupMemory|ImageMemory;
@@ -4382,7 +4382,7 @@ void AllMemoryBarrierWithGroupSync()
     case hlsl: __intrinsic_asm "AllMemoryBarrierWithGroupSync";
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__syncthreads()";
-    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock | mem_flags::mem_object_data)";
+    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
             OpControlBarrier Workgroup Device AcquireRelease|UniformMemory|WorkgroupMemory|ImageMemory;
@@ -6019,7 +6019,7 @@ void DeviceMemoryBarrier()
     case hlsl: __intrinsic_asm "DeviceMemoryBarrier";
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__threadfence()";
-    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock | mem_flags::mem_object_data)";
+    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
             OpMemoryBarrier Device AcquireRelease|UniformMemory|ImageMemory;
@@ -6036,7 +6036,7 @@ void DeviceMemoryBarrierWithGroupSync()
     case hlsl: __intrinsic_asm "DeviceMemoryBarrierWithGroupSync";
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__syncthreads()";
-    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock | mem_flags::mem_object_data)";
+    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
             OpControlBarrier Workgroup Device AcquireRelease|UniformMemory|ImageMemory;
