@@ -36,30 +36,12 @@ matrix<T,A,B> _slang_matrixReshape(matrix<T,N,M> m)
 
 static const char* kMetalBuiltinPreludeVectorReshape = R"(
 template<int A, typename T, int N>
-vector<T,A> _slang_vectorReshape(vector<T,N> v)
+vec<T,A> _slang_vectorReshape(vec<T,N> v)
 {
-    vector<T,A> result = T(0);
+    vec<T,A> result = T(0);
     for (int i = 0; i < min(A,N); i++)
         result[i] = v[i];
     return result;
-}
-)";
-
-static const char* kMetalBuiltinPreludeByteAddressBufferLoad = R"(
-template<typename T>
-T _slang_byteAddressBufferLoad(uint8_t device* ptr)
-{
-    T result;
-    memcpy(&result, ptr, sizeof(T));
-    return result;
-}
-)";
-
-static const char* kMetalBuiltinPreludeByteAddressBufferStore = R"(
-template<typename T>
-void _slang_byteAddressBufferLoad(uint8_t device* ptr, T val)
-{
-    memcpy(ptr, &val, sizeof(T));
 }
 )";
 
@@ -360,29 +342,30 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
         case kIROp_ByteAddressBufferLoad:
         {
-            ensurePrelude(kMetalBuiltinPreludeByteAddressBufferLoad);
+            // This only works for loads of 4-byte values.
+            // Other element types should have been lowered by previous legalization passes.
             auto elementType = inst->getDataType();
             auto buffer = inst->getOperand(0);
             auto offset = inst->getOperand(1);
-            m_writer->emit("_slang_byteAddressBufferLoad<");
+            m_writer->emit("as_type<");
             emitType(elementType);
             m_writer->emit(">(");
             emitOperand(buffer, getInfo(EmitOp::General));
-            m_writer->emit("+(");
+            m_writer->emit("[(");
             emitOperand(offset, getInfo(EmitOp::General));
-            m_writer->emit("))");
+            m_writer->emit(")>>2)]");
             return true;
         }
         case kIROp_ByteAddressBufferStore:
         {
-            ensurePrelude(kMetalBuiltinPreludeByteAddressBufferStore);
+            // This only works for loads of 4-byte values.
+            // Other element types should have been lowered by previous legalization passes.
             auto buffer = inst->getOperand(0);
             auto offset = inst->getOperand(1);
-            m_writer->emit("_slang_byteAddressBufferStore(");
             emitOperand(buffer, getInfo(EmitOp::General));
-            m_writer->emit("+(");
+            m_writer->emit("[(");
             emitOperand(offset, getInfo(EmitOp::General));
-            m_writer->emit("), ");
+            m_writer->emit(")>>2)] = as_type<uint32_t>(");
             emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
@@ -688,7 +671,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             case kIROp_HLSLByteAddressBufferType:
             case kIROp_HLSLRWByteAddressBufferType:
             case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
-                m_writer->emit("uint8_t device*");
+                m_writer->emit("uint32_t device*");
                 break;
             case kIROp_RaytracingAccelerationStructureType:
                 m_writer->emit("acceleration_structure<instancing>");

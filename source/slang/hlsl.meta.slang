@@ -4068,7 +4068,7 @@ vector<T, N> abs(vector<T, N> x)
     {
     case hlsl: __intrinsic_asm "abs";
     case glsl: __intrinsic_asm "abs";
-    case metal: __intrinsic_asm "metal";
+    case metal: __intrinsic_asm "abs";
     case spirv: return spirv_asm {
         result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
     };
@@ -6055,6 +6055,7 @@ T distance(vector<T, N> x, vector<T, N> y)
     {
     case glsl: __intrinsic_asm "distance";
     case hlsl: __intrinsic_asm "distance";
+    case metal: __intrinsic_asm "distance";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Distance $x $y
     };
@@ -10528,7 +10529,7 @@ int sign(T x)
     __target_switch
     {
     case hlsl: __intrinsic_asm "sign";
-    case metal: __intrinsic_asm "sign";
+    case metal: __intrinsic_asm "int(sign($0))";
     case glsl: __intrinsic_asm "int(sign($0))";
     case cuda:
     case cpp:
@@ -10553,6 +10554,7 @@ vector<int, N> sign(vector<T, N> x)
     {
     case hlsl: __intrinsic_asm "sign";
     case glsl: __intrinsic_asm "ivec$N0(sign($0))";
+    case metal: __intrinsic_asm "vec<int,$N0>(sign($0))";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm
