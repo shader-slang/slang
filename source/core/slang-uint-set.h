@@ -211,7 +211,7 @@ static inline Index bitscanForward(const uint64_t& in)
 #endif// #ifdef _WIN64
 
 #else 
-    return Index(__builtin_ctzll(&in));
+    return Index(__builtin_ctzll(in));
 #endif// #if defined(_MSC_VER)
 }
 
