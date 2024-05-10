@@ -188,49 +188,37 @@ inline void UIntSet::add(const UIntSet& other)
         m_buffer[i] |= other.m_buffer[i];
 }
 
+static inline uint64_t bitscanForward(const uint64_t& in)
+{
+#if defined(_MSC_VER)
+    uint64_t out;
+    _BitScanForward64((unsigned long*)&out, in);
+    return out;
+#else
+    return __builtin_ctzll(&in);
+#endif
+}
+
 template<typename T>
 List<T> UIntSet::getElements() const
 {
-    // This can be made faster with c++20/__clz support:
-    /*
-        List<T> elements;
+    auto count = m_buffer.getCount();
+    if (count == 0)
+        return {};
+
+    // Specific path for uint64_t. If using SIMD we should not use this path due to larger data types.
+
+    List<T> elements;
     elements.reserve(count);
     for (Index block = 0; block < count; block++)
-    {        
+    {
         Index n = m_buffer[block];
         while (n != 0)
         {
             Index bitUnset = n;
             n &= n - 1;
             bitUnset -= n;
-            elements.add(T((std::countr_zero(bitUnset)<<3) + kElementSize * block));
-        }
-    }
-    return elements;
-    */
-    auto count = m_buffer.getCount();
-    if (count == 0)
-        return {};
-
-    List<T> elements;
-    elements.reserve(count);
-    Element totalBitCounter = 0;
-    Index localBitCounter = 0;
-    for (Index block = 0; block < count; block++)
-    {
-        if (m_buffer[block] == 0)
-        {
-            totalBitCounter += kElementSize;
-            continue;
-        }
-
-        localBitCounter = 0;
-        while (localBitCounter < kElementSize)
-        {
-            if (m_buffer[block] >> localBitCounter & 1LL)
-                elements.add((T)totalBitCounter);
-            totalBitCounter++;
-            localBitCounter++;
+            elements.add(T((bitscanForward(bitUnset)) + kElementSize * block));
         }
     }
     return elements;

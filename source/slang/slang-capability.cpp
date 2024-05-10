@@ -693,6 +693,10 @@ bool CapabilitySet::hasSameTargets(const CapabilitySet& other) const
     return this->m_targetSets.getCount() == other.m_targetSets.getCount();
 }
 
+
+// MSVC incorrectly throws warning
+#pragma warning(push)
+#pragma warning(disable:4702)
 bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const
 {
     // returns true if 'this' is a better target for 'targetCaps' than 'that'
@@ -729,9 +733,8 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
             if (!thatStageSets)
                 return true;
 
-            // NOTE: not needed for now
             // We want the smallest (most specialized) set which is still contained by this/that. This means:
-            // 1. this/that.contains(target)
+            // 1. target.contains(this/that)
             // 2. choose smallest super set
             // 3. rank each super set and their atoms, choose the smallest rank'd set (most specialized)
             for (auto& shaderStageSetWeNeed : shaderStageSetsWeNeed.second.disjointSets)
@@ -801,9 +804,9 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
             }
         }
     }
-    
     return true;
 }
+#pragma warning(pop)
 
 List<const CapabilityAtomSet*> CapabilitySet::getAtomSets() const
 {
