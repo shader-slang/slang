@@ -188,14 +188,15 @@ inline void UIntSet::add(const UIntSet& other)
         m_buffer[i] |= other.m_buffer[i];
 }
 
-static inline Index bitscanForward(const uint64_t& in)
+template<typename T>
+static inline T bitscanForward(const uint64_t& in)
 {
 #if defined(_MSC_VER)
     __if_exists (_BitScanForward64)
     {
         uint64_t out;
         _BitScanForward64((unsigned long*)&out, in);
-        return Index(out);
+        return T(out);
     }
     __if_not_exists (_BitScanForward64)
     {
@@ -204,12 +205,12 @@ static inline Index bitscanForward(const uint64_t& in)
         // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
         _BitScanForward((unsigned long*)&out, *( ((uint32_t*)&in) + 1 ));
         if (out != bitsInType)
-            return Index(out);
+            return T(out);
         _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
-        return Index(out + bitsInType);        
+        return T(out + bitsInType);
     }
 #else
-    return Index(__builtin_ctzll(&in);
+    return T(__builtin_ctzll(&in);
 #endif
 }
 
@@ -232,7 +233,7 @@ List<T> UIntSet::getElements() const
             Index bitUnset = n;
             n &= n - 1;
             bitUnset -= n;
-            elements.add(bitscanForward<T>(bitUnset)+ T(kElementSize * block) );
+            elements.add(bitscanForward<T>(bitUnset)+ T(kElementSize * block));
         }
     }
     return elements;
