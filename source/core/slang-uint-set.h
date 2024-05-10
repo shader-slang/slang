@@ -6,6 +6,9 @@
 #include "slang-common.h"
 #include "slang-hash.h"
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
 #include <memory.h>
 
 namespace Slang
@@ -191,26 +194,25 @@ inline void UIntSet::add(const UIntSet& other)
 static inline Index bitscanForward(const uint64_t& in)
 {
 #if defined(_MSC_VER)
-    __if_exists (_BitScanForward64)
-    {
-        uint64_t out;
-        _BitScanForward64((unsigned long*)&out, in);
-        return Index(out);
-    }
-    __if_not_exists (_BitScanForward64)
-    {
-        constexpr uint32_t bitsInType = sizeof(uint32_t) * 8;
-        uint32_t out;
-        // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
-        _BitScanForward((unsigned long*)&out, *( ((uint32_t*)&in) + 1 ));
-        if (out != bitsInType)
-            return Index(out);
-        _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
-        return Index(out + bitsInType);
-    }
+
+#ifdef _WIN64
+    uint64_t out;
+    _BitScanForward64((unsigned long*)&out, in);
+    return Index(out);
 #else
+    constexpr uint32_t bitsInType = sizeof(uint32_t) * 8;
+    uint32_t out;
+    // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
+    _BitScanForward((unsigned long*)&out, *( ((uint32_t*)&in) + 1 ));
+    if (out != bitsInType)
+        return Index(out);
+    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
+    return Index(out + bitsInType);
+#endif// #ifdef _WIN64
+
+#else 
     return Index(__builtin_ctzll(&in));
-#endif
+#endif// #if defined(_MSC_VER)
 }
 
 template<typename T>
@@ -226,10 +228,10 @@ List<T> UIntSet::getElements() const
     elements.reserve(count);
     for (Index block = 0; block < count; block++)
     {
-        Index n = m_buffer[block];
+        Element n = m_buffer[block];
         while (n != 0)
         {
-            Index bitUnset = n;
+            Element bitUnset = n;
             n &= n - 1;
             bitUnset -= n;
             elements.add(T(bitscanForward(bitUnset) + (kElementSize * block)));
