@@ -2189,26 +2189,10 @@ Result DeviceImpl::createBufferView(
 {
     auto resourceImpl = (BufferResourceImpl*)buffer;
 
-    // TODO: These should come from the `ResourceView::Desc`
-    auto stride = desc.bufferElementSize;
-    if (stride == 0)
-    {
-        if (desc.format == Format::Unknown)
-        {
-            stride = 1;
-        }
-        else
-        {
-            FormatInfo info;
-            gfxGetFormatInfo(desc.format, &info);
-            stride = info.blockSizeInBytes;
-            assert(info.pixelsPerBlock == 1);
-        }
-    }
-    VkDeviceSize offset = (VkDeviceSize)desc.bufferRange.firstElement * stride;
-    VkDeviceSize size = desc.bufferRange.elementCount == 0
+    VkDeviceSize offset = (VkDeviceSize)desc.bufferRange.offset;
+    VkDeviceSize size = desc.bufferRange.size == 0
         ? (buffer ? resourceImpl->getDesc()->sizeInBytes : 0)
-        : (VkDeviceSize)desc.bufferRange.elementCount * stride;
+        : (VkDeviceSize)desc.bufferRange.size;
 
     // There are two different cases we need to think about for buffers.
     //

@@ -665,19 +665,10 @@ void ResourceCommandEncoder::_clearBuffer(
     VkBuffer buffer, uint64_t bufferSize, const IResourceView::Desc& desc, uint32_t clearValue)
 {
     auto& api = m_commandBuffer->m_renderer->m_api;
-
-    FormatInfo info = {};
-    gfxGetFormatInfo(desc.format, &info);
-    auto texelSize = info.blockSizeInBytes;
-    auto elementCount = desc.bufferRange.elementCount;
-    auto clearStart = (uint64_t)desc.bufferRange.firstElement * texelSize;
-    auto clearSize = bufferSize - clearStart;
-    if (elementCount != 0)
-    {
-        clearSize = (uint64_t)elementCount * texelSize;
-    }
+    auto clearOffset = desc.bufferRange.offset;
+    auto clearSize = desc.bufferRange.size == 0 ? bufferSize - clearOffset : desc.bufferRange.size;
     api.vkCmdFillBuffer(
-        m_commandBuffer->m_commandBuffer, buffer, clearStart, clearSize, clearValue);
+        m_commandBuffer->m_commandBuffer, buffer, clearOffset, clearSize, clearValue);
 }
 
 void ResourceCommandEncoder::clearResourceView(
@@ -724,13 +715,10 @@ void ResourceCommandEncoder::clearResourceView(
                         clearValue->color.uintValues[2] == clearValue->color.uintValues[0] &&
                         clearValue->color.uintValues[3] == clearValue->color.uintValues[0]);
                     auto viewImpl = static_cast<PlainBufferResourceViewImpl*>(viewImplBase);
-                    uint64_t clearStart = viewImpl->m_desc.bufferRange.firstElement;
-                    uint64_t clearSize = viewImpl->m_desc.bufferRange.elementCount;
-
+                    uint64_t clearStart = viewImpl->m_desc.bufferRange.offset;
+                    uint64_t clearSize = viewImpl->m_desc.bufferRange.size;
                     if (clearSize == 0)
                         clearSize = viewImpl->m_buffer->getDesc()->sizeInBytes - clearStart;
-                    if (viewImpl->m_desc.bufferElementSize != 0)
-                        clearSize *= viewImpl->m_desc.bufferElementSize;
                     api.vkCmdFillBuffer(
                         m_commandBuffer->m_commandBuffer,
                         viewImpl->m_buffer->m_buffer.m_buffer,

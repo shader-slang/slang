@@ -1678,6 +1678,7 @@ Result DeviceImpl::createBufferView(
         resourceImpl,
         counterResourceImpl,
         desc,
+        resourceImpl->getDesc()->elementSize,
         this,
         m_cpuViewHeap.get(),
         &viewImpl->m_descriptor));

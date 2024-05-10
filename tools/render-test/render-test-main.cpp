@@ -257,7 +257,6 @@ struct AssignValsFromLayoutContext
         IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::UnorderedAccess;
         viewDesc.format = srcBuffer.format;
-        viewDesc.bufferElementSize = srcVal->bufferDesc.stride;
         auto bufferView = device->createBufferView(bufferResource, counterResource, viewDesc);
         dstCursor.setResource(bufferView);
         maybeAddOutput(dstCursor, srcVal, bufferResource);
