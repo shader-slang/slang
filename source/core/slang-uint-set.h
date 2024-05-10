@@ -188,19 +188,17 @@ inline void UIntSet::add(const UIntSet& other)
         m_buffer[i] |= other.m_buffer[i];
 }
 
-template<typename T>
-static inline T bitscanForward(const uint64_t& in)
+static inline Index bitscanForward(const uint64_t& in)
 {
 #if defined(_MSC_VER)
-#define UINTSET_CLZ_TYPE uint64_t
     uint64_t out;
     _BitScanForward64((unsigned long*)&out, in);
-    return out;
+    return Index(out);
 #else
-#define UINTSET_CLZ_TYPE int
-    return __builtin_ctzll(&in);
+    return Index(__builtin_ctzll(&in));
 #endif
 }
+
 template<typename T>
 List<T> UIntSet::getElements() const
 {
@@ -220,7 +218,7 @@ List<T> UIntSet::getElements() const
             Index bitUnset = n;
             n &= n - 1;
             bitUnset -= n;
-            elements.add(T((bitscanForward<UINTSET_CLZ_TYPE>(bitUnset)) + kElementSize * block ));
+            elements.add(T((bitscanForward(bitUnset)) + kElementSize * block ));
         }
     }
     return elements;
