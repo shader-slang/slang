@@ -239,7 +239,6 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     {
         case kIROp_MakeVector:
         case kIROp_MakeMatrix:
-        case kIROp_MakeMatrixFromScalar:
         case kIROp_MakeVectorFromScalar:
         {
             if (inst->getOperandCount() == 1)
@@ -249,15 +248,12 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
                 auto prec = getInfo(EmitOp::Prefix);
                 needClose = maybeEmitParens(outerPrec, prec);
-
-                // Need to emit as cast for HLSL
                 emitType(inst->getDataType());
                 m_writer->emit("(");
                 emitOperand(inst->getOperand(0), rightSide(outerPrec, prec));
                 m_writer->emit(") ");
 
                 maybeCloseParens(needClose);
-                // Handled
                 return true;
             }
             break;
