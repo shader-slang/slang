@@ -10839,8 +10839,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // - If sccp is unable to eliminate the outer 'if' then we end up with
     //   duplicated code the the conditional value. Users don't tend to put
     //   huge gobs of code in the conditional expression in loops however.
-
-    invertLoops(module);
+    if (compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::LoopInversion))
+    {
+        invertLoops(module);
+    }
 
     // Next, attempt to promote local variables to SSA
     // temporaries and do basic simplifications.
