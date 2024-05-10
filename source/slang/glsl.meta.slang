@@ -328,7 +328,7 @@ public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public T inversesqrt(T x)
 {
     return rsqrt(x);
@@ -337,7 +337,7 @@ public T inversesqrt(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
 public vector<T, N> inversesqrt(vector<T, N> x)
 {
     return rsqrt(x);
@@ -350,7 +350,7 @@ public vector<T, N> inversesqrt(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 public T roundEven(T x)
 {
     return rint(x);
@@ -359,7 +359,7 @@ public T roundEven(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, GLSL_130)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 public vector<T,N> roundEven(vector<T,N> x)
 {
     return rint(x);
