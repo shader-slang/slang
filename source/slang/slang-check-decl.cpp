@@ -10327,19 +10327,19 @@ namespace Slang
         if(failedAtomsInsideAvailableSet.isEmpty() || failedAtomsInsideAvailableSet.contains((UInt)CapabilityAtom::Invalid))
             return;
 
-        //// There are two causes for why type checking failed on failedAvailableSet.
-        //// The first scenario is that failedAvailableSet defines a set of capabilities on a
-        //// compilation target (e.g. hlsl) that isn't defined by some callees, for example, if we have
-        //// a function:
-        ////    [require(hlsl)]  // <-- failedAvailableSet
-        ////    [require(cpp)]
-        ////    void caller()
-        ////    {
-        ////        printf(); // assume this is defined for (cpp | cuda).
-        ////    }
-        //// In this case we should diagnose error reporting printf isn't defined on a required target.
-        //// 
-        //// Now, we detect if we are case 1.
+        // There are two causes for why type checking failed on failedAvailableSet.
+        // The first scenario is that failedAvailableSet defines a set of capabilities on a
+        // compilation target (e.g. hlsl) that isn't defined by some callees, for example, if we have
+        // a function:
+        //    [require(hlsl)]  // <-- failedAvailableSet
+        //    [require(cpp)]
+        //    void caller()
+        //    {
+        //        printf(); // assume this is defined for (cpp | cuda).
+        //    }
+        // In this case we should diagnose error reporting printf isn't defined on a required target.
+        // 
+        // Now, we detect if we are case 1.
 
         {
             CapabilityAtom outFailedAtom;

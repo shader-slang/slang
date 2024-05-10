@@ -44,6 +44,7 @@ public:
     UIntSet(const UIntSet& other) { m_buffer = other.m_buffer; }
     UIntSet(UIntSet && other) { *this = (_Move(other)); }
     UIntSet(UInt maxVal) { resizeAndClear(maxVal); }
+    UIntSet(List<UIntSet::Element> buffer) { m_buffer = buffer; }
 
     UIntSet& operator=(UIntSet&& other);
     UIntSet& operator=(const UIntSet& other);
@@ -52,6 +53,8 @@ public:
 
         /// Return the count of all bits directly represented
     Int getCount() const { return Int(m_buffer.getCount()) * kElementSize; }
+
+    List<Element>& getBuffer() { return m_buffer; }
 
         /// Resize such that val can be stored and clear contents
     void resizeAndClear(UInt val);

@@ -23,7 +23,7 @@ namespace Slang
                     if (target->getTargetCaps().isIncompatibleWith(cap))
                         continue;
                     CapabilitySet capSet;
-                    if (cap == CapabilityName::Invalid)
+                    if (cap == CapabilityName::Invalid) // `default` case
                         capSet = CapabilitySet::makeEmpty();
                     else
                         capSet = CapabilitySet(cap);

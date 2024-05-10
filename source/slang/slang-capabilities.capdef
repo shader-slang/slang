@@ -581,8 +581,8 @@ alias DX_6_7 = sm_6_7;
 alias METAL_2_3 = metallib_2_3;
 alias METAL_2_4 = metallib_2_4;
 
-alias sm_2_0_GLSL_140 = sm_4_0 | glsl | spirv_1_0 | cuda | cpp;
-alias sm_2_0_GLSL_400 = sm_4_0 | glsl | spirv_1_0 | cuda | cpp;
+alias sm_2_0_GLSL_140 = _GLSL_140 + sm_4_0 | sm_4_0;
+alias sm_2_0_GLSL_400 = _GLSL_400 + sm_4_0 | sm_4_0;
 alias appendstructuredbuffer = sm_5_0 + raytracing_stages_compute_fragment;
 alias atomic_hlsl = _sm_4_0;
 alias atomic_hlsl_nvapi = _sm_4_0 + hlsl_nvapi;
@@ -658,8 +658,8 @@ alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp;
 alias texturefootprint = GL_NV_shader_texture_footprint + GLSL_450 | hlsl_nvapi + _sm_4_0;
 alias texturefootprintclamp = texturefootprint + GL_ARB_sparse_texture_clamp;
 
-alias shader5_sm_4_0 = GL_ARB_gpu_shader5 | sm_4_0;
-alias shader5_sm_5_0 = GL_ARB_gpu_shader5 | sm_5_0;
+alias shader5_sm_4_0 = GL_ARB_gpu_shader5 + sm_4_0 | sm_4_0;
+alias shader5_sm_5_0 = GL_ARB_gpu_shader5 + sm_4_0 | sm_5_0;
 
 alias subgroup_basic = GL_KHR_shader_subgroup_basic | _sm_6_0 | _cuda_sm_7_0;
 alias subgroup_ballot = spirv_1_0 + GL_KHR_shader_subgroup_ballot
@@ -722,38 +722,3 @@ alias all = _sm_6_7 + hlsl_nvapi
           | spirv_1_5 + sm_6_7
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + spvGroupNonUniformPartitionedNV
              + spvRayTracingMotionBlurNV + spvRayTracingMotionBlurNV;
-
-/// Test Capabilities
-
-alias TEST_ADD_1 = _sm_4_1 | _GLSL_130 | spirv_1_1 | metal
-                    ;
-
-alias TEST_ADD_2 = _sm_4_1 | _sm_4_0 + shader_stages_compute_fragment
-                    ;
-
-alias TEST_ADD_3 = _GLSL_130 + shader_stages_compute_fragment_geometry_vertex;
-
-//
-
-alias TEST_JOIN_1A = hlsl;
-alias TEST_JOIN_1B = glsl;
-
-alias TEST_JOIN_2A = hlsl;
-alias TEST_JOIN_2B = _sm_4_1 | glsl;
-
-alias TEST_JOIN_3A = glsl + fragment | _sm_4_0 + fragment 
-                    | glsl + vertex | hlsl + vertex
-                    ;
-alias TEST_JOIN_3B = _sm_4_1 + fragment 
-                    | _sm_4_0 + vertex
-                    | _sm_4_0 + compute
-                    | _GLSL_140 + vertex
-                    | _GLSL_140 + fragment
-                    | spirv_1_0 + fragment
-                    | glsl + raygen 
-                    | hlsl + raygen
-                    ;
-
-alias TEST_JOIN_4A = _GLSL_140 + _GL_EXT_texture_query_lod;
-alias TEST_JOIN_4B = _GLSL_150 + _GL_EXT_texture_shadow_lod;
-///

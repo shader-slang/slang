@@ -696,9 +696,10 @@ bool CapabilitySet::hasSameTargets(const CapabilitySet& other) const
 bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const
 {
     // returns true if 'this' is a better target for 'targetCaps' than 'that'
-    if (that.isEmpty() && this->isEmpty())
+    if (this->isEmpty() && (that.isEmpty() || that.isInvalid()))
     {
-        isEqual = true;
+        if(this->isEmpty() && that.isEmpty())
+            isEqual = true;
         return true;
     }
 
@@ -1104,6 +1105,42 @@ void TEST_CapabilitySet()
     TEST_CapabilitySet_join();
 }
 
+/*
+/// Test Capabilities
+
+alias TEST_ADD_1 = _sm_4_1 | _GLSL_130 | spirv_1_1 | metal
+                    ;
+
+alias TEST_ADD_2 = _sm_4_1 | _sm_4_0 + shader_stages_compute_fragment
+                    ;
+
+alias TEST_ADD_3 = _GLSL_130 + shader_stages_compute_fragment_geometry_vertex;
+
+//
+
+alias TEST_JOIN_1A = hlsl;
+alias TEST_JOIN_1B = glsl;
+
+alias TEST_JOIN_2A = hlsl;
+alias TEST_JOIN_2B = _sm_4_1 | glsl;
+
+alias TEST_JOIN_3A = glsl + fragment | _sm_4_0 + fragment 
+                    | glsl + vertex | hlsl + vertex
+                    ;
+alias TEST_JOIN_3B = _sm_4_1 + fragment 
+                    | _sm_4_0 + vertex
+                    | _sm_4_0 + compute
+                    | _GLSL_140 + vertex
+                    | _GLSL_140 + fragment
+                    | spirv_1_0 + fragment
+                    | glsl + raygen 
+                    | hlsl + raygen
+                    ;
+
+alias TEST_JOIN_4A = _GLSL_140 + _GL_EXT_texture_query_lod;
+alias TEST_JOIN_4B = _GLSL_150 + _GL_EXT_texture_shadow_lod;
+///
+*/
 #undef CHECK_CAPS
 
 #endif
