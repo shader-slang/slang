@@ -195,7 +195,7 @@ static inline Index bitscanForward(const uint64_t& in)
     _BitScanForward64((unsigned long*)&out, in);
     return Index(out);
 #else
-    return Index(__builtin_ctzll(&in));
+    return Index(__builtin_ctzll(in));
 #endif
 }
 
