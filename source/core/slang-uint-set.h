@@ -6,7 +6,9 @@
 #include "slang-common.h"
 #include "slang-hash.h"
 
+#if defined(_MSC_VER)
 #include <intrin.h>
+#endif
 #include <memory.h>
 
 namespace Slang
