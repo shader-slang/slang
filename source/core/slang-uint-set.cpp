@@ -159,7 +159,7 @@ Index UIntSet::countElements() const
 {
     // TODO: This can be made faster using SIMD intrinsics to count set bits.
     uint64_t tmp;
-    constexpr Index loopSize = ((kElementSize / sizeof(tmp)) != 0) ? kElementSize / sizeof(tmp) : 1;
+    constexpr Index loopSize = ((sizeof(Element) / sizeof(tmp)) != 0) ? sizeof(Element) / sizeof(tmp) : 1;
     Index count = 0;
     for (auto index = 0; index < this->m_buffer.getCount(); index++)
     {

@@ -175,7 +175,7 @@ void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(const Capability
     auto& localStageSets = targetSet.shaderStageSets[stageAtom];
     localStageSets.stage = stageAtom;
 
-    UIntSet setToAdd = UIntSet((UInt)CapabilityAtom::Count);
+    CapabilityAtomSet setToAdd = CapabilityAtomSet((UInt)CapabilityAtom::Count);
     for(auto i : canonicalRepresentation)
         setToAdd.add(asAtomUInt(i));
 
@@ -373,11 +373,11 @@ bool CapabilitySet::isIncompatibleWith(CapabilitySet const& other) const
     return true;
 }
 
-const UIntSet& getUIntSetOfTargets()
+const CapabilityAtomSet& getUIntSetOfTargets()
 {
     if (!globalAnyTargetUIntSet)
     {
-        globalAnyTargetUIntSet = new UIntSet();
+        globalAnyTargetUIntSet = new CapabilityAtomSet();
         auto info = _getInfo(CapabilityName::any_target);
         for (auto list : info.canonicalRepresentation)
         {
@@ -388,11 +388,11 @@ const UIntSet& getUIntSetOfTargets()
     }
     return *globalAnyTargetUIntSet;
 }
-const UIntSet& getUIntSetOfStages()
+const CapabilityAtomSet& getUIntSetOfStages()
 {
     if (!globalAnyStageUIntSet)
     {
-        globalAnyStageUIntSet = new UIntSet();
+        globalAnyStageUIntSet = new CapabilityAtomSet();
         auto info = _getInfo(CapabilityName::any_stage);
         for (auto list : info.canonicalRepresentation)
         {
@@ -403,9 +403,9 @@ const UIntSet& getUIntSetOfStages()
     return *globalAnyStageUIntSet;
 }
 
-bool hasTargetAtom(const UIntSet& setIn, CapabilityAtom& targetAtom)
+bool hasTargetAtom(const CapabilityAtomSet& setIn, CapabilityAtom& targetAtom)
 {
-    UIntSet intersection;
+    CapabilityAtomSet intersection;
     setIn.calcIntersection(intersection, getUIntSetOfTargets(), setIn);
 
     if (intersection.isEmpty())
@@ -631,57 +631,57 @@ void CapabilitySet::join(const CapabilitySet& other)
         this->m_targetSets[CapabilityAtom::Invalid].target = CapabilityAtom::Invalid;
 }
 
-//static uint32_t _calcAtomListDifferenceScore(List<CapabilityAtom> const& thisList, List<CapabilityAtom> const& thatList)
-//{
-//    uint32_t score = 0;
-//
-//    // Our approach here will be to scan through `this` and `that`
-//    // to identify atoms that are in `this` but not `that` (that is,
-//    // the atoms that would be present in the set difference `this - that`)
-//    // and then compute the maximum rank/score of those atoms.
-//
-//    Index thisCount = thisList.getCount();
-//    Index thatCount = thatList.getCount();
-//    Index thisIndex = 0;
-//    Index thatIndex = 0;
-//    for (;;)
-//    {
-//        if (thisIndex == thisCount) break;
-//        if (thatIndex == thatCount) break;
-//
-//        auto thisAtom = thisList[thisIndex];
-//        auto thatAtom = thatList[thatIndex];
-//
-//        if (thisAtom == thatAtom)
-//        {
-//            thisIndex++;
-//            thatIndex++;
-//            continue;
-//        }
-//
-//        if (thisAtom < thatAtom)
-//        {
-//            // `thisAtom` is not present in `that`, so it
-//            // should contribute to our ranking of the difference.
-//            //
-//            auto thisAtomInfo = _getInfo(thisAtom);
-//            auto thisAtomRank = thisAtomInfo.rank;
-//
-//            if (thisAtomRank > score)
-//            {
-//                score = thisAtomRank;
-//            }
-//
-//            thisIndex++;
-//        }
-//        else
-//        {
-//            SLANG_ASSERT(thisAtom > thatAtom);
-//            thatIndex++;
-//        }
-//    }
-//    return score;
-//}
+static uint32_t _calcAtomListDifferenceScore(List<CapabilityAtom> const& thisList, List<CapabilityAtom> const& thatList)
+{
+    uint32_t score = 0;
+
+    // Our approach here will be to scan through `this` and `that`
+    // to identify atoms that are in `this` but not `that` (that is,
+    // the atoms that would be present in the set difference `this - that`)
+    // and then compute the maximum rank/score of those atoms.
+
+    Index thisCount = thisList.getCount();
+    Index thatCount = thatList.getCount();
+    Index thisIndex = 0;
+    Index thatIndex = 0;
+    for (;;)
+    {
+        if (thisIndex == thisCount) break;
+        if (thatIndex == thatCount) break;
+
+        auto thisAtom = thisList[thisIndex];
+        auto thatAtom = thatList[thatIndex];
+
+        if (thisAtom == thatAtom)
+        {
+            thisIndex++;
+            thatIndex++;
+            continue;
+        }
+
+        if (thisAtom < thatAtom)
+        {
+            // `thisAtom` is not present in `that`, so it
+            // should contribute to our ranking of the difference.
+            //
+            auto thisAtomInfo = _getInfo(thisAtom);
+            auto thisAtomRank = thisAtomInfo.rank;
+
+            if (thisAtomRank > score)
+            {
+                score = thisAtomRank;
+            }
+
+            thisIndex++;
+        }
+        else
+        {
+            SLANG_ASSERT(thisAtom > thatAtom);
+            thatIndex++;
+        }
+    }
+    return score;
+}
 
 bool CapabilitySet::hasSameTargets(const CapabilitySet& other) const
 {
@@ -734,73 +734,80 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
             // 1. this/that.contains(target)
             // 2. choose smallest super set
             // 3. rank each super set and their atoms, choose the smallest rank'd set (most specialized)
-            //for (auto& shaderStageSetWeNeed : shaderStageSetsWeNeed.second.disjointSets)
-            //{
-            //    UIntSet tmp_set{};
-            //    Index tmpCount = 0;
+            for (auto& shaderStageSetWeNeed : shaderStageSetsWeNeed.second.disjointSets)
+            {
+                CapabilityAtomSet tmp_set{};
+                Index tmpCount = 0;
 
-            //    UIntSet thisSet{};
-            //    Index thisSetCount = 0;
-            //    
-            //    UIntSet thatSet{};
-            //    Index thatSetCount = 0;
+                CapabilityAtomSet thisSet{};
+                Index thisSetCount = 0;
+                
+                CapabilityAtomSet thatSet{};
+                Index thatSetCount = 0;
 
-            //    // subtraction of the set we want gets us the "elements which should be checked for whom is more specialized"
-            //    for (auto& thisStageSet : thisStageSets->disjointSets)
-            //    {
-            //        if (!thisStageSet.contains(shaderStageSetWeNeed))
-            //            continue;
-            //        if (thisStageSet == shaderStageSetWeNeed)
-            //            return true;
-            //        UIntSet::calcSubtract(tmp_set, thisStageSet, shaderStageSetWeNeed);
-            //        tmpCount = thisSet.countElements();
-            //        if (tmp_set.countElements() < tmpCount)
-            //        {
-            //            thisSet = tmp_set;
-            //            thisSetCount = tmpCount;
-            //        }
-            //    }
-            //    for (auto& thatStageSet : thatStageSets->disjointSets)
-            //    {
-            //        if (!thatStageSet.contains(shaderStageSetWeNeed))
-            //            continue;
-            //        if (thatStageSet == shaderStageSetWeNeed)
-            //            return false;
-            //        UIntSet::calcSubtract(tmp_set, thatStageSet, shaderStageSetWeNeed);
-            //        tmpCount = thatSet.countElements();
-            //        if (tmp_set.countElements() < tmpCount)
-            //        {
-            //            thatSet = tmp_set;
-            //            thatSetCount = tmpCount;
-            //        }
-            //    }
+                // subtraction of the set we want gets us the "elements which 'targetSet' has but `this/that` is less specialized for"
+                for (auto& thisStageSet : thisStageSets->disjointSets)
+                {
+                    // if `thisStageSet` is more specialized than the target, `thisStageSet` should not be a candidate
+                    if (!shaderStageSetWeNeed.contains(thisStageSet))
+                        continue;
+                    if (thisStageSet == shaderStageSetWeNeed)
+                        return true;
+                    CapabilityAtomSet::calcSubtract(tmp_set, shaderStageSetWeNeed, thisStageSet);
+                    tmpCount = tmp_set.countElements();
+                    if (thisSetCount < tmpCount)
+                    {
+                        thisSet = tmp_set;
+                        thisSetCount = tmpCount;
+                    }
+                }
+                for (auto& thatStageSet : thatStageSets->disjointSets)
+                {
+                    if (!shaderStageSetWeNeed.contains(thatStageSet))
+                        continue;
+                    if (thatStageSet == shaderStageSetWeNeed)
+                        return false;
+                    CapabilityAtomSet::calcSubtract(tmp_set, shaderStageSetWeNeed, thatStageSet);
+                    tmpCount = tmp_set.countElements();
+                    if (thatSetCount < tmpCount)
+                    {
+                        thatSet = tmp_set;
+                        thatSetCount = tmpCount;
+                    }
+                }
 
-            //    if (thisSet == thatSet)
-            //        isEqual = true;
+                if (thisSet == thatSet)
+                    isEqual = true;
+                
+                //empty means no candidate
+                if (thisSet == 0)
+                    return false;
+                if (thatSet == 0)
+                    return true;
 
-            //    if (thisSetCount < thatSetCount)
-            //        return true;
-            //    else if (thisSetCount > thatSetCount)
-            //        return false;
-            //    
-            //    auto thisSetElements = thisSet.getElements<CapabilityAtom>();
-            //    auto thatSetElements = thisSet.getElements<CapabilityAtom>();
-            //    auto shaderStageSetWeNeedElements = shaderStageSetWeNeed.getElements<CapabilityAtom>();
+                if (thisSetCount < thatSetCount)
+                    return true;
+                else if (thisSetCount > thatSetCount)
+                    return false;
+                
+                auto thisSetElements = thisSet.getElements<CapabilityAtom>();
+                auto thatSetElements = thisSet.getElements<CapabilityAtom>();
+                auto shaderStageSetWeNeedElements = shaderStageSetWeNeed.getElements<CapabilityAtom>();
 
-            //    auto thisDiffScore = _calcAtomListDifferenceScore(thisSetElements, shaderStageSetWeNeedElements);
-            //    auto thatDiffScore = _calcAtomListDifferenceScore(thisSetElements, shaderStageSetWeNeedElements);
+                auto thisDiffScore = _calcAtomListDifferenceScore(thisSetElements, shaderStageSetWeNeedElements);
+                auto thatDiffScore = _calcAtomListDifferenceScore(thisSetElements, shaderStageSetWeNeedElements);
 
-            //    return thisDiffScore < thatDiffScore;
-            //}
+                return thisDiffScore < thatDiffScore;
+            }
         }
     }
     
     return true;
 }
 
-List<const UIntSet*> CapabilitySet::getAtomSets() const
+List<const CapabilityAtomSet*> CapabilitySet::getAtomSets() const
 {
-    List<const UIntSet*> set;
+    List<const CapabilityAtomSet*> set;
     //reserve for worst case
     set.reserve(kCapabilityTargetCount * kCapabilityStageCount);
     for (auto& targetSet : m_targetSets)
@@ -828,7 +835,7 @@ List<List<CapabilityAtom>> CapabilitySet::getAtomSetsAsList() const
     return atomList;
 }
 
-bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, UIntSet& outFailedAvailableSet)
+bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, CapabilityAtomSet& outFailedAvailableSet)
 {
     // Requirements x are met by available disjoint capabilities (a | b) iff
     // both 'a' satisfies x and 'b' satisfies x.
@@ -877,7 +884,7 @@ bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, C
                 return false;
             }
 
-            const UIntSet* lastBadStage = nullptr;
+            const CapabilityAtomSet* lastBadStage = nullptr;
             for (const auto& availableStageSet : availableStage.second.disjointSets)
             {
                 lastBadStage = nullptr;
@@ -891,7 +898,7 @@ bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, C
                 if (lastBadStage)
                 {
                     // get missing atoms
-                    UIntSet::calcSubtract(outFailedAvailableSet, *lastBadStage, availableStageSet);
+                    CapabilityAtomSet::calcSubtract(outFailedAvailableSet, *lastBadStage, availableStageSet);
                     return false;
                 }
             }
@@ -972,7 +979,7 @@ int TEST_targetCapSetWithSpecificSetInStage(
     if (stage != stageSet.stage)
         return -1;
 
-    UIntSet set;
+    CapabilityAtomSet set;
     for (auto i : setToFind)
         set.add(UInt(i));
 

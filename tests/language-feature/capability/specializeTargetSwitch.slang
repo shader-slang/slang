@@ -1,13 +1,15 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -entry main -stage compute -capability _sm_5_1
 //TEST:SIMPLE(filecheck=CHECK_GLSL1): -target glsl -entry main -stage compute -capability _GLSL_420
 //TEST:SIMPLE(filecheck=CHECK_GLSL2): -target glsl -entry main -stage compute -capability _GLSL_330
+//TEST:SIMPLE(filecheck=CHECK_METAL): -target cpp -entry main -stage compute -capability image_loadstore
 //TEST:SIMPLE(filecheck=CHECK_WILL_ERROR): -target glsl -entry main -stage compute -capability image_loadstore -DWILL_ERROR
 
 RWTexture1D<int> tex;
 
-// CHECK_HLSL: {{.*}}21{{.*}};
+//CHECK_HLSL: {{.*}}21{{.*}};
 //CHECK_GLSL1: {{.*}}13{{.*}}
 //CHECK_GLSL2: {{.*}}11{{.*}}
+//CHECK_METAL: {{.*}}30{{.*}}
 //CHECK_WILL_ERROR: error 36109
 
 int specialize()
@@ -40,10 +42,13 @@ int specialize()
         return 21;
     case _sm_6_0:
         return 21;
+
+    default:
+        return 30;
     }
 }
 
-// CHECK: 
+[numthreads(1,1,1)] 
 void main()
 {
     tex[0] = specialize();

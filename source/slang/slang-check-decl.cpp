@@ -744,7 +744,7 @@ namespace Slang
 
         void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
-        void diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const UIntSet& failedAvailableSet);
+        void diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const CapabilityAtomSet& failedAvailableSet);
     };
 
 
@@ -10181,7 +10181,7 @@ namespace Slang
                 // At a minimum we will propagate shader requirements to our 
                 // function from calling children in all cases so the parent
                 // can enforce shader targets correctly and propagate to `main`
-                UIntSet failedAvailableCapabilityConjunction{};
+                CapabilityAtomSet failedAvailableCapabilityConjunction;
                 if (!CapabilitySet::checkCapabilityRequirement(
                     declaredCaps,
                     funcDecl->inferredCapabilityRequirements,
@@ -10223,7 +10223,7 @@ namespace Slang
                 ensureDecl(requirementDecl, DeclCheckState::CapabilityChecked);
                 ensureDecl(implDecl.declRefBase, DeclCheckState::CapabilityChecked);
                 
-                UIntSet failedAvailableCapabilityConjunction;
+                CapabilityAtomSet failedAvailableCapabilityConjunction;
                 if (!CapabilitySet::checkCapabilityRequirement(
                     requirementDecl->inferredCapabilityRequirements,
                     implDecl.getDecl()->inferredCapabilityRequirements,
@@ -10320,7 +10320,7 @@ namespace Slang
         }
     }
 
-    void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const UIntSet& failedAtomsInsideAvailableSet)
+    void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const CapabilityAtomSet& failedAtomsInsideAvailableSet)
     {
         if (decl->inferredCapabilityRequirements.isEmpty())
             return;
@@ -10349,10 +10349,10 @@ namespace Slang
                 
                 // Anything defined on a non-failed target atom may be the culprit to why we fail having a target capability.
                 // Print out all possible culprits.
-                UIntSet failedAtomSet;
+                CapabilityAtomSet failedAtomSet;
                 failedAtomSet.add((UInt)outFailedAtom);
-                UIntSet targetsNotUsedSet;
-                UIntSet::calcSubtract(targetsNotUsedSet, getUIntSetOfTargets(), failedAtomSet);
+                CapabilityAtomSet targetsNotUsedSet;
+                CapabilityAtomSet::calcSubtract(targetsNotUsedSet, getUIntSetOfTargets(), failedAtomSet);
                 auto targetsNotUsedAtomList = targetsNotUsedSet.getElements<CapabilityAtom>();
                 
                 for (auto atom : targetsNotUsedAtomList)

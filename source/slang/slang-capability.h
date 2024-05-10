@@ -47,6 +47,12 @@ namespace Slang
 //
 // In all cases, we represent a set of capabilities with `CapabilitySet`.
 
+
+struct CapabilityAtomSet : UIntSet 
+{
+    using UIntSet::UIntSet;
+};
+
 struct CapabilityTargetSet;
 typedef Dictionary<CapabilityAtom, CapabilityTargetSet> CapabilityTargetSets;
 
@@ -58,7 +64,7 @@ struct CapabilityStageSet
     CapabilityAtom stage{};
 
     /// LinkedList of all disjoint sets for fast remove/add of unconstrained list positions.  
-    LinkedList<UIntSet> disjointSets{};
+    LinkedList<CapabilityAtomSet> disjointSets{};
 
     bool tryJoin(const CapabilityTargetSet& other);
 };
@@ -142,7 +148,7 @@ public:
 
     /// Get access to the raw atomic capabilities that define this set.
     /// Get all bottom level UIntSets for each CapabilityTargetSet.
-    List<const UIntSet*> getAtomSets() const;
+    List<const CapabilityAtomSet*> getAtomSets() const;
     /// Expand all getAtomSets into list form. This is an expensive operation.
     List<List<CapabilityAtom>> getAtomSetsAsList() const;
 
@@ -152,7 +158,7 @@ public:
     bool isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const;
 
     /// Find any capability sets which are in 'available' but not in 'required'. Return false if this situation occurs. 
-    static bool checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, UIntSet& outFailedAvailableSet);
+    static bool checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, CapabilityAtomSet& outFailedAvailableSet);
 
     inline void addToTargetCapabilityWithTargetAndStageAtom(const CapabilityName& target, const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation);
     inline void addToTargetCapabilityWithTargetAndOrStageAtom(const CapabilityName& target, const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation);
@@ -188,12 +194,12 @@ bool isDirectChildOfAbstractAtom(CapabilityAtom name);
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);
 
-static UIntSet* globalAnyTargetUIntSet;
-const UIntSet& getUIntSetOfTargets();
-static UIntSet* globalAnyStageUIntSet;
-const UIntSet& getUIntSetOfStages();
+static CapabilityAtomSet* globalAnyTargetUIntSet;
+const CapabilityAtomSet& getUIntSetOfTargets();
+static CapabilityAtomSet* globalAnyStageUIntSet;
+const CapabilityAtomSet& getUIntSetOfStages();
 
-bool hasTargetAtom(const UIntSet& setIn, CapabilityAtom& targetAtom);
+bool hasTargetAtom(const CapabilityAtomSet& setIn, CapabilityAtom& targetAtom);
 
 //#define UNIT_TEST_CAPABILITIES
 #ifdef UNIT_TEST_CAPABILITIES

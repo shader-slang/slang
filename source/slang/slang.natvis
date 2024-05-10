@@ -880,7 +880,7 @@
 			</Synthetic>
 		</Expand>
 	</Type>
-	<Type Name="Slang::UIntSet">
+	<Type Name="Slang::CapabilityAtomSet">
 		<DisplayString>{{max_size={m_buffer.m_count*Slang::UIntSet::kElementSize}}}</DisplayString>
 		<Expand>
 			<Synthetic Name="[CapabilityAtomView]">

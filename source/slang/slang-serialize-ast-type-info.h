@@ -81,9 +81,9 @@ struct SerialTypeInfo<DeclRef<T>> : public SerialTypeInfo<DeclRefBase*> {};
 // UIntSet
 
 template<>
-struct SerialTypeInfo<UIntSet>
+struct SerialTypeInfo<CapabilityAtomSet>
 {
-    typedef UIntSet NativeType;
+    typedef CapabilityAtomSet NativeType;
     typedef SerialIndex SerialType;
     enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
@@ -98,12 +98,14 @@ struct SerialTypeInfo<UIntSet>
         auto& dst = *(NativeType*)native;
         auto& src = *(const SerialType*)serial;
 
-        List<UIntSet::Element> UIntSetBuffer;
+        List<CapabilityAtomSet::Element> UIntSetBuffer;
         reader->getArray(src, UIntSetBuffer);
 
-        dst = UIntSet(UIntSetBuffer);
+        dst = CapabilityAtomSet(UIntSetBuffer);
     }
 };
+
+// ~UIntSet
 
 template<>
 struct SerialTypeInfo<CapabilityStageSet>
@@ -127,7 +129,7 @@ struct SerialTypeInfo<CapabilityStageSet>
 
         for (auto& i : src.disjointSets)
         {
-            SerialTypeInfo<UIntSet>::toSerial(writer, &i, &SDisjointSetsList[iter]);
+            SerialTypeInfo<CapabilityAtomSet>::toSerial(writer, &i, &SDisjointSetsList[iter]);
             iter++;
         }
         
@@ -140,7 +142,7 @@ struct SerialTypeInfo<CapabilityStageSet>
         auto& src = *(const SerialType*)serial;
 
         CapabilityAtom stage;
-        List<UIntSet> items;
+        List<CapabilityAtomSet> items;
         SerialTypeInfo<CapabilityAtom>::toNative(reader, &src.stage, &stage);
         reader->getArray(src.disjointSets, items);
 
