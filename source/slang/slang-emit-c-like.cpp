@@ -541,6 +541,9 @@ void CLikeSourceEmitter::defaultEmitInstStmt(IRInst* inst)
             m_writer->emit(");\n");
         }
         break;
+    case kIROp_discard:
+        m_writer->emit("discard;\n");
+        break;
     default:
         diagnoseUnhandledInst(inst);
     }
@@ -2876,7 +2879,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         break;
 
     case kIROp_discard:
-        m_writer->emit("discard;\n");
+        emitInstStmt(inst);
         break;
 
     case kIROp_swizzleSet:
