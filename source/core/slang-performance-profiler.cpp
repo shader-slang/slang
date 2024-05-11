@@ -39,7 +39,7 @@ namespace Slang
             for (auto func : data)
             {
                 out << func.key << ": \t";
-                out << func.value.invocationCount << "\t" << func.value.duration.count()/1000000 << "\n";
+                out << static_cast<int>(func.value.invocationCount) << "\t" << static_cast<double>(func.value.duration.count()/1000000) << "\n";
             }
         }
     };
