@@ -211,7 +211,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             case SLANG_TEXTURE_1D:
                 ++paramCount;
                 params << t << "width";
-                metal << "(*($" << paramCount << ") = $0.get_width(" << metalMipLevel << ")),";
+                metal << "(*($" << String(paramCount) << ") = $0.get_width(" << String(metalMipLevel) << ")),";
 
                 sizeDimCount = 1;
                 break;
@@ -220,11 +220,11 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             case SLANG_TEXTURE_CUBE:
                 ++paramCount;
                 params << t << "width,";
-                metal << "(*($" << paramCount << ") = $0.get_width(" << metalMipLevel << ")),";
+                metal << "(*($" << String(paramCount) << ") = $0.get_width(" << String(metalMipLevel) << ")),";
 
                 ++paramCount;
                 params << t << "height";
-                metal << "(*($" << paramCount << ") = $0.get_height(" << metalMipLevel << ")),";
+                metal << "(*($" << String(paramCount) << ") = $0.get_height(" << String(metalMipLevel) << ")),";
 
                 sizeDimCount = 2;
                 break;
@@ -232,15 +232,15 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             case SLANG_TEXTURE_3D:
                 ++paramCount;
                 params << t << "width,";
-                metal << "(*($" << paramCount << ") = $0.get_width(" << metalMipLevel << ")),";
+                metal << "(*($" << String(paramCount) << ") = $0.get_width(" << String(metalMipLevel) << ")),";
 
                 ++paramCount;
                 params << t << "height,";
-                metal << "(*($" << paramCount << ") = $0.get_height(" << metalMipLevel << ")),";
+                metal << "(*($" << String(paramCount) << ") = $0.get_height(" << String(metalMipLevel) << ")),";
 
                 ++paramCount;
                 params << t << "depth";
-                metal << "(*($" << paramCount << ") = $0.get_depth(" << metalMipLevel << ")),";
+                metal << "(*($" << String(paramCount) << ") = $0.get_depth(" << String(metalMipLevel) << ")),";
 
                 sizeDimCount = 3;
                 break;
@@ -255,21 +255,21 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 ++sizeDimCount;
                 ++paramCount;
                 params << ", " << t << "elements";
-                metal << "(*($" << paramCount << ") = $0.get_array_size()),";
+                metal << "(*($" << String(paramCount) << ") = $0.get_array_size()),";
             }
 
             if (isMultisample)
             {
                 ++paramCount;
                 params << ", " << t << "sampleCount";
-                metal << "(*($" << paramCount << ") = $0.get_num_samples()),";
+                metal << "(*($" << String(paramCount) << ") = $0.get_num_samples()),";
             }
 
             if (includeMipInfo)
             {
                 ++paramCount;
                 params << ", " << t << "numberOfLevels";
-                metal << "(*($" << paramCount << ") = $0.get_num_mip_levels()),";
+                metal << "(*($" << String(paramCount) << ") = $0.get_num_mip_levels()),";
             }
 
             metal.reduceLength(metal.getLength() - 1); // drop the last comma
