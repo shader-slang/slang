@@ -192,7 +192,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
             int sizeDimCount = 0;
             StringBuilder params;
-            size_t paramCount = 0;
+            int paramCount = 0;
 
             StringBuilder metal;
             const char* metalMipLevel = "0";
