@@ -228,12 +228,14 @@ public:
                             this->stageNode = (*this->targetNode).second.shaderStageSets.begin();
                             if (this->stageNode == (*this->targetNode).second.shaderStageSets.end())
                                 continue;
+                            break;
                         }
                     }
 
                     this->disjointSetNode = (*this->stageNode).second.disjointSet;
                     if (!this->disjointSetNode.has_value())
                         continue;
+                    break;
                 }
                 return *this;
             }
