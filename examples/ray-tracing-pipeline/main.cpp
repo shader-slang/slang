@@ -318,6 +318,7 @@ Slang::Result initialize()
     IBufferResource::Desc primitiveBufferDesc;
     primitiveBufferDesc.type = IResource::Type::Buffer;
     primitiveBufferDesc.sizeInBytes = kPrimitiveCount * sizeof(Primitive);
+    primitiveBufferDesc.elementSize = sizeof(Primitive);
     primitiveBufferDesc.defaultState = ResourceState::ShaderResource;
     gPrimitiveBuffer = gDevice->createBufferResource(primitiveBufferDesc, &kPrimitiveData[0]);
     if (!gPrimitiveBuffer)
@@ -326,7 +327,6 @@ Slang::Result initialize()
     IResourceView::Desc primitiveSRVDesc = {};
     primitiveSRVDesc.format = Format::Unknown;
     primitiveSRVDesc.type = IResourceView::Type::ShaderResource;
-    primitiveSRVDesc.bufferElementSize = sizeof(Primitive);
     gPrimitiveBufferSRV = gDevice->createBufferView(gPrimitiveBuffer, nullptr, primitiveSRVDesc);
 
     IBufferResource::Desc transformBufferDesc;

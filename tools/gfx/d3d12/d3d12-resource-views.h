@@ -39,6 +39,7 @@ SlangResult createD3D12BufferDescriptor(
     BufferResourceImpl* buffer,
     BufferResourceImpl* counterBuffer,
     IResourceView::Desc const& desc,
+    uint32_t bufferStride,
     DeviceImpl* device,
     D3D12GeneralExpandingDescriptorHeap* descriptorHeap,
     D3D12Descriptor* outDescriptor);
