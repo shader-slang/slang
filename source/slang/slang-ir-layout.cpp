@@ -497,7 +497,6 @@ struct Std140LayoutRules : IRTypeLayoutRules
 Result getNaturalSizeAndAlignment(CompilerOptionSet& optionSet, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
     return getSizeAndAlignment(optionSet, IRTypeLayoutRules::getNatural(), type, outSizeAndAlignment);
-
 }
 
 Result getNaturalOffset(CompilerOptionSet& optionSet, IRStructField* field, IRIntegerValue* outOffset)
