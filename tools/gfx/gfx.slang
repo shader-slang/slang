@@ -1519,7 +1519,7 @@ public interface IRayTracingCommandEncoder : IResourceCommandEncoder
     public void serializeAccelerationStructure(DeviceAddress dest, IAccelerationStructure source);
     public void deserializeAccelerationStructure(IAccelerationStructure dest, DeviceAddress source);
 
-    public void bindPipeline(IPipelineState state, out IShaderObject rootObject);
+    public Result bindPipeline(IPipelineState state, out IShaderObject rootObject);
     // Sets the current pipeline state along with a pre-created mutable root shader object.
     public Result bindPipelineWithRootObject(IPipelineState state, IShaderObject rootObject);
 

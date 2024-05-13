@@ -542,6 +542,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::SaveStdLibBinSource, "-save-stdlib-bin-source","-save-stdlib-bin-source <filename>", "Same as -save-stdlib but output "
         "the data as a C array.\n"},
         { OptionKind::TrackLiveness, "-track-liveness", nullptr, "Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness." },
+        { OptionKind::LoopInversion, "-loop-inversion", nullptr, "Enable loop inversion in the code-gen optimization. Default is off" },
     };
     _addOptions(makeConstArrayView(internalOpts), options);
 
@@ -1689,6 +1690,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::IncompleteLibrary:
             case OptionKind::NoHLSLBinding:
             case OptionKind::NoHLSLPackConstantBufferElements:
+            case OptionKind::LoopInversion:
                 linkage->m_optionSet.set(optionKind, true); break;
                 break;
             case OptionKind::MatrixLayoutRow:
