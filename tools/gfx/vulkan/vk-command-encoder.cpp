@@ -1443,9 +1443,9 @@ void RayTracingCommandEncoder::deserializeAccelerationStructure(
         m_commandBuffer->m_commandBuffer, &copyInfo);
 }
 
-void RayTracingCommandEncoder::bindPipeline(IPipelineState* pipeline, IShaderObject** outRootObject)
+Result RayTracingCommandEncoder::bindPipeline(IPipelineState* pipeline, IShaderObject** outRootObject)
 {
-    setPipelineStateImpl(pipeline, outRootObject);
+    return setPipelineStateImpl(pipeline, outRootObject);
 }
 
 Result RayTracingCommandEncoder::bindPipelineWithRootObject(

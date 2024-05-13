@@ -945,6 +945,7 @@ extern "C"
             SaveStdLib,
             SaveStdLibBinSource,
             TrackLiveness,
+            LoopInversion,              // bool, enable loop inversion optimization
 
             // Deprecated
             ParameterBlocksUseRegisterSpaces,

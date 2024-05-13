@@ -1842,7 +1842,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         deserializeAccelerationStructure(IAccelerationStructure* dest, DeviceAddress source) = 0;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW Result SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;
     // Sets the current pipeline state along with a pre-created mutable root shader object.
     virtual SLANG_NO_THROW Result SLANG_MCALL

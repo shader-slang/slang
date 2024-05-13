@@ -1339,10 +1339,10 @@ void RayTracingCommandEncoderImpl::deserializeAccelerationStructure(
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_DESERIALIZE);
 }
 
-void RayTracingCommandEncoderImpl::bindPipeline(
+Result RayTracingCommandEncoderImpl::bindPipeline(
     IPipelineState* state, IShaderObject** outRootObject)
 {
-    bindPipelineImpl(state, outRootObject);
+    return bindPipelineImpl(state, outRootObject);
 }
 
 Result RayTracingCommandEncoderImpl::dispatchRays(
