@@ -963,6 +963,7 @@ void MetalSourceEmitter::emitFrontMatterImpl(TargetRequest*)
 {
     m_writer->emit("#include <metal_stdlib>\n");
     m_writer->emit("#include <metal_math>\n");
+    m_writer->emit("#include <metal_texture>\n");
     m_writer->emit("using namespace metal;\n");
 }
 

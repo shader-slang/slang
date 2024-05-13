@@ -964,14 +964,16 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_querylod)]
+    [require(glsl_hlsl_metal_spirv, texture_querylod)]
     float CalculateLevelOfDetail(SamplerState s, TextureCoord location)
     {
         __requireComputeDerivative();
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "CalculateLevelOfDetail";
+            __intrinsic_asm ".CalculateLevelOfDetail";
+        case metal:
+            __intrinsic_asm "$0.calculate_clamped_lod($1, $2)";
         case glsl:
             __intrinsic_asm "textureQueryLod($p, $2).x";
         case spirv:
@@ -984,14 +986,16 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_querylod)]
+    [require(glsl_hlsl_metal_spirv, texture_querylod)]
     float CalculateLevelOfDetailUnclamped(SamplerState s, TextureCoord location)
     {
         __requireComputeDerivative();
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "CalculateLevelOfDetailUnclamped";
+            __intrinsic_asm ".CalculateLevelOfDetailUnclamped";
+        case metal:
+            __intrinsic_asm "$0.calculate_unclamped_lod($1, $2)";
         case glsl:
             __intrinsic_asm "textureQueryLod($p, $2).y";
         case spirv:
@@ -1008,7 +1012,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
     {
         __requireComputeDerivative();
@@ -1017,6 +1021,32 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case cpp:
             case hlsl:
                 __intrinsic_asm ".Sample";
+            case metal:
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "$0.sample($1, ($2).x, uint(($2).y))";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w))";
+                    }
+                }
+                else
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                    case $(SLANG_TEXTURE_2D):
+                    case $(SLANG_TEXTURE_3D):
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "$0.sample($1, $2)";
+                    }
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<invalid intrinsic>";
             case glsl:
                 __intrinsic_asm "$ctexture($p, $2)$z";
             case cuda:
@@ -1062,7 +1092,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1071,6 +1101,26 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case cpp:
             case hlsl:
                 __intrinsic_asm ".Sample";
+            case metal:
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), $3)";
+                    }
+                }
+                else
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "$0.sample($1, $2, $3)";
+                    }
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<invalid intrinsic>";
             case glsl:
                 __intrinsic_asm "$ctextureOffset($p, $2, $3)$z";
             case spirv:
@@ -1086,7 +1136,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [__readNone]
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __requireComputeDerivative();
@@ -1095,6 +1145,26 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case cpp:
             case hlsl:
                 __intrinsic_asm ".Sample";
+            case metal:
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), min_lod_clamp($4), $3)";
+                    }
+                }
+                else
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "$0.sample($1, $2, min_lod_clamp($4), $3)";
+                    }
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<invalid intrinsic>";
             case glsl:
                 __intrinsic_asm "$ctextureOffsetClampARB($p, $2, $3, $4)$z";
             case spirv:
@@ -1110,7 +1180,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __target_switch
@@ -1124,7 +1194,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __requireComputeDerivative();
@@ -1133,6 +1203,29 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case cpp:
             case hlsl:
             __intrinsic_asm ".SampleBias";
+            case metal:
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), bias($3))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), bias($3))";
+                    }
+                }
+                else
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                    case $(SLANG_TEXTURE_3D):
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "$0.sample($1, $2, bias($3))";
+                    }
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<invalid intrinsic>";
             case glsl:
             __intrinsic_asm "$ctexture($p, $2, $3)$z";
             case spirv:
@@ -1147,7 +1240,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1156,6 +1249,26 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case cpp:
             case hlsl:
             __intrinsic_asm ".SampleBias";
+            case metal:
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), bias($3), $4)";
+                    }
+                }
+                else
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "$0.sample($1, $2, bias($3), $4)";
+                    }
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<invalid intrinsic>";
             case glsl:
             __intrinsic_asm "$ctextureOffset($p, $2, $4, $3)$z";
             case spirv:
@@ -1170,7 +1283,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -1190,6 +1303,27 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             }
         case hlsl:
             __intrinsic_asm ".SampleCmp";
+        case metal:
+            if (isArray == 1)
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3)";
+                case $(SLANG_TEXTURE_CUBE):
+                    __intrinsic_asm "$0.sample_compare($1, ($2).xyz, uint(($2).w), $3)";
+                }
+            }
+            else
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                case $(SLANG_TEXTURE_CUBE):
+                    __intrinsic_asm "$0.sample_compare($1, $2, $3)";
+                }
+            }
+            __intrinsic_asm "<invalid intrinsic>";
         case spirv:
             return spirv_asm
             {
@@ -1201,7 +1335,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -1217,6 +1351,27 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             }
         case hlsl:
             __intrinsic_asm ".SampleCmpLevelZero";
+        case metal:
+            if (isArray == 1)
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, level(0))";
+                case $(SLANG_TEXTURE_CUBE):
+                    __intrinsic_asm "$0.sample_compare($1, ($2).xyz, uint(($2).w), $3, level(0))";
+                }
+            }
+            else
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                case $(SLANG_TEXTURE_CUBE):
+                    __intrinsic_asm "$0.sample_compare($1, $2, $3, level(0))";
+                }
+            }
+            __intrinsic_asm "<invalid intrinsic>";
         case spirv:
             const float zeroFloat = 0.0f;
             return spirv_asm
@@ -1229,7 +1384,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1245,6 +1400,24 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             }
         case hlsl:
             __intrinsic_asm ".SampleCmp";
+        case metal:
+            if (isArray == 1)
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, $4)";
+                }
+            }
+            else
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "$0.sample_compare($1, $2, $3, $4)";
+                }
+            }
+            __intrinsic_asm "<invalid intrinsic>";
         case spirv:
             return spirv_asm
             {
@@ -1256,7 +1429,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1272,6 +1445,29 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             }
         case hlsl:
             __intrinsic_asm ".SampleCmpLevelZero";
+        case metal:
+            if (isShadow == 1)
+            {
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        // T sample_compare(sampler s, float2 coord, uint array, float compare_value, lod_options options, int2 offset = int2(0)) const
+                        __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, level(0), $4)";
+                    }
+                }
+                else
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        // T sample_compare(sampler s, float2 coord, float compare_value, lod_options options, int2 offset = int2(0)) const
+                        __intrinsic_asm "$0.sample_compare($1, $2, $3, level(0), $4)";
+                    }
+                }
+            }
+            __intrinsic_asm "<invalid intrinsic>";
         case spirv:
             const float zeroFloat = 0.0f;
             return spirv_asm
@@ -1284,14 +1480,39 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
         {
             case cpp:
             case hlsl:
-            __intrinsic_asm ".SampleGrad";
+                __intrinsic_asm ".SampleGrad";
+            case metal:
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), gradientcube($3, $4))";
+                    }
+                }
+                else
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, $2, gradient2d($3, $4))";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "$0.sample($1, $2, gradient3d($3, $4))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "$0.sample($1, $2, gradientcube($3, $4))";
+                    }
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<invalid intrinsic>";
             case glsl:
             __intrinsic_asm "$ctextureGrad($p, $2, $3, $4)$z";
             case spirv:
@@ -1306,14 +1527,35 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
     {
         __target_switch
         {
             case cpp:
             case hlsl:
-            __intrinsic_asm ".SampleGrad";
+                __intrinsic_asm ".SampleGrad";
+            case metal:
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4), $5)";
+                    }
+                }
+                else
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, $2, gradient2d($3, $4), $5)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "$0.sample($1, $2, gradient3d($3, $4), $5)";
+                    }
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<invalid intrinsic>";
             case glsl:
             __intrinsic_asm "$ctextureGradOffset($p, $2, $3, $4, $5)$z";
             case spirv:
@@ -1330,14 +1572,35 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [__readNone]
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
     {
         __target_switch
         {
             case cpp:
             case hlsl:
-            __intrinsic_asm ".SampleGrad";
+                __intrinsic_asm ".SampleGrad";
+            case metal:
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4), min_lod_clamp($6), $5)";
+                    }
+                }
+                else
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, $2, gradient2d($3, $4), min_lod_clamp($6), $5)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "$0.sample($1, $2, gradient3d($3, $4), min_lod_clamp($6), $5)";
+                    }
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<invalid intrinsic>";
             case glsl:
             __intrinsic_asm "$ctextureGradOffsetClampARB($p, $2, $3, $4, $5, $6)$z";
             case spirv:
@@ -1353,7 +1616,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
     {
         __target_switch
@@ -1361,6 +1624,29 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case cpp:
             case hlsl:
                 __intrinsic_asm ".SampleLevel";
+            case metal:
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), level($3))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), level($3))";
+                    }
+                }
+                else
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                    case $(SLANG_TEXTURE_3D):
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "$0.sample($1, $2, level($3))";
+                    }
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<invalid intrinsic>";
             case glsl:
                 __intrinsic_asm "$ctextureLod($p, $2, $3)$z";
             case cuda:
@@ -1406,7 +1692,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1414,6 +1700,28 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case cpp:
             case hlsl:
                 __intrinsic_asm ".SampleLevel";
+            case metal:
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), level($3), $4)";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), level($3), $4)";
+                    }
+                }
+                else
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                    case $(SLANG_TEXTURE_3D):
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "$0.sample($1, $2, level($3), $4)";
+                    }
+                }
+                __intrinsic_asm "<invalid intrinsic>";
             case glsl:
                 __intrinsic_asm "$ctextureLodOffset($p, $2, $3, $4)$z";
             case spirv:
@@ -1439,7 +1747,7 @@ for (int isMS = 0; isMS <= 1; isMS++) {
         if (shapeIndex != kStdlibShapeIndex2D)
             continue;
     }
-    if (isArray)
+    if (isArray == 1)
     {
         if (shapeIndex == kStdlibShapeIndex3D)
             continue;
@@ -1474,13 +1782,77 @@ Array<T,4> __makeArray<T>(T v0, T v1, T v2, T v3);
 // Gather for scalar textures.
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location, int component)
+[require(glsl_metal_spirv, GLSL_400)]
+vector<TElement,4> __texture_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location, int component)
 {
     __target_switch
     {
     case glsl:
         __intrinsic_asm "textureGather($p, $2, $3)";
+    case metal:
+        if (Shape.flavor == $(SLANG_TEXTURE_2D))
+        {
+            if (isArray == 1)
+            {
+                if (isShadow == 1)
+                {
+                    // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0)) const
+                    __intrinsic_asm "$0.gather($1, ($2).xy, as_type<uint>(($2).z))";
+                }
+                else
+                {
+                    // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0), component c = component::x) const
+                    __intrinsic_asm "$0.gather($1, ($2).xy, as_type<uint>(($2).z), int2(0), metal::component($3))";
+                }
+            }
+            else
+            {
+                if (isShadow == 1)
+                {
+                    // Tv gather(sampler s, float2 coord, int2 offset = int2(0)) const
+                    __intrinsic_asm "$0.gather($1, $2, 0)";
+                }
+                else
+                {
+                    // Tv gather(sampler s, float2 coord, int2 offset = int2(0), component c = component::x) const
+                    __intrinsic_asm "$0.gather($1, $2, int2(0), metal::component($3))";
+                }
+            }
+        }
+        else if (Shape.flavor == $(SLANG_TEXTURE_CUBE))
+        {
+            if (isArray == 1)
+            {
+                if (isShadow == 1)
+                {
+                    // Tv gather(sampler s, float3 coord, uint array) const
+                    __intrinsic_asm "$0.gather($1, ($2).xyz, as_type<uint>(($2).w))";
+                }
+                else
+                {
+                    // Tv gather(sampler s, float3 coord, uint array, component c = component::x) const
+                    __intrinsic_asm "$0.gather($1, ($2).xyz, as_type<uint>(($2).w), metal::component($3))";
+                }
+            }
+            else
+            {
+                if (isShadow == 1)
+                {
+                    // Tv gather(sampler s, float3 coord) const
+                    __intrinsic_asm "$0.gather($1, $2)";
+                }
+                else
+                {
+                    // Tv gather(sampler s, float3 coord, component c = component::x) const
+                    __intrinsic_asm "$0.gather($1, $2, metal::component($3))";
+                }
+            }
+        }
+        else
+        {
+            // TODO: This needs to be handled by the capability system
+            __intrinsic_asm "<Metal support gather only for 2D and Cube>";
+        }
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
@@ -1491,7 +1863,7 @@ vector<TElement,4> __glsl_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, int component)
+vector<TElement,4> __texture_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, int component)
 {
     __target_switch
     {
@@ -1505,13 +1877,48 @@ vector<TElement,4> __glsl_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gather_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, constexpr vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, int component)
+[require(glsl_metal_spirv, GLSL_400)]
+vector<TElement,4> __texture_gather_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, constexpr vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, int component)
 {
     __target_switch
     {
     case glsl:
         __intrinsic_asm "textureGatherOffset($p, $2, $3, $4)";
+    case metal:
+        if (Shape.flavor == $(SLANG_TEXTURE_2D))
+        {
+            if (isArray == 1)
+            {
+                if (isShadow == 1)
+                {
+                    // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0)) const
+                    __intrinsic_asm "$0.gather($1, ($2).xy, as_type<uint>(($2).z), $3)";
+                }
+                else
+                {
+                    // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0), component c = component::x) const
+                    __intrinsic_asm "$0.gather($1, ($2).xy, as_type<uint>(($2).z), $3, metal::component($4))";
+                }
+            }
+            else
+            {
+                if (isShadow == 1)
+                {
+                    // Tv gather(sampler s, float2 coord, int2 offset = int2(0)) const
+                    __intrinsic_asm "$0.gather($1, $2, $3)";
+                }
+                else
+                {
+                    // Tv gather(sampler s, float2 coord, int2 offset = int2(0), component c = component::x) const
+                    __intrinsic_asm "$0.gather($1, $2, $3, metal::component($4))";
+                }
+            }
+        }
+        else
+        {
+            // TODO: This needs to be handled by the capability system
+            __intrinsic_asm "<Metal support gather with offset only for 2D>";
+        }
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
@@ -1522,7 +1929,7 @@ vector<TElement,4> __glsl_gather_offset(__TextureImpl<T, Shape, isArray, 0, samp
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gather_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, int component)
+vector<TElement,4> __texture_gather_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, int component)
 {
     __target_switch
     {
@@ -1537,7 +1944,7 @@ vector<TElement,4> __glsl_gather_offset(__TextureImpl<T, Shape, isArray, 0, samp
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location,
+vector<TElement,4> __texture_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset1,
     constexpr vector<int, Shape.planeDimensions> offset2,
     constexpr vector<int, Shape.planeDimensions> offset3,
@@ -1560,7 +1967,7 @@ vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sam
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location,
+vector<TElement,4> __texture_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset1,
     constexpr vector<int, Shape.planeDimensions> offset2,
     constexpr vector<int, Shape.planeDimensions> offset3,
@@ -1581,13 +1988,45 @@ vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sam
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue)
+[require(glsl_metal_spirv, GLSL_400)]
+vector<TElement,4> __texture_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue)
 {
     __target_switch
     {
     case glsl:
         __intrinsic_asm "textureGather($p, $2, $3)";
+    case metal:
+        if (isShadow == 1)
+        {
+            if (Shape.flavor == $(SLANG_TEXTURE_2D))
+            {
+                if (isArray == 1)
+                {
+                    // Tv gather_compare(sampler s, float2 coord, uint array, float compare_value, int2 offset = int2(0)) const
+                    __intrinsic_asm "$0.gather_compare($1, ($2).xy, as_type<uint>(($2).z), $3)";
+                }
+                else
+                {
+                    // Tv gather_compare(sampler s, float2 coord, float compare_value, int2 offset = int2(0)) const
+                    __intrinsic_asm "$0.gather_compare($1, $2, $3)";
+                }
+            }
+            else if (Shape.flavor == $(SLANG_TEXTURE_CUBE))
+            {
+                if (isArray == 1)
+                {
+                    // Tv gather_compare(sampler s, float3 coord, uint array, float compare_value) const
+                    __intrinsic_asm "$0.gather_compare($1, ($2).xyz, as_type<uint>(($2).w), $3)";
+                }
+                else
+                {
+                    // Tv gather_compare(sampler s, float3 coord, float compare_value) const
+                    __intrinsic_asm "$0.gather_compare($1, $2, $3)";
+                }
+            }
+        }
+        // TODO: This needs to be handled by the capability system
+        __intrinsic_asm "<Metal support gather_compare only for 2D depth and Cube depth>";
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
@@ -1598,7 +2037,7 @@ vector<TElement,4> __glsl_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCo
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue)
+vector<TElement,4> __texture_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue)
 {
     __target_switch
     {
@@ -1612,13 +2051,32 @@ vector<TElement,4> __glsl_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCo
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue, constexpr vector<int, Shape.planeDimensions> offset)
+[require(glsl_metal_spirv, GLSL_400)]
+vector<TElement,4> __texture_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue, constexpr vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
     {
     case glsl:
         __intrinsic_asm "textureGatherOffset($p, $2, $3, $4)";
+    case metal:
+        if (isShadow == 1)
+        {
+            if (Shape.flavor == $(SLANG_TEXTURE_2D))
+            {
+                if (isArray == 1)
+                {
+                    // Tv gather_compare(sampler s, float2 coord, uint array, float compare_value, int2 offset = int2(0)) const
+                    __intrinsic_asm "$0.gather_compare($1, ($2).xy, as_type<uint>(($2).z), $3, $4)";
+                }
+                else
+                {
+                    // Tv gather_compare(sampler s, float2 coord, float compare_value, int2 offset = int2(0)) const
+                    __intrinsic_asm "$0.gather_compare($1, $2, $3, $4)";
+                }
+            }
+        }
+        // TODO: This needs to be handled by the capability system
+        __intrinsic_asm "<Metal support gather_compare with offset only for 2D depth>";
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
@@ -1629,7 +2087,7 @@ vector<TElement,4> __glsl_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, s
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue, constexpr vector<int, Shape.planeDimensions> offset)
+vector<TElement,4> __texture_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue, constexpr vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
     {
@@ -1644,7 +2102,7 @@ vector<TElement,4> __glsl_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, s
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue,
+vector<TElement,4> __texture_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue,
     vector<int, Shape.planeDimensions> offset1,
     vector<int, Shape.planeDimensions> offset2,
     vector<int, Shape.planeDimensions> offset3,
@@ -1666,7 +2124,7 @@ vector<TElement,4> __glsl_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, 
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, GLSL_400)]
-vector<TElement,4> __glsl_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue,
+vector<TElement,4> __texture_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue,
     vector<int, Shape.planeDimensions> offset1,
     vector<int, Shape.planeDimensions> offset2,
     vector<int, Shape.planeDimensions> offset3,
@@ -1703,7 +2161,9 @@ for (int isScalarTexture = 0; isScalarTexture <= 1; isScalarTexture++) {
 ${{{{
     // Gather component
     const char* samplerStateParam = isCombined ? "" : " s,";
-    for (int isCmp = 0; isCmp <= 1; ++isCmp) {
+    const char* metalSupport = isCombined ? "" : "metal_";
+    const char* caseMetal = isCombined ? "" : "case metal:";
+    for (int isCmp = 0; isCmp < 2; ++isCmp) {
         const char* cmp = isCmp ? "Cmp" : "";
         const char* cmpParam = isCmp ? ", T compareValue" : "";
         const char* compareArg = isCmp ? ", compareValue" : "";
@@ -1711,32 +2171,34 @@ ${{{{
         const char* componentNames[] = { "", "Red", "Green", "Blue", "Alpha"};
         const char* glslComponentNames[] = { ", 0", ", 1", ", 2", ", 3" };
 
-        for (auto componentId = 0;  componentId <= 4; componentId++) {
+        for (auto componentId = 0;  componentId < 5; componentId++) {
             auto componentName = componentNames[componentId];
             auto glslComponent = (isCmp ? "" :glslComponentNames[componentId == 0 ? 0 : componentId - 1]);
     }}}}
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_gather)]
+    [require(glsl_hlsl_$(metalSupport)spirv, texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam))
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
+        $(caseMetal)
         case glsl:
         case spirv:
-            return __glsl_gather$(cmp)<T>(this,$(samplerStateParam) location $(compareArg) $(glslComponent));
+            return __texture_gather$(cmp)<T>(this,$(samplerStateParam) location $(compareArg) $(glslComponent));
         }
     }
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_gather)]
+    [require(glsl_hlsl_$(metalSupport)spirv, texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam), constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
+        $(caseMetal)
         case glsl:
         case spirv:
-            return __glsl_gather$(cmp)_offset<T>(this,$(samplerStateParam) location $(compareArg), offset $(glslComponent));
+            return __texture_gather$(cmp)_offset<T>(this,$(samplerStateParam) location $(compareArg), offset $(glslComponent));
         }
     }
     [ForceInline]
@@ -1752,7 +2214,7 @@ ${{{{
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
         case glsl:
         case spirv:
-            return __glsl_gather$(cmp)_offsets<T>(this,$(samplerStateParam) location $(compareArg), offset1,offset2,offset3,offset4 $(glslComponent));
+            return __texture_gather$(cmp)_offsets<T>(this,$(samplerStateParam) location $(compareArg), offset1,offset2,offset3,offset4 $(glslComponent));
         }
     }
     ${{{{
@@ -1785,7 +2247,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
     {
         __target_switch
@@ -1793,6 +2255,62 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
         case cpp:
         case hlsl:
             __intrinsic_asm ".Load";
+        case metal:
+            switch (Shape.flavor)
+            {
+            case $(SLANG_TEXTURE_1D):
+                // lod is not supported for 1D texture
+                if (isArray == 1)
+                    // Tv read(uint coord, uint array, uint lod = 0) const
+                    __intrinsic_asm "$0.read(as_type<uint>(($1).x), as_type<uint>(($1).y))";
+                else
+                    // Tv read(uint coord, uint lod = 0) const
+                    __intrinsic_asm "$0.read(as_type<uint>(($1).x))";
+            case $(SLANG_TEXTURE_2D):
+                if (isShadow == 1)
+                {
+                    if (isArray == 1)
+                        // T read(uint2 coord, uint array, uint lod = 0) const
+                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                    else
+                        // T read(uint2 coord, uint lod = 0) const
+                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z))";
+                }
+                else
+                {
+                    if (isArray == 1)
+                        // Tv read(uint2 coord, uint array, uint lod = 0) const
+                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                    else
+                        // Tv read(uint2 coord, uint lod = 0) const
+                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z))";
+                }
+            case $(SLANG_TEXTURE_3D):
+                if (isShadow == 0 && isArray == 0)
+                    // Tv read(uint3 coord, uint lod = 0) const
+                    __intrinsic_asm "$0.read(as_type<vec<uint,3>>(($1).xyz), as_type<uint>(($1).w))";
+            case $(SLANG_TEXTURE_CUBE):
+                if (isShadow == 1)
+                {
+                    if (isArray == 1)
+                        // T read(uint2 coord, uint face, uint array, uint lod = 0) const
+                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                    else
+                        // T read(uint2 coord, uint face, uint lod = 0) const
+                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                }
+                else
+                {
+                    if (isArray == 1)
+                        // Tv read(uint2 coord, uint face, uint array, uint lod = 0) const
+                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                    else
+                        // Tv read(uint2 coord, uint face, uint lod = 0) const
+                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                }
+            }
+            // TODO: This needs to be handled by the capability system
+            __intrinsic_asm "<Not supported>";
         case glsl:
             __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e)$z";
         case spirv:
@@ -1919,14 +2437,39 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
         {
             case cpp:
             case hlsl:
-            __intrinsic_asm ".Load";
+                __intrinsic_asm ".Load";
+            case metal:
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                    if (isShadow == 1)
+                    {
+                        if (isArray == 1)
+                            // Tv read(uint2 coord, uint array, uint lod = 0) const
+                            __intrinsic_asm "$0.read(($1).xy, ($1).z)";
+                        else
+                            // T read(uint2 coord, uint sample) const
+                            __intrinsic_asm "$0.read($1, uint($2))";
+                    }
+                    else
+                    {
+                        if (isArray == 1)
+                            // Tv read(uint2 coord, uint array, uint lod = 0) const
+                            __intrinsic_asm "$0.read(($1).xy, ($1).z)";
+                        else
+                            // Tv read(uint2 coord, uint sample) const
+                            __intrinsic_asm "$0.read($1, uint($2))";
+                    }
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<Not supported>";
             case glsl:
                 __intrinsic_asm "$ctexelFetch($0, $1, ($2))$z";
             case spirv:
@@ -2212,7 +2755,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
 {
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_compute_fragment)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
@@ -2220,6 +2763,33 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
             case cpp:
             case hlsl:
                 __intrinsic_asm ".Load";
+            case metal:
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                    if (isShadow == 1)
+                    {
+                        if (isArray == 1)
+                            // The document seems to have a typo. `lod` must mean `sample`.
+                            // Tv read(uint2 coord, uint array, uint lod = 0) const
+                            __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), $2)";
+                        else
+                            // T read(uint2 coord, uint sample) const
+                            __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), $2)";
+                    }
+                    else
+                    {
+                        if (isArray == 1)
+                            // The document seems to have a typo. `lod` must mean `sample`.
+                            // Tv read(uint2 coord, uint array, uint lod = 0) const
+                            __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), $2)";
+                        else
+                            // Tv read(uint2 coord, uint sample) const
+                            __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), $2)";
+                    }
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<Not supported>";
             case glsl:
                 __intrinsic_asm "$(glslIntrinsicMS)";
             case spirv:
@@ -14024,8 +14594,8 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     char const* glslTextureSizeFunc = (isReadOnly) ? "textureSize" : "imageSize";
     char const* glslLoadFuncName = (isReadOnly) ? "texelFetch" : "imageLoad";
     char const* spvLoadInstName = (isReadOnly) ? "OpImageFetch" : "OpImageRead";
-    char const* requireToSetQuery = (isReadOnly) ? "[require(glsl_hlsl_spirv, texture_size)]" : "[require(glsl_hlsl_spirv, image_size)]";
-    char const* requireToSet = (isReadOnly) ? "[require(glsl_hlsl_spirv, texture_sm_4_1)]" : "[require(glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]";
+    char const* requireToSetQuery = (isReadOnly) ? "[require(glsl_hlsl_metal_spirv, texture_size)]" : "[require(glsl_hlsl_metal_spirv, image_size)]";
+    char const* requireToSet = (isReadOnly) ? "[require(glsl_hlsl_metal_spirv, texture_sm_4_1)]" : "[require(glsl_hlsl_metal_spirv, texture_sm_4_1_compute_fragment)]";
 }}}}
 
 __generic<T, let format:int>
@@ -14039,6 +14609,7 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         {
         case hlsl: __intrinsic_asm ".GetDimensions";
         case glsl: __intrinsic_asm "($1 = $(glslTextureSizeFunc)($0))";
+        case metal: __intrinsic_asm "(*($1) = $0.get_width())";
         case spirv:
             dim = spirv_asm {
                 OpCapability ImageQuery;
@@ -14055,6 +14626,7 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load";
+        case metal: __intrinsic_asm "$0.read(uint($1))";
         case glsl: __intrinsic_asm "$(glslLoadFuncName)($0, $1)$z";
         case spirv: return spirv_asm {
                 %sampled:__sampledType(T) = $(spvLoadInstName) $this $location;
@@ -14084,6 +14656,7 @@ ${{{{
                 {
                 case hlsl: __intrinsic_asm "($0)[$1] = $2";
                 case glsl: __intrinsic_asm "imageStore($0, int($1), $V2)";
+                case metal: __intrinsic_asm "$0.write($2, $1)";
                 case spirv: spirv_asm {
                         OpImageWrite $this $index __convertTexel(newValue);
                     };
