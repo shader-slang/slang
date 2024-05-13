@@ -18,7 +18,6 @@ struct PeepholeContext : InstPassBase
     bool removeOldInst = true;
     bool isInGeneric = false;
     bool isPrelinking = false;
-    bool isPostInlining = false;
 
     TargetProgram* targetProgram;
 
@@ -252,18 +251,18 @@ struct PeepholeContext : InstPassBase
         switch (inst->getOp())
         {
         case kIROp_AlignOf:
-            // Fold all calls to builtin functions that results in simple integer values.
-            // When postInlining flag is set, this happens for alignOf<T>() function, which
-            // infers the size of T and replaces the use with the IntLiteral.
-            if (isPostInlining && inst->getDataType()->getOp() == kIROp_IntType)
+            // Fold all calls to alignOf<T>() that returns a simple integer value.
+            if (inst->getDataType()->getOp() == kIROp_IntType)
             {
-                auto alignOfInst = as<IRAlignOf>(inst);
-                auto baseType = alignOfInst->getBaseOp()->getDataType();
-                if (as<IRParam>(baseType))
+                if (!targetProgram)
                     break;
 
                 IRSizeAndAlignment sizeAlignment;
+                auto alignOfInst = as<IRAlignOf>(inst);
+                auto baseType = alignOfInst->getBaseOp()->getDataType();
                 getNaturalSizeAndAlignment(targetProgram->getOptionSet(), baseType, &sizeAlignment);
+                if (sizeAlignment.size == 0)
+                    break;
                 IRBuilder builder(module);
                 builder.setInsertBefore(inst);
                 auto stride = builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
@@ -1145,7 +1144,6 @@ bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizat
     PeepholeContext context = PeepholeContext(module);
     context.targetProgram = target;
     context.isPrelinking = options.isPrelinking;
-    context.isPostInlining = options.isPostInlining;
     return context.processModule();
 }
 

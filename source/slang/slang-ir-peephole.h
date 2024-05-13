@@ -11,18 +11,10 @@ namespace Slang
     struct PeepholeOptimizationOptions
     {
         bool isPrelinking = false;
-        bool isPostInlining = false;
         static PeepholeOptimizationOptions getPrelinking()
         {
             PeepholeOptimizationOptions result;
             result.isPrelinking = true;
-            return result;
-        }
-
-        static PeepholeOptimizationOptions getPostInlining()
-        {
-            PeepholeOptimizationOptions result;
-            result.isPostInlining = true;
             return result;
         }
     };

@@ -49,7 +49,7 @@ namespace Slang
                 {
                     funcChanged = false;
                     funcChanged |= applySparseConditionalConstantPropagation(func, sink);
-                    funcChanged |= peepholeOptimize(target, func->getModule(), PeepholeOptimizationOptions::getPostInlining());
+                    funcChanged |= peepholeOptimize(target, func);
                     funcChanged |= removeRedundancyInFunc(func);
                     funcChanged |= simplifyCFG(func, options.cfgOptions);
                     eliminateDeadCode(func);

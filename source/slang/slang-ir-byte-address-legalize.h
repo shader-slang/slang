@@ -25,7 +25,7 @@ void legalizeByteAddressBufferOps(
     Session*                                    session,
     TargetProgram*                              target,
     IRModule*                                   module,
-	DiagnosticSink*								sink,
+    DiagnosticSink*                             sink,
     ByteAddressBufferLegalizationOptions const& options);
 }
 
