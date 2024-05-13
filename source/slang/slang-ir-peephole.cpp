@@ -261,8 +261,9 @@ struct PeepholeContext : InstPassBase
                 IRSizeAndAlignment sizeAlignment;
                 auto alignOfInst = as<IRAlignOf>(inst);
                 auto baseType = alignOfInst->getBaseOp()->getDataType();
-                if (getNaturalSizeAndAlignment(targetProgram->getOptionSet(), baseType, &sizeAlignment) ||
-                    sizeAlignment.size == 0)
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), baseType, &sizeAlignment)))
+                    break;
+                if (sizeAlignment.size == 0)
                     break;
 
                 IRBuilder builder(module);
