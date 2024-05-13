@@ -655,9 +655,8 @@ struct ClearValue
 
 struct BufferRange
 {
-    // TODO: Change to Index and Count?
-    uint64_t firstElement;
-    uint64_t elementCount;
+    Offset offset;  ///< Offset in bytes.
+    Size size;      ///< Size in bytes.
 };
 
 enum class TextureAspect : uint32_t
@@ -872,8 +871,6 @@ public:
         SubresourceRange subresourceRange;
         // Specifies the range of a buffer resource for a ShaderResource/UnorderedAccess view.
         BufferRange bufferRange;
-        // Specifies the element size in bytes of a structured buffer. Pass 0 for a raw buffer view.
-        Size bufferElementSize;
     };
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() = 0;
 

@@ -246,7 +246,6 @@ struct AutoDiffTexture : public WindowedAppBase
     {
         IResourceView::Desc desc = {};
         desc.type = IResourceView::Type::UnorderedAccess;
-        desc.bufferElementSize = 0;
         return gDevice->createBufferView(buffer, nullptr, desc);
     }
     ComPtr<gfx::IResourceView> createUAV(ITextureResource* texture, int level)
