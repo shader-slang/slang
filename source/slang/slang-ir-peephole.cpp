@@ -257,12 +257,14 @@ struct PeepholeContext : InstPassBase
                 if (!targetProgram)
                     break;
 
+                // Save the alignment information and exit early if it is invalid
                 IRSizeAndAlignment sizeAlignment;
                 auto alignOfInst = as<IRAlignOf>(inst);
                 auto baseType = alignOfInst->getBaseOp()->getDataType();
-                getNaturalSizeAndAlignment(targetProgram->getOptionSet(), baseType, &sizeAlignment);
-                if (sizeAlignment.size == 0)
+                if (getNaturalSizeAndAlignment(targetProgram->getOptionSet(), baseType, &sizeAlignment) ||
+                    sizeAlignment.size == 0)
                     break;
+
                 IRBuilder builder(module);
                 builder.setInsertBefore(inst);
                 auto stride = builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
