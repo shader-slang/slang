@@ -808,34 +808,9 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
 }
 #pragma warning(pop)
 
-List<const CapabilityAtomSet*> CapabilitySet::getAtomSets() const
+CapabilitySet::AtomSets::Iterator CapabilitySet::getAtomSets() const
 {
-    List<const CapabilityAtomSet*> set;
-    //reserve for worst case
-    set.reserve(kCapabilityTargetCount * kCapabilityStageCount);
-    for (auto& targetSet : m_targetSets)
-    {
-        for (auto& stageSets : targetSet.second.shaderStageSets)
-        {
-            for (auto& stageSet : stageSets.second.disjointSets)
-            {
-                set.add(&stageSet);
-            }
-        }
-    }
-    return set;
-}
-
-List<List<CapabilityAtom>> CapabilitySet::getAtomSetsAsList() const
-{
-    List<List<CapabilityAtom>> atomList;
-    //reserve for worst case
-    auto sets = getAtomSets();
-    atomList.reserve(sets.getCount());
-    for (auto& i : sets)
-        atomList.add(i->getElements<CapabilityAtom>());
-
-    return atomList;
+    return CapabilitySet::AtomSets::Iterator(&this->getCapabilityTargetSets()).begin();
 }
 
 bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, CapabilityAtomSet& outFailedAvailableSet)
@@ -916,7 +891,7 @@ void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
     bool isFirstSet = true;
     for (auto& set : capSet.getAtomSets())
     {
-        List<CapabilityAtom> compactAtomList = set->getElements<CapabilityAtom>();
+        List<CapabilityAtom> compactAtomList = set.getElements<CapabilityAtom>();
 
         if (!isFirstSet)
         {

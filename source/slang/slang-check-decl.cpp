@@ -9927,7 +9927,7 @@ namespace Slang
         {
             for (auto& capSet : nodeCaps.getAtomSets())
             {
-                auto elements = capSet->getElements<CapabilityAtom>();
+                auto elements = capSet.getElements<CapabilityAtom>();
                 decl->capabilityRequirementProvenance.reserve(decl->capabilityRequirementProvenance.getCount()+elements.getCount());
                 for (auto atom : elements)
                 {

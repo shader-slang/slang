@@ -81,6 +81,7 @@ struct CapabilityTargetSet
     void unionWith(const CapabilityTargetSet& other);
 };
 
+struct CapabilitySet;
 struct CapabilitySet
 {
 public:
@@ -146,12 +147,6 @@ public:
         /// Are these two capability sets equal?
     bool operator==(CapabilitySet const& that) const;
 
-    /// Get access to the raw atomic capabilities that define this set.
-    /// Get all bottom level UIntSets for each CapabilityTargetSet.
-    List<const CapabilityAtomSet*> getAtomSets() const;
-    /// Expand all getAtomSets into list form. This is an expensive operation.
-    List<List<CapabilityAtom>> getAtomSetsAsList() const;
-
     void addCapability(List<List<CapabilityAtom>>& atomLists);
     /// Calculate a list of "compacted" atoms, which excludes any atoms from the expanded list that are implies by another item in the list.
 
@@ -169,6 +164,120 @@ public:
     CapabilityTargetSets& getCapabilityTargetSets() { return m_targetSets; }
     const CapabilityTargetSets& getCapabilityTargetSets() const { return m_targetSets; }
 
+    struct AtomSets
+    {
+        struct Iterator
+        {
+        private:
+            const CapabilityTargetSets* context;
+            decltype(context->begin()) targetNode;
+            decltype((*targetNode).second.shaderStageSets.begin()) stageNode;
+            decltype((*stageNode).second.disjointSets.begin()) disjointSetNode;
+
+        public:
+            bool isValid() const
+            {
+                return disjointSetNode.current;
+            }
+            const CapabilityAtomSet& operator*() const
+            {
+                return (*this->disjointSetNode);
+            }
+            const CapabilityAtomSet* operator->() const
+            {
+                return &(*this->disjointSetNode);
+            }
+            bool operator==(const Iterator& other) const
+            {
+                return other.context == this->context
+                    && other.targetNode == this->targetNode
+                    ;
+            }
+            bool operator!=(const Iterator& other) const
+            {
+                return !(other == *this);
+            }
+
+            Iterator& operator++()
+            {
+                this->disjointSetNode++;
+                if (this->disjointSetNode == (*this->stageNode).second.disjointSets.end())
+                {
+nullDisjointSetNode:
+                    this->stageNode++;
+                    if (this->stageNode == (*this->targetNode).second.shaderStageSets.end())
+                    {
+nullStageSetNode:
+                        this->targetNode++;
+                        if (this->targetNode == this->context->end())
+                        {
+                            this->stageNode = {};
+                            this->disjointSetNode = {};
+                            return *this;
+                        }
+                        this->stageNode = (*this->targetNode).second.shaderStageSets.begin();
+                        if (this->stageNode == (*this->targetNode).second.shaderStageSets.end())
+                            goto nullStageSetNode;
+                    }
+
+                    this->disjointSetNode = (*this->stageNode).second.disjointSets.begin();
+                    if ((*this->stageNode).second.disjointSets.begin() == (*this->stageNode).second.disjointSets.end())
+                        goto nullDisjointSetNode;
+                }
+                return *this;
+            }
+            Iterator& operator++(int)
+            {
+                return ++(*this);
+            }
+            Iterator begin()
+            {
+                // first node may not have a valid disjointSet or stageSet. handle the senario of: 
+                // 1. targetNode is empty
+                // 2. stage node has no valid stage sets (not empty)
+                // 3. stage node is empty
+                // 4. disjointSets has no sets
+                Iterator tmp(this->context);
+                tmp.targetNode = this->context->begin();
+                if (tmp.targetNode == this->context->end())
+                    return tmp;
+
+                tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
+                while (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
+                {
+trySetupStageNode:
+                    tmp.targetNode++;
+                    if (tmp.targetNode == this->context->end())
+                        return tmp;
+                    tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
+                }
+                
+                tmp.disjointSetNode = (*tmp.stageNode).second.disjointSets.begin();
+                while (tmp.disjointSetNode == (*tmp.stageNode).second.disjointSets.end())
+                {
+                    tmp.stageNode++;
+                    if (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
+                        goto trySetupStageNode;
+                    tmp.disjointSetNode = (*tmp.stageNode).second.disjointSets.begin();
+                }
+
+                return tmp;
+            }
+            Iterator end()
+            {
+                Iterator tmp(this->context);
+                tmp.targetNode = this->context->end();
+                return tmp;
+            }
+            Iterator(const CapabilityTargetSets* mainContext)
+            {
+                context = mainContext;
+            }
+        };
+    };
+    /// Get access to the raw atomic capabilities that define this set.
+    /// Get all bottom level UIntSets for each CapabilityTargetSet.
+    CapabilitySet::AtomSets::Iterator getAtomSets() const;
 private:
     /// underlying data of CapabilitySet.
     CapabilityTargetSets m_targetSets{};

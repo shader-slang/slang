@@ -2440,11 +2440,11 @@ namespace Slang
         // be a minimal list of atoms such that they will produce
         // the same `CapabilitySet` when expanded.
 
-        List<List<CapabilityAtom>> compactedAtoms;
-        compactedAtoms = caps.getAtomSetsAsList();
+        auto compactedAtoms = caps.getAtomSets();
         List<IRInst*> conjunctions;
-        for( auto atomConjunction : compactedAtoms )
+        for( auto& atomConjunctionSet : compactedAtoms )
         {
+            auto atomConjunction = atomConjunctionSet.getElements<CapabilityAtom>();
             List<IRInst*> args;
             for (auto atom : atomConjunction)
                 args.add(getIntValue(capabilityAtomType, Int(atom)));
