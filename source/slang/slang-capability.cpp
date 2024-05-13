@@ -196,8 +196,7 @@ void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(const Capability
         }
     }
 
-    // Add setToAdd. It is fully disjoint.
-    localStageSets.disjointSets.addFirst(setToAdd);
+    localStageSets.addNewSet(setToAdd);
 }
 
 // No targets atoms have been defined on yet, set stage to target any_target capability 
@@ -469,20 +468,22 @@ bool CapabilitySet::implies(CapabilitySet const& other) const
 
 void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
 {
-    for (auto otherTargetSet : other.shaderStageSets)
+    for (auto otherStageSet : other.shaderStageSets)
     {
-        auto& thisTargetSet = this->shaderStageSets[otherTargetSet.first];
-        thisTargetSet.stage = otherTargetSet.first;
+        auto& thisStageSet = this->shaderStageSets[otherStageSet.first];
+        thisStageSet.stage = otherStageSet.first;
 
-        if (thisTargetSet.disjointSets.getCount() == 0)
+        if (thisStageSet.disjointSets.getCount() == 0)
         {
-            for (auto otherDisjointSet : otherTargetSet.second.disjointSets)
-                thisTargetSet.disjointSets.addFirst(otherDisjointSet);
+            for (auto otherDisjointSet : otherStageSet.second.disjointSets)
+            {
+                thisStageSet.addNewSet(otherDisjointSet);
+            }
         }
         else 
         {
-            for (auto otherDisjointSet : otherTargetSet.second.disjointSets)
-                for (auto thisDisjointSet : thisTargetSet.disjointSets)
+            for (auto otherDisjointSet : otherStageSet.second.disjointSets)
+                for (auto thisDisjointSet : thisStageSet.disjointSets)
                     thisDisjointSet.unionWith(otherDisjointSet);
         }
     }

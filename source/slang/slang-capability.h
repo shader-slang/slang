@@ -66,6 +66,17 @@ struct CapabilityStageSet
     /// LinkedList of all disjoint sets for fast remove/add of unconstrained list positions.  
     LinkedList<CapabilityAtomSet> disjointSets{};
 
+    void addNewSet(const CapabilityAtomSet& setToAdd)
+    {
+        // This function is how we would normally add fully disjoint atom sets.
+        // We do not want to allow this (at least for now). More than 1 set inside
+        // disjointSets will be effectively unioned.
+        if (disjointSets.getCount() == 0)
+            disjointSets.addFirst(setToAdd);
+        else
+            disjointSets.getFirst().add(setToAdd);
+        SLANG_ASSERT(disjointSets.getCount() == 1);
+    }
     bool tryJoin(const CapabilityTargetSet& other);
 };
 

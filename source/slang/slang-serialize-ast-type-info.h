@@ -152,7 +152,7 @@ struct SerialTypeInfo<CapabilityStageSet>
         disjointSets.clear();
         for (auto& i : items)
         {
-            dst.disjointSets.addFirst(i);
+            dst.addNewSet(i);
         }
     }
 };
