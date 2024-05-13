@@ -115,6 +115,7 @@ SlangResult createD3D12BufferDescriptor(
             srvDesc.Buffer.FirstElement = offset / sizeInfo.blockSizeInBytes;
             srvDesc.Buffer.NumElements = UINT(size / sizeInfo.blockSizeInBytes);
         }
+
         if (size >= (1ull << 32) - 8)
         {
             // D3D12 does not support view descriptors that has size near 4GB.
@@ -141,14 +142,7 @@ SlangResult ResourceViewInternalImpl::getBufferDescriptorForBinding(
     uint32_t bufferStride,
     D3D12Descriptor& outDescriptor)
 {
-    // If stride is 0, just use the default descriptor.
-    if (bufferStride == 0)
-    {
-        outDescriptor = m_descriptor;
-        return SLANG_OK;
-    }
-
-    // Otherwise, look for an existing descriptor from the cache if it exists.
+    // Look for an existing descriptor from the cache if it exists.
     if (auto descriptor = m_mapBufferStrideToDescriptor.tryGetValue(bufferStride))
     {
         outDescriptor = *descriptor;
