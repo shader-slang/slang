@@ -863,21 +863,12 @@
 		</Expand>
 	</Type>
 	<Type Name="Slang::CapabilityStageSet">
-		<DisplayString>{{size={disjointSets.count}}}</DisplayString>
+		<DisplayString>{{size={disjointSet}}}</DisplayString>
 		<Expand>
 			<CustomListItems>
 				<Item Name="stage">stage</Item>
-				<Item Name="disjointSets">disjointSets</Item>
+				<Item Name="disjointSet">disjointSet</Item>
 			</CustomListItems>
-			<Synthetic Name="disjointSets.[data]">
-				<Expand>
-			        <LinkedListItems>
-				        <HeadPointer>disjointSets.head</HeadPointer>
-				        <NextPointer>next</NextPointer>
-				        <ValueNode>value</ValueNode>
-			        </LinkedListItems>
-				</Expand>
-			</Synthetic>
 		</Expand>
 	</Type>
 

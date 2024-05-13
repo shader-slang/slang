@@ -6,6 +6,7 @@
 #include "../core/slang-dictionary.h"
 
 #include <stdint.h>
+#include <optional>
 
 namespace Slang
 {
@@ -64,18 +65,17 @@ struct CapabilityStageSet
     CapabilityAtom stage{};
 
     /// LinkedList of all disjoint sets for fast remove/add of unconstrained list positions.  
-    LinkedList<CapabilityAtomSet> disjointSets{};
+    std::optional<CapabilityAtomSet> disjointSet{};
 
     void addNewSet(const CapabilityAtomSet& setToAdd)
     {
         // This function is how we would normally add fully disjoint atom sets.
-        // We do not want to allow this (at least for now). More than 1 set inside
-        // disjointSets will be effectively unioned.
-        if (disjointSets.getCount() == 0)
-            disjointSets.addFirst(setToAdd);
+        // We do not want to allow multiple sets (at least for now). This was previously
+        // implemented, but then removed.
+        if (!disjointSet)
+            disjointSet = setToAdd;
         else
-            disjointSets.getFirst().add(setToAdd);
-        SLANG_ASSERT(disjointSets.getCount() == 1);
+            disjointSet->add(setToAdd);
     }
     bool tryJoin(const CapabilityTargetSet& other);
 };
@@ -183,12 +183,12 @@ public:
             const CapabilityTargetSets* context;
             decltype(context->begin()) targetNode;
             decltype((*targetNode).second.shaderStageSets.begin()) stageNode;
-            decltype((*stageNode).second.disjointSets.begin()) disjointSetNode;
+            decltype((*stageNode).second.disjointSet) disjointSetNode;
 
         public:
             operator bool() const
             {
-                return disjointSetNode.current;
+                return disjointSetNode.has_value();
             }
             const CapabilityAtomSet& operator*() const
             {
@@ -211,29 +211,29 @@ public:
 
             Iterator& operator++()
             {
-                this->disjointSetNode++;
-                if (this->disjointSetNode == (*this->stageNode).second.disjointSets.end())
+                for(;;)
                 {
-nullDisjointSetNode:
                     this->stageNode++;
                     if (this->stageNode == (*this->targetNode).second.shaderStageSets.end())
                     {
-nullStageSetNode:
-                        this->targetNode++;
-                        if (this->targetNode == this->context->end())
+                        for(;;)
                         {
-                            this->stageNode = {};
-                            this->disjointSetNode = {};
-                            return *this;
+                            this->targetNode++;
+                            if (this->targetNode == this->context->end())
+                            {
+                                this->stageNode = {};
+                                this->disjointSetNode = {};
+                                return *this;
+                            }
+                            this->stageNode = (*this->targetNode).second.shaderStageSets.begin();
+                            if (this->stageNode == (*this->targetNode).second.shaderStageSets.end())
+                                continue;
                         }
-                        this->stageNode = (*this->targetNode).second.shaderStageSets.begin();
-                        if (this->stageNode == (*this->targetNode).second.shaderStageSets.end())
-                            goto nullStageSetNode;
                     }
 
-                    this->disjointSetNode = (*this->stageNode).second.disjointSets.begin();
-                    if ((*this->stageNode).second.disjointSets.begin() == (*this->stageNode).second.disjointSets.end())
-                        goto nullDisjointSetNode;
+                    this->disjointSetNode = (*this->stageNode).second.disjointSet;
+                    if (!this->disjointSetNode.has_value())
+                        continue;
                 }
                 return *this;
             }
@@ -247,31 +247,33 @@ nullStageSetNode:
                 // 1. targetNode is empty
                 // 2. stage node has no valid stage sets (not empty)
                 // 3. stage node is empty
-                // 4. disjointSets has no sets
+                // 4. disjointSet has no sets
                 Iterator tmp(this->context);
                 tmp.targetNode = this->context->begin();
                 if (tmp.targetNode == this->context->end())
                     return tmp;
 
                 tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
-                while (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
+                for(;;)
                 {
-trySetupStageNode:
-                    tmp.targetNode++;
-                    if (tmp.targetNode == this->context->end())
-                        return tmp;
-                    tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
+                    while (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
+                    {
+                        tmp.targetNode++;
+                        if (tmp.targetNode == this->context->end())
+                            return tmp;
+                        tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
+                    }
+                    
+                    tmp.disjointSetNode = (*tmp.stageNode).second.disjointSet;
+                    while (!tmp.disjointSetNode.has_value())
+                    {
+                        tmp.stageNode++;
+                        if (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
+                            continue;
+                        tmp.disjointSetNode = (*tmp.stageNode).second.disjointSet;
+                    }
+                    break;
                 }
-                
-                tmp.disjointSetNode = (*tmp.stageNode).second.disjointSets.begin();
-                while (tmp.disjointSetNode == (*tmp.stageNode).second.disjointSets.end())
-                {
-                    tmp.stageNode++;
-                    if (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
-                        goto trySetupStageNode;
-                    tmp.disjointSetNode = (*tmp.stageNode).second.disjointSets.begin();
-                }
-
                 return tmp;
             }
             Iterator end() const

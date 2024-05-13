@@ -179,23 +179,6 @@ void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(const Capability
     for(auto i : canonicalRepresentation)
         setToAdd.add(asAtomUInt(i));
 
-    for (auto node = localStageSets.disjointSets.getFirstNode(); node; node = node->getNext())
-    {
-        auto stageSet = node->value;
-        if (stageSet.contains(setToAdd))
-        {
-            // don't add setToAdd since it is a subset of an existing set
-            return;
-        }
-        else if (setToAdd.contains(stageSet))
-        {
-            // remove existing set since it is a subset of setToAdd
-            auto current = node;
-            node = node->getPrevious();
-            current->removeAndDelete();
-        }
-    }
-
     localStageSets.addNewSet(setToAdd);
 }
 
@@ -437,7 +420,6 @@ bool CapabilitySet::implies(CapabilitySet const& other) const
             return false;
         }
 
-        bool contained = false;
         for (const auto& otherStage : otherTarget.second.shaderStageSets)
         {
             auto thisStage = thisTarget->shaderStageSets.tryGetValue(otherStage.first);
@@ -448,17 +430,13 @@ bool CapabilitySet::implies(CapabilitySet const& other) const
             }
 
             // all stage sets that are in 'other' must be contained by 'this'
-            for (const auto& thisStageSet : thisStage->disjointSets)
+            if(thisStage->disjointSet)
             {
-                contained = false;
-                for (const auto& otherStageSet : otherStage.second.disjointSets)
-                {
-                    if (thisStageSet.contains(otherStageSet))
-                        contained = true;
-                }
-                if (!contained)
-                {
-                    return false;
+                auto& thisStageSet = thisStage->disjointSet.value();
+                if(otherStage.second.disjointSet)
+                {   
+                    if (!thisStageSet.contains(otherStage.second.disjointSet.value()))
+                        return false;
                 }
             }
         }
@@ -473,19 +451,11 @@ void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
         auto& thisStageSet = this->shaderStageSets[otherStageSet.first];
         thisStageSet.stage = otherStageSet.first;
 
-        if (thisStageSet.disjointSets.getCount() == 0)
-        {
-            for (auto otherDisjointSet : otherStageSet.second.disjointSets)
-            {
-                thisStageSet.addNewSet(otherDisjointSet);
-            }
-        }
-        else 
-        {
-            for (auto otherDisjointSet : otherStageSet.second.disjointSets)
-                for (auto thisDisjointSet : thisStageSet.disjointSets)
-                    thisDisjointSet.unionWith(otherDisjointSet);
-        }
+        if (!thisStageSet.disjointSet)
+            thisStageSet.disjointSet = otherStageSet.second.disjointSet;
+        else
+            if(otherStageSet.second.disjointSet)
+                thisStageSet.disjointSet->unionWith(*otherStageSet.second.disjointSet);
     }
 }
 
@@ -549,37 +519,8 @@ bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
         return false;
 
     // should not exceed far beyond 2*2 or 1*1 elements
-    for (auto& otherSet : otherStageSet->disjointSets)
-    {
-        for (auto& thisSet : this->disjointSets)
-        {
-            thisSet.add(otherSet);
-        }
-    }
-
-    //cull overlapping sets, generally only 1-2, not very expensive
-    for (auto* thisSet1 = this->disjointSets.getFirstNode(); thisSet1; thisSet1 = thisSet1->getNext())
-    {
-        for (auto* thisSet2 = this->disjointSets.getFirstNode(); thisSet2; thisSet2 = thisSet2->getNext())
-        {
-            if (thisSet1 == thisSet2)
-                continue;
-            if (thisSet1->value.contains(thisSet2->value))
-            {
-                auto currentNode = thisSet2;
-                thisSet2 = thisSet2->getPrevious();
-                currentNode->removeAndDelete();
-                continue;
-            }
-            else if (thisSet2->value.contains(thisSet1->value))
-            {
-                auto currentNode = thisSet1;
-                thisSet1 = thisSet1->getPrevious();
-                currentNode->removeAndDelete();
-                continue;
-            }
-        }
-    }
+    if(otherStageSet->disjointSet && this->disjointSet)
+        this->disjointSet->add(*otherStageSet->disjointSet);
 
     return true;
 }
@@ -748,8 +689,9 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
             // 1. target.contains(this/that)
             // 2. choose smallest super set
             // 3. rank each super set and their atoms, choose the smallest rank'd set (most specialized)
-            for (auto& shaderStageSetWeNeed : shaderStageSetsWeNeed.second.disjointSets)
+            if(shaderStageSetsWeNeed.second.disjointSet)
             {
+                auto& shaderStageSetWeNeed = shaderStageSetsWeNeed.second.disjointSet.value();
                 CapabilityAtomSet tmp_set{};
                 Index tmpCount = 0;
 
@@ -760,33 +702,37 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
                 Index thatSetCount = 0;
 
                 // subtraction of the set we want gets us the "elements which 'targetSet' has but `this/that` is less specialized for"
-                for (auto& thisStageSet : thisStageSets->disjointSets)
+                if(thisStageSets->disjointSet)
                 {
+                    auto& thisStageSet = thisStageSets->disjointSet.value();
                     // if `thisStageSet` is more specialized than the target, `thisStageSet` should not be a candidate
-                    if (!shaderStageSetWeNeed.contains(thisStageSet))
-                        continue;
                     if (thisStageSet == shaderStageSetWeNeed)
-                        return true;
-                    CapabilityAtomSet::calcSubtract(tmp_set, shaderStageSetWeNeed, thisStageSet);
-                    tmpCount = tmp_set.countElements();
-                    if (thisSetCount < tmpCount)
+                        return true; 
+                    if (shaderStageSetWeNeed.contains(thisStageSet))
                     {
-                        thisSet = tmp_set;
-                        thisSetCount = tmpCount;
+                        CapabilityAtomSet::calcSubtract(tmp_set, shaderStageSetWeNeed, thisStageSet);
+                        tmpCount = tmp_set.countElements();
+                        if (thisSetCount < tmpCount)
+                        {
+                            thisSet = tmp_set;
+                            thisSetCount = tmpCount;
+                        }
                     }
                 }
-                for (auto& thatStageSet : thatStageSets->disjointSets)
+                if (thatStageSets->disjointSet)
                 {
-                    if (!shaderStageSetWeNeed.contains(thatStageSet))
-                        continue;
+                    auto& thatStageSet = thatStageSets->disjointSet.value();
                     if (thatStageSet == shaderStageSetWeNeed)
                         return false;
-                    CapabilityAtomSet::calcSubtract(tmp_set, shaderStageSetWeNeed, thatStageSet);
-                    tmpCount = tmp_set.countElements();
-                    if (thatSetCount < tmpCount)
+                    if (shaderStageSetWeNeed.contains(thatStageSet))
                     {
-                        thatSet = tmp_set;
-                        thatSetCount = tmpCount;
+                        CapabilityAtomSet::calcSubtract(tmp_set, shaderStageSetWeNeed, thatStageSet);
+                        tmpCount = tmp_set.countElements();
+                        if (thatSetCount < tmpCount)
+                        {
+                            thatSet = tmp_set;
+                            thatSetCount = tmpCount;
+                        }
                     }
                 }
 
@@ -874,11 +820,13 @@ bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, C
             }
 
             const CapabilityAtomSet* lastBadStage = nullptr;
-            for (const auto& availableStageSet : availableStage.second.disjointSets)
+            if(availableStage.second.disjointSet)
             {
+                const auto& availableStageSet = availableStage.second.disjointSet.value();
                 lastBadStage = nullptr;
-                for (const auto& reqStageSet : reqStage->disjointSets)
+                if(reqStage->disjointSet)
                 {
+                    const auto& reqStageSet = reqStage->disjointSet.value();
                     if (availableStageSet.contains(reqStageSet))
                         break;
                     else 
@@ -972,8 +920,9 @@ int TEST_targetCapSetWithSpecificSetInStage(
     for (auto i : setToFind)
         set.add(UInt(i));
 
-    for (auto& i : stageSet.disjointSets)
+    if (stageSet.disjointSet)
     {
+        auto& i = stageSet.disjointSet.value();
         if (i == set)
             return true;
     }

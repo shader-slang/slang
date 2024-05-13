@@ -113,7 +113,7 @@ struct SerialTypeInfo<CapabilityStageSet>
     struct SerialType
     {
         SerialIndex stage;
-        SerialIndex disjointSets;
+        SerialIndex disjointSet;
     };
 
     typedef CapabilityStageSet NativeType;
@@ -124,17 +124,18 @@ struct SerialTypeInfo<CapabilityStageSet>
         auto& dst = *(SerialType*)serial;
 
         List<SerialTypeInfo<CapabilityStageSet>::SerialType> SDisjointSetsList;
-        SDisjointSetsList.setCount(src.disjointSets.getCount());
+        SDisjointSetsList.setCount(src.disjointSet.has_value());
         Index iter = 0;
 
-        for (auto& i : src.disjointSets)
+        if(src.disjointSet)
         {
+            auto& i = src.disjointSet.value();
             SerialTypeInfo<CapabilityAtomSet>::toSerial(writer, &i, &SDisjointSetsList[iter]);
             iter++;
         }
         
         SerialTypeInfo<CapabilityAtom>::toSerial(writer, &src.stage, &dst.stage);
-        dst.disjointSets = writer->addSerialArray<CapabilityStageSet>(SDisjointSetsList.getBuffer(), SDisjointSetsList.getCount());
+        dst.disjointSet = writer->addSerialArray<CapabilityStageSet>(SDisjointSetsList.getBuffer(), SDisjointSetsList.getCount());
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
@@ -144,12 +145,10 @@ struct SerialTypeInfo<CapabilityStageSet>
         CapabilityAtom stage;
         List<CapabilityAtomSet> items;
         SerialTypeInfo<CapabilityAtom>::toNative(reader, &src.stage, &stage);
-        reader->getArray(src.disjointSets, items);
+        reader->getArray(src.disjointSet, items);
 
         dst.stage = stage;
 
-        auto& disjointSets = dst.disjointSets;
-        disjointSets.clear();
         for (auto& i : items)
         {
             dst.addNewSet(i);
