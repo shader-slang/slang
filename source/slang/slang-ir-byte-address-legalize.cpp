@@ -350,7 +350,7 @@ struct ByteAddressBufferLegalizationContext
                 // Emit an aligned load operation on an array when using a LoadAligned inst.
                 // Else, fallback to scalarizing the loads.
                 IRSizeAndAlignment elementLayout;
-                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), arrayType->getElementType(), &elementLayout));
+                SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), arrayType->getElementType(), &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (!isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
@@ -419,7 +419,7 @@ struct ByteAddressBufferLegalizationContext
                 // Emit an aligned vector load operation when using a LoadAligned inst.
                 // Else, fallback to scalarizing the loads.
                 IRSizeAndAlignment elementLayout;
-                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), vecType->getElementType(), &elementLayout));
+                SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), vecType->getElementType(), &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (m_options.scalarizeVectorLoadStore || !isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
@@ -941,7 +941,7 @@ struct ByteAddressBufferLegalizationContext
                 // Emit an aligned store operation on an array when using a StoreAligned inst.
                 // Else, fallback to scalarizing the stores.
                 IRSizeAndAlignment elementLayout;
-                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), arrayType->getElementType(), &elementLayout));
+				SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), arrayType->getElementType(), &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (!isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
@@ -1000,7 +1000,7 @@ struct ByteAddressBufferLegalizationContext
                 // Else, fallback to scalarizing the stores.
 
                 IRSizeAndAlignment elementLayout;
-                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), vecType->getElementType(), &elementLayout));
+				SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), vecType->getElementType(), &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (m_options.scalarizeVectorLoadStore || !isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
