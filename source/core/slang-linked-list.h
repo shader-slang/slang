@@ -323,7 +323,6 @@ public:
         }
         return rs;
     }
-    int getCount() { return count; }
     int getCount() const { return count; }
 };
 } // namespace Slang

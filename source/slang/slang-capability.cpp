@@ -218,7 +218,7 @@ void CapabilitySet::addToTargetCapabilityWithStageAtom(const CapabilityName& sta
         CapabilityName targetAtom;
         for (const auto& targetAtomCononicalRep : anyTargetInfo.canonicalRepresentation)
         {
-            listOfTargetAndStageAtoms.unsafeSetToCount(maxSizeOfCanonical);
+            listOfTargetAndStageAtoms.setCount(maxSizeOfCanonical);
             iterToAddTo = 0;
             for (auto anyTargetAtom : targetAtomCononicalRep)
             {
@@ -232,8 +232,8 @@ void CapabilitySet::addToTargetCapabilityWithStageAtom(const CapabilityName& sta
                 listOfTargetAndStageAtoms[iterToAddTo] = canonicalRepresentation[i];
                 iterToAddTo++;
             }
-            //unsafe shrink 
-            listOfTargetAndStageAtoms.unsafeSetToCount(iterToAddTo);
+            // shrink the list so we only can access a valid number of atoms. This handles `spirv` having less atoms than `glsl` (textualTarget)
+            listOfTargetAndStageAtoms.setCount(iterToAddTo);
             addToTargetCapabilityWithTargetAndStageAtom(targetAtom, stage, listOfTargetAndStageAtoms.getArrayView());
         }
     }
@@ -501,6 +501,9 @@ void CapabilitySet::unionWith(const CapabilitySet& other)
     }
 }
 
+/// Join sets, but: 
+/// 1. do not destroy target set's which are incompatable with `other` (destroying shaderStageSets is fine)
+/// 2. do not create an `CapabilityAtom::Invalid` target set.
 void CapabilitySet::nonDestructiveJoin(CapabilitySet& other)
 {
     if (this->isEmpty())
