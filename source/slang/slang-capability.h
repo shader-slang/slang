@@ -230,7 +230,7 @@ nullStageSetNode:
             {
                 return ++(*this);
             }
-            Iterator begin()
+            Iterator begin() const
             {
                 // first node may not have a valid disjointSet or stageSet. handle the senario of: 
                 // 1. targetNode is empty
@@ -263,7 +263,7 @@ trySetupStageNode:
 
                 return tmp;
             }
-            Iterator end()
+            Iterator end() const
             {
                 Iterator tmp(this->context);
                 tmp.targetNode = this->context->end();
