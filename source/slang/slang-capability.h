@@ -186,7 +186,7 @@ public:
             decltype((*stageNode).second.disjointSets.begin()) disjointSetNode;
 
         public:
-            bool isValid() const
+            operator bool() const
             {
                 return disjointSetNode.current;
             }

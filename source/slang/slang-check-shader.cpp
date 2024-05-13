@@ -525,7 +525,7 @@ namespace Slang
                 // Find out what exactly is incompatible and print out a trace of provenance to
                 // help user diagnose their code.
                 const auto& conjunctions = targetCaps.getAtomSets();
-                if (conjunctions.isValid() && interredCapConjunctions.isValid())
+                if (conjunctions && interredCapConjunctions)
                 {
                     auto compileCaps = conjunctions->getElements<CapabilityAtom>();
                     auto inferedAtomList = interredCapConjunctions->getElements<CapabilityAtom>();
