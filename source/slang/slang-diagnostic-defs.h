@@ -326,6 +326,9 @@ DIAGNOSTIC(30067, Error, mutatingMethodOnFunctionInputParameterError, "mutating 
 DIAGNOSTIC(30068, Warning, mutatingMethodOnFunctionInputParameterWarning, "mutating method '$0' called on `in` parameter '$1'; changes will not be visible to caller. copy the parameter into a local variable if this behavior is intended")
 
 DIAGNOSTIC(30070, Error, unsizedMemberMustAppearLast, "unsized member can only appear as the last member in a composite type.")
+DIAGNOSTIC(30071, Error, globalVarCannotBeUnsized, "global or static variable cannot not be unsized.")
+
+DIAGNOSTIC(30075, Error, cannotSpecializeGeneric, "cannot specialize generic '$0' with the provided arguments.")
 
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
 DIAGNOSTIC(30101, Error, cannotDereferenceType, "cannot dereference type '$0', do you mean to use '.'?")

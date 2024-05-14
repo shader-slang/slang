@@ -2040,11 +2040,20 @@ namespace Slang
             }
         }
 
+        std::optional<TypeTag> varTypeTags;
+        auto getVarTypeTags = [&]()
+        {
+            if (!varTypeTags.has_value())
+            {
+                varTypeTags = getTypeTags(varDecl->getType());
+            }
+            return varTypeTags.value();
+        };
         if (auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl)))
         {
-            auto typeTags = getTypeTags(varDecl->getType());
-            parentDecl->addTag(typeTags);
-            if ((int)typeTags & (int)TypeTag::Unsized)
+            parentDecl->addTag(getVarTypeTags());
+            bool isUnsized = (((int)getVarTypeTags() & (int)TypeTag::Unsized) != 0);
+            if (isUnsized)
             {
                 // Unsized decl must appear as the last member of the struct.
                 for (auto memberIdx = parentDecl->members.getCount() - 1; memberIdx >= 0; memberIdx--)
@@ -2064,7 +2073,17 @@ namespace Slang
                 }
             }
         }
-        
+        bool isGlobalVar = (isGlobalDecl(varDecl) && !isGlobalShaderParameter(varDecl))
+            || (!as<ParamDecl>(varDecl) && varDecl->hasModifier<HLSLStaticModifier>());
+        if (isGlobalVar)
+        {
+            bool isUnsized = (((int)getVarTypeTags() & (int)TypeTag::Unsized) != 0);
+            if (isUnsized)
+            {
+                getSink()->diagnose(varDecl, Diagnostics::globalVarCannotBeUnsized);
+            }
+        }
+
         if (auto elementType = getConstantBufferElementType(varDecl->getType()))
         {
             if (doesTypeHaveTag(elementType, TypeTag::Incomplete))

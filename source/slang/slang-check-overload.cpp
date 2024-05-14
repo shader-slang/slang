@@ -475,8 +475,14 @@ namespace Slang
             break;
 
         case OverloadCandidate::Flavor::Generic:
-            return TryCheckGenericOverloadCandidateTypes(context, candidate);
-
+            {
+                bool succ = TryCheckGenericOverloadCandidateTypes(context, candidate);
+                if (!succ && context.mode != OverloadResolveContext::Mode::JustTrying)
+                {
+                    getSink()->diagnose(context.loc, Diagnostics::cannotSpecializeGeneric, candidate.item.declRef);
+                }
+                return succ;
+            }
         default:
             SLANG_UNEXPECTED("unknown flavor of overload candidate");
             break;
