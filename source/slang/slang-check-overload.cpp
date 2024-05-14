@@ -263,6 +263,14 @@ namespace Slang
         //
         bool success = true;
 
+        auto maybeReportGeneralError = [&]()
+        {
+            if (context.mode != OverloadResolveContext::Mode::JustTrying)
+            {
+                getSink()->diagnose(context.loc, Diagnostics::cannotSpecializeGeneric, candidate.item.declRef);
+            }
+        };
+
         Index aa = 0;
         for (auto memberRef : getMembers(m_astBuilder, genericDeclRef))
         {
@@ -287,7 +295,10 @@ namespace Slang
                         // or this reference is ill-formed.
                         auto substType = typeParamRef.substitute(m_astBuilder, typeParamRef.getDecl()->initType.type);
                         if (!substType)
+                        {
+                            maybeReportGeneralError();
                             return false;
+                        }
                         checkedArgs.add(substType);
                         continue;
                     }
@@ -355,7 +366,10 @@ namespace Slang
                         ConstantFoldingCircularityInfo newCircularityInfo(valParamRef.getDecl(), nullptr);
                         auto defaultVal = tryConstantFoldExpr(valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr), ConstantFoldingKind::CompileTime, &newCircularityInfo);
                         if (!defaultVal)
+                        {
+                            maybeReportGeneralError();
                             return false;
+                        }
                         checkedArgs.add(defaultVal);
                         continue;
                     }
@@ -476,12 +490,7 @@ namespace Slang
 
         case OverloadCandidate::Flavor::Generic:
             {
-                bool succ = TryCheckGenericOverloadCandidateTypes(context, candidate);
-                if (!succ && context.mode != OverloadResolveContext::Mode::JustTrying)
-                {
-                    getSink()->diagnose(context.loc, Diagnostics::cannotSpecializeGeneric, candidate.item.declRef);
-                }
-                return succ;
+                return TryCheckGenericOverloadCandidateTypes(context, candidate);
             }
         default:
             SLANG_UNEXPECTED("unknown flavor of overload candidate");
