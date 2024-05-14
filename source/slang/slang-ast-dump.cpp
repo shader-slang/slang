@@ -722,7 +722,7 @@ struct ASTDumpContext
                 m_writer->emit(" | ");
             }
             bool isFirst = true;
-            for (auto& atom : set.getElements<CapabilityAtom>())
+            for (auto atom : set)
             {
                 if (!isFirst)
                 {

@@ -7,7 +7,7 @@
 
 namespace Slang
 {
-    void specializeTargetSwitch(TargetRequest* target, IRGlobalValueWithCode* code)
+    void specializeTargetSwitch(TargetRequest* target, IRGlobalValueWithCode* code, DiagnosticSink* sink)
     {
         bool changed = false;
         for (auto block : code->getBlocks())
@@ -27,8 +27,10 @@ namespace Slang
                         capSet = CapabilitySet::makeEmpty();
                     else
                         capSet = CapabilitySet(cap);
-                    if (capSet.isBetterForTarget(bestCapSet, target->getTargetCaps(), isEqual))
+                    bool isBetterForTarget = capSet.isBetterForTarget(bestCapSet, target->getTargetCaps(), isEqual);
+                    if (isBetterForTarget && target->getTargetCaps().implies(capSet))
                     {
+                        // Now check if bestCapSet contains targetCaps. If it does not then this is an invalid target
                         targetBlock = targetSwitch->getCaseBlock(i);
                         bestCapSet = capSet;
                     }
@@ -41,6 +43,7 @@ namespace Slang
                 }
                 else
                 {
+                    sink->diagnose(targetSwitch->sourceLoc, Diagnostics::profileIncompatibleWithTargetSwitch, target->getTargetCaps());
                     builder.emitMissingReturn();
                 }
                 targetSwitch->removeAndDeallocate();
@@ -54,19 +57,19 @@ namespace Slang
         }
     }
 
-    void specializeTargetSwitch(TargetRequest* target, IRModule* module)
+    void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticSink* sink)
     {
         for (auto globalInst : module->getGlobalInsts())
         {
             if (auto code = as<IRGlobalValueWithCode>(globalInst))
             {
-                specializeTargetSwitch(target, code);
+                specializeTargetSwitch(target, code, sink);
                 if (auto gen = as<IRGeneric>(code))
                 {
                     auto retVal = findGenericReturnVal(gen);
                     if (auto innerCode = as<IRGlobalValueWithCode>(retVal))
                     {
-                        specializeTargetSwitch(target, innerCode);
+                        specializeTargetSwitch(target, innerCode, sink);
                     }
                 }
             }

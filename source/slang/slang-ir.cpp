@@ -2444,9 +2444,8 @@ namespace Slang
         List<IRInst*> conjunctions;
         for( auto& atomConjunctionSet : compactedAtoms )
         {
-            auto atomConjunction = atomConjunctionSet.getElements<CapabilityAtom>();
             List<IRInst*> args;
-            for (auto atom : atomConjunction)
+            for (auto atom : atomConjunctionSet)
                 args.add(getIntValue(capabilityAtomType, Int(atom)));
             auto conjunctionInst = createIntrinsicInst(
                 capabilitySetType, kIROp_CapabilityConjunction, args.getCount(), args.getBuffer());

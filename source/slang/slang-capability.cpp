@@ -116,7 +116,7 @@ bool lookupCapabilityName(const UnownedStringSlice& str, CapabilityName& value);
 
 CapabilityName findCapabilityName(UnownedStringSlice const& name)
 {
-    CapabilityName result;
+	CapabilityName result{};
     if (!lookupCapabilityName(name, result))
         return CapabilityName::Invalid;
     return result;
@@ -142,7 +142,7 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
 
 //// CapabiltySet
 
-void CapabilitySet::addToTargetCapabilityWithValidUIntSetAndTargetAndStage(const CapabilityName& target, const CapabilityName& stage, const CapabilityAtomSet& setToAdd)
+void CapabilitySet::addToTargetCapabilityWithValidUIntSetAndTargetAndStage(CapabilityName target, CapabilityName stage, const CapabilityAtomSet& setToAdd)
 {
     SLANG_ASSERT(target != CapabilityName::Invalid && stage != CapabilityName::Invalid);
     auto stageAtom = asAtom(stage);
@@ -154,10 +154,10 @@ void CapabilitySet::addToTargetCapabilityWithValidUIntSetAndTargetAndStage(const
     auto& localStageSets = targetSet.shaderStageSets[stageAtom];
     localStageSets.stage = stageAtom;
 
-    localStageSets.addNewSet(setToAdd);
+	localStageSets.addNewSet(setToAdd);
 }
 
-void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(const CapabilityName& target, const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation)
+void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation)
 {
     // TODO: currently large portion of capabilities runtime cost is the excess stages made by `if (stage == CapabilityName::Invalid)`.
     // Senarios where we have do not have stage atoms should be a seperate case.
@@ -189,7 +189,7 @@ void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(const Capability
 }
 
 // No targets atoms have been defined on yet, set stage to target any_target capability 
-void CapabilitySet::addToTargetCapabilityWithStageAtom(const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation)
+void CapabilitySet::addToTargetCapabilityWithStageAtom(CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation)
 {
     
     if (m_targetSets.getCount() == 0)
@@ -199,7 +199,7 @@ void CapabilitySet::addToTargetCapabilityWithStageAtom(const CapabilityName& sta
         setToAdd.resize((UInt)CapabilityAtom::Count);
         for (int i = 0; i < canonicalRepresentation.getCount(); i++)
             setToAdd.add((UInt)canonicalRepresentation[i]);
-        CapabilityName targetAtom;
+		CapabilityName targetAtom{};
         for (const auto& targetAtomCononicalRep : anyTargetInfo.canonicalRepresentation)
         {
             for (auto anyTargetAtom : targetAtomCononicalRep)
@@ -215,7 +215,7 @@ void CapabilitySet::addToTargetCapabilityWithStageAtom(const CapabilityName& sta
     }
 }
 
-void CapabilitySet::addToTargetCapabilityWithTargetAndOrStageAtom(const CapabilityName& target, const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation)
+void CapabilitySet::addToTargetCapabilityWithTargetAndOrStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation)
 {
     if(target != CapabilityName::Invalid)
         addToTargetCapabilityWithTargetAndStageAtom(target, stage, canonicalRepresentation);
@@ -247,7 +247,7 @@ void CapabilitySet::addToTargetCapabilitesWithCanonicalRepresentation(const Arra
     addToTargetCapabilityWithTargetAndOrStageAtom(target, stage, canonicalRepresentation);
 }
 
-void CapabilitySet::addUnexpandedCapabilites(const CapabilityName& atom)
+void CapabilitySet::addUnexpandedCapabilites(CapabilityName atom)
 {
     auto info = _getInfo(atom);
     for (const auto& cr : info.canonicalRepresentation)
@@ -465,9 +465,9 @@ void CapabilitySet::unionWith(const CapabilitySet& other)
 }
 
 /// Join sets, but: 
-/// 1. do not destroy target set's which are incompatable with `other` (destroying shaderStageSets is fine)
+/// 1. do not destroy target set's which are incompatible with `other` (destroying shaderStageSets is fine)
 /// 2. do not create an `CapabilityAtom::Invalid` target set.
-void CapabilitySet::nonDestructiveJoin(CapabilitySet& other)
+void CapabilitySet::nonDestructiveJoin(const CapabilitySet& other)
 {
     if (this->isEmpty())
     {
@@ -503,7 +503,7 @@ CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySe
 }
 
 /// Join `this` with a compatble stage set of `CapabilityTargetSet other`.
-/// Return false when `other` is fully incompatable.
+/// Return false when `other` is fully incompatible.
 /// incompatability is when `this->stage` is not a supported stage by `other.shaderStageSets`.
 bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
 {
@@ -519,7 +519,7 @@ bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
 }
 
 /// Join a compatable target set from `this` with `CapabilityTargetSet other`.
-/// Return false when `other` is fully incompatable.
+/// Return false when `other` is fully incompatible.
 /// incompatability is when one of 2 senarios are true:
 /// 1. `this->target` is not a supported target by `other.shaderStageSets`
 /// 2. `this` has completly disjoint shader stages from other.
@@ -642,9 +642,11 @@ bool CapabilitySet::hasSameTargets(const CapabilitySet& other) const
 // MSVC incorrectly throws warning
 #pragma warning(push)
 #pragma warning(disable:4702)
+/// returns true if 'this' is a better target for 'targetCaps' than 'that'
+/// isEqual: is `this` and `that` equal
+/// isIncompatible: is `this` and `that` incompatible
 bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const
 {
-    // returns true if 'this' is a better target for 'targetCaps' than 'that'
     if (this->isEmpty() && (that.isEmpty() || that.isInvalid()))
     {
         if(this->isEmpty() && that.isEmpty())
@@ -685,12 +687,11 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
             if(shaderStageSetsWeNeed.second.atomSet)
             {
                 auto& shaderStageSetWeNeed = shaderStageSetsWeNeed.second.atomSet.value();
+
                 CapabilityAtomSet tmp_set{};
                 Index tmpCount = 0;
-
                 CapabilityAtomSet thisSet{};
                 Index thisSetCount = 0;
-                
                 CapabilityAtomSet thatSet{};
                 Index thatSetCount = 0;
 
@@ -733,11 +734,10 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
                     isEqual = true;
                 
                 //empty means no candidate
-                if (thisSet == 0)
+                if (thisSet.areAllZero())
                     return false;
-                if (thatSet == 0)
+                if (thatSet.areAllZero())
                     return true;
-
                 if (thisSetCount < thatSetCount)
                     return true;
                 else if (thisSetCount > thatSetCount)
@@ -843,14 +843,12 @@ void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
     bool isFirstSet = true;
     for (auto& set : capSet.getAtomSets())
     {
-        List<CapabilityAtom> compactAtomList = set.getElements<CapabilityAtom>();
-
         if (!isFirstSet)
         {
             sb<< " | ";
         }
         bool isFirst = true;
-        for (auto atom : compactAtomList)
+        for (auto atom : set)
         {
             if (!isFirst)
             {

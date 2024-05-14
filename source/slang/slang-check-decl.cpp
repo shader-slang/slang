@@ -744,7 +744,7 @@ namespace Slang
 
         void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
-        void diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const CapabilityAtomSet& failedAvailableSet);
+        void diagnoseUndeclaredCapability(Decl* decl, const DiagnosticInfo& diagnosticInfo, const CapabilityAtomSet& failedAtomsInsideAvailableSet);
     };
 
 
@@ -10342,7 +10342,7 @@ namespace Slang
         // Now, we detect if we are case 1.
 
         {
-            CapabilityAtom outFailedAtom;
+            CapabilityAtom outFailedAtom{};
             if (hasTargetAtom(failedAtomsInsideAvailableSet, outFailedAtom))
             {
                 diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, Diagnostics::declHasDependenciesNotCompatibleOnTarget, decl, outFailedAtom);
@@ -10353,10 +10353,9 @@ namespace Slang
                 failedAtomSet.add((UInt)outFailedAtom);
                 CapabilityAtomSet targetsNotUsedSet;
                 CapabilityAtomSet::calcSubtract(targetsNotUsedSet, getUIntSetOfTargets(), failedAtomSet);
-                auto targetsNotUsedAtomList = targetsNotUsedSet.getElements<CapabilityAtom>();
                 
-                for (auto atom : targetsNotUsedAtomList)
-                    diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, atom, true);
+                for (auto atom : targetsNotUsedSet)
+                    diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, (CapabilityAtom)atom, true);
                 return;
             }
         }
@@ -10375,11 +10374,11 @@ namespace Slang
 
         // We will produce all failed atoms. This is important since provenance of multiple atoms
         // can come from multiple referenced items in a function body.
-        for (auto& i : failedAtomsInsideAvailableSet.getElements<CapabilityAtom>())
+        for (auto i : failedAtomsInsideAvailableSet)
         {
             diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, diagnosticInfo, decl, i);
             // Print provenances.
-            diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, i);
+            diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, (CapabilityAtom)i);
         }
     }
 

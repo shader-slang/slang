@@ -29,6 +29,30 @@ constexpr static Index computeElementShift()
     return currentShift;
 }
 
+static inline Index bitscanForward(const uint64_t& in)
+{
+#if defined(_MSC_VER)
+
+#ifdef _WIN64
+    uint64_t out;
+    _BitScanForward64((unsigned long*)&out, in);
+    return Index(out);
+#else
+    constexpr uint32_t bitsInType = sizeof(uint32_t) * 8;
+    uint32_t out;
+    // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
+    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in) + 1));
+    if (out != bitsInType)
+        return Index(out);
+    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
+    return Index(out + bitsInType);
+#endif// #ifdef _WIN64
+
+#else 
+    return Index(__builtin_ctzll(in));
+#endif// #if defined(_MSC_VER)
+}
+
 /* Hold a set of UInt values. Implementation works by storing as a bit per value */
 /// UIntSet is essentially a Element[], where each Element is `b` bits big.
 /// Each index has `b` number of integers. If the bit is 1, we have an element there. 
@@ -117,7 +141,93 @@ public:
         /// Returns true if set1 and set2 have a same value set (ie there is an intersection)
     static bool hasIntersection(const UIntSet& set1, const UIntSet& set2);
 
+    struct Iterator
+    {
+        friend class UIntSet;
+    private:
+        const List<Element>* context;
+        Index block = 0;
+        Element processedElement = 0;
+    
+    public:
+        Iterator(const List<Element>* inContext) 
+        {
+            context = inContext;
+        }
+
+        Element operator*()
+        {
+            Element bitUnset = processedElement;
+            processedElement &= processedElement - 1;
+            bitUnset -= processedElement;
+            return Element(bitscanForward(bitUnset) + (kElementSize * block));
+        }
+        Iterator& operator++()
+        {
+            while (processedElement == 0)
+            {
+                block++;
+                if (block >= context->getCount())
+                {
+                    processedElement = 0;
+                    return *this;
+                }
+                processedElement = (*context)[block];
+            }
+            return *this;
+        }
+        Iterator& operator++(int)
+        {
+            return ++(*this);
+        }
+        bool operator==(const Iterator& other) const
+        {
+            return other.block == this->block
+                && other.processedElement == this->processedElement;
+        }
+        bool operator!=(const Iterator& other) const
+        {
+            return !(other == *this);
+        }
+    };
+    Iterator begin() const
+    {
+        Iterator tmp(&m_buffer);
+        if (m_buffer.getCount() == 0)
+            return tmp;
+
+        tmp.block = 0;
+        tmp.processedElement = m_buffer[0];
+        if (tmp.processedElement == 0)
+            tmp++;
+        return tmp;
+    }
+    Iterator end() const
+    {
+        Iterator tmp(&m_buffer);
+        tmp.block = m_buffer.getCount();
+        tmp.processedElement = 0;
+        return tmp;
+    }
+
+    bool areAllZero()
+    {
+        return _areAllZero(m_buffer.getBuffer(), m_buffer.getCount());
+    }
+
 protected:
+    static bool _areAllZero(const UIntSet::Element* elems, Index count)
+    {
+        for (Index i = 0; i < count; ++i)
+        {
+            if (elems[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     List<Element> m_buffer;
 };
 
@@ -189,30 +299,6 @@ inline void UIntSet::add(const UIntSet& other)
 
     for (auto i = 0; i < otherCount; i++)
         m_buffer[i] |= other.m_buffer[i];
-}
-
-static inline Index bitscanForward(const uint64_t& in)
-{
-#if defined(_MSC_VER)
-
-#ifdef _WIN64
-    uint64_t out;
-    _BitScanForward64((unsigned long*)&out, in);
-    return Index(out);
-#else
-    constexpr uint32_t bitsInType = sizeof(uint32_t) * 8;
-    uint32_t out;
-    // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
-    _BitScanForward((unsigned long*)&out, *( ((uint32_t*)&in) + 1 ));
-    if (out != bitsInType)
-        return Index(out);
-    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
-    return Index(out + bitsInType);
-#endif// #ifdef _WIN64
-
-#else 
-    return Index(__builtin_ctzll(in));
-#endif// #if defined(_MSC_VER)
 }
 
 template<typename T>

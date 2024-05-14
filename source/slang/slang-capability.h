@@ -69,9 +69,6 @@ struct CapabilityStageSet
 
     void addNewSet(const CapabilityAtomSet& setToAdd)
     {
-        // This function is how we would normally add fully disjoint atom sets.
-        // We do not want to allow multiple sets (at least for now). This was previously
-        // implemented, but then removed.
         if (!atomSet)
             atomSet = setToAdd;
         else
@@ -147,8 +144,8 @@ public:
     void join(const CapabilitySet& other);
 
     /// Join two capability sets to form ('this' & 'other'). 
-    /// If a target/set has an incompatable atom, do not destroy the target/set.
-    void nonDestructiveJoin(CapabilitySet& other);
+    /// If a target/set has an incompatible atom, do not destroy the target/set.
+    void nonDestructiveJoin(const CapabilitySet& other);
 
     /// Add all targets/sets of 'other' into 'this'. Overlapping sets are removed.
     void unionWith(const CapabilitySet& other);
@@ -167,12 +164,12 @@ public:
     /// Find any capability sets which are in 'available' but not in 'required'. Return false if this situation occurs. 
     static bool checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, CapabilityAtomSet& outFailedAvailableSet);
 
-    inline void addToTargetCapabilityWithValidUIntSetAndTargetAndStage(const CapabilityName& target, const CapabilityName& stage, const CapabilityAtomSet& setToAdd);
-    inline void addToTargetCapabilityWithTargetAndStageAtom(const CapabilityName& target, const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation);
-    inline void addToTargetCapabilityWithTargetAndOrStageAtom(const CapabilityName& target, const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation);
-    inline void addToTargetCapabilityWithStageAtom(const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation);
+    inline void addToTargetCapabilityWithValidUIntSetAndTargetAndStage(CapabilityName target, CapabilityName stage, const CapabilityAtomSet& setToAdd);
+    inline void addToTargetCapabilityWithTargetAndStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
+    inline void addToTargetCapabilityWithTargetAndOrStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
+    inline void addToTargetCapabilityWithStageAtom(CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
     inline void addToTargetCapabilitesWithCanonicalRepresentation(const ArrayView<CapabilityName>& atom);
-    inline void addUnexpandedCapabilites(const CapabilityName& atom);
+    inline void addUnexpandedCapabilites(CapabilityName atom);
     
     CapabilityTargetSets& getCapabilityTargetSets() { return m_targetSets; }
     const CapabilityTargetSets& getCapabilityTargetSets() const { return m_targetSets; }
@@ -183,27 +180,28 @@ public:
         {
         private:
             const CapabilityTargetSets* context;
-            CapabilityTargetSets::ConstIterator targetNode;
-            CapabilityStageSets::ConstIterator stageNode;
-            std::optional<CapabilityAtomSet> atomSetNode;
+            CapabilityTargetSets::ConstIterator targetNode{};
+            CapabilityStageSets::ConstIterator stageNode{};
+            const std::optional<CapabilityAtomSet>* atomSetNode;
 
         public:
             operator bool() const
             {
-                return atomSetNode.has_value();
+                return atomSetNode->has_value();
             }
             const CapabilityAtomSet& operator*() const
             {
-                return (*this->atomSetNode);
+                return *(*this->atomSetNode);
             }
             const CapabilityAtomSet* operator->() const
             {
-                return &(*this->atomSetNode);
+                return &(*(*this->atomSetNode));
             }
             bool operator==(const Iterator& other) const
             {
                 return other.context == this->context
                     && other.targetNode == this->targetNode
+                    && other.stageNode == this->stageNode
                     ;
             }
             bool operator!=(const Iterator& other) const
@@ -234,8 +232,8 @@ public:
                         }
                     }
 
-                    this->atomSetNode = (*this->stageNode).second.atomSet;
-                    if (!this->atomSetNode.has_value())
+                    this->atomSetNode = std::addressof((*this->stageNode).second.atomSet);
+                    if (!this->atomSetNode->has_value())
                         continue;
                     break;
                 }
@@ -247,37 +245,19 @@ public:
             }
             Iterator begin() const
             {
-                // first node may not have a valid atomSet or stageSet. handle the senario of: 
-                // 1. targetNode is empty
-                // 2. stage node has no valid stage sets (not empty)
-                // 3. stage node is empty
-                // 4. atomSet has no sets
                 Iterator tmp(this->context);
                 tmp.targetNode = this->context->begin();
                 if (tmp.targetNode == this->context->end())
                     return tmp;
-
                 tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
-                for(;;)
+                if (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
                 {
-                    while (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
-                    {
-                        tmp.targetNode++;
-                        if (tmp.targetNode == this->context->end())
-                            return tmp;
-                        tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
-                    }
-                    
-                    tmp.atomSetNode = (*tmp.stageNode).second.atomSet;
-                    while (!tmp.atomSetNode.has_value())
-                    {
-                        tmp.stageNode++;
-                        if (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
-                            continue;
-                        tmp.atomSetNode = (*tmp.stageNode).second.atomSet;
-                    }
-                    break;
+                    tmp++;
+                    return tmp;
                 }
+                tmp.atomSetNode = std::addressof((*tmp.stageNode).second.atomSet);
+                if (!tmp.atomSetNode->has_value())
+                    tmp++;
                 return tmp;
             }
             Iterator end() const

@@ -2,7 +2,9 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL1): -target glsl -entry main -stage compute -capability _GLSL_420
 //TEST:SIMPLE(filecheck=CHECK_GLSL2): -target glsl -entry main -stage compute -capability _GLSL_330
 //TEST:SIMPLE(filecheck=CHECK_METAL): -target cpp -entry main -stage compute -capability image_loadstore
-//TEST:SIMPLE(filecheck=CHECK_WILL_ERROR): -target glsl -entry main -stage compute -capability image_loadstore -DWILL_ERROR
+//TEST:SIMPLE(filecheck=CHECK_WILL_ERROR1): -target glsl -entry main -stage compute -capability image_loadstore -DWILL_ERROR1
+//TEST:SIMPLE(filecheck=CHECK_WILL_ERROR2): -target glsl -entry main -stage compute -capability _GLSL_130 -DWILL_ERROR2
+//TEST:SIMPLE(filecheck=CHECK_GLSL3): -target glsl -entry main -stage compute -capability _GLSL_130
 
 RWTexture1D<int> tex;
 
@@ -10,7 +12,9 @@ RWTexture1D<int> tex;
 //CHECK_GLSL1: {{.*}}13{{.*}}
 //CHECK_GLSL2: {{.*}}11{{.*}}
 //CHECK_METAL: {{.*}}30{{.*}}
-//CHECK_WILL_ERROR: error 36109
+//CHECK_WILL_ERROR1: error 36109
+//CHECK_WILL_ERROR2: error 41011
+//CHECK_GLSL3: {{.*}}30{{.*}}
 
 int specialize()
 {
@@ -22,8 +26,8 @@ int specialize()
         return 2;
     case spirv_1_2:
         return 3;
-    
-    case glsl:
+
+    case _GLSL_150:
         return 10;
     case _GLSL_330:
         return 11;
@@ -31,20 +35,20 @@ int specialize()
         return 12;
     case _GLSL_410:
         return 13;
-#ifdef WILL_ERROR
+#ifdef WILL_ERROR1
     case image_loadstore:
         return 14;
 #endif
-
     case _sm_5_0:
         return 20;
     case _sm_5_1:
         return 21;
     case _sm_6_0:
         return 21;
-
+#ifndef WILL_ERROR2
     default:
         return 30;
+#endif
     }
 }
 

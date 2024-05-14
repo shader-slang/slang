@@ -1884,7 +1884,7 @@ LinkedIR linkIR(
     }
 
     // Specialize target_switch branches to use the best branch for the target.
-    specializeTargetSwitch(targetReq, state->irModule);
+    specializeTargetSwitch(targetReq, state->irModule, codeGenContext->getSink());
 
     // Diagnose on unresolved symbols if we are compiling into a target that does
     // not allow incomplete symbols.

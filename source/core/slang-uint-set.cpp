@@ -3,18 +3,6 @@
 namespace Slang
 {
 
-static bool _areAllZero(const UIntSet::Element* elems, Index count)
-{
-    for (Index i = 0; i < count; ++i)
-    {
-        if (elems[i])
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
 UIntSet& UIntSet::operator=(UIntSet&& other)
 {
     m_buffer = _Move(other.m_buffer);
