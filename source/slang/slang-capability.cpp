@@ -197,6 +197,8 @@ void CapabilitySet::addToTargetCapabilityWithStageAtom(const CapabilityName& sta
         const auto anyTargetInfo = _getInfo(CapabilityName::any_target);
         CapabilityAtomSet setToAdd;
         setToAdd.resize((UInt)CapabilityAtom::Count);
+        for (int i = 0; i < canonicalRepresentation.getCount(); i++)
+            setToAdd.add((UInt)canonicalRepresentation[i]);
         CapabilityName targetAtom;
         for (const auto& targetAtomCononicalRep : anyTargetInfo.canonicalRepresentation)
         {
@@ -206,13 +208,9 @@ void CapabilitySet::addToTargetCapabilityWithStageAtom(const CapabilityName& sta
                 if (_getInfo(anyTargetAtom).abstractBase == CapabilityName::target)
                     targetAtom = anyTargetAtom;
             }
-
-            // only 1-2 elements in loop.
-            for (int i = 0; i < canonicalRepresentation.getCount(); i++)
-                setToAdd.add((UInt)canonicalRepresentation[i]);
             addToTargetCapabilityWithValidUIntSetAndTargetAndStage(targetAtom, stage, setToAdd);
-            for (int i = 0; i < canonicalRepresentation.getCount(); i++)
-                setToAdd.remove((UInt)canonicalRepresentation[i]);
+            for (auto anyTargetAtom : targetAtomCononicalRep)
+                setToAdd.remove((UInt)anyTargetAtom);
         }
     }
 }
