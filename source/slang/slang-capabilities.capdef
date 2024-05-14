@@ -62,9 +62,9 @@ def spirv_1_6 : spirv_1_5;
 alias spirv = spirv_1_0;
 alias spirv_latest = spirv_1_6;
 
-alias any_target = hlsl | glsl | c | cpp | cuda | spirv;
-alias any_textual_target = hlsl | glsl | c | cpp | cuda;
-alias any_gfx_target = hlsl | glsl | spirv;
+alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv;
+alias any_textual_target = hlsl | metal | glsl | c | cpp | cuda;
+alias any_gfx_target = hlsl | metal | glsl | spirv;
 alias any_cpp_target = cpp | cuda;
 
 alias cpp_cuda = cpp | cuda;

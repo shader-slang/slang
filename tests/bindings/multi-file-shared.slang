@@ -7,10 +7,6 @@ PUBLIC float4 use(float  val) { return val; };
 PUBLIC float4 use(float2 val) { return float4(val,0.0,0.0); };
 PUBLIC float4 use(float3 val) { return float4(val,0.0); };
 PUBLIC float4 use(float4 val) { return val; };
-
-#ifdef __SLANG__
-[require(hlsl)]
-#endif
 PUBLIC float4 use(Texture2D t, SamplerState s) { return t.SampleLevel(s, 0.0, 0.0); }
 
 PUBLIC Texture2D sharedT R(: register(t2));
