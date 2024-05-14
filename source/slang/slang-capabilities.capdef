@@ -62,9 +62,9 @@ def spirv_1_6 : spirv_1_5;
 alias spirv = spirv_1_0;
 alias spirv_latest = spirv_1_6;
 
-alias any_target = hlsl | glsl | c | cpp | cuda | spirv;
-alias any_textual_target = hlsl | glsl | c | cpp | cuda;
-alias any_gfx_target = hlsl | glsl | spirv;
+alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv;
+alias any_textual_target = hlsl | metal | glsl | c | cpp | cuda;
+alias any_gfx_target = hlsl | metal | glsl | spirv;
 alias any_cpp_target = cpp | cuda;
 
 alias cpp_cuda = cpp | cuda;
@@ -75,6 +75,7 @@ alias cpp_cuda_glsl_hlsl_metal_spirv = cpp | cuda | glsl | hlsl | metal | spirv_
 alias cpp_cuda_hlsl = cpp | cuda | hlsl;
 alias cpp_glsl = cpp | glsl;
 alias cpp_glsl_hlsl_spirv = cpp | glsl | hlsl | spirv_1_0;
+alias cpp_glsl_hlsl_metal_spirv = cpp | glsl | hlsl | metal | spirv_1_0;
 alias cpp_hlsl = cpp | hlsl;
 alias cuda_glsl_hlsl = cuda | glsl | hlsl;
 alias cuda_glsl_hlsl_spirv = cuda | glsl | hlsl | spirv_1_0;
@@ -84,6 +85,7 @@ alias cuda_hlsl = cuda | hlsl;
 alias cuda_hlsl_spirv = cuda | hlsl | spirv;
 alias glsl_hlsl_spirv = glsl | hlsl | spirv;
 alias glsl_hlsl_metal_spirv = glsl | hlsl | metal | spirv;
+alias glsl_metal_spirv = glsl | metal | spirv;
 alias glsl_spirv = glsl | spirv;
 alias hlsl_spirv = hlsl | spirv;
 
