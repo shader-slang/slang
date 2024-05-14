@@ -10663,13 +10663,14 @@ T NonUniformResourceIndex<T>(T value) { return value; }
 // Normalize a vector
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 vector<T,N> normalize(vector<T,N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "normalize";
     case hlsl: __intrinsic_asm "normalize";
+    case metal: __intrinsic_asm "normalize";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T,N> result glsl450 Normalize $x
     };
@@ -10680,13 +10681,14 @@ vector<T,N> normalize(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
 T normalize(T x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "normalize";
     case hlsl: __intrinsic_asm "normalize";
+    case metal: __intrinsic_asm "normalize";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Normalize $x
     };

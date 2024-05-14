@@ -18,10 +18,6 @@
     #define TEST_WHEN_DEPTH_CUBE_WORKS
 #endif
 
-// There is an unknown issue with cabability system that causes an error
-// when Cube, CubeArray and 2DArray are used.
-//#define TEST_AFTER_FIXING_CAPABILITY_PROBLEM
-
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
@@ -281,7 +277,7 @@ bool TEST_texture_float()
 
         // METAL: tCube{{.*}}.calculate_unclamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube(
-        && float(0) >= tCube.CalculateLevelOfDetailUnclamped(samplerState, float3(u, u, u))
+        && float(0) >= tCube.CalculateLevelOfDetailUnclamped(samplerState, normalize(float3(u, 1 - u, u)))
 
         // METAL: t2DArray{{.*}}.calculate_unclamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_2d_array(
@@ -289,7 +285,7 @@ bool TEST_texture_float()
 
         // METAL: tCubeArray{{.*}}.calculate_unclamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube_array(
-        && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(samplerState, float3(u, u, u))
+        && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(samplerState, normalize(float3(u, 1 - u, u)))
 
         // ===========
         // T Sample()
@@ -307,11 +303,9 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.sample_texture_3d.v4f32(
         && all(Tv(1) == t3D.Sample(samplerState, float3(u, u, u)))
 
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: tCube{{.*}}.sample({{.*}}
-        // M-ETALLIB: call {{.*}}.sample_texture_cube.v4f32(
+        // METAL: tCube{{.*}}.sample({{.*}}
+        // METALLIB: call {{.*}}.sample_texture_cube.v4f32(
         && all(Tv(1) == tCube.Sample(samplerState, normalize(float3(u, 1 - u, u))))
-#endif
 
         // METAL: t1DArray{{.*}}.sample(
         // METALLIB: call {{.*}}.sample_texture_1d_array.v4f32(
@@ -321,11 +315,9 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.sample_texture_2d_array.v4f32(
         && all(Tv(1) == t2DArray.Sample(samplerState, float3(u, u, 0)))
 
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: tCubeArray{{.*}}.sample({{.*}}
-        // M-ETALLIB: call {{.*}}.sample_texture_cube_array.v4f32(
+        // METAL: tCubeArray{{.*}}.sample({{.*}}
+        // METALLIB: call {{.*}}.sample_texture_cube_array.v4f32(
         && all(Tv(1) == tCubeArray.Sample(samplerState, normalize(float4(u, 1 - u, u, 0))))
-#endif
 
         // Offset variant
 
@@ -385,21 +377,17 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.sample_texture_3d.v4f32(
         && all(Tv(1) == t3D.SampleBias(samplerState, float3(u, u, u), float(-1)))
 
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: tCube{{.*}}.sample({{.*}}
-        // M-ETALLIB: call {{.*}}.sample_texture_cube.v4f32(
+        // METAL: tCube{{.*}}.sample({{.*}}
+        // METALLIB: call {{.*}}.sample_texture_cube.v4f32(
         && all(Tv(1) == tCube.SampleBias(samplerState, normalize(float3(u, 1 - u, u)), float(-1)))
-#endif
 
         // METAL: t2DArray{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_2d_array.v4f32(
         && all(Tv(1) == t2DArray.SampleBias(samplerState, float3(u, u, 0), float(-1)))
 
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: tCubeArray{{.*}}.sample({{.*}}
-        // M-ETALLIB: call {{.*}}.sample_texture_cube_array.v4f32(
+        // METAL: tCubeArray{{.*}}.sample({{.*}}
+        // METALLIB: call {{.*}}.sample_texture_cube_array.v4f32(
         && all(Tv(1) == tCubeArray.SampleBias(samplerState, normalize(float4(u, 1 - u, u, 0)), float(-1)))
-#endif
 
         // Offset variant
 
@@ -439,11 +427,9 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.sample_texture_3d.v4f32(
         && all(Tv(1) == t3D.SampleLevel(samplerState, float3(u, u, u), 0))
 
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: tCube{{.*}}.sample({{.*}} level(
-        // M-ETALLIB: call {{.*}}.sample_texture_cube.v4f32(
+        // METAL: tCube{{.*}}.sample({{.*}} level(
+        // METALLIB: call {{.*}}.sample_texture_cube.v4f32(
         && all(Tv(1) == tCube.SampleLevel(samplerState, normalize(float3(u, 1 - u, u)), 0))
-#endif
 
         // METAL: t2DArray{{.*}}.sample({{.*}} level(
         // METALLIB: call {{.*}}.sample_texture_2d_array.v4f32(
@@ -451,7 +437,7 @@ bool TEST_texture_float()
 
         // METAL: tCubeArray{{.*}}.sample({{.*}} level(
         // METALLIB: call {{.*}}.sample_texture_cube_array.v4f32(
-        && all(Tv(1) == tCubeArray.SampleLevel(samplerState, float4(u, u, u, 0), 0))
+        && all(Tv(1) == tCubeArray.SampleLevel(samplerState, float4(normalize(float3(u, 1 - u, u)), 0), 0))
 
         // Offset variant
 
@@ -481,22 +467,18 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
         && float(1) == d2D.SampleCmp(shadowSampler, float2(u, u), 0)
 
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: d2DArray{{.*}}.sample_compare(
-        // M-ETALLIB: call {{.*}}.sample_compare_depth_2d_array.f32(
+        // METAL: d2DArray{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_2d_array.f32(
         && float(1) == d2DArray.SampleCmp(shadowSampler, normalize(float3(u, 1 - u, u)), 0)
-#endif
 
 #if defined(TEST_WHEN_DEPTH_CUBE_WORKS)
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: dCube{{.*}}.sample_compare(
-        // M-ETALLIB: call {{.*}}.sample_compare_depth_cube.f32(
+        // METAL: dCube{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_cube.f32(
         && float(1) == dCube.SampleCmp(shadowSampler, normalize(float3(u, 1 - u, u)), 0)
 
-        // M-ETAL: dCubeArray{{.*}}.sample_compare(
-        // M-ETALLIB: call {{.*}}.sample_compare_depth_cube_array.f32(
+        // METAL: dCubeArray{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_cube_array.f32(
         && float(1) == dCubeArray.SampleCmp(shadowSampler, normalize(float4(u, 1-u, u, u)), 0)
-#endif
 #endif
 
         // Offset variant
@@ -513,22 +495,18 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
         && float(1) == d2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0)
 
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: d2DArray{{.*}}.sample_compare(
-        // M-ETALLIB: call {{.*}}.sample_compare_depth_2d_array.f32(
+        // METAL: d2DArray{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_2d_array.f32(
         && float(1) == d2DArray.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0)
-#endif
 
 #if defined(TEST_WHEN_DEPTH_CUBE_WORKS)
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: dCube{{.*}}.sample_compare(
-        // M-ETALLIB: call {{.*}}.sample_compare_depth_cube.f32(
+        // METAL: dCube{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_cube.f32(
         && float(1) == dCube.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0)
 
-        // M-ETAL: dCubeArray{{.*}}.sample_compare(
-        // M-ETALLIB: call {{.*}}.sample_compare_depth_cube_array.f32(
+        // METAL: dCubeArray{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_cube_array.f32(
         && float(1) == dCubeArray.SampleCmpLevelZero(shadowSampler, normalize(float4(u, 1-u, u, u)), 0)
-#endif
 #endif
 
         // Offset variant
@@ -545,21 +523,17 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.gather_texture_2d.v4f32(
         && all(Tv(1) == t2D.Gather(samplerState, float2(u, u)))
 
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: tCube{{.*}}.gather(
-        // M-ETALLIB: call {{.*}}.gather_texture_cube.v4f32(
+        // METAL: tCube{{.*}}.gather(
+        // METALLIB: call {{.*}}.gather_texture_cube.v4f32(
         && all(Tv(1) == tCube.Gather(samplerState, normalize(float3(u, 1 - u, u))))
-#endif
 
         // METAL: t2DArray{{.*}}.gather(
         // METALLIB: call {{.*}}.gather_texture_2d_array.v4f32(
         && all(Tv(1) == t2DArray.Gather(samplerState, float3(u, u, 0)))
 
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: tCubeArray{{.*}}.gather(
-        // M-ETALLIB: call {{.*}}.gather_texture_cube_array.v4f32(
+        // METAL: tCubeArray{{.*}}.gather(
+        // METALLIB: call {{.*}}.gather_texture_cube_array.v4f32(
         && all(Tv(1) == tCubeArray.Gather(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
-#endif
 
         // Offset variant
 
@@ -591,11 +565,9 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.sample_texture_3d_grad.v4f32(
         && all(Tv(1) == t3D.SampleGrad(samplerState, float3(u, u, u), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
 
-#if defined(TEST_AFTER_FIXING_CAPABILITY_PROBLEM)
-        // M-ETAL: tCube{{.*}}.sample(
-        // M-ETALLIB: call {{.*}}.sample_texture_cube_grad.v4f32(
+        // METAL: tCube{{.*}}.sample(
+        // METALLIB: call {{.*}}.sample_texture_cube_grad.v4f32(
         && all(Tv(1) == tCube.SampleGrad(samplerState, normalize(float3(u, 1 - u, u)), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
-#endif
 
         // METAL: t2DArray{{.*}}.sample(
         // METALLIB: call {{.*}}.sample_texture_2d_array_grad.v4f32(
