@@ -96,7 +96,7 @@ depth2d<float> d2D;
 depthcube<float> dCube;
 //TEST_INPUT: Texture2D(size=4, content = one, arrayLength=2):name d2DArray
 depth2d_array<float> d2DArray;
-//TEST_INPUT: Texture2D(size=4, content = one, arrayLength=2):name dCubeArray
+//TEST_INPUT: TextureCube(size=4, content = one, arrayLength=2):name dCubeArray
 depthcube_array<float> dCubeArray;
 
 //TEST_INPUT: Sampler:name samplerState
