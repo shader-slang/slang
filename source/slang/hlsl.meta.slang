@@ -1448,23 +1448,20 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         case metal:
             if (isShadow == 1)
             {
-                if (isArray == 1)
+                switch (Shape.flavor)
                 {
-                    switch (Shape.flavor)
+                case $(SLANG_TEXTURE_2D):
+                    if (isArray == 1)
                     {
-                    case $(SLANG_TEXTURE_2D):
                         // T sample_compare(sampler s, float2 coord, uint array, float compare_value, lod_options options, int2 offset = int2(0)) const
                         __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, level(0), $4)";
                     }
-                }
-                else
-                {
-                    switch (Shape.flavor)
+                    else
                     {
-                    case $(SLANG_TEXTURE_2D):
                         // T sample_compare(sampler s, float2 coord, float compare_value, lod_options options, int2 offset = int2(0)) const
                         __intrinsic_asm "$0.sample_compare($1, $2, $3, level(0), $4)";
                     }
+                    break;
                 }
             }
             __intrinsic_asm "<invalid intrinsic>";
@@ -1747,7 +1744,7 @@ for (int isMS = 0; isMS <= 1; isMS++) {
         if (shapeIndex != kStdlibShapeIndex2D)
             continue;
     }
-    if (isArray == 1)
+    if (isArray)
     {
         if (shapeIndex == kStdlibShapeIndex3D)
             continue;
