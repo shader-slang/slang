@@ -965,13 +965,17 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
     }
 
     auto descriptorSlotIndex = bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex;
-    D3D12Descriptor srcDescriptor = {};
+    D3D12Descriptor srcDescriptor = internalResourceView->m_descriptor;
 
-    SLANG_RETURN_ON_FAIL(internalResourceView->getBufferDescriptorForBinding(
-        static_cast<DeviceImpl*>(m_device.get()),
-        resourceViewImpl,
-        bindingRange.bufferElementStride,
-        srcDescriptor));
+    // Buffer descriptors are created on demand.
+    if (!srcDescriptor.cpuHandle.ptr)
+    {
+        SLANG_RETURN_ON_FAIL(internalResourceView->getBufferDescriptorForBinding(
+            static_cast<DeviceImpl*>(m_device.get()),
+            resourceViewImpl,
+            bindingRange.bufferElementStride,
+            srcDescriptor));
+    }
 
     if (srcDescriptor.cpuHandle.ptr)
     {

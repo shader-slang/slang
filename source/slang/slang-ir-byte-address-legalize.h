@@ -6,6 +6,7 @@ namespace Slang
 class Session;
 class TargetProgram;
 struct IRModule;
+class DiagnosticSink;
 
 struct ByteAddressBufferLegalizationOptions
 {
@@ -24,6 +25,7 @@ void legalizeByteAddressBufferOps(
     Session*                                    session,
     TargetProgram*                              target,
     IRModule*                                   module,
+    DiagnosticSink*                             sink,
     ByteAddressBufferLegalizationOptions const& options);
 }
 

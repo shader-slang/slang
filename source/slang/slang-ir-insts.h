@@ -2252,6 +2252,10 @@ struct IRLayoutDecoration : IRDecoration
 };
 
 //
+struct IRAlignOf : IRInst
+{
+    IRInst* getBaseOp() { return getOperand(0); }
+};
 
 struct IRCall : IRInst
 {
