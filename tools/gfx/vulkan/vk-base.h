@@ -40,6 +40,7 @@ namespace vk
     class ShaderObjectImpl;
     class MutableShaderObjectImpl;
     class RootShaderObjectImpl;
+    class MutableRootShaderObjectImpl;
     class ShaderTableImpl;
     class ResourceCommandEncoder;
     class RenderCommandEncoder;

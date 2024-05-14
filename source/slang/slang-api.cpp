@@ -5,6 +5,8 @@
 #include "slang-repro.h"
 
 #include "../core/slang-shared-library.h"
+#include "../slang-capture-replay/slang-global-session.h"
+#include "../slang-capture-replay/capture_utility.h"
 
 // implementation of C interface
 
@@ -116,7 +118,18 @@ SLANG_API SlangResult slang_createGlobalSession(
         }
     }
 
-    *outGlobalSession = globalSession.detach();
+    // Check if the SLANG_CAPTURE_ENABLE_ENV is enabled
+    if (SlangCapture::isCaptureLayerEnabled())
+    {
+        SlangCapture::GlobalSessionCapture* globalSessionCapture =
+            new SlangCapture::GlobalSessionCapture(globalSession.detach());
+        Slang::ComPtr<SlangCapture::GlobalSessionCapture> result(globalSessionCapture);
+        *outGlobalSession = result.detach();
+    }
+    else
+    {
+        *outGlobalSession = globalSession.detach();
+    }
 
 #ifdef SLANG_ENABLE_IR_BREAK_ALLOC
     // Reset inst debug alloc counter to 0 so IRInsts for user code always starts from 0.

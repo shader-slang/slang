@@ -47,7 +47,6 @@ namespace gfx_test
         IResourceView::Desc viewDesc = {};
         viewDesc.type = unorderedAccess ? IResourceView::Type::UnorderedAccess : IResourceView::Type::ShaderResource;
         viewDesc.format = Format::Unknown;
-        viewDesc.bufferElementSize = sizeof(float);
         GFX_CHECK_CALL_ABORT(device->createBufferView(
             outBuffer.buffer, nullptr, viewDesc, outBuffer.view.writeRef()));
     }

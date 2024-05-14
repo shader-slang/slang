@@ -20,8 +20,11 @@ public:
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
 
+    Dictionary<const char*, IRStringLit*> m_builtinPreludes;
 protected:
     RefPtr<MetalExtensionTracker> m_extensionTracker;
+
+    void ensurePrelude(const char* preludeText);
 
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
@@ -37,11 +40,14 @@ protected:
 
     virtual void emitMeshShaderModifiersImpl(IRInst* varInst) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
+    virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
     virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
 
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+    virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
+    
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) SLANG_OVERRIDE;
@@ -56,6 +62,8 @@ protected:
     virtual bool doesTargetSupportPtrTypes() SLANG_OVERRIDE { return true; }
 
     void emitFuncParamLayoutImpl(IRInst* param);
+
+    virtual void _emitType(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
 
     void _emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 

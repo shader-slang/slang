@@ -2189,26 +2189,10 @@ Result DeviceImpl::createBufferView(
 {
     auto resourceImpl = (BufferResourceImpl*)buffer;
 
-    // TODO: These should come from the `ResourceView::Desc`
-    auto stride = desc.bufferElementSize;
-    if (stride == 0)
-    {
-        if (desc.format == Format::Unknown)
-        {
-            stride = 1;
-        }
-        else
-        {
-            FormatInfo info;
-            gfxGetFormatInfo(desc.format, &info);
-            stride = info.blockSizeInBytes;
-            assert(info.pixelsPerBlock == 1);
-        }
-    }
-    VkDeviceSize offset = (VkDeviceSize)desc.bufferRange.firstElement * stride;
-    VkDeviceSize size = desc.bufferRange.elementCount == 0
+    VkDeviceSize offset = (VkDeviceSize)desc.bufferRange.offset;
+    VkDeviceSize size = desc.bufferRange.size == 0
         ? (buffer ? resourceImpl->getDesc()->sizeInBytes : 0)
-        : (VkDeviceSize)desc.bufferRange.elementCount * stride;
+        : (VkDeviceSize)desc.bufferRange.size;
 
     // There are two different cases we need to think about for buffers.
     //
@@ -2400,8 +2384,8 @@ Result DeviceImpl::createMutableShaderObject(
 {
     auto layoutImpl = static_cast<ShaderObjectLayoutImpl*>(layout);
 
-    RefPtr<MutableShaderObjectImpl> result = new MutableShaderObjectImpl();
-    SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
+    RefPtr<ShaderObjectImpl> result;
+    SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(this, layoutImpl, result.writeRef()));
     returnComPtr(outObject, result);
 
     return SLANG_OK;
@@ -2409,8 +2393,9 @@ Result DeviceImpl::createMutableShaderObject(
 
 Result DeviceImpl::createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
 {
-    RefPtr<MutableRootShaderObject> result =
-        new MutableRootShaderObject(this, static_cast<ShaderProgramBase*>(program));
+    RefPtr<MutableRootShaderObjectImpl> result = new MutableRootShaderObjectImpl();
+    auto programImpl = static_cast<ShaderProgramImpl*>(program);
+    SLANG_RETURN_ON_FAIL(result->init(this, programImpl->m_rootObjectLayout));
     returnComPtr(outObject, result);
     return SLANG_OK;
 }

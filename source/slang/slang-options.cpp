@@ -386,8 +386,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Optimization, "-O...", "-O<optimization-level>", "Set the optimization level."},
         { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },
         { OptionKind::GLSLForceScalarLayout,
-         "-force-glsl-scalar-layout", nullptr,
-         "Force using scalar block layout for uniform and shader storage buffers in GLSL output."},
+         "-force-glsl-scalar-layout,-fvk-use-scalar-layout", nullptr,
+         "Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV."},
         { OptionKind::VulkanBindShift, vkShiftNames.getBuffer(), "-fvk-<vulkan-shift>-shift <N> <space>", 
         "For example '-fvk-b-shift <N> <space>' shifts by N the inferred binding numbers for all resources in 'b' registers of space <space>. "
         "For a resource attached with :register(bX, <space>) but not [vk::binding(...)], "
@@ -542,6 +542,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::SaveStdLibBinSource, "-save-stdlib-bin-source","-save-stdlib-bin-source <filename>", "Same as -save-stdlib but output "
         "the data as a C array.\n"},
         { OptionKind::TrackLiveness, "-track-liveness", nullptr, "Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness." },
+        { OptionKind::LoopInversion, "-loop-inversion", nullptr, "Enable loop inversion in the code-gen optimization. Default is off" },
     };
     _addOptions(makeConstArrayView(internalOpts), options);
 
@@ -1689,6 +1690,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::IncompleteLibrary:
             case OptionKind::NoHLSLBinding:
             case OptionKind::NoHLSLPackConstantBufferElements:
+            case OptionKind::LoopInversion:
                 linkage->m_optionSet.set(optionKind, true); break;
                 break;
             case OptionKind::MatrixLayoutRow:
@@ -2824,6 +2826,7 @@ SlangResult OptionsParser::_parse(
                     case CodeGenTarget::ShaderHostCallable:
                     case CodeGenTarget::HostExecutable:
                     case CodeGenTarget::ShaderSharedLibrary:
+                    case CodeGenTarget::HostSharedLibrary:
                     case CodeGenTarget::PyTorchCppBinding:
                     case CodeGenTarget::DXIL:
                     case CodeGenTarget::MetalLib:

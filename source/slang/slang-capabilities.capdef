@@ -78,10 +78,12 @@ alias cpp_glsl_hlsl_spirv = cpp | glsl | hlsl | spirv_1_0;
 alias cpp_hlsl = cpp | hlsl;
 alias cuda_glsl_hlsl = cuda | glsl | hlsl;
 alias cuda_glsl_hlsl_spirv = cuda | glsl | hlsl | spirv_1_0;
+alias cuda_glsl_hlsl_metal_spirv = cuda | glsl | hlsl | metal | spirv_1_0;
 alias cuda_glsl_spirv = cuda | glsl | spirv;
 alias cuda_hlsl = cuda | hlsl;
 alias cuda_hlsl_spirv = cuda | hlsl | spirv;
 alias glsl_hlsl_spirv = glsl | hlsl | spirv;
+alias glsl_hlsl_metal_spirv = glsl | hlsl | metal | spirv;
 alias glsl_spirv = glsl | spirv;
 alias hlsl_spirv = hlsl | spirv;
 

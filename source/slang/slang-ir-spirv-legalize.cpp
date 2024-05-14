@@ -221,7 +221,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             if(user->getOp() == kIROp_GetLegalizedSPIRVGlobalParamAddr)
             {
-                user->replaceUsesWith(use->get());
+                user->replaceUsesWith(addr);
                 user->removeAndDeallocate();
             }
             else if((as<IRGetElement>(user) || as<IRFieldExtract>(user)) &&
@@ -251,10 +251,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 // Skip load's for referenced `Input` variables since a ref implies
                 // passing as is, which needs to be a pointer (pass as is).
-                if (user->getDataType() 
+                if (user->getDataType()
                     && user->getDataType()->getOp() == kIROp_RefType
                     && storageClass == SpvStorageClassInput)
+                {
+                    builder.replaceOperand(use, addr);
                     continue;
+                }
                 // If this is being used in an asm block, insert the load to
                 // just prior to the block.
                 const auto asmBlock = spirvAsmOperand->getAsmBlock();
@@ -276,7 +279,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
 
         for (auto i : instsToRemove)
+        {
             i->removeAndDeallocate();
+        }
     }
 
     // Returns true if the given type that should be decorated as in `UniformConstant` address space.
@@ -1215,7 +1220,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     break;
                 case kIROp_GetElementPtr:
                     // Ignore when `NonUniformResourceIndex` is not on the index
-                    if (user->getOperand(0)->getOp() != kIROp_NonUniformResourceIndex)
+                    if (user->getOperand(1) == inst)
                     {
                         // Replace gep(pArray, nonUniformRes(x)), into nonUniformRes(gep(pArray, x))
                         newUser = builder.emitElementAddress(user->getFullType(), user->getOperand(0), inst->getOperand(0));
@@ -1282,12 +1287,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 IRBuilder builder(operand);
                 builder.addSPIRVNonUniformResourceDecoration(operand);
-                inst->replaceUsesWith(operand);
-                inst->removeAndDeallocate();
             }
+            inst->replaceUsesWith(operand);
+            inst->removeAndDeallocate();
         }
-        nonUniformResourceIndexInst->removeFromParent();
-        m_instsToRemove.add(nonUniformResourceIndexInst);
     }
 
     void processImageSubscript(IRImageSubscript* subscript)

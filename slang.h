@@ -612,6 +612,7 @@ extern "C"
         SLANG_METAL,                    ///< Metal shading language
         SLANG_METAL_LIB,                ///< Metal library
         SLANG_METAL_LIB_ASM,            ///< Metal library assembly
+        SLANG_HOST_SHARED_LIBRARY,      ///< A shared library/Dll for host code (for hosting CPU/OS)
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -944,6 +945,7 @@ extern "C"
             SaveStdLib,
             SaveStdLibBinSource,
             TrackLiveness,
+            LoopInversion,              // bool, enable loop inversion optimization
 
             // Deprecated
             ParameterBlocksUseRegisterSpaces,

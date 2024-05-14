@@ -246,6 +246,7 @@ void Session::_initCodeGenTransitionMap()
             // is available. We prefer LLVM if that's available. If it's not we can use generic C/C++ compiler
 
             map.addTransition(source, CodeGenTarget::ShaderSharedLibrary, PassThroughMode::GenericCCpp);
+            map.addTransition(source, CodeGenTarget::HostSharedLibrary, PassThroughMode::GenericCCpp);
             map.addTransition(source, CodeGenTarget::HostExecutable, PassThroughMode::GenericCCpp);
             map.addTransition(source, CodeGenTarget::ObjectCode, PassThroughMode::GenericCCpp);
         }
@@ -314,6 +315,12 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
         // Already have a StdLib loaded
         return SLANG_FAIL;
     }
+
+#ifdef _DEBUG
+    // Print a message in debug builds to notice the user that compiling the stdlib
+    // can take a while.
+    fprintf(stderr, "Compiling stdlib on debug build, this can take a while.\n");
+#endif
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     StringBuilder stdLibSrcBuilder;
@@ -1709,6 +1716,7 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::PyTorchCppBinding:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
         atoms.add(CapabilityName::cpp);
@@ -4301,6 +4309,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     auto targetProgram = getTargetProgram(target);
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
     IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);

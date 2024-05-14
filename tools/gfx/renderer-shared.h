@@ -1157,6 +1157,7 @@ public:
     {
         m_version = getVersionCounter()++;
     }
+    virtual ~TransientResourceHeapBase() {}
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     ITransientResourceHeap* getInterface(const Slang::Guid& guid)
