@@ -320,8 +320,34 @@ struct DiffTransposePass
                     // Old cond block becomes new pre-break block.
                     IRBlock* revBreakBlock = revBlockMap[currentBlock];
 
-                    // Old true-side starting block becomes loop end block.
+                    // Old true-side starting block becomes loop end block...
                     IRBlock* revLoopEndBlock = revBlockMap[trueBlock];
+
+                    // ... unless the true block has multiple successors, in which 
+                    // case revLoopEndBlock is the merge block for some other if-else region
+                    // 
+                    // We will insert a new block after revLookEndBlock, which will serve as the
+                    // actual end block.
+                    // 
+                    HashSet<IRBlock*> uniqueSuccessors;
+                    for (auto successor : trueBlock->getSuccessors())
+                        uniqueSuccessors.add(successor);
+                    if (uniqueSuccessors.getCount() > 1)
+                    {
+                        auto revLookPreEndBlock = revLoopEndBlock;
+                        builder.setInsertAfter(revLookPreEndBlock);
+                        revLoopEndBlock = builder.emitBlock();
+
+                        if (isDifferentialInst(trueBlock))
+                        {
+                            builder.markInstAsDifferential(revLoopEndBlock);
+                        }
+
+                        builder.setInsertInto(revLookPreEndBlock);
+                        builder.emitBranch(revLoopEndBlock);
+                    }
+                    
+                    // Then, branch from the new loop end block to the new cond block.
                     builder.setInsertInto(revLoopEndBlock);
                     builder.emitBranch(
                         revCondBlock,
