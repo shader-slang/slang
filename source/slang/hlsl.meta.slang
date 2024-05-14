@@ -973,7 +973,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
         case hlsl:
             __intrinsic_asm ".CalculateLevelOfDetail";
         case metal:
-            __intrinsic_asm "$0.calculate_clamped_lod($1, $2)";
+            __intrinsic_asm ".calculate_clamped_lod";
         case glsl:
             __intrinsic_asm "textureQueryLod($p, $2).x";
         case spirv:
@@ -995,7 +995,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
         case hlsl:
             __intrinsic_asm ".CalculateLevelOfDetailUnclamped";
         case metal:
-            __intrinsic_asm "$0.calculate_unclamped_lod($1, $2)";
+            __intrinsic_asm ".calculate_unclamped_lod";
         case glsl:
             __intrinsic_asm "textureQueryLod($p, $2).y";
         case spirv:
@@ -1042,7 +1042,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, $2)";
+                        __intrinsic_asm ".sample";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1116,7 +1116,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     {
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "$0.sample($1, $2, $3)";
+                        __intrinsic_asm ".sample";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1320,7 +1320,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 {
                 case $(SLANG_TEXTURE_2D):
                 case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "$0.sample_compare($1, $2, $3)";
+                    __intrinsic_asm ".sample_compare";
                 }
             }
             __intrinsic_asm "<invalid intrinsic>";
@@ -1414,7 +1414,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 switch (Shape.flavor)
                 {
                 case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "$0.sample_compare($1, $2, $3, $4)";
+                    __intrinsic_asm ".sample_compare";
                 }
             }
             __intrinsic_asm "<invalid intrinsic>";
@@ -1790,69 +1790,38 @@ vector<TElement,4> __texture_gather(__TextureImpl<T, Shape, isArray, 0, sampleCo
     case glsl:
         __intrinsic_asm "textureGather($p, $2, $3)";
     case metal:
-        if (Shape.flavor == $(SLANG_TEXTURE_2D))
+        if (isShadow == 0)
         {
-            if (isArray == 1)
+            switch (Shape.flavor)
             {
-                if (isShadow == 1)
-                {
-                    // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z))";
-                }
-                else
+            case $(SLANG_TEXTURE_2D):
+                if (isArray == 1)
                 {
                     // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0), component c = component::x) const
                     __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), int2(0), metal::component($3))";
-                }
-            }
-            else
-            {
-                if (isShadow == 1)
-                {
-                    // Tv gather(sampler s, float2 coord, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather($1, $2, 0)";
                 }
                 else
                 {
                     // Tv gather(sampler s, float2 coord, int2 offset = int2(0), component c = component::x) const
                     __intrinsic_asm "$0.gather($1, $2, int2(0), metal::component($3))";
                 }
-            }
-        }
-        else if (Shape.flavor == $(SLANG_TEXTURE_CUBE))
-        {
-            if (isArray == 1)
-            {
-                if (isShadow == 1)
-                {
-                    // Tv gather(sampler s, float3 coord, uint array) const
-                    __intrinsic_asm "$0.gather($1, ($2).xyz, uint(($2).w))";
-                }
-                else
+                break;
+            case $(SLANG_TEXTURE_CUBE):
+                if (isArray == 1)
                 {
                     // Tv gather(sampler s, float3 coord, uint array, component c = component::x) const
                     __intrinsic_asm "$0.gather($1, ($2).xyz, uint(($2).w), metal::component($3))";
-                }
-            }
-            else
-            {
-                if (isShadow == 1)
-                {
-                    // Tv gather(sampler s, float3 coord) const
-                    __intrinsic_asm "$0.gather($1, $2)";
                 }
                 else
                 {
                     // Tv gather(sampler s, float3 coord, component c = component::x) const
                     __intrinsic_asm "$0.gather($1, $2, metal::component($3))";
                 }
+                break;
             }
         }
-        else
-        {
-            // TODO: This needs to be handled by the capability system
-            __intrinsic_asm "<Metal support gather only for 2D and Cube>";
-        }
+        // TODO: This needs to be handled by the capability system
+        __intrinsic_asm "<invalid intrinsic>";
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
@@ -1887,25 +1856,12 @@ vector<TElement,4> __texture_gather_offset(__TextureImpl<T, Shape, isArray, 0, s
     case metal:
         if (Shape.flavor == $(SLANG_TEXTURE_2D))
         {
-            if (isArray == 1)
+            if (isShadow == 0)
             {
-                if (isShadow == 1)
-                {
-                    // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), $3)";
-                }
-                else
+                if (isArray == 1)
                 {
                     // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0), component c = component::x) const
                     __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), $3, metal::component($4))";
-                }
-            }
-            else
-            {
-                if (isShadow == 1)
-                {
-                    // Tv gather(sampler s, float2 coord, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather($1, $2, $3)";
                 }
                 else
                 {
@@ -1914,11 +1870,8 @@ vector<TElement,4> __texture_gather_offset(__TextureImpl<T, Shape, isArray, 0, s
                 }
             }
         }
-        else
-        {
-            // TODO: This needs to be handled by the capability system
-            __intrinsic_asm "<Metal support gather with offset only for 2D>";
-        }
+        // TODO: This needs to be handled by the capability system
+        __intrinsic_asm "<Metal support gather with offset only for 2D>";
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
@@ -2026,7 +1979,7 @@ vector<TElement,4> __texture_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampl
             }
         }
         // TODO: This needs to be handled by the capability system
-        __intrinsic_asm "<Metal support gather_compare only for 2D depth and Cube depth>";
+        __intrinsic_asm "<invalid intrinsics>";
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
@@ -2076,7 +2029,7 @@ vector<TElement,4> __texture_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0
             }
         }
         // TODO: This needs to be handled by the capability system
-        __intrinsic_asm "<Metal support gather_compare with offset only for 2D depth>";
+        __intrinsic_asm "<invalid intrinsics>";
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
@@ -2266,6 +2219,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                 else
                     // Tv read(uint coord, uint lod = 0) const
                     __intrinsic_asm "$0.read(uint(($1).x))";
+                break;
             case $(SLANG_TEXTURE_2D):
                 if (isShadow == 1)
                 {
@@ -2285,10 +2239,12 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                         // Tv read(uint2 coord, uint lod = 0) const
                         __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
                 }
+                break;
             case $(SLANG_TEXTURE_3D):
                 if (isShadow == 0 && isArray == 0)
                     // Tv read(uint3 coord, uint lod = 0) const
                     __intrinsic_asm "$0.read(vec<uint,3>(($1).xyz), uint(($1).w))";
+                break;
             case $(SLANG_TEXTURE_CUBE):
                 if (isShadow == 1)
                 {
@@ -2308,9 +2264,10 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                         // Tv read(uint2 coord, uint face, uint lod = 0) const
                         __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                 }
+                break;
             }
             // TODO: This needs to be handled by the capability system
-            __intrinsic_asm "<Not supported>";
+            __intrinsic_asm "<invalid intrinsics>";
         case glsl:
             __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e)$z";
         case spirv:
@@ -2452,8 +2409,9 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
                     if (isShadow == 1)
                     {
                         if (isArray == 1)
+                            // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(($1).xy, ($1).z)";
+                            __intrinsic_asm "$0.read(($1).xy, ($1).z, uint($2))";
                         else
                             // T read(uint2 coord, uint sample) const
                             __intrinsic_asm "$0.read($1, uint($2))";
@@ -2461,12 +2419,14 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
                     else
                     {
                         if (isArray == 1)
+                            // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(($1).xy, ($1).z)";
+                            __intrinsic_asm "$0.read(($1).xy, ($1).z, uint($2))";
                         else
                             // Tv read(uint2 coord, uint sample) const
                             __intrinsic_asm "$0.read($1, uint($2))";
                     }
+                    break;
                 }
                 // TODO: This needs to be handled by the capability system
                 __intrinsic_asm "<Not supported>";
@@ -2787,6 +2747,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
                             // Tv read(uint2 coord, uint sample) const
                             __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), $2)";
                     }
+                    break;
                 }
                 // TODO: This needs to be handled by the capability system
                 __intrinsic_asm "<Not supported>";
