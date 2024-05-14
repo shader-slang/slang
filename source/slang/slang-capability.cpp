@@ -142,6 +142,21 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
 
 //// CapabiltySet
 
+void CapabilitySet::addToTargetCapabilityWithValidUIntSetAndTargetAndStage(const CapabilityName& target, const CapabilityName& stage, const CapabilityAtomSet& setToAdd)
+{
+    SLANG_ASSERT(target != CapabilityName::Invalid && stage != CapabilityName::Invalid);
+    auto stageAtom = asAtom(stage);
+    auto targetAtom = asAtom(target);
+    CapabilityTargetSet& targetSet = m_targetSets[targetAtom];
+    targetSet.target = targetAtom;
+    targetSet.shaderStageSets.reserve(kCapabilityStageCount);
+
+    auto& localStageSets = targetSet.shaderStageSets[stageAtom];
+    localStageSets.stage = stageAtom;
+
+    localStageSets.addNewSet(setToAdd);
+}
+
 void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(const CapabilityName& target, const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation)
 {
     // TODO: currently large portion of capabilities runtime cost is the excess stages made by `if (stage == CapabilityName::Invalid)`.
@@ -165,21 +180,12 @@ void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(const Capability
         }
         return;
     }
-
-    auto stageAtom = asAtom(stage);
-    auto targetAtom = asAtom(target);
-    CapabilityTargetSet& targetSet = m_targetSets[targetAtom];
-    targetSet.target = targetAtom;
-    targetSet.shaderStageSets.reserve(kCapabilityStageCount);
-
-    auto& localStageSets = targetSet.shaderStageSets[stageAtom];
-    localStageSets.stage = stageAtom;
-
+    
     CapabilityAtomSet setToAdd = CapabilityAtomSet((UInt)CapabilityAtom::Count);
     for(auto i : canonicalRepresentation)
         setToAdd.add(asAtomUInt(i));
 
-    localStageSets.addNewSet(setToAdd);
+    addToTargetCapabilityWithValidUIntSetAndTargetAndStage(target, stage, setToAdd);
 }
 
 // No targets atoms have been defined on yet, set stage to target any_target capability 
@@ -189,35 +195,24 @@ void CapabilitySet::addToTargetCapabilityWithStageAtom(const CapabilityName& sta
     if (m_targetSets.getCount() == 0)
     {
         const auto anyTargetInfo = _getInfo(CapabilityName::any_target);
-        auto canonicalRepCount = canonicalRepresentation.getCount();
-        
-        // +2 for textualTarget+TARGET, may also be TARGET only
-        // for this reason we also use 'unsafeSetToCount' to 
-        // allow reuse of the same set in a clean manner.
-        auto maxSizeOfCanonical = canonicalRepCount + 2;
-        List<CapabilityName> listOfTargetAndStageAtoms;
-        listOfTargetAndStageAtoms.setCount(maxSizeOfCanonical); 
-        int iterToAddTo;
+        CapabilityAtomSet setToAdd;
+        setToAdd.resize((UInt)CapabilityAtom::Count);
         CapabilityName targetAtom;
         for (const auto& targetAtomCononicalRep : anyTargetInfo.canonicalRepresentation)
         {
-            listOfTargetAndStageAtoms.setCount(maxSizeOfCanonical);
-            iterToAddTo = 0;
             for (auto anyTargetAtom : targetAtomCononicalRep)
             {
-                listOfTargetAndStageAtoms[iterToAddTo] = anyTargetAtom;
+                setToAdd.add((UInt)anyTargetAtom);
                 if (_getInfo(anyTargetAtom).abstractBase == CapabilityName::target)
                     targetAtom = anyTargetAtom;
-                iterToAddTo++;
             }
+
+            // only 1-2 elements in loop.
             for (int i = 0; i < canonicalRepresentation.getCount(); i++)
-            {
-                listOfTargetAndStageAtoms[iterToAddTo] = canonicalRepresentation[i];
-                iterToAddTo++;
-            }
-            // shrink the list so we only can access a valid number of atoms. This handles `spirv` having less atoms than `glsl` (textualTarget)
-            listOfTargetAndStageAtoms.setCount(iterToAddTo);
-            addToTargetCapabilityWithTargetAndStageAtom(targetAtom, stage, listOfTargetAndStageAtoms.getArrayView());
+                setToAdd.add((UInt)canonicalRepresentation[i]);
+            addToTargetCapabilityWithValidUIntSetAndTargetAndStage(targetAtom, stage, setToAdd);
+            for (int i = 0; i < canonicalRepresentation.getCount(); i++)
+                setToAdd.remove((UInt)canonicalRepresentation[i]);
         }
     }
 }
@@ -430,12 +425,12 @@ bool CapabilitySet::implies(CapabilitySet const& other) const
             }
 
             // all stage sets that are in 'other' must be contained by 'this'
-            if(thisStage->disjointSet)
+            if(thisStage->atomSet)
             {
-                auto& thisStageSet = thisStage->disjointSet.value();
-                if(otherStage.second.disjointSet)
+                auto& thisStageSet = thisStage->atomSet.value();
+                if(otherStage.second.atomSet)
                 {   
-                    if (!thisStageSet.contains(otherStage.second.disjointSet.value()))
+                    if (!thisStageSet.contains(otherStage.second.atomSet.value()))
                         return false;
                 }
             }
@@ -451,11 +446,11 @@ void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
         auto& thisStageSet = this->shaderStageSets[otherStageSet.first];
         thisStageSet.stage = otherStageSet.first;
 
-        if (!thisStageSet.disjointSet)
-            thisStageSet.disjointSet = otherStageSet.second.disjointSet;
+        if (!thisStageSet.atomSet)
+            thisStageSet.atomSet = otherStageSet.second.atomSet;
         else
-            if(otherStageSet.second.disjointSet)
-                thisStageSet.disjointSet->unionWith(*otherStageSet.second.disjointSet);
+            if(otherStageSet.second.atomSet)
+                thisStageSet.atomSet->unionWith(*otherStageSet.second.atomSet);
     }
 }
 
@@ -519,8 +514,8 @@ bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
         return false;
 
     // should not exceed far beyond 2*2 or 1*1 elements
-    if(otherStageSet->disjointSet && this->disjointSet)
-        this->disjointSet->add(*otherStageSet->disjointSet);
+    if(otherStageSet->atomSet && this->atomSet)
+        this->atomSet->add(*otherStageSet->atomSet);
 
     return true;
 }
@@ -689,9 +684,9 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
             // 1. target.contains(this/that)
             // 2. choose smallest super set
             // 3. rank each super set and their atoms, choose the smallest rank'd set (most specialized)
-            if(shaderStageSetsWeNeed.second.disjointSet)
+            if(shaderStageSetsWeNeed.second.atomSet)
             {
-                auto& shaderStageSetWeNeed = shaderStageSetsWeNeed.second.disjointSet.value();
+                auto& shaderStageSetWeNeed = shaderStageSetsWeNeed.second.atomSet.value();
                 CapabilityAtomSet tmp_set{};
                 Index tmpCount = 0;
 
@@ -702,9 +697,9 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
                 Index thatSetCount = 0;
 
                 // subtraction of the set we want gets us the "elements which 'targetSet' has but `this/that` is less specialized for"
-                if(thisStageSets->disjointSet)
+                if(thisStageSets->atomSet)
                 {
-                    auto& thisStageSet = thisStageSets->disjointSet.value();
+                    auto& thisStageSet = thisStageSets->atomSet.value();
                     // if `thisStageSet` is more specialized than the target, `thisStageSet` should not be a candidate
                     if (thisStageSet == shaderStageSetWeNeed)
                         return true; 
@@ -719,9 +714,9 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
                         }
                     }
                 }
-                if (thatStageSets->disjointSet)
+                if (thatStageSets->atomSet)
                 {
-                    auto& thatStageSet = thatStageSets->disjointSet.value();
+                    auto& thatStageSet = thatStageSets->atomSet.value();
                     if (thatStageSet == shaderStageSetWeNeed)
                         return false;
                     if (shaderStageSetWeNeed.contains(thatStageSet))
@@ -820,13 +815,13 @@ bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, C
             }
 
             const CapabilityAtomSet* lastBadStage = nullptr;
-            if(availableStage.second.disjointSet)
+            if(availableStage.second.atomSet)
             {
-                const auto& availableStageSet = availableStage.second.disjointSet.value();
+                const auto& availableStageSet = availableStage.second.atomSet.value();
                 lastBadStage = nullptr;
-                if(reqStage->disjointSet)
+                if(reqStage->atomSet)
                 {
-                    const auto& reqStageSet = reqStage->disjointSet.value();
+                    const auto& reqStageSet = reqStage->atomSet.value();
                     if (availableStageSet.contains(reqStageSet))
                         break;
                     else 
@@ -920,9 +915,9 @@ int TEST_targetCapSetWithSpecificSetInStage(
     for (auto i : setToFind)
         set.add(UInt(i));
 
-    if (stageSet.disjointSet)
+    if (stageSet.atomSet)
     {
-        auto& i = stageSet.disjointSet.value();
+        auto& i = stageSet.atomSet.value();
         if (i == set)
             return true;
     }

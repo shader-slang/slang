@@ -863,11 +863,11 @@
 		</Expand>
 	</Type>
 	<Type Name="Slang::CapabilityStageSet">
-		<DisplayString>{{size={disjointSet}}}</DisplayString>
+		<DisplayString>{{size={atomSet}}}</DisplayString>
 		<Expand>
 			<CustomListItems>
 				<Item Name="stage">stage</Item>
-				<Item Name="disjointSet">disjointSet</Item>
+				<Item Name="atomSet">atomSet</Item>
 			</CustomListItems>
 		</Expand>
 	</Type>

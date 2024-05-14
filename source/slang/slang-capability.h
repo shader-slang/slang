@@ -65,28 +65,29 @@ struct CapabilityStageSet
     CapabilityAtom stage{};
 
     /// LinkedList of all disjoint sets for fast remove/add of unconstrained list positions.  
-    std::optional<CapabilityAtomSet> disjointSet{};
+    std::optional<CapabilityAtomSet> atomSet{};
 
     void addNewSet(const CapabilityAtomSet& setToAdd)
     {
         // This function is how we would normally add fully disjoint atom sets.
         // We do not want to allow multiple sets (at least for now). This was previously
         // implemented, but then removed.
-        if (!disjointSet)
-            disjointSet = setToAdd;
+        if (!atomSet)
+            atomSet = setToAdd;
         else
-            disjointSet->add(setToAdd);
+            atomSet->add(setToAdd);
     }
     bool tryJoin(const CapabilityTargetSet& other);
 };
 
 /// CapabilityTargetSet encapsulates all capabilities of a specific target
+/// Format: {shader_stage, shader_stage_set}
+typedef Dictionary<CapabilityAtom, CapabilityStageSet> CapabilityStageSets;
 struct CapabilityTargetSet
 {
     CapabilityAtom target{};
 
-	/// Format: {shader_stage, shader_stage_set}
-    Dictionary<CapabilityAtom, CapabilityStageSet> shaderStageSets{};
+    CapabilityStageSets shaderStageSets{};
 
     bool tryJoin(const CapabilityTargetSets& other);
     void unionWith(const CapabilityTargetSet& other);
@@ -166,6 +167,7 @@ public:
     /// Find any capability sets which are in 'available' but not in 'required'. Return false if this situation occurs. 
     static bool checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, CapabilityAtomSet& outFailedAvailableSet);
 
+    inline void addToTargetCapabilityWithValidUIntSetAndTargetAndStage(const CapabilityName& target, const CapabilityName& stage, const CapabilityAtomSet& setToAdd);
     inline void addToTargetCapabilityWithTargetAndStageAtom(const CapabilityName& target, const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation);
     inline void addToTargetCapabilityWithTargetAndOrStageAtom(const CapabilityName& target, const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation);
     inline void addToTargetCapabilityWithStageAtom(const CapabilityName& stage, const ArrayView<CapabilityName>& canonicalRepresentation);
@@ -181,22 +183,22 @@ public:
         {
         private:
             const CapabilityTargetSets* context;
-            decltype(context->begin()) targetNode;
-            decltype((*targetNode).second.shaderStageSets.begin()) stageNode;
-            decltype((*stageNode).second.disjointSet) disjointSetNode;
+            CapabilityTargetSets::ConstIterator targetNode;
+            CapabilityStageSets::ConstIterator stageNode;
+            std::optional<CapabilityAtomSet> atomSetNode;
 
         public:
             operator bool() const
             {
-                return disjointSetNode.has_value();
+                return atomSetNode.has_value();
             }
             const CapabilityAtomSet& operator*() const
             {
-                return (*this->disjointSetNode);
+                return (*this->atomSetNode);
             }
             const CapabilityAtomSet* operator->() const
             {
-                return &(*this->disjointSetNode);
+                return &(*this->atomSetNode);
             }
             bool operator==(const Iterator& other) const
             {
@@ -222,7 +224,7 @@ public:
                             if (this->targetNode == this->context->end())
                             {
                                 this->stageNode = {};
-                                this->disjointSetNode = {};
+                                this->atomSetNode = {};
                                 return *this;
                             }
                             this->stageNode = (*this->targetNode).second.shaderStageSets.begin();
@@ -232,8 +234,8 @@ public:
                         }
                     }
 
-                    this->disjointSetNode = (*this->stageNode).second.disjointSet;
-                    if (!this->disjointSetNode.has_value())
+                    this->atomSetNode = (*this->stageNode).second.atomSet;
+                    if (!this->atomSetNode.has_value())
                         continue;
                     break;
                 }
@@ -245,11 +247,11 @@ public:
             }
             Iterator begin() const
             {
-                // first node may not have a valid disjointSet or stageSet. handle the senario of: 
+                // first node may not have a valid atomSet or stageSet. handle the senario of: 
                 // 1. targetNode is empty
                 // 2. stage node has no valid stage sets (not empty)
                 // 3. stage node is empty
-                // 4. disjointSet has no sets
+                // 4. atomSet has no sets
                 Iterator tmp(this->context);
                 tmp.targetNode = this->context->begin();
                 if (tmp.targetNode == this->context->end())
@@ -266,13 +268,13 @@ public:
                         tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
                     }
                     
-                    tmp.disjointSetNode = (*tmp.stageNode).second.disjointSet;
-                    while (!tmp.disjointSetNode.has_value())
+                    tmp.atomSetNode = (*tmp.stageNode).second.atomSet;
+                    while (!tmp.atomSetNode.has_value())
                     {
                         tmp.stageNode++;
                         if (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
                             continue;
-                        tmp.disjointSetNode = (*tmp.stageNode).second.disjointSet;
+                        tmp.atomSetNode = (*tmp.stageNode).second.atomSet;
                     }
                     break;
                 }

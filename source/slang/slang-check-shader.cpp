@@ -524,14 +524,13 @@ namespace Slang
 
                 // Find out what exactly is incompatible and print out a trace of provenance to
                 // help user diagnose their code.
-                const auto& conjunctions = targetCaps.getAtomSets();
-                if (conjunctions && interredCapConjunctions)
+                const auto& compileCaps = targetCaps.getAtomSets();
+                if (compileCaps && interredCapConjunctions)
                 {
-                    auto compileCaps = conjunctions->getElements<CapabilityAtom>();
                     auto inferedAtomList = interredCapConjunctions->getElements<CapabilityAtom>();
                     for (auto inferredAtom : inferedAtomList)
                     {
-                        if (!compileCaps.contains(inferredAtom))
+                        if (!compileCaps->contains((UInt)inferredAtom))
                         {
                             diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtom);
                             goto breakLabel;
