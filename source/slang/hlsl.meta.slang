@@ -1797,12 +1797,12 @@ vector<TElement,4> __texture_gather(__TextureImpl<T, Shape, isArray, 0, sampleCo
                 if (isShadow == 1)
                 {
                     // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather($1, ($2).xy, as_type<uint>(($2).z))";
+                    __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z))";
                 }
                 else
                 {
                     // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0), component c = component::x) const
-                    __intrinsic_asm "$0.gather($1, ($2).xy, as_type<uint>(($2).z), int2(0), metal::component($3))";
+                    __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), int2(0), metal::component($3))";
                 }
             }
             else
@@ -1826,12 +1826,12 @@ vector<TElement,4> __texture_gather(__TextureImpl<T, Shape, isArray, 0, sampleCo
                 if (isShadow == 1)
                 {
                     // Tv gather(sampler s, float3 coord, uint array) const
-                    __intrinsic_asm "$0.gather($1, ($2).xyz, as_type<uint>(($2).w))";
+                    __intrinsic_asm "$0.gather($1, ($2).xyz, uint(($2).w))";
                 }
                 else
                 {
                     // Tv gather(sampler s, float3 coord, uint array, component c = component::x) const
-                    __intrinsic_asm "$0.gather($1, ($2).xyz, as_type<uint>(($2).w), metal::component($3))";
+                    __intrinsic_asm "$0.gather($1, ($2).xyz, uint(($2).w), metal::component($3))";
                 }
             }
             else
@@ -1892,12 +1892,12 @@ vector<TElement,4> __texture_gather_offset(__TextureImpl<T, Shape, isArray, 0, s
                 if (isShadow == 1)
                 {
                     // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather($1, ($2).xy, as_type<uint>(($2).z), $3)";
+                    __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), $3)";
                 }
                 else
                 {
                     // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0), component c = component::x) const
-                    __intrinsic_asm "$0.gather($1, ($2).xy, as_type<uint>(($2).z), $3, metal::component($4))";
+                    __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), $3, metal::component($4))";
                 }
             }
             else
@@ -2003,7 +2003,7 @@ vector<TElement,4> __texture_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampl
                 if (isArray == 1)
                 {
                     // Tv gather_compare(sampler s, float2 coord, uint array, float compare_value, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather_compare($1, ($2).xy, as_type<uint>(($2).z), $3)";
+                    __intrinsic_asm "$0.gather_compare($1, ($2).xy, uint(($2).z), $3)";
                 }
                 else
                 {
@@ -2016,7 +2016,7 @@ vector<TElement,4> __texture_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampl
                 if (isArray == 1)
                 {
                     // Tv gather_compare(sampler s, float3 coord, uint array, float compare_value) const
-                    __intrinsic_asm "$0.gather_compare($1, ($2).xyz, as_type<uint>(($2).w), $3)";
+                    __intrinsic_asm "$0.gather_compare($1, ($2).xyz, uint(($2).w), $3)";
                 }
                 else
                 {
@@ -2066,7 +2066,7 @@ vector<TElement,4> __texture_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0
                 if (isArray == 1)
                 {
                     // Tv gather_compare(sampler s, float2 coord, uint array, float compare_value, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather_compare($1, ($2).xy, as_type<uint>(($2).z), $3, $4)";
+                    __intrinsic_asm "$0.gather_compare($1, ($2).xy, uint(($2).z), $3, $4)";
                 }
                 else
                 {
@@ -2262,51 +2262,51 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                 // lod is not supported for 1D texture
                 if (isArray == 1)
                     // Tv read(uint coord, uint array, uint lod = 0) const
-                    __intrinsic_asm "$0.read(as_type<uint>(($1).x), as_type<uint>(($1).y))";
+                    __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y))";
                 else
                     // Tv read(uint coord, uint lod = 0) const
-                    __intrinsic_asm "$0.read(as_type<uint>(($1).x))";
+                    __intrinsic_asm "$0.read(uint(($1).x))";
             case $(SLANG_TEXTURE_2D):
                 if (isShadow == 1)
                 {
                     if (isArray == 1)
                         // T read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                     else
                         // T read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z))";
+                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
                 }
                 else
                 {
                     if (isArray == 1)
                         // Tv read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                     else
                         // Tv read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z))";
+                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
                 }
             case $(SLANG_TEXTURE_3D):
                 if (isShadow == 0 && isArray == 0)
                     // Tv read(uint3 coord, uint lod = 0) const
-                    __intrinsic_asm "$0.read(as_type<vec<uint,3>>(($1).xyz), as_type<uint>(($1).w))";
+                    __intrinsic_asm "$0.read(vec<uint,3>(($1).xyz), uint(($1).w))";
             case $(SLANG_TEXTURE_CUBE):
                 if (isShadow == 1)
                 {
                     if (isArray == 1)
                         // T read(uint2 coord, uint face, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                     else
                         // T read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                 }
                 else
                 {
                     if (isArray == 1)
                         // Tv read(uint2 coord, uint face, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                     else
                         // Tv read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), as_type<uint>(($1).w))";
+                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                 }
             }
             // TODO: This needs to be handled by the capability system
@@ -2772,20 +2772,20 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
                         if (isArray == 1)
                             // The document seems to have a typo. `lod` must mean `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), $2)";
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), $2)";
                         else
                             // T read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), $2)";
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), $2)";
                     }
                     else
                     {
                         if (isArray == 1)
                             // The document seems to have a typo. `lod` must mean `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), as_type<uint>(($1).z), $2)";
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), $2)";
                         else
                             // Tv read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$0.read(as_type<vec<uint,2>>(($1).xy), $2)";
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), $2)";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
