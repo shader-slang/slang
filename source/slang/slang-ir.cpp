@@ -8305,11 +8305,12 @@ namespace Slang
         IRInst* val,
         CapabilityName  targetCapabilityAtom);
 
-    bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition)
+    bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition, IRInst*& outInst)
     {
         if (auto decor = findBestTargetIntrinsicDecoration(callee, targetCaps))
         {
             outDefinition = decor->getDefinition();
+            outInst = decor;
             return true;
         }
         auto func = as<IRGlobalValueWithCode>(callee);
@@ -8320,6 +8321,7 @@ namespace Slang
             if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
             {
                 outDefinition = genAsm->getAsm();
+                outInst = genAsm;
                 return true;
             }
         }

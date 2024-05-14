@@ -6422,8 +6422,22 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     void visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
     {
         auto builder = getBuilder();
-        IRInst* arg = builder->getStringValue(stmt->asmText.getUnownedSlice());
-        builder->emitIntrinsicInst(nullptr, kIROp_GenericAsm, 1, &arg);
+        ShortList<IRInst*> args;
+        args.add(builder->getStringValue(stmt->asmText.getUnownedSlice()));
+        for (auto argExpr : stmt->args)
+        {
+            if (auto typetype = as<TypeType>(argExpr->type))
+            {
+                auto type = lowerType(context, typetype->getType());
+                args.add(type);
+            }
+            else
+            {
+                auto argVal = lowerRValueExpr(context, argExpr);
+                args.add(argVal.val);
+            }
+        }
+        builder->emitIntrinsicInst(nullptr, kIROp_GenericAsm, args.getCount(), args.getArrayView().getBuffer());
     }
 
     void visitSwitchStmt(SwitchStmt* stmt)
