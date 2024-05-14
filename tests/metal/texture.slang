@@ -618,8 +618,6 @@ bool TEST_texture_float()
         // ===================
         //  T Load()
         // ===================
-        // T Load(vector<int, Shape.dimensions+isArray> location)
-        // T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
 
         // METAL: t1D{{.*}}.read(
         // METALLIB: call {{.*}}.read_texture_1d.v4f32(

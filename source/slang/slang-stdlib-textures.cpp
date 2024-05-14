@@ -200,7 +200,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             if (includeMipInfo)
             {
                 ++paramCount;
-                params << "uint mipLevel, ";
+                params << "uint mipLevel,";
 
                 if (baseShape != SLANG_TEXTURE_1D)
                     metalMipLevel = "$1";
