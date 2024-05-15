@@ -62,7 +62,6 @@ def spirv_1_6 : spirv_1_5;
 alias spirv = spirv_1_0;
 alias spirv_latest = spirv_1_6;
 
-
 alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv;
 alias any_textual_target = hlsl | metal | glsl | c | cpp | cuda;
 alias any_gfx_target = hlsl | metal | glsl | spirv;
@@ -75,6 +74,7 @@ alias cpp_cuda_glsl_hlsl_spirv = cpp | cuda | glsl | hlsl | spirv_1_0;
 alias cpp_cuda_glsl_hlsl_metal_spirv = cpp | cuda | glsl | hlsl | metal | spirv_1_0;
 alias cpp_cuda_hlsl = cpp | cuda | hlsl;
 alias cpp_cuda_hlsl_spirv = cpp | cuda | hlsl | spirv_1_0;
+alias cpp_cuda_hlsl_metal_spirv = cpp | cuda | hlsl | metal | spirv_1_0;
 alias cpp_glsl = cpp | glsl;
 alias cpp_glsl_hlsl_spirv = cpp | glsl | hlsl | spirv_1_0;
 alias cpp_glsl_hlsl_metal_spirv = cpp | glsl | hlsl | metal | spirv_1_0;
@@ -312,10 +312,10 @@ alias GL_ARB_derivative_control = _GL_ARB_derivative_control | spvDerivativeCont
 alias GL_ARB_fragment_shader_interlock = _GL_ARB_fragment_shader_interlock | spvFragmentShaderPixelInterlockEXT;
 alias GL_ARB_gpu_shader5 = _GL_ARB_gpu_shader5 | spirv_1_0;
 alias GL_ARB_sparse_texture_clamp = _GL_ARB_fragment_shader_interlock | spirv_1_0;
-alias GL_EXT_texture_query_lod = _GL_EXT_texture_query_lod | spvImageQuery;
-alias GL_ARB_texture_query_levels = _GL_ARB_texture_query_levels |spvImageQuery;
+alias GL_EXT_texture_query_lod = _GL_EXT_texture_query_lod | spvImageQuery | metal;
+alias GL_ARB_texture_query_levels = _GL_ARB_texture_query_levels | spvImageQuery | metal;
 alias GL_ARB_texture_cube_map = _GL_ARB_texture_cube_map | spirv_1_0;
-alias GL_ARB_texture_gather = _GL_ARB_texture_gather | spirv_1_0;
+alias GL_ARB_texture_gather = _GL_ARB_texture_gather | spirv_1_0 | metal;
 alias GL_EXT_buffer_reference = _GL_ARB_fragment_shader_interlock | spirv_1_5;
 alias GL_EXT_buffer_reference_uvec2 = _GL_EXT_buffer_reference_uvec2 | spirv_1_0;
 alias GL_EXT_debug_printf = _GL_EXT_debug_printf | SPV_KHR_non_semantic_info;
@@ -344,8 +344,8 @@ alias GL_KHR_shader_subgroup_shuffle_relative = _GL_KHR_shader_subgroup_shuffle_
 alias GL_KHR_shader_subgroup_vote = _GL_KHR_shader_subgroup_vote | spvGroupNonUniformVote;
 alias GL_KHR_shader_subgroup_quad = _GL_KHR_shader_subgroup_quad | spvGroupNonUniformQuad;
 alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SOURCE_EXT_GL_NV_compute_shader_derivatives | SPV_NV_compute_shader_derivatives | _sm_6_6;
-alias GL_ARB_shader_image_size = _GL_ARB_shader_image_size | spvImageQuery;
-alias GL_ARB_shader_texture_image_samples = _GL_ARB_shader_texture_image_samples | spvImageQuery;
+alias GL_ARB_shader_image_size = _GL_ARB_shader_image_size | spvImageQuery | metal;
+alias GL_ARB_shader_texture_image_samples = _GL_ARB_shader_texture_image_samples | spvImageQuery | metal;
 alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | spirv_1_0;
 alias GL_NV_shader_subgroup_partitioned = _GL_NV_shader_subgroup_partitioned | spvGroupNonUniformPartitionedNV;
 alias GL_NV_ray_tracing_motion_blur = _GL_NV_ray_tracing_motion_blur | spvRayTracingMotionBlurNV;
@@ -611,19 +611,20 @@ alias glsl_barrier = hlsl + memorybarrier_compute
 alias structuredbuffer = sm_4_0;
 alias structuredbuffer_rw = sm_4_0 + raytracing_stages_compute_fragment;
 alias texture_sm_4_1 = sm_4_1
-                     | cpp_cuda_hlsl_spirv + sm_4_1
                      ;
 alias texture_sm_4_1_samplerless = cpp + texture_sm_4_1
                               | cuda + texture_sm_4_1
                               | glsl + texture_sm_4_1 + GL_EXT_samplerless_texture_functions
                               | hlsl + texture_sm_4_1 + raytracing_stages_compute_fragment
                               | spirv_1_0 + texture_sm_4_1 + GL_EXT_samplerless_texture_functions
+                              | metal + texture_sm_4_1
                               ;
 alias texture_sm_4_1_compute_fragment = cpp + texture_sm_4_1
                               | cuda + texture_sm_4_1
                               | glsl + texture_sm_4_1
                               | hlsl + texture_sm_4_1 + raytracing_stages_compute_fragment
                               | spirv_1_0 + texture_sm_4_1
+                              | metal + texture_sm_4_1
                               ;
 // supposedly works on compute but docs say nothing, so for now keep as compute_fragment
 alias texture_sm_4_1_fragment = cpp + texture_sm_4_1
@@ -631,6 +632,7 @@ alias texture_sm_4_1_fragment = cpp + texture_sm_4_1
                               | glsl + texture_sm_4_1
                               | hlsl + texture_sm_4_1 + raytracing_stages_compute_fragment
                               | spirv_1_0 + texture_sm_4_1
+                              | metal + texture_sm_4_1
                               ;
 alias texture_sm_4_1_clamp_fragment = texture_sm_4_1_fragment + GL_ARB_sparse_texture_clamp;
 alias texture_sm_4_1_vertex_fragment_geometry = cpp + texture_sm_4_1
@@ -638,6 +640,7 @@ alias texture_sm_4_1_vertex_fragment_geometry = cpp + texture_sm_4_1
                                               | glsl + texture_sm_4_1
                                               | hlsl + texture_sm_4_1 + raytracing_stages_compute_fragment_geometry_vertex
                                               | spirv_1_0 + texture_sm_4_1
+                                              | metal + texture_sm_4_1
                                               ;
 alias texture_gather = texture_sm_4_1_vertex_fragment_geometry + GL_ARB_texture_gather;
 alias image_samples = texture_sm_4_1_compute_fragment + GL_ARB_shader_texture_image_samples;

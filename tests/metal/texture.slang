@@ -1,3 +1,4 @@
+//TEST:SIMPLE(filecheck=METAL_CAPS_ERROR): -stage compute -entry computeMain -target metal -DEMIT_SOURCE -DNEED_TO_TEST_FOR_METAL_CAPABILITY
 //TEST:SIMPLE(filecheck=METAL): -stage compute -entry computeMain -target metal -DEMIT_SOURCE
 //TEST:SIMPLE(filecheck=METALLIB): -stage compute -entry computeMain -target metallib -DEMIT_SOURCE -DMETALLIB
 //TEST:SIMPLE(filecheck=HLSL): -stage compute -entry computeMain -target hlsl -DEMIT_SOURCE
@@ -6,11 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-slang -compute -dx12 -profile cs_6_6 -use-dxil -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device
 
-#if !defined(METALLIB)
-    // Metal doesn't support some features, and we need a new test that
-    // can check if the capability system can error them out properly.
-    #define NEED_TO_TEST_FOR_METAL_CAPABILITY 1
-#endif
+// METAL_CAPS_ERROR: error 36107
 
 #if defined(EMIT_SOURCE)
     // It appears that Slang-test doesn't initialize the depth cube texture
