@@ -722,13 +722,14 @@ struct ASTDumpContext
                 m_writer->emit(" | ");
             }
             bool isFirst = true;
-            for (auto& atom : set.getElements<CapabilityAtom>())
+            for (auto atom : set)
             {
+                CapabilityName formattedAtom = (CapabilityName)atom;
                 if (!isFirst)
                 {
                     m_writer->emit("+");
                 }
-                dump(capabilityNameToString((CapabilityName)atom));
+                dump(capabilityNameToString((CapabilityName)formattedAtom));
                 isFirst = false;
             }
             isFirstSet = false;

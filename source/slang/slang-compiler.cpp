@@ -616,9 +616,9 @@ namespace Slang
     {
         for(auto& conjunctions : caps.getAtomSets() )
         {
-            for (auto atom : conjunctions.getElements<CapabilityAtom>())
+            for (auto atom : conjunctions)
             {
-                switch (atom)
+                switch ((CapabilityAtom)atom)
                 {
                 default:
                     break;

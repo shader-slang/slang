@@ -862,13 +862,14 @@ void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
             sb<< " | ";
         }
         bool isFirst = true;
-        for (auto atom : set.getElements<CapabilityAtom>())
+        for (auto atom : set)
         {
+            CapabilityName formattedAtom = (CapabilityName)atom;
             if (!isFirst)
             {
                 sb << " + ";
             }
-            auto name = capabilityNameToString((CapabilityName)atom);
+            auto name = capabilityNameToString((CapabilityName)formattedAtom);
             if (name.startsWith("_"))
                 name = name.tail(1);
             sb << name;
