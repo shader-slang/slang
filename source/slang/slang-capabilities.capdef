@@ -385,7 +385,7 @@ alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmeti
 
 
 alias sm_4_0 = _sm_4_0
-             | glsl_spirv_1_0 + _GLSL_150 + _GL_ARB_sparse_texture_clamp + _GL_EXT_samplerless_texture_functions
+             | glsl_spirv_1_0 + _GL_ARB_sparse_texture_clamp + _GL_EXT_samplerless_texture_functions
              | spirv_1_0 + spvImageQuery + spvImageGatherExtended + spvMinLod + SPV_GOOGLE_user_type
              | _cuda_sm_2_0
              | metal
@@ -393,7 +393,7 @@ alias sm_4_0 = _sm_4_0
              ;
 
 alias sm_4_1 = _sm_4_1
-             | glsl_spirv_1_0 + sm_4_0
+             | glsl_spirv_1_0 + _GLSL_150 + sm_4_0
              | spirv_1_0 + sm_4_0
              | _cuda_sm_6_0
              | metal
