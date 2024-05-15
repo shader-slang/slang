@@ -2734,7 +2734,7 @@ namespace Slang
 
         void visitTargetCaseStmt(TargetCaseStmt* stmt);
 
-        void visitIntrinsicAsmStmt(IntrinsicAsmStmt*) {}
+        void visitIntrinsicAsmStmt(IntrinsicAsmStmt*);
 
         void visitDefaultStmt(DefaultStmt* stmt);
 

@@ -291,7 +291,8 @@ struct ResourceOutputSpecializationPass
         if(!func->isDefinition())
             return false;
         UnownedStringSlice def;
-        if (findTargetIntrinsicDefinition(func, targetRequest->getTargetCaps(), def))
+        IRInst* intrinsicInst;
+        if (findTargetIntrinsicDefinition(func, targetRequest->getTargetCaps(), def, intrinsicInst))
             return false;
 
         // If any of the parameters of the function are `out`

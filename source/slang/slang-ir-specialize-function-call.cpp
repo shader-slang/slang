@@ -172,7 +172,8 @@ struct FunctionParameterSpecializationContext
         if(!func->isDefinition())
             return false;
         UnownedStringSlice def;
-        if (findTargetIntrinsicDefinition(func, codeGenContext->getTargetReq()->getTargetCaps(), def))
+        IRInst* intrinsicInst;
+        if (findTargetIntrinsicDefinition(func, codeGenContext->getTargetReq()->getTargetCaps(), def, intrinsicInst))
             return false;
         // With the basic checks out of the way, there are
         // two conditions we care about:

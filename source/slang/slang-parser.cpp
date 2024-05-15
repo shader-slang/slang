@@ -5075,6 +5075,12 @@ namespace Slang
         parser->ReadToken();
         
         stmt->asmText = getStringLiteralTokenValue(parser->ReadToken(TokenType::StringLiteral));
+
+        while (AdvanceIf(parser, TokenType::Comma))
+        {
+            stmt->args.add(parser->ParseArgExpr());
+        }
+
         parser->ReadToken(TokenType::Semicolon);
         return stmt;
     }

@@ -9894,15 +9894,32 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 
 // minimum
 __generic<T : __BuiltinIntegerType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(metal)
-__target_intrinsic(cuda, "$P_min($0, $1)")
-__target_intrinsic(cpp, "$P_min($0, $1)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
-T min(T x, T y);
+T min(T x, T y)
+{
+    __target_switch
+    {
+    case hlsl:
+    case glsl:
+    case metal:
+        __intrinsic_asm "min";
+    case cuda:
+    case cpp:
+        __intrinsic_asm "$P_min($0, $1)";
+    case spirv:
+    {
+        if (__isSignedInt<T>())
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 SMin $x $y
+            };
+        else
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 UMin $x $y
+            };
+    }
+    }
+}
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
