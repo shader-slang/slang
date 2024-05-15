@@ -550,9 +550,18 @@ Result linkAndOptimizeIR(
         lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
     }
 
-    if (target == CodeGenTarget::HLSL || ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    switch (target)
     {
+    default:
+        if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+            break;
+        [[fallthrough]];
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
         lowerCombinedTextureSamplers(irModule, sink);
+        break;
     }
 
     addUserTypeHintDecorations(irModule);
