@@ -2003,11 +2003,12 @@ int __SyntaxError()
 /// For downstream compilers that allow sizeof/alignof/offsetof
 /// Can't be called in the C/C++ style. Need to use __size_of<some_type>() as opposed to sizeof(some_type).
 __generic<T>
-__target_intrinsic(cpp, "sizeof($G0)")
-__target_intrinsic(cuda, "sizeof($G0)")
 [__readNone]
 [require(cpp_cuda)]
-int __sizeOf();
+int __sizeOf()
+{
+    __intrinsic_asm "sizeof($[0])", T;
+}
 
 __generic<T>
 [__readNone]
@@ -2022,11 +2023,17 @@ int __sizeOf(T v)
 }
 
 __generic<T>
-__target_intrinsic(cuda, "SLANG_ALIGN_OF($G0)")
-__target_intrinsic(cpp, "SLANG_ALIGN_OF($G0)")
 [__readNone]
 [require(cpp_cuda)]
-int __alignOf();
+int __alignOf()
+{
+    __target_switch
+    {
+    case cuda :
+    case cpp :
+        __intrinsic_asm "SLANG_ALIGN_OF($[0])", T;
+    }
+}
 
 __generic<T>
 [__readNone]
