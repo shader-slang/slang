@@ -92,17 +92,17 @@ public:
 		Index index = 0;
 		while (index < length)
 		{
-			const Char32 codePoint = getUnicodePointFromUTF16([&]() -> Byte
+			auto readByte = [&]() -> Byte
 			{
-                if (index < length)
-                    return bytes[index++];
-                else
-                    return Byte(0);
-			});
+				return (index < length) ? bytes[index++] : Byte(0);
+			};
+			const Char32 codePoint = m_reverseOrder ?
+				getUnicodePointFromUTF16Reversed(readByte) :
+				getUnicodePointFromUTF16(readByte);
 
 			char buf[5];
 			int count = encodeUnicodePointToUTF8(codePoint, buf);
-            ioBuffer.addRange((const char*)buf, count);
+			ioBuffer.addRange((const char*)buf, count);
 		}
 	}
 
@@ -134,11 +134,10 @@ private:
             outOffset = 2;
             return CharEncodeType::UTF16Reversed;
         }
-    }
-    else
-    {
-        // If we don't have a 'mark' byte then we are bit stumped. We'll look for a null bytes and assume they mean we have a 16 bit encoding
-        for (size_t i = 0; i < bytesCount; i += 2)
+
+        // If we don't have a 'mark' byte then we are bit stumped. We'll look for
+        // null (non-terminator) bytes and assume they mean we have a 16-bit encoding
+        for(size_t i = 0; i < (bytesCount-1); i += 2)
         {
 #if SLANG_LITTLE_ENDIAN
             const auto low = bytes[i];
@@ -146,7 +145,7 @@ private:
 #else
             const auto low = bytes[i + 1];
             const auto high = bytes[i];
-#endif 
+#endif
             if ((low == 0) ^ (high == 0))
             {
                 outOffset = 2;

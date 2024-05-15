@@ -2674,6 +2674,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         break;
 
     case kIROp_ByteAddressBufferLoad:
+    {
         m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(").Load<");
@@ -2682,20 +2683,21 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(")");
         break;
+    }
 
     case kIROp_ByteAddressBufferStore:
-        {
-            auto prec = getInfo(EmitOp::Postfix);
-            needClose = maybeEmitParens(outerPrec, prec);
+    {
+        auto prec = getInfo(EmitOp::Postfix);
+        needClose = maybeEmitParens(outerPrec, prec);
 
-            emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
-            m_writer->emit(".Store(");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            m_writer->emit(",");
-            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
-            m_writer->emit(")");
-        }
+        emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+        m_writer->emit(".Store(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(",");
+        emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
+        m_writer->emit(")");
         break;
+    }
     case kIROp_PackAnyValue:
     {
         m_writer->emit("packAnyValue<");
