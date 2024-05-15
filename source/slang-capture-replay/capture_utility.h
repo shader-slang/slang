@@ -1,6 +1,12 @@
 #ifndef CAPTURE_UTILITY_H
 #define CAPTURE_UTILITY_H
 
+// in gcc and clang, __PRETTY_FUNCTION__ is the function signature,
+// while MSVC uses __FUNCSIG__
+#ifdef _MSC_VER
+#define __PRETTY_FUNCTION__ __FUNCSIG__
+#endif
+
 namespace SlangCapture
 {
     enum LogLevel: unsigned int

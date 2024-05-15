@@ -1541,7 +1541,7 @@ namespace Slang
         // List of source files this module depends on
         FileDependencyList m_fileDependencyList;
 
-        // Entry points that were defined in thsi module
+        // Entry points that were defined in this module
         //
         // Note: the entry point defined in the module are *not*
         // part of the memory image/layout of the module when
