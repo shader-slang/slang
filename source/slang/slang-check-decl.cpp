@@ -2053,8 +2053,9 @@ namespace Slang
         if (parentDecl)
         {
             parentDecl->addTag(getVarTypeTags());
-            bool isUnsized = (((int)getVarTypeTags() & (int)TypeTag::Unsized) != 0);
-            if (isUnsized)
+            auto unsizedMask = (int)TypeTag::Unsized | (int)TypeTag::LinkTimeSized;
+            bool isUnknownSize = (((int)getVarTypeTags() & unsizedMask) != 0);
+            if (isUnknownSize)
             {
                 // Unsized decl must appear as the last member of the struct.
                 for (auto memberIdx = parentDecl->members.getCount() - 1; memberIdx >= 0; memberIdx--)

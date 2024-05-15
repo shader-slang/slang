@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK1):-target spirv -DERROR1
 //TEST:SIMPLE(filecheck=CHECK2):-target spirv -DERROR2
+extern static const int constValue = 1;
 
 struct RWTex<T : __BuiltinRealType, let N : uint>
 {
@@ -42,4 +43,7 @@ void main(uint3 pixel_i : SV_DispatchThreadID)
 
     //CHECK1-NOT:([[# @LINE+1]]): error
     float sa4[] = { 1, 2, 3 }; // should be ok.
+
+    //CHECK1-NOT:([[# @LINE+1]]): error
+    float sa5[constValue]; // should be ok.
 }
