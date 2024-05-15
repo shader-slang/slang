@@ -520,18 +520,19 @@ namespace Slang
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
                 diagnoseCapabilityErrors(sink, linkage->m_optionSet, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
-                auto interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getAtomSets();
+                const auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getAtomSets();
 
                 // Find out what exactly is incompatible and print out a trace of provenance to
                 // help user diagnose their code.
-                auto compileCaps = targetCaps.getAtomSets();
+                const auto& compileCaps = targetCaps.getAtomSets();
                 if (compileCaps && interredCapConjunctions)
                 {
-                    for (auto inferredAtom : *interredCapConjunctions)
+                    auto inferedAtomList = interredCapConjunctions->getElements<CapabilityAtom>();
+                    for (auto inferredAtom : inferedAtomList)
                     {
                         if (!compileCaps->contains((UInt)inferredAtom))
                         {
-                            diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, (CapabilityAtom)inferredAtom);
+                            diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtom);
                             goto breakLabel;
                         }
                     }

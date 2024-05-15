@@ -856,7 +856,7 @@ void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
             sb<< " | ";
         }
         bool isFirst = true;
-        for (auto atom : set)
+        for (auto atom : set.getElements<CapabilityAtom>())
         {
             if (!isFirst)
             {
