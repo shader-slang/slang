@@ -416,9 +416,9 @@ void outputUIntSetAsBufferValues(const String& nameOfBuffer, StringBuilder& resu
     // store UIntSet::Element as uint8_t to stay sizeof(UIntSet::Element) independent.
     // underlying type may change, bits stay the same.
     resultBuilder << "const static CapabilityAtomSet " << nameOfBuffer << " = CapabilityAtomSet({\n";
-    for (auto& i : set.getBuffer())
+    for (auto i : set.getBuffer())
     {
-        resultBuilder << "    UIntSet::Element(" << (i) << "),\n";
+        resultBuilder << "    UIntSet::Element(" << i << "),\n";
     }
     resultBuilder << "    0\n});\n";
 }

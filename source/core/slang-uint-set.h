@@ -14,22 +14,12 @@
 namespace Slang
 {
 
-template<typename T>
-constexpr static Index computeElementShift()
+constexpr Index intLog2(unsigned x)
 {
-    Index currentShift = 0;
-    Index currentShiftValue = 1;
-
-    while (currentShiftValue != sizeof(T)*8)
-    {
-        currentShift++;
-        currentShiftValue *= 2;
-    }
-
-    return currentShift;
+    return x == 1 ? 0 : 1 + intLog2(x >> 1);
 }
 
-static inline Index bitscanForward(const uint64_t& in)
+static inline Index bitscanForward(uint64_t in)
 {
 #if defined(_MSC_VER)
 
@@ -65,7 +55,7 @@ public:
     
     constexpr static Index kElementSize = sizeof(Element) * 8; ///< The number of bits in an element. This also determines how many values a element can hold.
     constexpr static Index kElementMask = kElementSize - 1; ///< Mask to get shift from an index
-    constexpr static Index kElementShift = computeElementShift<Element>(); ///< How many bits to shift to get Element index from an index. 5 for 2^5=32 elements in a uint32_t. 6 for 2^6=64 in a uint64_t.
+    constexpr static Index kElementShift = intLog2(sizeof(Element)); ///< How many bits to shift to get Element index from an index. 5 for 2^5=32 elements in a uint32_t. 6 for 2^6=64 in a uint64_t.
 
     UIntSet() {}
     UIntSet(const UIntSet& other) { m_buffer = other.m_buffer; }
@@ -90,7 +80,7 @@ public:
         /// Resize (but maintain contents) up to bit size.
         /// NOTE! That since storage is in Element blocks, it may mean some values after size are set (up to the Element boundary)
     void resize(UInt size);
-    void resizeBackingBufferDirectly(const Index& size);
+    void resizeBackingBufferDirectly(Index size);
 
         /// Clear all of the contents (by clearing the bits)
     void clear();
@@ -166,12 +156,6 @@ public:
             return Element(LSB + (kElementSize * block));
         }
 
-        template<typename T>
-        T get()
-        {
-            return T(*(*this));
-        }
-
         Iterator& operator++()
         {
             while (processedElement == 0)
@@ -179,7 +163,6 @@ public:
                 block++;
                 if (block >= context->getCount())
                 {
-                    processedElement = 0;
                     return *this;
                 }
                 processedElement = (*context)[block];
@@ -283,7 +266,7 @@ inline bool UIntSet::contains(const UIntSet& set) const
 
 // --------------------------------------------------------------------------
 
-inline void UIntSet::resizeBackingBufferDirectly(const Index& newCount)
+inline void UIntSet::resizeBackingBufferDirectly(Index newCount)
 {
     const Index oldCount = m_buffer.getCount();
     m_buffer.setCount(newCount);

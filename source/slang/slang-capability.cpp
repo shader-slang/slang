@@ -194,17 +194,17 @@ void CapabilitySet::addToTargetCapabilityWithStageAtom(CapabilityName stage, con
         setToAdd.resize((UInt)CapabilityAtom::Count);
         for (int i = 0; i < canonicalRepresentation.getCount(); i++)
             setToAdd.add((UInt)canonicalRepresentation[i]);
-		CapabilityName targetAtom{};
-        for (const auto& targetAtomCononicalRep : anyTargetInfo.canonicalRepresentation)
+        CapabilityName targetAtom{};
+        for (const auto& targetAtomCanonicalRep : anyTargetInfo.canonicalRepresentation)
         {
-            for (auto anyTargetAtom : targetAtomCononicalRep)
+            for (auto anyTargetAtom : targetAtomCanonicalRep)
             {
                 setToAdd.add((UInt)anyTargetAtom);
                 if (_getInfo(anyTargetAtom).abstractBase == CapabilityName::target)
                     targetAtom = anyTargetAtom;
             }
             addToTargetCapabilityWithValidUIntSetAndTargetAndStage(targetAtom, stage, setToAdd);
-            for (auto anyTargetAtom : targetAtomCononicalRep)
+            for (auto anyTargetAtom : targetAtomCanonicalRep)
                 setToAdd.remove((UInt)anyTargetAtom);
         }
     }
