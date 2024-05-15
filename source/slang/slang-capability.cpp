@@ -159,10 +159,6 @@ void CapabilitySet::addToTargetCapabilityWithValidUIntSetAndTargetAndStage(Capab
 
 void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation)
 {
-    // TODO: currently large portion of capabilities runtime cost is the excess stages made by `if (stage == CapabilityName::Invalid)`.
-    // Senarios where we have do not have stage atoms should be a seperate case.
-    CapabilityName stageToUse = stage;
-
     // If no provided 'stage', set the capability as a target of all stages
     if (stage == CapabilityName::Invalid)
     {
