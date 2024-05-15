@@ -1745,6 +1745,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         case kIROp_Neq:
         case kIROp_Eql:
         case kIROp_Call:
+        case kIROp_SPIRVAsm:
             return true;
         default:
             return false;

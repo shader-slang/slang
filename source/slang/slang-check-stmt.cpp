@@ -355,6 +355,13 @@ namespace Slang
         subContext.checkStmt(stmt->body);
     }
 
+    void SemanticsStmtVisitor::visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
+    {
+        WithOuterStmt subContext(this, stmt);
+        for (auto& arg : stmt->args)
+            arg = subContext.CheckExpr(arg);
+    }
+
     void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
     {
         auto switchStmt = FindOuterStmt<SwitchStmt>();

@@ -2592,7 +2592,8 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     auto decorated = getResolvedInstForDecorations(type);
     UnownedStringSlice intrinsicDef;
-    if (findTargetIntrinsicDefinition(decorated, intrinsicDef))
+    IRInst* intrinsicInst;
+    if (findTargetIntrinsicDefinition(decorated, intrinsicDef, intrinsicInst))
     {
         m_writer->emit(intrinsicDef);
         return;
