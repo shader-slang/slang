@@ -147,7 +147,6 @@ def _cuda_sm_8_0 : _cuda_sm_7_0;
 def _cuda_sm_9_0 : _cuda_sm_8_0;
 
 abstract stage;
-def undeclared_stage : stage;
 def vertex : stage;
 def fragment : stage;
 def compute : stage;
