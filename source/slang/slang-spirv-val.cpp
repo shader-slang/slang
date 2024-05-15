@@ -65,11 +65,12 @@ SlangResult debugValidateSPIRV(const List<uint8_t>& spirv)
 
     // If we failed, dump the spirv first.
     const auto ret = p->getReturnValue();
-    if(ret != 0)
+    //if(ret != 0)
     {
         String spirvDisErr;
         String spirvDis;
         disassembleSPIRV(spirv, spirvDisErr, spirvDis);
+        printf("Generated SPIR-V:\n%s", spirvDis);
         fwrite(spirvDisErr.getBuffer(), spirvDisErr.getLength(), 1, stderr);
         fwrite(spirvDis.getBuffer(), spirvDis.getLength(), 1, stderr);
     }

@@ -1609,6 +1609,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+        downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
+#if 0
         switch (codeGenContext->getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(CompilerOptionName::Optimization))
         {
         case OptimizationLevel::None:       downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None; break;
@@ -1617,9 +1619,16 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         case OptimizationLevel::Maximal:    downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Maximal;  break;
         default: SLANG_ASSERT(!"Unhandled optimization level"); break;
         }
+#endif
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();
         if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
         {
+
+            if (auto outSpirV = optimizedArtifact->getRepresentations().data)
+            {
+                auto spirvData = (*((Slang::ListBlob*)(*outSpirV))).m_data;
+                const auto validationResult = debugValidateSPIRV(spirvData);
+            }
             artifact = _Move(optimizedArtifact);
         }
         auto downstreamElapsedTime =

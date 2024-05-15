@@ -98,7 +98,7 @@ public:
     
     static ComPtr<ISlangBlob> moveCreate(List<uint8_t>& data) { return ComPtr<ISlangBlob>(new ListBlob(_Move(data))); } 
 
-protected:
+public:
     explicit ListBlob(const List<uint8_t>& data) : m_data(data) {}
         // Move ctor
     explicit ListBlob(List<uint8_t>&& data) : m_data(data) {}
