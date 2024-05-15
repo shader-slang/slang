@@ -166,7 +166,6 @@ void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(CapabilityName t
     // If no provided 'stage', set the capability as a target of all stages
     if (stage == CapabilityName::Invalid)
     {
-        stageToUse = CapabilityName::undeclared_stage;
         auto info = _getInfo(CapabilityName::any_stage);
         List<CapabilityName> newArr;
         auto count = canonicalRepresentation.getCount();
