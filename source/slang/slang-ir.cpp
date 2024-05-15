@@ -7387,6 +7387,8 @@ namespace Slang
             case BaseType::UInt16:
             case BaseType::UInt:
             case BaseType::UInt64:
+            case BaseType::IntPtr:
+            case BaseType::UIntPtr:
                 return true;
             default:
                 return false;
