@@ -9908,7 +9908,16 @@ T min(T x, T y)
     case cpp:
         __intrinsic_asm "$P_min($0, $1)";
     case spirv:
-        __intrinsic_asm "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1";
+    {
+        if (__isSignedInt<T>())
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 SMin $x $y
+            };
+        else
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 UMin $x $y
+            };
+    }
     }
 }
 
