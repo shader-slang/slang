@@ -149,6 +149,13 @@ public:
         Index block = 0;
         Element processedElement = 0;
         Element bitUnset = 0;
+
+        void processBitUnset()
+        {
+            bitUnset = processedElement;
+            processedElement &= processedElement - 1;
+            bitUnset -= processedElement;
+        }
     public:
         Iterator(const List<Element>* inContext) 
         {
@@ -159,6 +166,7 @@ public:
         {
             return Element(bitscanForward(bitUnset) + (kElementSize * block));
         }
+
         Iterator& operator++()
         {
             while (processedElement == 0)
@@ -171,9 +179,7 @@ public:
                 }
                 processedElement = (*context)[block];
             }
-            bitUnset = processedElement;
-            processedElement &= processedElement - 1;
-            bitUnset -= processedElement;
+            processBitUnset();
             return *this;
         }
         Iterator& operator++(int)
@@ -199,6 +205,9 @@ public:
         tmp.processedElement = m_buffer[0];
         if (tmp.processedElement == 0)
             tmp++;
+
+        tmp.processBitUnset();
+
         return tmp;
     }
     Iterator end() const
