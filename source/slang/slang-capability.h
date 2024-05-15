@@ -133,7 +133,7 @@ public:
     bool isIncompatibleWith(CapabilitySet const& other) const;
 
     /// Does this capability set imply all the capabilities in `other`?
-    bool implies(CapabilitySet const& other) const;
+    bool implies(CapabilitySet const& other, const bool onlyRequireSingleImply = false) const;
 
     /// Does this capability set imply the atomic capability `other`?
     bool implies(CapabilityAtom other) const;
@@ -232,7 +232,7 @@ public:
                         }
                     }
 
-                    this->atomSetNode = std::addressof((*this->stageNode).second.atomSet);
+                    this->atomSetNode = &(*this->stageNode).second.atomSet;
                     if (!this->atomSetNode->has_value())
                         continue;
                     break;

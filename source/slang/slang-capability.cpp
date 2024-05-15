@@ -400,7 +400,7 @@ bool CapabilitySet::implies(CapabilityAtom atom) const
     return this->implies(tmpSet);
 }
 
-bool CapabilitySet::implies(CapabilitySet const& other) const
+bool CapabilitySet::implies(CapabilitySet const& other, const bool onlyRequireSingleImply) const
 {
     // x implies (c | d) only if (x implies c) and (x implies d).
 
@@ -428,13 +428,21 @@ bool CapabilitySet::implies(CapabilitySet const& other) const
                 auto& thisStageSet = thisStage->atomSet.value();
                 if(otherStage.second.atomSet)
                 {   
-                    if (!thisStageSet.contains(otherStage.second.atomSet.value()))
-                        return false;
+                    if (!onlyRequireSingleImply)
+                    {
+                        if (!thisStageSet.contains(otherStage.second.atomSet.value()))
+                            return false;
+                    }
+                    else
+                    {
+                        if (thisStageSet.contains(otherStage.second.atomSet.value()))
+                            return true;
+                    }
                 }
             }
         }
     }
-    return true;
+    return !onlyRequireSingleImply;
 }
 
 void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
@@ -848,7 +856,7 @@ void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
             sb<< " | ";
         }
         bool isFirst = true;
-        for (auto atom : set)
+        for (auto atom : set.getElements<CapabilityAtom>())
         {
             if (!isFirst)
             {

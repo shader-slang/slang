@@ -148,7 +148,7 @@ public:
         const List<Element>* context;
         Index block = 0;
         Element processedElement = 0;
-    
+        Element bitUnset = 0;
     public:
         Iterator(const List<Element>* inContext) 
         {
@@ -157,9 +157,6 @@ public:
 
         Element operator*()
         {
-            Element bitUnset = processedElement;
-            processedElement &= processedElement - 1;
-            bitUnset -= processedElement;
             return Element(bitscanForward(bitUnset) + (kElementSize * block));
         }
         Iterator& operator++()
@@ -174,6 +171,9 @@ public:
                 }
                 processedElement = (*context)[block];
             }
+            bitUnset = processedElement;
+            processedElement &= processedElement - 1;
+            bitUnset -= processedElement;
             return *this;
         }
         Iterator& operator++(int)
@@ -196,7 +196,6 @@ public:
         if (m_buffer.getCount() == 0)
             return tmp;
 
-        tmp.block = 0;
         tmp.processedElement = m_buffer[0];
         if (tmp.processedElement == 0)
             tmp++;

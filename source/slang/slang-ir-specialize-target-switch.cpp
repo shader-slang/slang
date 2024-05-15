@@ -12,6 +12,7 @@ namespace Slang
         bool changed = false;
         for (auto block : code->getBlocks())
         {
+            bool failedImplies = false;
             if (auto targetSwitch = as<IRTargetSwitch>(block->getTerminator()))
             {
                 bool isEqual;
@@ -28,11 +29,17 @@ namespace Slang
                     else
                         capSet = CapabilitySet(cap);
                     bool isBetterForTarget = capSet.isBetterForTarget(bestCapSet, target->getTargetCaps(), isEqual);
-                    if (isBetterForTarget && target->getTargetCaps().implies(capSet))
+                    if (isBetterForTarget)
                     {
-                        // Now check if bestCapSet contains targetCaps. If it does not then this is an invalid target
-                        targetBlock = targetSwitch->getCaseBlock(i);
-                        bestCapSet = capSet;
+                        bool targetImpliesCapSet = (target->getTargetCaps().implies(capSet, true) || capSet.isEmpty());
+                        if (targetImpliesCapSet)
+                        {
+                            // Now check if bestCapSet contains targetCaps. If it does not then this is an invalid target
+                            targetBlock = targetSwitch->getCaseBlock(i);
+                            bestCapSet = capSet;
+                        }
+                        else
+                            failedImplies = true;
                     }
                 }
                 IRBuilder builder(targetSwitch);
@@ -43,7 +50,10 @@ namespace Slang
                 }
                 else
                 {
-                    sink->diagnose(targetSwitch->sourceLoc, Diagnostics::profileIncompatibleWithTargetSwitch, target->getTargetCaps());
+                    // only error if we have the chance of setting a valid target switch, but did not due to incompatability within same `target` atom.
+                    // Otherwise we will have an issue when we process a `__target_switch() { case metal: return; }` for glsl targets.
+                    if(failedImplies)
+                        sink->diagnose(targetSwitch->sourceLoc, Diagnostics::profileIncompatibleWithTargetSwitch, target->getTargetCaps());
                     builder.emitMissingReturn();
                 }
                 targetSwitch->removeAndDeallocate();
