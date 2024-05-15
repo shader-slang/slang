@@ -2049,7 +2049,8 @@ namespace Slang
             }
             return varTypeTags.value();
         };
-        if (auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl)))
+        auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl));
+        if (parentDecl)
         {
             parentDecl->addTag(getVarTypeTags());
             bool isUnsized = (((int)getVarTypeTags() & (int)TypeTag::Unsized) != 0);
@@ -2073,14 +2074,14 @@ namespace Slang
                 }
             }
         }
-        bool isGlobalVar = (isGlobalDecl(varDecl) && !isGlobalShaderParameter(varDecl))
-            || (!as<ParamDecl>(varDecl) && varDecl->hasModifier<HLSLStaticModifier>());
-        if (isGlobalVar)
+        bool isGlobalOrLocalVar = !isGlobalShaderParameter(varDecl) && !as<ParamDecl>(varDecl) &&
+            (!parentDecl || isEffectivelyStatic(varDecl));
+        if (isGlobalOrLocalVar)
         {
             bool isUnsized = (((int)getVarTypeTags() & (int)TypeTag::Unsized) != 0);
             if (isUnsized)
             {
-                getSink()->diagnose(varDecl, Diagnostics::globalVarCannotBeUnsized);
+                getSink()->diagnose(varDecl, Diagnostics::varCannotBeUnsized);
             }
         }
 
