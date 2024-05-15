@@ -8082,6 +8082,7 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
 __generic<T : __BuiltinType>
 [__readNone]
 __glsl_version(450)
+__glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
 T GetAttributeAtVertex(T attribute, uint vertexIndex)
 {
@@ -8089,7 +8090,7 @@ T GetAttributeAtVertex(T attribute, uint vertexIndex)
     {
     case hlsl:
         __intrinsic_asm "GetAttributeAtVertex";
-    case _GL_EXT_fragment_shader_barycentric: 
+    case glsl:
         __intrinsic_asm "$0[$1]";
     case spirv:
         return spirv_asm {
@@ -8115,6 +8116,7 @@ T GetAttributeAtVertex(T attribute, uint vertexIndex)
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
 __glsl_version(450)
+__glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
 vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex)
 {
@@ -8122,7 +8124,7 @@ vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex)
     {
     case hlsl:
         __intrinsic_asm "GetAttributeAtVertex";
-    case _GL_EXT_fragment_shader_barycentric: 
+    case glsl: 
         __intrinsic_asm "$0[$1]";
     case spirv:
         return spirv_asm {
@@ -8148,6 +8150,7 @@ vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex)
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
 __glsl_version(450)
+__glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
 matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex)
 {
@@ -8155,7 +8158,7 @@ matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex)
     {
     case hlsl:
         __intrinsic_asm "GetAttributeAtVertex";
-    case _GL_EXT_fragment_shader_barycentric: 
+    case glsl: 
         __intrinsic_asm "$0[$1]";
     case spirv:
         return spirv_asm {
