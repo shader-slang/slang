@@ -149,9 +149,9 @@ struct SerialTypeInfo<CapabilityStageSet>
 
         dst.stage = stage;
 
-        for (auto& i : items)
+        for (auto i : items)
         {
-            dst.addNewSet(i);
+            dst.addNewSet(std::move(i));
         }
     }
 };

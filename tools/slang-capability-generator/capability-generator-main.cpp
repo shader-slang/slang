@@ -7,6 +7,7 @@
 #include "../../source/core/slang-secure-crt.h"
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-file-system.h"
+#include "../../source/core/slang-uint-set.h"
 
 using namespace Slang;
 
@@ -391,28 +392,40 @@ void calcCanonicalRepresentations(const List<RefPtr<CapabilityDef>>& defs, const
 
 const Index kUnusedEnumValue = -1;
 
-void searchForAbstractWithIDFallbackNameAndCount(CapabilityDef* def, Index& idOfAbstract, const String& name, Index& counter)
+// Check if "def" uses a named ("name"/enumValueOfAbstract) abstract atom. If true, assign 
+// the enumValue of the found abstract atom (cache the unique ID) and increment counter.
+bool maybeProcessConcreteAtomForAbstractCapability(CapabilityDef* def, Index& enumValueOfAbstract, const String& name, Index& counter)
 {
     if (def->getAbstractBase()
         && (
-            (idOfAbstract == def->getAbstractBase()->enumValue)
-            || (idOfAbstract == kUnusedEnumValue && def->getAbstractBase() && def->getAbstractBase()->name.equals("target"))
+            (enumValueOfAbstract == def->getAbstractBase()->enumValue)
+            || 
+            (enumValueOfAbstract == kUnusedEnumValue && def->getAbstractBase()->name.equals(name))
             )
         )
     {
         counter++;
-        idOfAbstract = def->getAbstractBase()->enumValue;
+        enumValueOfAbstract = def->getAbstractBase()->enumValue;
+        return true;
     }
+    return false;
+}
+
+void outputUIntSetAsBufferValues(const String& nameOfBuffer, StringBuilder& resultBuilder, UIntSet& set)
+{
+    // store UIntSet::Element as uint8_t to stay sizeof(UIntSet::Element) independent.
+    // underlying type may change, bits stay the same.
+    resultBuilder << "const static CapabilityAtomSet " << nameOfBuffer << " = CapabilityAtomSet({\n";
+    for (auto& i : set.getBuffer())
+    {
+        resultBuilder << "    UIntSet::Element(" << (i) << "),\n";
+    }
+    resultBuilder << "    0\n});\n";
 }
 
 SlangResult generateDefinitions(const List<RefPtr<CapabilityDef>>& defs, StringBuilder& sbHeader, StringBuilder& sbCpp)
 {
-    Index enumValueOfTarget = kUnusedEnumValue;
-    Index targetCount = 0;
-
-    Index enumValueOfStage = kUnusedEnumValue;
-    Index stageCount = 0;
-
+   
     sbHeader << "enum class CapabilityAtom\n{\n";
     sbHeader << "    Invalid,\n";
     for (auto def : defs)
@@ -420,19 +433,11 @@ SlangResult generateDefinitions(const List<RefPtr<CapabilityDef>>& defs, StringB
         if (def->flavor == CapabilityFlavor::Normal)
         {
             sbHeader << "    " << def->name << ",\n";
-        
-            searchForAbstractWithIDFallbackNameAndCount(def.get(), enumValueOfTarget, "target", targetCount);
-            searchForAbstractWithIDFallbackNameAndCount(def.get(), enumValueOfStage, "stage", stageCount);
         }
     }
     sbHeader << "    Count\n";
     sbHeader << "};\n";
-    
-    sbHeader << "\nenum {\n";
-    sbHeader << "    kCapabilityTargetCount = " << targetCount <<",\n";
-    sbHeader << "    kCapabilityStageCount = " << stageCount <<",\n";
-    sbHeader << "};\n\n";
-
+  
     CapabilityDef* firstAbstractDef = nullptr;
     CapabilityDef* firstAliasDef = nullptr;
     sbHeader << "enum class CapabilityName\n{\n";
@@ -476,6 +481,31 @@ SlangResult generateDefinitions(const List<RefPtr<CapabilityDef>>& defs, StringB
     }
     sbHeader << "    Count\n";
     sbHeader << "};\n";
+
+    Index enumValueOfTarget = kUnusedEnumValue;
+    Index targetCount = 0;
+    Index enumValueOfStage = kUnusedEnumValue;
+    Index stageCount = 0;
+
+    UIntSet anyTargetAtomSet{};
+    UIntSet anyStageAtomSet{};
+    StringBuilder anyTargetUIntSetHash;
+    StringBuilder anyStageUIntSetHash;
+
+    for (auto def : defs)
+    {
+        if (maybeProcessConcreteAtomForAbstractCapability(def.get(), enumValueOfTarget, "target", targetCount))
+            anyTargetAtomSet.add(def->enumValue);
+        else if (maybeProcessConcreteAtomForAbstractCapability(def.get(), enumValueOfStage, "stage", stageCount))
+            anyStageAtomSet.add(def->enumValue);
+    }
+    outputUIntSetAsBufferValues("kAnyTargetUIntSetBuffer", anyTargetUIntSetHash, anyTargetAtomSet);
+    outputUIntSetAsBufferValues("kAnyStageUIntSetBuffer", anyStageUIntSetHash, anyStageAtomSet);
+    
+    sbHeader << "\nenum {\n";
+    sbHeader << "    kCapabilityTargetCount = " << targetCount << ",\n";
+    sbHeader << "    kCapabilityStageCount = " << stageCount << ",\n";
+    sbHeader << "};\n\n";
 
     calcCanonicalRepresentations(defs, mapEnumValueToDef);
 
@@ -531,6 +561,9 @@ SlangResult generateDefinitions(const List<RefPtr<CapabilityDef>>& defs, StringB
             conjunctions.add(serializeConjunction(c));
         def->serializedCanonicalRepresentation = serializeDisjunction(conjunctions);
     }
+    
+    sbCpp << anyTargetUIntSetHash;
+    sbCpp << anyStageUIntSetHash;
 
     sbCpp << "static CapabilityName kCapabilityArray[] = {\n";
     Index arrayIndex = 0;

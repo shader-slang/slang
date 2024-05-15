@@ -10019,7 +10019,6 @@ namespace Slang
                 }
                 set.unionWith(targetCap);
             }
-            //set.canonicalize();
             handleReferenceFunc(stmt, set, stmt->loc);
         }
 
@@ -10352,7 +10351,7 @@ namespace Slang
                 CapabilityAtomSet failedAtomSet;
                 failedAtomSet.add((UInt)outFailedAtom);
                 CapabilityAtomSet targetsNotUsedSet;
-                CapabilityAtomSet::calcSubtract(targetsNotUsedSet, getUIntSetOfTargets(), failedAtomSet);
+                CapabilityAtomSet::calcSubtract(targetsNotUsedSet, getAtomSetOfTargets(), failedAtomSet);
                 
                 for (auto atom : targetsNotUsedSet)
                 {

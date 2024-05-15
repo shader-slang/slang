@@ -78,7 +78,7 @@ public:
 
     HashCode getHashCode() const;
 
-        /// Return the count of all bits directly represented
+    /// Return the count of all bits directly represented
     Int getCount() const { return Int(m_buffer.getCount()) * kElementSize; }
 
     List<Element>& getBuffer() { return m_buffer; }

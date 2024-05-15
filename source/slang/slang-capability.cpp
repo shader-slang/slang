@@ -116,7 +116,7 @@ bool lookupCapabilityName(const UnownedStringSlice& str, CapabilityName& value);
 
 CapabilityName findCapabilityName(UnownedStringSlice const& name)
 {
-	CapabilityName result{};
+    CapabilityName result{};
     if (!lookupCapabilityName(name, result))
         return CapabilityName::Invalid;
     return result;
@@ -142,7 +142,7 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
 
 //// CapabiltySet
 
-void CapabilitySet::addToTargetCapabilityWithValidUIntSetAndTargetAndStage(CapabilityName target, CapabilityName stage, const CapabilityAtomSet& setToAdd)
+void CapabilitySet::addToTargetCapabilityWithValidUIntSetAndTargetAndStage(CapabilityName target, CapabilityName stage, CapabilityAtomSet setToAdd)
 {
     SLANG_ASSERT(target != CapabilityName::Invalid && stage != CapabilityName::Invalid);
     auto stageAtom = asAtom(stage);
@@ -154,7 +154,7 @@ void CapabilitySet::addToTargetCapabilityWithValidUIntSetAndTargetAndStage(Capab
     auto& localStageSets = targetSet.shaderStageSets[stageAtom];
     localStageSets.stage = stageAtom;
 
-	localStageSets.addNewSet(setToAdd);
+    localStageSets.addNewSet(std::move(setToAdd));
 }
 
 void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation)
@@ -343,40 +343,19 @@ bool CapabilitySet::isIncompatibleWith(CapabilitySet const& other) const
     return true;
 }
 
-const CapabilityAtomSet& getUIntSetOfTargets()
+const CapabilityAtomSet& getAtomSetOfTargets()
 {
-    if (!globalAnyTargetUIntSet)
-    {
-        globalAnyTargetUIntSet = new CapabilityAtomSet();
-        auto info = _getInfo(CapabilityName::any_target);
-        for (auto list : info.canonicalRepresentation)
-        {
-            for(auto a : list)
-                if(_getInfo(a).abstractBase == CapabilityName::target)
-                    globalAnyTargetUIntSet->add(asAtomUInt(a));
-        }
-    }
-    return *globalAnyTargetUIntSet;
+    return kAnyTargetUIntSetBuffer;
 }
-const CapabilityAtomSet& getUIntSetOfStages()
+const CapabilityAtomSet& getAtomSetOfStages()
 {
-    if (!globalAnyStageUIntSet)
-    {
-        globalAnyStageUIntSet = new CapabilityAtomSet();
-        auto info = _getInfo(CapabilityName::any_stage);
-        for (auto list : info.canonicalRepresentation)
-        {
-            for (auto a : list)
-                globalAnyStageUIntSet->add(asAtomUInt(a));
-        }
-    }
-    return *globalAnyStageUIntSet;
+    return kAnyStageUIntSetBuffer;
 }
 
 bool hasTargetAtom(const CapabilityAtomSet& setIn, CapabilityAtom& targetAtom)
 {
     CapabilityAtomSet intersection;
-    setIn.calcIntersection(intersection, getUIntSetOfTargets(), setIn);
+    setIn.calcIntersection(intersection, getAtomSetOfTargets(), setIn);
 
     if (intersection.isEmpty())
         return false;

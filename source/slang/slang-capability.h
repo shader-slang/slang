@@ -66,7 +66,7 @@ struct CapabilityStageSet
     /// LinkedList of all disjoint sets for fast remove/add of unconstrained list positions.  
     std::optional<CapabilityAtomSet> atomSet{};
 
-    void addNewSet(const CapabilityAtomSet& setToAdd)
+    void addNewSet(CapabilityAtomSet&& setToAdd)
     {
         if (!atomSet)
             atomSet = setToAdd;
@@ -163,7 +163,7 @@ public:
     /// Find any capability sets which are in 'available' but not in 'required'. Return false if this situation occurs. 
     static bool checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, CapabilityAtomSet& outFailedAvailableSet);
 
-    inline void addToTargetCapabilityWithValidUIntSetAndTargetAndStage(CapabilityName target, CapabilityName stage, const CapabilityAtomSet& setToAdd);
+    inline void addToTargetCapabilityWithValidUIntSetAndTargetAndStage(CapabilityName target, CapabilityName stage, CapabilityAtomSet setToAdd);
     inline void addToTargetCapabilityWithTargetAndStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
     inline void addToTargetCapabilityWithTargetAndOrStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
     inline void addToTargetCapabilityWithStageAtom(CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
@@ -298,10 +298,8 @@ bool isDirectChildOfAbstractAtom(CapabilityAtom name);
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);
 
-static CapabilityAtomSet* globalAnyTargetUIntSet;
-const CapabilityAtomSet& getUIntSetOfTargets();
-static CapabilityAtomSet* globalAnyStageUIntSet;
-const CapabilityAtomSet& getUIntSetOfStages();
+const CapabilityAtomSet& getAtomSetOfTargets();
+const CapabilityAtomSet& getAtomSetOfStages();
 
 bool hasTargetAtom(const CapabilityAtomSet& setIn, CapabilityAtom& targetAtom);
 
