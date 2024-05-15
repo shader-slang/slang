@@ -10355,7 +10355,10 @@ namespace Slang
                 CapabilityAtomSet::calcSubtract(targetsNotUsedSet, getUIntSetOfTargets(), failedAtomSet);
                 
                 for (auto atom : targetsNotUsedSet)
-                    diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, (CapabilityAtom)atom, true);
+                {
+                    CapabilityAtom formattedAtom = (CapabilityAtom)atom;
+                    diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, true);
+                }
                 return;
             }
         }
@@ -10376,9 +10379,10 @@ namespace Slang
         // can come from multiple referenced items in a function body.
         for (auto i : failedAtomsInsideAvailableSet)
         {
-            diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, diagnosticInfo, decl, i);
+            CapabilityAtom formattedAtom = (CapabilityAtom)i;
+            diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, diagnosticInfo, decl, formattedAtom);
             // Print provenances.
-            diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, (CapabilityAtom)i);
+            diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom);
         }
     }
 

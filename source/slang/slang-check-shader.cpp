@@ -520,27 +520,27 @@ namespace Slang
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
                 diagnoseCapabilityErrors(sink, linkage->m_optionSet, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
-                const auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getAtomSets();
-
+                
                 // Find out what exactly is incompatible and print out a trace of provenance to
                 // help user diagnose their code.
+                // TODO: provedence should have a way to filter out for provenance that are missing X capabilitySet from their caps, else in big functions we get junk errors
+                // This is specifically a problem for when a function is missing a target but otherwise has identical capabilities.
+                
+                const auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getAtomSets();
                 const auto& compileCaps = targetCaps.getAtomSets();
                 if (compileCaps && interredCapConjunctions)
                 {
-                    auto inferedAtomList = interredCapConjunctions->getElements<CapabilityAtom>();
-                    for (auto inferredAtom : inferedAtomList)
+                    for (auto inferredAtom : *interredCapConjunctions.begin())
                     {
+                        CapabilityAtom inferredAtomFormatted = (CapabilityAtom)inferredAtom;
                         if (!compileCaps->contains((UInt)inferredAtom))
                         {
-                            diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtom);
-                            goto breakLabel;
+                            diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtomFormatted);
                         }
                     }
                 }
             }
         }
-        breakLabel:;
-
     }
 
     // Given an entry point specified via API or command line options,

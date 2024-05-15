@@ -34,7 +34,7 @@ static inline Index bitscanForward(const uint64_t& in)
 #if defined(_MSC_VER)
 
 #ifdef _WIN64
-    uint64_t out;
+    uint64_t out = 0;
     _BitScanForward64((unsigned long*)&out, in);
     return Index(out);
 #else
@@ -148,23 +148,28 @@ public:
         const List<Element>* context;
         Index block = 0;
         Element processedElement = 0;
-        Element bitUnset = 0;
+        uint64_t LSB = 0;
 
-        void processBitUnset()
+        void clearLSB()
         {
-            bitUnset = processedElement;
+            LSB = bitscanForward(processedElement);
             processedElement &= processedElement - 1;
-            bitUnset -= processedElement;
         }
     public:
-        Iterator(const List<Element>* inContext) 
+        Iterator(const List<Element>* inContext)
         {
             context = inContext;
         }
 
         Element operator*()
         {
-            return Element(bitscanForward(bitUnset) + (kElementSize * block));
+            return Element(LSB + (kElementSize * block));
+        }
+
+        template<typename T>
+        T get()
+        {
+            return T(*(*this));
         }
 
         Iterator& operator++()
@@ -179,7 +184,7 @@ public:
                 }
                 processedElement = (*context)[block];
             }
-            processBitUnset();
+            clearLSB();
             return *this;
         }
         Iterator& operator++(int)
@@ -206,7 +211,7 @@ public:
         if (tmp.processedElement == 0)
             tmp++;
 
-        tmp.processBitUnset();
+        tmp.clearLSB();
 
         return tmp;
     }
@@ -325,10 +330,8 @@ List<T> UIntSet::getElements() const
         Element n = m_buffer[block];
         while (n != 0)
         {
-            Element bitUnset = n;
+            elements.add(T(bitscanForward((uint64_t)n) + (kElementSize * block)));
             n &= n - 1;
-            bitUnset -= n;
-            elements.add(T(bitscanForward(bitUnset) + (kElementSize * block)));
         }
     }
     return elements;

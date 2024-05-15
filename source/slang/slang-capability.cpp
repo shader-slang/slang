@@ -462,6 +462,9 @@ void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
 
 void CapabilitySet::unionWith(const CapabilitySet& other)
 {
+    if (this->isInvalid() || other.isInvalid())
+        return;
+
     this->m_targetSets.reserve(other.m_targetSets.getCount());
     for (auto otherTargetSet : other.m_targetSets)
     {
@@ -477,6 +480,9 @@ void CapabilitySet::unionWith(const CapabilitySet& other)
 /// 2. do not create an `CapabilityAtom::Invalid` target set.
 void CapabilitySet::nonDestructiveJoin(const CapabilitySet& other)
 {
+    if (this->isInvalid() || other.isInvalid())
+        return;
+
     if (this->isEmpty())
     {
         this->m_targetSets = other.m_targetSets;

@@ -48,8 +48,7 @@ namespace Slang
 //
 // In all cases, we represent a set of capabilities with `CapabilitySet`.
 
-
-struct CapabilityAtomSet : UIntSet 
+struct CapabilityAtomSet : UIntSet
 {
     using UIntSet::UIntSet;
 };
@@ -231,10 +230,9 @@ public:
                             break;
                         }
                     }
-
-                    this->atomSetNode = &(*this->stageNode).second.atomSet;
-                    if (!this->atomSetNode->has_value())
+                    if (!(*this->stageNode).second.atomSet)
                         continue;
+                    this->atomSetNode = &(*this->stageNode).second.atomSet;
                     break;
                 }
                 return *this;
@@ -255,7 +253,7 @@ public:
                     tmp++;
                     return tmp;
                 }
-                tmp.atomSetNode = std::addressof((*tmp.stageNode).second.atomSet);
+                tmp.atomSetNode = &(*tmp.stageNode).second.atomSet;
                 if (!tmp.atomSetNode->has_value())
                     tmp++;
                 return tmp;
