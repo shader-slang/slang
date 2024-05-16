@@ -14,9 +14,19 @@
 namespace Slang
 {
 
-constexpr Index intLog2(unsigned x)
+template<typename T>
+constexpr static Index computeElementShift()
 {
-    return x == 1 ? 0 : 1 + intLog2(x >> 1);
+    Index currentShift = 0;
+    Index currentShiftValue = 1;
+
+    while (currentShiftValue != sizeof(T) * 8)
+    {
+        currentShift++;
+        currentShiftValue *= 2;
+    }
+
+    return currentShift;
 }
 
 static inline Index bitscanForward(uint64_t in)
@@ -55,7 +65,7 @@ public:
     
     constexpr static Index kElementSize = sizeof(Element) * 8; ///< The number of bits in an element. This also determines how many values a element can hold.
     constexpr static Index kElementMask = kElementSize - 1; ///< Mask to get shift from an index
-    constexpr static Index kElementShift = intLog2(sizeof(Element)); ///< How many bits to shift to get Element index from an index. 5 for 2^5=32 elements in a uint32_t. 6 for 2^6=64 in a uint64_t.
+    constexpr static Index kElementShift = computeElementShift<Element>(); ///< How many bits to shift to get Element index from an index. 5 for 2^5=32 elements in a uint32_t. 6 for 2^6=64 in a uint64_t.
 
     UIntSet() {}
     UIntSet(const UIntSet& other) { m_buffer = other.m_buffer; }
