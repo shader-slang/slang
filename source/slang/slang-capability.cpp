@@ -535,17 +535,16 @@ bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
 
 void CapabilitySet::join(const CapabilitySet& other)
 {
-    if (isEmpty() || other.isInvalid())
+    if (this->isEmpty() || other.isInvalid())
     {
         *this = other;
         return;
     }
-    if (isInvalid())
+    if (this->isInvalid())
         return;
     if (other.isEmpty())
         return;
 
-    bool isEmptyBefore = this->m_targetSets.getCount() == 0;
     List<CapabilityAtom> destroySet;
     destroySet.reserve(this->m_targetSets.getCount());
     for (auto& thisTargetSet : this->m_targetSets)
@@ -560,7 +559,7 @@ void CapabilitySet::join(const CapabilitySet& other)
         this->m_targetSets.remove(i);
     }
     // join made a invalid CapabilitySet
-    if (!isEmptyBefore && this->m_targetSets.getCount() == 0)
+    if (this->m_targetSets.getCount() == 0)
         this->m_targetSets[CapabilityAtom::Invalid].target = CapabilityAtom::Invalid;
 }
 
@@ -785,7 +784,6 @@ bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, C
         auto reqTarget = required.m_targetSets.tryGetValue(availableTarget.first);
         if (!reqTarget)
         {
-            //continue;
             outFailedAvailableSet.add((UInt)availableTarget.first);
             return false;
         }
@@ -795,7 +793,6 @@ bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, C
             auto reqStage = reqTarget->shaderStageSets.tryGetValue(availableStage.first);
             if (!reqStage)
             {
-                //continue;
                 outFailedAvailableSet.add((UInt)availableStage.first);
                 return false;
             }

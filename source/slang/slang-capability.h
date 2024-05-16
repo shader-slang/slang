@@ -89,7 +89,6 @@ struct CapabilityTargetSet
     void unionWith(const CapabilityTargetSet& other);
 };
 
-struct CapabilitySet;
 struct CapabilitySet
 {
 public:

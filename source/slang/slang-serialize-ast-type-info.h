@@ -125,13 +125,11 @@ struct SerialTypeInfo<CapabilityStageSet>
 
         List<SerialTypeInfo<CapabilityStageSet>::SerialType> SatomSetsList;
         SatomSetsList.setCount(src.atomSet.has_value());
-        Index iter = 0;
-
+        
         if(src.atomSet)
         {
             auto& i = src.atomSet.value();
-            SerialTypeInfo<CapabilityAtomSet>::toSerial(writer, &i, &SatomSetsList[iter]);
-            iter++;
+            SerialTypeInfo<CapabilityAtomSet>::toSerial(writer, &i, &SatomSetsList[0]);
         }
         
         SerialTypeInfo<CapabilityAtom>::toSerial(writer, &src.stage, &dst.stage);
