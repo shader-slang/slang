@@ -518,6 +518,7 @@ ${{{{
     __intrinsic_op($(intrinsicOpCode))
     __implicit_conversion($(conversionCost), $(builtinConversionKind))
     __init($(kBaseTypes[ss].name) value);
+
 ${{{{
     }
 
