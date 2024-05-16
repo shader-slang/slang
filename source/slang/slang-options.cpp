@@ -390,8 +390,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Optimization, "-O...", "-O<optimization-level>", "Set the optimization level."},
         { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },
         { OptionKind::GLSLForceScalarLayout,
-         "-force-glsl-scalar-layout", nullptr,
-         "Force using scalar block layout for uniform and shader storage buffers in GLSL output."},
+         "-force-glsl-scalar-layout,-fvk-use-scalar-layout", nullptr,
+         "Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV."},
         { OptionKind::VulkanBindShift, vkShiftNames.getBuffer(), "-fvk-<vulkan-shift>-shift <N> <space>", 
         "For example '-fvk-b-shift <N> <space>' shifts by N the inferred binding numbers for all resources in 'b' registers of space <space>. "
         "For a resource attached with :register(bX, <space>) but not [vk::binding(...)], "
@@ -546,6 +546,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::SaveStdLibBinSource, "-save-stdlib-bin-source","-save-stdlib-bin-source <filename>", "Same as -save-stdlib but output "
         "the data as a C array.\n"},
         { OptionKind::TrackLiveness, "-track-liveness", nullptr, "Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness." },
+        { OptionKind::LoopInversion, "-loop-inversion", nullptr, "Enable loop inversion in the code-gen optimization. Default is off" },
     };
     _addOptions(makeConstArrayView(internalOpts), options);
 
@@ -1694,6 +1695,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::IncompleteLibrary:
             case OptionKind::NoHLSLBinding:
             case OptionKind::NoHLSLPackConstantBufferElements:
+            case OptionKind::LoopInversion:
                 linkage->m_optionSet.set(optionKind, true); break;
                 break;
             case OptionKind::MatrixLayoutRow:
@@ -1712,6 +1714,10 @@ SlangResult OptionsParser::_parse(
                 ScopedAllocation contents;
                 SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName.value, contents));
                 SLANG_RETURN_ON_FAIL(m_session->loadStdLib(contents.getData(), contents.getSizeInBytes()));
+                
+                // Ensure that the linkage's AST builder is up-to-date.
+                linkage->getASTBuilder()->m_cachedNodes = asInternal(m_session)->getGlobalASTBuilder()->m_cachedNodes;
+
                 break;
             }
             case OptionKind::CompileStdLib: m_compileStdLib = true; break;
@@ -2825,6 +2831,7 @@ SlangResult OptionsParser::_parse(
                     case CodeGenTarget::ShaderHostCallable:
                     case CodeGenTarget::HostExecutable:
                     case CodeGenTarget::ShaderSharedLibrary:
+                    case CodeGenTarget::HostSharedLibrary:
                     case CodeGenTarget::PyTorchCppBinding:
                     case CodeGenTarget::DXIL:
                     case CodeGenTarget::MetalLib:
@@ -2914,7 +2921,23 @@ SlangResult OptionsParser::_parse(
 
     // Copy all settings from linkage to targets.
     for (auto target : linkage->targets)
+    {
         target->getOptionSet().inheritFrom(linkage->m_optionSet);
+
+        // If there is no target specified in command line, we should inherit the default target options.
+        if(m_rawTargets.getCount() == 0)
+        {
+            target->getOptionSet().inheritFrom(m_defaultTarget.optionSet);
+        }
+    }
+
+    // If there are no targets specified in command line, and addCodeGenTarget() is not called
+    // yet, the options for the default target will be gone after option parsing. We
+    // should save the option for the future use when addCodeGenTarget() is called.
+    if ((linkage->targets.getCount() == 0) && (m_rawTargets.getCount() == 0))
+    {
+        m_requestImpl->m_optionSetForDefaultTarget = m_defaultTarget.optionSet;
+    }
     
     applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
 

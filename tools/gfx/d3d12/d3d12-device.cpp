@@ -1674,15 +1674,9 @@ Result DeviceImpl::createBufferView(
     viewImpl->m_counterResource = counterResourceImpl;
     viewImpl->m_desc = desc;
 
-    SLANG_RETURN_ON_FAIL(createD3D12BufferDescriptor(
-        resourceImpl,
-        counterResourceImpl,
-        desc,
-        this,
-        m_cpuViewHeap.get(),
-        &viewImpl->m_descriptor));
-    if (viewImpl->m_descriptor.cpuHandle.ptr != 0)
-        viewImpl->m_allocator = m_cpuViewHeap.get();
+    // Buffer view descriptors are created on demand.
+    viewImpl->m_descriptor = {0};
+    viewImpl->m_allocator = m_cpuViewHeap.get();
  
     returnComPtr(outView, viewImpl);
     return SLANG_OK;

@@ -6,12 +6,14 @@ namespace Slang
 class Session;
 class TargetProgram;
 struct IRModule;
+class DiagnosticSink;
 
 struct ByteAddressBufferLegalizationOptions
 {
     bool scalarizeVectorLoadStore = false;
     bool useBitCastFromUInt = false;
     bool translateToStructuredBufferOps = false;
+    bool lowerBasicTypeOps = false;
 };
 
     /// Legalize byte-address buffer `Load()` and `Store()` operations.
@@ -24,6 +26,7 @@ void legalizeByteAddressBufferOps(
     Session*                                    session,
     TargetProgram*                              target,
     IRModule*                                   module,
+    DiagnosticSink*                             sink,
     ByteAddressBufferLegalizationOptions const& options);
 }
 

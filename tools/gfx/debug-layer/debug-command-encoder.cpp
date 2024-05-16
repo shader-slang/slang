@@ -470,16 +470,17 @@ void DebugRayTracingCommandEncoder::deserializeAccelerationStructure(
     baseObject->deserializeAccelerationStructure(getInnerObj(dest), source);
 }
 
-void DebugRayTracingCommandEncoder::bindPipeline(
+Result DebugRayTracingCommandEncoder::bindPipeline(
     IPipelineState* state, IShaderObject** outRootObject)
 {
     SLANG_GFX_API_FUNC;
     auto innerPipeline = getInnerObj(state);
     IShaderObject* innerRootObject = nullptr;
     commandBuffer->rootObject.reset();
-    baseObject->bindPipeline(innerPipeline, &innerRootObject);
+    Result result = baseObject->bindPipeline(innerPipeline, &innerRootObject);
     commandBuffer->rootObject.baseObject.attach(innerRootObject);
     *outRootObject = &commandBuffer->rootObject;
+    return result;
 }
 
 Result DebugRayTracingCommandEncoder::bindPipelineWithRootObject(

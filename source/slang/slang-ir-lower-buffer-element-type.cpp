@@ -9,6 +9,8 @@ namespace Slang
 {
     struct LoweredElementTypeContext
     {
+        static const IRIntegerValue kMaxArraySizeToUnroll = 32;
+
         struct LoweredElementTypeInfo
         {
             IRType* originalType;
@@ -161,17 +163,42 @@ namespace Slang
             auto packedParam = builder.emitParam(structType);
             auto packedArray = builder.emitFieldExtract(innerArrayType, packedParam, dataKey);
             auto count = getIntVal(arrayType->getElementCount());
-            List<IRInst*> args;
-            args.setCount((Index)count);
-            for (IRIntegerValue ii = 0; ii < count; ++ii)
+            IRInst* result = nullptr;
+            if (count <= kMaxArraySizeToUnroll)
             {
-                auto packedElement = builder.emitElementExtract(packedArray, ii);
+                // If the array is small enough, just process each element directly.
+                List<IRInst*> args;
+                args.setCount((Index)count);
+                for (IRIntegerValue ii = 0; ii < count; ++ii)
+                {
+                    auto packedElement = builder.emitElementExtract(packedArray, ii);
+                    auto originalElement = innerTypeInfo.convertLoweredToOriginal
+                        ? builder.emitCallInst(innerTypeInfo.originalType, innerTypeInfo.convertLoweredToOriginal, 1, &packedElement)
+                        : packedElement;
+                    args[(Index)ii] = originalElement;
+                }
+                result = builder.emitMakeArray(arrayType, (UInt)args.getCount(), args.getBuffer());
+                
+            }
+            else
+            {
+                // The general case for large arrays is to emit a loop through the elements.
+                IRVar* resultVar = builder.emitVar(arrayType);
+                IRBlock* loopBodyBlock;
+                IRBlock* loopBreakBlock;
+                auto loopParam = emitLoopBlocks(&builder, builder.getIntValue(builder.getIntType(), 0), builder.getIntValue(builder.getIntType(), count),
+                    loopBodyBlock, loopBreakBlock);
+
+                builder.setInsertBefore(loopBodyBlock->getFirstOrdinaryInst());
+                auto packedElement = builder.emitElementExtract(packedArray, loopParam);
                 auto originalElement = innerTypeInfo.convertLoweredToOriginal
                     ? builder.emitCallInst(innerTypeInfo.originalType, innerTypeInfo.convertLoweredToOriginal, 1, &packedElement)
                     : packedElement;
-                args[(Index)ii] = originalElement;
+                auto varPtr = builder.emitElementAddress(resultVar, loopParam);
+                builder.emitStore(varPtr, originalElement);
+                builder.setInsertInto(loopBreakBlock);
+                result = builder.emitLoad(resultVar);
             }
-            auto result = builder.emitMakeArray(arrayType, (UInt)args.getCount(), args.getBuffer());
             builder.emitReturn(result);
             return func;
         }
@@ -191,18 +218,43 @@ namespace Slang
             builder.setInsertInto(func);
             builder.emitBlock();
             auto originalParam = builder.emitParam(arrayType);
+            IRInst* packedArray = nullptr;
             auto count = getIntVal(arrayType->getElementCount());
-            List<IRInst*> args;
-            args.setCount((Index)count);
-            for (IRIntegerValue ii = 0; ii < count; ++ii)
+            if (count <= kMaxArraySizeToUnroll)
             {
-                auto originalElement = builder.emitElementExtract(originalParam, ii);
+                // If the array is small enough, just process each element directly.
+                List<IRInst*> args;
+                args.setCount((Index)count);
+                for (IRIntegerValue ii = 0; ii < count; ++ii)
+                {
+                    auto originalElement = builder.emitElementExtract(originalParam, ii);
+                    auto packedElement = innerTypeInfo.convertOriginalToLowered
+                        ? builder.emitCallInst(innerTypeInfo.loweredType, innerTypeInfo.convertOriginalToLowered, 1, &originalElement)
+                        : originalElement;
+                    args[(Index)ii] = packedElement;
+                }
+                packedArray = builder.emitMakeArray(innerArrayType, (UInt)args.getCount(), args.getBuffer());
+            }
+            else
+            {
+                // The general case for large arrays is to emit a loop through the elements.
+                IRVar* packedArrayVar = builder.emitVar(innerArrayType);
+                IRBlock* loopBodyBlock;
+                IRBlock* loopBreakBlock;
+                auto loopParam = emitLoopBlocks(&builder, builder.getIntValue(builder.getIntType(), 0), builder.getIntValue(builder.getIntType(), count),
+                                            loopBodyBlock, loopBreakBlock);
+
+                builder.setInsertBefore(loopBodyBlock->getFirstOrdinaryInst());
+                auto originalElement = builder.emitElementExtract(originalParam, loopParam);
                 auto packedElement = innerTypeInfo.convertOriginalToLowered
                     ? builder.emitCallInst(innerTypeInfo.loweredType, innerTypeInfo.convertOriginalToLowered, 1, &originalElement)
                     : originalElement;
-                args[(Index)ii] = packedElement;
+                auto varPtr = builder.emitElementAddress(packedArrayVar, loopParam);
+                builder.emitStore(varPtr, packedElement);
+                builder.setInsertInto(loopBreakBlock);
+                packedArray = builder.emitLoad(packedArrayVar);
             }
-            auto packedArray = builder.emitMakeArray(innerArrayType, (UInt)args.getCount(), args.getBuffer());
+          
             auto result = builder.emitMakeStruct(structType, 1, &packedArray);
             builder.emitReturn(result);
             return func;

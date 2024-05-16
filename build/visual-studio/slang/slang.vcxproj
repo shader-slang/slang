@@ -308,6 +308,10 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\slang.h" />
+    <ClInclude Include="..\..\..\source\slang-capture-replay\capture_utility.h" />
+    <ClInclude Include="..\..\..\source\slang-capture-replay\slang-filesystem.h" />
+    <ClInclude Include="..\..\..\source\slang-capture-replay\slang-global-session.h" />
+    <ClInclude Include="..\..\..\source\slang-capture-replay\slang-session.h" />
     <ClInclude Include="..\..\..\source\slang\slang-artifact-output-util.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-all.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-base.h" />
@@ -348,8 +352,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-emit-spirv-ops-debug-info-ext.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-spirv-ops.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-torch.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-generated-capability-defs-impl.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-generated-capability-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
     <ClInclude Include="..\..\..\source\slang\slang-hlsl-to-vulkan-layout-options.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />
@@ -459,6 +461,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-simplify-cfg.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-simplify-for-emit.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-single-return.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-address-space.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-arrays.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-dispatch.h" />
@@ -487,7 +490,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-variable-scope-correction.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-vk-invert-y.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-wrap-global-context.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir.h" />
     <ClInclude Include="..\..\..\source\slang\slang-language-server-ast-lookup.h" />
@@ -540,6 +542,10 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\prelude\slang-cuda-prelude.h.cpp" />
     <ClCompile Include="..\..\..\prelude\slang-hlsl-prelude.h.cpp" />
     <ClCompile Include="..\..\..\prelude\slang-torch-prelude.h.cpp" />
+    <ClCompile Include="..\..\..\source\slang-capture-replay\capture_utility.cpp" />
+    <ClCompile Include="..\..\..\source\slang-capture-replay\slang-filesystem.cpp" />
+    <ClCompile Include="..\..\..\source\slang-capture-replay\slang-global-session.cpp" />
+    <ClCompile Include="..\..\..\source\slang-capture-replay\slang-session.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-api.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-artifact-output-util.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-base.cpp" />
@@ -692,6 +698,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-simplify-cfg.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-simplify-for-emit.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-single-return.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-address-space.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-arrays.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-dispatch.cpp" />
@@ -720,7 +727,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-variable-scope-correction.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-vk-invert-y.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-wrap-global-context.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-language-server-ast-lookup.cpp" />

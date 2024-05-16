@@ -520,29 +520,27 @@ namespace Slang
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
                 diagnoseCapabilityErrors(sink, linkage->m_optionSet, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
-                auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getExpandedAtoms();
-
+                
                 // Find out what exactly is incompatible and print out a trace of provenance to
                 // help user diagnose their code.
-                auto& conjunctions = targetCaps.getExpandedAtoms();
-                if (conjunctions.getCount() == 1 && interredCapConjunctions.getCount() == 1)
+                // TODO: provedence should have a way to filter out for provenance that are missing X capabilitySet from their caps, else in big functions we get junk errors
+                // This is specifically a problem for when a function is missing a target but otherwise has identical capabilities.
+                
+                const auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getAtomSets();
+                const auto& compileCaps = targetCaps.getAtomSets();
+                if (compileCaps && interredCapConjunctions)
                 {
-                    for (auto atom : conjunctions[0].getExpandedAtoms())
+                    for (auto inferredAtom : *interredCapConjunctions.begin())
                     {
-                        for (auto inferredAtom : interredCapConjunctions[0].getExpandedAtoms())
+                        CapabilityAtom inferredAtomFormatted = (CapabilityAtom)inferredAtom;
+                        if (!compileCaps->contains((UInt)inferredAtom))
                         {
-                            if (CapabilityConjunctionSet(inferredAtom).isIncompatibleWith(atom))
-                            {
-                                diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtom);
-                                goto breakLabel;
-                            }
+                            diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtomFormatted);
                         }
                     }
                 }
             }
         }
-        breakLabel:;
-
     }
 
     // Given an entry point specified via API or command line options,
@@ -918,7 +916,7 @@ namespace Slang
             for (Index tt = 0; tt < translationUnitCount; ++tt)
             {
                 auto translationUnit = translationUnits[tt];
-                translationUnit->getModule()->_discoverEntryPoints(sink);
+                translationUnit->getModule()->_discoverEntryPoints(sink, this->getLinkage()->targets);
             }
         }
     }

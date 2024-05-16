@@ -25,6 +25,8 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
 
 void printDiagnosticArg(StringBuilder& sb, DeclRefBase* declRefBase)
 {
+    if (!declRefBase)
+        return;
     printDiagnosticArg(sb, declRefBase->getDecl());
 }
 
