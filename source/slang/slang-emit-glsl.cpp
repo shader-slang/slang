@@ -2089,6 +2089,20 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // Handled
             return true;
         }
+        case kIROp_BeginFragmentShaderInterlock:
+        {
+            _requireGLSLVersion(420);
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_fragment_shader_interlock"));
+            m_writer->emit("beginInvocationInterlockARB()");
+            return true;
+        }
+        case kIROp_EndFragmentShaderInterlock:
+        {
+            _requireGLSLVersion(420);
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_fragment_shader_interlock"));
+            m_writer->emit("endInvocationInterlockARB()");
+            return true;
+        }
         default: break;
     }
 
@@ -2576,12 +2590,6 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 m_writer->emit("accelerationStructureEXT");
                 break;
             }
-
-                // TODO: These "translations" are obviously wrong for GLSL.
-            case kIROp_HLSLByteAddressBufferType:                   m_writer->emit("ByteAddressBuffer");                  break;
-            case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
-            case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
-
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
                 break;

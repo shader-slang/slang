@@ -15,6 +15,8 @@
 namespace Slang
 {
 
+bool isCPUTarget(TargetRequest* targetReq);
+
 // As is typical for IR passes in Slang, we will encapsulate the state
 // while we process the code in a context type.
 //
@@ -617,6 +619,66 @@ struct ByteAddressBufferLegalizationContext
             }
         }
 
+        if (m_options.lowerBasicTypeOps)
+        {
+            // Some platforms e.g. Metal does not allow loading basic types that are not 4-byte sized.
+            // We need to lower such loads.
+            IRSizeAndAlignment sizeAlignment;
+            SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &sizeAlignment));
+            if (sizeAlignment.size == 8)
+            {
+                // We need to load the value as two 4-byte values and then combine them.
+                auto loOffset = offset;
+                auto hiOffset = emitOffsetAddIfNeeded(offset, 4);
+                IRInst* loadLoArgs[] = { buffer, loOffset };
+                IRInst* loadHiArgs[] = { buffer, hiOffset };
+                auto loLoad = m_builder.emitIntrinsicInst(m_builder.getUIntType(), kIROp_ByteAddressBufferLoad, 2, loadLoArgs);
+                auto hiLoad = m_builder.emitIntrinsicInst(m_builder.getUIntType(), kIROp_ByteAddressBufferLoad, 2, loadHiArgs);
+                auto lo64 = m_builder.emitCast(m_builder.getUInt64Type(), loLoad);
+                auto hi64 = m_builder.emitCast(m_builder.getUInt64Type(), hiLoad);
+                auto shift = m_builder.emitShl(m_builder.getUInt64Type(), hi64, m_builder.getIntValue(m_builder.getUInt64Type(), 32));
+                auto fullValue = m_builder.emitBitOr(m_builder.getUInt64Type(), lo64, shift);
+                return m_builder.emitBitCast(type, fullValue);
+            }
+            else if (sizeAlignment.size < 4)
+            {
+                auto alignedOffset = m_builder.emitDiv(offset->getDataType(), offset, m_builder.getIntValue(offset->getDataType(), 4));
+                alignedOffset = m_builder.emitMul(offset->getDataType(), alignedOffset, m_builder.getIntValue(offset->getDataType(), 4));
+                IRInst* loadArgs[] = { buffer, alignedOffset };
+                auto val = m_builder.emitIntrinsicInst(m_builder.getUIntType(), kIROp_ByteAddressBufferLoad, 2, loadArgs);
+                auto shiftAmount = m_builder.emitSub(offset->getDataType(), offset, alignedOffset);
+                shiftAmount = m_builder.emitMul(offset->getDataType(), shiftAmount, m_builder.getIntValue(offset->getDataType(), 8));
+                IRInst* mask = nullptr;
+                switch (sizeAlignment.size)
+                {
+                case 1:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFF);
+                    break;
+                case 2:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFFFF);
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unexpected size");
+                    break;
+                }
+                auto shift = m_builder.emitShr(m_builder.getUIntType(), val, shiftAmount);
+                auto masked = m_builder.emitBitAnd(m_builder.getUIntType(), shift, mask);
+                IRInst* casted = nullptr;
+                switch (sizeAlignment.size)
+                {
+                case 1:
+                    casted = m_builder.emitCast(m_builder.getUInt8Type(), masked);
+                    break;
+                case 2:
+                    casted = m_builder.emitCast(m_builder.getUInt16Type(), masked);
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unexpected size");
+                    break;
+                }
+                return m_builder.emitBitCast(type, casted);
+            }
+        }
         // When we finally run out of special cases to handle, we just emit
         // a byte-address buffer load operation directly, assuming it will
         // work for the chosen target.
@@ -672,7 +734,25 @@ struct ByteAddressBufferLegalizationContext
             // the load was already for a `uint`.
             //
             return BaseType::UInt;
-
+        case kIROp_Int8Type:
+        case kIROp_UInt8Type:
+            return BaseType::UInt8;
+        case kIROp_Int16Type:
+        case kIROp_UInt16Type:
+        case kIROp_HalfType:
+            return BaseType::UInt16;
+        case kIROp_Int64Type:
+        case kIROp_UInt64Type:
+        case kIROp_DoubleType:
+            return BaseType::UInt64;
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
+        case kIROp_RawPointerType:
+        case kIROp_PtrType:
+            if (isCPUTarget(m_target) && sizeof(void*) == 4)
+                return BaseType::UInt;
+            else
+                return BaseType::UInt64;
         default:
             // All other types map to a sentinel value of `Void` to
             // indicate that a bit-cast solution shouldn't be attempted:
@@ -1071,7 +1151,62 @@ struct ByteAddressBufferLegalizationContext
             }
 
         }
-
+        if (m_options.lowerBasicTypeOps)
+        {
+            // Some platforms e.g. Metal does not allow storing basic types that are not 4-byte sized.
+            // We need to lower such loads.
+            IRSizeAndAlignment sizeAlignment;
+            SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &sizeAlignment));
+            if (sizeAlignment.size == 8)
+            {
+                // We need to store the value as two 4-byte values.
+                auto uint64Val = m_builder.emitBitCast(m_builder.getUInt64Type(), value);
+                auto loVal = m_builder.emitCast(m_builder.getUIntType(), uint64Val);
+                auto hiVal = m_builder.emitCast(
+                    m_builder.getUIntType(),
+                    m_builder.emitShr(m_builder.getUInt64Type(),
+                        uint64Val, m_builder.getIntValue(m_builder.getUInt64Type(), 32)));
+                auto loOffset = offset;
+                auto hiOffset = emitOffsetAddIfNeeded(offset, 4);
+                IRInst* storeLoArgs[] = { buffer, loOffset, loVal };
+                IRInst* storeHiArgs[] = { buffer, hiOffset, hiVal };
+                m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeLoArgs);
+                m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeHiArgs);
+                return SLANG_OK;
+            }
+            else if (sizeAlignment.size < 4)
+            {
+                IRInst* loadArgs[] = {buffer, offset};
+                auto existingVal = m_builder.emitIntrinsicInst(m_builder.getUIntType(), kIROp_ByteAddressBufferLoad, 2, loadArgs);
+                auto alignedOffset = m_builder.emitDiv(offset->getDataType(), offset, m_builder.getIntValue(offset->getDataType(), 4));
+                alignedOffset = m_builder.emitMul(offset->getDataType(), alignedOffset, m_builder.getIntValue(offset->getDataType(), 4));
+                auto shiftAmount = m_builder.emitSub(offset->getDataType(), offset, alignedOffset);
+                shiftAmount = m_builder.emitMul(offset->getDataType(), shiftAmount, m_builder.getIntValue(offset->getDataType(), 8));
+                auto uintVal = m_builder.emitCast(m_builder.getUIntType(),
+                    m_builder.emitBitCast(getSameSizeUIntType(value->getDataType()), value));
+                auto shiftedData = m_builder.emitShl(m_builder.getUIntType(), uintVal, shiftAmount);
+                IRInst* mask = nullptr;
+                switch (sizeAlignment.size)
+                {
+                case 1:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFF);
+                    break;
+                case 2:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFFFF);
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unexpected size");
+                    return SLANG_FAIL;
+                }
+                mask = m_builder.emitShl(m_builder.getUIntType(), mask, shiftAmount);
+                mask = m_builder.emitBitNot(m_builder.getUIntType(), mask);
+                auto maskedData = m_builder.emitBitAnd(m_builder.getUIntType(), existingVal, mask);
+                auto newData = m_builder.emitBitOr(m_builder.getUIntType(), maskedData, shiftedData);
+                IRInst* storeArgs[] = { buffer, alignedOffset, newData };
+                m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeArgs);
+                return SLANG_OK;
+            }
+        }
         {
             IRInst* storeArgs[] = { buffer, offset, value };
             m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeArgs);

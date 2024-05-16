@@ -3361,6 +3361,7 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 
     emitParamType(paramType, paramName);
     emitSemantics(param);
+    emitPostDeclarationAttributesForType(paramType);
 }
 
 void CLikeSourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
@@ -3649,6 +3650,7 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, b
         emitMemoryQualifiers(fieldKey);
         emitType(fieldType, getName(fieldKey));
         emitSemantics(fieldKey, allowOffsetLayout);
+        emitPostDeclarationAttributesForType(fieldType);
         m_writer->emit(";\n");
     }
 
@@ -3733,6 +3735,7 @@ void CLikeSourceEmitter::emitClass(IRClassType* classType)
 
         emitType(fieldType, getName(fieldKey));
         emitSemantics(fieldKey);
+        emitPostDeclarationAttributesForType(fieldType);
         m_writer->emit(";\n");
     }
 
@@ -3900,8 +3903,8 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
     emitType(varType, getName(varDecl));
 
     emitSemantics(varDecl);
-
     emitLayoutSemantics(varDecl);
+    emitPostDeclarationAttributesForType(varType);
 
     // TODO: ideally this logic should scan ahead to see if it can find a `store`
     // instruction that writes to the `var`, within the same block, such that all

@@ -349,7 +349,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             emitOperand(buffer, getInfo(EmitOp::General));
             m_writer->emit("[(");
             emitOperand(offset, getInfo(EmitOp::General));
-            m_writer->emit(")>>2)]");
+            m_writer->emit(")>>2])");
             return true;
         }
         case kIROp_ByteAddressBufferStore:
@@ -361,7 +361,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             emitOperand(buffer, getInfo(EmitOp::General));
             m_writer->emit("[(");
             emitOperand(offset, getInfo(EmitOp::General));
-            m_writer->emit(")>>2)] = as_type<uint32_t>(");
+            m_writer->emit(")>>2] = as_type<uint32_t>(");
             emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
@@ -433,17 +433,8 @@ void MetalSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVa
 
 void MetalSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* decl)
 {
-    switch (decl->getMode())
-    {
-    case kIRLoopControl_Unroll:
-        m_writer->emit("[unroll]\n");
-        break;
-    case kIRLoopControl_Loop:
-        m_writer->emit("[loop]\n");
-        break;
-    default:
-        break;
-    }
+    // Metal does not support loop control attributes.
+    SLANG_UNUSED(decl);
 }
 
 static bool _canEmitExport(const Profile& profile)
@@ -864,6 +855,23 @@ void MetalSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
     Super::emitSimpleFuncParamImpl(param);
     emitFuncParamLayoutImpl(param);
+}
+
+void MetalSourceEmitter::emitPostDeclarationAttributesForType(IRInst* type)
+{
+    Super::emitPostDeclarationAttributesForType(type);
+    if (auto textureType = as<IRTextureTypeBase>(type))
+    {
+        if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
+        {
+            m_writer->emit(" [[raster_order_group(0)]]");
+        }
+    }
+    else if (as<IRHLSLRasterizerOrderedByteAddressBufferType>(type) ||
+        as<IRHLSLRasterizerOrderedStructuredBufferType>(type))
+    {
+        m_writer->emit(" [[raster_order_group(0)]]");
+    }
 }
 
 static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)

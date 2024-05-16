@@ -1638,6 +1638,7 @@ public:
             kWriteOnly    = 0b100,
             kVolatile     = 0b1000,
             kRestrict     = 0b10000,
+            kRasterizerOrdered = 0b100000,
         };
     };
 

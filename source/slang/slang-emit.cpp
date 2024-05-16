@@ -753,6 +753,13 @@ Result linkAndOptimizeIR(
             //
             byteAddressBufferOptions.translateToStructuredBufferOps = true;
             break;
+        case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalLib:
+        case CodeGenTarget::MetalLibAssembly:
+            byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            byteAddressBufferOptions.translateToStructuredBufferOps = false;
+            byteAddressBufferOptions.lowerBasicTypeOps = true;
+            break;
         }
 
         // We also need to decide whether to translate

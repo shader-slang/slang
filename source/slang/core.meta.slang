@@ -2062,42 +2062,14 @@ int __offsetOf(in T t, in F field)
 }
 
 /// Mark beginning of "interlocked" operations in a fragment shader.
-__glsl_extension(GL_ARB_fragment_shader_interlock)
-__glsl_version(420)
-void beginInvocationInterlock()
-{
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "beginInvocationInterlockARB";
-    case spirv:
-        spirv_asm {
-            OpCapability FragmentShaderPixelInterlockEXT;
-            OpExtension "SPV_EXT_fragment_shader_interlock";
-            OpExecutionMode __entryPoint PixelInterlockOrderedEXT;
-            OpBeginInvocationInterlockEXT;
-        };
-    }
-}
+[require(glsl_spirv, GL_ARB_fragment_shader_interlock, fragment)]
+__intrinsic_op($(kIROp_BeginFragmentShaderInterlock))
+void beginInvocationInterlock();
 
 /// Mark end of "interlocked" operations in a fragment shader.
-__glsl_extension(GL_ARB_fragment_shader_interlock)
-__glsl_version(420)
-void endInvocationInterlock()
-{
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "endInvocationInterlockARB";
-    case spirv:
-        spirv_asm {
-            OpCapability FragmentShaderPixelInterlockEXT;
-            OpExtension "SPV_EXT_fragment_shader_interlock";
-            OpExecutionMode __entryPoint PixelInterlockOrderedEXT;
-            OpEndInvocationInterlockEXT;
-        };
-    }
-}
+[require(glsl_spirv, GL_ARB_fragment_shader_interlock, fragment)]
+__intrinsic_op($(kIROp_EndFragmentShaderInterlock))
+void endInvocationInterlock();
 
 // Operators to apply to `enum` types
 

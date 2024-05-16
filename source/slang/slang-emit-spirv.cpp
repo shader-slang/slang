@@ -2787,6 +2787,15 @@ struct SPIRVEmitContext
         case kIROp_discard:
             result = emitOpKill(parent, inst);
             break;
+        case kIROp_BeginFragmentShaderInterlock:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_fragment_shader_interlock"));
+            requireSPIRVCapability(SpvCapabilityFragmentShaderPixelInterlockEXT);
+            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, getParentFunc(inst), SpvExecutionModePixelInterlockOrderedEXT);
+            result = emitOpBeginInvocationInterlockEXT(parent, inst);
+            break;
+        case kIROp_EndFragmentShaderInterlock:
+            result = emitOpEndInvocationInterlockEXT(parent, inst);
+            break;
         case kIROp_unconditionalBranch:
             {
                 // If we are jumping to the main block of a loop,
