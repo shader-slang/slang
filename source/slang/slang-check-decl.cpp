@@ -2040,11 +2040,14 @@ namespace Slang
             }
         }
 
-        if (auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl)))
+        TypeTag varTypeTags = getTypeTags(varDecl->getType());
+        auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl));
+        if (parentDecl)
         {
-            auto typeTags = getTypeTags(varDecl->getType());
-            parentDecl->addTag(typeTags);
-            if ((int)typeTags & (int)TypeTag::Unsized)
+            parentDecl->addTag(varTypeTags);
+            auto unsizedMask = (int)TypeTag::Unsized;
+            bool isUnknownSize = (((int)varTypeTags & unsizedMask) != 0);
+            if (isUnknownSize)
             {
                 // Unsized decl must appear as the last member of the struct.
                 for (auto memberIdx = parentDecl->members.getCount() - 1; memberIdx >= 0; memberIdx--)
@@ -2064,7 +2067,17 @@ namespace Slang
                 }
             }
         }
-        
+        bool isGlobalOrLocalVar = !isGlobalShaderParameter(varDecl) && !as<ParamDecl>(varDecl) &&
+            (!parentDecl || isEffectivelyStatic(varDecl));
+        if (isGlobalOrLocalVar)
+        {
+            bool isUnsized = (((int)varTypeTags & (int)TypeTag::Unsized) != 0);
+            if (isUnsized)
+            {
+                getSink()->diagnose(varDecl, Diagnostics::varCannotBeUnsized);
+            }
+        }
+
         if (auto elementType = getConstantBufferElementType(varDecl->getType()))
         {
             if (doesTypeHaveTag(elementType, TypeTag::Incomplete))
