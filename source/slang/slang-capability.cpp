@@ -490,9 +490,6 @@ CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySe
     return newSet;
 }
 
-/// Join `this` with a compatble stage set of `CapabilityTargetSet other`.
-/// Return false when `other` is fully incompatible.
-/// incompatability is when `this->stage` is not a supported stage by `other.shaderStageSets`.
 bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
 {
     const CapabilityStageSet* otherStageSet = other.shaderStageSets.tryGetValue(this->stage);
@@ -506,11 +503,6 @@ bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
     return true;
 }
 
-/// Join a compatable target set from `this` with `CapabilityTargetSet other`.
-/// Return false when `other` is fully incompatible.
-/// incompatability is when one of 2 senarios are true:
-/// 1. `this->target` is not a supported target by `other.shaderStageSets`
-/// 2. `this` has completly disjoint shader stages from other.
 bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
 {
     const CapabilityTargetSet* otherTargetSet = other.tryGetValue(this->target);
@@ -631,9 +623,6 @@ bool CapabilitySet::hasSameTargets(const CapabilitySet& other) const
 #pragma warning(push)
 #pragma warning(disable:4702)
 #endif
-/// returns true if 'this' is a better target for 'targetCaps' than 'that'
-/// isEqual: is `this` and `that` equal
-/// isIncompatible: is `this` and `that` incompatible
 bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const
 {
     if (this->isEmpty() && (that.isEmpty() || that.isInvalid()))
