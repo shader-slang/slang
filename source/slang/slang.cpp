@@ -1740,7 +1740,9 @@ CapabilitySet TargetRequest::getTargetCaps()
     CapabilitySet targetCap = CapabilitySet(atoms);
 
     CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
-    CapabilityName latestSpirvAtom = (CapabilityName)latestSpirvCapSet.getExpandedAtoms()[0].getExpandedAtoms().getLast();
+    auto latestSpirvCapSetElements = latestSpirvCapSet.getAtomSets()->getElements<CapabilityAtom>();
+    CapabilityName latestSpirvAtom = (CapabilityName)latestSpirvCapSetElements[latestSpirvCapSetElements.getCount()-2]; //-1 gets shader stage
+
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
         auto atom = (CapabilityName)atomVal.intValue;

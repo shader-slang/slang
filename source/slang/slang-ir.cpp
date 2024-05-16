@@ -334,7 +334,7 @@ namespace Slang
                 for (Index i = 0; i < count; ++i)
                 {
                     auto operand = cast<IRCapabilitySet>(getOperand(i));
-                    result.getExpandedAtoms().addRange(operand->getCaps().getExpandedAtoms());
+                    result.unionWith(operand->getCaps());
                 }
                 return result;
             }
@@ -2440,13 +2440,12 @@ namespace Slang
         // be a minimal list of atoms such that they will produce
         // the same `CapabilitySet` when expanded.
 
-        List<List<CapabilityAtom>> compactedAtoms;
-        caps.calcCompactedAtoms(compactedAtoms);
+        auto compactedAtoms = caps.getAtomSets();
         List<IRInst*> conjunctions;
-        for( auto atomConjunction : compactedAtoms )
+        for( auto& atomConjunctionSet : compactedAtoms )
         {
             List<IRInst*> args;
-            for (auto atom : atomConjunction)
+            for (auto atom : atomConjunctionSet)
                 args.add(getIntValue(capabilityAtomType, Int(atom)));
             auto conjunctionInst = createIntrinsicInst(
                 capabilitySetType, kIROp_CapabilityConjunction, args.getCount(), args.getBuffer());
@@ -8294,7 +8293,8 @@ namespace Slang
                     continue;
             }
 
-            if(!bestDecoration || decorationCaps.isBetterForTarget(bestCaps, targetCaps))
+            bool isEqual;
+            if(!bestDecoration || decorationCaps.isBetterForTarget(bestCaps, targetCaps, isEqual))
             {
                 bestDecoration = decoration;
                 bestCaps = decorationCaps;

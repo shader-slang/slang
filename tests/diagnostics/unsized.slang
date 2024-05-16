@@ -5,6 +5,7 @@ extern static const int size = 1;
 struct V
 {
     // CHECK-DAG: ([[# @LINE+1]]): error 30070
+    int c[];
     int b[size];
     int a[];
 }

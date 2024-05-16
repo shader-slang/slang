@@ -715,20 +715,21 @@ struct ASTDumpContext
     {
         m_writer->emit("capability_set(");
         bool isFirstSet = true;
-        for (auto& set : capSet.getExpandedAtoms())
+        for (auto& set : capSet.getAtomSets())
         {
             if (!isFirstSet)
             {
                 m_writer->emit(" | ");
             }
             bool isFirst = true;
-            for (auto atom : set.getExpandedAtoms())
+            for (auto atom : set)
             {
+                CapabilityName formattedAtom = (CapabilityName)atom;
                 if (!isFirst)
                 {
                     m_writer->emit("+");
                 }
-                dump(capabilityNameToString((CapabilityName)atom));
+                dump(capabilityNameToString((CapabilityName)formattedAtom));
                 isFirst = false;
             }
             isFirstSet = false;
