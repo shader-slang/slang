@@ -3391,6 +3391,8 @@ public:
     IRBasicType* getInt64Type();
     IRBasicType* getUIntType();
     IRBasicType* getUInt64Type();
+    IRBasicType* getUInt16Type();
+    IRBasicType* getUInt8Type();
     IRBasicType* getCharType();
     IRStringType* getStringType();
     IRNativeStringType* getNativeStringType();
@@ -4174,6 +4176,16 @@ public:
         IRBlock*        defaultLabel,
         UInt            caseArgCount,
         IRInst* const* caseArgs);
+
+    IRInst* emitBeginFragmentShaderInterlock()
+    {
+        return emitIntrinsicInst(getVoidType(), kIROp_BeginFragmentShaderInterlock, 0, nullptr);
+    }
+
+    IRInst* emitEndFragmentShaderInterlock()
+    {
+        return emitIntrinsicInst(getVoidType(), kIROp_EndFragmentShaderInterlock, 0, nullptr);
+    }
 
     IRGlobalGenericParam* emitGlobalGenericParam(
         IRType* type);

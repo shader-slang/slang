@@ -13,6 +13,7 @@ struct ByteAddressBufferLegalizationOptions
     bool scalarizeVectorLoadStore = false;
     bool useBitCastFromUInt = false;
     bool translateToStructuredBufferOps = false;
+    bool lowerBasicTypeOps = false;
 };
 
     /// Legalize byte-address buffer `Load()` and `Store()` operations.

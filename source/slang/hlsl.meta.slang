@@ -2598,7 +2598,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 {
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location)
     {
         __target_switch
@@ -2643,6 +2643,66 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     %sampled:__sampledType(T) = OpImageRead $this $location;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case metal:
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_1D):
+                    // lod is not supported for 1D texture
+                    if (isArray == 1)
+                        // Tv read(uint coord, uint array, uint lod = 0) const
+                        __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y))";
+                    else
+                        // Tv read(uint coord, uint lod = 0) const
+                        __intrinsic_asm "$0.read(uint(($1).x))";
+                    break;
+                case $(SLANG_TEXTURE_2D):
+                    if (isShadow == 1)
+                    {
+                        if (isArray == 1)
+                            // T read(uint2 coord, uint array, uint lod = 0) const
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        else
+                            // T read(uint2 coord, uint lod = 0) const
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                    }
+                    else
+                    {
+                        if (isArray == 1)
+                            // Tv read(uint2 coord, uint array, uint lod = 0) const
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        else
+                            // Tv read(uint2 coord, uint lod = 0) const
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                    }
+                    break;
+                case $(SLANG_TEXTURE_3D):
+                    if (isShadow == 0 && isArray == 0)
+                        // Tv read(uint3 coord, uint lod = 0) const
+                        __intrinsic_asm "$0.read(vec<uint,3>(($1).xyz), uint(($1).w))";
+                    break;
+                case $(SLANG_TEXTURE_CUBE):
+                    if (isShadow == 1)
+                    {
+                        if (isArray == 1)
+                            // T read(uint2 coord, uint face, uint array, uint lod = 0) const
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6, uint(($1).w))";
+                        else
+                            // T read(uint2 coord, uint face, uint lod = 0) const
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                    }
+                    else
+                    {
+                        if (isArray == 1)
+                            // Tv read(uint2 coord, uint face, uint array, uint lod = 0) const
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6, uint(($1).w))";
+                        else
+                            // Tv read(uint2 coord, uint face, uint lod = 0) const
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                    }
+                    break;
+                }
+                // TODO: This needs to be handled by the capability system
+                __intrinsic_asm "<invalid intrinsics>";
         }
     }
 
@@ -2693,7 +2753,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
         get
         {
             __target_switch
@@ -2704,13 +2764,14 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                 case glsl:
                 case spirv:
                 case cuda:
+                case metal:
                     return Load(location);
             }
         }
 
         [nonmutating]
         [ForceInline]
-        [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
         set(T newValue)
         {
             __target_switch
@@ -2754,6 +2815,64 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     {
                         OpImageWrite $this $location __convertTexel(newValue);
                     };
+                case metal:
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        // lod is not supported for 1D texture
+                        if (isArray == 1)
+                            // void write(Tv color, uint coord, uint array, uint lod = 0) const
+                            __intrinsic_asm "$0.write($2, uint(($1).x))";
+                        else
+                            // void write(Tv color, uint coord, uint lod = 0) const
+                            __intrinsic_asm "$0.write($2, uint(($1).x))";
+                        break;
+                    case $(SLANG_TEXTURE_2D):
+                        if (isShadow == 1)
+                        {
+                            if (isArray == 1)
+                                // void write(Tv color, uint2 coord, uint array, uint lod = 0) const
+                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z))";
+                            else
+                                // void write(Tv color, uint2 coord, uint lod = 0) const
+                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy))";
+                        }
+                        else
+                        {
+                            if (isArray == 1)
+                                // void write(Tv color, uint2 coord, uint array, uint lod = 0) const
+                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z))";
+                            else
+                                // void write(Tv color, uint2 coord, uint lod = 0) const
+                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy))";
+                        }
+                        break;
+                    case $(SLANG_TEXTURE_3D):
+                        if (isShadow == 0 && isArray == 0)
+                            // void write(Tv color, uint3 coord, uint lod = 0) const
+                            __intrinsic_asm "$0.write($2, vec<uint,3>(($1).xyz))";
+                        break;
+                    case $(SLANG_TEXTURE_CUBE):
+                        if (isShadow == 1)
+                        {
+                            if (isArray == 1)
+                                // void write(Tv color, uint2 coord, uint face, uint array, uint lod = 0) const
+                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6)";
+                            else
+                                // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
+                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z))";
+                        }
+                        else
+                        {
+                            if (isArray == 1)
+                                // void write(Tv color, uint2 coord, uint face, uint array, uint lod = 0) const
+                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6)";
+                            else
+                                // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
+                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z))";
+                        }
+                        break;
+                    }
             }
         }
 
