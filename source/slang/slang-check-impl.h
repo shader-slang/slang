@@ -656,9 +656,13 @@ namespace Slang
                     return true;
                 else
                 {
-                    auto baseDecl = as<InheritanceDeclBaseTypeToFilterOn>(as<DeclRefType>(member->base.type));
+                    auto baseDeclRef = as<DeclRefType>(member->base.type);
+                    if (!baseDeclRef || !baseDeclRef->getDeclRef())
+                        continue;
 
-                    if (findInheritance<InheritanceDeclBaseTypeToFilterOn>(baseDecl, inheritanceToFilterOn))
+                    if (findInheritance<InheritanceDeclBaseTypeToFilterOn>(
+                            as<InheritanceDeclBaseTypeToFilterOn>(baseDeclRef->getDeclRef().getDecl()),
+                            inheritanceToFilterOn))
                     {
                         return true;
                     }
