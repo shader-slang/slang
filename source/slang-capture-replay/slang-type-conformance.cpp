@@ -27,7 +27,7 @@ namespace SlangCapture
     }
 
     SLANG_NO_THROW slang::ISession* TypeConformanceCapture::getSession()
-	{
+    {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         slang::ISession* res = m_actualTypeConformance->getSession();
         return res;
@@ -36,14 +36,14 @@ namespace SlangCapture
     SLANG_NO_THROW slang::ProgramLayout* TypeConformanceCapture::getLayout(
         SlangInt    targetIndex,
         slang::IBlob**     outDiagnostics)
-	{
+    {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         slang::ProgramLayout* res = m_actualTypeConformance->getLayout(targetIndex, outDiagnostics);
         return res;
     }
 
     SLANG_NO_THROW SlangInt TypeConformanceCapture::getSpecializationParamCount()
-	{
+    {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         SlangInt res = m_actualTypeConformance->getSpecializationParamCount();
         return res;
@@ -54,7 +54,7 @@ namespace SlangCapture
         SlangInt    targetIndex,
         slang::IBlob**     outCode,
         slang::IBlob**     outDiagnostics)
-	{
+    {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         SlangResult res = m_actualTypeConformance->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
         return res;
@@ -64,7 +64,7 @@ namespace SlangCapture
         SlangInt    entryPointIndex,
         SlangInt    targetIndex,
         ISlangMutableFileSystem** outFileSystem)
-	{
+    {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         SlangResult res = m_actualTypeConformance->getResultAsFileSystem(entryPointIndex, targetIndex, outFileSystem);
         return res;
@@ -74,7 +74,7 @@ namespace SlangCapture
         SlangInt    entryPointIndex,
         SlangInt    targetIndex,
         slang::IBlob**     outHash)
-	{
+    {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         m_actualTypeConformance->getEntryPointHash(entryPointIndex, targetIndex, outHash);
     }
@@ -84,7 +84,7 @@ namespace SlangCapture
         SlangInt                    specializationArgCount,
         slang::IComponentType**            outSpecializedComponentType,
         ISlangBlob**                outDiagnostics)
-	{
+    {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         SlangResult res = m_actualTypeConformance->specialize(specializationArgs, specializationArgCount, outSpecializedComponentType, outDiagnostics);
         return res;
@@ -93,7 +93,7 @@ namespace SlangCapture
     SLANG_NO_THROW SlangResult TypeConformanceCapture::link(
         slang::IComponentType**            outLinkedComponentType,
         ISlangBlob**                outDiagnostics)
-	{
+    {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         SlangResult res = m_actualTypeConformance->link(outLinkedComponentType, outDiagnostics);
         return res;
@@ -104,7 +104,7 @@ namespace SlangCapture
         int                     targetIndex,
         ISlangSharedLibrary**   outSharedLibrary,
         slang::IBlob**          outDiagnostics)
-	{
+    {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         SlangResult res = m_actualTypeConformance->getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
         return res;
@@ -112,7 +112,7 @@ namespace SlangCapture
 
     SLANG_NO_THROW SlangResult TypeConformanceCapture::renameEntryPoint(
         const char* newName, IComponentType** outEntryPoint)
-	{
+    {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         SlangResult res = m_actualTypeConformance->renameEntryPoint(newName, outEntryPoint);
         return res;
@@ -123,7 +123,7 @@ namespace SlangCapture
         uint32_t compilerOptionEntryCount,
         slang::CompilerOptionEntry* compilerOptionEntries,
         ISlangBlob** outDiagnostics)
-	{
+    {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         SlangResult res = m_actualTypeConformance->linkWithOptions(outLinkedComponentType, compilerOptionEntryCount, compilerOptionEntries, outDiagnostics);
         return res;

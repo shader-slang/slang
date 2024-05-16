@@ -92,15 +92,21 @@ namespace SlangCapture
         Slang::List<slang::IComponentType*> componentTypeList;
 
         // get the actual component types from our capture wrappers
-        assert(SLANG_OK == getActualComponentTypes(componentTypes, componentTypeCount, componentTypeList));
+        if(SLANG_OK != getActualComponentTypes(componentTypes, componentTypeCount, componentTypeList))
+        {
+            assert(!"Failed to get actual component types");
+        }
 
-        slang::IComponentType* compositeComponentType = nullptr;
         SlangResult result = m_actualSession->createCompositeComponentType(
-                componentTypeList.getBuffer(), componentTypeCount, &compositeComponentType, outDiagnostics);
+                componentTypeList.getBuffer(), componentTypeCount, outCompositeComponentType, outDiagnostics);
 
-        CompositeComponentTypeCapture* compositeComponentTypeCapture = new CompositeComponentTypeCapture(compositeComponentType);
-        Slang::ComPtr<CompositeComponentTypeCapture> resultCapture(compositeComponentTypeCapture);
-        *outCompositeComponentType = resultCapture.detach();
+        if (SLANG_OK == result)
+        {
+            CompositeComponentTypeCapture* compositeComponentTypeCapture = new CompositeComponentTypeCapture(*outCompositeComponentType);
+            Slang::ComPtr<CompositeComponentTypeCapture> resultCapture(compositeComponentTypeCapture);
+            *outCompositeComponentType = resultCapture.detach();
+        }
+
         return result;
     }
 
@@ -181,12 +187,14 @@ namespace SlangCapture
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
 
-        slang::ITypeConformance* pConformance = nullptr;
-        SlangResult result = m_actualSession->createTypeConformanceComponentType(type, interfaceType, &pConformance, conformanceIdOverride, outDiagnostics);
+        SlangResult result = m_actualSession->createTypeConformanceComponentType(type, interfaceType, outConformance, conformanceIdOverride, outDiagnostics);
 
-        TypeConformanceCapture* conformanceCapture = new TypeConformanceCapture(pConformance);
-        Slang::ComPtr<TypeConformanceCapture> resultCapture(conformanceCapture);
-        *outConformance = resultCapture.detach();
+        if (SLANG_OK != result)
+        {
+            TypeConformanceCapture* conformanceCapture = new TypeConformanceCapture(*outConformance);
+            Slang::ComPtr<TypeConformanceCapture> resultCapture(conformanceCapture);
+            *outConformance = resultCapture.detach();
+        }
 
         return result;
     }
