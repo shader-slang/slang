@@ -2372,7 +2372,7 @@ void insertFragmentShaderInterlock(SPIRVEmitSharedContext* context, IRModule* mo
         builder.emitBeginFragmentShaderInterlock();
         for (auto block : entryPoint->getBlocks())
         {
-            for (auto inst : block->getChildren())
+            if (auto inst = block->getTerminator())
             {
                 if (inst->getOp() == kIROp_Return || inst->getOp() == kIROp_discard)
                 {
