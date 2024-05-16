@@ -1989,7 +1989,7 @@ namespace Slang
     }
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
-        auto varDeclBaseType = as<BasicExpressionType>(varDecl->type.type);
+        auto varDeclBaseType = as<Type>(varDecl->type.type);
         // if zero initialize is true, set everything to a default
         if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) && !varDecl->initExpr)
         {
