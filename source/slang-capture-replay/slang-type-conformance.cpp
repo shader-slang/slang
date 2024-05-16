@@ -7,7 +7,7 @@ namespace SlangCapture
         : m_actualTypeConformance(typeConformance)
     {
         assert(m_actualTypeConformance != nullptr);
-        slangCaptureLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, m_actualTypeConformance);
+        slangCaptureLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, typeConformance);
     }
     TypeConformanceCapture::~TypeConformanceCapture()
     {

@@ -7,7 +7,7 @@ namespace SlangCapture
         : m_actualCompositeComponentType(componentType)
     {
         assert(m_actualCompositeComponentType != nullptr);
-        slangCaptureLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, m_actualCompositeComponentType);
+        slangCaptureLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, componentType);
     }
 
     CompositeComponentTypeCapture::~CompositeComponentTypeCapture()
