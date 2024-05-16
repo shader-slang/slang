@@ -2062,8 +2062,6 @@ int __offsetOf(in T t, in F field)
 }
 
 /// Mark beginning of "interlocked" operations in a fragment shader.
-//__glsl_extension(GL_ARB_fragment_shader_interlock)
-//__glsl_version(420)
 [require(glsl_spirv, GL_ARB_fragment_shader_interlock, fragment)]
 __intrinsic_op($(kIROp_BeginFragmentShaderInterlock))
 void beginInvocationInterlock();
