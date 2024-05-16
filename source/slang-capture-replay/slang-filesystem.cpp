@@ -6,7 +6,7 @@ namespace SlangCapture
     FileSystemCapture::FileSystemCapture(ISlangFileSystemExt* fileSystem)
         : m_actualFileSystem(fileSystem)
     {
-        assert(m_actualFileSystem);
+        SLANG_CAPTURE_ASSERT(m_actualFileSystem);
         slangCaptureLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, m_actualFileSystem.get());
     }
 

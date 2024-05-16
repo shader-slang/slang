@@ -1,17 +1,17 @@
 
 #include <vector>
 #include "slang-global-session.h"
-#include "capture_utility.h"
 #include "slang-session.h"
 #include "slang-filesystem.h"
 #include "../slang/slang-compiler.h"
+#include "capture_utility.h"
 
 namespace SlangCapture
 {
     GlobalSessionCapture::GlobalSessionCapture(slang::IGlobalSession* session):
         m_actualGlobalSession(session)
     {
-        assert(m_actualGlobalSession != nullptr);
+        SLANG_CAPTURE_ASSERT(m_actualGlobalSession != nullptr);
     }
 
     GlobalSessionCapture::~GlobalSessionCapture()

@@ -6,7 +6,7 @@ namespace SlangCapture
     EntryPointCapture::EntryPointCapture(slang::IEntryPoint* entryPoint)
         : m_actualEntryPoint(entryPoint)
     {
-        assert(m_actualEntryPoint != nullptr);
+        SLANG_CAPTURE_ASSERT(m_actualEntryPoint != nullptr);
         slangCaptureLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, entryPoint);
     }
 

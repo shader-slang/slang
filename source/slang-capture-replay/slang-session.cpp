@@ -1,4 +1,3 @@
-#include <cassert>
 #include "capture_utility.h"
 #include "slang-session.h"
 #include "slang-entrypoint.h"
@@ -11,7 +10,7 @@ namespace SlangCapture
     SessionCapture::SessionCapture(slang::ISession* session)
         : m_actualSession(session)
     {
-        assert(m_actualSession);
+        SLANG_CAPTURE_ASSERT(m_actualSession);
         slangCaptureLog(LogLevel::Verbose, "%s: %p\n", "SessionCapture create:", session);
     }
 
@@ -94,7 +93,7 @@ namespace SlangCapture
         // get the actual component types from our capture wrappers
         if(SLANG_OK != getActualComponentTypes(componentTypes, componentTypeCount, componentTypeList))
         {
-            assert(!"Failed to get actual component types");
+            SLANG_CAPTURE_ASSERT(!"Failed to get actual component types");
         }
 
         SlangResult result = m_actualSession->createCompositeComponentType(
@@ -224,7 +223,7 @@ namespace SlangCapture
             ModuleCapture* moduleCapture = m_mapModuleToCapture.tryGetValue(pModule);
             if (!moduleCapture)
             {
-                assert(!"Module not found in mapModuleToCapture");
+                SLANG_CAPTURE_ASSERT(!"Module not found in mapModuleToCapture");
             }
             return static_cast<slang::IModule*>(moduleCapture);
         }

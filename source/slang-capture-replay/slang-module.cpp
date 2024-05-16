@@ -6,7 +6,7 @@ namespace SlangCapture
     ModuleCapture::ModuleCapture(slang::IModule* module)
         : m_actualModule(module)
     {
-        assert(m_actualModule != nullptr);
+        SLANG_CAPTURE_ASSERT(m_actualModule != nullptr);
         slangCaptureLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, module);
     }
 
@@ -58,7 +58,7 @@ namespace SlangCapture
             EntryPointCapture* entryPointCapture = m_mapEntryPointToCapture.tryGetValue(*outEntryPoint);
             if (!entryPointCapture)
             {
-                assert(!"Entrypoint not found in mapEntryPointToCapture");
+                SLANG_CAPTURE_ASSERT(!"Entrypoint not found in mapEntryPointToCapture");
             }
             *outEntryPoint = static_cast<slang::IEntryPoint*>(entryPointCapture);
         }

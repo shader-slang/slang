@@ -6,7 +6,7 @@ namespace SlangCapture
     TypeConformanceCapture::TypeConformanceCapture(slang::ITypeConformance* typeConformance)
         : m_actualTypeConformance(typeConformance)
     {
-        assert(m_actualTypeConformance != nullptr);
+        SLANG_CAPTURE_ASSERT(m_actualTypeConformance != nullptr);
         slangCaptureLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, typeConformance);
     }
     TypeConformanceCapture::~TypeConformanceCapture()
