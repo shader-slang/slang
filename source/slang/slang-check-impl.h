@@ -645,11 +645,15 @@ namespace Slang
         template<typename InheritanceDeclBaseTypeToFilterOn>
         bool findInheritance(AggTypeDecl* targetToSearchThrough, Type* inheritanceToFilterOn)
         {
+                return false;
             for (auto member : targetToSearchThrough->getMembersOfType<InheritanceDecl>())
             {
+                if (!member->base || !member->base.type)
+                    continue;
+                
                 if (member->base.type == inheritanceToFilterOn)
                     return true;
-                else if (member->base.type)
+                else
                 {
                     if (auto baseDecl = as<InheritanceDeclBaseTypeToFilterOn>(as<DeclRefType>(member->base.type)->getDeclRef().getDecl()))
                     {

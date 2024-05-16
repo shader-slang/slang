@@ -5406,7 +5406,7 @@ namespace Slang
                 // If DefaultInitializableType is found, we must synthisize a default constructor with an empty body
                 // if missing
                 DeclRef<ConstructorDecl> maybeConstructorDecl = as<ConstructorDecl>(requiredMemberDeclRef);
-                if (!lookupResult.isValid() && superInterfaceType == m_astBuilder->getDefaultInitializableType() && maybeConstructorDecl)
+                if (superInterfaceType == m_astBuilder->getDefaultInitializableType() && maybeConstructorDecl)
                 {
                     return trySynthesizeConstructorRequirementWitness(context, LookupResult(), maybeConstructorDecl, witnessTable);
                 }
