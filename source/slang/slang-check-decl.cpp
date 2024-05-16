@@ -2053,7 +2053,7 @@ namespace Slang
         if (parentDecl)
         {
             parentDecl->addTag(getVarTypeTags());
-            auto unsizedMask = (int)TypeTag::Unsized | (int)TypeTag::LinkTimeSized;
+            auto unsizedMask = (int)TypeTag::Unsized;
             bool isUnknownSize = (((int)getVarTypeTags() & unsizedMask) != 0);
             if (isUnknownSize)
             {
