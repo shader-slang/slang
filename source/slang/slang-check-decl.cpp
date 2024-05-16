@@ -2040,21 +2040,13 @@ namespace Slang
             }
         }
 
-        std::optional<TypeTag> varTypeTags;
-        auto getVarTypeTags = [&]()
-        {
-            if (!varTypeTags.has_value())
-            {
-                varTypeTags = getTypeTags(varDecl->getType());
-            }
-            return varTypeTags.value();
-        };
+        TypeTag varTypeTags = getTypeTags(varDecl->getType());
         auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl));
         if (parentDecl)
         {
-            parentDecl->addTag(getVarTypeTags());
+            parentDecl->addTag(varTypeTags);
             auto unsizedMask = (int)TypeTag::Unsized;
-            bool isUnknownSize = (((int)getVarTypeTags() & unsizedMask) != 0);
+            bool isUnknownSize = (((int)varTypeTags & unsizedMask) != 0);
             if (isUnknownSize)
             {
                 // Unsized decl must appear as the last member of the struct.
@@ -2079,7 +2071,7 @@ namespace Slang
             (!parentDecl || isEffectivelyStatic(varDecl));
         if (isGlobalOrLocalVar)
         {
-            bool isUnsized = (((int)getVarTypeTags() & (int)TypeTag::Unsized) != 0);
+            bool isUnsized = (((int)varTypeTags & (int)TypeTag::Unsized) != 0);
             if (isUnsized)
             {
                 getSink()->diagnose(varDecl, Diagnostics::varCannotBeUnsized);
