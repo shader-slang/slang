@@ -186,7 +186,7 @@ namespace Slang
             result |= SLANG_TARGET_FLAG_DUMP_IR;
         if (getBoolOption(CompilerOptionName::GenerateWholeProgram))
             result |= SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM;
-        if (getBoolOption(CompilerOptionName::EmitSpirvDirectly))
+        if (!getBoolOption(CompilerOptionName::EmitSpirvViaGLSL))
             result |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
         if (getBoolOption(CompilerOptionName::ParameterBlocksUseRegisterSpaces))
             result |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
@@ -197,7 +197,10 @@ namespace Slang
     {
         set(CompilerOptionName::DumpIr, (flags & SLANG_TARGET_FLAG_DUMP_IR) != 0);
         set(CompilerOptionName::GenerateWholeProgram, (flags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0);
-        set(CompilerOptionName::EmitSpirvDirectly, (flags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY) != 0);
+        if ((flags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY) != 0)
+            set(CompilerOptionName::EmitSpirvViaGLSL, false);
+        else
+            set(CompilerOptionName::EmitSpirvViaGLSL, true);
         set(CompilerOptionName::ParameterBlocksUseRegisterSpaces, (flags & SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES) != 0);
     }
 

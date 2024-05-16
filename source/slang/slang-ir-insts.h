@@ -2252,6 +2252,10 @@ struct IRLayoutDecoration : IRDecoration
 };
 
 //
+struct IRAlignOf : IRInst
+{
+    IRInst* getBaseOp() { return getOperand(0); }
+};
 
 struct IRCall : IRInst
 {
@@ -3387,6 +3391,8 @@ public:
     IRBasicType* getInt64Type();
     IRBasicType* getUIntType();
     IRBasicType* getUInt64Type();
+    IRBasicType* getUInt16Type();
+    IRBasicType* getUInt8Type();
     IRBasicType* getCharType();
     IRStringType* getStringType();
     IRNativeStringType* getNativeStringType();
@@ -3435,6 +3441,9 @@ public:
     IRConstRefType* getConstRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
+    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace) { return getPtrType(op, valueType, (IRIntegerValue)addressSpace); }
+    IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace) { return getPtrType(kIROp_PtrType, valueType, (IRIntegerValue)addressSpace); }
+
     IRTextureTypeBase* getTextureType(
         IRType* elementType,
         IRInst* shape,
@@ -4042,6 +4051,10 @@ public:
     IRInst* emitElementAddress(
         IRInst* basePtr,
         const ArrayView<IRInst*>& accessChain);
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
+        const ArrayView<IRInst*>& accessChain,
+        const ArrayView<IRInst*>& types);
 
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, IRIntegerValue index, IRInst* newElement);
@@ -4163,6 +4176,16 @@ public:
         IRBlock*        defaultLabel,
         UInt            caseArgCount,
         IRInst* const* caseArgs);
+
+    IRInst* emitBeginFragmentShaderInterlock()
+    {
+        return emitIntrinsicInst(getVoidType(), kIROp_BeginFragmentShaderInterlock, 0, nullptr);
+    }
+
+    IRInst* emitEndFragmentShaderInterlock()
+    {
+        return emitIntrinsicInst(getVoidType(), kIROp_EndFragmentShaderInterlock, 0, nullptr);
+    }
 
     IRGlobalGenericParam* emitGlobalGenericParam(
         IRType* type);
@@ -4938,7 +4961,7 @@ IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*         val,
         CapabilityName  targetCapabilityAtom);
 
-bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition);
+bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition, IRInst*& outInst);
 
 inline IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(
     IRInst* inInst,

@@ -222,6 +222,10 @@ static gfx::DeviceType _toRenderType(Slang::RenderApiType apiType)
             //
             // TODO: At some point we could warn/error and deprecate this option.
         }
+        else if (argValue == "-g0")
+        {
+            outOptions.disableDebugInfo = true;
+        }
         else if (argValue == "-allow-glsl")
         {
             outOptions.allowGLSL = true;

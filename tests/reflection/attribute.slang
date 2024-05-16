@@ -10,7 +10,9 @@ struct MyStructAttribute
     int iParam;
     float fParam;
 };
+
 [__AttributeUsage(_AttributeTargets.Var)]
+[__AttributeUsage(_AttributeTargets.Param)]
 struct DefaultValueAttribute
 {
     int iParam;
@@ -35,8 +37,31 @@ struct B
 ParameterBlock<A> param;
 ParameterBlock<B> param2;
 
+[DefaultValue(2)] int globalInt;
+
+[__AttributeUsage(_AttributeTargets.Struct)]
+[__AttributeUsage(_AttributeTargets.Var)]
+[__AttributeUsage(_AttributeTargets.Param)]
+struct StructVarParamAttribute
+{
+    int iParam;
+};
+
+[StructVarParam(0)]
+struct D
+{
+    int a;
+};
+
+D param3;
+
+[StructVarParam(1)] int globalInt2;
+
+
 [numthreads(1, 1, 1)]
 void main(
-    uint3 dispatchThreadID : SV_DispatchThreadID)
+    uint3 dispatchThreadID : SV_DispatchThreadID,
+    [DefaultValue(3)] float a,
+    [StructVarParam(2)] float b)
 {
 }

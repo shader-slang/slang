@@ -85,6 +85,7 @@ namespace Slang
         PyTorchCppBinding   = SLANG_CPP_PYTORCH_BINDING,
         HostCPPSource       = SLANG_HOST_CPP_SOURCE,
         HostExecutable      = SLANG_HOST_EXECUTABLE,
+        HostSharedLibrary   = SLANG_HOST_SHARED_LIBRARY,
         ShaderSharedLibrary = SLANG_SHADER_SHARED_LIBRARY,
         ShaderHostCallable  = SLANG_SHADER_HOST_CALLABLE,
         CUDASource          = SLANG_CUDA_SOURCE,
@@ -1483,7 +1484,7 @@ namespace Slang
             ///
         void _collectShaderParams();
 
-        void _discoverEntryPoints(DiagnosticSink* sink);
+        void _discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets);
 
         class ModuleSpecializationInfo : public SpecializationInfo
         {
@@ -2834,6 +2835,8 @@ namespace Slang
             CompilerOptionSet targetOptions;
         };
         Dictionary<TargetRequest*, RefPtr<TargetInfo>> m_targetInfos;
+
+        CompilerOptionSet m_optionSetForDefaultTarget;
 
         CompilerOptionSet& getTargetOptionSet(TargetRequest* req);
 

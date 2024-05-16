@@ -70,7 +70,6 @@
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-wrap-structured-buffers.h"
-#include "slang-ir-wrap-global-context.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-translate-glsl-global-var.h"
@@ -551,9 +550,18 @@ Result linkAndOptimizeIR(
         lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
     }
 
-    if (target == CodeGenTarget::HLSL || ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    switch (target)
     {
+    default:
+        if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+            break;
+        [[fallthrough]];
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
         lowerCombinedTextureSamplers(irModule, sink);
+        break;
     }
 
     addUserTypeHintDecorations(irModule);
@@ -745,6 +753,13 @@ Result linkAndOptimizeIR(
             //
             byteAddressBufferOptions.translateToStructuredBufferOps = true;
             break;
+        case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalLib:
+        case CodeGenTarget::MetalLibAssembly:
+            byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            byteAddressBufferOptions.translateToStructuredBufferOps = false;
+            byteAddressBufferOptions.lowerBasicTypeOps = true;
+            break;
         }
 
         // We also need to decide whether to translate
@@ -778,7 +793,7 @@ Result linkAndOptimizeIR(
             break;
         }
 
-        legalizeByteAddressBufferOps(session, targetProgram, irModule, byteAddressBufferOptions);
+        legalizeByteAddressBufferOps(session, targetProgram, irModule, codeGenContext->getSink(), byteAddressBufferOptions);
     }
 
     // For CUDA targets only, we will need to turn operations
@@ -886,9 +901,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-    case CodeGenTarget::Metal:
         moveGlobalVarInitializationToEntryPoints(irModule);
         break;
+    case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
         moveGlobalVarInitializationToEntryPoints(irModule);
@@ -1096,12 +1111,6 @@ Result linkAndOptimizeIR(
         applyVariableScopeCorrection(irModule, targetRequest);
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
-
-    // Metal does not allow global variables and global parameters, so
-    // we need to convert them into an explicit global context parameter
-    // passed around through a function parameter.
-    if (target == CodeGenTarget::Metal)
-        wrapGlobalScopeInContextType(irModule);
 
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;

@@ -46,7 +46,7 @@ namespace Slang
 
     PerformanceProfiler* Slang::PerformanceProfiler::getProfiler()
     {
-        static PerformanceProfilerImpl profiler = PerformanceProfilerImpl();
+        thread_local static PerformanceProfilerImpl profiler = PerformanceProfilerImpl();
         return &profiler;
     }
 }

@@ -274,7 +274,8 @@ namespace Slang
             }
             else if (auto intVal = arrayType->getElementCount())
             {
-                sized = !intVal->isLinkTimeVal();
+                sized = true;
+                typeTag = (TypeTag)((int)typeTag | (int)TypeTag::LinkTimeSized);
             }
             if (!sized)
                 typeTag = (TypeTag)((int)typeTag | (int)TypeTag::Unsized);

@@ -825,6 +825,9 @@ namespace Slang
             return result;
         }
 
+        FunctionDeclBase* getParentFuncOfVisitor() { return m_parentFunc; }
+        void setParentFuncOfVisitor(FunctionDeclBase* funcDecl) { m_parentFunc = funcDecl; }
+
         SemanticsContext withParentFunc(FunctionDeclBase* parentFunc)
         {
             SemanticsContext result(*this);
@@ -1332,6 +1335,9 @@ namespace Slang
         Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
         Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
 
+        // Helper function to check if a struct can be used as its own differential type.
+        bool canStructBeUsedAsSelfDifferentialType(AggTypeDecl *aggTypeDecl);
+        void markSelfDifferentialMembersOfType(AggTypeDecl *parent, Type* type);
         
     public:
 
@@ -2731,7 +2737,7 @@ namespace Slang
 
         void visitTargetCaseStmt(TargetCaseStmt* stmt);
 
-        void visitIntrinsicAsmStmt(IntrinsicAsmStmt*) {}
+        void visitIntrinsicAsmStmt(IntrinsicAsmStmt*);
 
         void visitDefaultStmt(DefaultStmt* stmt);
 
@@ -2783,7 +2789,7 @@ namespace Slang
 
     DeclVisibility getDeclVisibility(Decl* decl);
 
-    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom);
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl = false);
 
     void _ensureAllDeclsRec(
         SemanticsDeclVisitorBase* visitor,

@@ -2350,6 +2350,18 @@ SpvInst* emitOpUnreachable(SpvInstParent* parent, IRInst* inst)
     return emitInst(parent, inst, SpvOpUnreachable);
 }
 
+// https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/extensions/EXT/SPV_EXT_fragment_shader_interlock.html#shaders-fragment-shader-interlock
+SpvInst* emitOpBeginInvocationInterlockEXT(SpvInstParent* parent, IRInst* inst)
+{
+    return emitInst(parent, inst, SpvOpBeginInvocationInterlockEXT);
+}
+
+// https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/extensions/EXT/SPV_EXT_fragment_shader_interlock.html#shaders-fragment-shader-interlock
+SpvInst* emitOpEndInvocationInterlockEXT(SpvInstParent* parent, IRInst* inst)
+{
+    return emitInst(parent, inst, SpvOpEndInvocationInterlockEXT);
+}
+
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionModeId
 template<typename T>
 SpvInst* emitOpExecutionModeId(

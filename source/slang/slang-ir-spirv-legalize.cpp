@@ -182,6 +182,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRBuilder builder(cbParamInst);
         builder.setInsertBefore(cbParamInst);
         auto structType = builder.createStructType();
+        addToWorkList(structType);
         StringBuilder sb;
         sb << "cbuffer_";
         getTypeNameHint(sb, innerType);
@@ -220,7 +221,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             if(user->getOp() == kIROp_GetLegalizedSPIRVGlobalParamAddr)
             {
-                user->replaceUsesWith(use->get());
+                user->replaceUsesWith(addr);
                 user->removeAndDeallocate();
             }
             else if((as<IRGetElement>(user) || as<IRFieldExtract>(user)) &&
@@ -250,10 +251,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 // Skip load's for referenced `Input` variables since a ref implies
                 // passing as is, which needs to be a pointer (pass as is).
-                if (user->getDataType() 
+                if (user->getDataType()
                     && user->getDataType()->getOp() == kIROp_RefType
                     && storageClass == SpvStorageClassInput)
+                {
+                    builder.replaceOperand(use, addr);
                     continue;
+                }
                 // If this is being used in an asm block, insert the load to
                 // just prior to the block.
                 const auto asmBlock = spirvAsmOperand->getAsmBlock();
@@ -275,7 +279,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
 
         for (auto i : instsToRemove)
+        {
             i->removeAndDeallocate();
+        }
     }
 
     // Returns true if the given type that should be decorated as in `UniformConstant` address space.
@@ -625,9 +631,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 storageClass = SpvStorageClassStorageBuffer;
                 needLoad = false;
 
+                auto memoryFlags = MemoryQualifierSetModifier::Flags::kNone;
+
                 // structured buffers in GLSL should be annotated as ReadOnly
                 if (as<IRHLSLStructuredBufferType>(structuredBufferType))
-                    builder.addMemoryQualifierSetDecoration(inst, MemoryQualifierSetModifier::Flags::kReadOnly);
+                    memoryFlags = MemoryQualifierSetModifier::Flags::kReadOnly;
+                if (as<IRHLSLRasterizerOrderedStructuredBufferType>(structuredBufferType))
+                    memoryFlags = MemoryQualifierSetModifier::Flags::kRasterizerOrdered;
+
+                if (memoryFlags != MemoryQualifierSetModifier::Flags::kNone)
+                    builder.addMemoryQualifierSetDecoration(inst, memoryFlags);
             }
             else if (auto glslShaderStorageBufferType = as<IRGLSLShaderStorageBufferType>(innerType))
             {
@@ -1214,7 +1227,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     break;
                 case kIROp_GetElementPtr:
                     // Ignore when `NonUniformResourceIndex` is not on the index
-                    if (user->getOperand(0)->getOp() != kIROp_NonUniformResourceIndex)
+                    if (user->getOperand(1) == inst)
                     {
                         // Replace gep(pArray, nonUniformRes(x)), into nonUniformRes(gep(pArray, x))
                         newUser = builder.emitElementAddress(user->getFullType(), user->getOperand(0), inst->getOperand(0));
@@ -1281,12 +1294,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 IRBuilder builder(operand);
                 builder.addSPIRVNonUniformResourceDecoration(operand);
-                inst->replaceUsesWith(operand);
-                inst->removeAndDeallocate();
             }
+            inst->replaceUsesWith(operand);
+            inst->removeAndDeallocate();
         }
-        nonUniformResourceIndexInst->removeFromParent();
-        m_instsToRemove.add(nonUniformResourceIndexInst);
     }
 
     void processImageSubscript(IRImageSubscript* subscript)
@@ -1741,6 +1752,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         case kIROp_Neq:
         case kIROp_Eql:
         case kIROp_Call:
+        case kIROp_SPIRVAsm:
             return true;
         default:
             return false;
@@ -2284,6 +2296,94 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
     }
 }
 
+static bool isRasterOrderedResource(IRInst* inst)
+{
+    if (auto memoryQualifierDecoration = inst->findDecoration<IRMemoryQualifierSetDecoration>())
+    {
+        if (memoryQualifierDecoration->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kRasterizerOrdered)
+            return true;
+    }
+    auto type = inst->getDataType();
+    for (;;)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            type = ptrType->getValueType();
+            continue;
+        }
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        break;
+    }
+    if (auto textureType = as<IRTextureTypeBase>(type))
+    {
+        if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
+            return true;
+    }
+    return false;
+}
+
+static bool hasExplicitInterlockInst(IRFunc* func)
+{
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (inst->getOp() == kIROp_BeginFragmentShaderInterlock)
+                return true;
+        }
+    }
+    return false;
+}
+
+void insertFragmentShaderInterlock(SPIRVEmitSharedContext* context, IRModule* module)
+{
+    HashSet<IRFunc*> fragmentShaders;
+    for (auto& [inst, entryPoints] : context->m_referencingEntryPoints)
+    {
+        if (isRasterOrderedResource(inst))
+        {
+            for (auto entryPoint : entryPoints)
+            {
+                auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
+                if (!entryPointDecor)
+                    continue;
+
+                if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                {
+                    fragmentShaders.add(entryPoint);
+                }
+            }
+        }
+    }
+
+    IRBuilder builder(module);
+    for (auto entryPoint : fragmentShaders)
+    {
+        if (hasExplicitInterlockInst(entryPoint))
+            continue;
+        auto firstBlock = entryPoint->getFirstBlock();
+        if (!firstBlock)
+            continue;
+        builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+        builder.emitBeginFragmentShaderInterlock();
+        for (auto block : entryPoint->getBlocks())
+        {
+            if (auto inst = block->getTerminator())
+            {
+                if (inst->getOp() == kIROp_Return || inst->getOp() == kIROp_discard)
+                {
+                    builder.setInsertBefore(inst);
+                    builder.emitEndFragmentShaderInterlock();
+                }
+            }
+        }
+    }
+}
+
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
@@ -2294,6 +2394,7 @@ void legalizeIRForSPIRV(
     legalizeSPIRV(context, module);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
+    insertFragmentShaderInterlock(context, module);
 }
 
 } // namespace Slang

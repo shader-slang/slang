@@ -414,6 +414,8 @@ __generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,
 // Allow real-number types to be cast into each other
 __intrinsic_op($(kIROp_FloatCast))
     T __realCast<T : __BuiltinRealType, U : __BuiltinRealType>(U val);
+__intrinsic_op($(kIROp_CastIntToFloat))
+    T __realCast<T : __BuiltinRealType, U : __BuiltinIntegerType>(U val);
 __intrinsic_op($(kIROp_IntCast))
     T __intCast<T : __BuiltinType, U : __BuiltinType>(U val);
 ${{{{
@@ -698,7 +700,8 @@ struct Ptr
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(int64_t val);
 
-    __subscript(int index) -> T
+    __generic<TInt : __BuiltinIntegerType>
+    __subscript(TInt index) -> T
     {
         __intrinsic_op($(kIROp_GetOffsetPtr))
         ref;
@@ -2043,11 +2046,12 @@ int __SyntaxError()
 /// For downstream compilers that allow sizeof/alignof/offsetof
 /// Can't be called in the C/C++ style. Need to use __size_of<some_type>() as opposed to sizeof(some_type).
 __generic<T>
-__target_intrinsic(cpp, "sizeof($G0)")
-__target_intrinsic(cuda, "sizeof($G0)")
 [__readNone]
 [require(cpp_cuda)]
-int __sizeOf();
+int __sizeOf()
+{
+    __intrinsic_asm "sizeof($[0])", T;
+}
 
 __generic<T>
 [__readNone]
@@ -2062,11 +2066,17 @@ int __sizeOf(T v)
 }
 
 __generic<T>
-__target_intrinsic(cuda, "SLANG_ALIGN_OF($G0)")
-__target_intrinsic(cpp, "SLANG_ALIGN_OF($G0)")
 [__readNone]
 [require(cpp_cuda)]
-int __alignOf();
+int __alignOf()
+{
+    __target_switch
+    {
+    case cuda :
+    case cpp :
+        __intrinsic_asm "SLANG_ALIGN_OF($[0])", T;
+    }
+}
 
 __generic<T>
 [__readNone]
@@ -2095,42 +2105,14 @@ int __offsetOf(in T t, in F field)
 }
 
 /// Mark beginning of "interlocked" operations in a fragment shader.
-__glsl_extension(GL_ARB_fragment_shader_interlock)
-__glsl_version(420)
-void beginInvocationInterlock()
-{
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "beginInvocationInterlockARB";
-    case spirv:
-        spirv_asm {
-            OpCapability FragmentShaderPixelInterlockEXT;
-            OpExtension "SPV_EXT_fragment_shader_interlock";
-            OpExecutionMode __entryPoint PixelInterlockOrderedEXT;
-            OpBeginInvocationInterlockEXT;
-        };
-    }
-}
+[require(glsl_spirv, GL_ARB_fragment_shader_interlock, fragment)]
+__intrinsic_op($(kIROp_BeginFragmentShaderInterlock))
+void beginInvocationInterlock();
 
 /// Mark end of "interlocked" operations in a fragment shader.
-__glsl_extension(GL_ARB_fragment_shader_interlock)
-__glsl_version(420)
-void endInvocationInterlock()
-{
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "endInvocationInterlockARB";
-    case spirv:
-        spirv_asm {
-            OpCapability FragmentShaderPixelInterlockEXT;
-            OpExtension "SPV_EXT_fragment_shader_interlock";
-            OpExecutionMode __entryPoint PixelInterlockOrderedEXT;
-            OpEndInvocationInterlockEXT;
-        };
-    }
-}
+[require(glsl_spirv, GL_ARB_fragment_shader_interlock, fragment)]
+__intrinsic_op($(kIROp_EndFragmentShaderInterlock))
+void endInvocationInterlock();
 
 // Operators to apply to `enum` types
 
@@ -2452,6 +2434,15 @@ int __naturalStrideOf()
     return __naturalStrideOf_impl(__declVal<T>());
 }
 
+__intrinsic_op($(kIROp_AlignOf))
+int __alignOf_intrinsic_impl<T>(T t);
+
+[ForceInline]
+int __alignOf_intrinsic<T>()
+{
+    return __alignOf_intrinsic_impl<T>(__default<T>());
+}
+
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
 
@@ -2601,6 +2592,9 @@ attribute_syntax [nonmutating] : NonmutatingAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [constref] : ConstRefAttribute;
 
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [__ref] : RefAttribute;
+
     /// Indicates that a function computes its result as a function of its arguments without loading/storing any memory or other state.
     ///
     /// This is equivalent to the LLVM `readnone` function attribute.
@@ -2612,6 +2606,7 @@ enum _AttributeTargets
     Struct = $( (int) UserDefinedAttributeTargets::Struct),
     Var = $( (int) UserDefinedAttributeTargets::Var),
     Function = $( (int) UserDefinedAttributeTargets::Function),
+    Param = $( (int) UserDefinedAttributeTargets::Param),
 };
 __attributeTarget(StructDecl)
 attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;

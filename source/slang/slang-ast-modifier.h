@@ -1004,13 +1004,20 @@ class NonmutatingAttribute : public Attribute
 };
 
 // A `[constref]` attribute, which indicates that the `this` parameter of
-// a member function should be passed by reference.
+// a member function should be passed by const reference.
 //
 class ConstRefAttribute : public Attribute
 {
     SLANG_AST_CLASS(ConstRefAttribute)
 };
 
+// A `[ref]` attribute, which indicates that the `this` parameter of
+// a member function should be passed by reference.
+//
+class RefAttribute : public Attribute
+{
+    SLANG_AST_CLASS(RefAttribute)
+};
 
 // A `[__readNone]` attribute, which indicates that a function
 // computes its results strictly based on argument values, without
@@ -1638,6 +1645,7 @@ public:
             kWriteOnly    = 0b100,
             kVolatile     = 0b1000,
             kRestrict     = 0b10000,
+            kRasterizerOrdered = 0b100000,
         };
     };
 

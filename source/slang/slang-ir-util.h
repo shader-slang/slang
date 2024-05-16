@@ -180,7 +180,7 @@ IRType* dropNormAttributes(IRType* const t);
 void getTypeNameHint(StringBuilder& sb, IRInst* type);
 void copyNameHintAndDebugDecorations(IRInst* dest, IRInst* src);
 IRInst* getRootAddr(IRInst* addrInst);
-IRInst* getRootAddr(IRInst* addrInst, List<IRInst*>& outAccessChain);
+IRInst* getRootAddr(IRInst* addrInst, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes = nullptr);
 
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 

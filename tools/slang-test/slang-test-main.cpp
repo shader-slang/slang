@@ -998,6 +998,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
 
         case SLANG_HOST_EXECUTABLE:
         case SLANG_SHADER_SHARED_LIBRARY:
+        case SLANG_HOST_SHARED_LIBRARY:
         {
             return PassThroughFlag::Generic_C_CPP;
         }

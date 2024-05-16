@@ -746,6 +746,12 @@ void cloneGlobalValueWithCodeCommon(
     {
         IRBlock* ob = originalValue->getFirstBlock();
         IRBlock* cb = clonedValue->getFirstBlock();
+        struct ParamCloneInfo
+        {
+            IRParam* originalParam;
+            IRParam* clonedParam;
+        };
+        ShortList<ParamCloneInfo> paramCloneInfos;
         while (ob)
         {
             SLANG_ASSERT(cb);
@@ -753,9 +759,28 @@ void cloneGlobalValueWithCodeCommon(
             builder->setInsertInto(cb);
             for (auto oi = ob->getFirstInst(); oi; oi = oi->getNextInst())
             {
-                cloneInst(context, builder, oi);
+                if (oi->getOp() == kIROp_Param)
+                {
+                    // Params may have forward references in its type and
+                    // decorations, so we just create a placeholder for it
+                    // in this first pass.
+                    IRParam* clonedParam = builder->emitParam(nullptr);
+                    registerClonedValue(context, clonedParam, oi);
+                    paramCloneInfos.add({ (IRParam*)oi, clonedParam });
+                }
+                else
+                {
+                    cloneInst(context, builder, oi);
+                }
             }
-
+            // Clone the type and decorations of parameters after all instructs in the block
+            // have been cloned.
+            for (auto param : paramCloneInfos)
+            {
+                builder->setInsertInto(param.clonedParam);
+                param.clonedParam->setFullType((IRType*)cloneValue(context, param.originalParam->getFullType()));
+                cloneDecorations(context, param.clonedParam, param.originalParam);
+            }
             ob = ob->getNextBlock();
             cb = cb->getNextBlock();
         }
@@ -1110,8 +1135,10 @@ bool isBetterForTarget(
     if(newCaps.isInvalid()) return false;
     if(oldCaps.isInvalid()) return true;
 
-    if(newCaps != oldCaps)
-        return newCaps.implies(oldCaps);
+    bool isEqual = false;
+    bool isNewBetter = newCaps.isBetterForTarget(oldCaps, targetCaps, isEqual);
+    if(!isEqual)
+        return isNewBetter;
 
     // All preceding factors being equal, an `[export]` is better
     // than an `[import]`.
@@ -1857,7 +1884,7 @@ LinkedIR linkIR(
     }
 
     // Specialize target_switch branches to use the best branch for the target.
-    specializeTargetSwitch(targetReq, state->irModule);
+    specializeTargetSwitch(targetReq, state->irModule, codeGenContext->getSink());
 
     // Diagnose on unresolved symbols if we are compiling into a target that does
     // not allow incomplete symbols.
