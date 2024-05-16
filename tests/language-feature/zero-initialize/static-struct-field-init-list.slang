@@ -10,7 +10,7 @@ struct structData
 
 struct structOuterData
 {
-    static structData data = {1};
+    static structData data1 = { 1 };
 };
 
 [numthreads(1,1,1)]
@@ -18,5 +18,7 @@ void computeMain()
 {
     // BUF: 1
     structOuterData mat;
-    outputBuffer[0] = mat.data.data == 1;
+    outputBuffer[0] = true
+        && mat.data1.data == 1
+        ;
 }

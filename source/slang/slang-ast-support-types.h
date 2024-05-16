@@ -466,6 +466,7 @@ namespace Slang
             /// functions, so it belongs in the last phase of checking.
             ///
         DefinitionChecked,
+        DefaultConstructorReadyForUse = DefinitionChecked,
 
             /// The capabilities required by the decl is infered and validated.
             ///

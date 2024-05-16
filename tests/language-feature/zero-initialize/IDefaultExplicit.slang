@@ -1,0 +1,66 @@
+//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
+// CHECK: {{.* }}= 0U;
+// CHECK: {{.* }}= 0U;
+// CHECK: {{.* }}= 0U;
+
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -emit-spirv-directly -allow-glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -entry computeMain -allow-glsl
+//TEST(smoke,compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-dx12 -use-dxil -compute -entry computeMain -allow-glsl -profile sm_6_2 -xslang -DDX12
+
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<int> outputBuffer;
+
+struct idefault1 : IDefaultInitializableType
+{
+    uint data;
+};
+
+struct idefault2_base : IDefaultInitializableType
+{
+    uint data1;
+};
+struct idefault2 : idefault2_base
+{
+    uint data2 = 1;
+};
+
+interface idefault3_base : IDefaultInitializableType
+{
+};
+struct idefault3 : idefault3_base
+{
+    uint data;
+};
+
+idefault1 getDefault1()
+{
+    idefault1 default1;
+    return default1;
+}
+idefault2 getDefault2()
+{
+    idefault2 default2;
+    return default2;
+}
+idefault3 getDefault3()
+{
+    idefault3 default3;
+    return default3;
+}
+
+[numthreads(1, 1, 1)]
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
+{
+    // BUF: 1
+    idefault1 default1 = getDefault1();
+    idefault2 default2 = getDefault2();
+    idefault3 default3 = getDefault3();
+    
+    outputBuffer[0] = true
+    && default1.data == 0
+    && default2.data1 == 0
+    && default2.data2 == 1
+    && default3.data == 0
+    ;
+}

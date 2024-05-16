@@ -97,7 +97,6 @@ class BasicExpressionType : public ArithmeticExpressionType
     }
 };
 
-
 // Base type for things that are built in to the compiler,
 // and will usually have special behavior or a custom
 // mapping to the IR level.
@@ -449,6 +448,11 @@ class DifferentialPairType : public ArithmeticExpressionType
 class DifferentiableType : public BuiltinType
 {
     SLANG_AST_CLASS(DifferentiableType)
+};
+
+class DefaultInitializableType : public BuiltinType
+{
+    SLANG_AST_CLASS(DefaultInitializableType);
 };
 
 // A vector type, e.g., `vector<T,N>`

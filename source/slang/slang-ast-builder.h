@@ -485,6 +485,9 @@ public:
 
     bool isDifferentiableInterfaceAvailable();
 
+    DeclRef<InterfaceDecl> getDefaultInitializableTypeInterfaceDecl();
+    Type* getDefaultInitializableType();
+
     MeshOutputType* getMeshOutputTypeFromModifier(
         HLSLMeshShaderOutputModifier* modifier,
         Type* elementType,

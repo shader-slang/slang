@@ -640,6 +640,27 @@ namespace Slang
         FunctionDifferentiableLevel _getFuncDifferentiableLevelImpl(FunctionDeclBase* func, int recurseLimit);
         FunctionDifferentiableLevel getFuncDifferentiableLevel(FunctionDeclBase* func);
 
+        // Go through decl->members<InheritanceDecl>() recursivley and return all instances of `inheritanceToFilterOn` type.
+        // Only traverse and check InheritanceDecl's which have a type equal to `InheritanceDeclBaseTypeToFilterOn`
+        template<typename InheritanceDeclBaseTypeToFilterOn>
+        bool findInheritance(AggTypeDecl* targetToSearchThrough, Type* inheritanceToFilterOn)
+        {
+            for (auto member : targetToSearchThrough->getMembersOfType<InheritanceDecl>())
+            {
+                if (member->base.type == inheritanceToFilterOn)
+                    return true;
+                else if (member->base.type)
+                {
+                    if (auto baseDecl = as<InheritanceDeclBaseTypeToFilterOn>(as<DeclRefType>(member->base.type)->getDeclRef().getDecl()))
+                    {
+                        if (findInheritance<InheritanceDeclBaseTypeToFilterOn>(baseDecl, inheritanceToFilterOn))
+                            return true;
+                    }
+                }
+            }
+            return false;
+        }
+
             /// Get the processed inheritance information for `type`, including all its facets
         InheritanceInfo getInheritanceInfo(Type* type);
 

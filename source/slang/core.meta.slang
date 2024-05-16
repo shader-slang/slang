@@ -74,6 +74,7 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
+__magic_type(DefaultInitializableType)
 interface IDefaultInitializableType
 {
     __init();
@@ -424,7 +425,6 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 {
 }}}}
 
-[OnlyAutoInitIfForced]
 __builtin_type($(int(kBaseTypes[tt].tag)))
 struct $(kBaseTypes[tt].name)
     : __BuiltinType
@@ -657,7 +657,6 @@ ${{{{
         __intrinsic_op($(kIROp_CastToVoid))
         __init(T value)
         {}
-        
 ${{{{
     }
 
@@ -1037,7 +1036,6 @@ extension int16_t : IRangedValue
 
 __generic<T, let N:int>
 __magic_type(ArrayExpressionType)
-[OnlyAutoInitIfForced]
 struct Array : IArray<T>
 {
     [ForceInline]
@@ -1061,7 +1059,6 @@ struct Array : IArray<T>
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
 __magic_type(VectorExpressionType)
-[OnlyAutoInitIfForced]
 struct vector : IArray<T>
 {
         /// The element type of the vector
@@ -1099,7 +1096,6 @@ const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
     /// A matrix with `R` rows and `C` columns, with elements of type `T`.
 __generic<T = float, let R : int = 4, let C : int = 4, let L : int = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)>
 __magic_type(MatrixExpressionType)
-[OnlyAutoInitIfForced]
 struct matrix : IArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
@@ -2734,7 +2730,3 @@ attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [noRefInline] : NoRefInlineAttribute;
-
-__attributeTarget(StructDecl)
-attribute_syntax [OnlyAutoInitIfForced] : OnlyAutoInitIfForcedAttribute;
-
