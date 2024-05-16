@@ -137,7 +137,8 @@ enum class TypeTag
 {
     None = 0,
     Unsized = 1,
-    Incomplete = 2
+    Incomplete = 2,
+    LinkTimeSized = 4,
 };
 
 // Declaration of a type that represents some sort of aggregate
