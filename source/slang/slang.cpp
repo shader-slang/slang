@@ -1050,9 +1050,6 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
         for (const auto& nameToMod : builtinLinkage->mapNameToLoadedModules)
             mapNameToLoadedModules.add(nameToMod);
     }
-
-    m_optionSet.add(CompilerOptionName::IgnoreCapabilities, true);
-    m_optionSet.add(CompilerOptionName::MinimumSlangOptimization, true);
 }
 
 ISlangUnknown* Linkage::getInterface(const Guid& guid)
