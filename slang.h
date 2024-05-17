@@ -862,6 +862,7 @@ extern "C"
             SourceEmbedName,
             SourceEmbedLanguage,
             DisableShortCircuit,   // bool
+            MinimumSlangOptimization, // bool
 
             // Target
 

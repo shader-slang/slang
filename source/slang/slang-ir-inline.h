@@ -9,6 +9,7 @@ namespace Slang
     struct IRCall;
     struct IRGlobalValueWithCode;
     class DiagnosticSink;
+    class TargetProgram;
 
         /// Any call to a function that takes or returns a string/RefType parameter is inlined
     Result performTypeInlining(IRModule* module, DiagnosticSink* sink);
@@ -29,7 +30,7 @@ namespace Slang
     bool performPreAutoDiffForceInlining(IRModule* module);
 
         /// Inline calls to functions that returns a resource/sampler via either return value or output parameter.
-    void performGLSLResourceReturnFunctionInlining(IRModule* module);
+    void performGLSLResourceReturnFunctionInlining(TargetProgram* targetProgram, IRModule* module);
 
         /// Inline simple intrinsic functions whose definition is a single asm block.
     void performIntrinsicFunctionInlining(IRModule* module);

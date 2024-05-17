@@ -15,19 +15,12 @@ namespace Slang
     {
         CFGSimplificationOptions cfgOptions;
         PeepholeOptimizationOptions peepholeOptions;
+        bool minimalOptimization = false;
 
-        static IRSimplificationOptions getDefault()
-        {
-            IRSimplificationOptions result;
-            return result;
-        }
-        static IRSimplificationOptions getFast()
-        {
-            IRSimplificationOptions result;
-            result.cfgOptions.removeSideEffectFreeLoops = false;
-            result.cfgOptions.removeTrivialSingleIterationLoops = false;
-            return result;
-        }
+        static IRSimplificationOptions getDefault(TargetProgram* targetProgram);
+
+        static IRSimplificationOptions getFast(TargetProgram* targetProgram);
+
     };
 
     // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
