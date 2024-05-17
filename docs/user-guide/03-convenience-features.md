@@ -217,11 +217,13 @@ property uint highBits
 > ```
 
 ## Initializers
+
+### Constructors
 > #### Note ####
-> The syntax for defining initializers is subject to future change.
+> The syntax for defining constructors is subject to future change.
 
 
-Slang supports defining initializers in `struct` types. You can write:
+Slang supports defining constructors in `struct` types. You can write:
 ```csharp
 struct MyType
 {
@@ -233,17 +235,17 @@ struct MyType
 }
 ```
 
-You can use an initializer to construct a new instance by using the type name in a function call expression:
+You can use a constructor to construct a new instance by using the type name in a function call expression:
 ```csharp
 MyType instance = MyType(1,2);  // instance.myVal is 3.
 ```
 
-You may also use C++ style initializer list to invoke an initializer:
+You may also use C++ style initializer list to invoke a constructor:
 ```csharp
 MyType instance = {1, 2};
 ```
 
-If an initializer does not define any parameters, it will be recognized as *default* initializer that will be automatically called at the definition of a variable:
+If a constructor does not define any parameters, it will be recognized as *default* constructor that will be automatically called at the definition of a variable:
 
 ```csharp
 struct MyType
@@ -259,6 +261,50 @@ int test()
 {
     MyType test;
     return test.myVal; // returns 10.
+}
+```
+
+Slang will also implicitly call a *default* constructor of all parents of a derived struct (same as C++):
+```csharp
+struct MyType_Base
+{
+    int myVal1;
+    __init() {myVal1 = 22;}
+}
+
+struct MyType1 : MyType_Base
+{
+    int myVal2;
+    __init()
+    {
+        // implicitly calls `MyType_Base::__init()`
+        myVal2 = 15;
+    }
+}
+testMyType1()
+{
+    MyType1 a;
+    // a.myVal1 == 22
+    // a.myVal2 == 15
+}
+
+struct MyType2 : MyType_Base
+{
+}
+testMyType2()
+{
+    MyType2 b; // implicitly calls `MyType_Base::__init()`
+    // b.myVal1 == 22
+}
+```
+
+### Member Init Expressions
+
+Slang supports member init expressions:
+```csharp
+struct MyType
+{
+    int myVal = 5;
 }
 ```
 
