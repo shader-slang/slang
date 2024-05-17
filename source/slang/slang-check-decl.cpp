@@ -1159,7 +1159,7 @@ namespace Slang
         /// This call does *not* handle updating the state of `decl`; the
         /// caller takes responsibility for doing so.
         ///
-    static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, SemanticsContext const& shared);
+    static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, SemanticsContext& shared);
 
     // Make sure a declaration has been checked, so we can refer to it.
     // Note that this may lead to us recursively invoking checking,
@@ -9084,7 +9084,7 @@ namespace Slang
         }
     }
 
-    static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, SemanticsContext const& shared)
+    static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, SemanticsContext& shared)
     {
         switch(state)
         {
@@ -9125,7 +9125,8 @@ namespace Slang
             break;
 
         case DeclCheckState::CapabilityChecked:
-            SemanticsDeclCapabilityVisitor(shared).dispatch(decl);
+            if(!shared.getOptionSet().getBoolOption(CompilerOptionName::IgnoreCapabilities))
+                SemanticsDeclCapabilityVisitor(shared).dispatch(decl);
             break;
         }
     }
