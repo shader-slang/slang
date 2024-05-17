@@ -10,12 +10,12 @@
 // CHECK_GLSL_LINEAR_C: layout(derivative_group_linearNV)
 
 //TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_C): -allow-glsl -stage compute -entry computeMain -target spirv -DQUAD -DCOMPUTE
-// CHECK_SPV_QUAD_C: DerivativeGroupQuadsNV
-// CHECK_SPV_QUAD_C: "SPV_NV_compute_shader_derivatives"
+// CHECK_SPV_QUAD_C-COUNT-1: DerivativeGroupQuadsNV
+// CHECK_SPV_QUAD_C-COUNT-1: "SPV_NV_compute_shader_derivatives"
 
 //TEST:SIMPLE(filecheck=CHECK_SPV_LINEAR_C): -allow-glsl -stage compute -entry computeMain -target spirv -DLINEAR -DCOMPUTE
-// CHECK_SPV_LINEAR_C: DerivativeGroupLinearNV
-// CHECK_SPV_LINEAR_C: "SPV_NV_compute_shader_derivatives"
+// CHECK_SPV_LINEAR_C-COUNT-1: DerivativeGroupLinearNV
+// CHECK_SPV_LINEAR_C-COUNT-1: "SPV_NV_compute_shader_derivatives"
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL_C): -allow-glsl -stage compute -entry computeMain -target hlsl -DCOMPUTE
 // CHECK_HLSL_C: computeMain(

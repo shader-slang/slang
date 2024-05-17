@@ -74,98 +74,17 @@ SpvInst* emitOpEntryPoint(
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
-template<typename T>
+template<typename... Operands, typename T>
 SpvInst* emitOpExecutionMode(
     SpvInstParent* parent,
     IRInst* inst,
     const T& entryPoint,
-    SpvExecutionMode mode
+    SpvExecutionMode mode,
+    const Operands& ...ops
 )
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpExecutionMode, entryPoint, mode);
-}
-
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
-template<typename T>
-SpvInst* emitOpExecutionModeLocalSize(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T& entryPoint,
-    const SpvLiteralInteger& xSize,
-    const SpvLiteralInteger& ySize,
-    const SpvLiteralInteger& zSize
-)
-{
-    static_assert(isSingular<T>);
-    return emitInst(
-        parent, inst, SpvOpExecutionMode, entryPoint, SpvExecutionModeLocalSize, xSize, ySize, zSize
-    );
-}
-
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
-template<typename T1, typename T2, typename T3, typename T4>
-SpvInst* emitOpExecutionModeLocalSizeId(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T1& entryPoint,
-    const T2& xSize,
-    const T3& ySize,
-    const T4& zSize
-)
-{
-    static_assert(isSingular<T1>);
-    static_assert(isSingular<T2>);
-    static_assert(isSingular<T3>);
-    static_assert(isSingular<T4>);
-    return emitInst(
-        parent, inst, SpvOpExecutionMode, entryPoint, SpvExecutionModeLocalSizeId, xSize, ySize, zSize
-    );
-}
-
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
-template<typename T>
-SpvInst* emitOpExecutionModeOutputVertices(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T& entryPoint,
-    const SpvLiteralInteger& vertexCount
-)
-{
-    static_assert(isSingular<T>);
-    return emitInst(
-        parent, inst, SpvOpExecutionMode, entryPoint, SpvExecutionModeOutputVertices, vertexCount
-    );
-}
-
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
-template<typename T>
-SpvInst* emitOpExecutionModeOutputPrimitivesEXT(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T& entryPoint,
-    const SpvLiteralInteger& primitiveCount
-)
-{
-    static_assert(isSingular<T>);
-    return emitInst(
-        parent, inst, SpvOpExecutionMode, entryPoint, SpvExecutionModeOutputPrimitivesEXT, primitiveCount
-    );
-}
-
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
-template<typename T>
-SpvInst* emitOpExecutionModeInvocations(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T& entryPoint,
-    const SpvLiteralInteger& invocations
-)
-{
-    static_assert(isSingular<T>);
-    return emitInst(
-        parent, inst, SpvOpExecutionMode, entryPoint, SpvExecutionModeInvocations, invocations
-    );
+    return emitInst(parent, inst, SpvOpExecutionMode, entryPoint, mode, ops...);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCapability
