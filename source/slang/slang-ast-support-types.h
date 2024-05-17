@@ -1604,6 +1604,8 @@ namespace Slang
     /// The kind of a builtin interface requirement that can be automatically synthesized.
     enum class BuiltinRequirementKind
     {
+        DefaultInitializableConstructor, ///< The `IDefaultInitializable.__init()` method
+
         DifferentialType, ///< The `IDifferentiable.Differential` associated type requirement 
         DZeroFunc, ///< The `IDifferentiable.dzero` function requirement 
         DAddFunc, ///< The `IDifferentiable.dadd` function requirement 

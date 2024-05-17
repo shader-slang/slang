@@ -1948,7 +1948,7 @@ namespace Slang
         checkVisibility(classDecl);
     }
 
-    static InvokeExpr* _getDefaultInitOfVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+    static InvokeExpr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
     {
         if (!varDecl->type || !varDecl->type.type)
             return nullptr;
@@ -1972,7 +1972,7 @@ namespace Slang
         }
         else
         {
-            auto* defaultCall = visitor->getASTBuilder()->create<VarExpr>();
+            auto* defaultCall = visitor->getASTBuilder()->create<DefaultValExpr>();
             defaultCall->type = QualType();
             defaultCall->name = visitor->getName("__default");
             defaultCall->scope = varDecl->parentDecl->ownedScope;
@@ -1996,7 +1996,7 @@ namespace Slang
         // if zero initialize is true, set everything to a default
         if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) && !varDecl->initExpr)
         {
-            varDecl->initExpr = _getDefaultInitOfVar(this, varDecl);
+            varDecl->initExpr = constructDefaultInitExprForVar(this, varDecl);
         }
         
         if (auto initExpr = varDecl->initExpr)
@@ -4211,8 +4211,9 @@ namespace Slang
                 }
             }
         }
-        if(!isDefaultInitializableType)
-            _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
+        if (isDefaultInitializableType)
+            context->parentDecl->addMember(ctorDecl);
+        _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
         return true;
     }
 
@@ -5394,23 +5395,15 @@ namespace Slang
         {
             lookupResult = lookUpMember(m_astBuilder, this, name, subType, nullptr, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
 
-            // If we failed to look up a member with the name of the
-            // requirement, it may be possible that we can still synthesis the
-            // implementation if this is one of the known builtin requirements.
-            // Otherwise, report diagnostic now.
-            if (!lookupResult.isValid() 
-                && !requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>()
-                && !(requiredMemberDeclRef.as<GenericDecl>() &&
-                    getInner(requiredMemberDeclRef.as<GenericDecl>())->hasModifier<BuiltinRequirementModifier>()))
+            if (!lookupResult.isValid())
             {
-                // If DefaultInitializableType is found, we must synthisize a default constructor with an empty body
-                // if missing
-                DeclRef<ConstructorDecl> maybeConstructorDecl = as<ConstructorDecl>(requiredMemberDeclRef);
-                if (superInterfaceType == m_astBuilder->getDefaultInitializableType() && maybeConstructorDecl)
-                {
-                    return trySynthesizeConstructorRequirementWitness(context, LookupResult(), maybeConstructorDecl, witnessTable);
-                }
-                else
+                // If we failed to look up a member with the name of the
+                // requirement, it may be possible that we can still synthesis the
+                // implementation if this is one of the known builtin requirements.
+                // Otherwise, report diagnostic now.
+                if (!requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() &&
+                    !(requiredMemberDeclRef.as<GenericDecl>() &&
+                        getInner(requiredMemberDeclRef.as<GenericDecl>())->hasModifier<BuiltinRequirementModifier>()))
                 {
                     getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
                     getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
@@ -6095,7 +6088,7 @@ namespace Slang
                 // This requires that we check for transitive relationships of all struct->interface, 
                 // struct->interface->interface..., relationship 
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
-                if(this->getShared()->findInheritance<InterfaceDecl>(decl, defaultInitializableType))
+                if(this->getShared()->findInheritance<InterfaceDecl>(this, decl, defaultInitializableType))
                 {
                     InheritanceDecl* conformanceDecl = m_astBuilder->create<InheritanceDecl>();
                     conformanceDecl->parentDecl = decl;
@@ -7540,6 +7533,14 @@ namespace Slang
         // expression. This would be a senario we need to
         // put the `ExpressionStmt` inside a `SeqStmt`.
         auto stmt = as<BlockStmt>(decl->body);
+        if (!stmt)
+        {
+            auto tmpExpr = decl->body;
+            auto blockStmt = m_astBuilder->create<BlockStmt>();
+            blockStmt->body = tmpExpr;
+            decl->body = blockStmt;
+            stmt = blockStmt;
+        }
         if (!as<SeqStmt>(stmt->body))
         {
             auto tmpExpr = stmt->body;
@@ -7593,7 +7594,7 @@ namespace Slang
 
         // ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if init expressions 
         // of members are to be synthisised, they are.
-        bool isDefaultInitializableType = this->getShared()->findInheritance<InterfaceDecl>(structDecl, m_astBuilder->getDefaultInitializableType());
+        bool isDefaultInitializableType = this->getShared()->findInheritance<InterfaceDecl>(this, structDecl, m_astBuilder->getDefaultInitializableType());
         for (auto m : structDecl->members)
         {
             auto varDeclBase = as<VarDeclBase>(m);
@@ -7603,7 +7604,7 @@ namespace Slang
             if (!isDefaultInitializableType
                 || varDeclBase->initExpr)
                 continue;
-            varDeclBase->initExpr = _getDefaultInitOfVar(this, varDeclBase);
+            varDeclBase->initExpr = constructDefaultInitExprForVar(this, varDeclBase);
         }
 
         Index insertOffset = 0;

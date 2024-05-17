@@ -77,6 +77,7 @@ syntax __extern_cpp : ExternCppModifier;
 __magic_type(DefaultInitializableType)
 interface IDefaultInitializableType
 {
+    __builtin_requirement($( (int)BuiltinRequirementKind::DefaultInitializableConstructor))
     __init();
 }
 

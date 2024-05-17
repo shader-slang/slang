@@ -643,31 +643,51 @@ namespace Slang
         // Go through decl->members<InheritanceDecl>() recursivley and return all instances of `inheritanceToFilterOn` type.
         // Only traverse and check InheritanceDecl's which have a type equal to `InheritanceDeclBaseTypeToFilterOn`
         template<typename InheritanceDeclBaseTypeToFilterOn>
-        bool findInheritance(AggTypeDecl* targetToSearchThrough, Type* inheritanceToFilterOn)
+        bool findInheritance(SemanticsVisitor* visitor, AggTypeDeclBase* targetToSearchThrough, Type* inheritanceToFilterOn)
         {
             if (!targetToSearchThrough)
                 return false;
 
-            for (auto member : targetToSearchThrough->getMembersOfType<InheritanceDecl>())
+            for (auto member : targetToSearchThrough->members)
             {
-                if (!member->base || !member->base.type)
-                    continue;
-                if (member->base.type == inheritanceToFilterOn)
-                    return true;
-                else
+                if (auto inheritanceDecl = as<InheritanceDecl>(member))
                 {
-                    auto baseDeclRef = as<DeclRefType>(member->base.type);
-                    if (!baseDeclRef || !baseDeclRef->getDeclRef())
+                    if (!inheritanceDecl->base || !inheritanceDecl->base.type)
                         continue;
-
-                    if (findInheritance<InheritanceDeclBaseTypeToFilterOn>(
-                            as<InheritanceDeclBaseTypeToFilterOn>(baseDeclRef->getDeclRef().getDecl()),
-                            inheritanceToFilterOn))
-                    {
+                    if (inheritanceDecl->base.type == inheritanceToFilterOn)
                         return true;
+                    else
+                    {
+                        auto baseDeclRef = as<DeclRefType>(inheritanceDecl->base.type);
+                        if (!baseDeclRef || !baseDeclRef->getDeclRef())
+                            continue;
+
+                        if (findInheritance<InheritanceDeclBaseTypeToFilterOn>(
+                                visitor,
+                                as<InheritanceDeclBaseTypeToFilterOn>(baseDeclRef->getDeclRef().getDecl()),
+                                inheritanceToFilterOn))
+                        {
+                            return true;
+                        }
                     }
                 }
             }
+
+            auto aggTypeDecl = as<AggTypeDecl>(targetToSearchThrough);
+            if (!aggTypeDecl)
+                return false;
+            
+            for (auto extensionDecl : getCandidateExtensions(aggTypeDecl, visitor))
+            {
+                if (findInheritance<InheritanceDeclBaseTypeToFilterOn>(
+                    visitor,
+                    extensionDecl,
+                    inheritanceToFilterOn))
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
 
