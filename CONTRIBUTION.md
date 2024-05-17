@@ -94,6 +94,7 @@ Install CMake and Ninja.
 ```
 $ sudo apt-get install cmake ninja-build
 ```
+> Warning: Currently the required CMake version is 3.20 or above.
 
 Run CMake with a following command to generate Makefile:
 ```
