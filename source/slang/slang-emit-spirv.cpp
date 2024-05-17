@@ -2765,13 +2765,13 @@ struct SPIRVEmitContext
                     if (isQuad)
                     {
                         verifyComputeDerivativeGroupModifiers(this->m_sink, inst->sourceLoc, true, false, numThreadsDecor);
-                        requireSPIRVExecutionMode(nullptr, getID(ensureInst(entryPoint)), SpvExecutionModeDerivativeGroupQuadsNV);
+                        requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), SpvExecutionModeDerivativeGroupQuadsNV);
                         requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupQuadsNV);
                     }
                     else
                     {
                         verifyComputeDerivativeGroupModifiers(this->m_sink, inst->sourceLoc, false, true, numThreadsDecor);
-                        requireSPIRVExecutionMode(nullptr, getID(ensureInst(entryPoint)), SpvExecutionModeDerivativeGroupLinearNV);
+                        requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), SpvExecutionModeDerivativeGroupLinearNV);
                         requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupLinearNV);
                     }
                 }
@@ -2790,7 +2790,7 @@ struct SPIRVEmitContext
         case kIROp_BeginFragmentShaderInterlock:
             ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_fragment_shader_interlock"));
             requireSPIRVCapability(SpvCapabilityFragmentShaderPixelInterlockEXT);
-            requireSPIRVExecutionMode(nullptr, getID(ensureInst(getParentFunc(inst))), SpvExecutionModePixelInterlockOrderedEXT);
+            requireSPIRVExecutionMode(nullptr, getIRInstSpvID(getParentFunc(inst)), SpvExecutionModePixelInterlockOrderedEXT);
             result = emitOpBeginInvocationInterlockEXT(parent, inst);
             break;
         case kIROp_EndFragmentShaderInterlock:
@@ -3130,7 +3130,7 @@ struct SPIRVEmitContext
         if (mode == SpvExecutionModeMax)
             return;
 
-        requireSPIRVExecutionMode(nullptr, getID(ensureInst(entryPoint)), mode);
+        requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
     }
 
     // Make user type name conform to `SPV_GOOGLE_user_type` spec.
@@ -3249,14 +3249,14 @@ struct SPIRVEmitContext
                 {
                 case Stage::Fragment:
                     //OpExecutionMode %main OriginUpperLeft
-                    requireSPIRVExecutionMode(nullptr, getID(ensureInst(entryPoint)), SpvExecutionModeOriginUpperLeft);
+                    requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), SpvExecutionModeOriginUpperLeft);
                     maybeEmitEntryPointDepthReplacingExecutionMode(entryPoint, referencedBuiltinIRVars);
                     for (auto decor : entryPoint->getDecorations())
                     {
                         switch (decor->getOp())
                         {
                         case kIROp_EarlyDepthStencilDecoration:
-                            requireSPIRVExecutionMode(nullptr, getID(ensureInst(entryPoint)), SpvExecutionModeEarlyFragmentTests);
+                            requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), SpvExecutionModeEarlyFragmentTests);
                             break;
                         default:
                             break;
