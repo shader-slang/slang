@@ -1893,10 +1893,20 @@ public vec2 textureQueryLod(__TextureImpl<
         format
     > sampler, float p)
 {
-    return vec2(
-        sampler.CalculateLevelOfDetail(p),
-        sampler.CalculateLevelOfDetailUnclamped(p)
-        );
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "textureQueryLod";
+    case spirv:
+        return spirv_asm {
+            result:$$float2 = OpImageQueryLod $sampler $p
+        };
+    default:
+        return vec2(
+            sampler.CalculateLevelOfDetail(p),
+            sampler.CalculateLevelOfDetailUnclamped(p)
+            );
+    }
 }
 
 __generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
@@ -1913,10 +1923,20 @@ public vec2 textureQueryLod(__TextureImpl<T,
         format
     > sampler, vector<float,Shape.dimensions> p)
 {
-    return vec2(
-        sampler.CalculateLevelOfDetail(p),
-        sampler.CalculateLevelOfDetailUnclamped(p)
-        );
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "textureQueryLod";
+    case spirv:
+        return spirv_asm {
+            result:$$float2 = OpImageQueryLod $sampler $p
+        };
+    default:
+        return vec2(
+            sampler.CalculateLevelOfDetail(p),
+            sampler.CalculateLevelOfDetailUnclamped(p)
+            );
+    }
 }
 
 // -------------------
@@ -2159,8 +2179,21 @@ public float texture(sampler1DShadow sampler, vec3 p)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DShadow sampler, vec3 p, float bias)
 {
-    // TODO: Need to apply bias
-    return sampler.SampleCmp(p.x, p.z);
+    float location = p.x;
+    float compareValue = p.z;
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
+        };
+    default:
+        // TODO: Need to apply bias
+        return sampler.SampleCmp(location, compareValue);
+    }
 }
 
 [ForceInline]
@@ -2174,8 +2207,21 @@ public float texture(sampler2DShadow sampler, vec3 p)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler2DShadow sampler, vec3 p, float bias)
 {
-    // TODO: Need to apply bias
-    return sampler.SampleCmp(p.xy, p.z);
+    vec2 location = p.xy;
+    float compareValue = p.z;
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
+        };
+    default: 
+        // TODO: Need to apply bias
+        return sampler.SampleCmp(location, compareValue);
+    }
 }
 
 [require(glsl_hlsl_spirv, texture_shadowlod_cube)]
@@ -2189,8 +2235,21 @@ public float texture(samplerCubeShadow sampler, vec4 p)
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p, float bias)
 {
-    // TODO: Need to apply bias
-    return sampler.SampleCmp(p.xyz, p.w);
+    vec3 location = p.xyz;
+    float compareValue = p.w;
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
+        };
+    default: 
+        // TODO: Need to apply bias
+        return sampler.SampleCmp(location, compareValue);
+    }
 }
 
 [ForceInline]
@@ -2204,8 +2263,21 @@ public float texture(sampler1DArrayShadow sampler, vec3 p)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
 {
-    // TODO: Need to apply bias
-    return sampler.SampleCmp(p.xy, p.z);
+    vec2 location = p.xy;
+    float compareValue = p.z;
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
+        };
+    default: 
+        // TODO: Need to apply bias
+        return sampler.SampleCmp(location, compareValue);
+    }
 }
 
 [ForceInline]
@@ -2395,10 +2467,10 @@ public float textureProj(sampler1DShadow sampler, vec4 p)
     case glsl: __intrinsic_asm "textureProj";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xw__ $compare_value
+            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xw__ $compareValue
         };
     }
     default:
@@ -2415,10 +2487,10 @@ public float textureProj(sampler1DShadow sampler, vec4 p, float bias)
     case glsl: __intrinsic_asm "textureProj";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xw__ $compare_value Bias $bias
+            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xw__ $compareValue Bias $bias
         };
     }
     default:
@@ -2435,10 +2507,10 @@ public float textureProj(sampler2DShadow sampler, vec4 p)
     case glsl: __intrinsic_asm "textureProj";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xyw_ $compare_value
+            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xyw_ $compareValue
         };
     }
     default:
@@ -2455,10 +2527,10 @@ public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
     case glsl: __intrinsic_asm "textureProj";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xyw_ $compare_value Bias $bias
+            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xyw_ $compareValue Bias $bias
         };
     }
     default:
@@ -2505,9 +2577,9 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
     case glsl: __intrinsic_asm "textureLod";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Lod $lod
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Lod $lod
         };
     }
     default:
@@ -2524,9 +2596,9 @@ public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
     case glsl: __intrinsic_asm "textureLod";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Lod $lod
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Lod $lod
         };
     }
     default:
@@ -2543,9 +2615,9 @@ public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
     case glsl: __intrinsic_asm "textureLod";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Lod $lod
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Lod $lod
         };
     }
     default:
@@ -2585,16 +2657,63 @@ public vector<T,4> textureOffset(Sampler3D<vector<T,N>> sampler, vec3 p, constex
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
 {
-    // TODO: Need to apply bias
-    return sampler.SampleCmp(p.xy, p.z, offset);
+    vec2 location = p.xy;
+    float compareValue = p.z;
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias|ConstOffset $bias $offset;
+        };
+    default:
+        // TODO: Need to apply bias
+        return sampler.SampleCmp(location, compareValue, offset);
+    }
 }
 
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
-public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset, float bias = 0.0)
+public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset)
 {
-    // TODO: Need to apply bias
-    return sampler.SampleCmp(p.x, p.z, offset);
+    float location = p.x;
+    float compareValue = p.z;
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue ConstOffset $offset;
+        };
+    default:
+        // TODO: Need to apply bias
+        return sampler.SampleCmp(location, compareValue, offset);
+    }
+}
+
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
+public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset, float bias)
+{
+    float location = p.x;
+    float compareValue = p.z;
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias|ConstOffset $bias $offset;
+        };
+    default:
+        // TODO: Need to apply bias
+        return sampler.SampleCmp(location, compareValue, offset);
+    }
 }
 
 __generic<T:__BuiltinFloatingPointType, let N:int>
@@ -2615,10 +2734,44 @@ public vector<T,4> textureOffset(Sampler2DArray<vector<T,N>> sampler, vec3 p, co
 
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
-public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int offset, float bias = 0.0)
+public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int offset)
 {
-    // TODO: Need to apply bias
-    return sampler.SampleCmp(p.xy, p.z, vector<int,1>(offset));
+    vec2 location = p.xy;
+    float compareValue = p.z;
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue ConstOffset $offset;
+        };
+    default:
+        // TODO: Need to apply bias
+        return sampler.SampleCmp(location, compareValue, vector<int,1>(offset));
+    }
+}
+
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
+public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int offset, float bias)
+{
+    vec2 location = p.xy;
+    float compareValue = p.z;
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias|ConstOffset $bias $offset;
+        };
+    default:
+        // TODO: Need to apply bias
+        return sampler.SampleCmp(location, compareValue, vector<int,1>(offset));
+    }
 }
 
 [ForceInline]
@@ -2689,7 +2842,13 @@ public vector<T,4> texelFetch(__TextureImpl<
         format
     > sampler, vector<int,2+isArray> p, int lod)
 {
-    return __vectorReshape<4>(sampler.Load(p, lod));
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texelFetch";
+    default:
+        // TODO: Need to apply lod
+        return __vectorReshape<4>(sampler.Load(__makeVector(p, 0)));
+    }
 }
 
 // -------------------
@@ -2919,10 +3078,10 @@ public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int of
     case glsl: __intrinsic_asm "textureProjOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xw__ $compare_value ConstOffset $offset
+            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xw__ $compareValue ConstOffset $offset
         };
     }
     default:
@@ -2939,10 +3098,10 @@ public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int of
     case glsl: __intrinsic_asm "textureProjOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xw__ $compare_value Bias|ConstOffset $bias $offset
+            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xw__ $compareValue Bias|ConstOffset $bias $offset
         };
     }
     default:
@@ -2959,10 +3118,10 @@ public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 
     case glsl: __intrinsic_asm "textureProjOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xyw_ $compare_value ConstOffset $offset
+            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xyw_ $compareValue ConstOffset $offset
         };
     }
     default:
@@ -2979,10 +3138,10 @@ public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 
     case glsl: __intrinsic_asm "textureProjOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xyw_ $compare_value Bias|ConstOffset $bias $offset
+            result:$$float = OpImageSampleProjDrefImplicitLod $sampler $xyw_ $compareValue Bias|ConstOffset $bias $offset
         };
     }
     default:
@@ -3029,9 +3188,9 @@ public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, conste
     case glsl: __intrinsic_asm "textureLodOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Lod|ConstOffset $lod $offset
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Lod|ConstOffset $lod $offset
         };
     }
     default:
@@ -3049,9 +3208,9 @@ public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, conste
     case glsl: __intrinsic_asm "textureLodOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Lod|ConstOffset $lod $offset
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Lod|ConstOffset $lod $offset
         };
     }
     default:
@@ -3069,9 +3228,9 @@ public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, c
     case glsl: __intrinsic_asm "textureLodOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Lod|ConstOffset $lod $offset
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Lod|ConstOffset $lod $offset
         };
     }
     default:
@@ -3181,10 +3340,10 @@ public float textureProjLod(sampler1DShadow sampler, vec4 p, float lod)
     case glsl: __intrinsic_asm "textureProjLod";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xw__ $compare_value Lod $lod
+            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xw__ $compareValue Lod $lod
         };
     }
     default:
@@ -3201,10 +3360,10 @@ public float textureProjLod(sampler2DShadow sampler, vec4 p, float lod)
     case glsl: __intrinsic_asm "textureProjLod";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xyw_ $compare_value Lod $lod
+            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xyw_ $compareValue Lod $lod
         };
     }
     default:
@@ -3313,10 +3472,10 @@ public float textureProjLodOffset(sampler1DShadow sampler, vec4 p, float lod, co
     case glsl: __intrinsic_asm "textureProjLodOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xw__ $compare_value Lod|ConstOffset $lod $offset
+            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xw__ $compareValue Lod|ConstOffset $lod $offset
         };
     }
     default:
@@ -3333,10 +3492,10 @@ public float textureProjLodOffset(sampler2DShadow sampler, vec4 p, float lod, co
     case glsl: __intrinsic_asm "textureProjLodOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xyw_ $compare_value Lod|ConstOffset $lod $offset
+            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xyw_ $compareValue Lod|ConstOffset $lod $offset
         };
     }
     default:
@@ -3384,9 +3543,9 @@ public float textureGrad(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy
     case glsl: __intrinsic_asm "textureGrad";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Grad $dPdx $dPdy
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Grad $dPdx $dPdy
         };
     }
     }
@@ -3401,9 +3560,9 @@ public float textureGrad(sampler1DArrayShadow sampler, vec3 p, float dPdx, float
     case glsl: __intrinsic_asm "textureGrad";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Grad $dPdx $dPdy
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Grad $dPdx $dPdy
         };
     }
     }
@@ -3418,9 +3577,9 @@ public float textureGrad(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
     case glsl: __intrinsic_asm "textureGrad";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Grad $dPdx $dPdy
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Grad $dPdx $dPdy
         };
     }
     }
@@ -3435,9 +3594,9 @@ public float textureGrad(samplerCubeShadow sampler, vec4 p, vec3 dPdx, vec3 dPdy
     case glsl: __intrinsic_asm "textureGrad";
     case spirv:
     {
-        float compare_value = p.w;
+        float compareValue = p.w;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Grad $dPdx $dPdy
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Grad $dPdx $dPdy
         };
     }
     }
@@ -3452,9 +3611,9 @@ public float textureGrad(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 d
     case glsl: __intrinsic_asm "textureGrad";
     case spirv:
     {
-        float compare_value = p.w;
+        float compareValue = p.w;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Grad $dPdx $dPdy
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Grad $dPdx $dPdy
         };
     }
     }
@@ -3499,9 +3658,9 @@ public float textureGradOffset(sampler1DShadow sampler, vec3 p, float dPdx, floa
     case glsl: __intrinsic_asm "textureGradOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Grad|ConstOffset $dPdx $dPdy $offset
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Grad|ConstOffset $dPdx $dPdy $offset
         };
     }
     }
@@ -3516,9 +3675,9 @@ public float textureGradOffset(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 
     case glsl: __intrinsic_asm "textureGradOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Grad|ConstOffset $dPdx $dPdy $offset
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Grad|ConstOffset $dPdx $dPdy $offset
         };
     }
     }
@@ -3533,9 +3692,9 @@ public float textureGradOffset(sampler1DArrayShadow sampler, vec3 p, float dPdx,
     case glsl: __intrinsic_asm "textureGradOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Grad|ConstOffset $dPdx $dPdy $offset
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Grad|ConstOffset $dPdx $dPdy $offset
         };
     }
     }
@@ -3550,9 +3709,9 @@ public float textureGradOffset(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, 
     case glsl: __intrinsic_asm "textureGradOffset";
     case spirv:
     {
-        float compare_value = p.w;
+        float compareValue = p.w;
         return spirv_asm {
-            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compare_value Grad|ConstOffset $dPdx $dPdy $offset
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Grad|ConstOffset $dPdx $dPdy $offset
         };
     }
     }
@@ -3659,10 +3818,10 @@ public float textureProjGrad(sampler1DShadow sampler, vec4 p, float dPdx, float 
     case glsl: __intrinsic_asm "textureProjGrad";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xw__ $compare_value Grad $dPdx $dPdy
+            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xw__ $compareValue Grad $dPdx $dPdy
         };
     }
     default:
@@ -3679,10 +3838,10 @@ public float textureProjGrad(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dP
     case glsl: __intrinsic_asm "textureProjGrad";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xyw_ $compare_value Grad $dPdx $dPdy
+            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xyw_ $compareValue Grad $dPdx $dPdy
         };
     }
     default:
@@ -3791,10 +3950,10 @@ public float textureProjGradOffset(sampler1DShadow sampler, vec4 p, float dPdx, 
     case glsl: __intrinsic_asm "textureProjGradOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xw__ $compare_value Grad|ConstOffset $dPdx $dPdy $offset
+            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xw__ $compareValue Grad|ConstOffset $dPdx $dPdy $offset
         };
     }
     default:
@@ -3811,10 +3970,10 @@ public float textureProjGradOffset(sampler2DShadow sampler, vec4 p, vec2 dPdx, v
     case glsl: __intrinsic_asm "textureProjGradOffset";
     case spirv:
     {
-        float compare_value = p.z;
+        float compareValue = p.z;
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xyw_ $compare_value Grad|ConstOffset $dPdx $dPdy $offset
+            result:$$float = OpImageSampleProjDrefExplicitLod $sampler $xyw_ $compareValue Grad|ConstOffset $dPdx $dPdy $offset
         };
     }
     default:

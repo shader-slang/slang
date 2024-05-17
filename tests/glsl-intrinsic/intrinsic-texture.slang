@@ -5,7 +5,7 @@
 //TEST:SIMPLE(filecheck=HLSL): -allow-glsl -stage fragment -entry computeMain -target hlsl
 //TEST:SIMPLE(filecheck=GLSL): -allow-glsl -stage compute  -entry computeMain -target glsl -DCOMPUTE
 //TEST:SIMPLE(filecheck=GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=GLSL_SPIRV): -allow-glsl -stage fragment -entry computeMain -target spirv -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=SPIR): -allow-glsl -stage fragment -entry computeMain -target spirv -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=SPIR): -allow-glsl -stage compute  -entry computeMain -target spirv -DCOMPUTE
 //TEST:SIMPLE(filecheck=SPIR): -allow-glsl -stage fragment -entry computeMain -target spirv
 //TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage compute  -entry computeMain -target cuda -DCOMPUTE
@@ -186,70 +186,74 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         // SPIR: OpImageQuerySize{{.*}}[[IMAGE]]
         && ivec2(0) == textureSize(gsampler2DMS)
 
+        // GLSL: textureSize({{.*}}sampler2DMSArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DMSArray
+        // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
+        // SPIR: OpImageQuerySize{{.*}}[[IMAGE]]
         && ivec3(0) == textureSize(gsampler2DMSArray)
 
         // GLSL: textureQueryLod({{.*}}sampler1D
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(gsampler1D, float(0))
 
         // GLSL: textureQueryLod({{.*}}sampler2D
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(gsampler2D, vec2(0))
 
         // GLSL: textureQueryLod({{.*}}sampler3D
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(gsampler3D, vec3(0))
 
         // GLSL: textureQueryLod({{.*}}samplerCube
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(gsamplerCube, vec3(0))
 
         // GLSL: textureQueryLod({{.*}}sampler1DArray
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(gsampler1DArray, float(0))
 
         // GLSL: textureQueryLod({{.*}}sampler2DArray
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(gsampler2DArray, vec2(0))
 
         // GLSL: textureQueryLod({{.*}}samplerCubeArray
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(gsamplerCubeArray, vec3(0))
 
         // GLSL: textureQueryLod({{.*}}sampler1DShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(uniform_sampler1DShadow, float(0))
 
         // GLSL: textureQueryLod({{.*}}sampler2DShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(uniform_sampler2DShadow, vec2(0))
 
         // GLSL: textureQueryLod({{.*}}samplerCubeShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(uniform_samplerCubeShadow, vec3(0))
 
         // GLSL: textureQueryLod({{.*}}sampler1DArrayShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(uniform_sampler1DArrayShadow, float(0))
 
         // GLSL: textureQueryLod({{.*}}sampler2DArrayShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(uniform_sampler2DArrayShadow, vec2(0))
 
         // GLSL: textureQueryLod({{.*}}samplerCubeArrayShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArrayShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArrayShadow
         // SPIR: OpImageQueryLod{{.*}}[[LOAD]]
         && vec2(0) == textureQueryLod(uniform_samplerCubeArrayShadow, vec3(0))
 
@@ -345,70 +349,114 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
 
         // 8.9.2. Texel Lookup Functions
 
-        // GLSL-COUNT-2: texture({{.*}}sampler1D
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // GLSL: texture({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
         // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]
         && gvec4(T(0)) == texture(gsampler1D, float(0))
+
+        // GLSL: texture({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == texture(gsampler1D, float(0), float(0))
 
-        // GLSL-COUNT-2: texture({{.*}}sampler2D
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // GLSL: texture({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
         // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]
         && gvec4(T(0)) == texture(gsampler2D, vec2(0))
+
+        // GLSL: texture({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == texture(gsampler2D, vec2(0), float(0))
 
-        // GLSL-COUNT-2: texture({{.*}}sampler3D
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
+        // GLSL: texture({{.*}}sampler3D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
         // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]
         && gvec4(T(0)) == texture(gsampler3D, vec3(0))
+
+        // GLSL: texture({{.*}}sampler3D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
+        // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == texture(gsampler3D, vec3(0), float(0))
 
-        // GLSL-COUNT-2: texture({{.*}}samplerCube
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
+        // GLSL: texture({{.*}}samplerCube
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
         // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]
         && gvec4(T(0)) == texture(gsamplerCube, vec3(0) )
+
+        // GLSL: texture({{.*}}samplerCube
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
+        // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == texture(gsamplerCube, vec3(0), float(0))
 
-        // GLSL-COUNT-2: texture({{.*}}sampler1DShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
+        // GLSL: texture({{.*}}sampler1DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
         // SPIR: OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
         && float(0) == texture(uniform_sampler1DShadow, vec3(0))
+
+        // GLSL: texture({{.*}}sampler1DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
+        // SPIR: OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
         && float(0) == texture(uniform_sampler1DShadow, vec3(0), float(0))
 
-        // GLSL-COUNT-2: texture({{.*}}sampler2DShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
+        // GLSL: texture({{.*}}sampler2DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
         // SPIR: OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
         && float(0) == texture(uniform_sampler2DShadow, vec3(0))
+
+        // GLSL: texture({{.*}}sampler2DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
+        // SPIR: OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
         && float(0) == texture(uniform_sampler2DShadow, vec3(0), float(0))
 
-        // GLSL-COUNT-2: texture({{.*}}samplerCubeShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
+        // GLSL: texture({{.*}}samplerCubeShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
         // SPIR: OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
         && float(0) == texture(uniform_samplerCubeShadow, vec4(0))
+
+        // GLSL: texture({{.*}}samplerCubeShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
+        // SPIR: OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
         && float(0) == texture(uniform_samplerCubeShadow, vec4(0), float(0))
 
-        // GLSL-COUNT-2: texture({{.*}}sampler2DArray
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
+        // GLSL: texture({{.*}}sampler2DArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
         // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]
         && gvec4(T(0)) == texture(gsampler2DArray, vec3(0))
+
+        // GLSL: texture({{.*}}sampler2DArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
+        // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == texture(gsampler2DArray, vec3(0), float(0))
 
-        // GLSL-COUNT-2: texture({{.*}}samplerCubeArray
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
+        // GLSL: texture({{.*}}samplerCubeArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
         // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]
         && gvec4(T(0)) == texture(gsamplerCubeArray, vec4(0) )
+
+        // GLSL: texture({{.*}}samplerCubeArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
+        // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == texture(gsamplerCubeArray, vec4(0), float(0))
 
-        // GLSL-COUNT-2: texture({{.*}}sampler1DArray
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
+        // GLSL: texture({{.*}}sampler1DArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
         // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]
         && gvec4(T(0)) == texture(gsampler1DArray, vec2(0))
+
+        // GLSL: texture({{.*}}sampler1DArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
+        // SPIR: OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == texture(gsampler1DArray, vec2(0), float(0))
 
-        // GLSL-COUNT-2: texture({{.*}}sampler1DArrayShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
+        // GLSL: texture({{.*}}sampler1DArrayShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
         // SPIR: OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
         && float(0) == texture(uniform_sampler1DArrayShadow, vec3(0))
+
+        // GLSL: texture({{.*}}sampler1DArrayShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
+        // SPIR: OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
         && float(0) == texture(uniform_sampler1DArrayShadow, vec3(0), float(0))
 
         // GLSL: texture({{.*}}sampler2DArrayShadow
@@ -431,38 +479,74 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         // SPIR: OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
         && float(0) == texture(uniform_samplerCubeArrayShadow, vec4(0), float(0))
 
-        // GLSL-COUNT-4: textureProj({{.*}}sampler1D
-        // SPIR-COUNT-4: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // GLSL: textureProj({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
         // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]
         && gvec4(T(0)) == textureProj(gsampler1D, vec2(0))
+
+        // GLSL: textureProj({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == textureProj(gsampler1D, vec2(0), float(0))
+
+        // GLSL: textureProj({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]
         && gvec4(T(0)) == textureProj(gsampler1D, vec4(0))
+
+        // GLSL: textureProj({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == textureProj(gsampler1D, vec4(0), float(0))
 
-        // GLSL-COUNT-4: textureProj({{.*}}sampler2D
-        // SPIR-COUNT-4: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // GLSL: textureProj({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
         // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]
         && gvec4(T(0)) == textureProj(gsampler2D, vec3(0))
+
+        // GLSL: textureProj({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == textureProj(gsampler2D, vec3(0), float(0))
+
+        // GLSL: textureProj({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]
         && gvec4(T(0)) == textureProj(gsampler2D, vec4(0))
+
+        // GLSL: textureProj({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == textureProj(gsampler2D, vec4(0), float(0))
 
-        // GLSL-COUNT-2: textureProj({{.*}}sampler3D
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
+        // GLSL: textureProj({{.*}}sampler3D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
         // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]
         && gvec4(T(0)) == textureProj(gsampler3D, vec4(0))
+
+        // GLSL: textureProj({{.*}}sampler3D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias %
         && gvec4(T(0)) == textureProj(gsampler3D, vec4(0), float(0))
 
-        // GLSL-COUNT-2: textureProj({{.*}}sampler1DShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
+        // GLSL: textureProj({{.*}}sampler1DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
         // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]
         && float(0) == textureProj(uniform_sampler1DShadow, vec4(0))
+
+        // GLSL: textureProj({{.*}}sampler1DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
+        // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias %
         && float(0) == textureProj(uniform_sampler1DShadow, vec4(0), float(0))
 
-        // GLSL-COUNT-2: textureProj({{.*}}sampler2DShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
+        // GLSL: textureProj({{.*}}sampler2DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
         // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]
         && float(0) == textureProj(uniform_sampler2DShadow, vec4(0))
+
+        // GLSL: textureProj({{.*}}sampler2DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
+        // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias %
         && float(0) == textureProj(uniform_sampler2DShadow, vec4(0), float(0))
 
         // GLSL-COUNT-2: textureProj({{.*}}sampler2DRect
@@ -478,133 +562,165 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
 
         // GLSL: textureLod({{.*}}sampler1D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T(0)) == textureLod(gsampler1D, float(0), float(0))
 
         // GLSL: textureLod({{.*}}sampler2D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T(0)) == textureLod(gsampler2D, vec2(0), float(0))
 
         // GLSL: textureLod({{.*}}sampler3D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T(0)) == textureLod(gsampler3D, vec3(0), float(0))
 
         // GLSL: textureLod({{.*}}samplerCube
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T(0)) == textureLod(gsamplerCube, vec3(0), float(0))
 
         // GLSL: textureLod({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == textureLod(uniform_sampler2DShadow, vec3(0), float(0))
 
         // GLSL: textureLod({{.*}}sampler1DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == textureLod(uniform_sampler1DShadow, vec3(0), float(0))
 
         // GLSL: textureLod({{.*}}sampler1DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T(0)) == textureLod(gsampler1DArray, vec2(0), float(0))
 
         // GLSL: textureLod({{.*}}sampler1DArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == textureLod(uniform_sampler1DArrayShadow, vec3(0), float(0))
 
         // GLSL: textureLod({{.*}}sampler2DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T(0)) == textureLod(gsampler2DArray, vec3(0), float(0))
 
         // GLSL: textureLod({{.*}}samplerCubeArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T(0)) == textureLod(gsamplerCubeArray, vec4(0), float(0))
 
-        // GLSL-COUNT-2: textureOffset({{.*}}sampler1D
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]
+        // GLSL: textureOffset({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler1D, float(0), int(0))
+
+        // GLSL: textureOffset({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler1D, float(0), int(0), float(0))
 
-        // GLSL-COUNT-2: textureOffset({{.*}}sampler2D
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]
+        // GLSL: textureOffset({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler2D, vec2(0), offset2D)
+
+        // GLSL: textureOffset({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler2D, vec2(0), offset2D, float(0))
 
-        // GLSL-COUNT-2: textureOffset({{.*}}sampler3D
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]
+        // GLSL: textureOffset({{.*}}sampler3D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
+        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler3D, vec3(0), offset3D)
+
+        // GLSL: textureOffset({{.*}}sampler3D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
+        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler3D, vec3(0), offset3D, float(0))
 
-        // GLSL-COUNT-2: textureOffset({{.*}}sampler2DShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]
+        // GLSL: textureOffset({{.*}}sampler2DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
+        // S-PIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && float(0) == textureOffset(uniform_sampler2DShadow, vec3(0), offset2D)
+
+        // GLSL: textureOffset({{.*}}sampler2DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
+        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && float(0) == textureOffset(uniform_sampler2DShadow, vec3(0), offset2D, float(0))
 
         // GLSL: textureOffset({{.*}}sampler2DRect
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
-        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]
+        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler2DRect, vec2(0), offset2D)
 
         // GLSL: textureOffset({{.*}}sampler2DRectShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]
+        // S-PIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && float(0) == textureOffset(uniform_sampler2DRectShadow, vec3(0), offset2D)
 
-        // GLSL-COUNT-2: textureOffset({{.*}}sampler1DShadow
+        // GLSL: textureOffset({{.*}}sampler1DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
-        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && float(0) == textureOffset(uniform_sampler1DShadow, vec3(0), int(0))
+
+        // GLSL: textureOffset({{.*}}sampler1DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
+        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && float(0) == textureOffset(uniform_sampler1DShadow, vec3(0), int(0), float(0))
 
-        // GLSL-COUNT-2: textureOffset({{.*}}sampler1DArray
+        // GLSL: textureOffset({{.*}}sampler1DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
-        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]
+        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler1DArray, vec2(0), int(0))
+
+        // GLSL: textureOffset({{.*}}sampler1DArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
+        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler1DArray, vec2(0), int(0), float(0))
 
-        // GLSL-COUNT-2: textureOffset({{.*}}sampler2DArray
+        // GLSL: textureOffset({{.*}}sampler2DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
-        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]
+        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler2DArray, vec3(0), offset2D)
+
+        // GLSL: textureOffset({{.*}}sampler2DArray
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
+        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler2DArray, vec3(0), offset2D, float(0))
 
-        // GLSL-COUNT-2: textureOffset({{.*}}sampler1DArrayShadow
+        // GLSL: textureOffset({{.*}}sampler1DArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
-        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && float(0) == textureOffset(uniform_sampler1DArrayShadow, vec3(0), int(0))
+
+        // GLSL: textureOffset({{.*}}sampler1DArrayShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
+        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && float(0) == textureOffset(uniform_sampler1DArrayShadow, vec3(0), int(0), float(0))
 
         // GLSL: textureOffset({{.*}}sampler2DArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
-        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]
+        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && float(0) == textureOffset(uniform_sampler2DArrayShadow, vec4(0), offset2D)
 
         // GLSL: texelFetch({{.*}}sampler1D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]
+        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod %
         && gvec4(T(0)) == texelFetch(gsampler1D, int(0), int(0))
 
         // GLSL: texelFetch({{.*}}sampler2D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]
+        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod %
         && gvec4(T(0)) == texelFetch(gsampler2D, ivec2(0), int(0))
 
         // GLSL: texelFetch({{.*}}sampler3D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]
+        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod %
         && gvec4(T(0)) == texelFetch(gsampler3D, ivec3(0), int(0))
 
         // GLSL: texelFetch({{.*}}sampler2DRect
@@ -616,13 +732,13 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         // GLSL: texelFetch({{.*}}sampler1DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]
+        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod %
         && gvec4(T(0)) == texelFetch(gsampler1DArray, ivec2(0), int(0))
 
         // GLSL: texelFetch({{.*}}sampler2DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]
+        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod %
         && gvec4(T(0)) == texelFetch(gsampler2DArray, ivec3(0), int(0))
 
         // GLSL: imageLoad({{.*}}samplerBuffer
@@ -633,512 +749,548 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         // GLSL: texelFetch({{.*}}sampler2DMS
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DMS
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]
+        // S-PIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod %
         && gvec4(T(0)) == texelFetch(gsampler2DMS, ivec2(0), int(0))
 
         // GLSL: texelFetch({{.*}}sampler2DMSArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DMSArray
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]
+        // S-PIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod %
         && gvec4(T(0)) == texelFetch(gsampler2DMSArray, ivec3(0), int(0))
 
         // GLSL: texelFetchOffset({{.*}}sampler1D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == texelFetchOffset(gsampler1D, int(0), int(0), int(0))
 
         // GLSL: texelFetchOffset({{.*}}sampler2D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == texelFetchOffset(gsampler2D, ivec2(0), int(0), offset2D)
 
         // GLSL: texelFetchOffset({{.*}}sampler3D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == texelFetchOffset(gsampler3D, ivec3(0), int(0), offset3D)
 
         // GLSL: texelFetchOffset({{.*}}sampler2DRect
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == texelFetchOffset(gsampler2DRect, ivec2(0), offset2D)
 
         // GLSL: texelFetchOffset({{.*}}sampler1DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == texelFetchOffset(gsampler1DArray, ivec2(0), int(0), int(0))
 
         // GLSL: texelFetchOffset({{.*}}sampler2DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
         // SPIR: [[IMAGE:%[1-9][0-9]*]] = OpImage{{.*}}[[LOAD]]
-        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageFetch {{.*}}[[IMAGE]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == texelFetchOffset(gsampler2DArray, ivec3(0), int(0), offset2D)
 
-        // GLSL-COUNT-4: textureProjOffset({{.*}}sampler1D
-        // SPIR-COUNT-4: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset
+        // GLSL: textureProjOffset({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureProjOffset(gsampler1D, vec2(0), int(0))
+
+        // GLSL: textureProjOffset({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && gvec4(T(0)) == textureProjOffset(gsampler1D, vec2(0), int(0), float(0))
+
+        // GLSL: textureProjOffset({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureProjOffset(gsampler1D, vec4(0), int(0))
+
+        // GLSL: textureProjOffset({{.*}}sampler1D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && gvec4(T(0)) == textureProjOffset(gsampler1D, vec4(0), int(0),float(0))
 
-        // GLSL-COUNT-4: textureProjOffset({{.*}}sampler2D
-        // SPIR-COUNT-4: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset
+        // GLSL: textureProjOffset({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureProjOffset(gsampler2D, vec3(0), offset2D)
+
+        // GLSL: textureProjOffset({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && gvec4(T(0)) == textureProjOffset(gsampler2D, vec3(0), offset2D, float(0))
+
+        // GLSL: textureProjOffset({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureProjOffset(gsampler2D, vec4(0), offset2D)
+
+        // GLSL: textureProjOffset({{.*}}sampler2D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && gvec4(T(0)) == textureProjOffset(gsampler2D, vec4(0), offset2D, float(0))
 
-        // GLSL-COUNT-2: textureProjOffset({{.*}}sampler3D
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset
+        // GLSL: textureProjOffset({{.*}}sampler3D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureProjOffset(gsampler3D, vec4(0), offset3D)
+
+        // GLSL: textureProjOffset({{.*}}sampler3D
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && gvec4(T(0)) == textureProjOffset(gsampler3D, vec4(0), offset3D, float(0))
 
         // GLSL-COUNT-2: textureProjOffset({{.*}}sampler2DRect
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
-        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset
+        // SPIR: OpImageSampleProjImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureProjOffset(gsampler2DRect, vec3(0), offset2D)
         && gvec4(T(0)) == textureProjOffset(gsampler2DRect, vec4(0), offset2D)
 
         // GLSL: textureProjOffset({{.*}}sampler2DRectShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset
+        // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && float(0) == textureProjOffset(uniform_sampler2DRectShadow, vec4(0), offset2D)
 
-        // GLSL-COUNT-2: textureProjOffset({{.*}}sampler1DShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
-        // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset
+        // GLSL: textureProjOffset({{.*}}sampler1DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
+        // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && float(0) == textureProjOffset(uniform_sampler1DShadow, vec4(0), int(0))
+
+        // GLSL: textureProjOffset({{.*}}sampler1DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
+        // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && float(0) == textureProjOffset(uniform_sampler1DShadow, vec4(0), int(0), float(0))
 
-        // GLSL-COUNT-2: textureProjOffset({{.*}}sampler2DShadow
-        // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset
+        // GLSL: textureProjOffset({{.*}}sampler2DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
+        // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && float(0) == textureProjOffset(uniform_sampler2DShadow, vec4(0), offset2D)
+
+        // GLSL: textureProjOffset({{.*}}sampler2DShadow
+        // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
+        // SPIR: OpImageSampleProjDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         && float(0) == textureProjOffset(uniform_sampler2DShadow, vec4(0), offset2D, float(0))
 
         // GLSL: textureLodOffset({{.*}}sampler1D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == textureLodOffset(gsampler1D, float(0), float(0), 0)
 
         // GLSL: textureLodOffset({{.*}}sampler2D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == textureLodOffset(gsampler2D, vec2(0), float(0), offset2D)
 
         // GLSL: textureLodOffset({{.*}}sampler3D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == textureLodOffset(gsampler3D, vec3(0), float(0), offset3D)
 
         // GLSL: textureLodOffset({{.*}}sampler1DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && float(0) == textureLodOffset(uniform_sampler1DShadow, vec3(0), float(0), 0)
 
         // GLSL: textureLodOffset({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && float(1) == textureLodOffset(uniform_sampler2DShadow, vec3(0), float(0), offset2D)
 
         // GLSL: textureLodOffset({{.*}}sampler1DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == textureLodOffset(gsampler1DArray, vec2(0), float(0), 0)
 
         // GLSL: textureLodOffset({{.*}}sampler2DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == textureLodOffset(gsampler2DArray, vec3(0), float(0), offset2D)
 
         // GLSL: textureLodOffset({{.*}}sampler1DArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && float(0) == textureLodOffset(uniform_sampler1DArrayShadow, vec3(0), float(0), int(0))
 
         // GLSL-COUNT-2: textureProjLod({{.*}}sampler1D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T(0)) == textureProjLod(gsampler1D, vec2(0), float(0))
         && gvec4(T(0)) == textureProjLod(gsampler1D, vec4(0), float(0))
 
         // GLSL-COUNT-2: textureProjLod({{.*}}sampler2D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T(0)) == textureProjLod(gsampler2D, vec3(0), float(0))
         && gvec4(T(0)) == textureProjLod(gsampler2D, vec4(0), float(0))
 
         // GLSL: textureProjLod({{.*}}sampler3D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T(0)) == textureProjLod(gsampler3D, vec4(0), float(0))
 
         // GLSL: textureProjLod({{.*}}sampler1DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
-        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod
+        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == textureProjLod(uniform_sampler1DShadow, vec4(0), float(0))
 
         // GLSL: textureProjLod({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod
+        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == textureProjLod(uniform_sampler2DShadow, vec4(0), float(0))
 
         // GLSL-COUNT-2: textureProjLodOffset({{.*}}sampler1D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == textureProjLodOffset(gsampler1D, vec2(0), float(0), 0)
         && gvec4(T(0)) == textureProjLodOffset(gsampler1D, vec4(0), float(0), 0)
 
         // GLSL-COUNT-2: textureProjLodOffset({{.*}}sampler2D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == textureProjLodOffset(gsampler2D, vec3(0), float(0), offset2D)
         && gvec4(T(0)) == textureProjLodOffset(gsampler2D, vec4(0), float(0), offset2D)
 
         // GLSL: textureProjLodOffset({{.*}}sampler3D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T(0)) == textureProjLodOffset(gsampler3D, vec4(0), float(0), offset3D)
 
         // GLSL: textureProjLodOffset({{.*}}sampler1DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
-        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod
+        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && float(0) == textureProjLodOffset(uniform_sampler1DShadow, vec4(0), float(0), int(0))
 
         // GLSL: textureProjLodOffset({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod
+        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && float(0) == textureProjLodOffset(uniform_sampler2DShadow, vec4(0), float(0), offset2D)
 
         // GLSL: textureGrad({{.*}}sampler1D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureGrad(gsampler1D, float(0), float(0), float(0))
 
         // GLSL: textureGrad({{.*}}sampler2D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureGrad(gsampler2D, vec2(0), vec2(0), vec2(0))
 
         // GLSL: textureGrad({{.*}}sampler3D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureGrad(gsampler3D, vec3(0), vec3(0), vec3(0))
 
         // GLSL: textureGrad({{.*}}samplerCube
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureGrad(gsamplerCube, vec3(0), vec3(0), vec3(0))
 
         // GLSL: textureGrad({{.*}}sampler2DRect
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureGrad(gsampler2DRect, vec2(0), vec2(0), vec2(0))
 
         // GLSL: textureGrad({{.*}}sampler2DRectShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && float(0) == textureGrad(uniform_sampler2DRectShadow, vec3(0), vec2(0), vec2(0))
 
         // GLSL: textureGrad({{.*}}sampler1DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && float(0) == textureGrad(uniform_sampler1DShadow, vec3(0), float(0), float(0))
 
         // GLSL: textureGrad({{.*}}sampler1DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureGrad(gsampler1DArray, vec2(0), float(0), float(0))
 
         // GLSL: textureGrad({{.*}}sampler2DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureGrad(gsampler2DArray, vec3(0), vec2(0), vec2(0))
 
         // GLSL: textureGrad({{.*}}sampler1DArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && float(0) == textureGrad(uniform_sampler1DArrayShadow, vec3(0), float(0), float(0))
 
         // GLSL: textureGrad({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && float(0) == textureGrad(uniform_sampler2DShadow, vec3(0), vec2(0), vec2(0))
 
         // GLSL: textureGrad({{.*}}samplerCubeShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && float(0) == textureGrad(uniform_samplerCubeShadow, vec4(0), vec3(0), vec3(0))
 
         // GLSL: textureGrad({{.*}}sampler2DArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && float(0) == textureGrad(uniform_sampler2DArrayShadow, vec4(0), vec2(0), vec2(0))
 
         // GLSL: textureGrad({{.*}}samplerCubeArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureGrad(gsamplerCubeArray, vec4(0), vec3(0), vec3(0))
 
         // GLSL: textureGradOffset({{.*}}sampler1D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && gvec4(T(0)) == textureGradOffset(gsampler1D, float(0), float(0), float(0), 0)
 
         // GLSL: textureGradOffset({{.*}}sampler2D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && gvec4(T(0)) == textureGradOffset(gsampler2D, vec2(0), vec2(0), vec2(0), offset2D)
 
         // GLSL: textureGradOffset({{.*}}sampler3D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && gvec4(T(0)) == textureGradOffset(gsampler3D, vec3(0), vec3(0), vec3(0), offset3D)
 
         // GLSL: textureGradOffset({{.*}}sampler2DRect
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && gvec4(T(0)) == textureGradOffset(gsampler2DRect, vec2(0), vec2(0), vec2(0), offset2D)
 
         // GLSL: textureGradOffset({{.*}}sampler2DRectShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && float(0) == textureGradOffset(uniform_sampler2DRectShadow, vec3(0), vec2(0), vec2(0), offset2D)
 
         // GLSL: textureGradOffset({{.*}}sampler1DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && float(0) == textureGradOffset(uniform_sampler1DShadow, vec3(0), float(0), float(0), int(0))
 
         // GLSL: textureGradOffset({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && float(0) == textureGradOffset(uniform_sampler2DShadow, vec3(0), vec2(0), vec2(0), offset2D)
 
         // GLSL: textureGradOffset({{.*}}sampler2DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && gvec4(T(0)) == textureGradOffset(gsampler2DArray, vec3(0), vec2(0), vec2(0), offset2D)
 
         // GLSL: textureGradOffset({{.*}}sampler1DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
-        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset
+        // SPIR: OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && gvec4(T(0)) == textureGradOffset(gsampler1DArray, vec2(0), float(0), float(0), int(0))
 
         // GLSL: textureGradOffset({{.*}}sampler1DArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && float(0) == textureGradOffset(uniform_sampler1DArrayShadow, vec3(0), float(0), float(0), int(0))
 
         // GLSL: textureGradOffset({{.*}}sampler2DArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
-        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset
+        // SPIR: OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && float(0) == textureGradOffset(uniform_sampler2DArrayShadow, vec4(0), vec2(0), vec2(0), offset2D)
 
         // GLSL-COUNT-2: textureProjGrad({{.*}}sampler1D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureProjGrad(gsampler1D, vec2(0), float(0), float(0))
         && gvec4(T(0)) == textureProjGrad(gsampler1D, vec4(0), float(0), float(0))
 
         // GLSL-COUNT-2: textureProjGrad({{.*}}sampler2D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureProjGrad(gsampler2D, vec3(0), vec2(0), vec2(0))
         && gvec4(T(0)) == textureProjGrad(gsampler2D, vec4(0), vec2(0), vec2(0))
 
         // GLSL: textureProjGrad({{.*}}sampler3D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureProjGrad(gsampler3D, vec4(0), vec3(0), vec3(0))
 
         // GLSL-COUNT-2: textureProjGrad({{.*}}sampler2DRect
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && gvec4(T(0)) == textureProjGrad(gsampler2DRect, vec3(0), vec2(0), vec2(0))
         && gvec4(T(0)) == textureProjGrad(gsampler2DRect, vec4(0), vec2(0), vec2(0))
 
         // GLSL: textureProjGrad({{.*}}sampler2DRectShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && float(0) == textureProjGrad(uniform_sampler2DRectShadow, vec4(0), vec2(0), vec2(0))
 
         // GLSL: textureProjGrad({{.*}}sampler1DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
-        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && float(0) == textureProjGrad(uniform_sampler1DShadow, vec4(0), float(0), float(0))
 
         // GLSL: textureProjGrad({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad %
         && float(0) == textureProjGrad(uniform_sampler2DShadow, vec4(0), vec2(0), vec2(0))
 
         // GLSL-COUNT-2: textureProjGradOffset({{.*}}sampler1D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && gvec4(T(0)) == textureProjGradOffset(gsampler1D, vec2(0), float(0), float(0), 0)
         && gvec4(T(0)) == textureProjGradOffset(gsampler1D, vec4(0), float(0), float(0), 0)
 
         // GLSL-COUNT-2: textureProjGradOffset({{.*}}sampler2D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && gvec4(T(0)) == textureProjGradOffset(gsampler2D, vec3(0), vec2(0), vec2(0), offset2D)
         && gvec4(T(0)) == textureProjGradOffset(gsampler2D, vec4(0), vec2(0), vec2(0), offset2D)
 
         // GLSL: textureProjGradOffset({{.*}}sampler3D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && gvec4(T(0)) == textureProjGradOffset(gsampler3D, vec4(0), vec3(0), vec3(0), offset3D)
 
         // GLSL-COUNT-2: textureProjGradOffset({{.*}}sampler2DRect
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
-        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && gvec4(T(0)) == textureProjGradOffset(gsampler2DRect, vec3(0), vec2(0), vec2(0), offset2D)
         && gvec4(T(0)) == textureProjGradOffset(gsampler2DRect, vec4(0), vec2(0), vec2(0), offset2D)
 
         // GLSL: textureProjGradOffset({{.*}}sampler2DRectShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && float(0) == textureProjGradOffset(uniform_sampler2DRectShadow, vec4(0), vec2(0), vec2(0), offset2D)
 
         // GLSL: textureProjGradOffset({{.*}}sampler1DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
-        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && float(0) == textureProjGradOffset(uniform_sampler1DShadow, vec4(0), float(0), float(0), int(0))
 
         // GLSL: textureProjGradOffset({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad
+        // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && float(0) == textureProjGradOffset(uniform_sampler2DShadow, vec4(0), vec2(0), vec2(0), offset2D)
         
         // 8.9.4. Texture Gather Functions
 
         // GLSL-COUNT-2: textureGather({{.*}}sampler2D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageGather {{.*}}[[LOAD]]
         && gvec4(T(0)) == textureGather(gsampler2D, vec2(0))
         && gvec4(T(0)) == textureGather(gsampler2D, vec2(0), int(0))
 
         // GLSL-COUNT-2: textureGather({{.*}}sampler2DArray
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
-        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageGather {{.*}}[[LOAD]]
         && gvec4(T(0)) == textureGather(gsampler2DArray, vec3(0))
         && gvec4(T(0)) == textureGather(gsampler2DArray, vec3(0), int(0))
 
         // GLSL-COUNT-2: textureGather({{.*}}samplerCube
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
-        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageGather {{.*}}[[LOAD]]
         && gvec4(T(0)) == textureGather(gsamplerCube, vec3(0))
         && gvec4(T(0)) == textureGather(gsamplerCube, vec3(0), int(0))
 
         // GLSL-COUNT-2: textureGather({{.*}}samplerCubeArray
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
-        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageGather {{.*}}[[LOAD]]
         && gvec4(T(0)) == textureGather(gsamplerCubeArray, vec4(0))
         && gvec4(T(0)) == textureGather(gsamplerCubeArray, vec4(0), int(0))
 
         // GLSL-COUNT-2: textureGather({{.*}}sampler2DRect
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
-        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageGather {{.*}}[[LOAD]]
         && gvec4(T(0)) == textureGather(gsampler2DRect, vec2(0))
         && gvec4(T(0)) == textureGather(gsampler2DRect, vec2(0), int(0))
 
         // GLSL: textureGather({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]
         && vec4(0) == textureGather(uniform_sampler2DShadow, vec2(0), float(0))
 
         // GLSL: textureGather({{.*}}sampler2DArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
-        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]
         && vec4(0) == textureGather(uniform_sampler2DArrayShadow, vec3(0), float(0))
 
         // GLSL: textureGather({{.*}}samplerCubeShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
-        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]
         && vec4(0) == textureGather(uniform_samplerCubeShadow, vec3(0), float(0))
 
         // GLSL: textureGather({{.*}}samplerCubeArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArrayShadow
-        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]
         && vec4(0) == textureGather(uniform_samplerCubeArrayShadow, vec4(0), float(0))
 
         // GLSL: textureGather({{.*}}sampler2DRectShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]
         && vec4(0) == textureGather(uniform_sampler2DRectShadow, vec2(0), float(0))
 
         // GLSL-COUNT-2: textureGatherOffset({{.*}}sampler2D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureGatherOffset(gsampler2D, vec2(0), offset2D)
         && gvec4(T(0)) == textureGatherOffset(gsampler2D, vec2(0), offset2D, int(0))
 
         // GLSL-COUNT-2: textureGatherOffset({{.*}}sampler2DArray
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
-        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureGatherOffset(gsampler2DArray, vec3(0), offset2D)
         && gvec4(T(0)) == textureGatherOffset(gsampler2DArray, vec3(0), offset2D, int(0))
 
         // GLSL: textureGatherOffset({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && vec4(0) == textureGatherOffset(uniform_sampler2DShadow, vec2(0), float(0), offset2D)
 
         // GLSL: textureGatherOffset({{.*}}sampler2DArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
-        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && vec4(0) == textureGatherOffset(uniform_sampler2DArrayShadow, vec3(0), float(0), offset2D)
 
         // GLSL-COUNT-2: textureGatherOffset({{.*}}sampler2DRect
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
-        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), offset2D)
         && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), offset2D, int(0))
 
         // GLSL: textureGatherOffset({{.*}}sampler2DRectShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}}
+        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}} ConstOffset %
         && vec4(0) == textureGatherOffset(uniform_sampler2DRectShadow, vec2(0), float(0), offset2D)
 
         // GLSL-COUNT-2: textureGatherOffsets({{.*}}sampler2D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}} ConstOffsets
+        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}} ConstOffsets %
         && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), offsets)
         && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), offsets, int(0))
 
         // GLSL-COUNT-2: textureGatherOffsets({{.*}}sampler2DArray
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
-        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}} ConstOffsets
+        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}} ConstOffsets %
         && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), offsets)
         && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), offsets, int(0))
 
         // GLSL: textureGatherOffsets({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}} ConstOffsets
+        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}} ConstOffsets %
         && vec4(0) == textureGatherOffsets(uniform_sampler2DShadow, vec2(0), float(0), offsets)
 
         // GLSL: textureGatherOffsets({{.*}}sampler2DArrayShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
-        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}} ConstOffsets
+        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}} ConstOffsets %
         && vec4(0) == textureGatherOffsets(uniform_sampler2DArrayShadow, vec3(0), float(0), offsets)
 
         // GLSL-COUNT-2: textureGatherOffsets({{.*}}sampler2DRect
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
-        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}} ConstOffsets
+        // SPIR: OpImageGather {{.*}}[[LOAD]]{{.*}} ConstOffsets %
         && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), offsets)
         && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), offsets, int(0))
 
         // GLSL: textureGatherOffsets({{.*}}sampler2DRectShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}} ConstOffsets
+        // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}} ConstOffsets %
         && vec4(0) == textureGatherOffsets(uniform_sampler2DRectShadow, vec2(0), float(0), offsets)
 
         // 8.9.5. Compatibility Profile Texture Functions

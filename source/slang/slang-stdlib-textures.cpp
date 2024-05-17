@@ -64,6 +64,7 @@ TextureTypeInfo::TextureTypeInfo(
 
 void TextureTypeInfo::writeFuncBody(
     const char* funcName,
+    bool needToRequireComputeDerivative,
     const String& glsl,
     const String& cuda,
     const String& spirvDefault,
@@ -73,6 +74,8 @@ void TextureTypeInfo::writeFuncBody(
 {
     BraceScope funcScope{i, sb};
     {
+        if (needToRequireComputeDerivative)
+            sb << i << "__requireComputeDerivative();\n";
         sb << i << "__target_switch\n";
         BraceScope switchScope{i, sb};
         sb << i << "case cpp:\n";
@@ -128,6 +131,7 @@ void TextureTypeInfo::writeFuncBody(
 void TextureTypeInfo::writeFuncWithSig(
     const char* funcName,
     const String& sig,
+    bool needToRequireComputeDerivative,
     const String& glsl,
     const String& spirvDefault,
     const String& spirvRWDefault,
@@ -140,7 +144,7 @@ void TextureTypeInfo::writeFuncWithSig(
         sb << i << "[__readNone]\n";
     sb << i << "[ForceInline]\n";
     sb << i << sig << "\n";
-    writeFuncBody(funcName, glsl, cuda, spirvDefault, spirvRWDefault, spirvCombined, metal);
+    writeFuncBody(funcName, needToRequireComputeDerivative, glsl, cuda, spirvDefault, spirvRWDefault, spirvCombined, metal);
     sb << "\n";
 }
 
@@ -148,6 +152,7 @@ void TextureTypeInfo::writeFunc(
     const char* returnType,
     const char* funcName,
     const String& params,
+    bool needToRequireComputeDerivative,
     const String& glsl,
     const String& spirvDefault,
     const String& spirvRWDefault,
@@ -159,6 +164,7 @@ void TextureTypeInfo::writeFunc(
     writeFuncWithSig(
         funcName,
         cat(returnType, " ", funcName, "(", params, ")"),
+        needToRequireComputeDerivative,
         glsl,
         spirvDefault,
         spirvRWDefault,
@@ -458,6 +464,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 "void",
                 "GetDimensions",
                 params,
+                !isMultisample,
                 glsl,
                 spirvDefault,
                 spirvRWDefault,

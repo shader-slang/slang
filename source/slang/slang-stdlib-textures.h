@@ -64,6 +64,7 @@ public:
 
     void writeFuncBody(
         const char* funcName,
+        bool needToRequireComputeDerivative,
         const String& glsl,
         const String& cuda,
         const String& spirvDefault,
@@ -74,6 +75,7 @@ public:
     void writeFuncWithSig(
         const char* funcName,
         const String& sig,
+        bool needToRequireComputeDerivative,
         const String& glsl = String{},
         const String& spirvDefault = String{},
         const String& spirvRWDefault = String{},
@@ -86,6 +88,7 @@ public:
         const char* returnType,
         const char* funcName,
         const String& params,
+        bool needToRequireComputeDerivative,
         const String& glsl = String{},
         const String& spirvDefault = String{},
         const String& spirvRWDefault = String{},
