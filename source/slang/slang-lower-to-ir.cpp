@@ -3925,6 +3925,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(arrayType->getElementCount());
     }
 
+    LoweredValInfo visitDefaultConstructExpr(DefaultConstructExpr* expr)
+    {
+        return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(lowerType(context, expr->type)));
+    }
+
     LoweredValInfo visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     {
         // Lets try and lower to a constant

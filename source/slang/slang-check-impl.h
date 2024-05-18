@@ -640,57 +640,6 @@ namespace Slang
         FunctionDifferentiableLevel _getFuncDifferentiableLevelImpl(FunctionDeclBase* func, int recurseLimit);
         FunctionDifferentiableLevel getFuncDifferentiableLevel(FunctionDeclBase* func);
 
-        // Go through decl->members<InheritanceDecl>() recursivley and return all instances of `inheritanceToFilterOn` type.
-        // Only traverse and check InheritanceDecl's which have a type equal to `InheritanceDeclBaseTypeToFilterOn`
-        template<typename InheritanceDeclBaseTypeToFilterOn>
-        bool findInheritance(SemanticsVisitor* visitor, AggTypeDeclBase* targetToSearchThrough, Type* inheritanceToFilterOn)
-        {
-            if (!targetToSearchThrough)
-                return false;
-
-            for (auto member : targetToSearchThrough->members)
-            {
-                if (auto inheritanceDecl = as<InheritanceDecl>(member))
-                {
-                    if (!inheritanceDecl->base || !inheritanceDecl->base.type)
-                        continue;
-                    if (inheritanceDecl->base.type == inheritanceToFilterOn)
-                        return true;
-                    else
-                    {
-                        auto baseDeclRef = as<DeclRefType>(inheritanceDecl->base.type);
-                        if (!baseDeclRef || !baseDeclRef->getDeclRef())
-                            continue;
-
-                        if (findInheritance<InheritanceDeclBaseTypeToFilterOn>(
-                                visitor,
-                                as<InheritanceDeclBaseTypeToFilterOn>(baseDeclRef->getDeclRef().getDecl()),
-                                inheritanceToFilterOn))
-                        {
-                            return true;
-                        }
-                    }
-                }
-            }
-
-            auto aggTypeDecl = as<AggTypeDecl>(targetToSearchThrough);
-            if (!aggTypeDecl)
-                return false;
-            
-            for (auto extensionDecl : getCandidateExtensions(aggTypeDecl, visitor))
-            {
-                if (findInheritance<InheritanceDeclBaseTypeToFilterOn>(
-                    visitor,
-                    extensionDecl,
-                    inheritanceToFilterOn))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
             /// Get the processed inheritance information for `type`, including all its facets
         InheritanceInfo getInheritanceInfo(Type* type);
 
@@ -2734,6 +2683,8 @@ namespace Slang
         Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr);
 
         Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
+
+        Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr);
 
         Expr* visitSPIRVAsmExpr(SPIRVAsmExpr*);
 

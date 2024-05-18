@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
-// CHECK-COUNT-4: {{.* }}= 0U;
+// CHECK-COUNT-6: {{.* }}= 0U;
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -emit-spirv-directly -allow-glsl
@@ -38,8 +38,17 @@ struct idefault4
 
 extension idefault4 : IDefaultInitializableType
 {
-
 }
+
+struct idefault5_base : IDefaultInitializableType
+{
+    uint data1;
+};
+
+struct idefault5 : idefault5_base
+{
+    uint data2;
+};
 
 idefault1 getDefault1()
 {
@@ -62,6 +71,12 @@ idefault4 getDefault4()
     return default4;   
 }
 
+idefault5 getDefault5()
+{
+    idefault5 default5;
+    return default5;
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
@@ -70,12 +85,19 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     idefault2 default2 = getDefault2();
     idefault3 default3 = getDefault3();
     idefault4 default4 = getDefault4();
-    
+    idefault5 default5 = getDefault5();
+
     outputBuffer[0] = true
-    && default1.data == 0
-    && default2.data1 == 0
-    && default2.data2 == 1
-    && default3.data == 0
-    && default4.data == 0
-    ;
+        && default1.data == 0
+
+        && default2.data1 == 0
+        && default2.data2 == 1
+
+        && default3.data == 0
+
+        && default4.data == 0
+
+        && default5.data1 == 0
+        && default5.data2 == 0
+        ;
 }

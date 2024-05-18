@@ -1948,7 +1948,7 @@ namespace Slang
         checkVisibility(classDecl);
     }
 
-    static InvokeExpr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+    static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
     {
         if (!varDecl->type || !varDecl->type.type)
             return nullptr;
@@ -1972,19 +1972,9 @@ namespace Slang
         }
         else
         {
-            auto* defaultCall = visitor->getASTBuilder()->create<VarExpr>();
-            defaultCall->type = QualType();
-            defaultCall->name = visitor->getName("__default");
-            defaultCall->scope = varDecl->parentDecl->ownedScope;
-
-            auto* defaultFunction = visitor->getASTBuilder()->create<GenericAppExpr>();
-            defaultFunction->functionExpr = defaultCall;
-            defaultFunction->arguments.add(varDecl->type.exp);
-
-            auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
-            invoke->functionExpr = defaultFunction;
-
-            return invoke;
+            auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();
+            defaultCall->type = QualType(varDecl->type);
+            return defaultCall;
         }
     }
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
@@ -6088,7 +6078,7 @@ namespace Slang
                 // This requires that we check for transitive relationships of all struct->interface, 
                 // struct->interface->interface..., relationship 
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
-                if(this->getShared()->findInheritance<InterfaceDecl>(this, decl, defaultInitializableType))
+                if(isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType))
                 {
                     InheritanceDecl* conformanceDecl = m_astBuilder->create<InheritanceDecl>();
                     conformanceDecl->parentDecl = decl;
@@ -7594,7 +7584,7 @@ namespace Slang
 
         // ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if init expressions 
         // of members are to be synthisised, they are.
-        bool isDefaultInitializableType = this->getShared()->findInheritance<InterfaceDecl>(this, structDecl, m_astBuilder->getDefaultInitializableType());
+        bool isDefaultInitializableType = isSubtype(DeclRefType::create(m_astBuilder, structDecl), m_astBuilder->getDefaultInitializableType());
         for (auto m : structDecl->members)
         {
             auto varDeclBase = as<VarDeclBase>(m);

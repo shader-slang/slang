@@ -3113,6 +3113,12 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsExprVisitor::visitDefaultConstructExpr(DefaultConstructExpr* expr)
+    {
+        return expr;
+    }
+
+
     static bool _isSizeOfType(Type* type)
     {
         if (!type)
