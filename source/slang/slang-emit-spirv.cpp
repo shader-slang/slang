@@ -6141,15 +6141,17 @@ struct SPIRVEmitContext
         }
     }
 
+    // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
     Dictionary<SpvWord, OrderedHashSet<SpvExecutionMode>> m_executionModes;
     template<typename... Operands>
     void requireSPIRVExecutionMode(IRInst* parentInst, SpvWord entryPoint, SpvExecutionMode executionMode, const Operands& ...ops)
     {
         if (m_executionModes[entryPoint].add(executionMode))
         {
-            emitOpExecutionMode(
+            emitInst(
                 getSection(SpvLogicalSectionID::ExecutionModes),
                 parentInst,
+                SpvOpExecutionMode,
                 entryPoint,
                 executionMode,
                 ops...

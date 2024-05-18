@@ -73,20 +73,6 @@ SpvInst* emitOpEntryPoint(
     return emitInst(parent, inst, SpvOpEntryPoint, executionModel, entryPoint, name, interfaces);
 }
 
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
-template<typename... Operands, typename T>
-SpvInst* emitOpExecutionMode(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T& entryPoint,
-    SpvExecutionMode mode,
-    const Operands& ...ops
-)
-{
-    static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpExecutionMode, entryPoint, mode, ops...);
-}
-
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCapability
 SpvInst* emitOpCapability(SpvInstParent* parent, IRInst* inst, SpvCapability capability)
 {
