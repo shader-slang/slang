@@ -294,6 +294,7 @@ void initCommandOptions(CommandOptions& options)
         "Structs will set all struct-fields without an init expression to 0."
         "All variables will call their default constructor if not explicitly initialized as usual."},
         { OptionKind::IgnoreCapabilities,"-ignore-capabilities", nullptr, "Do not warn or error if capabilities are violated"},
+        { OptionKind::MinimumSlangOptimization, "-minimum-slang-optimization", nullptr, "Perform minimum code optimization in Slang to favor compilation time."},
         { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
         "Set the module name to use when compiling multiple .slang source files into a single module."},
         { OptionKind::Output, "-o", "-o <path>", 

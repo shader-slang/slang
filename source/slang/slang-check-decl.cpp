@@ -9211,8 +9211,10 @@ namespace Slang
             break;
 
         case DeclCheckState::CapabilityChecked:
-            if(!shared.getOptionSet().getBoolOption(CompilerOptionName::IgnoreCapabilities))
+            if (!shared.getOptionSet().getBoolOption(CompilerOptionName::IgnoreCapabilities))
+            {
                 SemanticsDeclCapabilityVisitor(shared).dispatch(decl);
+            }
             break;
         }
     }

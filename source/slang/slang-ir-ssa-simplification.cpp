@@ -15,6 +15,27 @@
 
 namespace Slang
 {
+    IRSimplificationOptions IRSimplificationOptions::getDefault(TargetProgram* targetProgram)
+    {
+        IRSimplificationOptions result;
+        result.minimalOptimization = targetProgram->getOptionSet().shouldPerformMinimumOptimizations();
+        if (result.minimalOptimization)
+            result.cfgOptions = CFGSimplificationOptions::getFast();
+        else
+            result.cfgOptions = CFGSimplificationOptions::getDefault();
+        result.peepholeOptions = PeepholeOptimizationOptions();
+        return result;
+    }
+
+    IRSimplificationOptions IRSimplificationOptions::getFast(TargetProgram* targetProgram)
+    {
+        IRSimplificationOptions result;
+        result.minimalOptimization = targetProgram->getOptionSet().shouldPerformMinimumOptimizations();
+        result.cfgOptions = CFGSimplificationOptions::getFast();
+        result.peepholeOptions = PeepholeOptimizationOptions();
+        return result;
+    }
+
     // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
     // until no more changes are possible.
     void simplifyIR(TargetProgram* target, IRModule* module, IRSimplificationOptions options, DiagnosticSink* sink)
@@ -50,7 +71,8 @@ namespace Slang
                     funcChanged = false;
                     funcChanged |= applySparseConditionalConstantPropagation(func, sink);
                     funcChanged |= peepholeOptimize(target, func);
-                    funcChanged |= removeRedundancyInFunc(func);
+                    if (!options.minimalOptimization)
+                        funcChanged |= removeRedundancyInFunc(func);
                     funcChanged |= simplifyCFG(func, options.cfgOptions);
                     eliminateDeadCode(func);
                     funcChanged |= constructSSA(func);
@@ -78,7 +100,8 @@ namespace Slang
             changed = false;
             changed |= peepholeOptimize(target, module, options.peepholeOptions);
 
-            changed |= removeRedundancy(module);
+            if (!options.minimalOptimization)
+                changed |= removeRedundancy(module);
             changed |= simplifyCFG(module, options.cfgOptions);
 
             // Note: we disregard the `changed` state from dead code elimination pass since
@@ -103,7 +126,8 @@ namespace Slang
             changed = false;
             changed |= applySparseConditionalConstantPropagation(func, sink);
             changed |= peepholeOptimize(target, func);
-            changed |= removeRedundancyInFunc(func);
+            if (!options.minimalOptimization)
+                changed |= removeRedundancyInFunc(func);
             changed |= simplifyCFG(func, options.cfgOptions);
 
             // Note: we disregard the `changed` state from dead code elimination pass since
