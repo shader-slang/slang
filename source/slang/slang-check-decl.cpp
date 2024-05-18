@@ -1972,7 +1972,7 @@ namespace Slang
         }
         else
         {
-            auto* defaultCall = visitor->getASTBuilder()->create<DefaultValExpr>();
+            auto* defaultCall = visitor->getASTBuilder()->create<VarExpr>();
             defaultCall->type = QualType();
             defaultCall->name = visitor->getName("__default");
             defaultCall->scope = varDecl->parentDecl->ownedScope;
