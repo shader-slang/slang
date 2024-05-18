@@ -6074,11 +6074,9 @@ namespace Slang
 
             if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize))
             {
-                // Force add IDefaultInitializableType to any struct missing `IDefaultInitializableType`.
-                // This requires that we check for transitive relationships of all struct->interface, 
-                // struct->interface->interface..., relationship 
+                // Force add IDefaultInitializableType to any struct missing (transitively) `IDefaultInitializableType`.
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
-                if(isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType))
+                if(isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType), true)
                 {
                     InheritanceDecl* conformanceDecl = m_astBuilder->create<InheritanceDecl>();
                     conformanceDecl->parentDecl = decl;

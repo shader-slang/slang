@@ -51,19 +51,23 @@ namespace Slang
 
     SubtypeWitness* SemanticsVisitor::isSubtype(
         Type* subType,
-        Type* superType)
+        Type* superType,
+        bool subtypeInheritanceIsNotFullyResolved
+    )
     {
         SubtypeWitness* result = nullptr;
         if (getShared()->tryGetSubtypeWitnessFromCache(subType, superType, result))
             return result;
-        result = checkAndConstructSubtypeWitness(subType, superType);
-        getShared()->cacheSubtypeWitness(subType, superType, result);
+        result = checkAndConstructSubtypeWitness(subType, superType, subtypeInheritanceIsNotFullyResolved);
+        if(!subtypeInheritanceIsNotFullyResolved)
+            getShared()->cacheSubtypeWitness(subType, superType, result);
         return result;
     }
 
     SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         Type*                   subType,
-        Type*                   superType)
+        Type*                   superType,
+        bool                    subtypeInheritanceIsNotFullyResolved)
     {
         // TODO: The Slang codebase is currently being quite slippery by conflating
         // multiple concepts, all under the banner of a "subtype" test:
@@ -105,11 +109,13 @@ namespace Slang
         // tangling convertibility into it.
 
         // First, make sure both sub type and super type decl are ready for lookup.
-        if (auto subDeclRefType = as<DeclRefType>(subType))
-        {
-            ensureDecl(subDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
+        if (subtypeInheritanceIsNotFullyResolved) {
+            if (auto subDeclRefType = as<DeclRefType>(subType))
+            {
+                ensureDecl(subDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
+            }
         }
-        if (auto superDeclRefType = as<DeclRefType>(subType))
+        if (auto superDeclRefType = as<DeclRefType>(superType))
         {
             ensureDecl(superDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
         }

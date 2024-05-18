@@ -2057,9 +2057,14 @@ namespace Slang
             ///
         SubtypeWitness* isSubtype(
             Type*                   subType,
-            Type*                   superType);
+            Type*                   superType,
+            bool subtypeInheritanceIsNotFullyResolved = false //resolving members may not be required in `SemanticsDeclBasesVisitor`
+        );
 
-        SubtypeWitness* checkAndConstructSubtypeWitness(Type* subType, Type* superType);
+        SubtypeWitness* checkAndConstructSubtypeWitness(
+            Type* subType,
+            Type* superType,
+            bool subtypeInheritanceIsNotFullyResolved = false);
 
         bool isValidGenericConstraintType(Type* type);
 
