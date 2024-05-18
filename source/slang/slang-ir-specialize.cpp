@@ -1546,7 +1546,7 @@ struct SpecializationContext
         //
         addToWorkList(newFunc);
 
-        simplifyFunc(targetProgram, newFunc, IRSimplificationOptions::getFast());
+        simplifyFunc(targetProgram, newFunc, IRSimplificationOptions::getFast(targetProgram));
 
         return newFunc;
     }
@@ -2407,7 +2407,7 @@ IRInst* specializeGenericImpl(
                 {
                     if (auto func = as<IRFunc>(specializedVal))
                     {
-                        simplifyFunc(context->targetProgram, func, IRSimplificationOptions::getFast());
+                        simplifyFunc(context->targetProgram, func, IRSimplificationOptions::getFast(context->targetProgram));
                     }
                 }
 

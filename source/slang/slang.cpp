@@ -1266,6 +1266,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
     slang::IComponentType**         outCompositeComponentType,
     ISlangBlob**                    outDiagnostics)
 {
+    if (outCompositeComponentType == nullptr)
+        return SLANG_E_INVALID_ARG;
+
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     // Attempting to create a "composite" of just one component type should
@@ -1491,6 +1494,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
     SlangInt conformanceIdOverride,
     ISlangBlob** outDiagnostics)
 {
+    if (outConformanceComponentType == nullptr)
+        return SLANG_E_INVALID_ARG;
+
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     RefPtr<TypeConformance> result;
@@ -5682,6 +5688,16 @@ void EndToEndCompileRequest::setReportPerfBenchmark(bool value)
 void EndToEndCompileRequest::setSkipSPIRVValidation(bool value)
 {
     getOptionSet().set(CompilerOptionName::SkipSPIRVValidation, value);
+}
+
+void EndToEndCompileRequest::setTargetUseMinimumSlangOptimization(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::MinimumSlangOptimization, value);
+}
+
+void EndToEndCompileRequest::setIgnoreCapabilityCheck(bool value)
+{
+    getOptionSet().set(CompilerOptionName::IgnoreCapabilities, value);
 }
 
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)
