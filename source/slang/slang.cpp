@@ -5697,6 +5697,16 @@ void EndToEndCompileRequest::setSkipSPIRVValidation(bool value)
     getOptionSet().set(CompilerOptionName::SkipSPIRVValidation, value);
 }
 
+void EndToEndCompileRequest::setTargetUseMinimumSlangOptimization(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::MinimumSlangOptimization, value);
+}
+
+void EndToEndCompileRequest::setIgnoreCapabilityCheck(bool value)
+{
+    getOptionSet().set(CompilerOptionName::IgnoreCapabilities, value);
+}
+
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)
 {
     ComPtr<ISlangWriter> writer(new CallbackWriter(callback, userData, WriterFlag::IsConsole));
