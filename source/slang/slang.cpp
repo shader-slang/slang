@@ -319,6 +319,8 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 #ifdef _DEBUG
     // Print a message in debug builds to notice the user that compiling the stdlib
     // can take a while.
+    time_t beginTime;
+    time(&beginTime);
     fprintf(stderr, "Compiling stdlib on debug build, this can take a while.\n");
 #endif
 
@@ -372,6 +374,11 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
     finalizeSharedASTBuilder();
 
+#ifdef _DEBUG
+    time_t endTime;
+    time(&endTime);
+    fprintf(stderr, "Compiling stdlib took %.2f seconds.\n", difftime(endTime, beginTime));
+#endif
     return SLANG_OK;
 }
 
