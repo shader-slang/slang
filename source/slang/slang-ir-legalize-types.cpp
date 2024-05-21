@@ -2114,6 +2114,7 @@ static LegalVal legalizeLocalVar(
     }
     break;
     }
+    return {};
 }
 
 static LegalVal legalizeParam(
@@ -3539,6 +3540,7 @@ static LegalVal legalizeGlobalVar(
         }
         break;
     }
+    return {};
 }
 
 static LegalVal legalizeGlobalParam(
@@ -3588,6 +3590,7 @@ static LegalVal legalizeGlobalParam(
         }
         break;
     }
+    return {};
 }
 
 static constexpr int kHasBeenAddedOrProcessedScratchBitIndex = 0;

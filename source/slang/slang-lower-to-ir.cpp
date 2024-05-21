@@ -2224,7 +2224,7 @@ void addVarDecorations(
         {
             builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
         }
-        else if (auto dynamicUniform = as<DynamicUniformModifier>(mod))
+        else if (as<DynamicUniformModifier>(mod))
         {
             builder->addDynamicUniformDecoration(inst);
         }
@@ -8629,7 +8629,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     lowerPackOffsetModifier(fieldKey, packOffsetModifier);
                 }
-                else if (auto dynamicUniformModifer = as<DynamicUniformModifier>(mod))
+                else if (as<DynamicUniformModifier>(mod))
                 {
                     subBuilder->addDynamicUniformDecoration(fieldKey);
                 }
@@ -9774,15 +9774,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
             }
-            else if (auto derivativeGroupQuadMod = as<DerivativeGroupQuadAttribute>(modifier))
+            else if (as<DerivativeGroupQuadAttribute>(modifier))
             {
                 derivativeGroupQuadDecor = getBuilder()->addSimpleDecoration<IRDerivativeGroupQuadDecoration>(irFunc);
             }
-            else if (auto derivativeGroupLinearMod = as<DerivativeGroupLinearAttribute>(modifier))
+            else if (as<DerivativeGroupLinearAttribute>(modifier))
             {
                 derivativeGroupLinearDecor = getBuilder()->addSimpleDecoration<IRDerivativeGroupLinearDecoration>(irFunc);
             }
-            else if (auto noRefInlineAttribute = as<NoRefInlineAttribute>(modifier))
+            else if (as<NoRefInlineAttribute>(modifier))
             {
                 getBuilder()->addSimpleDecoration<IRNoRefInlineDecoration>(irFunc);
             }
@@ -9954,7 +9954,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
             else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
                 getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
-            else if (auto nonUniform= as<NonDynamicUniformAttribute>(modifier))
+            else if (as<NonDynamicUniformAttribute>(modifier))
                 getBuilder()->addDecoration(irFunc, kIROp_NonDynamicUniformReturnDecoration);
         }
 
