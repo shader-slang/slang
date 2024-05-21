@@ -4041,6 +4041,8 @@ namespace slang
             /** Sets the flags of the request's diagnostic sink.
                 The previously specified flags are discarded. */
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) = 0;
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()

@@ -2544,6 +2544,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setPassThrough(SlangPassThrough passThrough) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setWriter(SlangWriterChannel channel, ISlangWriter* writer) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW ISlangWriter* SLANG_MCALL getWriter(SlangWriterChannel channel) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL addSearchPath(const char* searchDir) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL addPreprocessorDefine(const char* key, const char* value) SLANG_OVERRIDE;
@@ -2625,6 +2626,8 @@ namespace Slang
 
         // Are we being driven by the command-line `slangc`, and should act accordingly?
         bool m_isCommandLineCompile = false;
+
+        bool m_reportDownstreamCompileTime = false;
 
         String m_diagnosticOutput;
 

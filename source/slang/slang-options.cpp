@@ -567,6 +567,7 @@ struct OptionsParser
             "  -Wno-<id>: Disable a warning with the specified id.\n"
             "  -dump-warning-diagnostics: Dump to output list of warning diagnostic numeric and name ids.\n"
             "  --: Treat the rest of the command line as input files.\n"
+            "  -report-downstream-time: Reports the time spent in the downstream compiler.\n"
             "\n"
             "Target code generation options:\n"
             "\n"
@@ -1653,6 +1654,12 @@ struct OptionsParser
                     {
                         SLANG_RETURN_ON_FAIL(addInputPath(reader.getValueAndAdvance().getBuffer()));
                     }
+                    break;
+                }
+                else if (argValue == "-report-downstream-time")
+                {
+                    // TODO: Set a flag on the compile request to report downstream time
+                    compileRequest->setReportDownstreamTime(true);
                     break;
                 }
                 else
