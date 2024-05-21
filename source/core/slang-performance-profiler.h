@@ -23,6 +23,20 @@ public:
     static PerformanceProfiler* getProfiler();
 };
 
+class SerialPerformaceProfiler
+{
+public:
+    virtual void accumulateResults(StringBuilder& out, PerformanceProfiler* profile) = 0;
+    static SerialPerformaceProfiler* getProfiler();
+private:
+    // Those are supposed to accumulate the time spent in each thread
+    static std::atomic<long long> m_semanticsCheckTime;
+    static std::atomic<long long> m_IRGenTime;
+    static std::atomic<long long> m_earlyInlneTime;
+    static std::atomic<long long> m_linkIRTime;
+    static std::atomic<long long> m_optimizeIRTime;
+};
+
 struct PerformanceProfilerFuncRAIIContext
 {
     FuncProfileContext context;

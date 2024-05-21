@@ -6025,6 +6025,10 @@ void EndToEndCompileRequest::setAllowGLSLInput(bool value)
     getOptionSet().set(CompilerOptionName::AllowGLSL, value);
 }
 
+#include <atomic>
+static std::atomic<long> totalTimeAtomic = 0;
+static std::atomic<long> downstreamTimeAtomic = 0;
+
 SlangResult EndToEndCompileRequest::compile()
 {
     SlangResult res = SLANG_FAIL;
@@ -6094,7 +6098,20 @@ SlangResult EndToEndCompileRequest::compile()
         double totalEndTime = 0;
         getSession()->getCompilerElapsedTime(&totalEndTime, &downstreamEndTime);
         double downstreamTime = downstreamEndTime - downstreamStartTime;
+        double totalTime = totalEndTime - totalStartTime;
         String downstreamTimeStr = String(downstreamTime, "%.2f");
+
+        long downstreamTimeLong = downstreamTime * 1e4;
+        long totalTimeLong = totalTime * 1e4;
+
+        totalTimeAtomic += totalTimeLong;
+        downstreamTimeAtomic += downstreamTimeLong;
+
+        // printf("Total Time: %.2f, Downstream time: %.2f\n", totalTimeAtomic.load() / 1e4f, downstreamTimeAtomic.load()/1e4f);
+        StringBuilder out;
+        SerialPerformaceProfiler::getProfiler()->accumulateResults(out, PerformanceProfiler::getProfiler());
+        printf("%s", out.toString().begin());
+
         getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
     }
     if (getOptionSet().getBoolOption(CompilerOptionName::ReportPerfBenchmark))
