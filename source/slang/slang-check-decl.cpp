@@ -6076,7 +6076,7 @@ namespace Slang
             {
                 // Force add IDefaultInitializableType to any struct missing (transitively) `IDefaultInitializableType`.
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
-                if(isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType), true)
+                if(!isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType), true)
                 {
                     InheritanceDecl* conformanceDecl = m_astBuilder->create<InheritanceDecl>();
                     conformanceDecl->parentDecl = decl;
