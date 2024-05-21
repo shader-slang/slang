@@ -510,16 +510,30 @@ float __glsl_texture_offset_level_zero_1d_shadow<TTexture, TCoord, TOffset>(TTex
     }
 }
 
+${{{{
+for (int isScalarTexture = 0; isScalarTexture < 2; isScalarTexture++)
+{
+    const char* returnType = isScalarTexture ? "T" : "vector<T,4>";
+    const char* isShadow = isScalarTexture ? "isShadow" : "0";
+    if (isScalarTexture)
+    {
+        sb << "__generic<T:__BuiltinArithmeticType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>\n";
+        sb << "extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>\n";
+    }
+    else
+    {
+        sb << "__generic<T:__BuiltinArithmeticType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>\n";
+        sb << "extension __TextureImpl<vector<T,4>,Shape,isArray,isMS,sampleCount,0,0,1,format>\n";
+    }
+}}}}
 
-__generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
-extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 {
     static const int access = 0;
 
     typealias TextureCoord = vector<float, Shape.dimensions>;
 
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetTexture))
-    __TextureImpl<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> __getTexture();
+    __TextureImpl<$(returnType), Shape, isArray, isMS, sampleCount, 0, $(isShadow), 0, format> __getTexture();
 
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
     SamplerState __getSampler();
@@ -576,7 +590,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
-    T Sample(vector<float, Shape.dimensions+isArray> location)
+    $(returnType) Sample(vector<float, Shape.dimensions+isArray> location)
     {
         __requireComputeDerivative();
         __target_switch
@@ -619,8 +633,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %sampled : __sampledType($(returnType)) = OpImageSampleImplicitLod $this $location None;
+                    __truncate $$$(returnType) result __sampledType($(returnType)) %sampled;
                 };
         }
     }
@@ -628,7 +642,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
-    T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
+    $(returnType) Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
         __target_switch
@@ -643,8 +657,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %sampled : __sampledType($(returnType)) = OpImageSampleImplicitLod $this $location None|ConstOffset $offset;
+                    __truncate $$$(returnType) result __sampledType($(returnType)) %sampled;
                 };
         }
     }
@@ -653,7 +667,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
-    T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp)
+    $(returnType) Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __requireComputeDerivative();
         __target_switch
@@ -668,8 +682,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset|MinLod $offset $clamp;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %sampled : __sampledType($(returnType)) = OpImageSampleImplicitLod $this $location None|ConstOffset|MinLod $offset $clamp;
+                    __truncate $$$(returnType) result __sampledType($(returnType)) %sampled;
                 };
         }
     }
@@ -677,7 +691,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
-    T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    $(returnType) Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __target_switch
         {
@@ -691,7 +705,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
-    T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias)
+    $(returnType) SampleBias(vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __requireComputeDerivative();
         __target_switch
@@ -705,8 +719,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias $bias;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %sampled : __sampledType($(returnType)) = OpImageSampleImplicitLod $this $location None|Bias $bias;
+                    __truncate $$$(returnType) result __sampledType($(returnType)) %sampled;
 
                 };
         }
@@ -715,7 +729,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
-    T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
+    $(returnType) SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
         __target_switch
@@ -729,8 +743,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset $bias $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %sampled : __sampledType($(returnType)) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset $bias $offset;
+                    __truncate $$$(returnType) result __sampledType($(returnType)) %sampled;
                 };
         }
     }
@@ -852,7 +866,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
+    $(returnType) SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
         {
@@ -866,8 +880,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad $gradX $gradY;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %sampled : __sampledType($(returnType)) = OpImageSampleExplicitLod $this $location None|Grad $gradX $gradY;
+                    __truncate $$$(returnType) result __sampledType($(returnType)) %sampled;
                 };
         }
     }
@@ -875,7 +889,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
+    $(returnType) SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
     {
         __target_switch
         {
@@ -888,8 +902,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset $gradX $gradY $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %sampled : __sampledType($(returnType)) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset $gradX $gradY $offset;
+                    __truncate $$$(returnType) result __sampledType($(returnType)) %sampled;
                 };
         }
     }
@@ -898,7 +912,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
+    $(returnType) SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
     {
         __target_switch
         {
@@ -912,8 +926,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %sampled : __sampledType($(returnType)) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                    __truncate $$$(returnType) result __sampledType($(returnType)) %sampled;
                 };
         }
     }
@@ -921,7 +935,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
-    T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level)
+    $(returnType) SampleLevel(vector<float, Shape.dimensions+isArray> location, float level)
     {
         __target_switch
         {
@@ -965,8 +979,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod $level;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %sampled : __sampledType($(returnType)) = OpImageSampleExplicitLod $this $location None|Lod $level;
+                    __truncate $$$(returnType) result __sampledType($(returnType)) %sampled;
                 };
         }
     }
@@ -974,7 +988,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
-    T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
+    $(returnType) SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
@@ -988,12 +1002,16 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod|ConstOffset $level $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %sampled : __sampledType($(returnType)) = OpImageSampleExplicitLod $this $location None|Lod|ConstOffset $level $offset;
+                    __truncate $$$(returnType) result __sampledType($(returnType)) %sampled;
                 };
         }
     }
 }
+
+${{{{
+}
+}}}}
 
 // Non-combined texture types specific functions
 __generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
@@ -1046,7 +1064,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
     }
 }
 
-__generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     [__readNone]
@@ -2134,34 +2152,21 @@ vector<TElement,4> __texture_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 
 }
 
 ${{{{
-for (int isCombined = 0; isCombined<=1; isCombined++) {
-for (int isScalarTexture = 0; isScalarTexture <= 1; isScalarTexture++) {
-    if (isScalarTexture == 0)
+for (int isCombined = 0; isCombined < 2; isCombined++) {
+for (int isScalarTexture = 0; isScalarTexture < 2; isScalarTexture++) {
+    if (isScalarTexture)
     {
         sb << "__generic<T:__BuiltinArithmeticType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>\n";
         sb << "extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow," << isCombined << ",format>\n";
     }
     else
     {
-        sb << "__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>\n";
-        sb << "extension __TextureImpl<vector<T,N>,Shape,isArray,0,sampleCount,0,isShadow," << isCombined << ",format>\n";
+        sb << "__generic<T:__BuiltinArithmeticType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>\n";
+        sb << "extension __TextureImpl<vector<T,4>,Shape,isArray,0,sampleCount,0,0," << isCombined << ",format>\n";
     }
 }}}}
 { // begin extension for gather
 ${{{{
-    if (isCombined)
-    {
-}}}}
-    __intrinsic_op($(kIROp_CombinedTextureSamplerGetTexture))
-    __TextureImpl<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> __getTexture();
-
-    __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
-    SamplerState __getSampler();
-
-    __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
-    SamplerComparisonState __getComparisonSampler();
-${{{{
-    }
 
     // Gather component
     const char* samplerStateParam = isCombined ? "" : " s,";
