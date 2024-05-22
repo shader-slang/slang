@@ -372,7 +372,7 @@ struct DiffUnzipPass
             }
             else
             {
-                if (auto inOutType = as<IRInOutType>(resolvedPrimalFuncType->getParamType(ii)))
+                if (as<IRInOutType>(resolvedPrimalFuncType->getParamType(ii)))
                 {
                     // For 'inout' parameter we need to create a temp var to hold the value
                     // before the primal call. This logic is similar to the 'inout' case for differentiable params

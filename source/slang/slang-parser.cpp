@@ -4536,7 +4536,6 @@ namespace Slang
         parser->pendingModifiers = &modifiers;
 
         auto loc = parser->tokenReader.peekLoc();
-        auto ptoken = parser->tokenReader.peekToken();
         switch (peekTokenType(parser))
         {
         case TokenType::Identifier:

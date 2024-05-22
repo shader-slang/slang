@@ -418,7 +418,7 @@ void outputUIntSetAsBufferValues(const String& nameOfBuffer, StringBuilder& resu
     resultBuilder << "const static CapabilityAtomSet " << nameOfBuffer << " = CapabilityAtomSet({\n";
     for (auto i : set.getBuffer())
     {
-        resultBuilder << "    UIntSet::Element(" << i << "),\n";
+        resultBuilder << "    UIntSet::Element(" << i << "U),\n";
     }
     resultBuilder << "    0\n});\n";
 }
