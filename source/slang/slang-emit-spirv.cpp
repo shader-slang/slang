@@ -2765,14 +2765,14 @@ struct SPIRVEmitContext
                     if (isQuad)
                     {
                         verifyComputeDerivativeGroupModifiers(this->m_sink, inst->sourceLoc, true, false, numThreadsDecor);
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, entryPoint, SpvExecutionModeDerivativeGroupQuadsNV);
-                        emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, SpvCapabilityComputeDerivativeGroupQuadsNV);
+                        requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), SpvExecutionModeDerivativeGroupQuadsNV);
+                        requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupQuadsNV);
                     }
                     else
                     {
                         verifyComputeDerivativeGroupModifiers(this->m_sink, inst->sourceLoc, false, true, numThreadsDecor);
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, entryPoint, SpvExecutionModeDerivativeGroupLinearNV);
-                        emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, SpvCapabilityComputeDerivativeGroupLinearNV);
+                        requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), SpvExecutionModeDerivativeGroupLinearNV);
+                        requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupLinearNV);
                     }
                 }
 
@@ -2790,7 +2790,7 @@ struct SPIRVEmitContext
         case kIROp_BeginFragmentShaderInterlock:
             ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_fragment_shader_interlock"));
             requireSPIRVCapability(SpvCapabilityFragmentShaderPixelInterlockEXT);
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, getParentFunc(inst), SpvExecutionModePixelInterlockOrderedEXT);
+            requireSPIRVExecutionMode(nullptr, getIRInstSpvID(getParentFunc(inst)), SpvExecutionModePixelInterlockOrderedEXT);
             result = emitOpBeginInvocationInterlockEXT(parent, inst);
             break;
         case kIROp_EndFragmentShaderInterlock:
@@ -3130,10 +3130,7 @@ struct SPIRVEmitContext
         if (mode == SpvExecutionModeMax)
             return;
 
-        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
-            nullptr,
-            entryPoint,
-            mode);
+        requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
     }
 
     // Make user type name conform to `SPV_GOOGLE_user_type` spec.
@@ -3252,14 +3249,14 @@ struct SPIRVEmitContext
                 {
                 case Stage::Fragment:
                     //OpExecutionMode %main OriginUpperLeft
-                    emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, dstID, SpvExecutionModeOriginUpperLeft);
+                    requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), SpvExecutionModeOriginUpperLeft);
                     maybeEmitEntryPointDepthReplacingExecutionMode(entryPoint, referencedBuiltinIRVars);
                     for (auto decor : entryPoint->getDecorations())
                     {
                         switch (decor->getOp())
                         {
                         case kIROp_EarlyDepthStencilDecoration:
-                            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, dstID, SpvExecutionModeEarlyFragmentTests);
+                            requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), SpvExecutionModeEarlyFragmentTests);
                             break;
                         default:
                             break;
@@ -3293,8 +3290,6 @@ struct SPIRVEmitContext
         // [3.6. Execution Mode]: LocalSize
         case kIROp_NumThreadsDecoration:
             {
-                auto section = getSection(SpvLogicalSectionID::ExecutionModes);
-
                 // TODO: The `LocalSize` execution mode option requires
                 // literal values for the X,Y,Z thread-group sizes.
                 // There is a `LocalSizeId` variant that takes `<id>`s
@@ -3305,10 +3300,10 @@ struct SPIRVEmitContext
                 // in those positions in the Slang IR).
                 //
                 auto numThreads = cast<IRNumThreadsDecoration>(decoration);
-                emitOpExecutionModeLocalSize(
-                    section,
+                requireSPIRVExecutionMode(
                     decoration,
                     dstID,
+                    SpvExecutionModeLocalSize,
                     SpvLiteralInteger::from32(int32_t(numThreads->getX()->getValue())),
                     SpvLiteralInteger::from32(int32_t(numThreads->getY()->getValue())),
                     SpvLiteralInteger::from32(int32_t(numThreads->getZ()->getValue()))
@@ -3324,8 +3319,7 @@ struct SPIRVEmitContext
             {
                 auto decor = as<IRInstanceDecoration>(decoration);
                 auto count = int32_t(getIntVal(decor->getCount()));
-                auto section = getSection(SpvLogicalSectionID::ExecutionModes);
-                emitOpExecutionModeInvocations(section, decoration, dstID, SpvLiteralInteger::from32(count));
+                requireSPIRVExecutionMode(decoration, dstID, SpvExecutionModeInvocations, SpvLiteralInteger::from32(count));
             }
             break;
         case kIROp_TriangleInputPrimitiveTypeDecoration:
@@ -3343,19 +3337,19 @@ struct SPIRVEmitContext
                     switch (inputDecor->getOp())
                     {
                     case kIROp_TriangleInputPrimitiveTypeDecoration:
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeTriangles);
+                        requireSPIRVExecutionMode(inputDecor, dstID, SpvExecutionModeTriangles);
                         break;
                     case kIROp_LineInputPrimitiveTypeDecoration:
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputLines);
+                        requireSPIRVExecutionMode(inputDecor, dstID, SpvExecutionModeInputLines);
                         break;
                     case kIROp_LineAdjInputPrimitiveTypeDecoration:
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputLinesAdjacency);
+                        requireSPIRVExecutionMode(inputDecor, dstID, SpvExecutionModeInputLinesAdjacency);
                         break;
                     case kIROp_PointInputPrimitiveTypeDecoration:
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputPoints);
+                        requireSPIRVExecutionMode(inputDecor, dstID, SpvExecutionModeInputPoints);
                         break;
                     case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputTrianglesAdjacency);
+                        requireSPIRVExecutionMode(inputDecor, dstID, SpvExecutionModeInputTrianglesAdjacency);
                         break;
                     }
                 }
@@ -3363,11 +3357,10 @@ struct SPIRVEmitContext
                 // so we emit them here.
                 if (auto maxVertexCount = decoration->getParent()->findDecoration<IRMaxVertexCountDecoration>())
                 {
-                    auto section = getSection(SpvLogicalSectionID::ExecutionModes);
-                    emitOpExecutionModeOutputVertices(
-                        section,
+                    requireSPIRVExecutionMode(
                         maxVertexCount,
                         dstID,
+                        SpvExecutionModeOutputVertices,
                         SpvLiteralInteger::from32(int32_t(getIntVal(maxVertexCount->getCount())))
                     );
                 }
@@ -3378,13 +3371,13 @@ struct SPIRVEmitContext
                 switch (type->getOp())
                 {
                 case kIROp_HLSLPointStreamType:
-                    emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeOutputPoints);
+                    requireSPIRVExecutionMode(decoration, dstID, SpvExecutionModeOutputPoints);
                     break;
                 case kIROp_HLSLLineStreamType:
-                    emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeOutputLineStrip);
+                    requireSPIRVExecutionMode(decoration, dstID, SpvExecutionModeOutputLineStrip);
                     break;
                 case kIROp_HLSLTriangleStreamType:
-                    emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeOutputTriangleStrip);
+                    requireSPIRVExecutionMode(decoration, dstID, SpvExecutionModeOutputTriangleStrip);
                     break;
                 default: SLANG_ASSERT(!"Unknown stream out type");
                 }
@@ -3433,17 +3426,17 @@ struct SPIRVEmitContext
                     : t == "point" ? SpvExecutionModeOutputPoints
                     : SpvExecutionModeMax;
                 SLANG_ASSERT(m != SpvExecutionModeMax);
-                emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, m);
+                requireSPIRVExecutionMode(decoration, dstID, m);
             }
             break;
 
         case kIROp_VerticesDecoration:
             {
                 const auto c = cast<IRVerticesDecoration>(decoration);
-                emitOpExecutionModeOutputVertices(
-                    getSection(SpvLogicalSectionID::ExecutionModes),
+                requireSPIRVExecutionMode(
                     decoration,
                     dstID,
+                    SpvExecutionModeOutputVertices,
                     SpvLiteralInteger::from32(int32_t(c->getMaxSize()->getValue()))
                 );
             }
@@ -3452,10 +3445,10 @@ struct SPIRVEmitContext
         case kIROp_PrimitivesDecoration:
             {
                 const auto c = cast<IRPrimitivesDecoration>(decoration);
-                emitOpExecutionModeOutputPrimitivesEXT(
-                    getSection(SpvLogicalSectionID::ExecutionModes),
+                requireSPIRVExecutionMode(
                     decoration,
                     dstID,
+                    SpvExecutionModeOutputPrimitivesEXT,
                     SpvLiteralInteger::from32(int32_t(c->getMaxSize()->getValue()))
                 );
             }
@@ -6136,7 +6129,6 @@ struct SPIRVEmitContext
     }
 
     OrderedHashSet<SpvCapability> m_capabilities;
-
     void requireSPIRVCapability(SpvCapability capability)
     {
         if (m_capabilities.add(capability))
@@ -6147,6 +6139,39 @@ struct SPIRVEmitContext
                 capability
             );
         }
+    }
+
+    // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
+    Dictionary<SpvWord, OrderedHashSet<SpvExecutionMode>> m_executionModes;
+    template<typename... Operands>
+    void requireSPIRVExecutionMode(IRInst* parentInst, SpvWord entryPoint, SpvExecutionMode executionMode, const Operands& ...ops)
+    {
+        if (m_executionModes[entryPoint].add(executionMode))
+        {
+            emitInst(
+                getSection(SpvLogicalSectionID::ExecutionModes),
+                parentInst,
+                SpvOpExecutionMode,
+                entryPoint,
+                executionMode,
+                ops...
+            );
+        }
+    } 
+
+    template<typename T1, typename T2, typename T3>
+    SpvInst* emitOpExecutionModeLocalSizeId(
+        IRInst* inst,
+        SpvWord entryPoint,
+        const T1& xSize,
+        const T2& ySize,
+        const T3& zSize
+    )
+    {
+        static_assert(isSingular<T1>);
+        static_assert(isSingular<T2>);
+        static_assert(isSingular<T3>);
+        requireSPIRVExecutionMode(inst, entryPoint, SpvExecutionModeLocalSizeId, xSize, ySize, zSize);
     }
 
     SPIRVEmitContext(IRModule* module, TargetProgram* program, DiagnosticSink* sink)
