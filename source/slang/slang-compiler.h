@@ -2888,9 +2888,10 @@ namespace Slang
 
         SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target, SlangPassThrough compiler) override;
         SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target) override;
-        SLANG_NO_THROW double SLANG_MCALL getDownstreamCompilerElapsedTime() override
+        SLANG_NO_THROW void SLANG_MCALL getCompilerElapsedTime(double* outTotalTime, double* outDownstreamTime) override
         {
-            return m_downstreamCompileTime;
+            *outDownstreamTime = m_downstreamCompileTime;
+            *outTotalTime = m_totalCompileTime;
         }
         
             /// Get the downstream compiler for a transition
@@ -2969,6 +2970,7 @@ namespace Slang
         ~Session();
 
         void addDownstreamCompileTime(double time) { m_downstreamCompileTime += time; }
+        void addTotalCompileTime(double time) { m_totalCompileTime += time; }
 
         ComPtr<ISlangSharedLibraryLoader> m_sharedLibraryLoader;                    ///< The shared library loader (never null)
 
@@ -2998,6 +3000,7 @@ namespace Slang
         CodeGenTransitionMap m_codeGenTransitionMap;
 
         double m_downstreamCompileTime = 0.0;
+        double m_totalCompileTime = 0.0;
     };
 
     void checkTranslationUnit(
@@ -3102,6 +3105,24 @@ SLANG_FORCE_INLINE SlangCompileTarget asExternal(CodeGenTarget target) { return 
 
 SLANG_FORCE_INLINE SlangSourceLanguage asExternal(SourceLanguage sourceLanguage) { return (SlangSourceLanguage)sourceLanguage; }
 
+// Helper class for recording compile time.
+struct CompileTimerRAII
+{
+    std::chrono::high_resolution_clock::time_point startTime;
+    Session* session;
+    CompileTimerRAII(Session* inSession)
+    {
+        startTime = std::chrono::high_resolution_clock::now();
+        session = inSession;
+    }
+    ~CompileTimerRAII()
+    {
+        double elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::high_resolution_clock::now() - startTime)
+            .count() / 1e6;
+        session->addTotalCompileTime(elapsedTime);
+    }
+};
 }
 
 #endif

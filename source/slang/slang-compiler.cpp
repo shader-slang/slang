@@ -618,7 +618,7 @@ namespace Slang
 #   pragma warning(disable:4702)
 #endif
     SlangResult CodeGenContext::emitEntryPointsSource(ComPtr<IArtifact>& outArtifact)
-    {        
+    {
         outArtifact.setNull();
 
         SLANG_RETURN_ON_FAIL(requireTranslationUnitSourceFiles());
@@ -1543,6 +1543,7 @@ namespace Slang
     // Do emit logic for a zero or more entry points
     SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     {
+        CompileTimerRAII recordCompileTime(getSession());
         auto target = getTargetFormat();
 
         switch (target)

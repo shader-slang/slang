@@ -3446,7 +3446,7 @@ namespace slang
             /** Get the time in seconds spent in the downstream compiler.
             @return The time spent in the downstream compiler in the current global session.
             */
-        virtual SLANG_NO_THROW double SLANG_MCALL getDownstreamCompilerElapsedTime() = 0;
+        virtual SLANG_NO_THROW void SLANG_MCALL getCompilerElapsedTime(double* outTotalTime, double* outDownstreamTime) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()
