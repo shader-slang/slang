@@ -1079,7 +1079,7 @@ namespace Slang
                         auto interfaceType = getSup(getLinkage()->getASTBuilder(), DeclRef<GenericTypeConstraintDecl>(constraintDecl));
 
                         // Use our semantic-checking logic to search for a witness to the required conformance
-                        auto witness = visitor.isSubtype(argType, interfaceType);
+                        auto witness = visitor.isSubtype(argType, interfaceType, IsSubTypeOptions::None);
                         if(!witness)
                         {
                             // If no witness was found, then we will be unable to satisfy
@@ -1111,7 +1111,7 @@ namespace Slang
                         argType = getLinkage()->getASTBuilder()->getErrorType();
                     }
 
-                    auto witness = visitor.isSubtype(argType, interfaceType);
+                    auto witness = visitor.isSubtype(argType, interfaceType, IsSubTypeOptions::None);
                     if (!witness)
                     {
                             // If no witness was found, then we will be unable to satisfy
@@ -1262,7 +1262,7 @@ namespace Slang
                 }
 
                 auto sup = getSup(astBuilder, constraintDeclRef);
-                auto subTypeWitness = visitor.isSubtype(sub, sup);
+                auto subTypeWitness = visitor.isSubtype(sub, sup, IsSubTypeOptions::None);
                 if(subTypeWitness)
                 {
                     genericArgs.add(subTypeWitness);
@@ -1302,7 +1302,7 @@ namespace Slang
             auto paramType = as<Type>(param.object);
             auto argType = as<Type>(specializationArg.val);
 
-            auto witness = visitor.isSubtype(argType, paramType);
+            auto witness = visitor.isSubtype(argType, paramType, IsSubTypeOptions::None);
             if (!witness)
             {
                 // If no witness was found, then we will be unable to satisfy
@@ -1460,7 +1460,7 @@ namespace Slang
 
             ExpandedSpecializationArg arg;
             arg.val = argType;
-            arg.witness = visitor.isSubtype(argType, paramType);
+            arg.witness = visitor.isSubtype(argType, paramType, IsSubTypeOptions::None);
             specializationArgs.add(arg);
         }
 

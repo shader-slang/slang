@@ -711,7 +711,7 @@ namespace Slang
             {
                 if(context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
-                    subTypeWitness = isSubtype(sub, sup);
+                    subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
                     getSink()->diagnose(context.loc, Diagnostics::typeArgumentDoesNotConformToInterface, sub, sup);
                 }
                 return false;
@@ -1024,9 +1024,9 @@ namespace Slang
 
             if (!leftType->equals(rightType))
             {
-                if (isSubtype(leftType, rightType))
+                if (isSubtype(leftType, rightType, IsSubTypeOptions::None))
                     return -1;
-                if (isSubtype(rightType, leftType))
+                if (isSubtype(rightType, leftType, IsSubTypeOptions::None))
                     return 1;
             }
         }

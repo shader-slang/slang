@@ -19,6 +19,13 @@ namespace Slang
         return sink->diagnose(pos, info, args...);
     }
 
+    enum class IsSubTypeOptions
+    {
+        None = 0,
+        /// Type may not be finished 'DeclCheckState::ReadyForLookup`
+        NotReadyForLookup = 1 << 0,
+    };
+
         /// Should the given `decl` be treated as a static rather than instance declaration?
     bool isEffectivelyStatic(
         Decl*           decl);
@@ -2058,13 +2065,14 @@ namespace Slang
         SubtypeWitness* isSubtype(
             Type*                   subType,
             Type*                   superType,
-            bool subtypeInheritanceIsNotFullyResolved = false //resolving members may not be required in `SemanticsDeclBasesVisitor`
+            IsSubTypeOptions        isSubTypeOptions
         );
 
         SubtypeWitness* checkAndConstructSubtypeWitness(
             Type* subType,
             Type* superType,
-            bool subtypeInheritanceIsNotFullyResolved = false);
+            IsSubTypeOptions isSubTypeOptions
+        );
 
         bool isValidGenericConstraintType(Type* type);
 
@@ -2084,7 +2092,7 @@ namespace Slang
             Type* subType,
             Type* superType)
         {
-            return isSubtype(subType, superType);
+            return isSubtype(subType, superType, IsSubTypeOptions::None);
         }
 
             /// Check whether `type` conforms to `interfaceDeclRef`,

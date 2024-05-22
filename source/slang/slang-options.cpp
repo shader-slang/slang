@@ -290,7 +290,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::MatrixLayoutColumn, "-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major."},
         { OptionKind::MatrixLayoutRow,"-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major."},
         { OptionKind::ZeroInitialize, "-zero-initialize", nullptr, 
-        "Set all variables to zero."
+        "Initialize all variables to zero."
         "Structs will set all struct-fields without an init expression to 0."
         "All variables will call their default constructor if not explicitly initialized as usual."},
         { OptionKind::IgnoreCapabilities,"-ignore-capabilities", nullptr, "Do not warn or error if capabilities are violated"},

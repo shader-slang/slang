@@ -1508,7 +1508,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         SharedSemanticsContext sharedSemanticsContext(this, nullptr, &sink);
         SemanticsVisitor visitor(&sharedSemanticsContext);
         auto witness =
-            visitor.isSubtype((Slang::Type*)type, (Slang::Type*)interfaceType);
+            visitor.isSubtype((Slang::Type*)type, (Slang::Type*)interfaceType, IsSubTypeOptions::None);
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
         {
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);

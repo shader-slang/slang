@@ -6076,7 +6076,7 @@ namespace Slang
             {
                 // Force add IDefaultInitializableType to any struct missing (transitively) `IDefaultInitializableType`.
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
-                if(!isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType), true)
+                if(!isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType, IsSubTypeOptions::NotReadyForLookup))
                 {
                     InheritanceDecl* conformanceDecl = m_astBuilder->create<InheritanceDecl>();
                     conformanceDecl->parentDecl = decl;
@@ -7582,7 +7582,7 @@ namespace Slang
 
         // ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if init expressions 
         // of members are to be synthisised, they are.
-        bool isDefaultInitializableType = isSubtype(DeclRefType::create(m_astBuilder, structDecl), m_astBuilder->getDefaultInitializableType());
+        bool isDefaultInitializableType = isSubtype(DeclRefType::create(m_astBuilder, structDecl), m_astBuilder->getDefaultInitializableType(), IsSubTypeOptions::None);
         for (auto m : structDecl->members)
         {
             auto varDeclBase = as<VarDeclBase>(m);
