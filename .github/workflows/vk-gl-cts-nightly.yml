@@ -12,11 +12,11 @@ concurrency:
   cancel-in-progress: true
 env:
   DISABLE_CTS_SLANG: 0
+  SLACK_WEBHOOK_URL: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
 jobs:
   build:
     runs-on: [Windows, self-hosted]
-    timeout-minutes: 100
-    continue-on-error: false
+    timeout-minutes: 1
     steps:
     - uses: actions/checkout@v4
       with:
@@ -58,3 +58,12 @@ jobs:
       working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
       run: |
         .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
+    - name: result notification
+      id: slack-notify
+      if : always()
+      uses: slackapi/slack-github-action@v1.26.0
+      with:
+        payload: |
+          {
+            "CTS-Nightly": "CTS nightly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          }
