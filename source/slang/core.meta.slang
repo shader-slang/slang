@@ -475,16 +475,6 @@ ${{{{
     }
 }}}}
 {
-
-    typedef $(kBaseTypes[tt].name) ThisType;
-
-    // Declare initializer of `This` type for default initialization
-    [ForceInline]
-    __init()
-    { 
-        this = __default<ThisType>();
-    }
-    
 ${{{{
     // Declare initializers to convert from various other types
     for (int ss = 0; ss < kBaseTypeCount; ++ss)
@@ -1051,14 +1041,6 @@ struct Array : IArray<T>
         __intrinsic_op($(kIROp_GetElement))
         get;
     }
-    
-    [ForceInline]
-    [TreatAsDifferentiable]
-    __init()
-    {
-        for(int i = 0; i < N; ++i)
-            this[i] = T();
-    }
 }
 
     /// An `N` component vector with elements of type `T`.
@@ -1086,13 +1068,6 @@ struct vector : IArray<T>
     int getCount() { return N; }
 
     __subscript(int index) -> T { __intrinsic_op($(kIROp_GetElement)) get; }
-
-    [ForceInline]
-    [TreatAsDifferentiable]
-    __init()
-    {
-        vector<Element,N>(Element());
-    }
 }
 
 const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
@@ -1118,13 +1093,6 @@ struct matrix : IArray<vector<T,C>>
     int getCount() { return R; }
 
     __subscript(int index) -> vector<T,C> { __intrinsic_op($(kIROp_GetElement)) get; }
-
-    [ForceInline]
-    [TreatAsDifferentiable]
-    __init()
-    {
-        matrix<T,R,C,L>(T());
-    }
 }
 
 __intrinsic_op($(kIROp_Eql))

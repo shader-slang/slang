@@ -1979,10 +1979,6 @@ namespace Slang
     }
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
-
-        DeclRefType* varDeclBaseType = nullptr;
-        if(varDecl->type)
-            varDeclBaseType = as<DeclRefType>(varDecl->type.type);
         // if zero initialize is true, set everything to a default
         if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) && !varDecl->initExpr)
         {
@@ -2014,7 +2010,7 @@ namespace Slang
             varDecl->setCheckState(DeclCheckState::DefinitionChecked);
             _validateCircularVarDefinition(varDecl);
         }
-        else if(!varDeclBaseType || !varDeclBaseType->getDeclRef() || !isFromStdLib(varDeclBaseType->getDeclRef().getDecl()))
+        else if(as<DeclRefType>(varDecl->type.type))
         {
             // If a variable doesn't have an explicit initial-value
             // expression, it is still possible that it should
@@ -4203,7 +4199,10 @@ namespace Slang
         }
         if (isDefaultInitializableType)
             context->parentDecl->addMember(ctorDecl);
+        else
+        
         _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
+        
         return true;
     }
 
@@ -6072,7 +6071,7 @@ namespace Slang
                 continue;
             }
 
-            if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize))
+            if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize) && !isFromStdLib(decl))
             {
                 // Force add IDefaultInitializableType to any struct missing (transitively) `IDefaultInitializableType`.
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();

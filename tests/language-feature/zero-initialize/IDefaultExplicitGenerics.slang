@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
-// CHECK: vec4(0.0);
+// CHECK: vec4(0.0
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -emit-spirv-directly -allow-glsl
