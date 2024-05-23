@@ -1,0 +1,30 @@
+name: Github-Slack-Notification
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Run some commands
+      id: run-commands
+      run: |
+        echo "Hello, World!"
+        exit 0
+    - name: Send custom JSON data to Slack workflow
+      id: slack
+      if : always()
+      uses: slackapi/slack-github-action@v1.26.0
+      with:
+        payload: |
+          {
+            "CTS-Nightly": "CTS nightly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
