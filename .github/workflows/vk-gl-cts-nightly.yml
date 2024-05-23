@@ -1,8 +1,12 @@
 name: VK-GL-CTS Nightly
 
 on:
-  schedule:
-    - cron: '00 07 * * *'
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  # schedule:
+  #   - cron: '00 07 * * *'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -11,8 +15,8 @@ env:
 jobs:
   build:
     runs-on: [Windows, self-hosted]
-    timeout-minutes: 180
-    continue-on-error: true
+    timeout-minutes: 100
+    continue-on-error: false
     steps:
     - uses: actions/checkout@v4
       with:
