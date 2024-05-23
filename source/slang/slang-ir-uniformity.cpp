@@ -97,7 +97,7 @@ namespace Slang
             // will use the fallback behavior (result is non-uniform if any of its arguments are non-uniform).
             for (auto block : key.func->getBlocks())
             {
-                if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
+                if (as<IRGenericAsm>(block->getTerminator()))
                 {
                     return nullptr;
                 }

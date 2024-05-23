@@ -515,7 +515,7 @@ namespace Slang
         {
             // If `type` is already a lowered type, no more lowering is required.
             LoweredElementTypeInfo info;
-            if (auto pInfo = mapLoweredTypeToInfo->tryGetValue(type))
+            if (mapLoweredTypeToInfo->tryGetValue(type))
             {
                 info.originalType = type;
                 info.loweredType = type;

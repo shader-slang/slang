@@ -1669,6 +1669,7 @@ namespace Slang
             SLANG_UNEXPECTED("unhandled code generation target");
             break;
         }
+        return SLANG_FAIL;
     }
 
     void EndToEndCompileRequest::writeArtifactToStandardOutput(IArtifact* artifact, DiagnosticSink* sink)
