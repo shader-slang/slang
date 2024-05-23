@@ -11,7 +11,7 @@ env:
 jobs:
   build:
     runs-on: [Windows, self-hosted]
-    timeout-minutes: 100
+    timeout-minutes: 180
     continue-on-error: true
     steps:
     - uses: actions/checkout@v4
