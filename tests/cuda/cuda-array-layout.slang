@@ -29,4 +29,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[2] = __offsetOf(s, s.b);
     outputBuffer[3] = __offsetOf(s, s.c);
     outputBuffer[4] = __offsetOf(s, s.d);
+
+    outputBuffer[5] = __sizeOf<int>();
 }

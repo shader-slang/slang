@@ -1641,8 +1641,7 @@ namespace Slang
                     previous = m;
                     continue;
                 }
-                for(auto& con : req->capabilitySet.getExpandedAtoms())
-                    firstRequire->capabilitySet.unionWith(con);
+                firstRequire->capabilitySet.unionWith(req->capabilitySet);
                 if(previous)
                     previous->next = next;
                 continue;

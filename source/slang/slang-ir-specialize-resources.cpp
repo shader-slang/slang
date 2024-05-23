@@ -291,7 +291,8 @@ struct ResourceOutputSpecializationPass
         if(!func->isDefinition())
             return false;
         UnownedStringSlice def;
-        if (findTargetIntrinsicDefinition(func, targetRequest->getTargetCaps(), def))
+        IRInst* intrinsicInst;
+        if (findTargetIntrinsicDefinition(func, targetRequest->getTargetCaps(), def, intrinsicInst))
             return false;
 
         // If any of the parameters of the function are `out`
@@ -1188,7 +1189,8 @@ bool specializeResourceUsage(
             // and turned into SSA temporaries. Such optimization may enable
             // the following passes to "see" and specialize more cases.
             //
-            simplifyIR(codeGenContext->getTargetProgram(), irModule, IRSimplificationOptions::getFast());
+            simplifyIR(codeGenContext->getTargetProgram(), irModule,
+                IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
             result |= changed;
         }
         if (unspecializableFuncs.getCount() == 0)
@@ -1208,7 +1210,8 @@ bool specializeResourceUsage(
                 inlineCall(call);
             });
         }
-        simplifyIR(codeGenContext->getTargetProgram(), irModule, IRSimplificationOptions::getFast());
+        simplifyIR(codeGenContext->getTargetProgram(), irModule,
+            IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
     }
     return result;
 }

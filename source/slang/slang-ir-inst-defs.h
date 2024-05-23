@@ -1170,6 +1170,9 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 /* Differentiable Type Dictionary */
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 
+INST(BeginFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
+INST(EndFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
+
 /* DebugInfo */
 INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)

@@ -309,9 +309,13 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
   <ItemGroup>
     <ClInclude Include="..\..\..\slang.h" />
     <ClInclude Include="..\..\..\source\slang-capture-replay\capture_utility.h" />
+    <ClInclude Include="..\..\..\source\slang-capture-replay\slang-composite-component-type.h" />
+    <ClInclude Include="..\..\..\source\slang-capture-replay\slang-entrypoint.h" />
     <ClInclude Include="..\..\..\source\slang-capture-replay\slang-filesystem.h" />
     <ClInclude Include="..\..\..\source\slang-capture-replay\slang-global-session.h" />
+    <ClInclude Include="..\..\..\source\slang-capture-replay\slang-module.h" />
     <ClInclude Include="..\..\..\source\slang-capture-replay\slang-session.h" />
+    <ClInclude Include="..\..\..\source\slang-capture-replay\slang-type-conformance.h" />
     <ClInclude Include="..\..\..\source\slang\slang-artifact-output-util.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-all.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-base.h" />
@@ -543,9 +547,13 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\prelude\slang-hlsl-prelude.h.cpp" />
     <ClCompile Include="..\..\..\prelude\slang-torch-prelude.h.cpp" />
     <ClCompile Include="..\..\..\source\slang-capture-replay\capture_utility.cpp" />
+    <ClCompile Include="..\..\..\source\slang-capture-replay\slang-composite-component-type.cpp" />
+    <ClCompile Include="..\..\..\source\slang-capture-replay\slang-entrypoint.cpp" />
     <ClCompile Include="..\..\..\source\slang-capture-replay\slang-filesystem.cpp" />
     <ClCompile Include="..\..\..\source\slang-capture-replay\slang-global-session.cpp" />
+    <ClCompile Include="..\..\..\source\slang-capture-replay\slang-module.cpp" />
     <ClCompile Include="..\..\..\source\slang-capture-replay\slang-session.cpp" />
+    <ClCompile Include="..\..\..\source\slang-capture-replay\slang-type-conformance.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-api.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-artifact-output-util.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-base.cpp" />

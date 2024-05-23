@@ -82,7 +82,7 @@ static IRType* translateToTupleType(
         }
         return builder.getTargetTupleType((UInt)elementTypes.getCount(), elementTypes.getBuffer());
     }
-    else if (auto targetTupleType = as<IRTargetTupleType>(type))
+    else if (as<IRTargetTupleType>(type))
     {
         return type;
     }
@@ -192,7 +192,7 @@ static IRInst* makeTargetTuple(IRBuilder& builder, IRInst* val)
         auto resultType = builder.getTargetTupleType((UInt)elementTypes.getCount(), elementTypes.getBuffer());
         return builder.emitMakeTargetTuple(resultType, (UInt)resultElements.getCount(), resultElements.getBuffer());
     }
-    else if (auto targetTupleType = as<IRTargetTupleType>(type))
+    else if (as<IRTargetTupleType>(type))
     {
         return val;
     }
@@ -284,7 +284,7 @@ static IRInst* makeValueFromTargetTuple(IRBuilder& builder, IRType* type, IRInst
         }
         return builder.emitMakeStruct(type, (UInt)resultElements.getCount(), resultElements.getBuffer());
     }
-    else if (auto targetTupleType = as<IRTargetTupleType>(type))
+    else if (as<IRTargetTupleType>(type))
     {
         return val;
     }
@@ -1021,7 +1021,7 @@ void lowerBuiltinTypesForKernelEntryPoints(IRModule* module, DiagnosticSink*)
                 // Rebuild the call/dispatch inst.
                 IRInst* newCall = nullptr;
                 
-                if (auto callInst = as<IRCall>(user))
+                if (as<IRCall>(user))
                     newCall = callBuilder.emitCallInst(user->getFullType(), func, convertedArgs);
                 else if (auto dispatchInst = as<IRDispatchKernel>(user))
                     newCall = callBuilder.emitDispatchKernelInst(

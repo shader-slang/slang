@@ -631,9 +631,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 storageClass = SpvStorageClassStorageBuffer;
                 needLoad = false;
 
+                auto memoryFlags = MemoryQualifierSetModifier::Flags::kNone;
+
                 // structured buffers in GLSL should be annotated as ReadOnly
                 if (as<IRHLSLStructuredBufferType>(structuredBufferType))
-                    builder.addMemoryQualifierSetDecoration(inst, MemoryQualifierSetModifier::Flags::kReadOnly);
+                    memoryFlags = MemoryQualifierSetModifier::Flags::kReadOnly;
+                if (as<IRHLSLRasterizerOrderedStructuredBufferType>(structuredBufferType))
+                    memoryFlags = MemoryQualifierSetModifier::Flags::kRasterizerOrdered;
+
+                if (memoryFlags != MemoryQualifierSetModifier::Flags::kNone)
+                    builder.addMemoryQualifierSetDecoration(inst, memoryFlags);
             }
             else if (auto glslShaderStorageBufferType = as<IRGLSLShaderStorageBufferType>(innerType))
             {
@@ -1745,6 +1752,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         case kIROp_Neq:
         case kIROp_Eql:
         case kIROp_Call:
+        case kIROp_SPIRVAsm:
             return true;
         default:
             return false;
@@ -2288,6 +2296,94 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
     }
 }
 
+static bool isRasterOrderedResource(IRInst* inst)
+{
+    if (auto memoryQualifierDecoration = inst->findDecoration<IRMemoryQualifierSetDecoration>())
+    {
+        if (memoryQualifierDecoration->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kRasterizerOrdered)
+            return true;
+    }
+    auto type = inst->getDataType();
+    for (;;)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            type = ptrType->getValueType();
+            continue;
+        }
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        break;
+    }
+    if (auto textureType = as<IRTextureTypeBase>(type))
+    {
+        if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
+            return true;
+    }
+    return false;
+}
+
+static bool hasExplicitInterlockInst(IRFunc* func)
+{
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (inst->getOp() == kIROp_BeginFragmentShaderInterlock)
+                return true;
+        }
+    }
+    return false;
+}
+
+void insertFragmentShaderInterlock(SPIRVEmitSharedContext* context, IRModule* module)
+{
+    HashSet<IRFunc*> fragmentShaders;
+    for (auto& [inst, entryPoints] : context->m_referencingEntryPoints)
+    {
+        if (isRasterOrderedResource(inst))
+        {
+            for (auto entryPoint : entryPoints)
+            {
+                auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
+                if (!entryPointDecor)
+                    continue;
+
+                if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                {
+                    fragmentShaders.add(entryPoint);
+                }
+            }
+        }
+    }
+
+    IRBuilder builder(module);
+    for (auto entryPoint : fragmentShaders)
+    {
+        if (hasExplicitInterlockInst(entryPoint))
+            continue;
+        auto firstBlock = entryPoint->getFirstBlock();
+        if (!firstBlock)
+            continue;
+        builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+        builder.emitBeginFragmentShaderInterlock();
+        for (auto block : entryPoint->getBlocks())
+        {
+            if (auto inst = block->getTerminator())
+            {
+                if (inst->getOp() == kIROp_Return || inst->getOp() == kIROp_discard)
+                {
+                    builder.setInsertBefore(inst);
+                    builder.emitEndFragmentShaderInterlock();
+                }
+            }
+        }
+    }
+}
+
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
@@ -2298,6 +2394,7 @@ void legalizeIRForSPIRV(
     legalizeSPIRV(context, module);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
+    insertFragmentShaderInterlock(context, module);
 }
 
 } // namespace Slang

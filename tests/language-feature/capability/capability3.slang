@@ -9,7 +9,7 @@ module test;
 
 RWStructuredBuffer<int> sideEffect;
 
-// CHECK: error 36104
+// CHECK: error {{(36107|36108)}}
 [require(glsl, _sm_4_0)]
 public void use1()
 {
@@ -28,7 +28,7 @@ void use2Sub()
         sideEffect[1] = 1;
     }
 }
-// CHECK: error 36108
+// CHECK: error {{(36107|36108)}}
 [require(spirv, spirv_1_0)]
 public void use2()
 {

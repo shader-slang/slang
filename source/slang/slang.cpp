@@ -319,6 +319,8 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 #ifdef _DEBUG
     // Print a message in debug builds to notice the user that compiling the stdlib
     // can take a while.
+    time_t beginTime;
+    time(&beginTime);
     fprintf(stderr, "Compiling stdlib on debug build, this can take a while.\n");
 #endif
 
@@ -372,6 +374,11 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
     finalizeSharedASTBuilder();
 
+#ifdef _DEBUG
+    time_t endTime;
+    time(&endTime);
+    fprintf(stderr, "Compiling stdlib took %.2f seconds.\n", difftime(endTime, beginTime));
+#endif
     return SLANG_OK;
 }
 
@@ -1266,6 +1273,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
     slang::IComponentType**         outCompositeComponentType,
     ISlangBlob**                    outDiagnostics)
 {
+    if (outCompositeComponentType == nullptr)
+        return SLANG_E_INVALID_ARG;
+
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     // Attempting to create a "composite" of just one component type should
@@ -1491,6 +1501,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
     SlangInt conformanceIdOverride,
     ISlangBlob** outDiagnostics)
 {
+    if (outConformanceComponentType == nullptr)
+        return SLANG_E_INVALID_ARG;
+
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     RefPtr<TypeConformance> result;
@@ -1740,7 +1753,9 @@ CapabilitySet TargetRequest::getTargetCaps()
     CapabilitySet targetCap = CapabilitySet(atoms);
 
     CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
-    CapabilityName latestSpirvAtom = (CapabilityName)latestSpirvCapSet.getExpandedAtoms()[0].getExpandedAtoms().getLast();
+    auto latestSpirvCapSetElements = latestSpirvCapSet.getAtomSets()->getElements<CapabilityAtom>();
+    CapabilityName latestSpirvAtom = (CapabilityName)latestSpirvCapSetElements[latestSpirvCapSetElements.getCount()-2]; //-1 gets shader stage
+
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
         auto atom = (CapabilityName)atomVal.intValue;
@@ -5680,6 +5695,16 @@ void EndToEndCompileRequest::setReportPerfBenchmark(bool value)
 void EndToEndCompileRequest::setSkipSPIRVValidation(bool value)
 {
     getOptionSet().set(CompilerOptionName::SkipSPIRVValidation, value);
+}
+
+void EndToEndCompileRequest::setTargetUseMinimumSlangOptimization(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::MinimumSlangOptimization, value);
+}
+
+void EndToEndCompileRequest::setIgnoreCapabilityCheck(bool value)
+{
+    getOptionSet().set(CompilerOptionName::IgnoreCapabilities, value);
 }
 
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)
