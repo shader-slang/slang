@@ -180,7 +180,7 @@ namespace Slang
                     Index i = 0;
                     for (; i < accessChain.getCount(); i++)
                     {
-                        if (auto key = as<IRStructKey>(accessChain[i]))
+                        if (as<IRStructKey>(accessChain[i]))
                         {
                             continue;
                         }
