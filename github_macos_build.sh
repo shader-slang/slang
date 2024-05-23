@@ -11,6 +11,11 @@ if [[ "" == "${TARGETARCH}" ]]; then
 TARGETARCH=${ARCH}
 fi
 
+productionBuildFlag=""
+if [[ ! -z ${PRODUCTION_BUILD} ]]; then
+    productionBuildFlag="--production-build=true"
+fi
+
 if [[ "${ARCH}" != "${TARGETARCH}" ]]; then
 
 # Create the makefile
@@ -22,11 +27,11 @@ make config=${CONFIGURATION}_${ARCH} -j`sysctl -n hw.ncpu`
 rm -rf ./bin
 
 # Create the makefile
-./premake5 gmake2 --cc=${CC} --enable-xlib=false --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --build-glslang=true --no-progress=true  --skip-source-generation=true --deploy-slang-llvm=false --deploy-slang-glslang=false
+./premake5 gmake2 --cc=${CC} --enable-xlib=false --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --build-glslang=true --no-progress=true  --skip-source-generation=true --deploy-slang-llvm=false --deploy-slang-glslang=false ${productionBuildFlag}
 make config=${CONFIGURATION}_${TARGETARCH} -j`sysctl -n hw.ncpu`
 else
 # Create the makefile
-./premake5 gmake2 --cc=${CC} --enable-xlib=false --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --build-glslang=true --no-progress=true --deploy-slang-glslang=false
+./premake5 gmake2 --cc=${CC} --enable-xlib=false --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --build-glslang=true --no-progress=true --deploy-slang-glslang=false ${productionBuildFlag}
 # Build the configuration
 make config=${CONFIGURATION}_${TARGETARCH}  -j`sysctl -n hw.ncpu`
 fi

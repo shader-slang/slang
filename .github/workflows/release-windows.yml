@@ -34,7 +34,7 @@ jobs:
       - name: premake 
         if: ${{ matrix.platform != 'aarch64' }}
         run:
-          .\premake.bat vs2019 --enable-embed-stdlib=true --arch=${{matrix.platform}} --deps=true --no-progress=true
+          .\premake.bat vs2019 --enable-embed-stdlib=true --arch=${{matrix.platform}} --deps=true --no-progress=true --production-build=true
       - name: tag-version
         run: .\make-slang-tag-version.bat
       - name: msbuild

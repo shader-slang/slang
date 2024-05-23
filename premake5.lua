@@ -244,6 +244,14 @@ newoption {
     allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
+newoption {
+    trigger     = "production-build",
+    description = "(Optional) Indicates that this is a production build, and will disable profiling and other debug features",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 buildGlslang = (_OPTIONS["build-glslang"] == "true")
@@ -263,6 +271,7 @@ dxOnVk = (_OPTIONS["dx-on-vk"] == "true")
 enableAftermath = (_OPTIONS["enable-aftermath"] == "true")
 defaultSPIRVDirect = (_OPTIONS["default-spirv-direct"] == "true")
 glibcForwardCompatible = (_OPTIONS["glibc-forward-compatible"] == "true")
+productionBuild = (_OPTIONS["production-build"] == "true")
 
 -- If stdlib embedding is enabled, disable stdlib source embedding by default
 disableStdlibSource = enableEmbedStdLib
@@ -349,6 +358,7 @@ end
 function getPlatforms(targetInfo)
     return { "x86", "x64", "aarch64" }
 end
+
 
 workspace "slang"
     -- We will support debug/release configuration and x86/x64 builds.
@@ -453,6 +463,11 @@ workspace "slang"
         linkoptions{ "-Wl,-rpath,'$$ORIGIN',--no-as-needed,--no-undefined" }
         -- allow libraries to be listed in any order (do not require dependency order)
         linkgroups "On"
+
+    if not (productionBuild) then
+        buildmessage " production build"
+        defines { "SLANG_PROFILER_ENABLE" }
+    end
 
     filter {}
         -- For including windows.h in a way that minimized namespace pollution.

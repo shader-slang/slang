@@ -33,6 +33,7 @@ jobs:
               export TARGETARCH=x64
               export TARGETARCH=x64
               export GLIBC_COMPATIBLE=1
+              export PRODUCTION_BUILD=1
               /bin/bash ./github_build.sh
 
       - name: CreatePackages

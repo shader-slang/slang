@@ -24,6 +24,12 @@ if [[ ! -z ${GLIBC_COMPATIBLE} ]]; then
     glibcCompatible="--glibc-forward-compatible=true"
 fi
 
+productionBuildFlag=""
+if [[ ! -z ${PRODUCTION_BUILD} ]]; then
+    productionBuildFlag="--production-build=true"
+fi
+
+
 if [[ "${ARCH}" != "${TARGETARCH}" ]]; then
 
 # Create the makefile
@@ -35,11 +41,11 @@ make config=${CONFIGURATION}_${ARCH} -j`nproc`
 rm -rf ./bin
 
 # Create the makefile
-./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true  --skip-source-generation=true --deploy-slang-llvm=false --deploy-slang-glslang=false ${glslangBuildFlag}
+./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true  --skip-source-generation=true --deploy-slang-llvm=false --deploy-slang-glslang=false ${glslangBuildFlag} ${productionBuildFlag}
 
 else
 # Create the makefile
-./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true ${glslangBuildFlag} ${glibcCompatible}
+./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true ${glslangBuildFlag} ${glibcCompatible} ${productionBuildFlag}
 fi
 
 # Build the configuration

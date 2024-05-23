@@ -41,6 +41,7 @@ jobs:
           export CONFIGURATION=${{matrix.configuration}}
           export ARCH=${{matrix.platform}}
           export TARGETARCH=${{matrix.targetPlatform}}
+          export PRODUCTION_BUILD=1
           echo "building..."
           source ./github_build.sh
           echo "creating binary archieves..."

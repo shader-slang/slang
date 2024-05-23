@@ -36,7 +36,11 @@ struct PerformanceProfilerFuncRAIIContext
     }
 };
 
+#ifdef SLANG_PROFILE_ENABLE
 #define SLANG_PROFILE PerformanceProfilerFuncRAIIContext _profileContext(__func__)
+#else
+#define SLANG_PROFILE (void(0))
+#endif // SLANG_PROFILE_ENABLE
 }
 
 #endif
