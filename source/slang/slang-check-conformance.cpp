@@ -112,7 +112,7 @@ namespace Slang
         // tangling convertibility into it.
 
         // First, make sure both sub type and super type decl are ready for lookup.
-        if (int(isSubTypeOptions) & int(IsSubTypeOptions::NotReadyForLookup))
+        if ( !(int(isSubTypeOptions) & int(IsSubTypeOptions::NotReadyForLookup)) )
         {
             if (auto subDeclRefType = as<DeclRefType>(subType))
             {
