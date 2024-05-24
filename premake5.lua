@@ -1209,6 +1209,7 @@ tool "gfx"
         -- Don't support any render techs...
     elseif os.target() == "macosx" then
         addSourceDir "tools/gfx/vulkan"
+        addSourceDir "tools/gfx/metal"
     else
         -- Linux like
         addSourceDir "tools/gfx/vulkan"
@@ -1221,7 +1222,7 @@ tool "gfx"
     end
 
     if os.target() == "macosx" then
-        links { "Cocoa.framework", "QuartzCore.framework" }
+        links { "Cocoa.framework", "QuartzCore.framework", "Metal.framework" }
     end
 
     if enableXlib then

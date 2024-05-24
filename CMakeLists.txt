@@ -500,7 +500,6 @@ if(SLANG_ENABLE_GFX)
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         LINK_WITH_FRAMEWORK
-            Foundation
             Cocoa
             QuartzCore
             Metal
