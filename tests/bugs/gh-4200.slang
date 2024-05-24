@@ -12,6 +12,6 @@ RWBuffer<uint4>    Dst : register(u2);
 void computeMain()
 {
 // CHECK_SPV: Sample %int_0
-// CHECK_HLSL: [{{.*}}int2{{.*}}][0]
-    Dst[0] = Src[int2(0)];
+// CHECK_HLSL: [{{.*}}1{{.*}}]
+    Dst[0] = Src[int2(1)];
 }

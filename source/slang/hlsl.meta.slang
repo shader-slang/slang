@@ -2576,7 +2576,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
             {
                 case cpp:
                 case hlsl:
-                    __intrinsic_asm "($0).sample[$1][0]";
+                    __intrinsic_asm "($0).sample[$1]";
                 case metal:
                 case glsl:
                 case spirv:
