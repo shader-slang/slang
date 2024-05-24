@@ -1140,7 +1140,7 @@ tool "gfx"
 
     defines { "SLANG_GFX_DYNAMIC", "SLANG_GFX_DYNAMIC_EXPORT" }
 
-    includedirs { ".", "external", "external/vulkan/include", "source" }
+    includedirs { ".", "external", "external/vulkan/include", "external/metal-cpp", "source" }
 
     files {"slang-gfx.h"}
 
