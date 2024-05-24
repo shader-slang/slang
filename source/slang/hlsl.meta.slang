@@ -2564,6 +2564,26 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
         }
     }
 
+    __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
+    {
+        __glsl_extension(GL_EXT_samplerless_texture_functions)
+        [__readNone]
+        [ForceInline]
+        [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_samplerless)]
+        get
+        {
+            __target_switch
+            {
+                case cpp:
+                case hlsl:
+                    __intrinsic_asm "($0).sample[$1][0]";
+                case metal:
+                case glsl:
+                case spirv:
+                    return Load(location, 0);
+            }
+        }
+    }
     __subscript(vector<uint, Shape.dimensions+isArray> location, int sampleIndex) -> T
     {
         __glsl_extension(GL_EXT_samplerless_texture_functions)
