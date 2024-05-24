@@ -1980,7 +1980,10 @@ namespace Slang
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
         // if zero initialize is true, set everything to a default
-        if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) && !varDecl->initExpr)
+        if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) 
+            && !varDecl->initExpr
+            && as<VarDecl>(varDecl)
+            )
         {
             varDecl->initExpr = constructDefaultInitExprForVar(this, varDecl);
         }
@@ -4200,8 +4203,7 @@ namespace Slang
         if (isDefaultInitializableType)
             context->parentDecl->addMember(ctorDecl);
         else
-        
-        _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
+            _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
         
         return true;
     }
