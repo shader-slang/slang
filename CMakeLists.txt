@@ -474,9 +474,10 @@ if(SLANG_ENABLE_GFX)
             imgui
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             ${CMAKE_DL_LIBS}
-            LINK_WITH_FRAMEWORK
+        LINK_WITH_FRAMEWORK
             Cocoa
             QuartzCore
+            Foundation
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
         INCLUDE_FROM_PRIVATE gfx
@@ -495,11 +496,14 @@ if(SLANG_ENABLE_GFX)
             core
             slang
             Vulkan-Headers
+            metal-cpp
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         LINK_WITH_FRAMEWORK
+            Foundation
             Cocoa
             QuartzCore
+            Metal
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:GFX_ENABLE_CUDA>
             $<$<BOOL:${SLANG_ENABLE_OPTIX}>:GFX_OPTIX>
