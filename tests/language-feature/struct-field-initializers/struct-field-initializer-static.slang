@@ -16,11 +16,13 @@ struct DefaultStructNoInit_base
 struct DefaultStructNoInit : DefaultStructNoInit_base
 {
     int data3 = 2;
+    static int data4 = 2;
 };
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
+    DefaultStructNoInit::data4 = 0;
     DefaultStructNoInit noInit;
     // BUF: 1
     outputBuffer[0] = true
@@ -28,5 +30,6 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         && noInit.data1 == 2
         && noInit.data2 == 2
         && noInit.data3 == 2
+        && noInit.data4 == 0;
         ;
 }
