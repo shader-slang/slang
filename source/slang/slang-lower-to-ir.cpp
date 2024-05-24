@@ -10834,13 +10834,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     constructSSA(module);
     simplifyCFG(module, CFGSimplificationOptions::getDefault());
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-    peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
+    // peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
 
-    for (auto inst : module->getGlobalInsts())
-    {
-        if (auto func = as<IRGlobalValueWithCode>(inst))
-            eliminateDeadCode(func);
-    }
+    // for (auto inst : module->getGlobalInsts())
+    // {
+    //     if (auto func = as<IRGlobalValueWithCode>(inst))
+    //         eliminateDeadCode(func);
+    // }
     // Next, inline calls to any functions that have been
     // marked for mandatory "early" inlining.
     //
@@ -10885,12 +10885,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         changed |= constructSSA(module);
         simplifyCFG(module, CFGSimplificationOptions::getDefault());
         changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-        changed |= peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
-        for (auto inst : module->getGlobalInsts())
-        {
-            if (auto func = as<IRGlobalValueWithCode>(inst))
-                eliminateDeadCode(func);
-        }
+        // changed |= peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
+        // for (auto inst : module->getGlobalInsts())
+        // {
+        //     if (auto func = as<IRGlobalValueWithCode>(inst))
+        //         eliminateDeadCode(func);
+        // }
         if (!changed)
             break;
     }
@@ -10961,7 +10961,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         //
         IRDeadCodeEliminationOptions options;
         options.keepExportsAlive = true;
-        eliminateDeadCode(module, options);
+        // eliminateDeadCode(module, options);
 
         if (linkage->m_optionSet.shouldObfuscateCode())
         {
