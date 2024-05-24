@@ -272,9 +272,10 @@ namespace Slang
                     sized = true;
                 }
             }
-            else if (auto intVal = arrayType->getElementCount())
+            else if (arrayType->getElementCount())
             {
-                sized = !intVal->isLinkTimeVal();
+                sized = true;
+                typeTag = (TypeTag)((int)typeTag | (int)TypeTag::LinkTimeSized);
             }
             if (!sized)
                 typeTag = (TypeTag)((int)typeTag | (int)TypeTag::Unsized);

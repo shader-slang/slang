@@ -1064,7 +1064,8 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     // that should be emitted as a target intrinsic,
     // then use that name instead.
     UnownedStringSlice intrinsicDef;
-    if(findTargetIntrinsicDefinition(inst, intrinsicDef))
+    IRInst* intrinsicInst = nullptr;
+    if(findTargetIntrinsicDefinition(inst, intrinsicDef, intrinsicInst))
     {
         return String(intrinsicDef);
     }
@@ -1536,7 +1537,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         // parameter. This is not indicated into the call, and can lead to output code computes something multiple
         // times as it is folding into the expression of the the target intrinsic, which we don't want.
         UnownedStringSlice intrinsicDef;
-        if (findTargetIntrinsicDefinition(funcValue, intrinsicDef))
+        IRInst* intrinsicInst;
+        if (findTargetIntrinsicDefinition(funcValue, intrinsicDef, intrinsicInst))
         {         
             // Find the index of the original instruction, to see if it's multiply used.
             IRUse* args = callInst->getArgs();
@@ -1854,14 +1856,15 @@ IRTargetIntrinsicDecoration* CLikeSourceEmitter::_findBestTargetIntrinsicDecorat
 }
 
 
-void CLikeSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, UnownedStringSlice intrinsicDefinition, EmitOpInfo const& inOuterPrec)
+void CLikeSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, UnownedStringSlice intrinsicDefinition, IRInst* intrinsicInst, EmitOpInfo const& inOuterPrec)
 {
-    emitIntrinsicCallExprImpl(inst, intrinsicDefinition, inOuterPrec);
+    emitIntrinsicCallExprImpl(inst, intrinsicDefinition, intrinsicInst, inOuterPrec);
 }
 
 void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     IRCall*                         inst,
     UnownedStringSlice              intrinsicDefinition,
+    IRInst*                         intrinsicInst,
     EmitOpInfo const&               inOuterPrec)
 {
     auto outerPrec = inOuterPrec;
@@ -1939,7 +1942,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     else
     {
         IntrinsicExpandContext context(this);
-        context.emit(inst, args, argCount, name);
+        context.emit(inst, args, argCount, name, intrinsicInst);
     }
 }
 
@@ -1985,9 +1988,9 @@ void CLikeSourceEmitter::emitComInterfaceCallExpr(IRCall* inst, EmitOpInfo const
     maybeCloseParens(needClose);
 }
 
-bool CLikeSourceEmitter::findTargetIntrinsicDefinition(IRInst* callee, UnownedStringSlice& outDefinition)
+bool CLikeSourceEmitter::findTargetIntrinsicDefinition(IRInst* callee, UnownedStringSlice& outDefinition, IRInst*& outInst)
 {
-    return Slang::findTargetIntrinsicDefinition(callee, getTargetCaps(), outDefinition);
+    return Slang::findTargetIntrinsicDefinition(callee, getTargetCaps(), outDefinition, outInst);
 }
 
 void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
@@ -2024,8 +2027,9 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     // We want to detect any call to an intrinsic operation,
     // that we can emit it directly without mangling, etc.
     UnownedStringSlice intrinsicDefinition;
+    IRInst* intrinsicInst;
     auto resolvedFunc = getResolvedInstForDecorations(funcValue);
-    if (findTargetIntrinsicDefinition(resolvedFunc, intrinsicDefinition))
+    if (findTargetIntrinsicDefinition(resolvedFunc, intrinsicDefinition, intrinsicInst))
     {
         // Make sure we register all required preludes for emit.
         if (auto func = as<IRFunc>(resolvedFunc))
@@ -2043,7 +2047,7 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
                 }
             }
         }
-        emitIntrinsicCallExpr(inst, intrinsicDefinition, outerPrec);
+        emitIntrinsicCallExpr(inst, intrinsicDefinition, intrinsicInst, outerPrec);
     }
     else
     {
@@ -2674,6 +2678,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         break;
 
     case kIROp_ByteAddressBufferLoad:
+    {
         m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(").Load<");
@@ -2682,20 +2687,21 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(")");
         break;
+    }
 
     case kIROp_ByteAddressBufferStore:
-        {
-            auto prec = getInfo(EmitOp::Postfix);
-            needClose = maybeEmitParens(outerPrec, prec);
+    {
+        auto prec = getInfo(EmitOp::Postfix);
+        needClose = maybeEmitParens(outerPrec, prec);
 
-            emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
-            m_writer->emit(".Store(");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            m_writer->emit(",");
-            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
-            m_writer->emit(")");
-        }
+        emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+        m_writer->emit(".Store(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(",");
+        emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
+        m_writer->emit(")");
         break;
+    }
     case kIROp_PackAnyValue:
     {
         m_writer->emit("packAnyValue<");
@@ -3355,6 +3361,7 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 
     emitParamType(paramType, paramName);
     emitSemantics(param);
+    emitPostDeclarationAttributesForType(paramType);
 }
 
 void CLikeSourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
@@ -3527,7 +3534,8 @@ bool CLikeSourceEmitter::isTargetIntrinsic(IRInst* inst)
     // target intrinsic for the current compilation target.
     //
     UnownedStringSlice intrinsicDef;
-    return findTargetIntrinsicDefinition(inst, intrinsicDef);
+    IRInst* intrinsicInst;
+    return findTargetIntrinsicDefinition(inst, intrinsicDef, intrinsicInst);
 }
 
 bool shouldWrapInExternCBlock(IRFunc* func)
@@ -3642,6 +3650,7 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, b
         emitMemoryQualifiers(fieldKey);
         emitType(fieldType, getName(fieldKey));
         emitSemantics(fieldKey, allowOffsetLayout);
+        emitPostDeclarationAttributesForType(fieldType);
         m_writer->emit(";\n");
     }
 
@@ -3726,6 +3735,7 @@ void CLikeSourceEmitter::emitClass(IRClassType* classType)
 
         emitType(fieldType, getName(fieldKey));
         emitSemantics(fieldKey);
+        emitPostDeclarationAttributesForType(fieldType);
         m_writer->emit(";\n");
     }
 
@@ -3893,8 +3903,8 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
     emitType(varType, getName(varDecl));
 
     emitSemantics(varDecl);
-
     emitLayoutSemantics(varDecl);
+    emitPostDeclarationAttributesForType(varType);
 
     // TODO: ideally this logic should scan ahead to see if it can find a `store`
     // instruction that writes to the `var`, within the same block, such that all

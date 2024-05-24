@@ -614,11 +614,11 @@ namespace Slang
         GLSLExtensionTracker*   extensionTracker,
         CapabilitySet const&    caps)
     {
-        for( auto conjunctions : caps.getExpandedAtoms() )
+        for(auto& conjunctions : caps.getAtomSets() )
         {
-            for (auto atom : conjunctions.getExpandedAtoms())
+            for (auto atom : conjunctions)
             {
-                switch (atom)
+                switch ((CapabilityAtom)atom)
                 {
                 default:
                     break;
@@ -1669,6 +1669,7 @@ namespace Slang
             SLANG_UNEXPECTED("unhandled code generation target");
             break;
         }
+        return SLANG_FAIL;
     }
 
     void EndToEndCompileRequest::writeArtifactToStandardOutput(IArtifact* artifact, DiagnosticSink* sink)

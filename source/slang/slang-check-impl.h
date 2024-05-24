@@ -825,6 +825,9 @@ namespace Slang
             return result;
         }
 
+        FunctionDeclBase* getParentFuncOfVisitor() { return m_parentFunc; }
+        void setParentFuncOfVisitor(FunctionDeclBase* funcDecl) { m_parentFunc = funcDecl; }
+
         SemanticsContext withParentFunc(FunctionDeclBase* parentFunc)
         {
             SemanticsContext result(*this);
@@ -2734,7 +2737,7 @@ namespace Slang
 
         void visitTargetCaseStmt(TargetCaseStmt* stmt);
 
-        void visitIntrinsicAsmStmt(IntrinsicAsmStmt*) {}
+        void visitIntrinsicAsmStmt(IntrinsicAsmStmt*);
 
         void visitDefaultStmt(DefaultStmt* stmt);
 
@@ -2786,7 +2789,7 @@ namespace Slang
 
     DeclVisibility getDeclVisibility(Decl* decl);
 
-    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom);
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl = false);
 
     void _ensureAllDeclsRec(
         SemanticsDeclVisitorBase* visitor,

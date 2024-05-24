@@ -862,6 +862,7 @@ extern "C"
             SourceEmbedName,
             SourceEmbedLanguage,
             DisableShortCircuit,   // bool
+            MinimumSlangOptimization, // bool
 
             // Target
 
@@ -1708,6 +1709,17 @@ extern "C"
         SlangCompileRequest*    request,
         int targetIndex,
         bool forceScalarLayout);
+
+    /*! @see slang::ICompileRequest::setTargetUseMinimumSlangOptimization */
+    SLANG_API void spSetTargetUseMinimumSlangOptimization(
+        slang::ICompileRequest* request,
+        int targetIndex,
+        bool val);
+
+    /*! @see slang::ICompileRequest::setIngoreCapabilityCheck */
+    SLANG_API void spSetIgnoreCapabilityCheck(
+        slang::ICompileRequest* request,
+        bool val);
 
     /*! @see slang::ICompileRequest::setCodeGenTarget */
     SLANG_API void spSetCodeGenTarget(
@@ -4402,6 +4414,10 @@ namespace slang
         virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) = 0;
 
         virtual SLANG_NO_THROW void SLANG_MCALL setSkipSPIRVValidation(bool value) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetUseMinimumSlangOptimization(int targetIndex, bool value) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setIgnoreCapabilityCheck(bool value) = 0;
 
     };
 

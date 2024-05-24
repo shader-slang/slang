@@ -250,6 +250,30 @@ struct PeepholeContext : InstPassBase
 
         switch (inst->getOp())
         {
+        case kIROp_AlignOf:
+            // Fold all calls to alignOf<T>() that returns a simple integer value.
+            if (inst->getDataType()->getOp() == kIROp_IntType)
+            {
+                if (!targetProgram)
+                    break;
+
+                // Save the alignment information and exit early if it is invalid
+                IRSizeAndAlignment sizeAlignment;
+                auto alignOfInst = as<IRAlignOf>(inst);
+                auto baseType = alignOfInst->getBaseOp()->getDataType();
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), baseType, &sizeAlignment)))
+                    break;
+                if (sizeAlignment.size == 0)
+                    break;
+
+                IRBuilder builder(module);
+                builder.setInsertBefore(inst);
+                auto stride = builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
+                inst->replaceUsesWith(stride);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
         case kIROp_GetResultError:
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultError)
             {

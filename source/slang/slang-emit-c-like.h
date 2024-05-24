@@ -316,8 +316,8 @@ public:
     IRTargetIntrinsicDecoration* _findBestTargetIntrinsicDecoration(IRInst* inst);
 
     // Find the definition of a target intrinsic either from __target_intrinsic decoration, or from
-    // a genericAsm inst in the function body.
-    bool findTargetIntrinsicDefinition(IRInst* callee, UnownedStringSlice& outDefinition);
+    // a genericAsm inst in the function body. `outInst` is the decoration or the genericAsm inst.
+    bool findTargetIntrinsicDefinition(IRInst* callee, UnownedStringSlice& outDefinition, IRInst*& outInst);
 
     // Check if the string being used to define a target intrinsic
     // is an "ordinary" name, such that we can simply emit a call
@@ -329,6 +329,7 @@ public:
     void emitIntrinsicCallExpr(
         IRCall*                         inst,
         UnownedStringSlice              intrinsicDefinition,
+        IRInst*                         intrinsicInst,
         EmitOpInfo const&               inOuterPrec);
 
     void emitCallExpr(IRCall* inst, EmitOpInfo outerPrec);
@@ -460,7 +461,7 @@ public:
     protected:
 
 
-
+    virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual bool doesTargetSupportPtrTypes() { return false; }
     virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
@@ -495,7 +496,7 @@ public:
     virtual void emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitParamTypeImpl(IRType* type, String const& name);
-    virtual void emitIntrinsicCallExprImpl(IRCall* inst, UnownedStringSlice intrinsicDefinition, EmitOpInfo const& inOuterPrec);
+    virtual void emitIntrinsicCallExprImpl(IRCall* inst, UnownedStringSlice intrinsicDefinition, IRInst* intrinsicInst, EmitOpInfo const& inOuterPrec);
     virtual void emitFunctionPreambleImpl(IRInst* inst) { SLANG_UNUSED(inst); }
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) { SLANG_UNUSED(decl); }
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) { SLANG_UNUSED(ifInst); }

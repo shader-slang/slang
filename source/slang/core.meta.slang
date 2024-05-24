@@ -2003,11 +2003,12 @@ int __SyntaxError()
 /// For downstream compilers that allow sizeof/alignof/offsetof
 /// Can't be called in the C/C++ style. Need to use __size_of<some_type>() as opposed to sizeof(some_type).
 __generic<T>
-__target_intrinsic(cpp, "sizeof($G0)")
-__target_intrinsic(cuda, "sizeof($G0)")
 [__readNone]
 [require(cpp_cuda)]
-int __sizeOf();
+int __sizeOf()
+{
+    __intrinsic_asm "sizeof($[0])", T;
+}
 
 __generic<T>
 [__readNone]
@@ -2022,11 +2023,17 @@ int __sizeOf(T v)
 }
 
 __generic<T>
-__target_intrinsic(cuda, "SLANG_ALIGN_OF($G0)")
-__target_intrinsic(cpp, "SLANG_ALIGN_OF($G0)")
 [__readNone]
 [require(cpp_cuda)]
-int __alignOf();
+int __alignOf()
+{
+    __target_switch
+    {
+    case cuda :
+    case cpp :
+        __intrinsic_asm "SLANG_ALIGN_OF($[0])", T;
+    }
+}
 
 __generic<T>
 [__readNone]
@@ -2055,42 +2062,14 @@ int __offsetOf(in T t, in F field)
 }
 
 /// Mark beginning of "interlocked" operations in a fragment shader.
-__glsl_extension(GL_ARB_fragment_shader_interlock)
-__glsl_version(420)
-void beginInvocationInterlock()
-{
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "beginInvocationInterlockARB";
-    case spirv:
-        spirv_asm {
-            OpCapability FragmentShaderPixelInterlockEXT;
-            OpExtension "SPV_EXT_fragment_shader_interlock";
-            OpExecutionMode __entryPoint PixelInterlockOrderedEXT;
-            OpBeginInvocationInterlockEXT;
-        };
-    }
-}
+[require(glsl_spirv, GL_ARB_fragment_shader_interlock, fragment)]
+__intrinsic_op($(kIROp_BeginFragmentShaderInterlock))
+void beginInvocationInterlock();
 
 /// Mark end of "interlocked" operations in a fragment shader.
-__glsl_extension(GL_ARB_fragment_shader_interlock)
-__glsl_version(420)
-void endInvocationInterlock()
-{
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "endInvocationInterlockARB";
-    case spirv:
-        spirv_asm {
-            OpCapability FragmentShaderPixelInterlockEXT;
-            OpExtension "SPV_EXT_fragment_shader_interlock";
-            OpExecutionMode __entryPoint PixelInterlockOrderedEXT;
-            OpEndInvocationInterlockEXT;
-        };
-    }
-}
+[require(glsl_spirv, GL_ARB_fragment_shader_interlock, fragment)]
+__intrinsic_op($(kIROp_EndFragmentShaderInterlock))
+void endInvocationInterlock();
 
 // Operators to apply to `enum` types
 
@@ -2410,6 +2389,15 @@ __generic<T>
 int __naturalStrideOf()
 {
     return __naturalStrideOf_impl(__declVal<T>());
+}
+
+__intrinsic_op($(kIROp_AlignOf))
+int __alignOf_intrinsic_impl<T>(T t);
+
+[ForceInline]
+int __alignOf_intrinsic<T>()
+{
+    return __alignOf_intrinsic_impl<T>(__default<T>());
 }
 
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))

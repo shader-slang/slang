@@ -1112,6 +1112,7 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 void CPPSourceEmitter::emitIntrinsicCallExprImpl(
     IRCall*                         inst,
     UnownedStringSlice              intrinsicDefinition,
+    IRInst*                         intrinsicInst,
     EmitOpInfo const&               inOuterPrec)
 {
     // TODO: Much of this logic duplicates code that is already
@@ -1176,7 +1177,7 @@ void CPPSourceEmitter::emitIntrinsicCallExprImpl(
     }
 
     // Use default impl (which will do intrinsic special macro expansion as necessary)
-    return Super::emitIntrinsicCallExprImpl(inst, intrinsicDefinition, inOuterPrec);
+    return Super::emitIntrinsicCallExprImpl(inst, intrinsicDefinition, intrinsicInst, inOuterPrec);
 }
 
 void CPPSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* decl)

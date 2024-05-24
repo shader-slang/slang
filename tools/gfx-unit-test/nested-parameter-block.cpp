@@ -67,9 +67,8 @@ namespace gfx_test
             IResourceView::Desc srvDesc = {};
             srvDesc.type = IResourceView::Type::ShaderResource;
             srvDesc.format = Format::Unknown;
-            srvDesc.bufferElementSize = sizeof(uint32_t) * 4;
-            srvDesc.bufferRange.elementCount = 1;
-            srvDesc.bufferRange.firstElement = 0;
+            srvDesc.bufferRange.offset = 0;
+            srvDesc.bufferRange.size = sizeof(uint32_t) * 4;
             srvs.add(device->createBufferView(srvBuffers[i], nullptr, srvDesc));
         }
         Slang::ComPtr<IBufferResource> resultBuffer =
@@ -77,9 +76,8 @@ namespace gfx_test
         IResourceView::Desc resultBufferViewDesc = {};
         resultBufferViewDesc.type = IResourceView::Type::UnorderedAccess;
         resultBufferViewDesc.format = Format::Unknown;
-        resultBufferViewDesc.bufferElementSize = sizeof(uint32_t) * 4;
-        resultBufferViewDesc.bufferRange.elementCount = 1;
-        resultBufferViewDesc.bufferRange.firstElement = 0;
+        resultBufferViewDesc.bufferRange.offset = 0;
+        resultBufferViewDesc.bufferRange.size = sizeof(uint32_t) * 4;
         Slang::ComPtr<IResourceView> resultBufferView;
         SLANG_CHECK(SLANG_SUCCEEDED(device->createBufferView(
             resultBuffer, nullptr, resultBufferViewDesc, resultBufferView.writeRef())));

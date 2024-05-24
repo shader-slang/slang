@@ -5,7 +5,9 @@
 #include "../../slang.h"
 #include "../../slang-com-helper.h"
 #include "../core/slang-smart-pointer.h"
+#include "../core/slang-dictionary.h"
 #include "../slang/slang-compiler.h"
+#include "slang-module.h"
 
 namespace SlangCapture
 {
@@ -92,7 +94,19 @@ namespace SlangCapture
         {
             return static_cast<slang::ISession*>(session);
         }
+
+        // The IComponentType object is the capture target, therefore `componentTypes` will not be
+        // the actual component types, we have to use the COM interface to get the actual objects.
+        SlangResult getActualComponentTypes(
+            slang::IComponentType* const*   componentTypes,
+            SlangInt                        componentTypeCount,
+            List<slang::IComponentType*>&   outActualComponentTypes);
+
+        ModuleCapture* getModuleCapture(slang::IModule* module);
+
         Slang::ComPtr<slang::ISession> m_actualSession;
+
+        Dictionary<slang::IModule*, ModuleCapture> m_mapModuleToCapture;
     };
 }
 

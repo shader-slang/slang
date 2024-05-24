@@ -304,6 +304,18 @@ SLANG_API void spSetTargetForceGLSLScalarBufferLayout(
     request->setTargetForceGLSLScalarBufferLayout(targetIndex, forceScalarLayout);
 }
 
+SLANG_API void spSetTargetUseMinimumSlangOptimization(slang::ICompileRequest* request, int targetIndex, bool val)
+{
+    SLANG_ASSERT(request);
+    request->setTargetUseMinimumSlangOptimization(targetIndex, val);
+}
+
+SLANG_API void spSetIgnoreCapabilityCheck(slang::ICompileRequest* request, bool ignore)
+{
+    SLANG_ASSERT(request);
+    request->setIgnoreCapabilityCheck(ignore);
+}
+
 SLANG_API void spSetTargetLineDirectiveMode(
     slang::ICompileRequest* request,
     int targetIndex,

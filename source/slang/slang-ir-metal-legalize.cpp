@@ -36,7 +36,7 @@ namespace Slang
         List<IRParam*> paramsToProcess;
         for (auto param : func->getParams())
         {
-            if (auto structType = as<IRStructType>(param->getDataType()))
+            if (as<IRStructType>(param->getDataType()))
             {
                 paramsToProcess.add(param);
             }
