@@ -5,7 +5,7 @@ namespace Slang
 {
     struct FuncProfileInfo
     {
-        int invocationCount = 0;
+        Int32 invocationCount = 0;
         std::chrono::nanoseconds duration = std::chrono::nanoseconds::zero();
     };
     class PerformanceProfilerImpl : public PerformanceProfiler
@@ -39,7 +39,7 @@ namespace Slang
             for (auto func : data)
             {
                 out << func.key << ": \t";
-                out << static_cast<int>(func.value.invocationCount) << "\t" << static_cast<double>(func.value.duration.count()/1000000) << "\n";
+                out << static_cast<Int32>(func.value.invocationCount) << "\t" << static_cast<double>(func.value.duration.count()/1000000) << "\n";
             }
         }
     };
