@@ -411,11 +411,16 @@ float4 myPackedVector = reinterpret<float4>(myVal);
 
 Slang supports pointers when generating code for SPIRV, C++ and CUDA targets. The syntax for pointers is similar to C, with the exception that operator `.` can also be used to dereference a member from a pointer. For example:
 ```csharp
+
+struct MyType {
+    int a;
+};
+
 int test(MyType* pObj)
 {
     MyType* pNext = pObj + 1;
-    MyType* pNext = &pNext[1];
-    return pNext.a + pNext->a + (*pNext).a + pNext[0].a;
+    MyType* pNext2 = &pNext[1];
+    return pNext.a + pNext->a + (*pNext2).a + pNext2[0].a;
 }
 ```
 
