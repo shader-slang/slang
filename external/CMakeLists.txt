@@ -31,6 +31,10 @@ endif()
 # Vulkan headers
 add_subdirectory(vulkan EXCLUDE_FROM_ALL)
 
+# metal-cpp headers
+add_library(metal-cpp INTERFACE)
+target_include_directories(metal-cpp INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-cpp")
+
 # SPIRV-Headers
 add_subdirectory(spirv-headers EXCLUDE_FROM_ALL)
 
