@@ -4442,7 +4442,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitDefaultConstructExpr(DefaultConstructExpr* expr)
     {
         return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(lowerType(context, expr->type)));
-        //return getDefaultVal(expr->type);
     }
 
     LoweredValInfo getDefaultVal(DeclRef<VarDeclBase> decl)
