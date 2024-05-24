@@ -1222,7 +1222,7 @@ tool "gfx"
     end
 
     if os.target() == "macosx" then
-        links { "Cocoa.framework", "QuartzCore.framework", "Metal.framework" }
+        links { "Foundation.framework", "Cocoa.framework", "QuartzCore.framework", "Metal.framework" }
     end
 
     if enableXlib then
@@ -1284,7 +1284,7 @@ tool "platform"
     if targetInfo.isWindows then
         systemversion "latest"
     elseif os.target() == "macosx" then
-        links { "Cocoa.framework", "QuartzCore.framework" }
+        links { "Foundation.framework", "Cocoa.framework", "QuartzCore.framework" }
     else
         if enableXlib then
             defines { "SLANG_ENABLE_XLIB" }
