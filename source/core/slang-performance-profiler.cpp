@@ -61,14 +61,38 @@ namespace Slang
                 {
                     m_semanticsCheckTime += ms;
                 }
-                else if (!strcmp(func.key, "generateIRForTranslationUnit"))
-                {
-                    m_IRGenTime += ms;
-                }
-                else if (!strcmp(func.key, "performMandatoryEarlyInlining"))
-                {
-                    m_earlyInlneTime += ms;
-                }
+                // else if (!strcmp(func.key, "generateIRForTranslationUnit"))
+                // {
+                //     m_IRGenTime += ms;
+                // }
+                // else if (!strcmp(func.key, "synthesizeBitFieldAccessors"))
+                // {
+                //     m_synthesizeBitFieldAccessors += ms;
+                // }
+                // else if (!strcmp(func.key, "constructSSA"))
+                // {
+                //     m_constructSSA += ms;
+                // }
+                // else if (!strcmp(func.key, "simplifyCFG"))
+                // {
+                //     m_simplifyCFG += ms;
+                // }
+                // else if (!strcmp(func.key, "peepholeOptimize"))
+                // {
+                //     m_peepholeOptimize += ms;
+                // }
+                // else if (!strcmp(func.key, "propagateConstExpr"))
+                // {
+                //     m_propagateConstExpr += ms;
+                // }
+                // else if (!strcmp(func.key, "performMandatoryEarlyInlining"))
+                // {
+                //     m_earlyInlneTime += ms;
+                // }
+                // else if (!strcmp(func.key, "eliminateDeadCode"))
+                // {
+                //     m_eliminateDeadCode += ms;
+                // }
                 else if (!strcmp(func.key, "linkAndOptimizeIR"))
                 {
                     m_linkIRTime += ms;
@@ -78,9 +102,16 @@ namespace Slang
                     m_optimizeIRTime += ms;
                 }
             }
+
             out << "Semantics Check Time: " << SerialPerformaceProfilerImpl::m_semanticsCheckTime.load() << "ms\n";
-            out << "IR Generation Time: " << SerialPerformaceProfilerImpl::m_IRGenTime.load() << "ms\n";
-            out << "Early Inline Time: " << SerialPerformaceProfilerImpl::m_earlyInlneTime.load() << "ms\n";
+            // out << "IR Generation Time: " << SerialPerformaceProfilerImpl::m_IRGenTime.load() << "ms\n";
+            // out << "    synthesizeBitFieldAccessors time: " << SerialPerformaceProfilerImpl::m_synthesizeBitFieldAccessors.load() << "ms\n";
+            // out << "    constructSSA time: " << SerialPerformaceProfilerImpl::m_constructSSA.load() << "ms\n";
+            // out << "    simplifyCFG time: " << SerialPerformaceProfilerImpl::m_simplifyCFG.load() << "ms\n";
+            // out << "    peepholeOptimize time: " << SerialPerformaceProfilerImpl::m_peepholeOptimize.load() << "ms\n";
+            // out << "    propagateConstExpr time: " << SerialPerformaceProfilerImpl::m_propagateConstExpr.load() << "ms\n";
+            // out << "    eliminateDeadCode time: " << SerialPerformaceProfilerImpl::m_eliminateDeadCode.load() << "ms\n";
+            // out << "    Early Inline Time: " << SerialPerformaceProfilerImpl::m_earlyInlneTime.load() << "ms\n";
             out << "Link IR Time: " << SerialPerformaceProfilerImpl::m_linkIRTime.load() << "ms\n";
             out << "Optimize IR Time: " << SerialPerformaceProfilerImpl::m_optimizeIRTime.load() << "ms\n";
        }
@@ -91,6 +122,12 @@ namespace Slang
         std::atomic<long> m_earlyInlneTime;
         std::atomic<long> m_linkIRTime;
         std::atomic<long> m_optimizeIRTime;
+        std::atomic<long> m_synthesizeBitFieldAccessors;
+        std::atomic<long> m_constructSSA;
+        std::atomic<long> m_simplifyCFG;
+        std::atomic<long> m_peepholeOptimize;
+        std::atomic<long> m_propagateConstExpr;
+        std::atomic<long> m_eliminateDeadCode;
     };
 
     // SerialPerformaceProfilerImpl profiler is intent to be shared by all threads, it's thread safe object

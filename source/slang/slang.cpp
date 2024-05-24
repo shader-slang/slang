@@ -6108,9 +6108,9 @@ SlangResult EndToEndCompileRequest::compile()
         downstreamTimeAtomic += downstreamTimeLong;
 
         // printf("Total Time: %.2f, Downstream time: %.2f\n", totalTimeAtomic.load() / 1e4f, downstreamTimeAtomic.load()/1e4f);
-        StringBuilder out;
-        SerialPerformaceProfiler::getProfiler()->accumulateResults(out, PerformanceProfiler::getProfiler());
-        printf("%s", out.toString().begin());
+        // StringBuilder out;
+        // SerialPerformaceProfiler::getProfiler()->accumulateResults(out, PerformanceProfiler::getProfiler());
+        // printf("%s", out.toString().begin());
 
         getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
     }

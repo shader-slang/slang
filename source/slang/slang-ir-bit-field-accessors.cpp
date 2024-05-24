@@ -2,6 +2,7 @@
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -129,6 +130,8 @@ static void synthesizeBitFieldSetter(IRFunc* func, IRBitFieldAccessorDecoration*
 
 void synthesizeBitFieldAccessors(IRModule* module)
 {
+    SLANG_PROFILE;
+
     for(const auto inst : module->getModuleInst()->getGlobalInsts())
     {
         const auto func = as<IRFunc>(getResolvedInstForDecorations(inst));

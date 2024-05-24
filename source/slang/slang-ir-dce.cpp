@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -461,6 +462,8 @@ bool eliminateDeadCode(
     IRModule*                           module,
     IRDeadCodeEliminationOptions const& options)
 {
+    SLANG_PROFILE;
+
     DeadCodeEliminationContext context;
     context.module = module;
     context.options = options;

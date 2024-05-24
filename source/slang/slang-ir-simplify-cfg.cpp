@@ -7,6 +7,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-reachability.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -927,6 +928,8 @@ static bool processFunc(IRGlobalValueWithCode* func, CFGSimplificationOptions op
 
 bool simplifyCFG(IRModule* module, CFGSimplificationOptions options)
 {
+    SLANG_PROFILE;
+
     bool changed = false;
     for (auto inst : module->getGlobalInsts())
     {

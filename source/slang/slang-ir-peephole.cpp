@@ -4,6 +4,7 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-util.h"
 #include "slang-ir-layout.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -1144,6 +1145,8 @@ struct PeepholeContext : InstPassBase
 
 bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizationOptions options)
 {
+    SLANG_PROFILE;
+
     PeepholeContext context = PeepholeContext(module);
     context.targetProgram = target;
     context.isPrelinking = options.isPrelinking;
@@ -1152,6 +1155,8 @@ bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizat
 
 bool peepholeOptimize(TargetProgram* target, IRInst* func)
 {
+    // SLANG_PROFILE;
+
     PeepholeContext context = PeepholeContext(func->getModule());
     context.targetProgram = target;
     return context.processFunc(func);

@@ -7,6 +7,8 @@
 #include "slang-ir-validate.h"
 #include "slang-ir-util.h"
 
+#include "../core/slang-performance-profiler.h"
+
 namespace Slang {
 
 // Track information on a phi node we are in
@@ -1077,6 +1079,7 @@ static void breakCriticalEdges(
 // Construct SSA form for a global value with code
 bool constructSSA(ConstructSSAContext* context)
 {
+    SLANG_PROFILE;
     // First, detect and and break any critical edges in the CFG,
     // because our representation of SSA form doesn't allow for them.
     breakCriticalEdges(context);

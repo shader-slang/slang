@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-dominators.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang {
 
@@ -609,6 +610,8 @@ void propagateConstExpr(
     IRModule*       module,
     DiagnosticSink* sink)
 {
+    SLANG_PROFILE;
+
     PropagateConstExprContext context(module);
     context.sink = sink;
     context.builder = IRBuilder(module);
