@@ -230,8 +230,9 @@ bool isSimpleDataType(IRType* type)
         return true;
     case kIROp_ArrayType:
     case kIROp_UnsizedArrayType:
-    case kIROp_PtrType:
         return isSimpleDataType((IRType*)type->getOperand(0));
+    case kIROp_PtrType:
+        return as<IRBasicType>((IRType*)type->getOperand(0));
     default:
         return false;
     }

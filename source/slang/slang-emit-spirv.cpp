@@ -5700,18 +5700,25 @@ struct SPIRVEmitContext
                 builder.getIntValue(builder.getUIntType(), spvEncoding),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
         }
-        else if (as<IRPtrTypeBase>(type))
+        else if (auto ptrType = as<IRPtrTypeBase>(type))
         {
             StringBuilder sbName;
             getTypeNameHint(sbName, basicType);
-            return emitOpDebugTypeBasic(
+
+            auto ptrValueType = ptrType->getValueType();
+            SpvInst* baseType = emitDebugType(ptrValueType);
+
+            SpvStorageClass storageClass = SpvStorageClassFunction;
+            if (ptrType->hasAddressSpace())
+                storageClass = (SpvStorageClass)ptrType->getAddressSpace();
+
+            return emitOpDebugTypePointer(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
-                builder.getStringValue(sbName.getUnownedSlice()),
-                builder.getIntValue(builder.getUIntType(), 64),
-                builder.getIntValue(builder.getUIntType(), 0),
+                baseType,
+                builder.getIntValue(builder.getUIntType(), storageClass),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
         }
         return ensureInst(m_voidType);
