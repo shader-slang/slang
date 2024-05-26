@@ -1666,85 +1666,136 @@ ${{{{
 
 for (auto op : intrinsicBinaryOps)
 {
-    for (auto type : kBaseTypes)
+    for (auto firstType : kBaseTypes)
     {
-        if ((type.flags & op.flags) == 0)
+        if ((firstType.flags & op.flags) == 0)
             continue;
 
-        char const* leftType = type.name;
-        char const* rightType = leftType;
-        char const* resultType = leftType;
+        sb << "\n// Operator overloading: " << firstType.name << "\n";
 
-        if (op.flags & BOOL_RESULT) resultType = "bool";
+        for (auto secondType : kBaseTypes)
+        {
+            if ((secondType.flags & op.flags) == 0)
+                continue;
 
-        // TODO: We should handle a `SHIFT` flag on the op
-        // by changing `rightType` to `int` in order to
-        // account for the fact that the shift amount should
-        // always have a fixed type independent of the LHS.
-        //
-        // (It is unclear why this change hadn't been made
-        // already, so it is possible that such a change
-        // breaks overload resolution or other parts of
-        // the compiler)
+            // When an unsigned integer value is implicitly casted to a signed
+            // integer value, we need to warn.
+            const bool needToWarn = (op.flags & INT_MASK)
+                && (((firstType.conversionKind == kBaseTypeConversionKind_Signed
+                        && secondType.conversionKind == kBaseTypeConversionKind_Unsigned)
+                    || (firstType.conversionKind == kBaseTypeConversionKind_Unsigned
+                        && secondType.conversionKind == kBaseTypeConversionKind_Signed)));
 
-        // scalar version
-        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftType << " left, " << rightType << " right);\n";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " __" << op.funcName << "(" << leftType << " left, " << rightType << " right);\n";
+            const bool isSameType = (firstType.conversionKind == secondType.conversionKind
+                && firstType.conversionRank == secondType.conversionRank);
 
-        // vector version
-        sb << "__generic<let N : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
+            if (!isSameType && !needToWarn)
+                continue;
 
-        // matrix version
-        sb << "__generic<let N : int, let M : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
+            char const* leftType = firstType.name;
+            char const* rightType = secondType.name;
+            char const* resultType = leftType;
+            const int opCode = int(needToWarn ? op.opCodeWarn : op.opCode);
 
-        // We currently synthesize addiitonal overloads
-        // for the case where one or the other operand
-        // is a scalar. This choice serves a few purposes:
-        //
-        // 1. It avoids introducing scalar-to-vector or
-        // scalar-to-matrix promotions before the operator,
-        // which might allow some back ends to produce
-        // more optimal code.
-        //
-        // 2. It avoids concerns about making overload resolution
-        // and the inference rules for `N` and `M` able to
-        // handle the mixed vector/scalar or matrix/scalar case.
-        //
-        // 3. Having explicit overloads for the matrix/scalar cases
-        // here means that we do *not* need to support a general
-        // implicit conversion from scalars to matrices, unless
-        // we decide we want to.
-        //
-        // Note: Case (2) of the motivation shouldn't really apply
-        // any more, because we end up having to support similar
-        // inteference for built-in binary math functions where
-        // vectors and scalars might be combined (and where defining
-        // additional overloads to cover all the combinations doesn't
-        // seem practical or desirable).
-        //
-        // TODO: We should consider whether dropping these extra
-        // overloads is possible and worth it. The optimization
-        // concern (1) could possibly be addressed in specific
-        // back-ends. The issue (3) about not wanting to support
-        // implicit scalar-to-matrix conversion may be moot if
-        // we end up needing to support mixed scalar/matrix input
-        // for builtin in non-operator functions anyway.
+            if (op.flags & BOOL_RESULT)
+            {
+                resultType = "bool";
+            }
+            else if (firstType.conversionRank == secondType.conversionRank)
+            {
+                // When the given types are signed and unsigned integer types,
+                // and their sizes are same, the return type is signed, because
+                // the conversion cost of "unsigned to signed" is 200, and
+                // "signed to unsigned" is 300.
+                //
+                if (secondType.conversionKind == kBaseTypeConversionKind_Signed)
+                {
+                    resultType = rightType;
+                }
+            }
+            else if (firstType.conversionRank < secondType.conversionRank)
+            {
+                resultType = rightType;
+            }
 
-        // scalar-vector and scalar-matrix
-        sb << "__generic<let N : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftType << " left, vector<" << rightType << ",N> right);\n";
+            // TODO: We should handle a `SHIFT` flag on the op
+            // by changing `rightType` to `int` in order to
+            // account for the fact that the shift amount should
+            // always have a fixed type independent of the LHS.
+            //
+            // (It is unclear why this change hadn't been made
+            // already, so it is possible that such a change
+            // breaks overload resolution or other parts of
+            // the compiler)
 
-        sb << "__generic<let N : int, let M : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftType << " left, matrix<" << rightType << ",N,M> right);\n";
+            sb << "\n// Scalar version\n";
+            sb << "__intrinsic_op(" << opCode << ")\n";
+            sb << resultType << " operator" << op.opName << "(" << leftType << " left, " << rightType << " right);\n";
 
-        // vector-scalar and matrix-scalar
-        sb << "__generic<let N : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<" << leftType << ",N> left, " << rightType << " right);\n";
+            sb << "\n__intrinsic_op(" << opCode << ")\n";
+            sb << resultType << " __" << op.funcName << "(" << leftType << " left, " << rightType << " right);\n";
 
-        sb << "__generic<let N : int, let M : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
+            sb << "\n// vector version\n";
+            sb << "__generic<let N : int>\n";
+            sb << "__intrinsic_op(" << opCode << ")\n";
+            sb << "vector<" << resultType << ",N> operator" << op.opName << "(vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
+
+            sb << "\n// matrix version\n";
+            sb << "__generic<let N : int, let M : int>\n";
+            sb << "__intrinsic_op(" << opCode << ")\n";
+            sb << "matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
+
+            // We currently synthesize addiitonal overloads
+            // for the case where one or the other operand
+            // is a scalar. This choice serves a few purposes:
+            //
+            // 1. It avoids introducing scalar-to-vector or
+            // scalar-to-matrix promotions before the operator,
+            // which might allow some back ends to produce
+            // more optimal code.
+            //
+            // 2. It avoids concerns about making overload resolution
+            // and the inference rules for `N` and `M` able to
+            // handle the mixed vector/scalar or matrix/scalar case.
+            //
+            // 3. Having explicit overloads for the matrix/scalar cases
+            // here means that we do *not* need to support a general
+            // implicit conversion from scalars to matrices, unless
+            // we decide we want to.
+            //
+            // Note: Case (2) of the motivation shouldn't really apply
+            // any more, because we end up having to support similar
+            // inteference for built-in binary math functions where
+            // vectors and scalars might be combined (and where defining
+            // additional overloads to cover all the combinations doesn't
+            // seem practical or desirable).
+            //
+            // TODO: We should consider whether dropping these extra
+            // overloads is possible and worth it. The optimization
+            // concern (1) could possibly be addressed in specific
+            // back-ends. The issue (3) about not wanting to support
+            // implicit scalar-to-matrix conversion may be moot if
+            // we end up needing to support mixed scalar/matrix input
+            // for builtin in non-operator functions anyway.
+
+            sb << "\n// scalar-vector and scalar-matrix\n";
+            sb << "__generic<let N : int>\n";
+            sb << "__intrinsic_op(" << opCode << ")\n";
+            sb << "vector<" << resultType << ",N> operator" << op.opName << "(" << leftType << " left, vector<" << rightType << ",N> right);\n";
+
+            sb << "\n__generic<let N : int, let M : int>\n";
+            sb << "__intrinsic_op(" << opCode << ")\n";
+            sb << "matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftType << " left, matrix<" << rightType << ",N,M> right);\n";
+
+            sb << "\n// vector-scalar and matrix-scalar\n";
+            sb << "__generic<let N : int>\n";
+            sb << "__intrinsic_op(" << opCode << ")\n";
+            sb << "vector<" << resultType << ",N> operator" << op.opName << "(vector<" << leftType << ",N> left, " << rightType << " right);\n";
+
+            sb << "\n__generic<let N : int, let M : int>\n";
+            sb << "__intrinsic_op(" << opCode << ")\n";
+            sb << "matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
+        }
     }
 
     // Synthesize generic versions

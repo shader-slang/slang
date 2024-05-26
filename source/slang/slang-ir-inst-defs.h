@@ -608,6 +608,14 @@ INST(Sub, sub, 2, 0)
 INST(Mul, mul, 2, 0)
 INST(Div, div, 2, 0)
 
+// Same as without the suffix, "_warn", but these prints warning about
+// the given input types are implicitly converted from unsigned integer
+// type to signed integer type.
+INST(Add_warn, add, 2, 0)
+INST(Sub_warn, sub, 2, 0)
+INST(Mul_warn, mul, 2, 0)
+INST(Div_warn, div, 2, 0)
+
 // Remainder of division.
 //
 // Note: this is distinct from modulus, and we should have a separate

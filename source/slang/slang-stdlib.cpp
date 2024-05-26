@@ -260,34 +260,42 @@ namespace Slang
         return intrinsicOpCode;
     }
 
-    struct IntrinsicOpInfo { IROp opCode; char const* funcName; char const* opName; char const* interface; unsigned flags; };
+    struct IntrinsicOpInfo
+    {
+        IROp opCode;
+        IROp opCodeWarn;
+        char const* funcName;
+        char const* opName;
+        char const* interface;
+        unsigned flags;
+    };
 
     [[maybe_unused]]
     static const IntrinsicOpInfo intrinsicUnaryOps[] = {
-        { kIROp_Neg,    "neg",              "-",    "__BuiltinArithmeticType",  ARITHMETIC_MASK },
-        { kIROp_Not,    "logicalNot",       "!",    nullptr,                    BOOL_MASK | BOOL_RESULT },
-        { kIROp_BitNot, "not",              "~",    "__BuiltinLogicalType",     INT_MASK        },
+        { kIROp_Neg,    kIROp_Neg,    "neg",              "-",    "__BuiltinArithmeticType",  ARITHMETIC_MASK },
+        { kIROp_Not,    kIROp_Not,    "logicalNot",       "!",    nullptr,                    BOOL_MASK | BOOL_RESULT },
+        { kIROp_BitNot, kIROp_BitNot, "not",              "~",    "__BuiltinLogicalType",     INT_MASK        },
     };
 
     [[maybe_unused]]
     static const IntrinsicOpInfo intrinsicBinaryOps[] = {
-        {kIROp_Add, "add", "+", "__BuiltinArithmeticType", ARITHMETIC_MASK},
-        {kIROp_Sub, "sub", "-", "__BuiltinArithmeticType", ARITHMETIC_MASK},
-        {kIROp_Mul, "mul", "*", "__BuiltinArithmeticType", ARITHMETIC_MASK},
-        {kIROp_Div, "div", "/", "__BuiltinArithmeticType", ARITHMETIC_MASK},
-        {kIROp_IRem, "irem", "%", "__BuiltinIntegerType", INT_MASK},
-        {kIROp_FRem, "frem", "%", "__BuiltinFloatingPointType", FLOAT_MASK},
-        {kIROp_And, "logicalAnd", "&&", nullptr, BOOL_MASK | BOOL_RESULT},
-        {kIROp_Or, "logicalOr", "||", nullptr, BOOL_MASK | BOOL_RESULT},
-        {kIROp_BitAnd, "and", "&", "__BuiltinLogicalType", LOGICAL_MASK},
-        {kIROp_BitOr, "or", "|", "__BuiltinLogicalType", LOGICAL_MASK},
-        {kIROp_BitXor, "xor", "^", "__BuiltinLogicalType", LOGICAL_MASK},
-        {kIROp_Eql, "eql", "==", "__BuiltinType", ANY_MASK | BOOL_RESULT},
-        {kIROp_Neq, "neq", "!=", "__BuiltinType", ANY_MASK | BOOL_RESULT},
-        {kIROp_Greater, "greater", ">", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
-        {kIROp_Less, "less", "<", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
-        {kIROp_Geq, "geq", ">=", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
-        {kIROp_Leq, "leq", "<=", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
+        {kIROp_Add, kIROp_Add_warn, "add", "+", "__BuiltinArithmeticType", ARITHMETIC_MASK},
+        {kIROp_Sub, kIROp_Sub_warn, "sub", "-", "__BuiltinArithmeticType", ARITHMETIC_MASK},
+        {kIROp_Mul, kIROp_Mul_warn, "mul", "*", "__BuiltinArithmeticType", ARITHMETIC_MASK},
+        {kIROp_Div, kIROp_Div_warn, "div", "/", "__BuiltinArithmeticType", ARITHMETIC_MASK},
+        {kIROp_IRem, kIROp_IRem, "irem", "%", "__BuiltinIntegerType", INT_MASK},
+        {kIROp_FRem, kIROp_FRem, "frem", "%", "__BuiltinFloatingPointType", FLOAT_MASK},
+        {kIROp_And, kIROp_And, "logicalAnd", "&&", nullptr, BOOL_MASK | BOOL_RESULT},
+        {kIROp_Or, kIROp_Or, "logicalOr", "||", nullptr, BOOL_MASK | BOOL_RESULT},
+        {kIROp_BitAnd, kIROp_BitAnd, "and", "&", "__BuiltinLogicalType", LOGICAL_MASK},
+        {kIROp_BitOr, kIROp_BitOr, "or", "|", "__BuiltinLogicalType", LOGICAL_MASK},
+        {kIROp_BitXor, kIROp_BitXor, "xor", "^", "__BuiltinLogicalType", LOGICAL_MASK},
+        {kIROp_Eql, kIROp_Eql, "eql", "==", "__BuiltinType", ANY_MASK | BOOL_RESULT},
+        {kIROp_Neq, kIROp_Neq, "neq", "!=", "__BuiltinType", ANY_MASK | BOOL_RESULT},
+        {kIROp_Greater, kIROp_Greater, "greater", ">", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
+        {kIROp_Less, kIROp_Less, "less", "<", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
+        {kIROp_Geq, kIROp_Geq, "geq", ">=", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
+        {kIROp_Leq, kIROp_Leq, "leq", "<=", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
     };
 
     // Integer types that can be used in atomic operations in CUDA.
