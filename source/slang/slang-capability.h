@@ -168,7 +168,6 @@ public:
 
     /// returns true if 'this' is a better target for 'targetCaps' than 'that'
     /// isEqual: is `this` and `that` equal
-    /// isIncompatible: is `this` and `that` incompatible
     bool isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const;
 
     /// Find any capability sets which are in 'available' but not in 'required'. Return false if this situation occurs. 

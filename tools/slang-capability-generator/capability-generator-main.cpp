@@ -24,12 +24,19 @@ enum class CapabilityFlavor
     Abstract,
     Alias
 };
+enum class AddCapabilityOptions
+{
+    Union = 0,
+    InclusiveJoin = 1 << 0,
+};
 
 struct CapabilityDef;
 
 struct CapabilityConjunctionExpr
 {
     List<CapabilityDef*> atoms;
+    AddCapabilityOptions howToJoinWithNextSetFlag;
+    SourceLoc            sourceLoc;
 };
 
 struct CapabilityDisjunctionExpr
@@ -45,13 +52,18 @@ struct SerializedArrayView
 
 struct CapabilityDef : public RefObject
 {
-    Index enumValue;
+public:
+    static inline CapabilityDef* ptrOfTarget = nullptr;
+    static inline CapabilityDef* ptrOfStage = nullptr;
+
     String name;
+    Index enumValue;
     CapabilityDisjunctionExpr expr;
     CapabilityFlavor flavor;
     int rank;
     List<List<CapabilityDef*>> canonicalRepresentation;
     SerializedArrayView serializedCanonicalRepresentation;
+    SourceLoc sourceLoc;
 
     CapabilityDef* getAbstractBase()
     {
@@ -65,6 +77,86 @@ struct CapabilityDef : public RefObject
             return nullptr;
         return expr.conjunctions[0].atoms[0];
     }
+
+    const HashSet<CapabilityDef*>& getAbstractAtomsPresent() const
+    {
+        return abstractAtomsPresent;
+    }
+    void fillAbstractAtomsPresentFromCannonicalRepresentation()
+    {
+        bool alreadySetTarget = false;
+        HashSet<CapabilityDef*> firstTargetSet;
+
+        bool alreadySetStage = false;
+        HashSet<CapabilityDef*> firstStageSet;
+
+        HashSet<CapabilityDef*> abstractFound;
+
+        for (auto& c : canonicalRepresentation)
+        {
+
+            alreadySetTarget = false;
+            firstTargetSet.clear();
+            alreadySetStage = false;
+            firstStageSet.clear();
+
+            abstractFound.clear();
+
+            for (auto& atom : c)
+            {
+                for (auto& otherAbstractAtomsPresent : atom->abstractAtomsPresent)
+                {
+                    auto base = otherAbstractAtomsPresent->getAbstractBase();
+                    if (CapabilityDef::ptrOfTarget && base == CapabilityDef::ptrOfTarget)
+                    {
+                        if (!alreadySetTarget)
+                            firstTargetSet.add(otherAbstractAtomsPresent);
+                    }
+                    else if (CapabilityDef::ptrOfStage && base == CapabilityDef::ptrOfStage)
+                    {
+                        if (!alreadySetStage)
+                            firstStageSet.add(otherAbstractAtomsPresent);
+                    }
+
+                    abstractFound.add(otherAbstractAtomsPresent);
+                }
+                if (alreadySetTarget)
+                {
+                    for (auto i : firstTargetSet)
+                    {
+                        if (abstractFound.contains(i))
+                            continue;
+                        firstTargetSet.remove(i);
+                    }
+                }
+                if (alreadySetStage)
+                {
+                    for (auto i : firstStageSet)
+                    {
+                        if (!abstractFound.contains(i))
+                            continue;
+                        firstStageSet.remove(i);
+                    }
+                }
+
+                if (firstTargetSet.getCount() > 0)
+                    alreadySetTarget = true;
+                if (firstStageSet.getCount() > 0)
+                    alreadySetStage = true;
+            }
+           
+
+            for (auto sharedAbstractAtom : firstTargetSet)
+                this->abstractAtomsPresent.add(sharedAbstractAtom);
+            for (auto sharedAbstractAtom : firstStageSet)
+                this->abstractAtomsPresent.add(sharedAbstractAtom);
+        }
+        if (auto base = this->getAbstractBase())
+            abstractAtomsPresent.add(this);
+    }
+
+    private:
+        HashSet<CapabilityDef*> abstractAtomsPresent;
 };
 
 struct CapabilityDefParser
@@ -126,7 +218,7 @@ struct CapabilityDefParser
                 m_sink->diagnose(nameToken.loc, Diagnostics::undefinedIdentifier, nameToken);
                 return SLANG_FAIL;
             }
-            if (!(advanceIf(TokenType::OpAnd) || advanceIf(TokenType::OpAdd)))
+            if (!(advanceIf(TokenType::OpAdd)))
                 break;
         }
         return SLANG_OK;
@@ -134,13 +226,20 @@ struct CapabilityDefParser
 
     SlangResult parseExpr(CapabilityDisjunctionExpr& expr)
     {
+        AddCapabilityOptions addOption = AddCapabilityOptions::Union;
         for (;;)
         {
             CapabilityConjunctionExpr conjunction;
+            conjunction.sourceLoc = this->m_tokenReader.m_cursor->getLoc();
             SLANG_RETURN_ON_FAIL(parseConjunction(conjunction));
+            conjunction.howToJoinWithNextSetFlag = addOption;
+
             expr.conjunctions.add(conjunction);
+            addOption = AddCapabilityOptions::Union;
             if (!advanceIf(TokenType::OpBitOr))
                 break;
+            if (advanceIf(TokenType::OpBitAnd))
+                addOption = AddCapabilityOptions::InclusiveJoin;
         }
         return SLANG_OK;
     }
@@ -212,6 +311,16 @@ struct CapabilityDefParser
                 m_sink->diagnose(nextToken.loc, Diagnostics::redefinition, def->name);
                 return SLANG_FAIL;
             }
+
+            //set abstract atom identifiers
+            if (!CapabilityDef::ptrOfTarget
+                && def->name.equals("target"))
+                CapabilityDef::ptrOfTarget = def;
+            else if (!CapabilityDef::ptrOfStage
+                && def->name.equals("stage"))
+                CapabilityDef::ptrOfStage = def;
+
+            def->sourceLoc = nameToken.loc;
         }
         return SLANG_OK;
     }
@@ -220,6 +329,24 @@ struct CapabilityDefParser
 struct CapabilityConjunction
 {
     HashSet<CapabilityDef*> atoms;
+
+    String toString() const
+    {
+        bool first = true;
+        String outS = "[";
+        for (auto i : atoms)
+        {
+            if (!first)
+            {
+                outS.append(" + ");
+            }
+            first = false;
+            outS.append(i->name);
+        }
+        outS.appendChar(']');
+        return outS;
+    }
+
     bool implies(const CapabilityConjunction& c) const
     {
         for (auto& atom : c.atoms)
@@ -227,6 +354,41 @@ struct CapabilityConjunction
             if (!atoms.contains(atom))
                 return false;
         }
+        return true;
+    }
+
+    const CapabilityDef* CapabilityConjunction::getAbstractAtom(CapabilityDef* defToFilterFor) const
+    {
+        for (auto* atom : this->atoms)
+        {
+            for (auto present : atom->getAbstractAtomsPresent())
+            {
+                auto base = present->getAbstractBase();
+                if (base != defToFilterFor)
+                    continue;
+                return present;
+            }
+        }
+        return nullptr;
+    }
+
+    bool shareTargetAndStageAtom(const CapabilityConjunction& other)
+    {
+        // shared target means thisTarget==otherTarget
+        // shared stage means either `nostage + ...` or `stage == stage`
+        
+        const CapabilityDef* thisTarget = this->getAbstractAtom(CapabilityDef::ptrOfTarget);
+        const CapabilityDef* otherTarget = other.getAbstractAtom(CapabilityDef::ptrOfTarget);
+
+        if (thisTarget != otherTarget && thisTarget && otherTarget)
+            return false;
+
+        const CapabilityDef* thisStage = this->getAbstractAtom(CapabilityDef::ptrOfStage);
+        const CapabilityDef* otherStage = other.getAbstractAtom(CapabilityDef::ptrOfStage);
+
+        if (thisStage != otherStage && thisStage && otherStage)
+            return false;
+
         return true;
     }
 
@@ -259,11 +421,82 @@ struct CapabilityConjunction
     }
 };
 
+String tryGetCapabilityName(const CapabilityDef* def)
+{
+    if(def)
+        return def->name;
+    return "[none]";
+}
+
 struct CapabilityDisjunction
 {
     List<CapabilityConjunction> conjunctions;
 
-    void addConjunction(const CapabilityConjunction& c)
+    void addConjunction(DiagnosticSink* sink, SourceLoc sourceLoc, const CapabilityConjunction& c)
+    {
+        if (c.isImpossible())
+            return;
+        bool cImpliesThis = false;
+        for (Index i = 0; i < conjunctions.getCount();)
+        {
+            // implied sets will be replaced
+            if (c.implies(conjunctions[i]))
+            {
+                cImpliesThis = true;
+                conjunctions.fastRemoveAt(i);
+            }
+            else
+                i++;
+        }
+        if (cImpliesThis)
+        {
+            conjunctions.add(_Move(c));
+            return;
+        }
+
+        for (Index i = 0; i < conjunctions.getCount();)
+        {
+            if (conjunctions[i].implies(c))
+            {
+                // subset is implied, we do not need to add it.
+                return;
+            }
+            else
+            {
+                // validate we are not creating a disjunction of same targets
+                if (conjunctions[i].shareTargetAndStageAtom(c))
+                {
+                    if (sink)
+                    {
+                        sink->diagnose(sourceLoc, Diagnostics::unionWithSameAbstractAtomButNotSubset, conjunctions[i].toString(), c.toString());
+                        sink = nullptr;
+                    }
+                }
+                i++;
+            }
+        }
+        conjunctions.add(_Move(c));
+    }
+    void removeImplied()
+    {
+        for (Index i = 0; i < conjunctions.getCount(); i++)
+        {
+            for (Index ii = 0; ii < conjunctions.getCount(); ii++)
+            {
+                if (ii == i)
+                    continue;
+                if (conjunctions[i].implies(conjunctions[ii]))
+                {
+                    conjunctions.fastRemoveAt(ii);
+                    ii--;
+                    if (i > ii)
+                        i--;
+                }
+            }
+        }
+    }
+
+    void inclusiveJoinConjunction(const CapabilityConjunction& c, List<CapabilityConjunction>& toAddAfter)
     {
         if (c.isImpossible())
             return;
@@ -274,9 +507,15 @@ struct CapabilityDisjunction
         }
         for (Index i = 0; i < conjunctions.getCount();)
         {
-            if (conjunctions[i].implies(c))
+            if (conjunctions[i].shareTargetAndStageAtom(c))
             {
-                conjunctions.fastRemoveAt(i);
+                CapabilityConjunction toAddAfterSet;
+                for (auto atom : conjunctions[i].atoms)
+                    toAddAfterSet.atoms.add(atom);
+                for (auto atom : c.atoms)
+                    toAddAfterSet.atoms.add(atom);
+                toAddAfter.add(toAddAfterSet);
+                return;
             }
             else
             {
@@ -286,7 +525,7 @@ struct CapabilityDisjunction
         conjunctions.add(_Move(c));
     }
 
-    CapabilityDisjunction joinWith(const CapabilityDisjunction& other)
+    CapabilityDisjunction joinWith(DiagnosticSink* sink, SourceLoc sourceLoc, const CapabilityDisjunction& other)
     {
         if (conjunctions.getCount() == 0)
         {
@@ -308,9 +547,14 @@ struct CapabilityDisjunction
                     newC.atoms.add(atom);
                 for (auto atom : thatC.atoms)
                     newC.atoms.add(atom);
-                result.addConjunction(_Move(newC));
+                result.addConjunction(sink, sourceLoc, _Move(newC));
             }
         }
+
+        // incompatible abstract atoms
+        if (result.conjunctions.getCount() == 0)
+            sink->diagnose(sourceLoc, Diagnostics::invalidJoinInGenerator);
+
         return result;
     }
 
@@ -353,18 +597,18 @@ CapabilityDisjunction getCanonicalRepresentation(CapabilityDef* def)
     return result;
 }
 
-CapabilityDisjunction evaluateConjunction(const List<CapabilityDef*>& atoms)
+CapabilityDisjunction evaluateConjunction(DiagnosticSink* sink, SourceLoc sourceLoc, const List<CapabilityDef*>& atoms)
 {
     CapabilityDisjunction result;
     for (auto& def : atoms)
     {
         CapabilityDisjunction defCanonical = getCanonicalRepresentation(def);
-        result = result.joinWith(defCanonical);
+        result = result.joinWith(sink, sourceLoc, defCanonical);
     }
     return result;
 }
 
-void calcCanonicalRepresentation(CapabilityDef* def, const List<CapabilityDef*>& mapEnumValueToDef)
+void calcCanonicalRepresentation(DiagnosticSink* sink, CapabilityDef* def, const List<CapabilityDef*>& mapEnumValueToDef)
 {
     CapabilityDisjunction disjunction;
     if (def->flavor == CapabilityFlavor::Normal)
@@ -376,39 +620,38 @@ void calcCanonicalRepresentation(CapabilityDef* def, const List<CapabilityDef*>&
     CapabilityDisjunction exprVal;
     for (auto& c : def->expr.conjunctions)
     {
-        CapabilityDisjunction evalD = evaluateConjunction(c.atoms);
+        CapabilityDisjunction evalD = evaluateConjunction(sink, c.sourceLoc, c.atoms);
+        List<CapabilityConjunction> toAddAfter;
         for (auto& cc : evalD.conjunctions)
-            exprVal.addConjunction(cc);
+        {
+            switch (c.howToJoinWithNextSetFlag)
+            {
+            case AddCapabilityOptions::Union:
+            {
+                exprVal.addConjunction(sink, c.sourceLoc, cc);
+                break;
+            }
+            case AddCapabilityOptions::InclusiveJoin:
+            {
+                exprVal.inclusiveJoinConjunction(cc, toAddAfter);
+                break;
+            }
+            }
+        }
+        for (auto& i : toAddAfter)
+            exprVal.conjunctions.add(i);
+        if (toAddAfter.getCount() > 0)
+            exprVal.removeImplied();
     }
-    disjunction = disjunction.joinWith(exprVal);
+    disjunction = disjunction.joinWith(sink, def->sourceLoc, exprVal);
     def->canonicalRepresentation = disjunction.canonicalize();
+    def->fillAbstractAtomsPresentFromCannonicalRepresentation();
 }
 
-void calcCanonicalRepresentations(const List<RefPtr<CapabilityDef>>& defs, const List<CapabilityDef*>& mapEnumValueToDef)
+void calcCanonicalRepresentations(DiagnosticSink* sink, const List<RefPtr<CapabilityDef>>& defs, const List<CapabilityDef*>& mapEnumValueToDef)
 {
     for (auto def : defs)
-        calcCanonicalRepresentation(def, mapEnumValueToDef);
-}
-
-const Index kUnusedEnumValue = -1;
-
-// Check if "def" uses a named ("name"/enumValueOfAbstract) abstract atom. If true, assign 
-// the enumValue of the found abstract atom (cache the unique ID) and increment counter.
-bool maybeProcessConcreteAtomForAbstractCapability(CapabilityDef* def, Index& enumValueOfAbstract, const String& name, Index& counter)
-{
-    if (def->getAbstractBase()
-        && (
-            (enumValueOfAbstract == def->getAbstractBase()->enumValue)
-            || 
-            (enumValueOfAbstract == kUnusedEnumValue && def->getAbstractBase()->name.equals(name))
-            )
-        )
-    {
-        counter++;
-        enumValueOfAbstract = def->getAbstractBase()->enumValue;
-        return true;
-    }
-    return false;
+        calcCanonicalRepresentation(sink, def, mapEnumValueToDef);
 }
 
 void outputUIntSetAsBufferValues(const String& nameOfBuffer, StringBuilder& resultBuilder, UIntSet& set)
@@ -429,7 +672,7 @@ void outputUIntSetAsBufferValues(const String& nameOfBuffer, StringBuilder& resu
     resultBuilder << "const static CapabilityAtomSet " << nameOfBuffer << " = generate_" << nameOfBuffer << "();\n";
 }
 
-SlangResult generateDefinitions(const List<RefPtr<CapabilityDef>>& defs, StringBuilder& sbHeader, StringBuilder& sbCpp)
+SlangResult generateDefinitions(DiagnosticSink* sink, const List<RefPtr<CapabilityDef>>& defs, StringBuilder& sbHeader, StringBuilder& sbCpp)
 {
    
     sbHeader << "enum class CapabilityAtom\n{\n";
@@ -488,9 +731,7 @@ SlangResult generateDefinitions(const List<RefPtr<CapabilityDef>>& defs, StringB
     sbHeader << "    Count\n";
     sbHeader << "};\n";
 
-    Index enumValueOfTarget = kUnusedEnumValue;
     Index targetCount = 0;
-    Index enumValueOfStage = kUnusedEnumValue;
     Index stageCount = 0;
 
     UIntSet anyTargetAtomSet{};
@@ -500,10 +741,16 @@ SlangResult generateDefinitions(const List<RefPtr<CapabilityDef>>& defs, StringB
 
     for (auto def : defs)
     {
-        if (maybeProcessConcreteAtomForAbstractCapability(def.get(), enumValueOfTarget, "target", targetCount))
+        if (def->getAbstractBase() == CapabilityDef::ptrOfTarget)
+        {
+            targetCount++;
             anyTargetAtomSet.add(def->enumValue);
-        else if (maybeProcessConcreteAtomForAbstractCapability(def.get(), enumValueOfStage, "stage", stageCount))
+        }
+        else if (def->getAbstractBase() == CapabilityDef::ptrOfStage)
+        {
+            stageCount++;
             anyStageAtomSet.add(def->enumValue);
+        }
     }
     outputUIntSetAsBufferValues("kAnyTargetUIntSetBuffer", anyTargetUIntSetHash, anyTargetAtomSet);
     outputUIntSetAsBufferValues("kAnyStageUIntSetBuffer", anyStageUIntSetHash, anyStageAtomSet);
@@ -513,7 +760,7 @@ SlangResult generateDefinitions(const List<RefPtr<CapabilityDef>>& defs, StringB
     sbHeader << "    kCapabilityStageCount = " << stageCount << ",\n";
     sbHeader << "};\n\n";
 
-    calcCanonicalRepresentations(defs, mapEnumValueToDef);
+    calcCanonicalRepresentations(sink, defs, mapEnumValueToDef);
 
     List<String> capabiltiyNameArray;
     List<SerializedArrayView> serializedCapabilityArrays;
@@ -721,8 +968,9 @@ int main(int argc, const char* const* argv)
     }
 
     StringBuilder sbHeader, sbCpp;
-    if (SLANG_FAILED(generateDefinitions(defs, sbHeader, sbCpp)))
+    if (SLANG_FAILED(generateDefinitions(&sink, defs, sbHeader, sbCpp)))
     {
+        printDiagnostics(&sink);
         return 1;
     }
 
@@ -740,5 +988,6 @@ int main(int argc, const char* const* argv)
         printDiagnostics(&sink);
         return 1;
     }
+    printDiagnostics(&sink);
     return 0;
 }

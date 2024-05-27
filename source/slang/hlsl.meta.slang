@@ -3665,7 +3665,7 @@ struct InputPatch
 };
 
 __generic<T, let N : int>
-[require(glsl_hlsl_spirv, shader_stages_domain_hull)]
+[require(glsl_hlsl_spirv, domain_hull)]
 __magic_type(HLSLOutputPatchType)
 __intrinsic_type($(kIROp_HLSLOutputPatchType))
 struct OutputPatch
