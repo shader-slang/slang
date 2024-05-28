@@ -165,6 +165,9 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
         case LayoutResourceKind::VaryingInput:
             m_writer->emit(" [[stage_in]]");
             break;
+        case LayoutResourceKind::MetalPayload:
+            m_writer->emit(" [[payload]]");
+            break;
         }
     }
     if (auto sysSemanticAttr = layout->findSystemValueSemanticAttr())
@@ -190,6 +193,12 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoi
         break;
     case Stage::Compute:
         m_writer->emit("[[kernel]] ");
+        break;
+    case Stage::Mesh:
+        m_writer->emit("[[mesh]] ");
+        break;
+    case Stage::Amplification:
+        m_writer->emit("[[object]] ");
         break;
     default:
         SLANG_ABORT_COMPILATION("unsupported stage.");
@@ -618,6 +627,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             case AddressSpace::GroupShared:
                 m_writer->emit(" threadgroup");
                 break;
+            case AddressSpace::MetalObjectData:
+                m_writer->emit(" object_data");
+                break;
             }
             m_writer->emit("*");
             return;
@@ -939,6 +951,8 @@ void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRI
     case AddressSpace::ThreadLocal:
         m_writer->emit("thread ");
         break;
+    case AddressSpace::MetalObjectData:
+        m_writer->emit("object_data ");
     default:
         break;
     }

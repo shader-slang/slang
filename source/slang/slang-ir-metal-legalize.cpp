@@ -1,5 +1,6 @@
 #include "slang-ir-metal-legalize.h"
 
+#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir-clone.h"
@@ -306,6 +307,63 @@ namespace Slang
         fixUpFuncType(func, structType);
     }
 
+    void legalizeDispatchMeshPayloadForMetal(EntryPointInfo entryPoint)
+    {
+        // Find out DispatchMesh function
+        IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
+        for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
+        {
+            if (const auto func = as<IRGlobalValueWithCode>(globalInst))
+            {
+                if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
+                {
+                    if (dec->getName() == "DispatchMesh")
+                    {
+                        SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
+                        dispatchMeshFunc = func;
+                    }
+                }
+            }
+        }
+
+        if (!dispatchMeshFunc)
+            return;
+
+        IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
+        builder.setInsertBefore(dispatchMeshFunc);
+
+        // We'll rewrite the call to use mesh_grid_properties.set_threadgroups_per_grid
+        traverseUses(dispatchMeshFunc, [&](const IRUse* use) {
+            if (const auto call = as<IRCall>(use->getUser()))
+            {
+                SLANG_ASSERT(call->getArgCount() == 4);
+                const auto payload = call->getArg(3);
+
+                const auto payloadPtrType = composeGetters<IRPtrType>(
+                    payload,
+                    &IRInst::getDataType
+                );
+                SLANG_ASSERT(payloadPtrType);
+                const auto payloadType = payloadPtrType->getValueType();
+                SLANG_ASSERT(payloadType);
+
+                builder.setInsertBefore(entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+                const auto annotatedPayloadType =
+                    builder.getPtrType(
+                        kIROp_RefType,
+                        payloadPtrType->getValueType(),
+                        AddressSpace::MetalObjectData
+                    );
+                auto packedParam = builder.emitParam(annotatedPayloadType);
+                IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+                // Add the MetalPayload resource info, so we can emit [[payload]]
+                varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+                auto paramVarLayout = varLayoutBuilder.build();
+                builder.addLayoutDecoration(packedParam, paramVarLayout);
+            }
+            });
+    }
     void legalizeEntryPointForMetal(EntryPointInfo entryPoint, DiagnosticSink* sink)
     {
         SLANG_UNUSED(sink);
@@ -313,7 +371,9 @@ namespace Slang
         hoistEntryPointParameterFromStruct(entryPoint);
         packStageInParameters(entryPoint);
         wrapReturnValueInStruct(entryPoint);
+        legalizeDispatchMeshPayloadForMetal(entryPoint);
     }
+
 
     void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
     {
@@ -337,4 +397,6 @@ namespace Slang
 
         specializeAddressSpace(module);
     }
+
 }
+

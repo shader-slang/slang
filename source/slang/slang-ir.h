@@ -46,6 +46,8 @@ enum class AddressSpace
     Global = 2,
     GroupShared = 3,
     Uniform = 4,
+    // specific address space for payload data in metal
+    MetalObjectData = 5,
 };
 
 typedef unsigned int IROpFlags;

@@ -2280,6 +2280,9 @@ extern "C"
         // Metal [[attribute]] inputs.
         SLANG_PARAMETER_CATEGORY_METAL_ATTRIBUTE,
 
+        // Metal [[payload]] inputs
+        SLANG_PARAMETER_CATEGORY_METAL_PAYLOAD,
+
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
 
@@ -2854,6 +2857,7 @@ namespace slang
         MetalTexture = SLANG_PARAMETER_CATEGORY_METAL_TEXTURE,
         MetalArgumentBufferElement = SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
         MetalAttribute = SLANG_PARAMETER_CATEGORY_METAL_ATTRIBUTE,
+        MetalPayload = SLANG_PARAMETER_CATEGORY_METAL_PAYLOAD,
 
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,
