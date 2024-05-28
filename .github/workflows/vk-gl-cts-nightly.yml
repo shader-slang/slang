@@ -36,6 +36,7 @@ jobs:
         repository: "shader-slang/VK-GL-CTS"
         sparse-checkout: |
           test-lists/slang-passing-tests.txt
+          test-lists/slang-waiver-tests.xml
         path: test-lists
         sparse-checkout-cone-mode: false
     - name: vkcts setup
@@ -48,11 +49,13 @@ jobs:
 
         copy ${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
 
+        copy ${{ github.workspace }}\test-lists\test-lists\slang-waiver-tests.xml ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-waiver-tests.xml
+
         copy ${{ github.workspace }}\bin\windows-x64\release\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\test-server.exe
     - name: vkcts run
       working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
       run: |
-        .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
+        .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt --deqp-waiver-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-waiver-tests.xml
     - name: result notification
       id: slack-notify
       if : always()
