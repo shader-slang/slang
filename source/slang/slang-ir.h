@@ -1551,6 +1551,8 @@ SIMPLE_IR_TYPE(VerticesType, MeshOutputType)
 SIMPLE_IR_TYPE(IndicesType, MeshOutputType)
 SIMPLE_IR_TYPE(PrimitivesType, MeshOutputType)
 
+SIMPLE_IR_TYPE(MetalMeshGridPropertiesType, Type)
+
 SIMPLE_IR_TYPE(GLSLInputAttachmentType, Type)
 SIMPLE_IR_PARENT_TYPE(ParameterGroupType, PointerLikeType)
 SIMPLE_IR_PARENT_TYPE(UniformParameterGroupType, ParameterGroupType)

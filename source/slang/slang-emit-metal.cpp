@@ -643,6 +643,11 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(">");
             return;
         }
+        case kIROp_MetalMeshGridPropertiesType:
+        {
+            m_writer->emit("mesh_grid_properties ");
+            return;
+        }
         default:
             break;
     }

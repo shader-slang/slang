@@ -361,6 +361,21 @@ namespace Slang
                 varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
                 auto paramVarLayout = varLayoutBuilder.build();
                 builder.addLayoutDecoration(packedParam, paramVarLayout);
+
+                // Now we replace the call to DispatchMesh with a call to the mesh grid properties
+                // But first we need to create the parameter
+                const auto meshGridPropertiesType = builder.getMetalMeshGridPropertiesType();
+                auto mgp = builder.emitParam(meshGridPropertiesType);
+
+                // Now we store whatever got passed as the payload to the parameter
+                builder.setInsertBefore(call);
+                builder.emitStore(packedParam, builder.emitLoad(payload));
+
+                // lastly we call the set_threadgroups_per_grid
+                // However it also doesnt take 3 separate arguments for the group sizes, but one uint3
+                const auto groupSizeType = builder.getVectorType(builder.getUIntType(), 3);
+                const auto groupSize = builder.emitMakeVector(groupSizeType, Slang::List(call->getArg(0), call->getArg(1), call->getArg(2)));
+                builder.emitCallInst(mgp->getFullType(), builder.getFuncType(Slang::List<IRType*>(groupSizeType), builder.getVoidType()), 1, &groupSize);
             }
             });
     }

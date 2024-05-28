@@ -3579,6 +3579,11 @@ public:
         return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
     }
 
+    IRMetalMeshGridPropertiesType* getMetalMeshGridPropertiesType()
+    {
+        return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
+    }
+
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
     IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex = nullptr);
