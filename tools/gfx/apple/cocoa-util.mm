@@ -22,10 +22,18 @@ void* CocoaUtil::createMetalLayer(void* nswindow)
     return layer;
 }
 
+void* CocoaUtil::nextDrawable(void* metalLayer)
+{
+    CAMetalLayer* layer = (CAMetalLayer*)metalLayer;
+    return [layer nextDrawable];
+}
+
 void CocoaUtil::destroyMetalLayer(void* metalLayer)
 {
     CAMetalLayer* layer = (CAMetalLayer*)metalLayer;
     [layer release];
 }
+
+
 
 }
