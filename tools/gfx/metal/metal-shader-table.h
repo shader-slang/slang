@@ -1,22 +1,23 @@
-// d3d12-shader-table.h
+// metal-shader-table.h
 #pragma once
 
-#include "d3d12-base.h"
+#include "metal-base.h"
 
 namespace gfx
-{
-namespace d3d12
 {
 
 using namespace Slang;
 
+namespace metal
+{
+
 class ShaderTableImpl : public ShaderTableBase
 {
 public:
-    uint32_t m_rayGenTableOffset;
-    uint32_t m_missTableOffset;
-    uint32_t m_hitGroupTableOffset;
-    uint32_t m_callableTableOffset;
+    uint32_t m_raygenTableSize;
+    uint32_t m_missTableSize;
+    uint32_t m_hitTableSize;
+    uint32_t m_callableTableSize;
 
     DeviceImpl* m_device;
 
@@ -26,5 +27,5 @@ public:
         IResourceCommandEncoder* encoder) override;
 };
 
-} // namespace d3d12
+} // namespace metal
 } // namespace gfx
