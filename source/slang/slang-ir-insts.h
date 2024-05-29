@@ -3681,6 +3681,13 @@ public:
     {
         return emitCallInst(type, func, args.getCount(), args.getBuffer());
     }
+    IRCall* emitCallInst(
+        IRType* type,
+        IRInst* func,
+        ArrayView<IRInst*> args)
+    {
+        return emitCallInst(type, func, args.getCount(), args.getBuffer());
+    }
 
     IRInst* emitTryCallInst(
         IRType* type,
