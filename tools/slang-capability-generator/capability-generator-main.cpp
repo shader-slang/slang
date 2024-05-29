@@ -357,7 +357,7 @@ struct CapabilityConjunction
         return true;
     }
 
-    const CapabilityDef* CapabilityConjunction::getAbstractAtom(CapabilityDef* defToFilterFor) const
+    const CapabilityDef* getAbstractAtom(CapabilityDef* defToFilterFor) const
     {
         for (auto* atom : this->atoms)
         {
