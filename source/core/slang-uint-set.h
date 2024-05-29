@@ -304,7 +304,7 @@ inline void UIntSet::add(const UIntSet& other)
 inline void UIntSet::add(const List<Element>& other)
 {
     for (auto i : other)
-        add(i);
+        add((UInt)i);
 }
 
 inline void UIntSet::addRawElement(UInt other, Index elementIndex)
