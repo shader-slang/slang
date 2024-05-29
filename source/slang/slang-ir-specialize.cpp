@@ -56,7 +56,7 @@ struct SpecializationContext
     SpecializationContext(IRModule* inModule, TargetProgram* target)
         : workList(*inModule->getContainerPool().getList<IRInst>())
         , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
-        , cleanInsts(*module->getContainerPool().getHashSet<IRInst>())
+        , cleanInsts(*inModule->getContainerPool().getHashSet<IRInst>())
         , module(inModule)
         , targetProgram(target)
     {
@@ -1250,13 +1250,9 @@ struct SpecializationContext
         if (!isInstFullySpecialized(inst))
             return false;
 
-        List<IRInst*>& localWorkList = *module->getContainerPool().getList<IRInst>();
-        HashSet<IRInst*>& processedInsts = *module->getContainerPool().getHashSet<IRInst>();
-        SLANG_DEFER(module->getContainerPool().free(&localWorkList));
-        SLANG_DEFER(module->getContainerPool().free(&processedInsts));
+        ShortList<IRInst*> localWorkList;
 
         localWorkList.add(inst);
-        processedInsts.add(inst);
 
         while (localWorkList.getCount() != 0)
         {
@@ -1279,10 +1275,7 @@ struct SpecializationContext
             for (UInt i = 0; i < curInst->getOperandCount(); ++i)
             {
                 auto operand = curInst->getOperand(i);
-                if (processedInsts.add(operand))
-                {
-                    localWorkList.add(operand);
-                }
+                localWorkList.add(operand);
             }
         }
         return true;

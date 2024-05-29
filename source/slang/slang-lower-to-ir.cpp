@@ -10829,14 +10829,20 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         insertDebugValueStore(module);
     }
 
+
     // Next, attempt to promote local variables to SSA
     // temporaries and do basic simplifications.
     //
     constructSSA(module);
-    simplifyCFG(module, CFGSimplificationOptions::getDefault());
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-    auto peepholeOptions = PeepholeOptimizationOptions::getPrelinking();
-    peepholeOptimize(nullptr, module, peepholeOptions);
+    
+    bool minimumOptimizations = linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
+    if (!minimumOptimizations)
+    {
+        simplifyCFG(module, CFGSimplificationOptions::getFast());
+        auto peepholeOptions = PeepholeOptimizationOptions::getPrelinking();
+        peepholeOptimize(nullptr, module, peepholeOptions);
+    }
 
     IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
     dceOptions.keepExportsAlive = true;
@@ -10881,20 +10887,18 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // are eliminated from the callee, and not copied into
     // call sites.
     //
-    HashSet<IRInst*>* modifiedFuncs = module->getContainerPool().getHashSet<IRInst>();
-    SLANG_DEFER(module->getContainerPool().free(modifiedFuncs));
-    bool minimumOptimizations = sharedContextStorage.m_linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
+    InstHashSet modifiedFuncs(module);
     for (;;)
     {
         bool changed = false;
-        modifiedFuncs->clear();
-        changed = performMandatoryEarlyInlining(module, modifiedFuncs);
+        modifiedFuncs.clear();
+        changed = performMandatoryEarlyInlining(module, &modifiedFuncs.getHashSet());
         if (changed)
         {
             changed = peepholeOptimizeGlobalScope(nullptr, module);
             if (!minimumOptimizations)
             {
-                for (auto func : *modifiedFuncs)
+                for (auto func : modifiedFuncs.getHashSet())
                 {
                     changed |= constructSSA(func);
                     changed |= applySparseConditionalConstantPropagation(func, compileRequest->getSink());
@@ -10908,7 +10912,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     }
 
     // Check for using uninitialized out parameters.
-    if (!compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DisableNonEssentialValidations))
+    if (compileRequest->getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
         // Propagate `constexpr`-ness through the dataflow graph (and the
         // call graph) based on constraints imposed by different instructions.

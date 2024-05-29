@@ -88,10 +88,10 @@ namespace Slang
 template<typename F>
 class SlangDeferImpl
 {
-    const F& f;
+    F f;
 public:
-    SlangDeferImpl(const F& f)
-        : f(f)
+    SlangDeferImpl(F&& f)
+        : f(Slang::_Move(f))
     {}
     ~SlangDeferImpl()
     {
@@ -101,7 +101,7 @@ public:
 
 #ifndef SLANG_DEFER_LAMBDA
 #define SLANG_DEFER_LAMBDA(x) auto SLANG_CONCAT(slang_defer_, __LINE__) = SlangDeferImpl(x)
-#define SLANG_DEFER(x) auto SLANG_CONCAT(slang_defer_##,__LINE__) = SlangDeferImpl([&](){x;})
+#define SLANG_DEFER(x) auto SLANG_CONCAT(slang_defer_,__LINE__) = SlangDeferImpl([&](){x;})
 #endif
 
 //

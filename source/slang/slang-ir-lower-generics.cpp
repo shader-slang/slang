@@ -182,7 +182,8 @@ namespace Slang
 
     void stripWrapExistential(IRModule* module)
     {
-        auto& workList = *module->getContainerPool().getList<IRInst>();
+        InstWorkList workList(module);
+
         workList.add(module->getModuleInst());
         for (Index i = 0; i < workList.getCount(); i++)
         {

@@ -636,7 +636,7 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
+    if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
         checkForRecursiveTypes(irModule, sink);
 
     if (sink->getErrorCount() != 0)
