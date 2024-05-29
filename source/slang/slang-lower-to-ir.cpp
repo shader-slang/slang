@@ -10881,32 +10881,30 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // are eliminated from the callee, and not copied into
     // call sites.
     //
+    HashSet<IRInst*>* modifiedFuncs = module->getContainerPool().getHashSet<IRInst>();
+    SLANG_DEFER(module->getContainerPool().free(modifiedFuncs));
+    bool minimumOptimizations = sharedContextStorage.m_linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
     for (;;)
     {
         bool changed = false;
-        changed |= performMandatoryEarlyInlining(module);
+        modifiedFuncs->clear();
+        changed = performMandatoryEarlyInlining(module, modifiedFuncs);
+        if (changed)
+        {
+            changed = peepholeOptimizeGlobalScope(nullptr, module);
+            if (!minimumOptimizations)
+            {
+                for (auto func : *modifiedFuncs)
+                {
+                    changed |= constructSSA(func);
+                    changed |= applySparseConditionalConstantPropagation(func, compileRequest->getSink());
+                    changed |= peepholeOptimize(nullptr, func);
+                    eliminateDeadCode(func);
+                }
+            }
+        }
         if (!changed)
             break;
-    }
-
-    // Optionally, run optimization after inlining.
-    if (!sharedContextStorage.m_linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization))
-    {
-        for (;;)
-        {
-            bool changed = false;
-            changed |= constructSSA(module);
-            simplifyCFG(module, CFGSimplificationOptions::getDefault());
-            changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-            changed |= peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
-            for (auto inst : module->getGlobalInsts())
-            {
-                if (auto func = as<IRGlobalValueWithCode>(inst))
-                    eliminateDeadCode(func);
-            }
-            if (!changed)
-                break;
-        }
     }
 
     // Check for using uninitialized out parameters.

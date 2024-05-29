@@ -61,6 +61,12 @@ struct SpecializationContext
         , targetProgram(target)
     {
     }
+    ~SpecializationContext()
+    {
+        module->getContainerPool().free(&workList);
+        module->getContainerPool().free(&workListSet);
+        module->getContainerPool().free(&cleanInsts);
+    }
 
     // An instruction is then fully specialized if and only
     // if it is in our set.
@@ -1246,6 +1252,9 @@ struct SpecializationContext
 
         List<IRInst*>& localWorkList = *module->getContainerPool().getList<IRInst>();
         HashSet<IRInst*>& processedInsts = *module->getContainerPool().getHashSet<IRInst>();
+        SLANG_DEFER(module->getContainerPool().free(&localWorkList));
+        SLANG_DEFER(module->getContainerPool().free(&processedInsts));
+
         localWorkList.add(inst);
         processedInsts.add(inst);
 

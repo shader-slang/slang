@@ -193,6 +193,9 @@ namespace Slang
         {
             List<IRInst*>& nextWorkList = *module->getContainerPool().getList<IRInst>();
             HashSet<IRInst*>& workListSet = *module->getContainerPool().getHashSet<IRInst>();
+            SLANG_DEFER([&]() { module->getContainerPool().free(&nextWorkList); });
+            SLANG_DEFER([&]() { module->getContainerPool().free(&workListSet); });
+
             auto addToWorkList = [&](IRInst* inst)
                 {
                     if (workListSet.add(inst))
@@ -412,6 +415,8 @@ namespace Slang
         void analyzeModule()
         {
             List<IRInst*>& workList = *module->getContainerPool().getList<IRInst>();
+            SLANG_DEFER([&]() { module->getContainerPool().free(&workList); });
+
             for (auto globalInst : module->getGlobalInsts())
             {
                 if (auto code = as<IRGlobalValueWithCode>(globalInst))
@@ -449,6 +454,8 @@ namespace Slang
         void eliminateAsDynamicUniformInst()
         {
             List<IRInst*>& workList = *module->getContainerPool().getList<IRInst>();
+            SLANG_DEFER([&]() { module->getContainerPool().free(&workList); });
+
             workList.add(module->getModuleInst());
             for (Index i = 0; i < workList.getCount(); i++)
             {

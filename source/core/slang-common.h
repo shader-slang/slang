@@ -84,6 +84,26 @@ namespace Slang
     }
 }
 
+// SLANG_DEFER
+template<typename F>
+class SlangDeferImpl
+{
+    const F& f;
+public:
+    SlangDeferImpl(const F& f)
+        : f(f)
+    {}
+    ~SlangDeferImpl()
+    {
+        f();
+    }
+};
+
+#ifndef SLANG_DEFER_LAMBDA
+#define SLANG_DEFER_LAMBDA(x) auto SLANG_CONCAT(slang_defer_, __LINE__) = SlangDeferImpl(x)
+#define SLANG_DEFER(x) auto SLANG_CONCAT(slang_defer_##,__LINE__) = SlangDeferImpl([&](){x;})
+#endif
+
 //
 // Some macros for avoiding boilerplate
 // TODO: could probably deduce the size with templates, and move the whole

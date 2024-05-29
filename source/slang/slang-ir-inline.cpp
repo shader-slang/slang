@@ -29,6 +29,8 @@ struct InliningPassBase
         /// The module that we are optimizing/transforming
     IRModule* m_module = nullptr;
 
+    HashSet<IRInst*>* m_modifiedFuncs = nullptr;
+
         /// Initialize an inlining pass to operate on the given `module`
     InliningPassBase(IRModule* module)
         : m_module(module)
@@ -157,6 +159,11 @@ struct InliningPassBase
         // given call site, we hand off the a worker routine
         // that does the meat of the work.
         //
+        if (m_modifiedFuncs)
+        {
+            if (auto parentFunc = getParentFunc(call))
+                m_modifiedFuncs->add(parentFunc);
+        }
         inlineCallSite(callSite);
         return true;
     }
@@ -698,11 +705,12 @@ struct MandatoryEarlyInliningPass : InliningPassBase
 };
 
 
-bool performMandatoryEarlyInlining(IRModule* module)
+bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedFuncs)
 {
     SLANG_PROFILE;
 
     MandatoryEarlyInliningPass pass(module);
+    pass.m_modifiedFuncs = modifiedFuncs;
     return pass.considerAllCallSites();
 }
 
