@@ -139,6 +139,8 @@ namespace Slang
                 continue;
             if (!layout->findOffsetAttr(LayoutResourceKind::VaryingInput))
                 continue;
+            if(param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
+                continue;
             paramsToPack.add(param);
         }
 
@@ -307,8 +309,36 @@ namespace Slang
         fixUpFuncType(func, structType);
     }
 
+    void legalizeMeshEntryPoint(EntryPointInfo entryPoint)
+    {
+        auto func = entryPoint.entryPointFunc;
+
+        if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Mesh)
+        {
+            return;
+        }
+
+        IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
+        for (auto param : func->getParams())
+        {
+            if(param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
+            {
+                IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+                varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+                auto paramVarLayout = varLayoutBuilder.build();
+                builder.addLayoutDecoration(param, paramVarLayout);
+            }
+        }
+
+    }
+
     void legalizeDispatchMeshPayloadForMetal(EntryPointInfo entryPoint)
     {
+        if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Amplification)
+        {
+            return;
+        }
         // Find out DispatchMesh function
         IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
         for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
@@ -330,7 +360,6 @@ namespace Slang
             return;
 
         IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
-        builder.setInsertBefore(dispatchMeshFunc);
 
         // We'll rewrite the call to use mesh_grid_properties.set_threadgroups_per_grid
         traverseUses(dispatchMeshFunc, [&](const IRUse* use) {
@@ -379,6 +408,7 @@ namespace Slang
             }
             });
     }
+
     void legalizeEntryPointForMetal(EntryPointInfo entryPoint, DiagnosticSink* sink)
     {
         SLANG_UNUSED(sink);
@@ -386,6 +416,7 @@ namespace Slang
         hoistEntryPointParameterFromStruct(entryPoint);
         packStageInParameters(entryPoint);
         wrapReturnValueInStruct(entryPoint);
+        legalizeMeshEntryPoint(entryPoint);
         legalizeDispatchMeshPayloadForMetal(entryPoint);
     }
 
