@@ -332,6 +332,17 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
         result.byteAddressBuffer = true;
         break;
     }
+    if (!result.generics || !result.existentialTypeLayout)
+    {
+        // If any instruction has an interface type, we need to run
+        // the generics lowering pass.
+        auto type = inst->getDataType();
+        if (type && type->getOp() == kIROp_InterfaceType)
+        {
+            result.generics = true;
+            result.existentialTypeLayout = true;
+        }
+    }
     for (auto child : inst->getDecorationsAndChildren())
     {
         calcRequiredLoweringPassSet(result, codeGenContext, child);

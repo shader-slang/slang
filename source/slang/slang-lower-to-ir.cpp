@@ -10839,7 +10839,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     bool minimumOptimizations = linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
     if (!minimumOptimizations)
     {
-        simplifyCFG(module, CFGSimplificationOptions::getFast());
+        simplifyCFG(module, CFGSimplificationOptions::getDefault());
         auto peepholeOptions = PeepholeOptimizationOptions::getPrelinking();
         peepholeOptimize(nullptr, module, peepholeOptions);
     }
@@ -10900,11 +10900,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             {
                 for (auto func : modifiedFuncs.getHashSet())
                 {
+                    auto codeInst = as<IRGlobalValueWithCode>(func);
                     changed |= constructSSA(func);
                     changed |= applySparseConditionalConstantPropagation(func, compileRequest->getSink());
                     changed |= peepholeOptimize(nullptr, func);
-                    changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast())
-                    eliminateDeadCode(func);
+                    changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
+                    eliminateDeadCode(func, dceOptions);
                 }
             }
         }
@@ -10920,6 +10921,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         propagateConstExpr(module, compileRequest->getSink());
 
         checkForUsingUninitializedOutParams(module, compileRequest->getSink());
+        
         // TODO: give error messages if any `undefined` or
         // instructions remain.
 
