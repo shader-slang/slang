@@ -23,6 +23,13 @@ public:
     static PerformanceProfiler* getProfiler();
 };
 
+class SerialPerformaceProfiler
+{
+public:
+    virtual void accumulateResults(StringBuilder& out, PerformanceProfiler* profile) = 0;
+    static SerialPerformaceProfiler* getProfiler();
+};
+
 struct PerformanceProfilerFuncRAIIContext
 {
     FuncProfileContext context;
