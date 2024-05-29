@@ -10824,7 +10824,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // Generate DebugValue insts to store values into debug variables,
     // if debug symbols are enabled.
-    if (compileRequest->getLinkage()->m_optionSet.getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation) != DebugInfoLevel::None)
+    if (context->includeDebugInfo)
     {
         insertDebugValueStore(module);
     }

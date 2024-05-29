@@ -213,6 +213,16 @@ struct LinkingAndOptimizationOptions
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
 
+// To improve the performance of our backend, we will try to avoid running
+// passes related to features not used in the user code.
+// To do so, we will scan the IR module once, and determine which passes are needed
+// based on the instructions used in the IR module.
+// This will allow us to skip running passes that are not needed, without having to
+// run all the passes only to find out that no work is needed.
+// This is especially important for the performance of the backend, as some passes
+// have an initialization cost (such as building reference graphs or DOM trees) that
+// can be expensive.
+//
 struct RequiredLoweringPassSet
 {
     bool resultType;
@@ -233,6 +243,9 @@ struct RequiredLoweringPassSet
     bool byteAddressBuffer;
 };
 
+// Scan the IR module and determine which lowering/legalization passes are needed based
+// on the instructions we see.
+//
 void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext* codeGenContext, IRInst* inst)
 {
     switch (inst->getOp())
@@ -594,9 +607,9 @@ Result linkAndOptimizeIR(
         performMandatoryEarlyInlining(irModule);
 
         // Unroll loops.
-        if (codeGenContext->getSink()->getErrorCount() == 0)
+        if (!fastIRSimplificationOptions.minimalOptimization)
         {
-            if (!fastIRSimplificationOptions.minimalOptimization)
+            if (codeGenContext->getSink()->getErrorCount() == 0)
             {
                 if (!unrollLoopsInModule(targetProgram, irModule, codeGenContext->getSink()))
                     return SLANG_FAIL;
@@ -611,14 +624,14 @@ Result linkAndOptimizeIR(
         if (requiredLoweringPassSet.higherOrderFunc)
             changed |= specializeHigherOrderParameters(codeGenContext, irModule);
 
-        dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
-        enableIRValidationAtInsert();
         if (requiredLoweringPassSet.autodiff)
         {
+            dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
+            enableIRValidationAtInsert();
             changed |= processAutodiffCalls(targetProgram, irModule, sink);
+            disableIRValidationAtInsert();
+            dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
         }
-        disableIRValidationAtInsert();
-        dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
 
         if (!changed)
             break;
@@ -687,7 +700,8 @@ Result linkAndOptimizeIR(
         simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
     }
 
-    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
+        targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
         // We could fail because (perhaps, somehow) end up with getStringHash that the operand is not a string literal
         SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
