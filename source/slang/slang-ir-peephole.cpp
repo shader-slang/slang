@@ -261,8 +261,12 @@ struct PeepholeContext : InstPassBase
 
                 // Save the alignment information and exit early if it is invalid
                 IRSizeAndAlignment sizeAlignment;
-                auto alignOfInst = as<IRAlignOf>(inst);
-                auto baseType = alignOfInst->getBaseOp()->getDataType();
+                IRType* baseType = nullptr;
+                if (auto t = as<IRType>(inst->getOperand(0)))
+                    baseType = t;
+                else
+                    baseType = inst->getOperand(0)->getDataType();
+
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), baseType, &sizeAlignment)))
                     break;
                 if (sizeAlignment.size == 0)

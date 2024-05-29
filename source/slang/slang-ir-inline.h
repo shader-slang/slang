@@ -15,7 +15,7 @@ namespace Slang
     Result performTypeInlining(IRModule* module, DiagnosticSink* sink);
 
         /// Inline any call sites to functions marked `[unsafeForceInlineEarly]`
-    void performMandatoryEarlyInlining(IRModule* module);
+    bool performMandatoryEarlyInlining(IRModule* module);
 
         /// Inline any call sites to functions marked `[ForceInline]`
     void performForceInlining(IRModule* module);

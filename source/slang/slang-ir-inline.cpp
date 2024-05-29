@@ -698,12 +698,12 @@ struct MandatoryEarlyInliningPass : InliningPassBase
 };
 
 
-void performMandatoryEarlyInlining(IRModule* module)
+bool performMandatoryEarlyInlining(IRModule* module)
 {
     SLANG_PROFILE;
 
     MandatoryEarlyInliningPass pass(module);
-    pass.considerAllCallSites();
+    return pass.considerAllCallSites();
 }
 
 namespace { // anonymous

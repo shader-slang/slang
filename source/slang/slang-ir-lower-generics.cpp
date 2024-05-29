@@ -277,8 +277,7 @@ namespace Slang
         sharedContext.targetProgram = program;
         sharedContext.sink = sink;
 
-        cleanUpRTTIHandleTypes(&sharedContext);
-        cleanUpInterfaceTypes(&sharedContext);
+        specializeRTTIObjects(&sharedContext, sink);
 
         lowerTuples(module, sink);
         if (sink->getErrorCount() != 0)

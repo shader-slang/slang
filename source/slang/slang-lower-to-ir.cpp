@@ -10883,11 +10883,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // Optionally, run another optimization pass to clean up things.
     //
-    if (!sharedContextStorage.m_linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization))
+    for (;;)
     {
-        for (;;)
+        bool changed = false;
+        changed |= performMandatoryEarlyInlining(module);
+        if (!sharedContextStorage.m_linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization))
         {
-            bool changed = false;
             changed |= constructSSA(module);
             simplifyCFG(module, CFGSimplificationOptions::getDefault());
             changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
@@ -10897,9 +10898,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 if (auto func = as<IRGlobalValueWithCode>(inst))
                     eliminateDeadCode(func);
             }
-            if (!changed)
-                break;
         }
+        if (!changed)
+            break;
     }
 
 

@@ -259,6 +259,9 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
         }
         break;
     case kIROp_PseudoPtrType:
+    case kIROp_BoundInterfaceType:
+    case kIROp_BindExistentialsType:
+        result.generics = true;
         result.existentialTypeLayout = true;
         break;
     case kIROp_GetRegisterIndex:
@@ -267,6 +270,7 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
         break;
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
+    case kIROp_MakeDifferentialPairUserCode:
         result.autodiff = true;
         break;
     case kIROp_VerticesType:
@@ -581,6 +585,9 @@ Result linkAndOptimizeIR(
 
     finalizeSpecialization(irModule);
 
+    requiredLoweringPassSet = {};
+    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
+
     switch (target)
     {
     case CodeGenTarget::PyTorchCppBinding:
@@ -641,9 +648,6 @@ Result linkAndOptimizeIR(
         // We could fail because (perhaps, somehow) end up with getStringHash that the operand is not a string literal
         SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
     }
-
-    requiredLoweringPassSet = {};
-    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
     // For targets that supports dynamic dispatch, we need to lower the
     // generics / interface types to ordinary functions and types using
