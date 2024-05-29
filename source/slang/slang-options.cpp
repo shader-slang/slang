@@ -1685,7 +1685,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::VulkanEmitReflection:
             case OptionKind::IgnoreCapabilities:
             case OptionKind::MinimumSlangOptimization:
-            case OptionKind::DisableUninitializedCheck:
+            case OptionKind::DisableNonEssentialValidations:
             case OptionKind::DefaultImageFormatUnknown:
             case OptionKind::Obfuscate:
             case OptionKind::OutputIncludes:
