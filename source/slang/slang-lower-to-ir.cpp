@@ -10903,6 +10903,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                     changed |= constructSSA(func);
                     changed |= applySparseConditionalConstantPropagation(func, compileRequest->getSink());
                     changed |= peepholeOptimize(nullptr, func);
+                    changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast())
                     eliminateDeadCode(func);
                 }
             }
