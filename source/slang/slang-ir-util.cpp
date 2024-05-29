@@ -1077,11 +1077,6 @@ bool isPureFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
 
 bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
 {
-    // If the call has been marked as no-side-effect, we
-    // will treat it so, by-passing all other checks.
-    if (call->findDecoration<IRNoSideEffectDecoration>())
-        return false;
-
     if (!doesCalleeHaveSideEffect(call->getCallee()))
     {
         return areCallArgumentsSideEffectFree(call, options);

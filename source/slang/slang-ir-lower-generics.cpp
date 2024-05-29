@@ -229,7 +229,6 @@ namespace Slang
         // and used to create a tuple representing the existential value.
         augmentMakeExistentialInsts(module);
 
-
         lowerGenericFunctions(&sharedContext);
         if (sink->getErrorCount() != 0)
             return;
@@ -271,4 +270,29 @@ namespace Slang
         // We should remove them now.
         stripWrapExistential(module);
     }
+
+    void cleanupGenerics(TargetProgram* program, IRModule* module, DiagnosticSink* sink)
+    {
+        SharedGenericsLoweringContext sharedContext(module);
+        sharedContext.targetProgram = program;
+        sharedContext.sink = sink;
+
+        cleanUpRTTIHandleTypes(&sharedContext);
+        cleanUpInterfaceTypes(&sharedContext);
+
+        lowerTuples(module, sink);
+        if (sink->getErrorCount() != 0)
+            return;
+
+        generateAnyValueMarshallingFunctions(&sharedContext);
+        if (sink->getErrorCount() != 0)
+            return;
+
+        // At this point, we should no longer need to care any `WrapExistential` insts,
+        // although they could still exist in the IR in order to call generic stdlib functions,
+        // e.g. RWStucturedBuffer.Load(WrapExistential(sbuffer, type), index).
+        // We should remove them now.
+        stripWrapExistential(module);
+    }
+
 } // namespace Slang

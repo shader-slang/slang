@@ -10875,43 +10875,47 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         invertLoops(module);
     }
 
-    // Next, attempt to promote local variables to SSA
-    // temporaries and do basic simplifications.
+    // Optionally, run another optimization pass to clean up things.
     //
-    for (;;)
+    if (!sharedContextStorage.m_linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization))
     {
-        bool changed = false;
-        performMandatoryEarlyInlining(module);
-        changed |= constructSSA(module);
-        simplifyCFG(module, CFGSimplificationOptions::getDefault());
-        changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-        changed |= peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
-        for (auto inst : module->getGlobalInsts())
+        for (;;)
         {
-            if (auto func = as<IRGlobalValueWithCode>(inst))
-                eliminateDeadCode(func);
+            bool changed = false;
+            changed |= constructSSA(module);
+            simplifyCFG(module, CFGSimplificationOptions::getDefault());
+            changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
+            changed |= peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
+            for (auto inst : module->getGlobalInsts())
+            {
+                if (auto func = as<IRGlobalValueWithCode>(inst))
+                    eliminateDeadCode(func);
+            }
+            if (!changed)
+                break;
         }
-        if (!changed)
-            break;
     }
 
-    // Propagate `constexpr`-ness through the dataflow graph (and the
-    // call graph) based on constraints imposed by different instructions.
-    propagateConstExpr(module, compileRequest->getSink());
-
-    // TODO: give error messages if any `undefined` or
-    // `unreachable` instructions remain.
 
     // Check for using uninitialized out parameters.
-    checkForUsingUninitializedOutParams(module, compileRequest->getSink());
+    if (!compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DisableNonEssentialValidations))
+    {
+        // Propagate `constexpr`-ness through the dataflow graph (and the
+        // call graph) based on constraints imposed by different instructions.
+        propagateConstExpr(module, compileRequest->getSink());
 
-    checkForMissingReturns(module, compileRequest->getSink());
+        checkForUsingUninitializedOutParams(module, compileRequest->getSink());
+        // TODO: give error messages if any `undefined` or
+        // instructions remain.
 
-    // We don't allow recursive types.
-    checkForRecursiveTypes(module, compileRequest->getSink());
+        checkForMissingReturns(module, compileRequest->getSink());
 
-    // Check for invalid differentiable function body.
-    checkAutoDiffUsages(module, compileRequest->getSink());
+        // We don't allow recursive types.
+        checkForRecursiveTypes(module, compileRequest->getSink());
+
+        // Check for invalid differentiable function body.
+        checkAutoDiffUsages(module, compileRequest->getSink());
+    }
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions

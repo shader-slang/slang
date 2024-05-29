@@ -251,8 +251,8 @@ struct PeepholeContext : InstPassBase
         switch (inst->getOp())
         {
         case kIROp_AlignOf:
+        case kIROp_SizeOf:
             // Fold all calls to alignOf<T>() that returns a simple integer value.
-            if (inst->getDataType()->getOp() == kIROp_IntType)
             {
                 if (!targetProgram)
                     break;
@@ -268,8 +268,12 @@ struct PeepholeContext : InstPassBase
 
                 IRBuilder builder(module);
                 builder.setInsertBefore(inst);
-                auto stride = builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
-                inst->replaceUsesWith(stride);
+                IRInst* resultVal = nullptr;
+                if (inst->getOp() == kIROp_AlignOf)
+                    resultVal = builder.getIntValue(inst->getDataType(), sizeAlignment.alignment);
+                else
+                    resultVal = builder.getIntValue(inst->getDataType(), sizeAlignment.size);
+                inst->replaceUsesWith(resultVal);
                 maybeRemoveOldInst(inst);
                 changed = true;
             }
@@ -346,7 +350,7 @@ struct PeepholeContext : InstPassBase
             }
             else
             {
-                changed |= tryFoldElementExtractFromUpdateInst(inst);
+                //changed |= tryFoldElementExtractFromUpdateInst(inst);
             }
             break;
         case kIROp_GetElement:
@@ -411,7 +415,7 @@ struct PeepholeContext : InstPassBase
             }
             else
             {
-                changed |= tryFoldElementExtractFromUpdateInst(inst);
+                //changed |= tryFoldElementExtractFromUpdateInst(inst);
             }
             break;
         case kIROp_UpdateElement:
@@ -842,7 +846,7 @@ struct PeepholeContext : InstPassBase
         case kIROp_Div:
         case kIROp_And:
         case kIROp_Or:
-            changed |= tryOptimizeArithmeticInst(inst);
+            //changed |= tryOptimizeArithmeticInst(inst);
             break;
         case kIROp_Param:
             {
@@ -891,6 +895,7 @@ struct PeepholeContext : InstPassBase
                             // Never remove param inst.
                             changed = true;
                         }
+#if 0
                         else
                         {
                             // If argValue is defined locally,
@@ -908,6 +913,7 @@ struct PeepholeContext : InstPassBase
                                 changed = true;
                             }
                         }
+#endif
                     }
                 }
             }

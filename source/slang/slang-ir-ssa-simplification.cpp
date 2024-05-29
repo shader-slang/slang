@@ -74,20 +74,19 @@ namespace Slang
                     if (!options.minimalOptimization)
                         funcChanged |= removeRedundancyInFunc(func);
                     funcChanged |= simplifyCFG(func, options.cfgOptions);
+                    // Note: we disregard the `changed` state from dead code elimination pass since
+                    // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
+                    // DCE will always remove those nearly generated consts and always returns true here.
                     eliminateDeadCode(func);
-                    funcChanged |= constructSSA(func);
+                    if (funcIterationCount == 0)
+                        funcChanged |= constructSSA(func);
                     changed |= funcChanged;
                     funcIterationCount++;
                 }
             }
-
-            // Note: we disregard the `changed` state from dead code elimination pass since
-            // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
-            // DCE will always remove those nearly generated consts and always returns true here.
-            eliminateDeadCode(module);
-
             iterationCounter++;
         }
+        eliminateDeadCode(module);
     }
 
     void simplifyNonSSAIR(TargetProgram* target, IRModule* module, IRSimplificationOptions options)
