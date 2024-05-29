@@ -1678,7 +1678,7 @@ namespace Slang
             {
                 if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))
                 {
-                    //getSink()->diagnose(modifier->loc, Diagnostics::duplicateModifier, modifier, existingModifier);
+                    getSink()->diagnose(modifier->loc, Diagnostics::duplicateModifier, modifier, existingModifier);
                 }
                 mapExclusiveGroupToModifier[conflictGroup] = modifier;
             }
