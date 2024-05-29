@@ -327,6 +327,8 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
         break;
     case kIROp_ByteAddressBufferLoad:
     case kIROp_ByteAddressBufferStore:
+    case kIROp_HLSLRWByteAddressBufferType:
+    case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
         break;
     }

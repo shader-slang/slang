@@ -1242,6 +1242,7 @@ struct SpecializationContext
     }
 
     // Test if a type is compile time constant.
+    HashSet<IRInst*> seenTypeSet;
     bool isCompileTimeConstantType(IRInst* inst)
     {
         // TODO: We probably need/want a more robust test here.
@@ -1251,8 +1252,10 @@ struct SpecializationContext
             return false;
 
         ShortList<IRInst*> localWorkList;
+        seenTypeSet.clear();
 
         localWorkList.add(inst);
+        seenTypeSet.add(inst);
 
         while (localWorkList.getCount() != 0)
         {
@@ -1275,7 +1278,8 @@ struct SpecializationContext
             for (UInt i = 0; i < curInst->getOperandCount(); ++i)
             {
                 auto operand = curInst->getOperand(i);
-                localWorkList.add(operand);
+                if (seenTypeSet.add(operand))
+                    localWorkList.add(operand);
             }
         }
         return true;
