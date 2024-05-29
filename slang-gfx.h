@@ -1410,6 +1410,10 @@ public:
         const char** hitGroupNames;
         const ShaderRecordOverwrite* hitGroupRecordOverwrites;
 
+        GfxCount callableShaderCount;
+        const char** callableShaderEntryPointNames;
+        const ShaderRecordOverwrite* callableShaderRecordOverwrites;
+
         IShaderProgram* program;
     };
 };

@@ -1409,6 +1409,15 @@ Result RayTracingCommandEncoderImpl::dispatchRays(
         dispatchDesc.HitGroupTable.StrideInBytes = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
     }
 
+    if (shaderTableImpl->m_callableShaderCount > 0)
+    {
+        dispatchDesc.CallableShaderTable.StartAddress =
+            shaderTableAddr + shaderTableImpl->m_callableTableOffset;
+        dispatchDesc.CallableShaderTable.SizeInBytes =
+            shaderTableImpl->m_callableShaderCount * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+        dispatchDesc.CallableShaderTable.StrideInBytes = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    }
+
     dispatchDesc.Width = (UINT)width;
     dispatchDesc.Height = (UINT)height;
     dispatchDesc.Depth = (UINT)depth;
