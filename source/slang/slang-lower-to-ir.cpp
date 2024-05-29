@@ -10708,6 +10708,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     auto session = translationUnit->getSession();
     auto compileRequest = translationUnit->compileRequest;
+    Linkage* linkage = compileRequest->getLinkage();
 
     SharedIRGenContext sharedContextStorage(
         session,
@@ -10847,18 +10848,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         if (auto func = as<IRGlobalValueWithCode>(inst))
             eliminateDeadCode(func, dceOptions);
     }
-    // Next, inline calls to any functions that have been
-    // marked for mandatory "early" inlining.
-    //
-    // Note: We performed certain critical simplifications
-    // above, before this step, so that the body of functions
-    // subject to mandatory inlining can be simplified ahead
-    // of time. By simplifying the body before inlining it,
-    // we can make sure that things like superfluous temporaries
-    // are eliminated from the callee, and not copied into
-    // call sites.
-    //
-    performMandatoryEarlyInlining(module);
 
     // Where possible, move loop condition checks to the end of loops, and wrap
     // the loop in an 'if(condition)'.
@@ -10881,14 +10870,31 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         invertLoops(module);
     }
 
-    // Optionally, run another optimization pass to clean up things.
+    // Next, inline calls to any functions that have been
+    // marked for mandatory "early" inlining.
+    //
+    // Note: We performed certain critical simplifications
+    // above, before this step, so that the body of functions
+    // subject to mandatory inlining can be simplified ahead
+    // of time. By simplifying the body before inlining it,
+    // we can make sure that things like superfluous temporaries
+    // are eliminated from the callee, and not copied into
+    // call sites.
     //
     for (;;)
     {
         bool changed = false;
         changed |= performMandatoryEarlyInlining(module);
-        if (!sharedContextStorage.m_linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization))
+        if (!changed)
+            break;
+    }
+
+    // Optionally, run optimization after inlining.
+    if (!sharedContextStorage.m_linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization))
+    {
+        for (;;)
         {
+            bool changed = false;
             changed |= constructSSA(module);
             simplifyCFG(module, CFGSimplificationOptions::getDefault());
             changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
@@ -10898,11 +10904,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 if (auto func = as<IRGlobalValueWithCode>(inst))
                     eliminateDeadCode(func);
             }
+            if (!changed)
+                break;
         }
-        if (!changed)
-            break;
     }
-
 
     // Check for using uninitialized out parameters.
     if (!compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DisableNonEssentialValidations))
@@ -10948,8 +10953,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         //
         IRStripOptions stripOptions;
 
-        Linkage* linkage = compileRequest->getLinkage();
-
         stripOptions.shouldStripNameHints = linkage->m_optionSet.shouldObfuscateCode();
 
         // If we are generating an obfuscated source map, we don't want to strip locs, 
@@ -10972,11 +10975,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         //
         eliminateDeadCode(module, dceOptions);
 
-        if (linkage->m_optionSet.shouldObfuscateCode())
-        {
-            // The obfuscated source map is stored on the module
-            obfuscateModuleLocs(module, compileRequest->getSourceManager());
-        }
+    }
+
+    if (linkage->m_optionSet.shouldObfuscateCode())
+    {
+        // The obfuscated source map is stored on the module
+        obfuscateModuleLocs(module, compileRequest->getSourceManager());
     }
 
     // TODO: consider doing some more aggressive optimizations

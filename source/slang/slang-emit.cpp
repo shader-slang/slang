@@ -220,12 +220,17 @@ struct RequiredLoweringPassSet
     bool combinedTextureSamplers;
     bool reinterpret;
     bool generics;
+    bool bindExistential;
     bool autodiff;
     bool derivativePyBindWrapper;
     bool bitcast;
     bool existentialTypeLayout;
     bool bindingQuery;
     bool meshOutput;
+    bool higherOrderFunc;
+    bool glslGlobalVar;
+    bool glslSSBO;
+    bool byteAddressBuffer;
 };
 
 void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext* codeGenContext, IRInst* inst)
@@ -303,6 +308,27 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
     case kIROp_AutoPyBindCudaDecoration:
         result.derivativePyBindWrapper = true;
         break;
+    case kIROp_Param:
+        if (as<IRFuncType>(inst->getDataType()))
+            result.higherOrderFunc = true;
+        break;
+    case kIROp_GlobalInputDecoration:
+    case kIROp_GlobalOutputDecoration:
+    case kIROp_GetWorkGroupSize:
+        result.glslGlobalVar = true;
+        break;
+    case kIROp_BindExistentialSlotsDecoration:
+        result.bindExistential = true;
+        result.generics = true;
+        result.existentialTypeLayout = true;
+        break;
+    case kIROp_GLSLShaderStorageBufferType:
+        result.glslSSBO = true;
+        break;
+    case kIROp_ByteAddressBufferLoad:
+    case kIROp_ByteAddressBufferStore:
+        result.byteAddressBuffer = true;
+        break;
     }
     for (auto child : inst->getDecorationsAndChildren())
     {
@@ -348,10 +374,14 @@ Result linkAndOptimizeIR(
     // un-specialized IR.
     dumpIRIfEnabled(codeGenContext, irModule, "POST IR VALIDATION");
 
-    if(!isKhronosTarget(targetRequest))
+    // Scan the IR module and determine which lowering/legalization passes are needed.
+    RequiredLoweringPassSet requiredLoweringPassSet = {};
+    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
+
+    if(!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);
 
-    if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
+    if (requiredLoweringPassSet.glslGlobalVar)
         translateGLSLGlobalVar(codeGenContext, irModule);
 
     // Replace any global constants with their values.
@@ -370,7 +400,8 @@ Result linkAndOptimizeIR(
     // shader parameters for those slots, to be wired up to
     // use sites.
     //
-    bindExistentialSlots(irModule, sink);
+    if (requiredLoweringPassSet.bindExistential)
+        bindExistentialSlots(irModule, sink);
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "EXISTENTIALS BOUND");
 #endif
@@ -449,9 +480,6 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CUDASource:
         break;
     }
-
-    RequiredLoweringPassSet requiredLoweringPassSet = {};
-    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
     if (requiredLoweringPassSet.optionalType)
         lowerOptionalType(irModule, sink);
@@ -540,7 +568,10 @@ Result linkAndOptimizeIR(
             return SLANG_FAIL;
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
 
-        applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
+        if (changed)
+        {
+            applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
+        }
         eliminateDeadCode(irModule, deadCodeEliminationOptions);
 
         validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -564,7 +595,7 @@ Result linkAndOptimizeIR(
         // which do.
         // Specialize away these parameters
         // TODO: We should implement a proper defunctionalization pass
-        if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
+        if (requiredLoweringPassSet.higherOrderFunc)
             changed |= specializeHigherOrderParameters(codeGenContext, irModule);
 
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
@@ -673,7 +704,11 @@ Result linkAndOptimizeIR(
     // up downstream passes like type legalization, so we
     // will run a DCE pass to clean up after the specialization.
     //
-    if (!fastIRSimplificationOptions.minimalOptimization)
+    if (fastIRSimplificationOptions.minimalOptimization)
+    {
+        eliminateDeadCode(irModule, deadCodeEliminationOptions);
+    }
+    else
     {
         simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
     }
@@ -788,7 +823,9 @@ Result linkAndOptimizeIR(
     // to see if we can clean up any temporaries created by legalization.
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
-    if (!fastIRSimplificationOptions.minimalOptimization)
+    if (fastIRSimplificationOptions.minimalOptimization)
+        eliminateDeadCode(irModule, deadCodeEliminationOptions);
+    else
         simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
 
 #if 0
@@ -849,6 +886,7 @@ Result linkAndOptimizeIR(
     // of aggregate types from/to byte-address buffers into
     // stores of individual scalar or vector values.
     //
+    if (requiredLoweringPassSet.byteAddressBuffer)
     {
         ByteAddressBufferLegalizationOptions byteAddressBufferOptions;
 
