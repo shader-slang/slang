@@ -50,11 +50,34 @@ struct SerializedArrayView
     Index count;
 };
 
+struct CapabilitySharedContext
+{
+    CapabilityDef* ptrOfTarget = nullptr;
+    CapabilityDef* ptrOfStage = nullptr;
+};
+
+static void _removeFromOtherAtomsNotInThis(HashSet<const CapabilityDef*> thisSet, HashSet<const CapabilityDef*> otherSet, List<const CapabilityDef*> atomsToRemove)
+{
+    atomsToRemove.clear();
+    atomsToRemove.reserve(otherSet.getCount());
+    for (auto abstractAtom : otherSet)
+    {
+        if (thisSet.contains(abstractAtom))
+            continue;
+        atomsToRemove.add(abstractAtom);
+    }
+
+    for (auto atomToRemove : atomsToRemove)
+        otherSet.remove(atomToRemove);
+}
+
 struct CapabilityDef : public RefObject
 {
 public:
-    static inline CapabilityDef* ptrOfTarget = nullptr;
-    static inline CapabilityDef* ptrOfStage = nullptr;
+
+    CapabilityDef(CapabilitySharedContext& context) : sharedContext(context)
+    {
+    }
 
     String name;
     Index enumValue;
@@ -64,8 +87,11 @@ public:
     List<List<CapabilityDef*>> canonicalRepresentation;
     SerializedArrayView serializedCanonicalRepresentation;
     SourceLoc sourceLoc;
+    HashSet<const CapabilityDef*> abstractAtomsPresent;
 
-    CapabilityDef* getAbstractBase()
+    CapabilitySharedContext& sharedContext;
+
+    CapabilityDef* getAbstractBase() const
     {
         if (flavor != CapabilityFlavor::Normal)
             return nullptr;
@@ -78,85 +104,68 @@ public:
         return expr.conjunctions[0].atoms[0];
     }
 
-    const HashSet<CapabilityDef*>& getAbstractAtomsPresent() const
-    {
-        return abstractAtomsPresent;
-    }
     void fillAbstractAtomsPresentFromCannonicalRepresentation()
     {
-        bool alreadySetTarget = false;
-        HashSet<CapabilityDef*> firstTargetSet;
-
-        bool alreadySetStage = false;
-        HashSet<CapabilityDef*> firstStageSet;
-
-        HashSet<CapabilityDef*> abstractFound;
-
-        for (auto& c : canonicalRepresentation)
+        HashSet<const CapabilityDef*> targetAbstractAtomsOfType;
+        HashSet<const CapabilityDef*> stageAbstractAtomsOfType;
+        HashSet<const CapabilityDef*> abstractFound;
+        List<const CapabilityDef*> atomsToRemove;
+        for (auto& canonicalSet : canonicalRepresentation)
         {
+            bool alreadySetTarget = false;
+            bool alreadySetStage = false;
+            targetAbstractAtomsOfType.clear();
+            stageAbstractAtomsOfType.clear();
 
-            alreadySetTarget = false;
-            firstTargetSet.clear();
-            alreadySetStage = false;
-            firstStageSet.clear();
-
-            abstractFound.clear();
-
-            for (auto& atom : c)
+            // find abstract atoms all atoms in a canonicalSet share.
+            for (auto& atom : canonicalSet)
             {
-                for (auto& otherAbstractAtomsPresent : atom->abstractAtomsPresent)
+                bool foundTarget = false;
+                bool foundStage = false;
+                for (auto otherAbstractAtomsPresent : atom->abstractAtomsPresent)
                 {
                     auto base = otherAbstractAtomsPresent->getAbstractBase();
-                    if (CapabilityDef::ptrOfTarget && base == CapabilityDef::ptrOfTarget)
+                    // add all `target` abstract atoms associated with atom in canonicalSet
+                    if (base == sharedContext.ptrOfTarget)
                     {
+                        foundTarget = true;
                         if (!alreadySetTarget)
-                            firstTargetSet.add(otherAbstractAtomsPresent);
+                            targetAbstractAtomsOfType.add(otherAbstractAtomsPresent);
                     }
-                    else if (CapabilityDef::ptrOfStage && base == CapabilityDef::ptrOfStage)
+                    // add all `stage` abstract atoms associated with atom in canonicalSet
+                    else if (base == sharedContext.ptrOfStage)
                     {
-                        if (!alreadySetStage)
-                            firstStageSet.add(otherAbstractAtomsPresent);
+                        foundStage = true;
+                        if(!alreadySetTarget)
+                            stageAbstractAtomsOfType.add(otherAbstractAtomsPresent);
                     }
-
+                    // all abstract atoms associated with atom
                     abstractFound.add(otherAbstractAtomsPresent);
                 }
-                if (alreadySetTarget)
-                {
-                    for (auto i : firstTargetSet)
-                    {
-                        if (abstractFound.contains(i))
-                            continue;
-                        firstTargetSet.remove(i);
-                    }
-                }
-                if (alreadySetStage)
-                {
-                    for (auto i : firstStageSet)
-                    {
-                        if (!abstractFound.contains(i))
-                            continue;
-                        firstStageSet.remove(i);
-                    }
-                }
 
-                if (firstTargetSet.getCount() > 0)
+                // remove all abstract atoms which are not shared 
+                if (foundTarget)
+                {
                     alreadySetTarget = true;
-                if (firstStageSet.getCount() > 0)
+                    _removeFromOtherAtomsNotInThis(abstractFound, targetAbstractAtomsOfType, atomsToRemove);
+                }
+                if (foundStage)
+                {
                     alreadySetStage = true;
+                    _removeFromOtherAtomsNotInThis(abstractFound, stageAbstractAtomsOfType, atomsToRemove);
+                }
+                abstractFound.clear();
             }
-           
-
-            for (auto sharedAbstractAtom : firstTargetSet)
-                this->abstractAtomsPresent.add(sharedAbstractAtom);
-            for (auto sharedAbstractAtom : firstStageSet)
-                this->abstractAtomsPresent.add(sharedAbstractAtom);
+            
+            // add all abstract atoms shared
+            for (auto abstractAtom : targetAbstractAtomsOfType)
+                this->abstractAtomsPresent.add(abstractAtom);
+            for (auto abstractAtom : stageAbstractAtomsOfType)
+                this->abstractAtomsPresent.add(abstractAtom);
         }
         if (auto base = this->getAbstractBase())
             abstractAtomsPresent.add(this);
     }
-
-    private:
-        HashSet<CapabilityDef*> abstractAtomsPresent;
 };
 
 struct CapabilityDefParser
@@ -244,13 +253,13 @@ struct CapabilityDefParser
         return SLANG_OK;
     }
 
-    SlangResult parseDefs()
+    SlangResult parseDefs(CapabilitySharedContext& capabilitySharedContext)
     {
         auto tokens = m_lexer->lexAllSemanticTokens();
         m_tokenReader = TokenReader(tokens);
         for (;;)
         {
-            RefPtr<CapabilityDef> def = new CapabilityDef();
+            RefPtr<CapabilityDef> def = new CapabilityDef(capabilitySharedContext);
             def->flavor = CapabilityFlavor::Normal;
             auto nextToken = m_tokenReader.advanceToken();
             if (nextToken.getContent() == "alias")
@@ -313,12 +322,12 @@ struct CapabilityDefParser
             }
 
             //set abstract atom identifiers
-            if (!CapabilityDef::ptrOfTarget
+            if (!capabilitySharedContext.ptrOfTarget
                 && def->name.equals("target"))
-                CapabilityDef::ptrOfTarget = def;
-            else if (!CapabilityDef::ptrOfStage
+                capabilitySharedContext.ptrOfTarget = def;
+            else if (!capabilitySharedContext.ptrOfStage
                 && def->name.equals("stage"))
-                CapabilityDef::ptrOfStage = def;
+                capabilitySharedContext.ptrOfStage = def;
 
             def->sourceLoc = nameToken.loc;
         }
@@ -333,18 +342,18 @@ struct CapabilityConjunction
     String toString() const
     {
         bool first = true;
-        String outS = "[";
-        for (auto i : atoms)
+        String result = "[";
+        for (auto atom : atoms)
         {
             if (!first)
             {
-                outS.append(" + ");
+                result.append(" + ");
             }
             first = false;
-            outS.append(i->name);
+            result.append(atom->name);
         }
-        outS.appendChar(']');
-        return outS;
+        result.appendChar(']');
+        return result;
     }
 
     bool implies(const CapabilityConjunction& c) const
@@ -361,7 +370,7 @@ struct CapabilityConjunction
     {
         for (auto* atom : this->atoms)
         {
-            for (auto present : atom->getAbstractAtomsPresent())
+            for (auto present : atom->abstractAtomsPresent)
             {
                 auto base = present->getAbstractBase();
                 if (base != defToFilterFor)
@@ -372,19 +381,19 @@ struct CapabilityConjunction
         return nullptr;
     }
 
-    bool shareTargetAndStageAtom(const CapabilityConjunction& other)
+    bool shareTargetAndStageAtom(const CapabilityConjunction& other, CapabilitySharedContext& context)
     {
         // shared target means thisTarget==otherTarget
         // shared stage means either `nostage + ...` or `stage == stage`
         
-        const CapabilityDef* thisTarget = this->getAbstractAtom(CapabilityDef::ptrOfTarget);
-        const CapabilityDef* otherTarget = other.getAbstractAtom(CapabilityDef::ptrOfTarget);
+        const CapabilityDef* thisTarget = this->getAbstractAtom(context.ptrOfTarget);
+        const CapabilityDef* otherTarget = other.getAbstractAtom(context.ptrOfTarget);
 
         if (thisTarget != otherTarget && thisTarget && otherTarget)
             return false;
 
-        const CapabilityDef* thisStage = this->getAbstractAtom(CapabilityDef::ptrOfStage);
-        const CapabilityDef* otherStage = other.getAbstractAtom(CapabilityDef::ptrOfStage);
+        const CapabilityDef* thisStage = this->getAbstractAtom(context.ptrOfStage);
+        const CapabilityDef* otherStage = other.getAbstractAtom(context.ptrOfStage);
 
         if (thisStage != otherStage && thisStage && otherStage)
             return false;
@@ -432,7 +441,7 @@ struct CapabilityDisjunction
 {
     List<CapabilityConjunction> conjunctions;
 
-    void addConjunction(DiagnosticSink* sink, SourceLoc sourceLoc, const CapabilityConjunction& c)
+    void addConjunction(DiagnosticSink* sink, SourceLoc sourceLoc, CapabilitySharedContext& context, CapabilityConjunction& c)
     {
         if (c.isImpossible())
             return;
@@ -464,7 +473,7 @@ struct CapabilityDisjunction
             else
             {
                 // validate we are not creating a disjunction of same targets
-                if (conjunctions[i].shareTargetAndStageAtom(c))
+                if (conjunctions[i].shareTargetAndStageAtom(c, context))
                 {
                     if (sink)
                     {
@@ -481,7 +490,7 @@ struct CapabilityDisjunction
     {
         for (Index i = 0; i < conjunctions.getCount(); i++)
         {
-            for (Index ii = 0; ii < conjunctions.getCount(); ii++)
+            for (Index ii = 1; ii < conjunctions.getCount(); ii++)
             {
                 if (ii == i)
                     continue;
@@ -496,7 +505,7 @@ struct CapabilityDisjunction
         }
     }
 
-    void inclusiveJoinConjunction(const CapabilityConjunction& c, List<CapabilityConjunction>& toAddAfter)
+    void inclusiveJoinConjunction(CapabilitySharedContext& context, CapabilityConjunction& c, List<CapabilityConjunction>& toAddAfter)
     {
         if (c.isImpossible())
             return;
@@ -507,7 +516,7 @@ struct CapabilityDisjunction
         }
         for (Index i = 0; i < conjunctions.getCount();)
         {
-            if (conjunctions[i].shareTargetAndStageAtom(c))
+            if (conjunctions[i].shareTargetAndStageAtom(c, context))
             {
                 CapabilityConjunction toAddAfterSet;
                 for (auto atom : conjunctions[i].atoms)
@@ -525,7 +534,7 @@ struct CapabilityDisjunction
         conjunctions.add(_Move(c));
     }
 
-    CapabilityDisjunction joinWith(DiagnosticSink* sink, SourceLoc sourceLoc, const CapabilityDisjunction& other)
+    CapabilityDisjunction joinWith(DiagnosticSink* sink, SourceLoc sourceLoc, CapabilitySharedContext& context, const CapabilityDisjunction& other)
     {
         if (conjunctions.getCount() == 0)
         {
@@ -547,7 +556,7 @@ struct CapabilityDisjunction
                     newC.atoms.add(atom);
                 for (auto atom : thatC.atoms)
                     newC.atoms.add(atom);
-                result.addConjunction(sink, sourceLoc, _Move(newC));
+                result.addConjunction(sink, sourceLoc, context, _Move(newC));
             }
         }
 
@@ -597,13 +606,13 @@ CapabilityDisjunction getCanonicalRepresentation(CapabilityDef* def)
     return result;
 }
 
-CapabilityDisjunction evaluateConjunction(DiagnosticSink* sink, SourceLoc sourceLoc, const List<CapabilityDef*>& atoms)
+CapabilityDisjunction evaluateConjunction(DiagnosticSink* sink, SourceLoc sourceLoc, CapabilitySharedContext& context, const List<CapabilityDef*>& atoms)
 {
     CapabilityDisjunction result;
     for (auto& def : atoms)
     {
         CapabilityDisjunction defCanonical = getCanonicalRepresentation(def);
-        result = result.joinWith(sink, sourceLoc, defCanonical);
+        result = result.joinWith(sink, sourceLoc, context, defCanonical);
     }
     return result;
 }
@@ -620,7 +629,7 @@ void calcCanonicalRepresentation(DiagnosticSink* sink, CapabilityDef* def, const
     CapabilityDisjunction exprVal;
     for (auto& c : def->expr.conjunctions)
     {
-        CapabilityDisjunction evalD = evaluateConjunction(sink, c.sourceLoc, c.atoms);
+        CapabilityDisjunction evalD = evaluateConjunction(sink, c.sourceLoc, def->sharedContext, c.atoms);
         List<CapabilityConjunction> toAddAfter;
         for (auto& cc : evalD.conjunctions)
         {
@@ -628,12 +637,12 @@ void calcCanonicalRepresentation(DiagnosticSink* sink, CapabilityDef* def, const
             {
             case AddCapabilityOptions::Union:
             {
-                exprVal.addConjunction(sink, c.sourceLoc, cc);
+                exprVal.addConjunction(sink, c.sourceLoc, def->sharedContext, cc);
                 break;
             }
             case AddCapabilityOptions::InclusiveJoin:
             {
-                exprVal.inclusiveJoinConjunction(cc, toAddAfter);
+                exprVal.inclusiveJoinConjunction(def->sharedContext, cc, toAddAfter);
                 break;
             }
             }
@@ -643,7 +652,7 @@ void calcCanonicalRepresentation(DiagnosticSink* sink, CapabilityDef* def, const
         if (toAddAfter.getCount() > 0)
             exprVal.removeImplied();
     }
-    disjunction = disjunction.joinWith(sink, def->sourceLoc, exprVal);
+    disjunction = disjunction.joinWith(sink, def->sourceLoc, def->sharedContext, exprVal);
     def->canonicalRepresentation = disjunction.canonicalize();
     def->fillAbstractAtomsPresentFromCannonicalRepresentation();
 }
@@ -741,12 +750,12 @@ SlangResult generateDefinitions(DiagnosticSink* sink, const List<RefPtr<Capabili
 
     for (auto def : defs)
     {
-        if (def->getAbstractBase() == CapabilityDef::ptrOfTarget)
+        if (def->getAbstractBase() == def->sharedContext.ptrOfTarget)
         {
             targetCount++;
             anyTargetAtomSet.add(def->enumValue);
         }
-        else if (def->getAbstractBase() == CapabilityDef::ptrOfStage)
+        else if (def->getAbstractBase() == def->sharedContext.ptrOfStage)
         {
             stageCount++;
             anyStageAtomSet.add(def->enumValue);
@@ -889,7 +898,7 @@ SlangResult generateDefinitions(DiagnosticSink* sink, const List<RefPtr<Capabili
 }
 
 
-SlangResult parseDefFile(DiagnosticSink* sink, String inputPath, List<RefPtr<CapabilityDef>>& outDefs)
+SlangResult parseDefFile(DiagnosticSink* sink, String inputPath, List<RefPtr<CapabilityDef>>& outDefs, CapabilitySharedContext& capabilitySharedContext)
 {
     auto sourceManager = sink->getSourceManager();
 
@@ -906,7 +915,7 @@ SlangResult parseDefFile(DiagnosticSink* sink, String inputPath, List<RefPtr<Cap
    
     CapabilityDefParser parser(&lexer, sink);
 
-    SLANG_RETURN_ON_FAIL(parser.parseDefs());
+    SLANG_RETURN_ON_FAIL(parser.parseDefs(capabilitySharedContext));
     outDefs = _Move(parser.m_defs);
     return SLANG_OK;
 }
@@ -961,7 +970,8 @@ int main(int argc, const char* const* argv)
     sourceManager.initialize(nullptr, OSFileSystem::getExtSingleton());
     DiagnosticSink sink(&sourceManager, nullptr);
     List<RefPtr<CapabilityDef>> defs;
-    if (SLANG_FAILED(parseDefFile(&sink, inPath, defs)))
+    CapabilitySharedContext capabilitySharedContext;
+    if (SLANG_FAILED(parseDefFile(&sink, inPath, defs, capabilitySharedContext)))
     {
         printDiagnostics(&sink);
         return 1;

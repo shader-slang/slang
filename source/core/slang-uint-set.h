@@ -90,9 +90,9 @@ public:
         /// Add a value
     inline void add(UInt val);
     inline void add(const UIntSet& val);
-    inline void add(const List<Element>& other);
+    inline void add(const List<UInt>& other);
 
-    inline void addRawElement(UInt val, Index bitOffset); 
+    inline void addRawElement(Element val, Index bitOffset);
 
         /// Remove a value
     inline void remove(UInt val);
@@ -147,11 +147,12 @@ public:
             m_LSB = bitscanForward(m_processedElement);
             m_processedElement &= m_processedElement - 1;
         }
-    public:
+
         Iterator(const List<Element>* context)
         {
             m_context = context;
         }
+    public:
 
         Element operator*()
         {
@@ -301,13 +302,13 @@ inline void UIntSet::add(const UIntSet& other)
         m_buffer[i] |= other.m_buffer[i];
 }
 
-inline void UIntSet::add(const List<Element>& other)
+inline void UIntSet::add(const List<UInt>& other)
 {
     for (auto i : other)
-        add((UInt)i);
+        add(i);
 }
 
-inline void UIntSet::addRawElement(UInt other, Index elementIndex)
+inline void UIntSet::addRawElement(Element other, Index elementIndex)
 {
     if(this->m_buffer.getCount() <= elementIndex)
         resizeBackingBufferDirectly(elementIndex+1);
