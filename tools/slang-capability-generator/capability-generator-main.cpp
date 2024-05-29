@@ -83,7 +83,7 @@ public:
     Index enumValue;
     CapabilityDisjunctionExpr expr;
     CapabilityFlavor flavor;
-    int rank;
+    int rank = 0; // optional, 0 is default
     List<List<CapabilityDef*>> canonicalRepresentation;
     SerializedArrayView serializedCanonicalRepresentation;
     SourceLoc sourceLoc;
