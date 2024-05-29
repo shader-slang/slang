@@ -556,7 +556,7 @@ struct CapabilityDisjunction
                     newC.atoms.add(atom);
                 for (auto atom : thatC.atoms)
                     newC.atoms.add(atom);
-                result.addConjunction(sink, sourceLoc, context, _Move(newC));
+                result.addConjunction(sink, sourceLoc, context, newC);
             }
         }
 
