@@ -2419,6 +2419,7 @@ struct InstWorkList
         other.pool = nullptr;
         return *this;
     }
+    List<IRInst*>& getList() { return *workList; }
     IRInst* operator[](Index i) { return (*workList)[i]; }
     Index getCount() { return workList->getCount(); }
     IRInst** begin() { return workList->begin(); }
@@ -2464,7 +2465,7 @@ struct InstHashSet
         other.pool = nullptr;
         return *this;
     }
-
+    HashSet<IRInst*>& getHashSet() { return *set; }
     Index getCount() { return set->getCount(); }
     bool add(IRInst* inst) { return set->add(inst); }
     bool contains(IRInst* inst) { return set->contains(inst); }

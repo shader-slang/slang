@@ -864,6 +864,7 @@ extern "C"
             SourceEmbedLanguage,
             DisableShortCircuit,   // bool
             MinimumSlangOptimization, // bool
+            DisableNonEssentialValidations, // bool
 
             // Target
 
