@@ -254,7 +254,6 @@ struct PeepholeContext : InstPassBase
         {
         case kIROp_AlignOf:
         case kIROp_SizeOf:
-            // Fold all calls to alignOf<T>() that returns a simple integer value.
             {
                 if (!targetProgram)
                     break;
