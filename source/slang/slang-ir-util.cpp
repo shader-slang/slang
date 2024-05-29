@@ -227,12 +227,11 @@ bool isSimpleDataType(IRType* type)
     case kIROp_MatrixType:
     case kIROp_InterfaceType:
     case kIROp_AnyValueType:
+    case kIROp_PtrType:
         return true;
     case kIROp_ArrayType:
     case kIROp_UnsizedArrayType:
         return isSimpleDataType((IRType*)type->getOperand(0));
-    case kIROp_PtrType:
-        return as<IRBasicType>((IRType*)type->getOperand(0));
     default:
         return false;
     }

@@ -5702,23 +5702,36 @@ struct SPIRVEmitContext
         }
         else if (auto ptrType = as<IRPtrTypeBase>(type))
         {
-            StringBuilder sbName;
-            getTypeNameHint(sbName, basicType);
+            IRType* baseType = ptrType->getValueType();
+            if (as<IRBasicType>(baseType))
+            {
+                // If the base type of the pointer is basic types,
+                // emit the basic types and emit DebugTypePointer with it.
+                SpvInst* debugBaseType = emitDebugType(baseType);
+                SpvStorageClass storageClass = SpvStorageClassFunction;
+                if (ptrType->hasAddressSpace())
+                    storageClass = (SpvStorageClass)ptrType->getAddressSpace();
 
-            auto ptrValueType = ptrType->getValueType();
-            SpvInst* baseType = emitDebugType(ptrValueType);
+                return emitOpDebugTypePointer(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    nullptr,
+                    m_voidType,
+                    getNonSemanticDebugInfoExtInst(),
+                    debugBaseType,
+                    builder.getIntValue(builder.getUIntType(), storageClass),
+                    builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
+            }
 
-            SpvStorageClass storageClass = SpvStorageClassFunction;
-            if (ptrType->hasAddressSpace())
-                storageClass = (SpvStorageClass)ptrType->getAddressSpace();
-
-            return emitOpDebugTypePointer(
+            // If the base type of the pointer is more complex,
+            // emit the pointer as "uintptr" of DebugTypeBasic.
+            return emitOpDebugTypeBasic(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
-                baseType,
-                builder.getIntValue(builder.getUIntType(), storageClass),
+                builder.getStringValue(String("uintptr").getUnownedSlice()),
+                builder.getIntValue(builder.getUIntType(), 64),
+                builder.getIntValue(builder.getUIntType(), 0),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
         }
         return ensureInst(m_voidType);
