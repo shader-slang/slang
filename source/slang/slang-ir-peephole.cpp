@@ -11,13 +11,15 @@ struct PeepholeContext : InstPassBase
 {
     PeepholeContext(IRModule* inModule)
         : InstPassBase(inModule)
-    {}
+    {
+    }
 
     bool changed = false;
     FloatingPointMode floatingPointMode = FloatingPointMode::Precise;
     bool removeOldInst = true;
     bool isInGeneric = false;
     bool isPrelinking = false;
+    bool useFastAnalysis = false;
 
     TargetProgram* targetProgram;
 
@@ -350,7 +352,7 @@ struct PeepholeContext : InstPassBase
             }
             else
             {
-                //changed |= tryFoldElementExtractFromUpdateInst(inst);
+                changed |= tryFoldElementExtractFromUpdateInst(inst);
             }
             break;
         case kIROp_GetElement:
@@ -415,7 +417,7 @@ struct PeepholeContext : InstPassBase
             }
             else
             {
-                //changed |= tryFoldElementExtractFromUpdateInst(inst);
+                changed |= tryFoldElementExtractFromUpdateInst(inst);
             }
             break;
         case kIROp_UpdateElement:
@@ -846,7 +848,7 @@ struct PeepholeContext : InstPassBase
         case kIROp_Div:
         case kIROp_And:
         case kIROp_Or:
-            //changed |= tryOptimizeArithmeticInst(inst);
+            changed |= tryOptimizeArithmeticInst(inst);
             break;
         case kIROp_Param:
             {
@@ -895,8 +897,7 @@ struct PeepholeContext : InstPassBase
                             // Never remove param inst.
                             changed = true;
                         }
-#if 0
-                        else
+                        else if (!useFastAnalysis)
                         {
                             // If argValue is defined locally,
                             // we can replace only if argVal dominates inst.
@@ -913,7 +914,6 @@ struct PeepholeContext : InstPassBase
                                 changed = true;
                             }
                         }
-#endif
                     }
                 }
             }
@@ -1120,7 +1120,8 @@ struct PeepholeContext : InstPassBase
 
     bool processFunc(IRInst* func)
     {
-        func->getModule()->invalidateAllAnalysis();
+        if (!useFastAnalysis)
+            func->getModule()->invalidateAllAnalysis();
 
         bool lastIsInGeneric = isInGeneric;
         if (!isInGeneric)
@@ -1153,6 +1154,9 @@ bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizat
     PeepholeContext context = PeepholeContext(module);
     context.targetProgram = target;
     context.isPrelinking = options.isPrelinking;
+    context.useFastAnalysis = target
+        ? target->getOptionSet().getBoolOption(CompilerOptionName::MinimumSlangOptimization)
+        : true;
     return context.processModule();
 }
 
@@ -1160,6 +1164,9 @@ bool peepholeOptimize(TargetProgram* target, IRInst* func)
 {
     PeepholeContext context = PeepholeContext(func->getModule());
     context.targetProgram = target;
+    context.useFastAnalysis = target
+        ? target->getOptionSet().getBoolOption(CompilerOptionName::MinimumSlangOptimization)
+        : true;
     return context.processFunc(func);
 }
 
@@ -1167,7 +1174,7 @@ bool peepholeOptimizeGlobalScope(TargetProgram* target, IRModule* module)
 {
     PeepholeContext context = PeepholeContext(module);
     context.targetProgram = target;
-
+    context.useFastAnalysis = true;
     bool result = false;
     for (;;)
     {
@@ -1189,6 +1196,7 @@ bool tryReplaceInstUsesWithSimplifiedValue(TargetProgram* target, IRModule* modu
     PeepholeContext context = PeepholeContext(inst->getModule());
     context.targetProgram = target;
     context.removeOldInst = false;
+    context.useFastAnalysis = true;
     context.processInst(inst);
     return context.changed;
 }

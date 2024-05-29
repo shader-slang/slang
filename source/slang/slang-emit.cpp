@@ -479,7 +479,9 @@ Result linkAndOptimizeIR(
 
     IRSimplificationOptions defaultIRSimplificationOptions = IRSimplificationOptions::getDefault(targetProgram);
     IRSimplificationOptions fastIRSimplificationOptions = IRSimplificationOptions::getFast(targetProgram);
+    IRDeadCodeEliminationOptions deadCodeEliminationOptions = IRDeadCodeEliminationOptions();
     fastIRSimplificationOptions.minimalOptimization = defaultIRSimplificationOptions.minimalOptimization;
+    deadCodeEliminationOptions.useFastAnalysis = fastIRSimplificationOptions.minimalOptimization;
 
     simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
 
@@ -535,7 +537,7 @@ Result linkAndOptimizeIR(
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
 
         applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
-        eliminateDeadCode(irModule);
+        eliminateDeadCode(irModule, deadCodeEliminationOptions);
 
         validateIRModuleIfEnabled(codeGenContext, irModule);
     
@@ -627,7 +629,7 @@ Result linkAndOptimizeIR(
     
     if (fastIRSimplificationOptions.minimalOptimization)
     {
-        eliminateDeadCode(irModule);
+        eliminateDeadCode(irModule, deadCodeEliminationOptions);
     }
     else
     {
@@ -1078,7 +1080,7 @@ Result linkAndOptimizeIR(
     //
     // We run DCE pass again to clean things up.
     //
-    eliminateDeadCode(irModule);
+    eliminateDeadCode(irModule, deadCodeEliminationOptions);
 
     if (isKhronosTarget(targetRequest))
     {
@@ -1139,7 +1141,7 @@ Result linkAndOptimizeIR(
     if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
-        eliminateDeadCode(irModule);
+        eliminateDeadCode(irModule, deadCodeEliminationOptions);
     }
     eliminateMultiLevelBreak(irModule);
 

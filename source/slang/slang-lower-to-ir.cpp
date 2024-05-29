@@ -10834,12 +10834,18 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     constructSSA(module);
     simplifyCFG(module, CFGSimplificationOptions::getDefault());
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-    peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
+    auto peepholeOptions = PeepholeOptimizationOptions::getPrelinking();
+    peepholeOptimize(nullptr, module, peepholeOptions);
+
+    IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
+    dceOptions.keepExportsAlive = true;
+    dceOptions.keepLayoutsAlive = true;
+    dceOptions.useFastAnalysis = true;
 
     for (auto inst : module->getGlobalInsts())
     {
         if (auto func = as<IRGlobalValueWithCode>(inst))
-            eliminateDeadCode(func);
+            eliminateDeadCode(func, dceOptions);
     }
     // Next, inline calls to any functions that have been
     // marked for mandatory "early" inlining.
@@ -10963,9 +10969,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // pass here, but make sure to set our options so that we don't
         // eliminate anything that has been marked for export.
         //
-        IRDeadCodeEliminationOptions options;
-        options.keepExportsAlive = true;
-        eliminateDeadCode(module, options);
+        eliminateDeadCode(module, dceOptions);
 
         if (linkage->m_optionSet.shouldObfuscateCode())
         {
