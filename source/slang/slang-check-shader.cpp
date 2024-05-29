@@ -519,7 +519,7 @@ namespace Slang
             targetCaps.join(stageCapabilitySet);
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
-                diagnoseCapabilityErrors(sink, linkage->m_optionSet, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
+                maybeDiagnose(sink, linkage->m_optionSet, TypeOfErrorToDiagnose::Capability, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
                 
                 // Find out what exactly is incompatible and print out a trace of provenance to
                 // help user diagnose their code.
@@ -539,6 +539,30 @@ namespace Slang
                         }
                     }
                 }
+            }
+
+            // if profile was implicitly upgraded:
+            // A = entry point, B = target
+            // 1. if(!B.implies(A)) => disjoint sets, missing capabilities, error
+
+            if (
+                (
+                    target->getOptionSet().hasOption(CompilerOptionName::Capability)
+                    ||
+                    target->getOptionSet().hasOption(CompilerOptionName::Profile)
+                )
+                && targetCaps.atLeastOneSetImpliedInOther(entryPointFuncDecl->inferredCapabilityRequirements) == CapabilitySet::ImpliesReturnFlags::NotImplied
+               )
+            {
+                maybeDiagnoseWarningOrError(
+                    sink,
+                    target->getOptionSet(),
+                    TypeOfErrorToDiagnose::Capability,
+                    entryPointFuncDecl->loc,
+                    Diagnostics::profileImplicitlyUpgraded,
+                    Diagnostics::profileImplicitlyUpgradedRestrictive,
+                    (*targetCaps.getCapabilityTargetSets().begin()).second,
+                    entryPointFuncDecl->inferredCapabilityRequirements.getCapabilityTargetSets()[(*targetCaps.getCapabilityTargetSets().begin()).first]);
             }
         }
     }

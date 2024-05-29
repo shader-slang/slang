@@ -131,7 +131,13 @@ public:
     bool isIncompatibleWith(CapabilitySet const& other) const;
 
     /// Does this capability set imply all the capabilities in `other`?
-    bool implies(CapabilitySet const& other, const bool onlyRequireSingleImply = false) const;
+    enum class ImpliesReturnFlags : int
+    {
+        NotImplied = 0,
+        Implied = 1 << 1,
+    };
+    bool implies(CapabilitySet const& other) const;
+    ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const;
 
     /// Does this capability set imply the atomic capability `other`?
     bool implies(CapabilityAtom other) const;
@@ -279,6 +285,13 @@ private:
     void addCapability(CapabilityName name);
 
     bool hasSameTargets(const CapabilitySet& other) const;
+
+    enum class ImpliesFlags
+    {
+        None = 0,
+        OnlyRequireASingleValidImply = 1 << 1,
+    };
+    ImpliesReturnFlags _implies(CapabilitySet const& other, ImpliesFlags flags) const;
 };
 
     /// Returns true if atom is derived from base

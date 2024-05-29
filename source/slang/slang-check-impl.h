@@ -11,14 +11,6 @@
 
 namespace Slang
 {
-    template<typename P, typename... Args>
-    bool diagnoseCapabilityErrors(DiagnosticSink* sink, CompilerOptionSet& optionSet, P const& pos, DiagnosticInfo const& info, Args const&... args)
-    {
-        if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
-            return false;
-        return sink->diagnose(pos, info, args...);
-    }
-
         /// Should the given `decl` be treated as a static rather than instance declaration?
     bool isEffectivelyStatic(
         Decl*           decl);

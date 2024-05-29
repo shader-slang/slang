@@ -18,6 +18,7 @@ namespace Slang
                 bool isEqual;
                 CapabilitySet bestCapSet = CapabilitySet::makeInvalid();
                 IRBlock* targetBlock = nullptr;
+                CapabilitySet::ImpliesReturnFlags impliesReturnType = CapabilitySet::ImpliesReturnFlags::NotImplied;
                 for (UInt i = 0; i < targetSwitch->getCaseCount(); i++)
                 {
                     auto cap = (CapabilityName)getIntVal(targetSwitch->getCaseValue(i));
@@ -31,7 +32,8 @@ namespace Slang
                     bool isBetterForTarget = capSet.isBetterForTarget(bestCapSet, target->getTargetCaps(), isEqual);
                     if (isBetterForTarget)
                     {
-                        bool targetImpliesCapSet = (target->getTargetCaps().implies(capSet, true) || capSet.isEmpty());
+                        impliesReturnType = target->getTargetCaps().atLeastOneSetImpliedInOther(capSet);
+                        bool targetImpliesCapSet = ((int)impliesReturnType & (int)CapabilitySet::ImpliesReturnFlags::Implied || capSet.isEmpty());
                         if (targetImpliesCapSet)
                         {
                             // Now check if bestCapSet contains targetCaps. If it does not then this is an invalid target

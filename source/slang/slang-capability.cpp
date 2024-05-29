@@ -374,17 +374,22 @@ bool CapabilitySet::implies(CapabilityAtom atom) const
     return this->implies(tmpSet);
 }
 
-bool CapabilitySet::implies(CapabilitySet const& other, const bool onlyRequireSingleImply) const
+CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(CapabilitySet const& otherSet, ImpliesFlags flags) const
 {
     // x implies (c | d) only if (x implies c) and (x implies d).
 
-    for (const auto& otherTarget : other.m_targetSets)
+    bool onlyRequireSingleImply = ((int)flags & (int)ImpliesFlags::OnlyRequireASingleValidImply);
+    int flagsCollected = (int)CapabilitySet::ImpliesReturnFlags::NotImplied;
+
+    for (const auto& otherTarget : otherSet.m_targetSets)
     {
         auto thisTarget = this->m_targetSets.tryGetValue(otherTarget.first);
         if (!thisTarget)
         {
+            if (onlyRequireSingleImply)
+                continue;
             // 'this' lacks a target 'other' has.
-            return false;
+            return CapabilitySet::ImpliesReturnFlags::NotImplied;
         }
 
         for (const auto& otherStage : otherTarget.second.shaderStageSets)
@@ -392,31 +397,44 @@ bool CapabilitySet::implies(CapabilitySet const& other, const bool onlyRequireSi
             auto thisStage = thisTarget->shaderStageSets.tryGetValue(otherStage.first);
             if (!thisStage)
             {
+                if (onlyRequireSingleImply)
+                    continue;
                 // 'this' lacks a stage 'other' has.
-                return false;
+                return CapabilitySet::ImpliesReturnFlags::NotImplied;
             }
 
             // all stage sets that are in 'other' must be contained by 'this'
-            if(thisStage->atomSet)
+            if (thisStage->atomSet)
             {
                 auto& thisStageSet = thisStage->atomSet.value();
-                if(otherStage.second.atomSet)
-                {   
-                    if (!onlyRequireSingleImply)
+                if (otherStage.second.atomSet)
+                {
+                    auto contained = thisStageSet.contains(otherStage.second.atomSet.value());
+                    if (!onlyRequireSingleImply && !contained)
                     {
-                        if (!thisStageSet.contains(otherStage.second.atomSet.value()))
-                            return false;
+                        return CapabilitySet::ImpliesReturnFlags::NotImplied;
                     }
-                    else
+                    else if (onlyRequireSingleImply && contained)
                     {
-                        if (thisStageSet.contains(otherStage.second.atomSet.value()))
-                            return true;
+                        return CapabilitySet::ImpliesReturnFlags::Implied;
                     }
                 }
             }
         }
     }
-    return !onlyRequireSingleImply;
+    if (!onlyRequireSingleImply)
+        flagsCollected |= (int)CapabilitySet::ImpliesReturnFlags::Implied;
+
+    return (CapabilitySet::ImpliesReturnFlags)flagsCollected;
+}
+
+bool CapabilitySet::implies(CapabilitySet const& other) const
+{
+    return (int)_implies(other, ImpliesFlags::None) & (int)CapabilitySet::ImpliesReturnFlags::Implied;
+}
+CapabilitySet::ImpliesReturnFlags CapabilitySet::atLeastOneSetImpliedInOther(CapabilitySet const& other) const
+{
+    return _implies(other, ImpliesFlags::OnlyRequireASingleValidImply);
 }
 
 void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
@@ -852,6 +870,13 @@ void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
         }
         isFirstSet = false;
     }
+}
+
+void printDiagnosticArg(StringBuilder& sb, const CapabilityTargetSet& targetSet)
+{
+    CapabilitySet set;
+    set.getCapabilityTargetSets()[targetSet.target] = targetSet;
+    printDiagnosticArg(sb, set);
 }
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom)
