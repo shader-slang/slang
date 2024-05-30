@@ -220,6 +220,7 @@ public:
         Iterator<T, N>& operator--()
         {
             this->m_element--;
+            return *this;
         }
         bool operator==(const Iterator<T, N>& other) const
         {
