@@ -190,7 +190,6 @@ class PreallocatedStackVector
     const Index m_maxElementCount = N;
 
 public:
-    template<typename T, Index N>
     struct Iterator
     {
         PreallocatedStackVector<T, N>& m_context;
@@ -200,33 +199,33 @@ public:
         {
         }
 
-        Iterator<T, N> begin() const
+        Iterator begin() const
         {
             return m_context->begin();
         }
-        Iterator<T, N> end() const
+        Iterator end() const
         {
             return m_context->end();
         }
-        Iterator<T, N>& operator++()
+        Iterator& operator++()
         {
             this->m_element++;
             return *this;
         }
-        Iterator<T, N>& operator++(int)
+        Iterator& operator++(int)
         {
             return ++(*this);
         }
-        Iterator<T, N>& operator--()
+        Iterator& operator--()
         {
             this->m_element--;
             return *this;
         }
-        bool operator==(const Iterator<T, N>& other) const
+        bool operator==(const Iterator& other) const
         {
             return &this->m_context == &other.m_context && this->m_element == other.m_element;
         }
-        bool operator!=(const Iterator<T, N>& other) const
+        bool operator!=(const Iterator& other) const
         {
             return !(*this == other);
         }
@@ -252,14 +251,14 @@ public:
         return m_data[index];
     }
 
-    Iterator<T, N> begin()
+    Iterator begin()
     {
-        return Iterator<T, N>(*this, 0);
+        return Iterator(*this, 0);
     }
 
-    Iterator<T, N> end()
+    Iterator end()
     {
-        return Iterator<T, N>(*this, m_currentElementCount - 1);
+        return Iterator(*this, m_currentElementCount - 1);
     }
 
     T& getLast()
