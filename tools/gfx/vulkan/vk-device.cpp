@@ -1678,7 +1678,7 @@ Result DeviceImpl::createTextureResource(
                 break;
             case SLANG_SCALAR_TYPE_UINT32:
                 for(int i = 0; i < 4; i++)
-                    clearColor.uint32[i] = *reinterpret_cast<uint32_t*>(const_cast<void*>(initData->data));                break;
+                    clearColor.uint32[i] = *reinterpret_cast<uint32_t*>(const_cast<void*>(initData->data));
                 break;
             case SLANG_SCALAR_TYPE_INT64:
             {

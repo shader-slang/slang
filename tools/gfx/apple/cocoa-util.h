@@ -9,7 +9,7 @@ struct CocoaUtil {
 
     static void* createMetalLayer(void* nswindow);
     static void destroyMetalLayer(void* metalLayer);
-
+    static void* nextDrawable(void* metalLayer) ;
 };
 
 }

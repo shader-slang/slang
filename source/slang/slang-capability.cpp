@@ -627,8 +627,10 @@ bool CapabilitySet::hasSameTargets(const CapabilitySet& other) const
 
 
 // MSVC incorrectly throws warning
+#if defined(_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable:4702)
+#endif
 /// returns true if 'this' is a better target for 'targetCaps' than 'that'
 /// isEqual: is `this` and `that` equal
 /// isIncompatible: is `this` and `that` incompatible
@@ -743,7 +745,9 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
     }
     return true;
 }
+#if defined(_MSC_VER)
 #pragma warning(pop)
+#endif
 
 CapabilitySet::AtomSets::Iterator CapabilitySet::getAtomSets() const
 {

@@ -150,7 +150,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __alignOf_intrinsic<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
         }
     }
 
@@ -192,7 +192,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __alignOf_intrinsic<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
         }
     }
 
@@ -234,7 +234,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __alignOf_intrinsic<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
         }
     }
 
@@ -259,7 +259,7 @@ struct ByteAddressBuffer
     [ForceInline]
     T LoadAligned<T>(int location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __alignOf_intrinsic<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
 };
 
@@ -2153,7 +2153,7 @@ ${{{{
     {
 }}}}
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetTexture))
-    __TextureImpl<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> __getTexture();
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, 0, isShadow, 0, format> __getTexture();
 
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
     SamplerState __getSampler();
@@ -2564,6 +2564,26 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
         }
     }
 
+    __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
+    {
+        __glsl_extension(GL_EXT_samplerless_texture_functions)
+        [__readNone]
+        [ForceInline]
+        [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_samplerless)]
+        get
+        {
+            __target_switch
+            {
+                case cpp:
+                case hlsl:
+                    __intrinsic_asm "($0).sample[$1]";
+                case metal:
+                case glsl:
+                case spirv:
+                    return Load(location, 0);
+            }
+        }
+    }
     __subscript(vector<uint, Shape.dimensions+isArray> location, int sampleIndex) -> T
     {
         __glsl_extension(GL_EXT_samplerless_texture_functions)
@@ -3738,7 +3758,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __alignOf_intrinsic<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
         }
     }
 
@@ -3780,7 +3800,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __alignOf_intrinsic<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
         }
     }
 
@@ -3822,7 +3842,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __alignOf_intrinsic<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
         }
     }
 
@@ -3850,7 +3870,7 @@ struct $(item.name)
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     T LoadAligned<T>(int location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __alignOf_intrinsic<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
 
 ${{{{
@@ -4743,7 +4763,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store2";
         default:
-            __byteAddressBufferStore(this, address, __alignOf_intrinsic<uint2>(), value);
+            __byteAddressBufferStore(this, address, __naturalStrideOf<uint2>(), value);
         }
     }
 
@@ -4780,7 +4800,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store3";
         default:
-            __byteAddressBufferStore(this, address, __alignOf_intrinsic<uint3>(), value);
+            __byteAddressBufferStore(this, address, __naturalStrideOf<uint3>(), value);
         }
     }
 
@@ -4817,7 +4837,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store4";
         default:
-            __byteAddressBufferStore(this, address, __alignOf_intrinsic<uint4>(), value);
+            __byteAddressBufferStore(this, address, __naturalStrideOf<uint4>(), value);
         }
     }
 
@@ -4836,7 +4856,7 @@ ${{{{
     [ForceInline]
     void StoreAligned<T>(int offset, T value)
     {
-        __byteAddressBufferStore(this, offset, __alignOf_intrinsic<T>(), value);
+        __byteAddressBufferStore(this, offset, __naturalStrideOf<T>(), value);
     }
 };
 
