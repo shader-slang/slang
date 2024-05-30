@@ -617,21 +617,26 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             {
             case AddressSpace::Global:
                 m_writer->emit(" device");
+                m_writer->emit("*");
                 break;
             case AddressSpace::Uniform:
                 m_writer->emit(" constant");
+                m_writer->emit("*");
                 break;
             case AddressSpace::ThreadLocal:
                 m_writer->emit(" thread");
+                m_writer->emit("*");
                 break;
             case AddressSpace::GroupShared:
                 m_writer->emit(" threadgroup");
+                m_writer->emit("*");
                 break;
             case AddressSpace::MetalObjectData:
                 m_writer->emit(" object_data");
+                // object data is passed by reference
+                m_writer->emit("&");
                 break;
             }
-            m_writer->emit("*");
             return;
         }
         case kIROp_ArrayType:
@@ -958,6 +963,7 @@ void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRI
         break;
     case AddressSpace::MetalObjectData:
         m_writer->emit("object_data ");
+        break;
     default:
         break;
     }
