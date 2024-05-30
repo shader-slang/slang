@@ -18,6 +18,8 @@ namespace Diagnostics
 #undef DIAGNOSTIC
 }
 
+const Index kCapabilityDefCount = 3000;
+
 enum class CapabilityFlavor
 {
     Normal,
@@ -74,22 +76,34 @@ static void _removeFromOtherAtomsNotInThis(HashSet<const CapabilityDef*> thisSet
 struct CapabilityDef : public RefObject
 {
 public:
-
-    CapabilityDef(CapabilitySharedContext& context) : sharedContext(context)
+    void operator=(const CapabilityDef& other)
     {
+        this->name = other.name;
+        this->enumValue = other.enumValue;
+        this->expr = other.expr;
+        this->flavor = other.flavor;
+        this->rank = other.rank;
+        this->canonicalRepresentation = other.canonicalRepresentation;
+        this->serializedCanonicalRepresentation = other.serializedCanonicalRepresentation;
+        this->sourceLoc = other.sourceLoc;
+        this->abstractAtomsPresent = other.abstractAtomsPresent;
+        this->sharedContext = other.sharedContext;
     }
 
     String name;
     Index enumValue;
     CapabilityDisjunctionExpr expr;
     CapabilityFlavor flavor;
-    int rank = 0; // optional, 0 is default
+    /// optional, 0 is default rank.
+    int rank = 0;
     List<List<CapabilityDef*>> canonicalRepresentation;
     SerializedArrayView serializedCanonicalRepresentation;
     SourceLoc sourceLoc;
+    /// Stores abstract atoms a CapabilityDef refers to. 
+    /// Shared abstract atoms: abstract atoms shared between every individual set in a canonicalRepresentation, added together.
     HashSet<const CapabilityDef*> abstractAtomsPresent;
 
-    CapabilitySharedContext& sharedContext;
+    CapabilitySharedContext* sharedContext;
 
     CapabilityDef* getAbstractBase() const
     {
@@ -106,16 +120,16 @@ public:
 
     void fillAbstractAtomsPresentFromCannonicalRepresentation()
     {
-        HashSet<const CapabilityDef*> targetAbstractAtomsOfType;
-        HashSet<const CapabilityDef*> stageAbstractAtomsOfType;
+        HashSet<const CapabilityDef*> sharedAbstractAtomsInCanonicalSet_target;
+        HashSet<const CapabilityDef*> sharedAbstractAtomsInCanonicalSet_stage;
         HashSet<const CapabilityDef*> abstractFound;
         List<const CapabilityDef*> atomsToRemove;
         for (auto& canonicalSet : canonicalRepresentation)
         {
             bool alreadySetTarget = false;
             bool alreadySetStage = false;
-            targetAbstractAtomsOfType.clear();
-            stageAbstractAtomsOfType.clear();
+            sharedAbstractAtomsInCanonicalSet_target.clear();
+            sharedAbstractAtomsInCanonicalSet_stage.clear();
 
             // find abstract atoms all atoms in a canonicalSet share.
             for (auto& atom : canonicalSet)
@@ -126,18 +140,18 @@ public:
                 {
                     auto base = otherAbstractAtomsPresent->getAbstractBase();
                     // add all `target` abstract atoms associated with atom in canonicalSet
-                    if (base == sharedContext.ptrOfTarget)
+                    if (base == sharedContext->ptrOfTarget)
                     {
                         foundTarget = true;
                         if (!alreadySetTarget)
-                            targetAbstractAtomsOfType.add(otherAbstractAtomsPresent);
+                            sharedAbstractAtomsInCanonicalSet_target.add(otherAbstractAtomsPresent);
                     }
                     // add all `stage` abstract atoms associated with atom in canonicalSet
-                    else if (base == sharedContext.ptrOfStage)
+                    else if (base == sharedContext->ptrOfStage)
                     {
                         foundStage = true;
                         if(!alreadySetTarget)
-                            stageAbstractAtomsOfType.add(otherAbstractAtomsPresent);
+                            sharedAbstractAtomsInCanonicalSet_stage.add(otherAbstractAtomsPresent);
                     }
                     // all abstract atoms associated with atom
                     abstractFound.add(otherAbstractAtomsPresent);
@@ -147,20 +161,20 @@ public:
                 if (foundTarget)
                 {
                     alreadySetTarget = true;
-                    _removeFromOtherAtomsNotInThis(abstractFound, targetAbstractAtomsOfType, atomsToRemove);
+                    _removeFromOtherAtomsNotInThis(abstractFound, sharedAbstractAtomsInCanonicalSet_target, atomsToRemove);
                 }
                 if (foundStage)
                 {
                     alreadySetStage = true;
-                    _removeFromOtherAtomsNotInThis(abstractFound, stageAbstractAtomsOfType, atomsToRemove);
+                    _removeFromOtherAtomsNotInThis(abstractFound, sharedAbstractAtomsInCanonicalSet_stage, atomsToRemove);
                 }
                 abstractFound.clear();
             }
             
             // add all abstract atoms shared
-            for (auto abstractAtom : targetAbstractAtomsOfType)
+            for (auto abstractAtom : sharedAbstractAtomsInCanonicalSet_target)
                 this->abstractAtomsPresent.add(abstractAtom);
-            for (auto abstractAtom : stageAbstractAtomsOfType)
+            for (auto abstractAtom : sharedAbstractAtomsInCanonicalSet_stage)
                 this->abstractAtomsPresent.add(abstractAtom);
         }
         if (auto base = this->getAbstractBase())
@@ -168,11 +182,112 @@ public:
     }
 };
 
+template<typename T, Index N>
+class PreallocatedStackVector
+{
+    T m_data[N];
+    Index m_currentElementCount = 0;
+    const Index m_maxElementCount = N;
+
+public:
+    template<typename T, Index N>
+    struct Iterator
+    {
+        PreallocatedStackVector<T, N>& m_context;
+        Index m_element;
+        Iterator(PreallocatedStackVector<T, N>& context, Index element) : m_context(context), m_element(element)
+        {
+        }
+
+        Iterator<T, N> begin() const
+        {
+            return m_context->begin();
+        }
+        Iterator<T, N> end() const
+        {
+            return m_context->end()
+        }
+        Iterator<T, N>& operator++()
+        {
+            this->m_element++;
+            return *this;
+        }
+        Iterator<T, N>& operator++(int)
+        {
+            return ++(*this);
+        }
+        Iterator<T, N>& operator--() const
+        {
+            this->m_element--;
+        }
+        bool operator==(const Iterator<T, N>& other) const
+        {
+            return &this->m_context == &other.m_context && this->m_element == other.m_element;
+        }
+        bool operator!=(const Iterator<T, N>& other) const
+        {
+            return !(*this == other);
+        }
+
+        const T& operator*() const
+        {
+            return m_context[m_element];
+        }
+        
+        T& operator*()
+        {
+            return m_context[m_element];
+        }
+    };
+
+    PreallocatedStackVector()
+    {
+    }
+
+
+    T& operator[](Index index)
+    {
+        return m_data[index];
+    }
+
+    Iterator<T, N> begin()
+    {
+        return Iterator<T, N>(*this, 0);
+    }
+
+    Iterator<T, N> end()
+    {
+        return Iterator<T, N>(*this, m_currentElementCount - 1);
+    }
+
+    T& getLast()
+    {
+        return (*this)[m_currentElementCount - 1];
+    }
+
+    Index getCount()
+    {
+        return m_currentElementCount;
+    }
+
+    void add(const T& item)
+    {
+        SLANG_ASSERT(m_currentElementCount != m_maxElementCount);
+
+        (*this)[m_currentElementCount] = item;
+        m_currentElementCount++;
+    }
+};
+
 struct CapabilityDefParser
 {
-    CapabilityDefParser(Lexer* lexer, DiagnosticSink* sink)
+    CapabilityDefParser(
+        Lexer* lexer, 
+        DiagnosticSink* sink, 
+        PreallocatedStackVector<CapabilityDef, kCapabilityDefCount>& defs)
         : m_lexer(lexer)
         , m_sink(sink)
+        , m_defs(defs)
     {
     }
     
@@ -180,7 +295,7 @@ struct CapabilityDefParser
     DiagnosticSink* m_sink;
 
     Dictionary<String, CapabilityDef*> m_mapNameToCapability;
-    List<RefPtr<CapabilityDef>> m_defs;
+    PreallocatedStackVector<CapabilityDef, kCapabilityDefCount>& m_defs;
 
     TokenReader m_tokenReader;
 
@@ -259,20 +374,21 @@ struct CapabilityDefParser
         m_tokenReader = TokenReader(tokens);
         for (;;)
         {
-            RefPtr<CapabilityDef> def = new CapabilityDef(capabilitySharedContext);
-            def->flavor = CapabilityFlavor::Normal;
+            CapabilityDef def = CapabilityDef();
+            def.sharedContext = &capabilitySharedContext;
+            def.flavor = CapabilityFlavor::Normal;
             auto nextToken = m_tokenReader.advanceToken();
             if (nextToken.getContent() == "alias")
             {
-                def->flavor = CapabilityFlavor::Alias;
+                def.flavor = CapabilityFlavor::Alias;
             }
             else if (nextToken.getContent() == "abstract")
             {
-                def->flavor = CapabilityFlavor::Abstract;
+                def.flavor = CapabilityFlavor::Abstract;
             }
             else if (nextToken.getContent() == "def")
             {
-                def->flavor = CapabilityFlavor::Normal;
+                def.flavor = CapabilityFlavor::Normal;
             }
             else if (nextToken.type == TokenType::EndOfFile)
             {
@@ -286,50 +402,50 @@ struct CapabilityDefParser
 
             Token nameToken;
             SLANG_RETURN_ON_FAIL(readToken(TokenType::Identifier, nameToken));
-            def->name = nameToken.getContent();
+            def.name = nameToken.getContent();
 
-            if (def->flavor == CapabilityFlavor::Normal)
+            if (def.flavor == CapabilityFlavor::Normal)
             {
                 if (advanceIf(TokenType::Colon))
                 {
-                    SLANG_RETURN_ON_FAIL(parseExpr(def->expr));
+                    SLANG_RETURN_ON_FAIL(parseExpr(def.expr));
                 }
                 if (advanceIf(TokenType::OpAssign))
                 {
                     Token rankToken;
                     SLANG_RETURN_ON_FAIL(readToken(TokenType::IntegerLiteral, rankToken));
-                    def->rank = stringToInt(rankToken.getContent());
+                    def.rank = stringToInt(rankToken.getContent());
                 }
             }
-            else if (def->flavor == CapabilityFlavor::Alias)
+            else if (def.flavor == CapabilityFlavor::Alias)
             {
                 SLANG_RETURN_ON_FAIL(readToken(TokenType::OpAssign));
-                SLANG_RETURN_ON_FAIL(parseExpr(def->expr));
+                SLANG_RETURN_ON_FAIL(parseExpr(def.expr));
             }
-            else if (def->flavor == CapabilityFlavor::Abstract)
+            else if (def.flavor == CapabilityFlavor::Abstract)
             {
                 if (advanceIf(TokenType::Colon))
                 {
-                    SLANG_RETURN_ON_FAIL(parseExpr(def->expr));
+                    SLANG_RETURN_ON_FAIL(parseExpr(def.expr));
                 }
             }
             SLANG_RETURN_ON_FAIL(readToken(TokenType::Semicolon));
             m_defs.add(def);
-            if (!m_mapNameToCapability.addIfNotExists(def->name, def))
+            if (!m_mapNameToCapability.addIfNotExists(def.name, &m_defs.getLast()))
             {
-                m_sink->diagnose(nextToken.loc, Diagnostics::redefinition, def->name);
+                m_sink->diagnose(nextToken.loc, Diagnostics::redefinition, def.name);
                 return SLANG_FAIL;
             }
 
             //set abstract atom identifiers
             if (!capabilitySharedContext.ptrOfTarget
-                && def->name.equals("target"))
-                capabilitySharedContext.ptrOfTarget = def;
+                && def.name.equals("target"))
+                capabilitySharedContext.ptrOfTarget = &m_defs.getLast();
             else if (!capabilitySharedContext.ptrOfStage
-                && def->name.equals("stage"))
-                capabilitySharedContext.ptrOfStage = def;
+                && def.name.equals("stage"))
+                capabilitySharedContext.ptrOfStage = &m_defs.getLast();
 
-            def->sourceLoc = nameToken.loc;
+            def.sourceLoc = nameToken.loc;
         }
         return SLANG_OK;
     }
@@ -429,13 +545,6 @@ struct CapabilityConjunction
         return false;
     }
 };
-
-String tryGetCapabilityName(const CapabilityDef* def)
-{
-    if(def)
-        return def->name;
-    return "[none]";
-}
 
 struct CapabilityDisjunction
 {
@@ -609,7 +718,7 @@ CapabilityDisjunction getCanonicalRepresentation(CapabilityDef* def)
 CapabilityDisjunction evaluateConjunction(DiagnosticSink* sink, SourceLoc sourceLoc, CapabilitySharedContext& context, const List<CapabilityDef*>& atoms)
 {
     CapabilityDisjunction result;
-    for (auto& def : atoms)
+    for (auto* def : atoms)
     {
         CapabilityDisjunction defCanonical = getCanonicalRepresentation(def);
         result = result.joinWith(sink, sourceLoc, context, defCanonical);
@@ -629,7 +738,7 @@ void calcCanonicalRepresentation(DiagnosticSink* sink, CapabilityDef* def, const
     CapabilityDisjunction exprVal;
     for (auto& c : def->expr.conjunctions)
     {
-        CapabilityDisjunction evalD = evaluateConjunction(sink, c.sourceLoc, def->sharedContext, c.atoms);
+        CapabilityDisjunction evalD = evaluateConjunction(sink, c.sourceLoc, *def->sharedContext, c.atoms);
         List<CapabilityConjunction> toAddAfter;
         for (auto& cc : evalD.conjunctions)
         {
@@ -637,12 +746,12 @@ void calcCanonicalRepresentation(DiagnosticSink* sink, CapabilityDef* def, const
             {
             case AddCapabilityOptions::Union:
             {
-                exprVal.addConjunction(sink, c.sourceLoc, def->sharedContext, cc);
+                exprVal.addConjunction(sink, c.sourceLoc, *def->sharedContext, cc);
                 break;
             }
             case AddCapabilityOptions::InclusiveJoin:
             {
-                exprVal.inclusiveJoinConjunction(def->sharedContext, cc, toAddAfter);
+                exprVal.inclusiveJoinConjunction(*def->sharedContext, cc, toAddAfter);
                 break;
             }
             }
@@ -652,15 +761,15 @@ void calcCanonicalRepresentation(DiagnosticSink* sink, CapabilityDef* def, const
         if (toAddAfter.getCount() > 0)
             exprVal.removeImplied();
     }
-    disjunction = disjunction.joinWith(sink, def->sourceLoc, def->sharedContext, exprVal);
+    disjunction = disjunction.joinWith(sink, def->sourceLoc, *def->sharedContext, exprVal);
     def->canonicalRepresentation = disjunction.canonicalize();
     def->fillAbstractAtomsPresentFromCannonicalRepresentation();
 }
 
-void calcCanonicalRepresentations(DiagnosticSink* sink, const List<RefPtr<CapabilityDef>>& defs, const List<CapabilityDef*>& mapEnumValueToDef)
+void calcCanonicalRepresentations(DiagnosticSink* sink, PreallocatedStackVector<CapabilityDef, kCapabilityDefCount>& defs, const List<CapabilityDef*>& mapEnumValueToDef)
 {
-    for (auto def : defs)
-        calcCanonicalRepresentation(sink, def, mapEnumValueToDef);
+    for (auto& def : defs)
+        calcCanonicalRepresentation(sink, &def, mapEnumValueToDef);
 }
 
 void outputUIntSetAsBufferValues(const String& nameOfBuffer, StringBuilder& resultBuilder, UIntSet& set)
@@ -681,16 +790,16 @@ void outputUIntSetAsBufferValues(const String& nameOfBuffer, StringBuilder& resu
     resultBuilder << "const static CapabilityAtomSet " << nameOfBuffer << " = generate_" << nameOfBuffer << "();\n";
 }
 
-SlangResult generateDefinitions(DiagnosticSink* sink, const List<RefPtr<CapabilityDef>>& defs, StringBuilder& sbHeader, StringBuilder& sbCpp)
+SlangResult generateDefinitions(DiagnosticSink* sink, PreallocatedStackVector<CapabilityDef, kCapabilityDefCount>& defs, StringBuilder& sbHeader, StringBuilder& sbCpp)
 {
    
     sbHeader << "enum class CapabilityAtom\n{\n";
     sbHeader << "    Invalid,\n";
-    for (auto def : defs)
+    for (auto& def : defs)
     {
-        if (def->flavor == CapabilityFlavor::Normal)
+        if (def.flavor == CapabilityFlavor::Normal)
         {
-            sbHeader << "    " << def->name << ",\n";
+            sbHeader << "    " << def.name << ",\n";
         }
     }
     sbHeader << "    Count\n";
@@ -703,38 +812,38 @@ SlangResult generateDefinitions(DiagnosticSink* sink, const List<RefPtr<Capabili
     Index enumValueCounter = 1;
     List<CapabilityDef*> mapEnumValueToDef;
     mapEnumValueToDef.add(nullptr); // For Invalid.
-    for (auto def : defs)
+    for (auto& def : defs)
     {
-        if (def->flavor == CapabilityFlavor::Normal)
+        if (def.flavor == CapabilityFlavor::Normal)
         {
-            def->enumValue = enumValueCounter;
+            def.enumValue = enumValueCounter;
             ++enumValueCounter;
-            mapEnumValueToDef.add(def);
-            sbHeader << "    " << def->name << " = (int)CapabilityAtom::" << def->name << ",\n";
+            mapEnumValueToDef.add(&def);
+            sbHeader << "    " << def.name << " = (int)CapabilityAtom::" << def.name << ",\n";
         }
     }
-    for (auto def : defs)
+    for (auto& def : defs)
     {
-        if (def->flavor == CapabilityFlavor::Abstract)
+        if (def.flavor == CapabilityFlavor::Abstract)
         {
             if (firstAbstractDef == nullptr)
-                firstAbstractDef = def;
-            def->enumValue = enumValueCounter;
+                firstAbstractDef = &def;
+            def.enumValue = enumValueCounter;
             ++enumValueCounter;
-            mapEnumValueToDef.add(def);
-            sbHeader << "    " << def->name << ",\n";
+            mapEnumValueToDef.add(&def);
+            sbHeader << "    " << def.name << ",\n";
         }
     }
-    for (auto def : defs)
+    for (auto& def : defs)
     {
-        if (def->flavor == CapabilityFlavor::Alias)
+        if (def.flavor == CapabilityFlavor::Alias)
         {
             if (firstAliasDef == nullptr)
-                firstAliasDef = def;
-            def->enumValue = enumValueCounter;
+                firstAliasDef = &def;
+            def.enumValue = enumValueCounter;
             ++enumValueCounter;
-            mapEnumValueToDef.add(def);
-            sbHeader << "    " << def->name << ",\n";
+            mapEnumValueToDef.add(&def);
+            sbHeader << "    " << def.name << ",\n";
         }
     }
     sbHeader << "    Count\n";
@@ -748,17 +857,17 @@ SlangResult generateDefinitions(DiagnosticSink* sink, const List<RefPtr<Capabili
     StringBuilder anyTargetUIntSetHash;
     StringBuilder anyStageUIntSetHash;
 
-    for (auto def : defs)
+    for (auto& def : defs)
     {
-        if (def->getAbstractBase() == def->sharedContext.ptrOfTarget)
+        if (def.getAbstractBase() == def.sharedContext->ptrOfTarget)
         {
             targetCount++;
-            anyTargetAtomSet.add(def->enumValue);
+            anyTargetAtomSet.add(def.enumValue);
         }
-        else if (def->getAbstractBase() == def->sharedContext.ptrOfStage)
+        else if (def.getAbstractBase() == def.sharedContext->ptrOfStage)
         {
             stageCount++;
-            anyStageAtomSet.add(def->enumValue);
+            anyStageAtomSet.add(def.enumValue);
         }
     }
     outputUIntSetAsBufferValues("kAnyTargetUIntSetBuffer", anyTargetUIntSetHash, anyTargetAtomSet);
@@ -770,7 +879,6 @@ SlangResult generateDefinitions(DiagnosticSink* sink, const List<RefPtr<Capabili
     sbHeader << "};\n\n";
 
     calcCanonicalRepresentations(sink, defs, mapEnumValueToDef);
-
     List<String> capabiltiyNameArray;
     List<SerializedArrayView> serializedCapabilityArrays;
 
@@ -819,9 +927,9 @@ SlangResult generateDefinitions(DiagnosticSink* sink, const List<RefPtr<Capabili
     for (auto& def : defs)
     {
         List<SerializedArrayView> conjunctions;
-        for (auto& c : def->canonicalRepresentation)
+        for (auto& c : def.canonicalRepresentation)
             conjunctions.add(serializeConjunction(c));
-        def->serializedCanonicalRepresentation = serializeDisjunction(conjunctions);
+        def.serializedCanonicalRepresentation = serializeDisjunction(conjunctions);
     }
     
     sbCpp << anyTargetUIntSetHash;
@@ -851,7 +959,7 @@ SlangResult generateDefinitions(DiagnosticSink* sink, const List<RefPtr<Capabili
     sbCpp << "};\n";
 
     sbCpp << "static const CapabilityAtomInfo kCapabilityNameInfos[int(CapabilityName::Count)] = {\n";
-    for (auto def : mapEnumValueToDef)
+    for (auto& def : mapEnumValueToDef)
     {
         if (!def)
         {
@@ -898,7 +1006,7 @@ SlangResult generateDefinitions(DiagnosticSink* sink, const List<RefPtr<Capabili
 }
 
 
-SlangResult parseDefFile(DiagnosticSink* sink, String inputPath, List<RefPtr<CapabilityDef>>& outDefs, CapabilitySharedContext& capabilitySharedContext)
+SlangResult parseDefFile(DiagnosticSink* sink, String inputPath, PreallocatedStackVector<CapabilityDef, kCapabilityDefCount>& outDefs, CapabilitySharedContext& capabilitySharedContext)
 {
     auto sourceManager = sink->getSourceManager();
 
@@ -913,10 +1021,9 @@ SlangResult parseDefFile(DiagnosticSink* sink, String inputPath, List<RefPtr<Cap
     namePool.setRootNamePool(&rootPool);
     lexer.initialize(sourceView, sink, &namePool, sourceManager->getMemoryArena());
    
-    CapabilityDefParser parser(&lexer, sink);
-
+    CapabilityDefParser parser(&lexer, sink, outDefs);
     SLANG_RETURN_ON_FAIL(parser.parseDefs(capabilitySharedContext));
-    outDefs = _Move(parser.m_defs);
+    
     return SLANG_OK;
 }
 
@@ -969,7 +1076,7 @@ int main(int argc, const char* const* argv)
     SourceManager sourceManager;
     sourceManager.initialize(nullptr, OSFileSystem::getExtSingleton());
     DiagnosticSink sink(&sourceManager, nullptr);
-    List<RefPtr<CapabilityDef>> defs;
+    PreallocatedStackVector<CapabilityDef, kCapabilityDefCount> defs{};
     CapabilitySharedContext capabilitySharedContext;
     if (SLANG_FAILED(parseDefFile(&sink, inPath, defs, capabilitySharedContext)))
     {
@@ -988,9 +1095,9 @@ int main(int argc, const char* const* argv)
     writeIfChanged(outCppPath, sbCpp.produceString());
 
     List<String> opnames;
-    for (auto def : defs)
+    for (auto& def : defs)
     {
-        opnames.add(def->name);
+        opnames.add(def.name);
     }
 
     if (SLANG_FAILED(writePerfectHashLookupCppFile(outLookupPath, opnames, "CapabilityName", "CapabilityName::", "slang-capability.h", &sink)))
