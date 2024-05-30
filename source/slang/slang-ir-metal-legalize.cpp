@@ -384,7 +384,7 @@ namespace Slang
                         AddressSpace::MetalObjectData
                     );
                 auto packedParam = builder.emitParam(annotatedPayloadType);
-                builder.addNameHintDecoration(packedParam, toSlice("_slang_mesh_payload"));
+                builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
                 IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
 
                 // Add the MetalPayload resource info, so we can emit [[payload]]
@@ -396,7 +396,7 @@ namespace Slang
                 // But first we need to create the parameter
                 const auto meshGridPropertiesType = builder.getMetalMeshGridPropertiesType();
                 auto mgp = builder.emitParam(meshGridPropertiesType);
-                builder.addNameHintDecoration(mgp, toSlice("_slang_mgp"));
+                builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
                 }
             });
     }
