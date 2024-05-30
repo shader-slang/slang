@@ -4415,8 +4415,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             }
             else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
-                List<IRInst*> args;
+                if (aggTypeDeclRef.as<InterfaceDecl>())
+                {
+                    return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
+                }
 
+                List<IRInst*> args;
                 if (auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())
                 {
                     if (auto baseStructType = findBaseStructType(getASTBuilder(), structTypeDeclRef))
