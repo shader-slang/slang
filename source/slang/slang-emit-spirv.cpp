@@ -5729,7 +5729,7 @@ struct SPIRVEmitContext
                 nullptr,
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
-                builder.getStringValue(String("uintptr").getUnownedSlice()),
+                builder.getStringValue(String("uint64").getUnownedSlice()),
                 builder.getIntValue(builder.getUIntType(), 64),
                 builder.getIntValue(builder.getUIntType(), 0),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
