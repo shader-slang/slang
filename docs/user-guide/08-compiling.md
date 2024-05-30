@@ -319,8 +319,10 @@ A Slang _global session_ uses the interface `slang::IGlobalSession` and it repre
 A global session is created using the function `slang::createGlobalSession()`:
 
 ```c++
+using namespace slang;
+
 Slang::ComPtr<IGlobalSession> globalSession;
-slang::createGlobalSession(globalSession.writeRef());
+createGlobalSession(globalSession.writeRef());
 ```
 
 When a global session is created, the Slang system will load its internal representation of the _standard library_ that the compiler provides to user code.
@@ -413,7 +415,7 @@ For example:
 
 ```c++
 TargetDesc targetDesc;
-targetDesc.format = SLANG_FORMAT_SPIRV;
+targetDesc.format = SLANG_SPIRV;
 ```
 
 The `profile` field must be set with the ID of one of the profiles supported by the Slang compiler.
@@ -463,7 +465,7 @@ of the `SessionDesc` or `TargetDesc` structures. See the [Compiler Options](#com
 The simplest way to load code into a session is with `ISession::loadModule()`:
 
 ```c++
-Slang::ComPtr<IModule> module = session->loadModule("MyShaders");
+IModule* module = session->loadModule("MyShaders");
 ```
 
 Executing `loadModule("MyShaders")` in host C++ code is similar to using `import MyShaders` in Slang code.
