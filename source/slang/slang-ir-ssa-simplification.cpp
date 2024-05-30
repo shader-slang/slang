@@ -18,7 +18,7 @@ namespace Slang
     IRSimplificationOptions IRSimplificationOptions::getDefault(TargetProgram* targetProgram)
     {
         IRSimplificationOptions result;
-        result.minimalOptimization = targetProgram->getOptionSet().shouldPerformMinimumOptimizations();
+        result.minimalOptimization = targetProgram ? targetProgram->getOptionSet().shouldPerformMinimumOptimizations() : false;
         if (result.minimalOptimization)
             result.cfgOptions = CFGSimplificationOptions::getFast();
         else
@@ -30,7 +30,7 @@ namespace Slang
     IRSimplificationOptions IRSimplificationOptions::getFast(TargetProgram* targetProgram)
     {
         IRSimplificationOptions result;
-        result.minimalOptimization = targetProgram->getOptionSet().shouldPerformMinimumOptimizations();
+        result.minimalOptimization = targetProgram ? targetProgram->getOptionSet().shouldPerformMinimumOptimizations() : false;
         result.cfgOptions = CFGSimplificationOptions::getFast();
         result.peepholeOptions = PeepholeOptimizationOptions();
         return result;

@@ -2153,7 +2153,7 @@ ${{{{
     {
 }}}}
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetTexture))
-    __TextureImpl<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> __getTexture();
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, 0, isShadow, 0, format> __getTexture();
 
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
     SamplerState __getSampler();
