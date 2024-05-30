@@ -1628,6 +1628,10 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             {
                 auto spirvData = (*((Slang::ListBlob*)(*outSpirV))).m_data;
                 const auto validationResult = debugValidateSPIRV(spirvData);
+                if (validationResult)
+                {
+                    return SLANG_FAIL;
+                }
             }
             artifact = _Move(optimizedArtifact);
         }
