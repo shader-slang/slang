@@ -190,11 +190,11 @@ class PreallocatedStackVector
     const Index m_maxElementCount = N;
 
 public:
-    template<typename T, Index N>
     struct Iterator
     {
         PreallocatedStackVector<T, N>& m_context;
         Index m_element;
+
         Iterator(PreallocatedStackVector<T, N>& context, Index element) : m_context(context), m_element(element)
         {
         }
@@ -205,7 +205,7 @@ public:
         }
         Iterator<T, N> end() const
         {
-            return m_context->end()
+            return m_context->end();
         }
         Iterator<T, N>& operator++()
         {
@@ -216,7 +216,7 @@ public:
         {
             return ++(*this);
         }
-        Iterator<T, N>& operator--() const
+        Iterator<T, N>& operator--()
         {
             this->m_element--;
         }
