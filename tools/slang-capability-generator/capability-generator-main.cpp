@@ -190,6 +190,7 @@ class PreallocatedStackVector
     const Index m_maxElementCount = N;
 
 public:
+    template<typename T, Index N>
     struct Iterator
     {
         PreallocatedStackVector<T, N>& m_context;
