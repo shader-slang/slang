@@ -595,7 +595,7 @@ struct CapabilityDisjunction
                     continue;
                 if (conjunctions[i].implies(conjunctions[ii]))
                 {
-                    conjunctions.fastRemoveAt(ii);
+                    conjunctions.removeAt(ii);
                     ii--;
                     if (i > ii)
                         i--;
