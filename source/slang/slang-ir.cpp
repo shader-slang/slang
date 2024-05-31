@@ -8532,6 +8532,18 @@ namespace Slang
         return nullptr;
     }
 
+    bool hasDescendent(IRInst* inst, IRInst* child)
+    {
+        auto parent = child->getParent();
+        while (parent)
+        {
+            if (inst == parent)
+                return true;
+            parent = parent->getParent();
+        }
+        return false;
+    }
+
     IRInst* getGenericReturnVal(IRInst* inst)
     {
         if (auto gen = as<IRGeneric>(inst))
