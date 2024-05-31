@@ -26,18 +26,12 @@ enum class CapabilityFlavor
     Abstract,
     Alias
 };
-enum class AddCapabilityOptions
-{
-    Union = 0,
-    InclusiveJoin = 1 << 0,
-};
 
 struct CapabilityDef;
 
 struct CapabilityConjunctionExpr
 {
     List<CapabilityDef*> atoms;
-    AddCapabilityOptions howToJoinWithNextSetFlag;
     SourceLoc            sourceLoc;
 };
 
@@ -62,11 +56,11 @@ static void _removeFromOtherAtomsNotInThis(HashSet<const CapabilityDef*> thisSet
 {
     atomsToRemove.clear();
     atomsToRemove.reserve(otherSet.getCount());
-    for (auto abstractAtom : otherSet)
+    for (auto keyAtom : otherSet)
     {
-        if (thisSet.contains(abstractAtom))
+        if (thisSet.contains(keyAtom))
             continue;
-        atomsToRemove.add(abstractAtom);
+        atomsToRemove.add(keyAtom);
     }
 
     for (auto atomToRemove : atomsToRemove)
@@ -86,7 +80,7 @@ public:
         this->canonicalRepresentation = other.canonicalRepresentation;
         this->serializedCanonicalRepresentation = other.serializedCanonicalRepresentation;
         this->sourceLoc = other.sourceLoc;
-        this->abstractAtomsPresent = other.abstractAtomsPresent;
+        this->keyAtomsPresent = other.keyAtomsPresent;
         this->sharedContext = other.sharedContext;
     }
 
@@ -99,9 +93,9 @@ public:
     List<List<CapabilityDef*>> canonicalRepresentation;
     SerializedArrayView serializedCanonicalRepresentation;
     SourceLoc sourceLoc;
-    /// Stores abstract atoms a CapabilityDef refers to. 
-    /// Shared abstract atoms: abstract atoms shared between every individual set in a canonicalRepresentation, added together.
-    HashSet<const CapabilityDef*> abstractAtomsPresent;
+    /// Stores key atoms a CapabilityDef refers to. 
+    /// Shared key atoms: key atoms shared between every individual set in a canonicalRepresentation, added together.
+    HashSet<const CapabilityDef*> keyAtomsPresent;
 
     CapabilitySharedContext* sharedContext;
 
@@ -118,67 +112,67 @@ public:
         return expr.conjunctions[0].atoms[0];
     }
 
-    void fillAbstractAtomsPresentFromCannonicalRepresentation()
+    void fillKeyAtomsPresentInCannonicalRepresentation()
     {
-        HashSet<const CapabilityDef*> sharedAbstractAtomsInCanonicalSet_target;
-        HashSet<const CapabilityDef*> sharedAbstractAtomsInCanonicalSet_stage;
-        HashSet<const CapabilityDef*> abstractFound;
+        HashSet<const CapabilityDef*> sharedKeyAtomsInCanonicalSet_target;
+        HashSet<const CapabilityDef*> sharedKeyAtomsInCanonicalSet_stage;
+        HashSet<const CapabilityDef*> keyAtomsFound;
         List<const CapabilityDef*> atomsToRemove;
         for (auto& canonicalSet : canonicalRepresentation)
         {
             bool alreadySetTarget = false;
             bool alreadySetStage = false;
-            sharedAbstractAtomsInCanonicalSet_target.clear();
-            sharedAbstractAtomsInCanonicalSet_stage.clear();
+            sharedKeyAtomsInCanonicalSet_target.clear();
+            sharedKeyAtomsInCanonicalSet_stage.clear();
 
-            // find abstract atoms all atoms in a canonicalSet share.
+            // find key atoms all atoms in a canonical set share.
             for (auto& atom : canonicalSet)
             {
                 bool foundTarget = false;
                 bool foundStage = false;
-                for (auto otherAbstractAtomsPresent : atom->abstractAtomsPresent)
+                for (auto otherkeyAtomsPresent : atom->keyAtomsPresent)
                 {
-                    auto base = otherAbstractAtomsPresent->getAbstractBase();
-                    // add all `target` abstract atoms associated with atom in canonicalSet
+                    auto base = otherkeyAtomsPresent->getAbstractBase();
+                    // add all `target` key atoms associated with atom in canonicalSet
                     if (base == sharedContext->ptrOfTarget)
                     {
                         foundTarget = true;
                         if (!alreadySetTarget)
-                            sharedAbstractAtomsInCanonicalSet_target.add(otherAbstractAtomsPresent);
+                            sharedKeyAtomsInCanonicalSet_target.add(otherkeyAtomsPresent);
                     }
-                    // add all `stage` abstract atoms associated with atom in canonicalSet
+                    // add all `stage` key atoms associated with atom in canonicalSet
                     else if (base == sharedContext->ptrOfStage)
                     {
                         foundStage = true;
                         if(!alreadySetTarget)
-                            sharedAbstractAtomsInCanonicalSet_stage.add(otherAbstractAtomsPresent);
+                            sharedKeyAtomsInCanonicalSet_stage.add(otherkeyAtomsPresent);
                     }
-                    // all abstract atoms associated with atom
-                    abstractFound.add(otherAbstractAtomsPresent);
+                    // all key atoms associated with atom
+                    keyAtomsFound.add(otherkeyAtomsPresent);
                 }
 
-                // remove all abstract atoms which are not shared 
+                // remove all not shared key atoms 
                 if (foundTarget)
                 {
                     alreadySetTarget = true;
-                    _removeFromOtherAtomsNotInThis(abstractFound, sharedAbstractAtomsInCanonicalSet_target, atomsToRemove);
+                    _removeFromOtherAtomsNotInThis(keyAtomsFound, sharedKeyAtomsInCanonicalSet_target, atomsToRemove);
                 }
                 if (foundStage)
                 {
                     alreadySetStage = true;
-                    _removeFromOtherAtomsNotInThis(abstractFound, sharedAbstractAtomsInCanonicalSet_stage, atomsToRemove);
+                    _removeFromOtherAtomsNotInThis(keyAtomsFound, sharedKeyAtomsInCanonicalSet_stage, atomsToRemove);
                 }
-                abstractFound.clear();
+                keyAtomsFound.clear();
             }
             
-            // add all abstract atoms shared
-            for (auto abstractAtom : sharedAbstractAtomsInCanonicalSet_target)
-                this->abstractAtomsPresent.add(abstractAtom);
-            for (auto abstractAtom : sharedAbstractAtomsInCanonicalSet_stage)
-                this->abstractAtomsPresent.add(abstractAtom);
+            // add all shared key atoms
+            for (auto keyAtom : sharedKeyAtomsInCanonicalSet_target)
+                this->keyAtomsPresent.add(keyAtom);
+            for (auto keyAtom : sharedKeyAtomsInCanonicalSet_stage)
+                this->keyAtomsPresent.add(keyAtom);
         }
         if (auto base = this->getAbstractBase())
-            abstractAtomsPresent.add(this);
+            keyAtomsPresent.add(this);
     }
 };
 
@@ -351,20 +345,15 @@ struct CapabilityDefParser
 
     SlangResult parseExpr(CapabilityDisjunctionExpr& expr)
     {
-        AddCapabilityOptions addOption = AddCapabilityOptions::Union;
         for (;;)
         {
             CapabilityConjunctionExpr conjunction;
             conjunction.sourceLoc = this->m_tokenReader.m_cursor->getLoc();
             SLANG_RETURN_ON_FAIL(parseConjunction(conjunction));
-            conjunction.howToJoinWithNextSetFlag = addOption;
 
             expr.conjunctions.add(conjunction);
-            addOption = AddCapabilityOptions::Union;
             if (!advanceIf(TokenType::OpBitOr))
                 break;
-            if (advanceIf(TokenType::OpBitAnd))
-                addOption = AddCapabilityOptions::InclusiveJoin;
         }
         return SLANG_OK;
     }
@@ -487,7 +476,7 @@ struct CapabilityConjunction
     {
         for (auto* atom : this->atoms)
         {
-            for (auto present : atom->abstractAtomsPresent)
+            for (auto present : atom->keyAtomsPresent)
             {
                 auto base = present->getAbstractBase();
                 if (base != defToFilterFor)
@@ -587,7 +576,7 @@ struct CapabilityDisjunction
                 {
                     if (sink)
                     {
-                        sink->diagnose(sourceLoc, Diagnostics::unionWithSameAbstractAtomButNotSubset, conjunctions[i].toString(), c.toString());
+                        sink->diagnose(sourceLoc, Diagnostics::unionWithSameKeyAtomButNotSubset, conjunctions[i].toString(), c.toString());
                         sink = nullptr;
                     }
                 }
@@ -743,19 +732,7 @@ void calcCanonicalRepresentation(DiagnosticSink* sink, CapabilityDef* def, const
         List<CapabilityConjunction> toAddAfter;
         for (auto& cc : evalD.conjunctions)
         {
-            switch (c.howToJoinWithNextSetFlag)
-            {
-            case AddCapabilityOptions::Union:
-            {
-                exprVal.addConjunction(sink, c.sourceLoc, *def->sharedContext, cc);
-                break;
-            }
-            case AddCapabilityOptions::InclusiveJoin:
-            {
-                exprVal.inclusiveJoinConjunction(*def->sharedContext, cc, toAddAfter);
-                break;
-            }
-            }
+            exprVal.inclusiveJoinConjunction(*def->sharedContext, cc, toAddAfter);
         }
         for (auto& i : toAddAfter)
             exprVal.conjunctions.add(i);
@@ -764,7 +741,7 @@ void calcCanonicalRepresentation(DiagnosticSink* sink, CapabilityDef* def, const
     }
     disjunction = disjunction.joinWith(sink, def->sourceLoc, *def->sharedContext, exprVal);
     def->canonicalRepresentation = disjunction.canonicalize();
-    def->fillAbstractAtomsPresentFromCannonicalRepresentation();
+    def->fillKeyAtomsPresentInCannonicalRepresentation();
 }
 
 void calcCanonicalRepresentations(DiagnosticSink* sink, PreallocatedStackVector<CapabilityDef, kCapabilityDefCount>& defs, const List<CapabilityDef*>& mapEnumValueToDef)

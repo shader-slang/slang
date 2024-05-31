@@ -25,11 +25,11 @@ enum class CapabilityNameFlavor : int32_t
     Concrete,
 
     // An abstract capability represents a class of feature
-    // where multiple different implementations might be possible.
-    // For example, "ray tracing" might be an abstract feature
-    // that a function can require, but a specific target will
-    // only be able to provide that abstract feature via some
-    // specific concrete feature (e.g., `GL_EXT_ray_tracing`).
+    // where multiple distinct implementations might be possible.
+    // 'raytracing' may be allowed with a 'raygen' "stage", but 
+    // not a 'vertex' "stage"
+    // For more information (and a clearer description of the rules), 
+    // read `slang-capabilities.capdef`
     Abstract,
 
     // An alias capability atom is one that is exactly equivalent

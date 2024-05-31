@@ -54,6 +54,6 @@ DIAGNOSTIC(20001, Error, unexpectedEOF, " Unexpected end of file.")
 DIAGNOSTIC(20002, Error, syntaxError, "syntax error.")
 DIAGNOSTIC(20003, Error, undefinedIdentifier, "undefined identifier \"$0\".")
 DIAGNOSTIC(20004, Error, redefinition, "capability redefinition: '$0'.")
-DIAGNOSTIC(20005, Error, unionWithSameAbstractAtomButNotSubset, "unioning ('|') capability sets which have incompatible atoms but compatible abstract atoms, this: '$0', other: '$1'")
-DIAGNOSTIC(20006, Error, invalidJoinInGenerator, "joining ('+') capability sets which have incompatible abstract atoms")
+DIAGNOSTIC(20005, Error, unionWithSameKeyAtomButNotSubset, "unioning ('|') capability sets which have incompatible atoms but compatible 'key atoms', this: '$0', other: '$1'")
+DIAGNOSTIC(20006, Error, invalidJoinInGenerator, "joining ('+') capability sets which have incompatible 'key atoms'")
 #undef DIAGNOSTIC
