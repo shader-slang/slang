@@ -24,6 +24,7 @@
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -9018,6 +9019,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     ASTBuilder* astBuilder,
     TranslationUnitRequest* translationUnit)
 {
+    SLANG_PROFILE;
+
     auto session = translationUnit->getSession();
     auto compileRequest = translationUnit->compileRequest;
 

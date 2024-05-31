@@ -15,6 +15,7 @@
 #include "slang-ir-witness-table-wrapper.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
+#include "../core/slang-performance-profiler.h"
 
 
 namespace Slang
@@ -183,6 +184,8 @@ namespace Slang
         IRModule*               module,
         DiagnosticSink*         sink)
     {
+        SLANG_PROFILE;
+
         SharedGenericsLoweringContext sharedContext;
         sharedContext.targetReq = targetReq;
         sharedContext.module = module;

@@ -3,6 +3,7 @@
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-pairs.h"
 #include "slang-ir-validate.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -870,6 +871,7 @@ bool processAutodiffCalls(
     DiagnosticSink*                     sink,
     IRAutodiffPassOptions const&)
 {
+    SLANG_PROFILE;
     bool modified = false;
 
     // Create shared context for all auto-diff related passes

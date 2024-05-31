@@ -17,6 +17,7 @@
 #include "slang-ir-insts.h"
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -3447,6 +3448,7 @@ void legalizeResourceTypes(
     IRModule*       module,
     DiagnosticSink* sink)
 {
+    SLANG_PROFILE;
     SLANG_UNUSED(sink);
 
     IRResourceTypeLegalizationContext context(module);
@@ -3457,6 +3459,7 @@ void legalizeExistentialTypeLayout(
     IRModule*       module,
     DiagnosticSink* sink)
 {
+    SLANG_PROFILE;
     SLANG_UNUSED(module);
     SLANG_UNUSED(sink);
 

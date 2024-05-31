@@ -9,6 +9,7 @@
 #include "slang-ir-hoist-constants.h"
 #include "slang-ir-deduplicate-generic-children.h"
 #include "slang-ir-remove-unused-generic-param.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -16,6 +17,8 @@ namespace Slang
     // until no more changes are possible.
     void simplifyIR(IRModule* module)
     {
+        SLANG_PROFILE;
+
         bool changed = true;
         const int kMaxIterations = 8;
         int iterationCounter = 0;

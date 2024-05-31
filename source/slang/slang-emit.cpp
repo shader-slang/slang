@@ -2,6 +2,7 @@
 
 #include "../core/slang-writer.h"
 #include "../core/slang-type-text-util.h"
+#include "../core/slang-performance-profiler.h"
 
 #include "../compiler-core/slang-name.h"
 
@@ -186,6 +187,7 @@ Result linkAndOptimizeIR(
     LinkingAndOptimizationOptions const&    options,
     LinkedIR&                               outLinkedIR)
 {
+    SLANG_PROFILE;
     auto session = codeGenContext->getSession();
     auto sink = codeGenContext->getSink();
     auto target = codeGenContext->getTargetFormat();
@@ -909,6 +911,8 @@ Result linkAndOptimizeIR(
 
 SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact)
 {
+    SLANG_PROFILE;
+
     outArtifact.setNull();
 
     auto session = getSession();
