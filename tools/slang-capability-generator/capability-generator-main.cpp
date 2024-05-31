@@ -179,10 +179,10 @@ struct CapabilityDefParser
     CapabilityDefParser(
         Lexer* lexer, 
         DiagnosticSink* sink,
-        List<CapabilityDef*>& defs)
+        CapabilitySharedContext& sharedContext)
         : m_lexer(lexer)
         , m_sink(sink)
-        , m_defs(defs)
+        , m_sharedContext(sharedContext)
     {
     }
     
@@ -190,7 +190,8 @@ struct CapabilityDefParser
     DiagnosticSink* m_sink;
 
     Dictionary<String, CapabilityDef*> m_mapNameToCapability;
-    List<CapabilityDef*>& m_defs;
+    List<RefPtr<CapabilityDef>> m_defs;
+    CapabilitySharedContext& m_sharedContext;
 
     TokenReader m_tokenReader;
 
@@ -250,7 +251,6 @@ struct CapabilityDefParser
             CapabilityConjunctionExpr conjunction;
             conjunction.sourceLoc = this->m_tokenReader.m_cursor->getLoc();
             SLANG_RETURN_ON_FAIL(parseConjunction(conjunction));
-
             expr.conjunctions.add(conjunction);
             if (!advanceIf(TokenType::OpBitOr))
                 break;
@@ -258,14 +258,14 @@ struct CapabilityDefParser
         return SLANG_OK;
     }
 
-    SlangResult parseDefs(CapabilitySharedContext& capabilitySharedContext)
+    SlangResult parseDefs()
     {
         auto tokens = m_lexer->lexAllSemanticTokens();
         m_tokenReader = TokenReader(tokens);
         for (;;)
         {
-            CapabilityDef* def = new CapabilityDef();
-            def->sharedContext = &capabilitySharedContext;
+            RefPtr<CapabilityDef> def = new CapabilityDef();
+            def->sharedContext = &m_sharedContext;
             def->flavor = CapabilityFlavor::Normal;
             auto nextToken = m_tokenReader.advanceToken();
             if (nextToken.getContent() == "alias")
@@ -328,12 +328,12 @@ struct CapabilityDefParser
             }
 
             //set abstract atom identifiers
-            if (!capabilitySharedContext.ptrOfTarget
+            if (!m_sharedContext.ptrOfTarget
                 && def->name.equals("target"))
-                capabilitySharedContext.ptrOfTarget = m_defs.getLast();
-            else if (!capabilitySharedContext.ptrOfStage
+                m_sharedContext.ptrOfTarget = m_defs.getLast();
+            else if (!m_sharedContext.ptrOfStage
                 && def->name.equals("stage"))
-                capabilitySharedContext.ptrOfStage = m_defs.getLast();
+                m_sharedContext.ptrOfStage = m_defs.getLast();
 
             def->sourceLoc = nameToken.loc;
         }
@@ -644,9 +644,9 @@ void calcCanonicalRepresentation(DiagnosticSink* sink, CapabilityDef* def, const
     def->fillKeyAtomsPresentInCannonicalRepresentation();
 }
 
-void calcCanonicalRepresentations(DiagnosticSink* sink, List<CapabilityDef*>& defs, const List<CapabilityDef*>& mapEnumValueToDef)
+void calcCanonicalRepresentations(DiagnosticSink* sink, List<RefPtr<CapabilityDef>>& defs, const List<CapabilityDef*>& mapEnumValueToDef)
 {
-    for (auto* def : defs)
+    for (auto def : defs)
         calcCanonicalRepresentation(sink, def, mapEnumValueToDef);
 }
 
@@ -668,12 +668,12 @@ void outputUIntSetAsBufferValues(const String& nameOfBuffer, StringBuilder& resu
     resultBuilder << "const static CapabilityAtomSet " << nameOfBuffer << " = generate_" << nameOfBuffer << "();\n";
 }
 
-SlangResult generateDefinitions(DiagnosticSink* sink, List<CapabilityDef*>& defs, StringBuilder& sbHeader, StringBuilder& sbCpp)
+SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>>& defs, StringBuilder& sbHeader, StringBuilder& sbCpp)
 {
    
     sbHeader << "enum class CapabilityAtom\n{\n";
     sbHeader << "    Invalid,\n";
-    for (auto* def : defs)
+    for (auto def : defs)
     {
         if (def->flavor == CapabilityFlavor::Normal)
         {
@@ -690,7 +690,7 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<CapabilityDef*>& defs
     Index enumValueCounter = 1;
     List<CapabilityDef*> mapEnumValueToDef;
     mapEnumValueToDef.add(nullptr); // For Invalid.
-    for (auto* def : defs)
+    for (auto def : defs)
     {
         if (def->flavor == CapabilityFlavor::Normal)
         {
@@ -700,7 +700,7 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<CapabilityDef*>& defs
             sbHeader << "    " << def->name << " = (int)CapabilityAtom::" << def->name << ",\n";
         }
     }
-    for (auto* def : defs)
+    for (auto def : defs)
     {
         if (def->flavor == CapabilityFlavor::Abstract)
         {
@@ -712,7 +712,7 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<CapabilityDef*>& defs
             sbHeader << "    " << def->name << ",\n";
         }
     }
-    for (auto* def : defs)
+    for (auto def : defs)
     {
         if (def->flavor == CapabilityFlavor::Alias)
         {
@@ -735,7 +735,7 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<CapabilityDef*>& defs
     StringBuilder anyTargetUIntSetHash;
     StringBuilder anyStageUIntSetHash;
 
-    for (auto* def : defs)
+    for (auto def : defs)
     {
         if (def->getAbstractBase() == def->sharedContext->ptrOfTarget)
         {
@@ -802,7 +802,7 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<CapabilityDef*>& defs
             result.count = conjunctions.getCount();
             return result;
         };
-    for (auto* def : defs)
+    for (auto def : defs)
     {
         List<SerializedArrayView> conjunctions;
         for (auto& c : def->canonicalRepresentation)
@@ -884,7 +884,7 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<CapabilityDef*>& defs
 }
 
 
-SlangResult parseDefFile(DiagnosticSink* sink, String inputPath, List<CapabilityDef*>& outDefs, CapabilitySharedContext& capabilitySharedContext)
+SlangResult parseDefFile(DiagnosticSink* sink, String inputPath, List<RefPtr<CapabilityDef>>& outDefs, CapabilitySharedContext& capabilitySharedContext)
 {
     auto sourceManager = sink->getSourceManager();
 
@@ -899,9 +899,10 @@ SlangResult parseDefFile(DiagnosticSink* sink, String inputPath, List<Capability
     namePool.setRootNamePool(&rootPool);
     lexer.initialize(sourceView, sink, &namePool, sourceManager->getMemoryArena());
    
-    CapabilityDefParser parser(&lexer, sink, outDefs);
-    SLANG_RETURN_ON_FAIL(parser.parseDefs(capabilitySharedContext));
-    
+    CapabilityDefParser parser(&lexer, sink, capabilitySharedContext);
+
+    SLANG_RETURN_ON_FAIL(parser.parseDefs());
+    outDefs = _Move(parser.m_defs);
     return SLANG_OK;
 }
 
@@ -954,7 +955,7 @@ int main(int argc, const char* const* argv)
     SourceManager sourceManager;
     sourceManager.initialize(nullptr, OSFileSystem::getExtSingleton());
     DiagnosticSink sink(&sourceManager, nullptr);
-    List<CapabilityDef*> defs{};
+    List<RefPtr<CapabilityDef>> defs;
     CapabilitySharedContext capabilitySharedContext;
     if (SLANG_FAILED(parseDefFile(&sink, inPath, defs, capabilitySharedContext)))
     {
@@ -973,7 +974,7 @@ int main(int argc, const char* const* argv)
     writeIfChanged(outCppPath, sbCpp.produceString());
 
     List<String> opnames;
-    for (auto* def : defs)
+    for (auto def : defs)
     {
         opnames.add(def->name);
     }
