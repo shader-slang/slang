@@ -493,13 +493,20 @@ struct CapabilityDisjunction
             {
                 if (ii == i)
                     continue;
-                if (conjunctions[i].implies(conjunctions[ii]))
+
+                if (!conjunctions[i].implies(conjunctions[ii]))
+                    continue;
+
+                if(i < ii)
+                {
+                    conjunctions.fastRemoveAt(ii);    
+                }
+                else
                 {
                     conjunctions.removeAt(ii);
-                    ii--;
-                    if (i > ii)
-                        i--;
+                    i--;
                 }
+                ii--;
             }
         }
     }
