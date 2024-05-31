@@ -1,11 +1,6 @@
-// TEST:SIMPLE(filecheck=CHECK): -target metal
-// TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
-// TEST:REFLECTION(filecheck=REFLECT):-target metal -entry main_kernel -stage task
-
-// CHECK:      0
-// CHECK-NEXT: 1
-// CHECK-NEXT: 8
-// CHECK-NEXT: 27
+//TEST:SIMPLE(filecheck=CHECK): -target metal
+//TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
+//TEST:REFLECTION(filecheck=REFLECT):-target metal -entry taskMain -stage task
 
 // TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 
@@ -27,9 +22,13 @@ struct MeshPayload
     int exponent;
 };
 
+// CHECK: MeshPayload_0 object_data& _slang_mesh_payload [[payload]]
+// CHECK: mesh_grid_properties  _slang_mgp
 [numthreads(1,1,1)]
 void taskMain()
 {
+    // CHECK: _slang_mgp.set_threadgroups_per_grid
+    // CHECK: _slang_mesh_payload
     MeshPayload p;
     p.exponent = 3;
     DispatchMesh(1, 1, 1, p);
