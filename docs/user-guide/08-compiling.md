@@ -31,7 +31,7 @@ Note that the `#include`d files do not become additional source units; they are 
 Source units (such as files) are grouped into _translation units_, and each translation unit will produce a single _module_ when compiled.
 
 While the source units are all preprocessed and parsed independently, semantic checking is applied to a translation unit as a whole.
-One source file in a translation unit may freely refer to declarations in another translation unit without any need for forward declarations. For example:
+One source file in a translation unit may freely refer to declarations in another source file from the same translation unit without any need for forward declarations. For example:
 
 ```hlsl
 // A.slang
@@ -63,7 +63,7 @@ Slang supports two models for identifying entry points when compiling.
 
 ### Entry Point Attributes
 
-By default, the compiler wll scan a translation unit for function declarations marked with the `[shader(...)]` attribute; each such function will be identified as an entry point in the module.
+By default, the compiler will scan a translation unit for function declarations marked with the `[shader(...)]` attribute; each such function will be identified as an entry point in the module.
 Developers are encouraged to use this model because it directly documents intention and makes source code less dependent on external compiler configuration options.
 
 ### Explicit Entry Point Options

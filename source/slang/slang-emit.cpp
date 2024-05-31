@@ -598,13 +598,12 @@ Result linkAndOptimizeIR(
         {
             applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
         }
-        eliminateDeadCode(irModule, deadCodeEliminationOptions);
-
         validateIRModuleIfEnabled(codeGenContext, irModule);
     
         // Inline calls to any functions marked with [__unsafeInlineEarly] again,
         // since we may be missing out cases prevented by the functions that we just specialzied.
         performMandatoryEarlyInlining(irModule);
+        eliminateDeadCode(irModule, deadCodeEliminationOptions);
 
         // Unroll loops.
         if (!fastIRSimplificationOptions.minimalOptimization)
@@ -691,11 +690,7 @@ Result linkAndOptimizeIR(
     // do unnecessary work to lower them.
     unpinWitnessTables(irModule);
     
-    if (fastIRSimplificationOptions.minimalOptimization)
-    {
-        eliminateDeadCode(irModule, deadCodeEliminationOptions);
-    }
-    else
+    if (!fastIRSimplificationOptions.minimalOptimization)
     {
         simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
     }
