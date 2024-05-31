@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
 //TEST:REFLECTION(filecheck=REFLECT):-target metal -entry taskMain -stage task
 
-// TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 
 uniform RWStructuredBuffer<float> outputBuffer;
 
