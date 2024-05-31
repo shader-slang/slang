@@ -90,7 +90,7 @@ public:
         /// Add a value
     inline void add(UInt val);
     inline void add(const UIntSet& val);
-    inline void add(const List<UInt>& other);
+    inline void addRange(const List<UInt>& other);
 
     inline void addRawElement(Element val, Index bitOffset);
 
@@ -302,7 +302,7 @@ inline void UIntSet::add(const UIntSet& other)
         m_buffer[i] |= other.m_buffer[i];
 }
 
-inline void UIntSet::add(const List<UInt>& other)
+inline void UIntSet::addRange(const List<UInt>& other)
 {
     for (auto i : other)
         add(i);
