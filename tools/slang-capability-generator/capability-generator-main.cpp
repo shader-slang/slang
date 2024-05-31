@@ -589,7 +589,7 @@ struct CapabilityDisjunction
     {
         for (Index i = 0; i < conjunctions.getCount(); i++)
         {
-            for (Index ii = 1; ii < conjunctions.getCount(); ii++)
+            for (Index ii = 0; ii < conjunctions.getCount(); ii++)
             {
                 if (ii == i)
                     continue;
