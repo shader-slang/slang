@@ -56,26 +56,27 @@ namespace Slang
 
             for (auto func : profilerImpl->data)
             {
-                auto milliseconds = std::chrono::duration_cast< std::chrono::milliseconds >(func.value.duration);
-                long ms = milliseconds.count();
+                std::chrono::nanoseconds ns = func.value.duration;
 
                 auto entry = m_compileTimeProfiler.find(func.key);
                 if (entry == m_compileTimeProfiler.end())
                 {
-                    m_compileTimeProfiler.emplace(std::make_pair(func.key, 0l));
+                    m_compileTimeProfiler.emplace(std::make_pair(func.key, FuncProfileInfo()));
                     entry = m_compileTimeProfiler.find(func.key);
                 }
-                entry->second += ms;
+                entry->second.invocationCount += func.value.invocationCount;
+                entry->second.duration += ns;
             }
 
             for (auto entry : m_compileTimeProfiler)
             {
-                out << entry.first.c_str() << ": \t" << entry.second << " ms\n";
+                auto milliseconds = std::chrono::duration_cast< std::chrono::milliseconds >(entry.second.duration);
+                out << entry.first.c_str() << ": \t" << entry.second.invocationCount << "\t" << milliseconds.count() << " ms\n";
             }
        }
     private:
         // Those are supposed to accumulate the time spent in each thread
-        std::unordered_map<std::string, long> m_compileTimeProfiler;
+        std::unordered_map<std::string, FuncProfileInfo> m_compileTimeProfiler;
         std::mutex m_mutex;
     };
 
