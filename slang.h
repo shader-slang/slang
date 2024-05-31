@@ -1773,6 +1773,11 @@ extern "C"
     SLANG_API SlangResult spEnableReproCapture(
         SlangCompileRequest* request);
 
+    /*! @see slang::ICompileRequest::getCompileTimeProfile */
+    SLANG_API SlangResult spGetCompileTimeProfile(
+        SlangCompileRequest* request,
+        ISlangBlob** compileTimeProfile);
+
 
     /** Extract contents of a repro.
 
@@ -4043,6 +4048,8 @@ namespace slang
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) = 0;
 
         virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCompileTimeProfile(ISlangBlob** compileTimeProfile) = 0;
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()

@@ -1,6 +1,7 @@
 #include "slang-performance-profiler.h"
 #include "slang-dictionary.h"
-#include <atomic>
+#include <unordered_map>
+#include <mutex>
 
 namespace Slang
 {
@@ -49,48 +50,34 @@ namespace Slang
     class SerialPerformaceProfilerImpl : public SerialPerformaceProfiler
     {
     public:
-       virtual void accumulateResults(StringBuilder& out, PerformanceProfiler* profile)
+       void accumulateResults(StringBuilder& out, PerformanceProfiler* profile)
        {
-           PerformanceProfilerImpl* profilerImpl = static_cast<PerformanceProfilerImpl*>(profile);
+            PerformanceProfilerImpl* profilerImpl = static_cast<PerformanceProfilerImpl*>(profile);
+            const std::lock_guard<std::mutex> scopeLock(m_mutex);
+
             for (auto func : profilerImpl->data)
             {
                 auto milliseconds = std::chrono::duration_cast< std::chrono::milliseconds >(func.Value.duration);
                 long ms = milliseconds.count();
 
-                if (!strcmp(func.Key, "checkAllTranslationUnits"))
+                auto entry = m_compileTimeProfiler.find(func.Key);
+                if (entry == m_compileTimeProfiler.end())
                 {
-                    m_semanticsCheckTime += ms;
+                    m_compileTimeProfiler.emplace(std::make_pair(func.Key, 0l));
+                    entry = m_compileTimeProfiler.find(func.Key);
                 }
-                else if (!strcmp(func.Key, "generateIRForTranslationUnit"))
-                {
-                    m_IRGenTime += ms;
-                }
-                else if (!strcmp(func.Key, "performMandatoryEarlyInlining"))
-                {
-                    m_earlyInlneTime += ms;
-                }
-                else if (!strcmp(func.Key, "linkAndOptimizeIR"))
-                {
-                    m_linkIRTime += ms;
-                }
-                else if (!strcmp(func.Key, "linkIR"))
-                {
-                    m_optimizeIRTime += ms;
-                }
+                entry->second += ms;
             }
-            out << "Semantics Check Time: " << SerialPerformaceProfilerImpl::m_semanticsCheckTime.load() << "ms\n";
-            out << "IR Generation Time: " << SerialPerformaceProfilerImpl::m_IRGenTime.load() << "ms\n";
-            out << "Early Inline Time: " << SerialPerformaceProfilerImpl::m_earlyInlneTime.load() << "ms\n";
-            out << "Link IR Time: " << SerialPerformaceProfilerImpl::m_linkIRTime.load() << "ms\n";
-            out << "Optimize IR Time: " << SerialPerformaceProfilerImpl::m_optimizeIRTime.load() << "ms\n";
+
+            for (auto entry : m_compileTimeProfiler)
+            {
+                out << entry.first.c_str() << ": \t" << entry.second << " ms\n";
+            }
        }
     private:
         // Those are supposed to accumulate the time spent in each thread
-        std::atomic<long> m_semanticsCheckTime;
-        std::atomic<long> m_IRGenTime;
-        std::atomic<long> m_earlyInlneTime;
-        std::atomic<long> m_linkIRTime;
-        std::atomic<long> m_optimizeIRTime;
+        std::unordered_map<std::string, long> m_compileTimeProfiler;
+        std::mutex m_mutex;
     };
 
     // SerialPerformaceProfilerImpl profiler is intent to be shared by all threads, it's thread safe object

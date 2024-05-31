@@ -6,6 +6,7 @@
 #include "../core/slang-archive-file-system.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
+#include "../core/slang-performance-profiler.h"
 
 // Artifact
 #include "../compiler-core/slang-artifact-impl.h"
@@ -2317,6 +2318,8 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
 
 void FrontEndCompileRequest::checkAllTranslationUnits()
 {
+    SLANG_PROFILE;
+
     LoadedModuleDictionary loadedModules;
     if (additionalLoadedModules)
         loadedModules = *additionalLoadedModules;
@@ -5036,8 +5039,6 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
         getSession()->getCompilerElapsedTime(&totalEndTime, &downstreamEndTime);
         double downstreamTime = downstreamEndTime - downstreamStartTime;
         String downstreamTimeStr = String(downstreamTime, "%.2f");
-        printf("total: start: %.2f, end: %.2f\n", totalStartTime, totalEndTime);
-        printf("downstream: start: %.2f, end: %.2f\n", downstreamStartTime, downstreamEndTime);
         getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
 
     }
@@ -5135,6 +5136,21 @@ void const* EndToEndCompileRequest::getEntryPointCode(int entryPointIndex, size_
     }
 
     return (void*)blob->getBufferPointer();
+}
+
+SlangResult EndToEndCompileRequest::getCompileTimeProfile(ISlangBlob** compileTimeProfile)
+{
+    if (compileTimeProfile == nullptr)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    StringBuilder outString;
+    SerialPerformaceProfiler::getProfiler()->accumulateResults(outString, PerformanceProfiler::getProfiler());
+
+    ComPtr<ISlangBlob> resultBlob = StringUtil::createStringBlob(outString.ProduceString());
+    *compileTimeProfile = resultBlob.detach();
+    return SLANG_OK;
 }
 
 static SlangResult _getEntryPointResult(

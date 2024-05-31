@@ -765,6 +765,14 @@ SLANG_API SlangResult spCompileRequest_getEntryPoint(
     return request->getEntryPoint(entryPointIndex, outEntryPoint);
 }
 
+SLANG_API SlangResult spGetCompileTimeProfile(
+    slang::ICompileRequest* request,
+    ISlangBlob** compileTimeProfile)
+{
+    SLANG_ASSERT(request);
+    return request->getCompileTimeProfile(compileTimeProfile);
+}
+
 // Get the output code associated with a specific translation unit
 SLANG_API char const* spGetTranslationUnitSource(
     slang::ICompileRequest*    /*request*/,

@@ -43,8 +43,7 @@ struct PerformanceProfilerFuncRAIIContext
     }
 };
 
-// #define SLANG_PROFILE PerformanceProfilerFuncRAIIContext _profileContext(__func__)
-#define SLANG_PROFILE (void(0))
+#define SLANG_PROFILE PerformanceProfilerFuncRAIIContext _profileContext(__func__)
 }
 
 #endif
