@@ -106,6 +106,13 @@ SpvInst* emitOpDebugTypeMatrix(SpvInstParent* parent, IRInst* inst, const T& idR
 }
 
 template<typename T>
+SpvInst* emitOpDebugTypePointer(SpvInstParent* parent, IRInst* inst, const T& idResultType, SpvInst* set, SpvInst* baseType, IRInst* storageClass, IRInst* flags)
+{
+    static_assert(isSingular<T>);
+    return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(3), baseType, storageClass, flags);
+}
+
+template<typename T>
 SpvInst* emitOpDebugScope(SpvInstParent* parent, IRInst* inst, const T& idResultType, SpvInst* set, SpvInst* scope)
 {
     static_assert(isSingular<T>);
