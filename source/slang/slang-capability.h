@@ -302,6 +302,7 @@ bool isDirectChildOfAbstractAtom(CapabilityAtom name);
 
     /// Return true if `name` represents an atom for a target version, e.g. spirv_1_5.
 bool isTargetVersionAtom(CapabilityName name);
+bool isSpirvExtensionAtom(CapabilityName name);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);

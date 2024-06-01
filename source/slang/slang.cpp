@@ -1738,6 +1738,19 @@ CapabilitySet TargetRequest::getTargetCaps()
             isGLSLTarget = true;
             atoms.add(CapabilityName::glsl);
         }
+        // If the user specified any SPIR-V extensions in the profile,
+        // pull them in.
+        for (auto profileCapAtomSet : profileCaps.getAtomSets())
+        {
+            for (auto atom : profileCapAtomSet)
+            {
+                if (isSpirvExtensionAtom((CapabilityName)atom))
+                {
+                    atoms.add((CapabilityName)atom);
+                    hasTargetVersionAtom = true;
+                }
+            }
+        }
         break;
 
     case CodeGenTarget::HLSL:

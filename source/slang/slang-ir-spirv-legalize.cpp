@@ -2126,6 +2126,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 case CapabilityName::spirv_1_6:
                     m_sharedContext->requireSpirvVersion(0x10600);
                     break;
+                case CapabilityName::SPV_EXT_demote_to_helper_invocation:
+                    m_sharedContext->m_useDemoteToHelperInvocationExtension = true;
+                    break;
                 default:
                     break;
                 }

@@ -1290,6 +1290,13 @@ struct SPIRVEmitContext
         return ensureExtensionDeclaration(name);
     }
 
+    SpvInst* ensureExtensionDeclarationBeforeSpv16(UnownedStringSlice name)
+    {
+        if (isSpirv16OrLater())
+            return nullptr;
+        return ensureExtensionDeclaration(name);
+    }
+
     bool hasExtensionDeclaration(const UnownedStringSlice& name)
     {
         return m_extensionInsts.containsKey(name);
@@ -2554,11 +2561,10 @@ struct SPIRVEmitContext
                 emitLocalInst(spvBlock, irInst);
                 if (irInst->getOp() == kIROp_loop)
                     pendingLoopInsts.add(as<IRLoop>(irInst));
-                if (irInst->getOp() == kIROp_discard && !isSpirv16OrLater())
+                if (irInst->getOp() == kIROp_discard && !shouldEmitDiscardAsDemote())
                 {
-                    // Prior to SPIRV 1.6, we emit OpKill for discard.
-                    // OpKill is a terminator inst, so we will stop emitting anything
-                    // after this inst in the block.
+                    // If we emitted OpKill for discard, we should stop emitting anything
+                    // after this inst in the block, because OpKill is a terminator inst.
                     break;
                 }
             }
@@ -2605,6 +2611,11 @@ struct SPIRVEmitContext
             }
         }
         return false;
+    }
+
+    bool shouldEmitDiscardAsDemote()
+    {
+        return (isSpirv16OrLater() || m_useDemoteToHelperInvocationExtension);
     }
 
     // The instructions that appear inside the basic blocks of
@@ -2806,8 +2817,9 @@ struct SPIRVEmitContext
                 result = emitOpReturnValue(parent, inst, as<IRReturn>(inst)->getVal());
             break;
         case kIROp_discard:
-            if (isSpirv16OrLater())
+            if (shouldEmitDiscardAsDemote())
             {
+                ensureExtensionDeclarationBeforeSpv16(toSlice("SPV_EXT_demote_to_helper_invocation"));
                 requireSPIRVCapability(SpvCapabilityDemoteToHelperInvocation);
                 result = emitOpDemoteToHelperInvocation(parent, inst);
             }

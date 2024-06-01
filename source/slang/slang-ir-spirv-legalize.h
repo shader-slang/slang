@@ -27,6 +27,7 @@ struct SPIRVEmitSharedContext
     IRInst* m_voidType;
 
     unsigned int m_spvVersion = 0x10000;
+    bool m_useDemoteToHelperInvocationExtension = false;
 
     bool isSpirv14OrLater()
     {

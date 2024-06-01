@@ -121,6 +121,11 @@ bool isTargetVersionAtom(CapabilityName name)
     return false;
 }
 
+bool isSpirvExtensionAtom(CapabilityName name)
+{
+    return UnownedStringSlice(_getInfo(name).name).startsWith("SPV_");
+}
+
 bool lookupCapabilityName(const UnownedStringSlice& str, CapabilityName& value);
 
 CapabilityName findCapabilityName(UnownedStringSlice const& name)
