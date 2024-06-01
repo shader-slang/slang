@@ -1717,15 +1717,18 @@ CapabilitySet TargetRequest::getTargetCaps()
         {
             // Default to SPIRV 1.5 if the user has not specified a target version.
             bool hasTargetVersionAtom = false;
-            profileCaps.join(CapabilitySet(CapabilityName::spirv_1_0));
-            for (auto profileCapAtomSet : profileCaps.getAtomSets())
+            if (!profileCaps.isEmpty())
             {
-                for (auto atom : profileCapAtomSet)
+                profileCaps.join(CapabilitySet(CapabilityName::spirv_1_0));
+                for (auto profileCapAtomSet : profileCaps.getAtomSets())
                 {
-                    if (isTargetVersionAtom((CapabilityName)atom))
+                    for (auto atom : profileCapAtomSet)
                     {
-                        atoms.add((CapabilityName)atom);
-                        hasTargetVersionAtom = true;
+                        if (isTargetVersionAtom((CapabilityName)atom))
+                        {
+                            atoms.add((CapabilityName)atom);
+                            hasTargetVersionAtom = true;
+                        }
                     }
                 }
             }

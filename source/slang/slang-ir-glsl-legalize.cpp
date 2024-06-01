@@ -2959,7 +2959,7 @@ void legalizeEntryPointForGLSL(
     case Stage::RayGeneration:
     case Stage::Intersection:
     case Stage::ClosestHit:
-        glslExtensionTracker->requireSPIRVVersion(SemanticVersion(1, 5, 0));
+        glslExtensionTracker->requireSPIRVVersion(SemanticVersion(1, 4, 0));
         break;
     }
 
