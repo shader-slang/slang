@@ -4413,14 +4413,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 return LoweredValInfo::simple(getBuilder()->getIntValue(irType, 0));
             }
+            else if (declRef.as<InterfaceDecl>())
+            {
+                return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
+            }
             else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
-                if (aggTypeDeclRef.as<InterfaceDecl>())
-                {
-                    return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
-                }
-
                 List<IRInst*> args;
+
                 if (auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())
                 {
                     if (auto baseStructType = findBaseStructType(getASTBuilder(), structTypeDeclRef))
