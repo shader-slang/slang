@@ -20,10 +20,22 @@
 // There are three types of capability definitions:
 // - `def`: this will introduce an new capability atom. If there is an inheritance clause,
 //    the capability name will expand to all inherited atoms plus the newly introduced atom.
-// - `abstract`: an abstract capability does not introduce an actual atom, but it defines
-//   an implicit conflict group such that two capabilities inheriting the same abstract
-//   capability cannot be satisfied simultaneously. When used in an expression, `abstract`
-//   capability also expands into a disjunction (or) of all inherited capabilities.
+// - `abstract`: an abstract capability does not introduce an actual atom. Primarily used to 
+//   make disjunctions using the following rules:
+//      1. Each type of abstract atom defines a "keyhole". `target` and `stage` are distinct "keyholes".
+//      2. Any atom immediately derived off of an abstract atom is a "key atom". 
+//      3. Every conjunction may only populate each "keyhole" once, else the set is incompatible.
+//          * If joining ('+') incompatible sets, an invalid capability is made.
+//          * If Inclusive joining ('|') incompatible sets, a disjunction is made.
+//      4. ex: `hlsl + glsl` both populate the same "keyhole" of `target`, this is incompatible. 
+//      5. ex: `hlsl + _sm_6_0` both populate same keyholes of `hlsl` and `hlsl`, this is compatible.
+//      6. ex: `hlsl | glsl` creates a disjunction of 2 sets: `hlsl` and `glsl`. This is due to the 
+//         2 sets being incompatible.
+//      7. Having a not populated "keyhole" means your set is compatible with any "key atom" of 
+//         distinct "keyhole".
+//      8. ex: `vertex + glsl` works because 'vertex' has a unpopulated `target` "keyhole", and 
+//         therefore is compatible with all `target` "key atoms"
+
 // - `alias`: this defines an alias and does not introduce actual atoms.
 
 // Several capabilities represent the target formats in which we generate code.
@@ -176,26 +188,22 @@ alias tesscontrol = hull;
 alias tesseval = domain;
 alias amplification_mesh = amplification | mesh;
 alias raytracing_stages = raygen | intersection | anyhit | closesthit | miss | callable;
-alias raytracing_stages_intersection = intersection;
-alias raytracing_stages_raygen = raygen;
-alias raytracing_stages_anyhit_closesthit = anyhit | closesthit;
-alias raytracing_stages_raygen_closesthit_miss = raygen | closesthit | miss;
-alias raytracing_stages_anyhit_closesthit_intersection = anyhit | closesthit | intersection;
-alias raytracing_stages_anyhit_closesthit_intersection_miss = anyhit | closesthit | intersection | miss;
-alias raytracing_stages_raygen_closesthit_miss_callable = raygen | closesthit | miss | callable;
-alias shader_stages_compute_tesscontrol_tesseval = compute | tesscontrol | tesseval;
-alias shader_stages_compute_fragment = compute | fragment;
-alias shader_stages_compute_fragment_geometry_vertex = compute | fragment | geometry | vertex;
-alias shader_stages_domain_hull = domain | hull;
-alias raytracing_stages_fragment = raytracing_stages | fragment;
-alias raytracing_stages_compute = raytracing_stages | compute;
-alias raytracing_stages_compute_amplification_mesh = raytracing_stages_compute | amplification_mesh;
-alias raytracing_stages_compute_fragment = raytracing_stages | shader_stages_compute_fragment;
-alias raytracing_stages_compute_fragment_geometry_vertex = raytracing_stages | shader_stages_compute_fragment_geometry_vertex;
+alias anyhit_closesthit = anyhit | closesthit;
+alias raygen_closesthit_miss = raygen | closesthit | miss;
+alias anyhit_closesthit_intersection = anyhit | closesthit | intersection;
+alias anyhit_closesthit_intersection_miss = anyhit | closesthit | intersection | miss;
+alias raygen_closesthit_miss_callable = raygen | closesthit | miss | callable;
+alias compute_tesscontrol_tesseval = compute | tesscontrol | tesseval;
+alias compute_fragment = compute | fragment;
+alias compute_fragment_geometry_vertex = compute | fragment | geometry | vertex;
+alias domain_hull = domain | hull;
+alias raytracingstages_fragment = raytracing_stages | fragment;
+alias raytracingstages_compute = raytracing_stages | compute;
+alias raytracingstages_compute_amplification_mesh = raytracingstages_compute | amplification_mesh;
+alias raytracingstages_compute_fragment = raytracing_stages | compute_fragment;
+alias raytracingstages_compute_fragment_geometry_vertex = raytracing_stages | compute_fragment_geometry_vertex;
 
 // SPIRV extensions.
-
-def SOURCE_EXT_GL_NV_compute_shader_derivatives : spirv_1_0;
 
 def SPV_EXT_fragment_shader_interlock : spirv_1_0;
 def SPV_KHR_fragment_shader_barycentric : spirv_1_0;
@@ -347,7 +355,7 @@ alias GL_KHR_shader_subgroup_shuffle = _GL_KHR_shader_subgroup_shuffle | spvGrou
 alias GL_KHR_shader_subgroup_shuffle_relative = _GL_KHR_shader_subgroup_shuffle_relative | spvGroupNonUniformShuffle;
 alias GL_KHR_shader_subgroup_vote = _GL_KHR_shader_subgroup_vote | spvGroupNonUniformVote;
 alias GL_KHR_shader_subgroup_quad = _GL_KHR_shader_subgroup_quad | spvGroupNonUniformQuad;
-alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SOURCE_EXT_GL_NV_compute_shader_derivatives | SPV_NV_compute_shader_derivatives | _sm_6_6;
+alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SPV_NV_compute_shader_derivatives | _sm_6_6;
 alias GL_ARB_shader_image_size = _GL_ARB_shader_image_size | spvImageQuery | metal;
 alias GL_ARB_shader_texture_image_samples = _GL_ARB_shader_texture_image_samples | spvImageQuery | metal;
 alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | spirv_1_0;
@@ -369,8 +377,8 @@ alias rayquery = GL_EXT_ray_query | _sm_6_5;
 alias raytracing_motionblur =  raytracing + motionblur | cuda;
 alias ser_motion = ser + motionblur;
 alias shaderclock = GL_EXT_shader_realtime_clock | hlsl_nvapi | cpp | cuda;
-alias meshshading_internal = spvMeshShadingEXT + _sm_6_5 + _GL_EXT_mesh_shader;
-alias meshshading = amplification + meshshading_internal | mesh + meshshading_internal;
+alias meshshading_internal = GL_EXT_mesh_shader | _sm_6_5;
+alias meshshading = amplification_mesh + meshshading_internal;
 alias fragmentshaderinterlock = _GL_ARB_fragment_shader_interlock | hlsl_nvapi | spvFragmentShaderPixelInterlockEXT;
 alias atomic64 = GL_EXT_shader_atomic_int64 | _sm_6_6 | cpp | cuda;
 alias atomicfloat = GL_EXT_shader_atomic_float | _sm_6_0 + hlsl_nvapi | cpp | cuda;
@@ -380,7 +388,7 @@ alias groupnonuniform = GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_s
                         | _sm_6_0 | cuda;
 alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
 alias shadermemorycontrol = glsl | spirv_1_0 | _sm_5_0;
-alias shadermemorycontrol_compute = raytracing_stages_compute + shadermemorycontrol;
+alias shadermemorycontrol_compute = raytracingstages_compute + shadermemorycontrol;
 alias subpass = fragment + any_gfx_target;
 alias waveprefix = _sm_6_5 | _cuda_sm_7_0 | GL_KHR_shader_subgroup_arithmetic;
 alias bufferreference = GL_EXT_buffer_reference;
@@ -569,7 +577,7 @@ alias GLSL_460 = _GLSL_460
                | cpp
                ;
 
-alias GLSL_410_SPIRV_1_0 = _GLSL_410 + GLSL_400 | GLSL_400;
+alias GLSL_410_SPIRV_1_0 = _GLSL_410 | spirv_1_0;
 alias GLSL_420_SPIRV_1_0 = _GLSL_420 + GLSL_410_SPIRV_1_0 | GLSL_410_SPIRV_1_0;
 alias GLSL_430_SPIRV_1_0 = _GLSL_430 + GLSL_420_SPIRV_1_0 | GLSL_420_SPIRV_1_0;
 
@@ -600,41 +608,41 @@ alias SPIRV_1_6 = spirv_1_6;
 
 alias sm_2_0_GLSL_140 = _GLSL_140 + sm_4_0 | sm_4_0;
 alias sm_2_0_GLSL_400 = _GLSL_400 + sm_4_0 | sm_4_0;
-alias appendstructuredbuffer = sm_5_0 + raytracing_stages_compute_fragment;
+alias appendstructuredbuffer = sm_5_0 + raytracingstages_compute_fragment;
 alias atomic_hlsl = _sm_4_0;
 alias atomic_hlsl_nvapi = _sm_4_0 + hlsl_nvapi;
 alias atomic_hlsl_sm_6_6 = _sm_6_6;
 alias byteaddressbuffer = sm_4_0;
-alias byteaddressbuffer_rw = sm_4_0 + raytracing_stages_compute_fragment;
-alias consumestructuredbuffer = sm_5_0 + raytracing_stages_compute_fragment;
+alias byteaddressbuffer_rw = sm_4_0 + raytracingstages_compute_fragment;
+alias consumestructuredbuffer = sm_5_0 + raytracingstages_compute_fragment;
 alias fragmentprocessing = fragment + _sm_5_0
                          | fragment + glsl_spirv
-                         | raytracing_stages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
+                         | raytracingstages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
                          ;
 alias fragmentprocessing_derivativecontrol = fragment + _sm_5_0
                                            | fragment + GL_ARB_derivative_control
-                                           | raytracing_stages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
+                                           | raytracingstages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
                                            ;
 alias getattributeatvertex = fragment + _sm_6_1 | fragment + GL_EXT_fragment_shader_barycentric;
-alias memorybarrier_compute = raytracing_stages_compute + sm_5_0;
+alias memorybarrier_compute = raytracingstages_compute + sm_5_0;
 alias glsl_barrier = hlsl + memorybarrier_compute 
-                   | glsl_spirv + shader_stages_compute_tesscontrol_tesseval
+                   | glsl_spirv + compute_tesscontrol_tesseval
                    ;
 alias structuredbuffer = sm_4_0;
-alias structuredbuffer_rw = sm_4_0 + raytracing_stages_compute_fragment;
+alias structuredbuffer_rw = sm_4_0 + raytracingstages_compute_fragment;
 alias texture_sm_4_1 = sm_4_1
                      ;
 alias texture_sm_4_1_samplerless = cpp + texture_sm_4_1
                               | cuda + texture_sm_4_1
                               | glsl + texture_sm_4_1 + GL_EXT_samplerless_texture_functions
-                              | hlsl + texture_sm_4_1 + raytracing_stages_compute_fragment
+                              | hlsl + texture_sm_4_1 + raytracingstages_compute_fragment
                               | spirv_1_0 + texture_sm_4_1 + GL_EXT_samplerless_texture_functions
                               | metal + texture_sm_4_1
                               ;
 alias texture_sm_4_1_compute_fragment = cpp + texture_sm_4_1
                               | cuda + texture_sm_4_1
                               | glsl + texture_sm_4_1
-                              | hlsl + texture_sm_4_1 + raytracing_stages_compute_fragment
+                              | hlsl + texture_sm_4_1 + raytracingstages_compute_fragment
                               | spirv_1_0 + texture_sm_4_1
                               | metal + texture_sm_4_1
                               ;
@@ -642,7 +650,7 @@ alias texture_sm_4_1_compute_fragment = cpp + texture_sm_4_1
 alias texture_sm_4_1_fragment = cpp + texture_sm_4_1
                               | cuda + texture_sm_4_1
                               | glsl + texture_sm_4_1
-                              | hlsl + texture_sm_4_1 + raytracing_stages_compute_fragment
+                              | hlsl + texture_sm_4_1 + raytracingstages_compute_fragment
                               | spirv_1_0 + texture_sm_4_1
                               | metal + texture_sm_4_1
                               ;
@@ -650,7 +658,7 @@ alias texture_sm_4_1_clamp_fragment = texture_sm_4_1_fragment + GL_ARB_sparse_te
 alias texture_sm_4_1_vertex_fragment_geometry = cpp + texture_sm_4_1
                                               | cuda + texture_sm_4_1
                                               | glsl + texture_sm_4_1
-                                              | hlsl + texture_sm_4_1 + raytracing_stages_compute_fragment_geometry_vertex
+                                              | hlsl + texture_sm_4_1 + raytracingstages_compute_fragment_geometry_vertex
                                               | spirv_1_0 + texture_sm_4_1
                                               | metal + texture_sm_4_1
                                               ;
@@ -678,8 +686,8 @@ alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp;
 alias texturefootprint = GL_NV_shader_texture_footprint + GLSL_450 | hlsl_nvapi + _sm_4_0;
 alias texturefootprintclamp = texturefootprint + GL_ARB_sparse_texture_clamp;
 
-alias shader5_sm_4_0 = GL_ARB_gpu_shader5 + sm_4_0 | sm_4_0;
-alias shader5_sm_5_0 = GL_ARB_gpu_shader5 + sm_4_0 | sm_5_0;
+alias shader5_sm_4_0 = GL_ARB_gpu_shader5 + _GLSL_140 + sm_4_0 | sm_4_0;
+alias shader5_sm_5_0 = GL_ARB_gpu_shader5 + _GLSL_140 + sm_4_0 | sm_5_0;
 
 alias subgroup_basic = GL_KHR_shader_subgroup_basic | _sm_6_0 | _cuda_sm_7_0;
 alias subgroup_ballot = spirv_1_0 + GL_KHR_shader_subgroup_ballot
@@ -694,7 +702,8 @@ alias subgroup_ballot_activemask = spirv_1_0 + GL_KHR_shader_subgroup_ballot
                       ;
 alias subgroup_basic_ballot = glsl + GL_KHR_shader_subgroup_basic + subgroup_ballot 
                             | spirv + GL_KHR_shader_subgroup_basic + subgroup_ballot
-                            | hlsl + subgroup_ballot | cuda + subgroup_ballot
+                            | hlsl + subgroup_ballot
+                            | cuda + subgroup_ballot
                             ;
 alias subgroup_vote = GL_KHR_shader_subgroup_vote | _sm_6_0 | _cuda_sm_7_0;
 alias shaderinvocationgroup = subgroup_vote;
@@ -718,23 +727,23 @@ alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp;
 alias rayobject = raytracing | rayquery;
 alias raytracing_allstages = raytracing_stages + raytracing;
 alias raytracing_anyhit = anyhit + raytracing;
-alias raytracing_intersection = raytracing_stages_intersection + raytracing;
-alias raytracing_anyhit_closesthit = raytracing_stages_anyhit_closesthit + raytracing;
-alias raytracing_anyhit_closesthit_intersection = raytracing_stages_anyhit_closesthit_intersection + raytracing;
-alias raytracing_raygen_closesthit_miss = raytracing_stages_raygen_closesthit_miss + raytracing;
-alias raytracing_anyhit_closesthit_intersection_miss = raytracing_stages_anyhit_closesthit_intersection_miss + raytracing;
-alias raytracing_raygen_closesthit_miss_callable = raytracing_stages_raygen_closesthit_miss_callable + raytracing;
-alias raytracing_position = raytracing + GL_EXT_ray_tracing_position_fetch + anyhit + closesthit;
-alias raytracing_motionblur_anyhit_closesthit_intersection_miss = raytracing_stages_anyhit_closesthit_intersection_miss + raytracing_motionblur;
-alias raytracing_motionblur_raygen_closesthit_miss = raytracing_stages_raygen_closesthit_miss + raytracing_motionblur;
+alias raytracing_intersection = intersection + raytracing;
+alias raytracing_anyhit_closesthit = anyhit_closesthit + raytracing;
+alias raytracing_anyhit_closesthit_intersection = anyhit_closesthit_intersection + raytracing;
+alias raytracing_raygen_closesthit_miss = raygen_closesthit_miss + raytracing;
+alias raytracing_anyhit_closesthit_intersection_miss = anyhit_closesthit_intersection_miss + raytracing;
+alias raytracing_raygen_closesthit_miss_callable = raygen_closesthit_miss_callable + raytracing;
+alias raytracing_position = raytracing + GL_EXT_ray_tracing_position_fetch + anyhit_closesthit;
+alias raytracing_motionblur_anyhit_closesthit_intersection_miss = anyhit_closesthit_intersection_miss + raytracing_motionblur;
+alias raytracing_motionblur_raygen_closesthit_miss = raygen_closesthit_miss + raytracing_motionblur;
 alias rayquery_position = rayquery + GL_EXT_ray_tracing_position_fetch;
-alias ser_raygen = raytracing_stages_raygen + ser;
-alias ser_raygen_closesthit_miss = raytracing_stages_raygen_closesthit_miss + ser;
-alias ser_any_closesthit_intersection_miss = raytracing_stages_anyhit_closesthit_intersection_miss + ser;
-alias ser_anyhit_closesthit_intersection = raytracing_stages_anyhit_closesthit_intersection + ser;
-alias ser_anyhit_closesthit = raytracing_stages_anyhit_closesthit + ser;
-alias ser_motion_raygen_closesthit_miss = raytracing_stages_raygen_closesthit_miss + ser_motion;
-alias ser_motion_raygen = raytracing_stages_raygen + ser_motion;
+alias ser_raygen = raygen + ser;
+alias ser_raygen_closesthit_miss = raygen_closesthit_miss + ser;
+alias ser_any_closesthit_intersection_miss = anyhit_closesthit_intersection_miss + ser;
+alias ser_anyhit_closesthit_intersection = anyhit_closesthit_intersection + ser;
+alias ser_anyhit_closesthit = anyhit_closesthit + ser;
+alias ser_motion_raygen_closesthit_miss = raygen_closesthit_miss + ser_motion;
+alias ser_motion_raygen = raygen + ser_motion;
 
 alias all = _sm_6_7 + hlsl_nvapi
           | glsl_spirv_1_5 + sm_6_7

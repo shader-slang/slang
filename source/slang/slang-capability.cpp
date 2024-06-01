@@ -25,11 +25,11 @@ enum class CapabilityNameFlavor : int32_t
     Concrete,
 
     // An abstract capability represents a class of feature
-    // where multiple different implementations might be possible.
-    // For example, "ray tracing" might be an abstract feature
-    // that a function can require, but a specific target will
-    // only be able to provide that abstract feature via some
-    // specific concrete feature (e.g., `GL_EXT_ray_tracing`).
+    // where multiple distinct implementations might be possible.
+    // 'raytracing' may be allowed with a 'raygen' "stage", but 
+    // not a 'vertex' "stage"
+    // For more information (and a clearer description of the rules), 
+    // read `slang-capabilities.capdef`
     Abstract,
 
     // An alias capability atom is one that is exactly equivalent
@@ -528,9 +528,6 @@ CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySe
     return newSet;
 }
 
-/// Join `this` with a compatble stage set of `CapabilityTargetSet other`.
-/// Return false when `other` is fully incompatible.
-/// incompatability is when `this->stage` is not a supported stage by `other.shaderStageSets`.
 bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
 {
     const CapabilityStageSet* otherStageSet = other.shaderStageSets.tryGetValue(this->stage);
@@ -544,11 +541,6 @@ bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
     return true;
 }
 
-/// Join a compatable target set from `this` with `CapabilityTargetSet other`.
-/// Return false when `other` is fully incompatible.
-/// incompatability is when one of 2 senarios are true:
-/// 1. `this->target` is not a supported target by `other.shaderStageSets`
-/// 2. `this` has completly disjoint shader stages from other.
 bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
 {
     const CapabilityTargetSet* otherTargetSet = other.tryGetValue(this->target);
@@ -669,9 +661,6 @@ bool CapabilitySet::hasSameTargets(const CapabilitySet& other) const
 #pragma warning(push)
 #pragma warning(disable:4702)
 #endif
-/// returns true if 'this' is a better target for 'targetCaps' than 'that'
-/// isEqual: is `this` and `that` equal
-/// isIncompatible: is `this` and `that` incompatible
 bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const
 {
     if (this->isEmpty() && (that.isEmpty() || that.isInvalid()))
@@ -920,6 +909,16 @@ int TEST_findTargetStage(
     return capSet.getCapabilityTargetSets()[target].shaderStageSets.containsKey(stage);
 }
 
+
+int TEST_targetCapSetWithSpecificAtomInStage(
+    CapabilitySet& capSet,
+    CapabilityAtom target,
+    CapabilityAtom stage,
+    CapabilityAtom atom)
+{
+    return capSet.getCapabilityTargetSets()[target].shaderStageSets[stage].atomSet->contains((UInt)atom);
+}
+
 int TEST_targetCapSetWithSpecificSetInStage(
     CapabilitySet& capSet,
     CapabilityAtom target,
@@ -981,8 +980,8 @@ void TEST_CapabilitySet_addAtom()
     testCapSet = CapabilitySet(CapabilityName::TEST_ADD_2);
 
     CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
-    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::vertex,
-        { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::vertex,
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::compute,
+        { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::compute,
         CapabilityAtom::_sm_4_0, CapabilityAtom::_sm_4_1 }));
     CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment,
         { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::fragment,
@@ -997,7 +996,54 @@ void TEST_CapabilitySet_addAtom()
     CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment,
         { CapabilityAtom::textualTarget, CapabilityAtom::glsl, CapabilityAtom::fragment,
         CapabilityAtom::_GLSL_130 }));
+
     // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_1);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
+    CHECK_CAPS((int)!TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::vertex));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_0));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_5_0));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_2);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
+    CHECK_CAPS((int)!TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_5));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_5_0));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_3);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_NV_shader_texture_footprint));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_NV_compute_shader_derivatives));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_4);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_NV_shader_texture_footprint));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_ARB_shader_image_size));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_5);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_5));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_4));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_0));
 }
 
 void TEST_CapabilitySet_join()
@@ -1072,15 +1118,15 @@ void TEST_CapabilitySet()
 /*
 /// Test Capabilities
 
-alias TEST_ADD_1 = _sm_4_1 | _GLSL_130 | spirv_1_1 | metal
-                    ;
+alias TEST_ADD_1 = _sm_4_1 | _GLSL_130 | spirv_1_1 | metal;
+alias TEST_ADD_2 = _sm_4_1 |& _sm_4_0 + compute_fragment;
+alias TEST_ADD_3 = _GLSL_130 + compute_fragment_geometry_vertex;
 
-alias TEST_ADD_2 = _sm_4_1 | _sm_4_0 + shader_stages_compute_fragment
-                    ;
-
-alias TEST_ADD_3 = _GLSL_130 + shader_stages_compute_fragment_geometry_vertex;
-
-//
+alias TEST_GEN_1 = _sm_6_5 + fragment | _sm_6_0 + vertex;
+alias TEST_GEN_2 = _sm_6_5 + fragment;
+alias TEST_GEN_3 = GL_NV_shader_texture_footprint + GL_NV_compute_shader_derivatives + fragment | _GL_NV_shader_texture_footprint + fragment;
+alias TEST_GEN_4 = GL_ARB_shader_image_size |& GL_NV_shader_texture_footprint + fragment;
+alias TEST_GEN_5 = sm_6_0 + compute_fragment| sm_6_5;
 
 alias TEST_JOIN_1A = hlsl;
 alias TEST_JOIN_1B = glsl;
@@ -1103,6 +1149,13 @@ alias TEST_JOIN_3B = _sm_4_1 + fragment
 
 alias TEST_JOIN_4A = _GLSL_140 + _GL_EXT_texture_query_lod;
 alias TEST_JOIN_4B = _GLSL_150 + _GL_EXT_texture_shadow_lod;
+
+// Will cause capability generator failiure
+alias TEST_ERROR_GEN_1 = GL_NV_shader_texture_footprint + GL_NV_compute_shader_derivatives + fragment | _GL_NV_shader_texture_footprint + _GL_NV_shader_atomic_fp16_vector + fragment;
+alias TEST_ERROR_GEN_2 = GL_NV_shader_texture_footprint | GL_NV_ray_tracing_motion_blur;
+alias TEST_ERROR_GEN_3 = GL_ARB_shader_image_size | GL_NV_shader_texture_footprint + fragment;
+alias TEST_ERROR_GEN_4 = _sm_6_5 + fragment + vertex + cpp;
+
 ///
 */
 #undef CHECK_CAPS
