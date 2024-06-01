@@ -3171,6 +3171,7 @@ void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersi
                 case 4: atom = CapabilityName::spirv_1_4; break;
                 case 5: atom = CapabilityName::spirv_1_5; break;
                 case 6: atom = CapabilityName::spirv_1_6; break;
+                default: SLANG_UNEXPECTED("Unknown SPIRV version");
             }
             break;
         }
