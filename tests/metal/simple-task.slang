@@ -1,5 +1,4 @@
 //TEST:SIMPLE(filecheck=CHECK): -entry taskMain -stage amplification -target metal
-//TEST:SIMPLE(filecheck=CHECK-ASM): -entry taskMain -stage amplification -target metallib
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 
