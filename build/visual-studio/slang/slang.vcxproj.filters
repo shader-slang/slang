@@ -702,6 +702,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-workspace-version.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-operator-shift-overflow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\prelude\slang-cpp-host-prelude.h.cpp">
@@ -1416,6 +1419,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-operator-shift-overflow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
