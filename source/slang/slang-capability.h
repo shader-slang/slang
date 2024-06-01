@@ -180,7 +180,7 @@ public:
             const CapabilityTargetSets* context;
             CapabilityTargetSets::ConstIterator targetNode{};
             CapabilityStageSets::ConstIterator stageNode{};
-            const std::optional<CapabilityAtomSet>* atomSetNode;
+            const std::optional<CapabilityAtomSet>* atomSetNode = {};
 
         public:
             operator bool() const
@@ -247,10 +247,12 @@ public:
                 if (tmp.targetNode == this->context->end())
                     return tmp;
                 tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
-                if (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
+                while (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
                 {
-                    tmp++;
-                    return tmp;
+                    tmp.targetNode++;
+                    if (tmp.targetNode == this->context->end())
+                        return end();
+                    tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
                 }
                 tmp.atomSetNode = &(*tmp.stageNode).second.atomSet;
                 if (!tmp.atomSetNode->has_value())
@@ -287,12 +289,19 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base);
     /// Find a capability atom with the given `name`, or return CapabilityAtom::Invalid.
 CapabilityName findCapabilityName(UnownedStringSlice const& name);
 
+CapabilityName getLatestSpirvAtom();
+CapabilityName getLatestMetalAtom();
+
     /// Gets the capability names.
 void getCapabilityNames(List<UnownedStringSlice>& ioNames);
 
 UnownedStringSlice capabilityNameToString(CapabilityName name);
 
 bool isDirectChildOfAbstractAtom(CapabilityAtom name);
+
+
+    /// Return true if `name` represents an atom for a target version, e.g. spirv_1_5.
+bool isTargetVersionAtom(CapabilityName name);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);

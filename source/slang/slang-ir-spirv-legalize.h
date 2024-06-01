@@ -26,6 +26,26 @@ struct SPIRVEmitSharedContext
     const SPIRVCoreGrammarInfo* m_grammarInfo;
     IRInst* m_voidType;
 
+    unsigned int m_spvVersion = 0x10000;
+
+    bool isSpirv14OrLater()
+    {
+        return m_spvVersion >= 0x10400;
+    }
+    bool isSpirv15OrLater()
+    {
+        return m_spvVersion >= 0x10500;
+    }
+    bool isSpirv16OrLater()
+    {
+        return m_spvVersion >= 0x10600;
+    }
+
+    void requireSpirvVersion(unsigned int version)
+    {
+        m_spvVersion = Math::Max(m_spvVersion, version);
+    }
+
     SPIRVEmitSharedContext(IRModule* module, TargetProgram* program, DiagnosticSink* sink)
         : m_irModule(module),
           m_targetProgram(program),

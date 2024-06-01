@@ -1666,6 +1666,12 @@ HLSLToVulkanLayoutOptions* TargetRequest::getHLSLToVulkanLayoutOptions()
     return hlslToVulkanOptions.get();
 }
 
+void TargetRequest::setTargetCaps(CapabilitySet capSet)
+{
+    cookedCapabilities = capSet;
+
+}
+
 CapabilitySet TargetRequest::getTargetCaps()
 {
     if(!cookedCapabilities.isEmpty())
@@ -1691,6 +1697,23 @@ CapabilitySet TargetRequest::getTargetCaps()
     // are available where can be directly encoded on the declarations.
 
     List<CapabilityName> atoms;
+
+    // If the user specified a explicit profile, we should pull
+    // a corresponding atom representing the target version from the profile.
+    CapabilitySet profileCaps = CapabilitySet(optionSet.getProfile().getCapabilityName());
+    bool hasTargetVersionAtom = false;
+    for (auto profileCapAtomSet : profileCaps.getAtomSets())
+    {
+        for (auto atom : profileCapAtomSet)
+        {
+            if (isTargetVersionAtom((CapabilityName)atom))
+            {
+                atoms.add((CapabilityName)atom);
+                hasTargetVersionAtom = true;
+            }
+        }
+    }
+
     bool isGLSLTarget = false;
     switch(getTarget())
     {
@@ -1704,7 +1727,11 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::SPIRVAssembly:
         if (getOptionSet().shouldEmitSPIRVDirectly())
         {
-            atoms.add(CapabilityName::spirv_1_5);
+            // Default to SPIRV 1.5 if the user has not specified a target version.
+            if (!hasTargetVersionAtom)
+            {
+                atoms.add(CapabilityName::spirv_1_5);
+            }
         }
         else
         {
@@ -1752,9 +1779,7 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     CapabilitySet targetCap = CapabilitySet(atoms);
 
-    CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
-    auto latestSpirvCapSetElements = latestSpirvCapSet.getAtomSets()->getElements<CapabilityAtom>();
-    CapabilityName latestSpirvAtom = (CapabilityName)latestSpirvCapSetElements[latestSpirvCapSetElements.getCount()-2]; //-1 gets shader stage
+    CapabilityName latestSpirvAtom = getLatestSpirvAtom();
 
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {

@@ -112,6 +112,15 @@ bool isDirectChildOfAbstractAtom(CapabilityAtom name)
     return _getInfo(name).abstractBase != CapabilityName::Invalid;
 }
 
+bool isTargetVersionAtom(CapabilityName name)
+{
+    if (name >= CapabilityName::spirv_1_0 && name <= getLatestSpirvAtom())
+        return true;
+    if (name >= CapabilityName::metallib_2_3 && name <= getLatestMetalAtom())
+        return true;
+    return false;
+}
+
 bool lookupCapabilityName(const UnownedStringSlice& str, CapabilityName& value);
 
 CapabilityName findCapabilityName(UnownedStringSlice const& name)
@@ -119,6 +128,30 @@ CapabilityName findCapabilityName(UnownedStringSlice const& name)
     CapabilityName result{};
     if (!lookupCapabilityName(name, result))
         return CapabilityName::Invalid;
+    return result;
+}
+
+CapabilityName getLatestSpirvAtom()
+{
+    static CapabilityName result = CapabilityName::Invalid;
+    if (result == CapabilityName::Invalid)
+    {
+        CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
+        auto latestSpirvCapSetElements = latestSpirvCapSet.getAtomSets()->getElements<CapabilityAtom>();
+        result = (CapabilityName)latestSpirvCapSetElements[latestSpirvCapSetElements.getCount() - 2]; //-1 gets shader stage
+    }
+    return result;
+}
+
+CapabilityName getLatestMetalAtom()
+{
+    static CapabilityName result = CapabilityName::Invalid;
+    if (result == CapabilityName::Invalid)
+    {
+        CapabilitySet latestMetalCapSet = CapabilitySet(CapabilityName::metallib_latest);
+        auto latestMetalCapSetElements = latestMetalCapSet.getAtomSets()->getElements<CapabilityAtom>();
+        result = (CapabilityName)latestMetalCapSetElements[latestMetalCapSetElements.getCount() - 2]; //-1 gets shader stage
+    }
     return result;
 }
 

@@ -763,7 +763,8 @@ DIAGNOSTIC(41300, Error, byteAddressBufferUnaligned, "invalid alignment `$0` spe
 //
 
 DIAGNOSTIC(50010, Internal, missingExistentialBindingsForParameter, "missing argument for existential parameter slot")
-
+DIAGNOSTIC(50011, Error, spirvVersionNotSupported, "Slang's SPIR-V backend only supports SPIR-V version 1.3 and later."
+                                                   "Use `-emit-spirv-via-glsl` option to produce SPIR-V 1.0 through 1.2.")
 DIAGNOSTIC(50020, Error, invalidTessCoordType, "TessCoord must have vec2 or vec3 type.")
 DIAGNOSTIC(50020, Error, invalidFragCoordType, "FragCoord must be a vec4.")
 DIAGNOSTIC(50020, Error, invalidInvocationIdType, "InvocationId must have int type.")

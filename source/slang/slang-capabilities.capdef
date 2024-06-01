@@ -117,6 +117,9 @@ def _GLSL_460 : _GLSL_450;
 // metal versions
 def metallib_2_3 : metal;
 def metallib_2_4 : metallib_2_3;
+def metallib_3_0 : metallib_2_4;
+def metallib_3_1 : metallib_3_0;
+alias metallib_latest = metallib_3_1;
 
 // hlsl versions
 def _sm_4_0 : hlsl;
@@ -584,6 +587,14 @@ alias DX_6_7 = sm_6_7;
 
 alias METAL_2_3 = metallib_2_3;
 alias METAL_2_4 = metallib_2_4;
+
+alias SPIRV_1_0 = spirv_1_0;
+alias SPIRV_1_1 = spirv_1_1;
+alias SPIRV_1_2 = spirv_1_2;
+alias SPIRV_1_3 = spirv_1_3;
+alias SPIRV_1_4 = spirv_1_4;
+alias SPIRV_1_5 = spirv_1_5;
+alias SPIRV_1_6 = spirv_1_6;
 
 alias sm_2_0_GLSL_140 = _GLSL_140 + sm_4_0 | sm_4_0;
 alias sm_2_0_GLSL_400 = _GLSL_400 + sm_4_0 | sm_4_0;
