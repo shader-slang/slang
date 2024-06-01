@@ -10,8 +10,6 @@ cbuffer Uniforms
     float4x4 modelViewProjection;
 }
 
-// CHECK-ASM: define void @taskMain
-
 //
 // Task shader
 //
