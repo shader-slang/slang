@@ -1701,18 +1701,6 @@ CapabilitySet TargetRequest::getTargetCaps()
     // If the user specified a explicit profile, we should pull
     // a corresponding atom representing the target version from the profile.
     CapabilitySet profileCaps = CapabilitySet(optionSet.getProfile().getCapabilityName());
-    bool hasTargetVersionAtom = false;
-    for (auto profileCapAtomSet : profileCaps.getAtomSets())
-    {
-        for (auto atom : profileCapAtomSet)
-        {
-            if (isTargetVersionAtom((CapabilityName)atom))
-            {
-                atoms.add((CapabilityName)atom);
-                hasTargetVersionAtom = true;
-            }
-        }
-    }
 
     bool isGLSLTarget = false;
     switch(getTarget())
@@ -1728,28 +1716,41 @@ CapabilitySet TargetRequest::getTargetCaps()
         if (getOptionSet().shouldEmitSPIRVDirectly())
         {
             // Default to SPIRV 1.5 if the user has not specified a target version.
+            bool hasTargetVersionAtom = false;
+            profileCaps.join(CapabilitySet(CapabilityName::spirv_1_0));
+            for (auto profileCapAtomSet : profileCaps.getAtomSets())
+            {
+                for (auto atom : profileCapAtomSet)
+                {
+                    if (isTargetVersionAtom((CapabilityName)atom))
+                    {
+                        atoms.add((CapabilityName)atom);
+                        hasTargetVersionAtom = true;
+                    }
+                }
+            }
             if (!hasTargetVersionAtom)
             {
                 atoms.add(CapabilityName::spirv_1_5);
+            }
+            // If the user specified any SPIR-V extensions in the profile,
+            // pull them in.
+            for (auto profileCapAtomSet : profileCaps.getAtomSets())
+            {
+                for (auto atom : profileCapAtomSet)
+                {
+                    if (isSpirvExtensionAtom((CapabilityName)atom))
+                    {
+                        atoms.add((CapabilityName)atom);
+                        hasTargetVersionAtom = true;
+                    }
+                }
             }
         }
         else
         {
             isGLSLTarget = true;
             atoms.add(CapabilityName::glsl);
-        }
-        // If the user specified any SPIR-V extensions in the profile,
-        // pull them in.
-        for (auto profileCapAtomSet : profileCaps.getAtomSets())
-        {
-            for (auto atom : profileCapAtomSet)
-            {
-                if (isSpirvExtensionAtom((CapabilityName)atom))
-                {
-                    atoms.add((CapabilityName)atom);
-                    hasTargetVersionAtom = true;
-                }
-            }
         }
         break;
 
