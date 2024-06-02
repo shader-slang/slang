@@ -1739,6 +1739,8 @@ namespace Slang
 
         CapabilitySet getTargetCaps();
 
+        void setTargetCaps(CapabilitySet capSet);
+
         HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();
 
     private:

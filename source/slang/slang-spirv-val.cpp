@@ -44,7 +44,7 @@ SlangResult debugValidateSPIRV(const List<uint8_t>& spirv)
     CommandLine commandLine;
     commandLine.m_executableLocation.setName("spirv-val");
     commandLine.addArg("--target-env");
-    commandLine.addArg("vulkan1.2");
+    commandLine.addArg("vulkan1.3");
     commandLine.addArg("--scalar-block-layout");
     RefPtr<Process> p;
     const auto createResult = Process::create(commandLine, 0, p);

@@ -20,6 +20,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint threadId = dispatchThreadID.x;
     resultBuffer[threadId] = inputBuffers[0][threadId] + inputBuffers[1][threadId];
     // CHECK: OpCapability RuntimeDescriptorArray
-    // CHECK: OpExtension "SPV_EXT_descriptor_indexing"
     // BUFFER: 3
 }

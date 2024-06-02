@@ -55,62 +55,44 @@
 </Type>
   
 <Type Name="Slang::Dictionary&lt;*,*&gt;">
-    <DisplayString>{{ size={m_count} }}</DisplayString>
+    <DisplayString>{{ {map.m_values} }}</DisplayString>
     <Expand>
-        <Item Name="[size]">m_count</Item>
-        <Item Name="[capacity]">m_bucketCountMinusOne + 1</Item>
-        <CustomListItems MaxItemsPerView="5000" ExcludeView="Test">
-            <Variable Name="iBucket" InitialValue="0" />
-            <Variable Name="pBucket" InitialValue="m_hashMap" />
-            <Variable Name="isDeleted" InitialValue="0" />
-            <Variable Name="isEmpty" InitialValue="0" />
-            <Size>m_count</Size>
-            <Exec>pBucket = m_hashMap</Exec>
-            <Loop>
-                <If Condition="iBucket &gt;= m_bucketCountMinusOne">
-                    <Break/>
-                </If>
-                <Exec>
-                    isDeleted = m_marks.m_buffer.m_count &gt; (iBucket*2+1)/32
-                    ? ((m_marks.m_buffer.m_buffer[(iBucket*2+1)/32]&amp;(1&lt;&lt;(iBucket*2+1)%32)) != 0)
-                      : 0
-                 </Exec>
-                <Exec>
-                    isEmpty = m_marks.m_buffer.m_count &gt; (iBucket*2)/32
-                    ? ((m_marks.m_buffer.m_buffer[(iBucket*2)/32]&amp;(1&lt;&lt;(iBucket*2)%32)) == 0)
-                    : 1
-                </Exec>
-                <If Condition="isDeleted+isEmpty==0">
-                    <Item>*(m_hashMap + iBucket)</Item>
-                </If>
-                <Exec>iBucket++</Exec>
-            </Loop>
-        </CustomListItems>
+        <Item Name="[items]">map.m_values</Item>
+        <Item Name="map">map</Item>
     </Expand>
 </Type>
 
-    <Type Name="Slang::OrderedHashSet&lt;*&gt;">
-        <DisplayString>{{ size={dict._count} }}</DisplayString>
-        <Expand>
-            <LinkedListItems>
-                <Size>m_dict._count</Size>
-                <HeadPointer>m_dict.kvPairs.head</HeadPointer>
-                <NextPointer>next</NextPointer>
-                <ValueNode>value</ValueNode>
-            </LinkedListItems>
-        </Expand>
-    </Type>
-    <Type Name="Slang::OrderedDictionary&lt;*,*&gt;">
-        <DisplayString>{{ size={m_count} }}</DisplayString>
-        <Expand>
-            <LinkedListItems>
-                <Size>m_count</Size>
-                <HeadPointer>m_kvPairs.head</HeadPointer>
-                <NextPointer>next</NextPointer>
-                <ValueNode>value</ValueNode>
-            </LinkedListItems>
-        </Expand>
-    </Type>
+<Type Name="Slang::HashSet&lt;*&gt;">
+    <DisplayString>{{ {dict} }}</DisplayString>
+    <Expand>
+        <Item Name="dict">dict</Item>
+    </Expand>
+</Type>
+    
+<Type Name="Slang::OrderedHashSet&lt;*&gt;">
+    <DisplayString>{{ size={dict._count} }}</DisplayString>
+    <Expand>
+        <LinkedListItems>
+            <Size>m_dict._count</Size>
+            <HeadPointer>m_dict.kvPairs.head</HeadPointer>
+            <NextPointer>next</NextPointer>
+            <ValueNode>value</ValueNode>
+        </LinkedListItems>
+    </Expand>
+</Type>
+
+<Type Name="Slang::OrderedDictionary&lt;*,*&gt;">
+    <DisplayString>{{ size={m_count} }}</DisplayString>
+    <Expand>
+        <LinkedListItems>
+            <Size>m_count</Size>
+            <HeadPointer>m_kvPairs.head</HeadPointer>
+            <NextPointer>next</NextPointer>
+            <ValueNode>value</ValueNode>
+        </LinkedListItems>
+    </Expand>
+</Type>
+
 <Type Name="Slang::RefPtr&lt;*&gt;">
     <SmartPointer Usage="Minimal">pointer</SmartPointer>
     <DisplayString Condition="pointer == 0">empty</DisplayString>

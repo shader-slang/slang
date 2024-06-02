@@ -4413,6 +4413,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 return LoweredValInfo::simple(getBuilder()->getIntValue(irType, 0));
             }
+            else if (declRef.as<InterfaceDecl>())
+            {
+                return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
+            }
             else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
                 List<IRInst*> args;
@@ -11595,6 +11599,9 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
     builder->addLayoutDecoration(irModule->getModuleInst(), irGlobalScopeVarLayout);
 
+    auto latestSpirvAtom = getLatestSpirvAtom();
+    auto latestMetalAtom = getLatestMetalAtom();
+
     for( auto entryPointLayout : programLayout->entryPoints )
     {
         auto funcDeclRef = entryPointLayout->entryPoint;
@@ -11611,6 +11618,19 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         if( !irFunc->findDecoration<IRLinkageDecoration>() )
         {
             builder->addImportDecoration(irFunc, getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
+        }
+
+        for (auto atomSet : as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements.getAtomSets())
+        {
+            for (auto atomVal : atomSet)
+            {
+                auto atom = (CapabilityName)atomVal;
+                if (atom >= CapabilityName::spirv_1_0 && atom <= latestSpirvAtom ||
+                    atom >= CapabilityName::metallib_2_3 && atom <= latestMetalAtom)
+                {
+                    builder->addRequireCapabilityAtomDecoration(irFunc, atom);
+                }
+            }
         }
 
         auto irEntryPointLayout = lowerEntryPointLayout(context, entryPointLayout);
