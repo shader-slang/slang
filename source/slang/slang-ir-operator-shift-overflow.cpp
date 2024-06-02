@@ -11,7 +11,6 @@ namespace Slang {
     class DiagnosticSink;
     struct IRModule;
 
-    //struct 
     void checkForOperatorShiftOverflowRecursive(
         IRInst* inst,
         DiagnosticSink* sink)
@@ -70,7 +69,6 @@ namespace Slang {
                     if (sizeofLhs * 8 <= shiftAmount)
                     {
                         (void)lhsType;
-                        printf("JKWAK found 'operator<<' shifting by %" PRId64 "\n", shiftAmount);
                         sink->diagnose(opShiftLeft, Diagnostics::operatorShiftLeftOverflow, lhsType, shiftAmount);
                     }
                 }
