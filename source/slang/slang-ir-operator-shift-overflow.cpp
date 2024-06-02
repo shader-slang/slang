@@ -35,7 +35,7 @@ namespace Slang {
                     IRInst* lhs = opShiftLeft->getOperand(0);
                     IRType* lhsType = lhs->getDataType();
 
-                    IRIntegerValue sizeofLhs = 1;
+                    IRIntegerValue sizeofLhs;
                     switch (lhsType->getOp())
                     {
                     case kIROp_BoolType:
@@ -64,6 +64,9 @@ namespace Slang {
                     case kIROp_UIntPtrType:
                         sizeofLhs = 8;
                         break;
+
+                    default:
+                        continue;
                     }
 
                     if (sizeofLhs * 8 <= shiftAmount)
