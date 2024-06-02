@@ -2235,6 +2235,11 @@ SpvInst* emitOpKill(SpvInstParent* parent, IRInst* inst)
     return emitInst(parent, inst, SpvOpKill);
 }
 
+SpvInst* emitOpDemoteToHelperInvocation(SpvInstParent* parent, IRInst* inst)
+{
+    return emitInst(parent, inst, SpvOpDemoteToHelperInvocation);
+}
+
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpReturn
 SpvInst* emitOpReturn(SpvInstParent* parent, IRInst* inst)
 {

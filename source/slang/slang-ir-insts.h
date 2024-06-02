@@ -351,6 +351,18 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
     }
 };
 
+struct IRRequireCapabilityAtomDecoration : IRDecoration
+{
+    enum { kOp = kIROp_RequireCapabilityAtomDecoration };
+    IR_LEAF_ISA(RequireCapabilityAtomDecoration)
+
+    IRConstant* getCapabilityAtomOperand() { return cast<IRConstant>(getOperand(0)); }
+    CapabilityName getAtom()
+    {
+        return (CapabilityName)getCapabilityAtomOperand()->value.intVal;
+    }
+};
+
 struct IRRequireCUDASMVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireCUDASMVersionDecoration };
@@ -4532,6 +4544,11 @@ public:
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
         addDecoration(value, kIROp_RequireCUDASMVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
+    }
+
+    void addRequireCapabilityAtomDecoration(IRInst* value, CapabilityName atom)
+    {
+        addDecoration(value, kIROp_RequireCapabilityAtomDecoration, getIntValue(getUIntType(), IRIntegerValue(atom)));
     }
 
     void addPatchConstantFuncDecoration(IRInst* value, IRInst* patchConstantFunc)
