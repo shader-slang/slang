@@ -2538,6 +2538,9 @@ bool isBuiltin(IRInst* inst);
     // Get the enclosuing function of an instruction.
 IRFunc* getParentFunc(IRInst* inst);
 
+    // Is child a descendent of inst
+bool hasDescendent(IRInst* inst, IRInst* child);
+
     // True if moving this inst will not change the semantics of the program
 bool isMovableInst(IRInst* inst);
 
