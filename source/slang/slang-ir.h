@@ -46,6 +46,8 @@ enum class AddressSpace
     Global = 2,
     GroupShared = 3,
     Uniform = 4,
+    // specific address space for payload data in metal
+    MetalObjectData = 5,
 };
 
 typedef unsigned int IROpFlags;
@@ -1548,6 +1550,8 @@ struct IRMeshOutputType : IRType
 SIMPLE_IR_TYPE(VerticesType, MeshOutputType)
 SIMPLE_IR_TYPE(IndicesType, MeshOutputType)
 SIMPLE_IR_TYPE(PrimitivesType, MeshOutputType)
+
+SIMPLE_IR_TYPE(MetalMeshGridPropertiesType, Type)
 
 SIMPLE_IR_TYPE(GLSLInputAttachmentType, Type)
 SIMPLE_IR_PARENT_TYPE(ParameterGroupType, PointerLikeType)

@@ -165,6 +165,9 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
         case LayoutResourceKind::VaryingInput:
             m_writer->emit(" [[stage_in]]");
             break;
+        case LayoutResourceKind::MetalPayload:
+            m_writer->emit(" [[payload]]");
+            break;
         }
     }
     if (auto sysSemanticAttr = layout->findSystemValueSemanticAttr())
@@ -190,6 +193,12 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoi
         break;
     case Stage::Compute:
         m_writer->emit("[[kernel]] ");
+        break;
+    case Stage::Mesh:
+        m_writer->emit("[[mesh]] ");
+        break;
+    case Stage::Amplification:
+        m_writer->emit("[[object]] ");
         break;
     default:
         SLANG_ABORT_COMPILATION("unsupported stage.");
@@ -608,18 +617,26 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             {
             case AddressSpace::Global:
                 m_writer->emit(" device");
+                m_writer->emit("*");
                 break;
             case AddressSpace::Uniform:
                 m_writer->emit(" constant");
+                m_writer->emit("*");
                 break;
             case AddressSpace::ThreadLocal:
                 m_writer->emit(" thread");
+                m_writer->emit("*");
                 break;
             case AddressSpace::GroupShared:
                 m_writer->emit(" threadgroup");
+                m_writer->emit("*");
+                break;
+            case AddressSpace::MetalObjectData:
+                m_writer->emit(" object_data");
+                // object data is passed by reference
+                m_writer->emit("&");
                 break;
             }
-            m_writer->emit("*");
             return;
         }
         case kIROp_ArrayType:
@@ -629,6 +646,11 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(", ");
             emitVal(type->getOperand(1), getInfo(EmitOp::General));
             m_writer->emit(">");
+            return;
+        }
+        case kIROp_MetalMeshGridPropertiesType:
+        {
+            m_writer->emit("mesh_grid_properties ");
             return;
         }
         default:
@@ -938,6 +960,9 @@ void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRI
         break;
     case AddressSpace::ThreadLocal:
         m_writer->emit("thread ");
+        break;
+    case AddressSpace::MetalObjectData:
+        m_writer->emit("object_data ");
         break;
     default:
         break;
