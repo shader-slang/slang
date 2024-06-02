@@ -1,14 +1,17 @@
 // slang-ir-operator-shift-overflow.cpp
 #include "slang-ir-operator-shift-overflow.h"
 
+#include "../../slang.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 
 namespace Slang {
 
     class DiagnosticSink;
     struct IRModule;
 
+    //struct 
     void checkForOperatorShiftOverflowRecursive(
         IRInst* inst,
         DiagnosticSink* sink)
@@ -30,22 +33,51 @@ namespace Slang {
                         continue;
 
                     IRIntegerValue shiftAmount = rhsLit->getValue();
-
                     IRInst* lhs = opShiftLeft->getOperand(0);
-                    IRUse lhsType = lhs->typeUse;
+                    IRType* lhsType = lhs->getDataType();
 
-                    // TODO: Not sure how to get the size of the type.
+                    IRIntegerValue sizeofLhs = 1;
+                    switch (lhsType->getOp())
+                    {
+                    case kIROp_BoolType:
+                    case kIROp_Int8Type:
+                    case kIROp_UInt8Type:
+                    case kIROp_CharType:
+                        sizeofLhs = 1;
+                        break;
+
+                    case kIROp_Int16Type:
+                    case kIROp_UInt16Type:
+                        sizeofLhs = 2;
+                        break;
+
+                    case kIROp_IntType:
+                    case kIROp_UIntType:
+                        sizeofLhs = 4;
+                        break;
+
+                    case kIROp_Int64Type:
+                    case kIROp_UInt64Type:
+                        sizeofLhs = 8;
+                        break;
+
+                    case kIROp_IntPtrType:
+                    case kIROp_UIntPtrType:
+                        sizeofLhs = 8;
+                        break;
+                    }
+
+                    if (sizeofLhs * 8 <= shiftAmount)
                     {
                         (void)lhsType;
                         printf("JKWAK found 'operator<<' shifting by %" PRId64 "\n", shiftAmount);
-                        //sink->diagnose(child, Diagnostics::operatorShiftLeftOverflow);
+                        sink->diagnose(opShiftLeft, Diagnostics::operatorShiftLeftOverflow, lhsType, shiftAmount);
                     }
                 }
             }
         }
 
-        // TODO: Need to figure out if this can be just "inst->getChildren()"
-        for (auto childInst : inst->getDecorationsAndChildren())
+        for (auto childInst : inst->getChildren())
         {
             checkForOperatorShiftOverflowRecursive(childInst, sink);
         }
