@@ -521,11 +521,7 @@ struct SPIRVEmitContext
 
         // > Version nuumber
         //
-
-        // We are targeting SPIRV 1.5 for now.
-
-        static const uint32_t spvVersion1_5_0 = 0x00010500;
-        m_words.add(spvVersion1_5_0);
+        m_words.add(m_spvVersion);
 
         // > Generator's magic number.
         //
@@ -1280,6 +1276,27 @@ struct SPIRVEmitContext
         return result;
     }
 
+    SpvInst* ensureExtensionDeclarationBeforeSpv14(UnownedStringSlice name)
+    {
+        if (isSpirv14OrLater())
+            return nullptr;
+        return ensureExtensionDeclaration(name);
+    }
+
+    SpvInst* ensureExtensionDeclarationBeforeSpv15(UnownedStringSlice name)
+    {
+        if (isSpirv15OrLater())
+            return nullptr;
+        return ensureExtensionDeclaration(name);
+    }
+
+    SpvInst* ensureExtensionDeclarationBeforeSpv16(UnownedStringSlice name)
+    {
+        if (isSpirv16OrLater())
+            return nullptr;
+        return ensureExtensionDeclaration(name);
+    }
+
     bool hasExtensionDeclaration(const UnownedStringSlice& name)
     {
         return m_extensionInsts.containsKey(name);
@@ -1403,6 +1420,7 @@ struct SPIRVEmitContext
                     auto spvValueType = ensureInst(valueType);
                     valueTypeId = getID(spvValueType);
                 }
+
                 auto resultSpvType = emitOpTypePointer(
                     inst,
                     storageClass,
@@ -1463,8 +1481,11 @@ struct SPIRVEmitContext
                 if (structSize >= (uint64_t)IRSizeAndAlignment::kIndeterminateSize)
                 {
                     IRBuilder builder(inst);
-                    auto decoration = builder.addDecoration(inst, kIROp_SPIRVBlockDecoration);
-                    emitDecoration(getID(spvStructType), decoration);
+                    if (isSpirv14OrLater() || !inst->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+                    {
+                        auto decoration = builder.addDecoration(inst, kIROp_SPIRVBlockDecoration);
+                        emitDecoration(getID(spvStructType), decoration);
+                    }
                 }
                 emitLayoutDecorations(as<IRStructType>(inst), getID(spvStructType));
                 return spvStructType;
@@ -2248,7 +2269,7 @@ struct SPIRVEmitContext
                 emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), decor, varInst, SpvDecorationPerPrimitiveEXT);
                 break;
             case kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration:
-                ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_descriptor_indexing"));
+                ensureExtensionDeclarationBeforeSpv15(UnownedStringSlice("SPV_EXT_descriptor_indexing"));
                 requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
                 break;
             }
@@ -2540,6 +2561,12 @@ struct SPIRVEmitContext
                 emitLocalInst(spvBlock, irInst);
                 if (irInst->getOp() == kIROp_loop)
                     pendingLoopInsts.add(as<IRLoop>(irInst));
+                if (irInst->getOp() == kIROp_discard && !shouldEmitDiscardAsDemote())
+                {
+                    // If we emitted OpKill for discard, we should stop emitting anything
+                    // after this inst in the block, because OpKill is a terminator inst.
+                    break;
+                }
             }
         }
 
@@ -2584,6 +2611,11 @@ struct SPIRVEmitContext
             }
         }
         return false;
+    }
+
+    bool shouldEmitDiscardAsDemote()
+    {
+        return (isSpirv16OrLater() || m_useDemoteToHelperInvocationExtension);
     }
 
     // The instructions that appear inside the basic blocks of
@@ -2785,7 +2817,16 @@ struct SPIRVEmitContext
                 result = emitOpReturnValue(parent, inst, as<IRReturn>(inst)->getVal());
             break;
         case kIROp_discard:
-            result = emitOpKill(parent, inst);
+            if (shouldEmitDiscardAsDemote())
+            {
+                ensureExtensionDeclarationBeforeSpv16(toSlice("SPV_EXT_demote_to_helper_invocation"));
+                requireSPIRVCapability(SpvCapabilityDemoteToHelperInvocation);
+                result = emitOpDemoteToHelperInvocation(parent, inst);
+            }
+            else
+            {
+                result = emitOpKill(parent, inst);
+            }
             break;
         case kIROp_BeginFragmentShaderInterlock:
             ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_fragment_shader_interlock"));
@@ -3224,6 +3265,17 @@ struct SPIRVEmitContext
                             auto refSet = m_referencingEntryPoints.tryGetValue(globalInst);
                             if (refSet && refSet->contains(entryPoint))
                             {
+                                if (!isSpirv14OrLater())
+                                {
+                                    // Prior to SPIRV 1.4, we can only reference In and Out variables
+                                    // in the interface part.
+                                    if (auto ptrType = as<IRPtrTypeBase>(globalInst->getDataType()))
+                                    {
+                                        auto addrSpace = ptrType->getAddressSpace();
+                                        if (addrSpace != SpvStorageClassInput && addrSpace != SpvStorageClassOutput)
+                                            continue;
+                                    }
+                                }
                                 paramsSet.add(spvGlobalInst);
                                 params.add(spvGlobalInst);
                                 referencedBuiltinIRVars.add(globalInst);
@@ -3406,6 +3458,8 @@ struct SPIRVEmitContext
 
         case kIROp_SPIRVNonUniformResourceDecoration:
             {
+                ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
+
                 requireSPIRVCapability(SpvCapabilityShaderNonUniform);
                 emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
@@ -3548,6 +3602,7 @@ struct SPIRVEmitContext
                 break;
             case kIROp_SemanticDecoration:
                 {
+                    ensureExtensionDeclarationBeforeSpv14(toSlice("SPV_GOOGLE_hlsl_functionality1"));
                     emitOpDecorateString(getSection(SpvLogicalSectionID::Annotations),
                                                decoration,
                                                dstID,
@@ -3558,6 +3613,7 @@ struct SPIRVEmitContext
             case kIROp_UserTypeNameDecoration:
                 {
                     ensureExtensionDeclaration(toSlice("SPV_GOOGLE_user_type"));
+                    ensureExtensionDeclarationBeforeSpv14(toSlice("SPV_GOOGLE_hlsl_functionality1"));
                     emitOpDecorateString(getSection(SpvLogicalSectionID::Annotations),
                         decoration,
                         dstID,
@@ -3676,6 +3732,7 @@ struct SPIRVEmitContext
                 {
                     if (shouldEmitSPIRVReflectionInfo())
                     {
+                        ensureExtensionDeclarationBeforeSpv14(toSlice("SPV_GOOGLE_hlsl_functionality1"));
                         emitOpMemberDecorateString(
                             getSection(SpvLogicalSectionID::Annotations),
                             nullptr,
@@ -3980,7 +4037,10 @@ struct SPIRVEmitContext
                 }
                 else if (semanticName == "sv_rendertargetarrayindex")
                 {
-                    requireSPIRVCapability(SpvCapabilityShaderLayer);
+                    if (isSpirv14OrLater())
+                        requireSPIRVCapability(SpvCapabilityShaderLayer);
+                    else
+                        requireSPIRVCapability(SpvCapabilityGeometry);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLayer);
                 }
                 else if (semanticName == "sv_sampleindex")
@@ -4840,11 +4900,12 @@ struct SPIRVEmitContext
     {
         //"%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1;"
         IRBuilder builder(inst);
+        auto storageClass = isSpirv14OrLater()? SpvStorageClassStorageBuffer : SpvStorageClassUniform;
         return emitOpAccessChain(
             parent,
             inst,
             // Make sure the resulting pointer has the correct storage class
-            getPtrTypeWithAddressSpace(cast<IRPtrTypeBase>(inst->getDataType()), SpvStorageClassStorageBuffer),
+            getPtrTypeWithAddressSpace(cast<IRPtrTypeBase>(inst->getDataType()), storageClass),
             inst->getOperand(0),
             makeArray(emitIntConstant(0, builder.getIntType()), ensureInst(inst->getOperand(1)))
         );

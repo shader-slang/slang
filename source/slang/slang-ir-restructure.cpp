@@ -255,7 +255,6 @@ namespace Slang
             case kIROp_Unreachable:
             case kIROp_MissingReturn:
             case kIROp_Return:
-            case kIROp_discard:
             case kIROp_GenericAsm:
                 // These cases are all simple terminators that can be handled as-is
                 // without needing to construct a separate `Region` to encapsulate them.
