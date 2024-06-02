@@ -6,7 +6,5 @@ namespace Slang
 {
     class DiagnosticSink;
 
-    void legalizeDispatchMeshPayloadForMetal(IRModule* module);
-
     void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink);
 }
