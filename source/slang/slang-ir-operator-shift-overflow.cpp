@@ -20,29 +20,33 @@ namespace Slang {
         {
             for (auto block : code->getBlocks())
             {
-                for (auto opShiftLeft : block->getChildren())
+                for (auto opInst : block->getChildren())
                 {
-                    if (opShiftLeft->getOp() != kIROp_Lsh)
-                        continue;
-
-                    SLANG_ASSERT(opShiftLeft->getOperandCount() == 2);
-
-                    IRInst* rhs = opShiftLeft->getOperand(1);
-                    auto rhsLit = as<IRIntLit>(rhs);
-                    if (!rhsLit)
-                        continue;
-
-                    IRInst* lhs = opShiftLeft->getOperand(0);
-                    IRType* lhsType = lhs->getDataType();
-
-                    IRSizeAndAlignment sizeAlignment;
-                    if (SLANG_FAILED(getNaturalSizeAndAlignment(optionSet, lhsType, &sizeAlignment)))
-                        continue;
-
-                    IRIntegerValue shiftAmount = rhsLit->getValue();
-                    if (sizeAlignment.size * 8 <= shiftAmount)
+                    switch (opInst->getOp())
                     {
-                        sink->diagnose(opShiftLeft, Diagnostics::operatorShiftLeftOverflow, lhsType, shiftAmount);
+                    case kIROp_Lsh:
+                    {
+                        SLANG_ASSERT(opInst->getOperandCount() == 2);
+
+                        IRInst* rhs = opInst->getOperand(1);
+                        auto rhsLit = as<IRIntLit>(rhs);
+                        if (!rhsLit)
+                            continue;
+
+                        IRInst* lhs = opInst->getOperand(0);
+                        IRType* lhsType = lhs->getDataType();
+
+                        IRSizeAndAlignment sizeAlignment;
+                        if (SLANG_FAILED(getNaturalSizeAndAlignment(optionSet, lhsType, &sizeAlignment)))
+                            continue;
+
+                        IRIntegerValue shiftAmount = rhsLit->getValue();
+                        if (sizeAlignment.size * 8 <= shiftAmount)
+                        {
+                            sink->diagnose(opInst, Diagnostics::operatorShiftLeftOverflow, lhsType, shiftAmount);
+                        }
+                        break;
+                    }
                     }
                 }
             }
