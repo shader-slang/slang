@@ -165,6 +165,7 @@ struct IntroduceExplicitGlobalContextPass
         // type with a name hint of `KernelContext`.
         //
         m_contextStructType = builder.createStructType();
+        builder.addExternCppDecoration(m_contextStructType, UnownedStringSlice(""));
         builder.addNameHintDecoration(m_contextStructType, UnownedTerminatedStringSlice("KernelContext"));
 
         // The context will usually be passed around by pointer,
