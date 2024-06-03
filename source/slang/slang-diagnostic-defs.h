@@ -740,7 +740,7 @@ DIAGNOSTIC(41021, Error, differentiableFuncMustHaveOutput, "a differentiable fun
 DIAGNOSTIC(41022, Error, differentiableFuncMustHaveInput, "a differentiable function must have at least one differentiable input.")
 DIAGNOSTIC(41023, Error, getStringHashMustBeOnStringLiteral, "getStringHash can only be called when argument is statically resolvable to a string literal")
 
-DIAGNOSTIC(41030, Warning, operatorShiftLeftOverflow, "left shift amount, `$1`, is bigger than the bit count of type, `$0`.")
+DIAGNOSTIC(41030, Warning, operatorShiftLeftOverflow, "left shift amount exceeds the number of bits, (`$0` << `$1`).")
 
 DIAGNOSTIC(41901, Error, unsupportedUseOfLValueForAutoDiff, "unsupported use of L-value for auto differentiation.")
 DIAGNOSTIC(41902, Error, cannotDifferentiateDynamicallyIndexedData, "cannot auto-differentiate mixed read/write access to dynamically indexed data in '$0'.")
