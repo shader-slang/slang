@@ -55,7 +55,7 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] =
     { SLANG_CPP_PYTORCH_BINDING, "cpp,c++,cxx",                                 "torch,torch-binding,torch-cpp,torch-cpp-binding", "C++ for pytorch binding" },
     { SLANG_HOST_CPP_SOURCE, "cpp,c++,cxx",                                     "host-cpp,host-c++,host-cxx", "C++ source for host execution"},
     { SLANG_HOST_EXECUTABLE,"exe",                                              "exe,executable",           "Executable binary" },
-    { SLANG_SHADER_SHARED_LIBRARY, "shader-dll,shader-so",                      "shader-sharedlib,sahder-sharedlibrary,shader-dll", "Shared library/Dll for shader kernel" },
+    { SLANG_SHADER_SHARED_LIBRARY, "shader-dll,shader-so",                      "shader-sharedlib,shader-sharedlibrary,shader-dll", "Shared library/Dll for shader kernel" },
     { SLANG_HOST_SHARED_LIBRARY, "dll,so",                                      "sharedlib,sharedlibrary,dll", "Shared library/Dll for host execution" },
     { SLANG_CUDA_SOURCE,    "cu",                                               "cuda,cu",                  "CUDA source code"  },
     { SLANG_CUDA_HEADER,    "cuh",                                              "cuh",                      "CUDA source header"  },

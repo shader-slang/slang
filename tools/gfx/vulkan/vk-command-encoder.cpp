@@ -105,12 +105,10 @@ void PipelineCommandEncoder::uploadBufferDataImpl(
         data);
 }
 
-Result PipelineCommandEncoder::bindRootShaderObjectImpl(VkPipelineBindPoint bindPoint)
+Result PipelineCommandEncoder::bindRootShaderObjectImpl(RootShaderObjectImpl* rootShaderObject, VkPipelineBindPoint bindPoint)
 {
     // Obtain specialized root layout.
-    auto rootObjectImpl = &m_commandBuffer->m_rootObject;
-
-    auto specializedLayout = rootObjectImpl->getSpecializedLayout();
+    auto specializedLayout = rootShaderObject->getSpecializedLayout();
     if (!specializedLayout)
         return SLANG_FAIL;
 
@@ -142,7 +140,7 @@ Result PipelineCommandEncoder::bindRootShaderObjectImpl(VkPipelineBindPoint bind
     //
     // TODO: It could probably bind the descriptor sets as well.
     //
-    rootObjectImpl->bindAsRoot(this, context, specializedLayout);
+    rootShaderObject->bindAsRoot(this, context, specializedLayout);
 
     // Once we've filled in all the descriptor sets, we bind them
     // to the pipeline at once.
@@ -167,6 +165,7 @@ Result PipelineCommandEncoder::setPipelineStateImpl(
     IPipelineState* state, IShaderObject** outRootObject)
 {
     m_currentPipeline = static_cast<PipelineStateImpl*>(state);
+    m_commandBuffer->m_mutableRootShaderObject = nullptr;
     SLANG_RETURN_ON_FAIL(m_commandBuffer->m_rootObject.init(
         m_commandBuffer->m_renderer,
         m_currentPipeline->getProgram<ShaderProgramImpl>()->m_rootObjectLayout));
@@ -175,12 +174,10 @@ Result PipelineCommandEncoder::setPipelineStateImpl(
 }
 
 Result PipelineCommandEncoder::setPipelineStateWithRootObjectImpl(
-    IPipelineState* state, IShaderObject* inObject)
+    IPipelineState* state, IShaderObject* rootObject)
 {
-    IShaderObject* rootObject = nullptr;
-    SLANG_RETURN_ON_FAIL(setPipelineStateImpl(state, &rootObject));
-    static_cast<ShaderObjectBase*>(rootObject)
-        ->copyFrom(inObject, m_commandBuffer->m_transientHeap);
+    m_currentPipeline = static_cast<PipelineStateImpl*>(state);
+    m_commandBuffer->m_mutableRootShaderObject = static_cast<MutableRootShaderObjectImpl*>(rootObject);
     return SLANG_OK;
 }
 
@@ -190,15 +187,18 @@ Result PipelineCommandEncoder::bindRenderState(VkPipelineBindPoint pipelineBindP
 
     // Get specialized pipeline state and bind it.
     //
+    RootShaderObjectImpl* rootObjectImpl = m_commandBuffer->m_mutableRootShaderObject
+        ? m_commandBuffer->m_mutableRootShaderObject.Ptr()
+        : &m_commandBuffer->m_rootObject;
     RefPtr<PipelineStateBase> newPipeline;
     SLANG_RETURN_ON_FAIL(m_device->maybeSpecializePipeline(
-        m_currentPipeline, &m_commandBuffer->m_rootObject, newPipeline));
+        m_currentPipeline, rootObjectImpl, newPipeline));
     PipelineStateImpl* newPipelineImpl = static_cast<PipelineStateImpl*>(newPipeline.Ptr());
 
     SLANG_RETURN_ON_FAIL(newPipelineImpl->ensureAPIPipelineStateCreated());
     m_currentPipeline = newPipelineImpl;
 
-    bindRootShaderObjectImpl(pipelineBindPoint);
+    bindRootShaderObjectImpl(rootObjectImpl, pipelineBindPoint);
 
     auto pipelineBindPointId = getBindPointIndex(pipelineBindPoint);
     if (m_boundPipelines[pipelineBindPointId] != newPipelineImpl->m_pipeline)
@@ -665,19 +665,10 @@ void ResourceCommandEncoder::_clearBuffer(
     VkBuffer buffer, uint64_t bufferSize, const IResourceView::Desc& desc, uint32_t clearValue)
 {
     auto& api = m_commandBuffer->m_renderer->m_api;
-
-    FormatInfo info = {};
-    gfxGetFormatInfo(desc.format, &info);
-    auto texelSize = info.blockSizeInBytes;
-    auto elementCount = desc.bufferRange.elementCount;
-    auto clearStart = (uint64_t)desc.bufferRange.firstElement * texelSize;
-    auto clearSize = bufferSize - clearStart;
-    if (elementCount != 0)
-    {
-        clearSize = (uint64_t)elementCount * texelSize;
-    }
+    auto clearOffset = desc.bufferRange.offset;
+    auto clearSize = desc.bufferRange.size == 0 ? bufferSize - clearOffset : desc.bufferRange.size;
     api.vkCmdFillBuffer(
-        m_commandBuffer->m_commandBuffer, buffer, clearStart, clearSize, clearValue);
+        m_commandBuffer->m_commandBuffer, buffer, clearOffset, clearSize, clearValue);
 }
 
 void ResourceCommandEncoder::clearResourceView(
@@ -724,13 +715,10 @@ void ResourceCommandEncoder::clearResourceView(
                         clearValue->color.uintValues[2] == clearValue->color.uintValues[0] &&
                         clearValue->color.uintValues[3] == clearValue->color.uintValues[0]);
                     auto viewImpl = static_cast<PlainBufferResourceViewImpl*>(viewImplBase);
-                    uint64_t clearStart = viewImpl->m_desc.bufferRange.firstElement;
-                    uint64_t clearSize = viewImpl->m_desc.bufferRange.elementCount;
-
+                    uint64_t clearStart = viewImpl->m_desc.bufferRange.offset;
+                    uint64_t clearSize = viewImpl->m_desc.bufferRange.size;
                     if (clearSize == 0)
                         clearSize = viewImpl->m_buffer->getDesc()->sizeInBytes - clearStart;
-                    if (viewImpl->m_desc.bufferElementSize != 0)
-                        clearSize *= viewImpl->m_desc.bufferElementSize;
                     api.vkCmdFillBuffer(
                         m_commandBuffer->m_commandBuffer,
                         viewImpl->m_buffer->m_buffer.m_buffer,
@@ -1443,9 +1431,9 @@ void RayTracingCommandEncoder::deserializeAccelerationStructure(
         m_commandBuffer->m_commandBuffer, &copyInfo);
 }
 
-void RayTracingCommandEncoder::bindPipeline(IPipelineState* pipeline, IShaderObject** outRootObject)
+Result RayTracingCommandEncoder::bindPipeline(IPipelineState* pipeline, IShaderObject** outRootObject)
 {
-    setPipelineStateImpl(pipeline, outRootObject);
+    return setPipelineStateImpl(pipeline, outRootObject);
 }
 
 Result RayTracingCommandEncoder::bindPipelineWithRootObject(
@@ -1492,11 +1480,10 @@ Result RayTracingCommandEncoder::dispatchRays(
     hitSBT.stride = alignedHandleSize;
     hitSBT.size = shaderTableImpl->m_hitTableSize;
 
-    // TODO: Are callable shaders needed?
     VkStridedDeviceAddressRegionKHR callableSBT;
-    callableSBT.deviceAddress = 0;
-    callableSBT.stride = 0;
-    callableSBT.size = 0;
+    callableSBT.deviceAddress = hitSBT.deviceAddress + hitSBT.size;
+    callableSBT.stride = alignedHandleSize;
+    callableSBT.size = shaderTableImpl->m_callableTableSize;
 
     vkApi.vkCmdTraceRaysKHR(
         vkCommandBuffer,

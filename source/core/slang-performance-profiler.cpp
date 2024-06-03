@@ -39,14 +39,14 @@ namespace Slang
             for (auto func : data)
             {
                 out << func.key << ": \t";
-                out << func.value.invocationCount << "\t" << func.value.duration.count()/1000000 << "\n";
+                out << func.value.invocationCount << "\t" << func.value.duration.count() / 1000000.0f << "\n";
             }
         }
     };
 
     PerformanceProfiler* Slang::PerformanceProfiler::getProfiler()
     {
-        static PerformanceProfilerImpl profiler = PerformanceProfilerImpl();
+        thread_local static PerformanceProfilerImpl profiler = PerformanceProfilerImpl();
         return &profiler;
     }
 }

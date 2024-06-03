@@ -351,6 +351,18 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
     }
 };
 
+struct IRRequireCapabilityAtomDecoration : IRDecoration
+{
+    enum { kOp = kIROp_RequireCapabilityAtomDecoration };
+    IR_LEAF_ISA(RequireCapabilityAtomDecoration)
+
+    IRConstant* getCapabilityAtomOperand() { return cast<IRConstant>(getOperand(0)); }
+    CapabilityName getAtom()
+    {
+        return (CapabilityName)getCapabilityAtomOperand()->value.intVal;
+    }
+};
+
 struct IRRequireCUDASMVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireCUDASMVersionDecoration };
@@ -2252,6 +2264,10 @@ struct IRLayoutDecoration : IRDecoration
 };
 
 //
+struct IRAlignOf : IRInst
+{
+    IRInst* getBaseOp() { return getOperand(0); }
+};
 
 struct IRCall : IRInst
 {
@@ -3387,6 +3403,8 @@ public:
     IRBasicType* getInt64Type();
     IRBasicType* getUIntType();
     IRBasicType* getUInt64Type();
+    IRBasicType* getUInt16Type();
+    IRBasicType* getUInt8Type();
     IRBasicType* getCharType();
     IRStringType* getStringType();
     IRNativeStringType* getNativeStringType();
@@ -3435,6 +3453,9 @@ public:
     IRConstRefType* getConstRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
+    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace) { return getPtrType(op, valueType, (IRIntegerValue)addressSpace); }
+    IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace) { return getPtrType(kIROp_PtrType, valueType, (IRIntegerValue)addressSpace); }
+
     IRTextureTypeBase* getTextureType(
         IRType* elementType,
         IRInst* shape,
@@ -3570,6 +3591,11 @@ public:
         return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
     }
 
+    IRMetalMeshGridPropertiesType* getMetalMeshGridPropertiesType()
+    {
+        return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
+    }
+
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
     IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex = nullptr);
@@ -3669,6 +3695,13 @@ public:
         IRType*                 type,
         IRInst*                 func,
         List<IRInst*> const&    args)
+    {
+        return emitCallInst(type, func, args.getCount(), args.getBuffer());
+    }
+    IRCall* emitCallInst(
+        IRType* type,
+        IRInst* func,
+        ArrayView<IRInst*> args)
     {
         return emitCallInst(type, func, args.getCount(), args.getBuffer());
     }
@@ -4168,6 +4201,16 @@ public:
         UInt            caseArgCount,
         IRInst* const* caseArgs);
 
+    IRInst* emitBeginFragmentShaderInterlock()
+    {
+        return emitIntrinsicInst(getVoidType(), kIROp_BeginFragmentShaderInterlock, 0, nullptr);
+    }
+
+    IRInst* emitEndFragmentShaderInterlock()
+    {
+        return emitIntrinsicInst(getVoidType(), kIROp_EndFragmentShaderInterlock, 0, nullptr);
+    }
+
     IRGlobalGenericParam* emitGlobalGenericParam(
         IRType* type);
 
@@ -4501,6 +4544,11 @@ public:
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
         addDecoration(value, kIROp_RequireCUDASMVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
+    }
+
+    void addRequireCapabilityAtomDecoration(IRInst* value, CapabilityName atom)
+    {
+        addDecoration(value, kIROp_RequireCapabilityAtomDecoration, getIntValue(getUIntType(), IRIntegerValue(atom)));
     }
 
     void addPatchConstantFuncDecoration(IRInst* value, IRInst* patchConstantFunc)
@@ -4942,7 +4990,7 @@ IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*         val,
         CapabilityName  targetCapabilityAtom);
 
-bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition);
+bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition, IRInst*& outInst);
 
 inline IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(
     IRInst* inInst,

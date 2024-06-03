@@ -316,6 +316,14 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
         return SLANG_FAIL;
     }
 
+#ifdef _DEBUG
+    // Print a message in debug builds to notice the user that compiling the stdlib
+    // can take a while.
+    time_t beginTime;
+    time(&beginTime);
+    fprintf(stderr, "Compiling stdlib on debug build, this can take a while.\n");
+#endif
+
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     StringBuilder stdLibSrcBuilder;
     stdLibSrcBuilder
@@ -366,6 +374,11 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
     finalizeSharedASTBuilder();
 
+#ifdef _DEBUG
+    time_t endTime;
+    time(&endTime);
+    fprintf(stderr, "Compiling stdlib took %.2f seconds.\n", difftime(endTime, beginTime));
+#endif
     return SLANG_OK;
 }
 
@@ -1260,6 +1273,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
     slang::IComponentType**         outCompositeComponentType,
     ISlangBlob**                    outDiagnostics)
 {
+    if (outCompositeComponentType == nullptr)
+        return SLANG_E_INVALID_ARG;
+
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     // Attempting to create a "composite" of just one component type should
@@ -1485,6 +1501,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
     SlangInt conformanceIdOverride,
     ISlangBlob** outDiagnostics)
 {
+    if (outConformanceComponentType == nullptr)
+        return SLANG_E_INVALID_ARG;
+
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     RefPtr<TypeConformance> result;
@@ -1647,6 +1666,12 @@ HLSLToVulkanLayoutOptions* TargetRequest::getHLSLToVulkanLayoutOptions()
     return hlslToVulkanOptions.get();
 }
 
+void TargetRequest::setTargetCaps(CapabilitySet capSet)
+{
+    cookedCapabilities = capSet;
+
+}
+
 CapabilitySet TargetRequest::getTargetCaps()
 {
     if(!cookedCapabilities.isEmpty())
@@ -1672,6 +1697,11 @@ CapabilitySet TargetRequest::getTargetCaps()
     // are available where can be directly encoded on the declarations.
 
     List<CapabilityName> atoms;
+
+    // If the user specified a explicit profile, we should pull
+    // a corresponding atom representing the target version from the profile.
+    CapabilitySet profileCaps = CapabilitySet(optionSet.getProfile().getCapabilityName());
+
     bool isGLSLTarget = false;
     switch(getTarget())
     {
@@ -1685,7 +1715,40 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::SPIRVAssembly:
         if (getOptionSet().shouldEmitSPIRVDirectly())
         {
-            atoms.add(CapabilityName::spirv_1_5);
+            // Default to SPIRV 1.5 if the user has not specified a target version.
+            bool hasTargetVersionAtom = false;
+            if (!profileCaps.isEmpty())
+            {
+                profileCaps.join(CapabilitySet(CapabilityName::spirv_1_0));
+                for (auto profileCapAtomSet : profileCaps.getAtomSets())
+                {
+                    for (auto atom : profileCapAtomSet)
+                    {
+                        if (isTargetVersionAtom((CapabilityName)atom))
+                        {
+                            atoms.add((CapabilityName)atom);
+                            hasTargetVersionAtom = true;
+                        }
+                    }
+                }
+            }
+            if (!hasTargetVersionAtom)
+            {
+                atoms.add(CapabilityName::spirv_1_5);
+            }
+            // If the user specified any SPIR-V extensions in the profile,
+            // pull them in.
+            for (auto profileCapAtomSet : profileCaps.getAtomSets())
+            {
+                for (auto atom : profileCapAtomSet)
+                {
+                    if (isSpirvExtensionAtom((CapabilityName)atom))
+                    {
+                        atoms.add((CapabilityName)atom);
+                        hasTargetVersionAtom = true;
+                    }
+                }
+            }
         }
         else
         {
@@ -1735,8 +1798,8 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     CapabilitySet targetCap = CapabilitySet(atoms);
 
-    CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
-    CapabilityName latestSpirvAtom = (CapabilityName)latestSpirvCapSet.getExpandedAtoms()[0].getExpandedAtoms().getLast();
+    CapabilityName latestSpirvAtom = getLatestSpirvAtom();
+
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
         auto atom = (CapabilityName)atomVal.intValue;
@@ -4305,6 +4368,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     auto targetProgram = getTargetProgram(target);
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
     IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
@@ -5675,6 +5739,16 @@ void EndToEndCompileRequest::setReportPerfBenchmark(bool value)
 void EndToEndCompileRequest::setSkipSPIRVValidation(bool value)
 {
     getOptionSet().set(CompilerOptionName::SkipSPIRVValidation, value);
+}
+
+void EndToEndCompileRequest::setTargetUseMinimumSlangOptimization(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::MinimumSlangOptimization, value);
+}
+
+void EndToEndCompileRequest::setIgnoreCapabilityCheck(bool value)
+{
+    getOptionSet().set(CompilerOptionName::IgnoreCapabilities, value);
 }
 
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)

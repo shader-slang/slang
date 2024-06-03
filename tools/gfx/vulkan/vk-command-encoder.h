@@ -40,11 +40,11 @@ public:
 
     void uploadBufferDataImpl(IBufferResource* buffer, Offset offset, Size size, void* data);
 
-    Result bindRootShaderObjectImpl(VkPipelineBindPoint bindPoint);
+    Result bindRootShaderObjectImpl(RootShaderObjectImpl* rootShaderObject, VkPipelineBindPoint bindPoint);
 
     Result setPipelineStateImpl(IPipelineState* state, IShaderObject** outRootObject);
 
-    Result setPipelineStateWithRootObjectImpl(IPipelineState* state, IShaderObject* inObject);
+    Result setPipelineStateWithRootObjectImpl(IPipelineState* state, IShaderObject* rootObject);
 
     Result bindRenderState(VkPipelineBindPoint pipelineBindPoint);
 };
@@ -336,7 +336,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL deserializeAccelerationStructure(
         IAccelerationStructure* dest, DeviceAddress source) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW Result SLANG_MCALL
         bindPipeline(IPipelineState* pipeline, IShaderObject** outRootObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL bindPipelineWithRootObject(

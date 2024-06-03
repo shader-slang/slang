@@ -15,6 +15,27 @@
 
 namespace Slang
 {
+    IRSimplificationOptions IRSimplificationOptions::getDefault(TargetProgram* targetProgram)
+    {
+        IRSimplificationOptions result;
+        result.minimalOptimization = targetProgram ? targetProgram->getOptionSet().shouldPerformMinimumOptimizations() : false;
+        if (result.minimalOptimization)
+            result.cfgOptions = CFGSimplificationOptions::getFast();
+        else
+            result.cfgOptions = CFGSimplificationOptions::getDefault();
+        result.peepholeOptions = PeepholeOptimizationOptions();
+        return result;
+    }
+
+    IRSimplificationOptions IRSimplificationOptions::getFast(TargetProgram* targetProgram)
+    {
+        IRSimplificationOptions result;
+        result.minimalOptimization = targetProgram ? targetProgram->getOptionSet().shouldPerformMinimumOptimizations() : false;
+        result.cfgOptions = CFGSimplificationOptions::getFast();
+        result.peepholeOptions = PeepholeOptimizationOptions();
+        return result;
+    }
+
     // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
     // until no more changes are possible.
     void simplifyIR(TargetProgram* target, IRModule* module, IRSimplificationOptions options, DiagnosticSink* sink)
@@ -24,6 +45,8 @@ namespace Slang
         const int kMaxIterations = 8;
         const int kMaxFuncIterations = 16;
         int iterationCounter = 0;
+        IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
+        dceOptions.useFastAnalysis = options.minimalOptimization;
 
         while (changed && iterationCounter < kMaxIterations)
         {
@@ -50,22 +73,22 @@ namespace Slang
                     funcChanged = false;
                     funcChanged |= applySparseConditionalConstantPropagation(func, sink);
                     funcChanged |= peepholeOptimize(target, func);
-                    funcChanged |= removeRedundancyInFunc(func);
+                    if (!options.minimalOptimization)
+                        funcChanged |= removeRedundancyInFunc(func);
                     funcChanged |= simplifyCFG(func, options.cfgOptions);
-                    eliminateDeadCode(func);
-                    funcChanged |= constructSSA(func);
+                    // Note: we disregard the `changed` state from dead code elimination pass since
+                    // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
+                    // DCE will always remove those nearly generated consts and always returns true here.
+                    eliminateDeadCode(func, dceOptions);
+                    if (funcIterationCount == 0)
+                        funcChanged |= constructSSA(func);
                     changed |= funcChanged;
                     funcIterationCount++;
                 }
             }
-
-            // Note: we disregard the `changed` state from dead code elimination pass since
-            // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
-            // DCE will always remove those nearly generated consts and always returns true here.
-            eliminateDeadCode(module);
-
             iterationCounter++;
         }
+        eliminateDeadCode(module, dceOptions);
     }
 
     void simplifyNonSSAIR(TargetProgram* target, IRModule* module, IRSimplificationOptions options)
@@ -73,18 +96,22 @@ namespace Slang
         bool changed = true;
         const int kMaxIterations = 8;
         int iterationCounter = 0;
+        IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
+        dceOptions.useFastAnalysis = options.minimalOptimization;
+
         while (changed && iterationCounter < kMaxIterations)
         {
             changed = false;
             changed |= peepholeOptimize(target, module, options.peepholeOptions);
 
-            changed |= removeRedundancy(module);
+            if (!options.minimalOptimization)
+                changed |= removeRedundancy(module);
             changed |= simplifyCFG(module, options.cfgOptions);
 
             // Note: we disregard the `changed` state from dead code elimination pass since
             // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
             // DCE will always remove those nearly generated consts and always returns true here.
-            eliminateDeadCode(module);
+            eliminateDeadCode(module, dceOptions);
             iterationCounter++;
         }
     }
@@ -92,6 +119,9 @@ namespace Slang
 
     void simplifyFunc(TargetProgram* target, IRGlobalValueWithCode* func, IRSimplificationOptions options, DiagnosticSink* sink)
     {
+        IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
+        dceOptions.useFastAnalysis = options.minimalOptimization;
+
         bool changed = true;
         const int kMaxIterations = 8;
         int iterationCounter = 0;
@@ -103,13 +133,14 @@ namespace Slang
             changed = false;
             changed |= applySparseConditionalConstantPropagation(func, sink);
             changed |= peepholeOptimize(target, func);
-            changed |= removeRedundancyInFunc(func);
+            if (!options.minimalOptimization)
+                changed |= removeRedundancyInFunc(func);
             changed |= simplifyCFG(func, options.cfgOptions);
 
             // Note: we disregard the `changed` state from dead code elimination pass since
             // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
             // DCE will always remove those nearly generated consts and always returns true here.
-            eliminateDeadCode(func);
+            eliminateDeadCode(func, dceOptions);
 
             changed |= constructSSA(func);
 

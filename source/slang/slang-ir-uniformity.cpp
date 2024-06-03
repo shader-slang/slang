@@ -97,7 +97,7 @@ namespace Slang
             // will use the fallback behavior (result is non-uniform if any of its arguments are non-uniform).
             for (auto block : key.func->getBlocks())
             {
-                if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
+                if (as<IRGenericAsm>(block->getTerminator()))
                 {
                     return nullptr;
                 }
@@ -191,8 +191,9 @@ namespace Slang
 
         void propagateNonUniform(IRFunc* root, List<IRInst*>& workList)
         {
-            List<IRInst*>& nextWorkList = *module->getContainerPool().getList<IRInst>();
-            HashSet<IRInst*>& workListSet = *module->getContainerPool().getHashSet<IRInst>();
+            InstWorkList nextWorkList(module);
+            InstHashSet workListSet(module);
+
             auto addToWorkList = [&](IRInst* inst)
                 {
                     if (workListSet.add(inst))
@@ -404,14 +405,15 @@ namespace Slang
                         addToWorkList(user);
                     }
                 }
-                workList.swapWith(nextWorkList);
+                workList.swapWith(nextWorkList.getList());
                 nextWorkList.clear();
             }
         }
 
         void analyzeModule()
         {
-            List<IRInst*>& workList = *module->getContainerPool().getList<IRInst>();
+            InstWorkList workList(module);
+
             for (auto globalInst : module->getGlobalInsts())
             {
                 if (auto code = as<IRGlobalValueWithCode>(globalInst))
@@ -438,7 +440,7 @@ namespace Slang
                     }
                     currentCallee = func;
                     call = nullptr;
-                    propagateNonUniform(func, workList);
+                    propagateNonUniform(func, workList.getList());
                 }
             }
             workList.clear();
@@ -448,7 +450,7 @@ namespace Slang
 
         void eliminateAsDynamicUniformInst()
         {
-            List<IRInst*>& workList = *module->getContainerPool().getList<IRInst>();
+            InstWorkList workList(module);
             workList.add(module->getModuleInst());
             for (Index i = 0; i < workList.getCount(); i++)
             {

@@ -16,4 +16,7 @@ namespace Slang
         IRModule*               module,
         DiagnosticSink*         sink);
 
+    // Clean up any generic-related IR insts that are no longer needed. Called when
+    // it has been determined that no more dynamic dispatch code will be generated.
+    void cleanupGenerics(TargetProgram* targetReq, IRModule* module, DiagnosticSink* sink);
 }

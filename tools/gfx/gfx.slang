@@ -47,6 +47,7 @@ public enum class DeviceType
     DirectX12,
     OpenGl,
     Vulkan,
+    Metal,
     CPU,
     CUDA,
     CountOf,
@@ -58,6 +59,7 @@ public enum class ProjectionStyle
     OpenGl,
     DirectX,
     Vulkan,
+    Metal,
     CountOf,
 };
 
@@ -67,6 +69,7 @@ public enum class BindingStyle
     DirectX,
     OpenGl,
     Vulkan,
+    Metal,
     CPU,
     CUDA,
     CountOf,
@@ -336,6 +339,7 @@ public enum class InteropHandleAPI
     FileDescriptor,           // A file descriptor.
     DeviceAddress,            // A device address.
     D3D12CpuDescriptorHandle, // A D3D12_CPU_DESCRIPTOR_HANDLE value.
+    Metal,                    // A general Metal object handle.
 };
 
 public struct InteropHandle
@@ -446,9 +450,8 @@ public struct ClearValue
 
 public struct BufferRange
 {
-    // TODO: Change to Index and Count?
-    public uint64_t firstElement;
-    public uint64_t elementCount;
+    public Offset offset;   ///< Offset in bytes.
+    public Size size;       ///< Size in bytes.
 };
 
 public enum class TextureAspect : uint32_t
@@ -651,8 +654,6 @@ public struct ResourceViewDesc
     public SubresourceRange subresourceRange;
     // Specifies the range of a buffer resource for a ShaderResource/UnorderedAccess view.
     public BufferRange bufferRange;
-    // Specifies the element size in bytes of a structured buffer. Pass 0 for a raw buffer view.
-    public Size bufferElementSize;
 };
 
 [COM("7b6c4926-0884-408c-ad8a-50-3a-8e-23-98-a4")]
@@ -1519,7 +1520,7 @@ public interface IRayTracingCommandEncoder : IResourceCommandEncoder
     public void serializeAccelerationStructure(DeviceAddress dest, IAccelerationStructure source);
     public void deserializeAccelerationStructure(IAccelerationStructure dest, DeviceAddress source);
 
-    public void bindPipeline(IPipelineState state, out IShaderObject rootObject);
+    public Result bindPipeline(IPipelineState state, out IShaderObject rootObject);
     // Sets the current pipeline state along with a pre-created mutable root shader object.
     public Result bindPipelineWithRootObject(IPipelineState state, IShaderObject rootObject);
 

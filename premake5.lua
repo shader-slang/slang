@@ -1140,7 +1140,7 @@ tool "gfx"
 
     defines { "SLANG_GFX_DYNAMIC", "SLANG_GFX_DYNAMIC_EXPORT" }
 
-    includedirs { ".", "external", "external/vulkan/include", "source" }
+    includedirs { ".", "external", "external/vulkan/include", "external/metal-cpp", "source" }
 
     files {"slang-gfx.h"}
 
@@ -1209,6 +1209,7 @@ tool "gfx"
         -- Don't support any render techs...
     elseif os.target() == "macosx" then
         addSourceDir "tools/gfx/vulkan"
+        addSourceDir "tools/gfx/metal"
     else
         -- Linux like
         addSourceDir "tools/gfx/vulkan"
@@ -1221,7 +1222,7 @@ tool "gfx"
     end
 
     if os.target() == "macosx" then
-        links { "Cocoa.framework", "QuartzCore.framework" }
+        links { "Foundation.framework", "Cocoa.framework", "QuartzCore.framework", "Metal.framework" }
     end
 
     if enableXlib then
@@ -1283,7 +1284,7 @@ tool "platform"
     if targetInfo.isWindows then
         systemversion "latest"
     elseif os.target() == "macosx" then
-        links { "Cocoa.framework", "QuartzCore.framework" }
+        links { "Foundation.framework", "Cocoa.framework", "QuartzCore.framework" }
     else
         if enableXlib then
             defines { "SLANG_ENABLE_XLIB" }
@@ -1609,6 +1610,8 @@ if enableEmbedStdLib then
             "source/slang/slang-lookup-glslstd450.cpp",
             "source/slang/slang-lookup-capability-defs.cpp"
         }
+        addSourceDir("source/slang-capture-replay")
+
         if not targetInfo.isWindows then
             links { "pthread" }
         end
@@ -1732,6 +1735,7 @@ standardProject("slang", "source/slang")
         "source/slang/slang-generated-capability-defs-impl.h",
     }
 
+    addSourceDir("source/slang-capture-replay")
     --
     -- The most challenging part of building `slang` is that we need
     -- to invoke generators such as slang-cpp-extractor and slang-generate

@@ -192,6 +192,9 @@ INST(Nop, nop, 0, 0)
             INST(PrimitivesType, Primitives, 2, HOISTABLE)
         INST_RANGE(MeshOutputType, VerticesType, PrimitivesType)
 
+        /* Metal Mesh Grid Properties */
+            INST(MetalMeshGridPropertiesType, mesh_grid_properties, 0, HOISTABLE)
+
         /* HLSLStructuredBufferTypeBase */
             INST(HLSLStructuredBufferType,                  StructuredBuffer,                   0, HOISTABLE)
             INST(HLSLRWStructuredBufferType,                RWStructuredBuffer,                 0, HOISTABLE)
@@ -428,25 +431,27 @@ INST(ImageStore, imageStore, 3, 0)
 
 // Load (almost) arbitrary-type data from a byte-address buffer
 //
-// %dst = byteAddressBufferLoad(%buffer, %offset)
+// %dst = byteAddressBufferLoad(%buffer, %offset, %alignment)
 //
 // where
 // - `buffer` is a value of some `ByteAddressBufferTypeBase` type
 // - `offset` is an `int`
+// - `alignment` is an `int`
 // - `dst` is a value of some type containing only ordinary data
 //
-INST(ByteAddressBufferLoad, byteAddressBufferLoad, 2, 0)
+INST(ByteAddressBufferLoad, byteAddressBufferLoad, 3, 0)
 
 // Store (almost) arbitrary-type data to a byte-address buffer
 //
-// byteAddressBufferLoad(%buffer, %offset, %src)
+// byteAddressBufferLoad(%buffer, %offset, %alignment, %src)
 //
 // where
 // - `buffer` is a value of some `ByteAddressBufferTypeBase` type
 // - `offset` is an `int`
+// - `alignment` is an `int`
 // - `src` is a value of some type containing only ordinary data
 //
-INST(ByteAddressBufferStore, byteAddressBufferStore, 3, 0)
+INST(ByteAddressBufferStore, byteAddressBufferStore, 4, 0)
 
 // Load data from a structured buffer
 //
@@ -583,14 +588,14 @@ INST(TargetSwitch, targetSwitch, 1, 0)
 // A generic asm inst has an return semantics that terminates the control flow.
 INST(GenericAsm, GenericAsm, 1, 0)
 
-INST(discard, discard, 0, 0)
-
 /* IRUnreachable */
 INST(MissingReturn, missingReturn, 0, 0)
 INST(Unreachable, unreachable, 0, 0)
 INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
 INST_RANGE(TerminatorInst, Return, Unreachable)
+
+INST(discard, discard, 0, 0)
 
 INST(RequirePrelude, RequirePrelude, 1, 0)
 INST(RequireGLSLExtension, RequireGLSLExtension, 1, 0)
@@ -733,6 +738,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
     INST(RequireCUDASMVersionDecoration,    requireCUDASMVersion,   1, 0)
+    INST(RequireCapabilityAtomDecoration,   requireCapabilityAtom, 1, 0)
 
     INST(HasExplicitHLSLBindingDecoration, HasExplicitHLSLBinding, 0, 0)
 
@@ -1167,6 +1173,9 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 
 /* Differentiable Type Dictionary */
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
+
+INST(BeginFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
+INST(EndFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
 
 /* DebugInfo */
 INST(DebugSource, DebugSource, 2, HOISTABLE)

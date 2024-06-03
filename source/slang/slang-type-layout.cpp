@@ -4136,7 +4136,7 @@ static TypeLayoutResult _createTypeLayout(
             type,
             rules);
     }
-    else if (auto subpassType = as<SubpassInputType>(type))
+    else if (as<SubpassInputType>(type))
     {
         ShaderParameterKind kind = ShaderParameterKind::SubpassInput;
         return createSimpleTypeLayout(
@@ -4144,7 +4144,7 @@ static TypeLayoutResult _createTypeLayout(
             type,
             rules);
     }
-    else if (auto atomicType = as<GLSLAtomicUintType>(type))
+    else if (as<GLSLAtomicUintType>(type))
     {
         ShaderParameterKind kind = ShaderParameterKind::AtomicUint;
         return createSimpleTypeLayout(

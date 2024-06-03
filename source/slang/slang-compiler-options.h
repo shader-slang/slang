@@ -361,6 +361,16 @@ namespace Slang
             return getBoolOption(CompilerOptionName::Obfuscate);
         }
 
+        bool shouldPerformMinimumOptimizations()
+        {
+            return getBoolOption(CompilerOptionName::MinimumSlangOptimization);
+        }
+
+        bool shouldRunNonEssentialValidation()
+        {
+            return !getBoolOption(CompilerOptionName::DisableNonEssentialValidations);
+        }
+
         FloatingPointMode getFloatingPointMode()
         {
             return getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);

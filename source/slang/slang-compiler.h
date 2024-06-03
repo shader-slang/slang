@@ -1337,6 +1337,11 @@ namespace Slang
             char const*             name,
             slang::IEntryPoint**     outEntryPoint) SLANG_OVERRIDE
         {
+            if (outEntryPoint == nullptr)
+            {
+                return SLANG_E_INVALID_ARG;
+            }
+
             ComPtr<slang::IEntryPoint> entryPoint(findEntryPointByName(UnownedStringSlice(name)));
             if((!entryPoint))
                 return SLANG_FAIL;
@@ -1351,6 +1356,11 @@ namespace Slang
             slang::IEntryPoint** outEntryPoint,
             ISlangBlob** outDiagnostics) override
         {
+            if (outEntryPoint == nullptr)
+            {
+                return SLANG_E_INVALID_ARG;
+            }
+
             ComPtr<slang::IEntryPoint> entryPoint(findAndCheckEntryPoint(UnownedStringSlice(name), stage, outDiagnostics));
             if ((!entryPoint))
                 return SLANG_FAIL;
@@ -1368,6 +1378,11 @@ namespace Slang
         {
             if (index < 0 || index >= m_entryPoints.getCount())
                 return SLANG_E_INVALID_ARG;
+
+            if (outEntryPoint == nullptr)
+            {
+                return SLANG_E_INVALID_ARG;
+            }
 
             ComPtr<slang::IEntryPoint> entryPoint(m_entryPoints[index].Ptr());
             *outEntryPoint = entryPoint.detach();
@@ -1543,7 +1558,7 @@ namespace Slang
         // List of source files this module depends on
         FileDependencyList m_fileDependencyList;
 
-        // Entry points that were defined in thsi module
+        // Entry points that were defined in this module
         //
         // Note: the entry point defined in the module are *not*
         // part of the memory image/layout of the module when
@@ -1725,6 +1740,8 @@ namespace Slang
         CompilerOptionSet& getOptionSet() { return optionSet; }
 
         CapabilitySet getTargetCaps();
+
+        void setTargetCaps(CapabilitySet capSet);
 
         HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();
 
@@ -2765,6 +2782,8 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setSkipSPIRVValidation(bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetUseMinimumSlangOptimization(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setIgnoreCapabilityCheck(bool value) SLANG_OVERRIDE;
 
         void setTrackLiveness(bool v);
 

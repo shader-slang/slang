@@ -3,15 +3,22 @@
 
 #include "slang-emit-cuda.h"
 #include "slang-ir-util.h"
+#include "../core/slang-char-util.h"
 
 namespace Slang {
 
-void IntrinsicExpandContext::emit(IRCall* inst, IRUse* args, Int argCount, const UnownedStringSlice& intrinsicText)
+void IntrinsicExpandContext::emit(
+    IRCall* inst,
+    IRUse* args,
+    Int argCount,
+    const UnownedStringSlice& intrinsicText,
+    IRInst* intrinsicInst)
 {
     m_args = args;
     m_argCount = argCount;
     m_text = intrinsicText;
     m_callInst = inst;
+    m_intrinsicInst = intrinsicInst;
 
     const auto returnType = inst->getDataType();
 
@@ -213,6 +220,22 @@ static bool _isResourceWrite(IRCall* call)
     return returnType && (as<IRVoidType>(returnType) != nullptr);
 }
 
+static Index parseNumber(const char*& cursor, const char* end)
+{
+    char d = *cursor;
+    SLANG_RELEASE_ASSERT(CharUtil::isDigit(d));
+    Index n = 0;
+    while (CharUtil::isDigit(d))
+    {
+        n = n * 10 + (d - '0');
+        cursor++;
+        if (cursor == end)
+            break;
+        d = *cursor;
+    }
+    return n;
+}
+
 const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 {
     const char*const end = m_text.end();
@@ -224,24 +247,13 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
     SLANG_RELEASE_ASSERT(cursor < end);
 
     char d = *cursor++;
+    auto parseNat = [&]() -> Index
+    {
+        return parseNumber(cursor, end);
+    };
 
     // Takes the first character of the number, parses the rest and returns the
     // total value.
-    auto isDigit = [](char c){ return c >= '0' && c <= '9'; };
-    auto parseNat = [&](){
-        char d = *cursor;
-        SLANG_RELEASE_ASSERT(isDigit(d));
-        Index n = 0;
-        while(isDigit(d))
-        {
-            n = n * 10 + (d - '0');
-            cursor++;
-            if(cursor == end)
-                break;
-            d = *cursor;
-        }
-        return n;
-    };
 
     switch (d)
     {
@@ -840,7 +852,33 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             }
             break;
         }
-
+        case '[':
+        {
+            Index argIndex = parseNat();
+            auto arg = m_intrinsicInst->getOperand((UInt)(1 + argIndex));
+            if (!arg->getDataType())
+            {
+                m_emitter->emitSimpleType((IRType*)arg);
+            }
+            else
+            {
+                switch (arg->getDataType()->getOp())
+                {
+                case kIROp_TypeKind:
+                case kIROp_TypeType:
+                    m_emitter->emitType((IRType*)arg);
+                    break;
+                default:
+                    m_emitter->emitOperand(
+                        m_intrinsicInst->getOperand((UInt)(1 + argIndex)),
+                        getInfo(EmitOp::General));
+                    break;
+                }
+            }
+            SLANG_ASSERT(*cursor == ']');
+            cursor++;
+            break;
+        }
         default:
             SLANG_UNEXPECTED("bad format in intrinsic definition");
             break;

@@ -1655,7 +1655,8 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     if (SLANG_SUCCEEDED(result))
     {
         disableIRValidationAtInsert();
-        simplifyFunc(autoDiffSharedContext->targetProgram, func, IRSimplificationOptions::getDefault());
+        auto simplifyOptions = IRSimplificationOptions::getDefault(nullptr);
+        simplifyFunc(autoDiffSharedContext->targetProgram, func, simplifyOptions);
         enableIRValidationAtInsert();
     }
     return result;

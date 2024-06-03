@@ -900,6 +900,7 @@ static bool processFunc(IRGlobalValueWithCode* func, CFGSimplificationOptions op
                 branch->removeAndDeallocate();
                 assert(!successor->hasUses());
                 successor->removeAndDeallocate();
+
                 break;
             }
             for (auto successor : block->getSuccessors())

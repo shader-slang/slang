@@ -1135,8 +1135,10 @@ bool isBetterForTarget(
     if(newCaps.isInvalid()) return false;
     if(oldCaps.isInvalid()) return true;
 
-    if(newCaps != oldCaps)
-        return newCaps.implies(oldCaps);
+    bool isEqual = false;
+    bool isNewBetter = newCaps.isBetterForTarget(oldCaps, targetCaps, isEqual);
+    if(!isEqual)
+        return isNewBetter;
 
     // All preceding factors being equal, an `[export]` is better
     // than an `[import]`.
@@ -1884,7 +1886,7 @@ LinkedIR linkIR(
     }
 
     // Specialize target_switch branches to use the best branch for the target.
-    specializeTargetSwitch(targetReq, state->irModule);
+    specializeTargetSwitch(targetReq, state->irModule, codeGenContext->getSink());
 
     // Diagnose on unresolved symbols if we are compiling into a target that does
     // not allow incomplete symbols.

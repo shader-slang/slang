@@ -508,6 +508,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.fragmentShadingRateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.fragmentShadingRateFeatures;
 
+        // Compute Quad Derivative features
+        extendedFeatures.computeShaderDerivativesFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.computeShaderDerivativesFeatures;
+
         if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_2)
         {
             extendedFeatures.vulkan12Features.pNext = deviceFeatures2.pNext;
@@ -600,6 +604,13 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             extendedDynamicState,
             VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
             "extended-dynamic-states"
+        );
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.computeShaderDerivativesFeatures,
+            computeDerivativeGroupQuads,
+            VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
+            "compute-shader-derivative"
         );
 
         if (extendedFeatures.accelerationStructureFeatures.accelerationStructure
@@ -1678,7 +1689,7 @@ Result DeviceImpl::createTextureResource(
                 break;
             case SLANG_SCALAR_TYPE_UINT32:
                 for(int i = 0; i < 4; i++)
-                    clearColor.uint32[i] = *reinterpret_cast<uint32_t*>(const_cast<void*>(initData->data));                break;
+                    clearColor.uint32[i] = *reinterpret_cast<uint32_t*>(const_cast<void*>(initData->data));
                 break;
             case SLANG_SCALAR_TYPE_INT64:
             {
@@ -2189,26 +2200,10 @@ Result DeviceImpl::createBufferView(
 {
     auto resourceImpl = (BufferResourceImpl*)buffer;
 
-    // TODO: These should come from the `ResourceView::Desc`
-    auto stride = desc.bufferElementSize;
-    if (stride == 0)
-    {
-        if (desc.format == Format::Unknown)
-        {
-            stride = 1;
-        }
-        else
-        {
-            FormatInfo info;
-            gfxGetFormatInfo(desc.format, &info);
-            stride = info.blockSizeInBytes;
-            assert(info.pixelsPerBlock == 1);
-        }
-    }
-    VkDeviceSize offset = (VkDeviceSize)desc.bufferRange.firstElement * stride;
-    VkDeviceSize size = desc.bufferRange.elementCount == 0
+    VkDeviceSize offset = (VkDeviceSize)desc.bufferRange.offset;
+    VkDeviceSize size = desc.bufferRange.size == 0
         ? (buffer ? resourceImpl->getDesc()->sizeInBytes : 0)
-        : (VkDeviceSize)desc.bufferRange.elementCount * stride;
+        : (VkDeviceSize)desc.bufferRange.size;
 
     // There are two different cases we need to think about for buffers.
     //
@@ -2400,8 +2395,8 @@ Result DeviceImpl::createMutableShaderObject(
 {
     auto layoutImpl = static_cast<ShaderObjectLayoutImpl*>(layout);
 
-    RefPtr<MutableShaderObjectImpl> result = new MutableShaderObjectImpl();
-    SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
+    RefPtr<ShaderObjectImpl> result;
+    SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(this, layoutImpl, result.writeRef()));
     returnComPtr(outObject, result);
 
     return SLANG_OK;
@@ -2409,8 +2404,9 @@ Result DeviceImpl::createMutableShaderObject(
 
 Result DeviceImpl::createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
 {
-    RefPtr<MutableRootShaderObject> result =
-        new MutableRootShaderObject(this, static_cast<ShaderProgramBase*>(program));
+    RefPtr<MutableRootShaderObjectImpl> result = new MutableRootShaderObjectImpl();
+    auto programImpl = static_cast<ShaderProgramImpl*>(program);
+    SLANG_RETURN_ON_FAIL(result->init(this, programImpl->m_rootObjectLayout));
     returnComPtr(outObject, result);
     return SLANG_OK;
 }

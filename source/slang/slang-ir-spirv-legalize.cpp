@@ -136,7 +136,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             break;
         }
         builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
-        builder.addDecoration(structType, kIROp_SPIRVBlockDecoration);
+        if (m_sharedContext->isSpirv14OrLater())
+            builder.addDecoration(structType, kIROp_SPIRVBlockDecoration);
+        else
+            builder.addDecoration(structType, kIROp_SPIRVBufferBlockDecoration);
 
         result.structType = structType;
         result.arrayKey = arrayKey;
@@ -221,7 +224,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             if(user->getOp() == kIROp_GetLegalizedSPIRVGlobalParamAddr)
             {
-                user->replaceUsesWith(use->get());
+                user->replaceUsesWith(addr);
                 user->removeAndDeallocate();
             }
             else if((as<IRGetElement>(user) || as<IRFieldExtract>(user)) &&
@@ -251,10 +254,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 // Skip load's for referenced `Input` variables since a ref implies
                 // passing as is, which needs to be a pointer (pass as is).
-                if (user->getDataType() 
+                if (user->getDataType()
                     && user->getDataType()->getOp() == kIROp_RefType
                     && storageClass == SpvStorageClassInput)
+                {
+                    builder.replaceOperand(use, addr);
                     continue;
+                }
                 // If this is being used in an asm block, insert the load to
                 // just prior to the block.
                 const auto asmBlock = spirvAsmOperand->getAsmBlock();
@@ -276,7 +282,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
 
         for (auto i : instsToRemove)
+        {
             i->removeAndDeallocate();
+        }
     }
 
     // Returns true if the given type that should be decorated as in `UniformConstant` address space.
@@ -623,18 +631,33 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(innerType))
             {
                 innerType = lowerStructuredBufferType(structuredBufferType).structType;
-                storageClass = SpvStorageClassStorageBuffer;
+                storageClass = getStorageBufferStorageClass();
                 needLoad = false;
+
+                auto memoryFlags = MemoryQualifierSetModifier::Flags::kNone;
 
                 // structured buffers in GLSL should be annotated as ReadOnly
                 if (as<IRHLSLStructuredBufferType>(structuredBufferType))
-                    builder.addMemoryQualifierSetDecoration(inst, MemoryQualifierSetModifier::Flags::kReadOnly);
+                    memoryFlags = MemoryQualifierSetModifier::Flags::kReadOnly;
+                if (as<IRHLSLRasterizerOrderedStructuredBufferType>(structuredBufferType))
+                    memoryFlags = MemoryQualifierSetModifier::Flags::kRasterizerOrdered;
+
+                if (memoryFlags != MemoryQualifierSetModifier::Flags::kNone)
+                    builder.addMemoryQualifierSetDecoration(inst, memoryFlags);
             }
             else if (auto glslShaderStorageBufferType = as<IRGLSLShaderStorageBufferType>(innerType))
             {
                 innerType = glslShaderStorageBufferType->getElementType();
-                builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
-                storageClass = SpvStorageClassStorageBuffer;
+                if (m_sharedContext->isSpirv14OrLater())
+                {
+                    builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
+                    storageClass = SpvStorageClassStorageBuffer;
+                }
+                else
+                {
+                    builder.addDecoration(innerType, kIROp_SPIRVBufferBlockDecoration);
+                    storageClass = SpvStorageClassUniform;
+                }
                 needLoad = false;
             }
 
@@ -699,7 +722,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             break;
         case LayoutResourceKind::ShaderResource:
         case LayoutResourceKind::UnorderedAccess:
-            storageClass = SpvStorageClassStorageBuffer;
+            storageClass = getStorageBufferStorageClass();
             break;
         case LayoutResourceKind::PushConstantBuffer:
             storageClass = SpvStorageClassPushConstant;
@@ -1132,6 +1155,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    SpvStorageClass getStorageBufferStorageClass()
+    {
+        return m_sharedContext->isSpirv14OrLater() ? SpvStorageClassStorageBuffer : SpvStorageClassUniform;
+    }
+
     void processStructuredBufferLoad(IRInst* loadInst)
     {
         auto sb = loadInst->getOperand(0);
@@ -1140,7 +1168,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(loadInst);
         IRInst* args[] = { sb, index };
         auto addrInst = builder.emitIntrinsicInst(
-            builder.getPtrType(kIROp_PtrType, translateToStorageBufferPointer(loadInst->getFullType()), SpvStorageClassStorageBuffer),
+            builder.getPtrType(kIROp_PtrType, translateToStorageBufferPointer(loadInst->getFullType()), getStorageBufferStorageClass()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             args);
@@ -1159,7 +1187,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(storeInst);
         IRInst* args[] = { sb, index };
         auto addrInst = builder.emitIntrinsicInst(
-            builder.getPtrType(kIROp_PtrType, value->getFullType(), SpvStorageClassStorageBuffer),
+            builder.getPtrType(kIROp_PtrType, value->getFullType(), getStorageBufferStorageClass()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             args);
@@ -1215,7 +1243,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     break;
                 case kIROp_GetElementPtr:
                     // Ignore when `NonUniformResourceIndex` is not on the index
-                    if (user->getOperand(0)->getOp() != kIROp_NonUniformResourceIndex)
+                    if (user->getOperand(1) == inst)
                     {
                         // Replace gep(pArray, nonUniformRes(x)), into nonUniformRes(gep(pArray, x))
                         newUser = builder.emitElementAddress(user->getFullType(), user->getOperand(0), inst->getOperand(0));
@@ -1282,12 +1310,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 IRBuilder builder(operand);
                 builder.addSPIRVNonUniformResourceDecoration(operand);
-                inst->replaceUsesWith(operand);
-                inst->removeAndDeallocate();
             }
+            inst->replaceUsesWith(operand);
+            inst->removeAndDeallocate();
         }
-        nonUniformResourceIndexInst->removeFromParent();
-        m_instsToRemove.add(nonUniformResourceIndexInst);
     }
 
     void processImageSubscript(IRImageSubscript* subscript)
@@ -1742,6 +1768,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         case kIROp_Neq:
         case kIROp_Eql:
         case kIROp_Call:
+        case kIROp_SPIRVAsm:
             return true;
         default:
             return false;
@@ -2067,8 +2094,95 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(beforeInst);
     }
 
+    void determineSpirvVersion()
+    {
+        // Determine minimum spirv version from target request.
+        auto targetCaps = m_sharedContext->m_targetProgram->getTargetReq()->getTargetCaps();
+        for (auto targetAtomSet : targetCaps.getAtomSets())
+        {
+            for (auto atom : targetAtomSet)
+            {
+                auto spirvAtom = ((CapabilityName)atom);
+                switch (spirvAtom)
+                {
+                case CapabilityName::spirv_1_0:
+                    m_sharedContext->requireSpirvVersion(0x10000);
+                    break;
+                case CapabilityName::spirv_1_1:
+                    m_sharedContext->requireSpirvVersion(0x10100);
+                    break;
+                case CapabilityName::spirv_1_2:
+                    m_sharedContext->requireSpirvVersion(0x10200);
+                    break;
+                case CapabilityName::spirv_1_3:
+                    m_sharedContext->requireSpirvVersion(0x10300);
+                    break;
+                case CapabilityName::spirv_1_4:
+                    m_sharedContext->requireSpirvVersion(0x10400);
+                    break;
+                case CapabilityName::spirv_1_5:
+                    m_sharedContext->requireSpirvVersion(0x10500);
+                    break;
+                case CapabilityName::spirv_1_6:
+                    m_sharedContext->requireSpirvVersion(0x10600);
+                    break;
+                case CapabilityName::SPV_EXT_demote_to_helper_invocation:
+                    m_sharedContext->m_useDemoteToHelperInvocationExtension = true;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+        // Scan through the entry points and find the max version required.
+        auto processInst = [&](IRInst* globalInst)
+        {
+            for (auto decor : globalInst->getDecorations())
+            {
+                switch (decor->getOp())
+                {
+                case kIROp_RequireCapabilityAtomDecoration:
+                    {
+                        auto atomDecor = as<IRRequireCapabilityAtomDecoration>(decor);
+                        switch (atomDecor->getAtom())
+                        {
+                        case CapabilityName::spirv_1_3:
+                            m_sharedContext->requireSpirvVersion(0X10300);
+                            break;
+                        case CapabilityName::spirv_1_4:
+                            m_sharedContext->requireSpirvVersion(0X10400);
+                            break;
+                        case CapabilityName::spirv_1_5:
+                            m_sharedContext->requireSpirvVersion(0X10500);
+                            break;
+                        case CapabilityName::spirv_1_6:
+                            m_sharedContext->requireSpirvVersion(0X10600);
+                            break;
+                        }
+                        break;
+                    }
+                }
+            }
+        };
+
+        processInst(m_module->getModuleInst());
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            processInst(globalInst);
+        }
+
+        if (m_sharedContext->m_spvVersion < 0x10300)
+        {
+            // Direct SPIRV backend does not support generating SPIRV before 1.3,
+            // we will issue an error message here.
+            m_sharedContext->m_sink->diagnose(SourceLoc(), Diagnostics::spirvVersionNotSupported);
+        }
+    }
+
     void processModule()
     {
+        determineSpirvVersion();
+
         // Process global params before anything else, so we don't generate inefficient
         // array marhalling code for array-typed global params.
         for (auto globalInst : m_module->getGlobalInsts())
@@ -2107,7 +2221,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto lowered = lowerStructuredBufferType(t);
             IRBuilder builder(t);
             builder.setInsertBefore(t);
-            t->replaceUsesWith(builder.getPtrType(kIROp_PtrType, lowered.structType, SpvStorageClassStorageBuffer));
+            t->replaceUsesWith(builder.getPtrType(kIROp_PtrType, lowered.structType, getStorageBufferStorageClass()));
         }
         for (auto t : textureFootprintTypes)
         {
@@ -2285,6 +2399,95 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
     }
 }
 
+static bool isRasterOrderedResource(IRInst* inst)
+{
+    if (auto memoryQualifierDecoration = inst->findDecoration<IRMemoryQualifierSetDecoration>())
+    {
+        if (memoryQualifierDecoration->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kRasterizerOrdered)
+            return true;
+    }
+    auto type = inst->getDataType();
+    for (;;)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            type = ptrType->getValueType();
+            continue;
+        }
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        break;
+    }
+    if (auto textureType = as<IRTextureTypeBase>(type))
+    {
+        if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
+            return true;
+    }
+    return false;
+}
+
+static bool hasExplicitInterlockInst(IRFunc* func)
+{
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (inst->getOp() == kIROp_BeginFragmentShaderInterlock)
+                return true;
+        }
+    }
+    return false;
+}
+
+void insertFragmentShaderInterlock(SPIRVEmitSharedContext* context, IRModule* module)
+{
+    HashSet<IRFunc*> fragmentShaders;
+    for (auto& [inst, entryPoints] : context->m_referencingEntryPoints)
+    {
+        if (isRasterOrderedResource(inst))
+        {
+            for (auto entryPoint : entryPoints)
+            {
+                auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
+                if (!entryPointDecor)
+                    continue;
+
+                if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                {
+                    fragmentShaders.add(entryPoint);
+                }
+            }
+        }
+    }
+
+    IRBuilder builder(module);
+    for (auto entryPoint : fragmentShaders)
+    {
+        if (hasExplicitInterlockInst(entryPoint))
+            continue;
+        auto firstBlock = entryPoint->getFirstBlock();
+        if (!firstBlock)
+            continue;
+        builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+        builder.emitBeginFragmentShaderInterlock();
+        for (auto block : entryPoint->getBlocks())
+        {
+            if (auto inst = block->getTerminator())
+            {
+                if (inst->getOp() == kIROp_Return || 
+                    !context->isSpirv16OrLater() && inst->getOp() == kIROp_discard)
+                {
+                    builder.setInsertBefore(inst);
+                    builder.emitEndFragmentShaderInterlock();
+                }
+            }
+        }
+    }
+}
+
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
@@ -2295,6 +2498,7 @@ void legalizeIRForSPIRV(
     legalizeSPIRV(context, module);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
+    insertFragmentShaderInterlock(context, module);
 }
 
 } // namespace Slang

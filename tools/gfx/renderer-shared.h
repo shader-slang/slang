@@ -1157,6 +1157,7 @@ public:
     {
         m_version = getVersionCounter()++;
     }
+    virtual ~TransientResourceHeapBase() {}
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     ITransientResourceHeap* getInterface(const Slang::Guid& guid)
@@ -1182,6 +1183,7 @@ public:
     uint32_t m_rayGenShaderCount;
     uint32_t m_missShaderCount;
     uint32_t m_hitGroupCount;
+    uint32_t m_callableShaderCount;
 
     Slang::Dictionary<PipelineStateBase*, Slang::RefPtr<BufferResource>> m_deviceBuffers;
 

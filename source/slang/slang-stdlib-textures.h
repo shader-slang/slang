@@ -68,8 +68,9 @@ public:
         const String& cuda,
         const String& spirvDefault,
         const String& spirvRWDefault,
-        const String& spirvCombined
-    );
+        const String& spirvCombined,
+        const String& metal
+        );
     void writeFuncWithSig(
         const char* funcName,
         const String& sig,
@@ -78,6 +79,7 @@ public:
         const String& spirvRWDefault = String{},
         const String& spirvCombined = String{},
         const String& cuda = String{},
+        const String& metal = String{},
         const ReadNoneMode readNoneMode = ReadNoneMode::Never
     );
     void writeFunc(
@@ -89,6 +91,7 @@ public:
         const String& spirvRWDefault = String{},
         const String& spirvCombined = String{},
         const String& cuda = String{},
+        const String& metal = String{},
         const ReadNoneMode readNoneMode = ReadNoneMode::Never
     );
 

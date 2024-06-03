@@ -334,7 +334,7 @@ namespace Slang
                 for (Index i = 0; i < count; ++i)
                 {
                     auto operand = cast<IRCapabilitySet>(getOperand(i));
-                    result.getExpandedAtoms().addRange(operand->getCaps().getExpandedAtoms());
+                    result.unionWith(operand->getCaps());
                 }
                 return result;
             }
@@ -558,7 +558,6 @@ namespace Slang
         case kIROp_Return:
         case kIROp_Unreachable:
         case kIROp_MissingReturn:
-        case kIROp_discard:
         case kIROp_GenericAsm:
             break;
 
@@ -854,7 +853,6 @@ namespace Slang
         case kIROp_conditionalBranch:
         case kIROp_loop:
         case kIROp_ifElse:
-        case kIROp_discard:
         case kIROp_Switch:
         case kIROp_Unreachable:
         case kIROp_MissingReturn:
@@ -2440,13 +2438,12 @@ namespace Slang
         // be a minimal list of atoms such that they will produce
         // the same `CapabilitySet` when expanded.
 
-        List<List<CapabilityAtom>> compactedAtoms;
-        caps.calcCompactedAtoms(compactedAtoms);
+        auto compactedAtoms = caps.getAtomSets();
         List<IRInst*> conjunctions;
-        for( auto atomConjunction : compactedAtoms )
+        for( auto& atomConjunctionSet : compactedAtoms )
         {
             List<IRInst*> args;
-            for (auto atom : atomConjunction)
+            for (auto atom : atomConjunctionSet)
                 args.add(getIntValue(capabilityAtomType, Int(atom)));
             auto conjunctionInst = createIntrinsicInst(
                 capabilitySetType, kIROp_CapabilityConjunction, args.getCount(), args.getBuffer());
@@ -2664,6 +2661,16 @@ namespace Slang
     IRBasicType* IRBuilder::getUInt64Type()
     {
         return (IRBasicType*)getType(kIROp_UInt64Type);
+    }
+
+    IRBasicType* IRBuilder::getUInt16Type()
+    {
+        return (IRBasicType*)getType(kIROp_UInt16Type);
+    }
+
+    IRBasicType* IRBuilder::getUInt8Type()
+    {
+        return (IRBasicType*)getType(kIROp_UInt8Type);
     }
 
     IRBasicType* IRBuilder::getCharType()
@@ -7387,6 +7394,8 @@ namespace Slang
             case BaseType::UInt16:
             case BaseType::UInt:
             case BaseType::UInt64:
+            case BaseType::IntPtr:
+            case BaseType::UIntPtr:
                 return true;
             default:
                 return false;
@@ -8282,7 +8291,8 @@ namespace Slang
                     continue;
             }
 
-            if(!bestDecoration || decorationCaps.isBetterForTarget(bestCaps, targetCaps))
+            bool isEqual;
+            if(!bestDecoration || decorationCaps.isBetterForTarget(bestCaps, targetCaps, isEqual))
             {
                 bestDecoration = decoration;
                 bestCaps = decorationCaps;
@@ -8305,11 +8315,12 @@ namespace Slang
         IRInst* val,
         CapabilityName  targetCapabilityAtom);
 
-    bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition)
+    bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition, IRInst*& outInst)
     {
         if (auto decor = findBestTargetIntrinsicDecoration(callee, targetCaps))
         {
             outDefinition = decor->getDefinition();
+            outInst = decor;
             return true;
         }
         auto func = as<IRGlobalValueWithCode>(callee);
@@ -8320,6 +8331,7 @@ namespace Slang
             if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
             {
                 outDefinition = genAsm->getAsm();
+                outInst = genAsm;
                 return true;
             }
         }
@@ -8516,6 +8528,18 @@ namespace Slang
             parent = parent->getParent();
         }
         return nullptr;
+    }
+
+    bool hasDescendent(IRInst* inst, IRInst* child)
+    {
+        auto parent = child->getParent();
+        while (parent)
+        {
+            if (inst == parent)
+                return true;
+            parent = parent->getParent();
+        }
+        return false;
     }
 
     IRInst* getGenericReturnVal(IRInst* inst)

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.25)
 
 # Our module dir, include that now so that we can get the version automatically
 # from git describe
@@ -328,7 +328,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     slang_add_target(
         source/slang-glslang
         MODULE
-        USE_EXTRA_WARNINGS
+        USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt
         INSTALL
     )
@@ -448,10 +448,12 @@ endif()
 
 if(SLANG_ENABLE_PREBUILT_BINARIES)
     if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+        file(GLOB prebuilt_binaries "${CMAKE_SOURCE_DIR}/external/slang-binaries/bin/windows-x64/*")
         add_custom_target(
             copy-prebuilt-binaries ALL
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${CMAKE_SOURCE_DIR}/external/slang-binaries/bin/windows-x64
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+                ${prebuilt_binaries}
                 ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}
             VERBATIM
         )
@@ -472,7 +474,8 @@ if(SLANG_ENABLE_GFX)
             imgui
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             ${CMAKE_DL_LIBS}
-            LINK_WITH_FRAMEWORK
+        LINK_WITH_FRAMEWORK
+            Foundation
             Cocoa
             QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
@@ -493,11 +496,14 @@ if(SLANG_ENABLE_GFX)
             core
             slang
             Vulkan-Headers
+            metal-cpp
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         LINK_WITH_FRAMEWORK
+            Foundation
             Cocoa
             QuartzCore
+            Metal
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:GFX_ENABLE_CUDA>
             $<$<BOOL:${SLANG_ENABLE_OPTIX}>:GFX_OPTIX>
@@ -699,6 +705,11 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
     )
     set_target_properties(all-examples PROPERTIES FOLDER examples)
     function(example dir)
+        set(debug_dir ${dir})
+        if (MSVC)
+            set(debug_dir ${CMAKE_BINARY_DIR}/${dir})
+        endif()
+
         slang_add_target(
             ${dir}
             EXECUTABLE
@@ -716,9 +727,40 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
                 $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
             REQUIRED_BY all-examples
             FOLDER examples
-            DEBUG_DIR ${dir}
+            DEBUG_DIR ${debug_dir}
             ${ARGN}
         )
+
+        if (MSVC)
+            get_filename_component(example_target ${dir} NAME)
+            file(GLOB asset_files
+                "${CMAKE_SOURCE_DIR}/${dir}/*.slang"
+                "${CMAKE_SOURCE_DIR}/${dir}/*.jpg"
+                "${CMAKE_SOURCE_DIR}/${dir}/*.obj"
+                "${CMAKE_SOURCE_DIR}/${dir}/*.mtl"
+            )
+
+            list(LENGTH asset_files asset_files_length)
+                if (asset_files_length GREATER 0)
+                set(copy_assets_target "${example_target}-copy-assets")
+
+                add_custom_target(
+                    ${copy_assets_target}
+                    COMMAND ${CMAKE_COMMAND} -E make_directory ${debug_dir}
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${asset_files} ${debug_dir}
+                    COMMENT "Copy example assets to ${debug_dir}"
+                )
+
+                set_target_properties(${copy_assets_target} PROPERTIES FOLDER "examples/copy_assets")
+
+                add_dependencies(${example_target} ${copy_assets_target})
+
+                # Copy DirectX shader binaries so signing doesn't fail when running from Visual Studio
+                if (SLANG_ENABLE_PREBUILT_BINARIES)
+                    add_dependencies(${example_target} copy-prebuilt-binaries)
+                endif()
+            endif()
+        endif()
     endfunction()
 
     example(examples/autodiff-texture WIN32_EXECUTABLE)

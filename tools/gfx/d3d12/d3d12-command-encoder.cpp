@@ -384,11 +384,14 @@ void ResourceCommandEncoderImpl::clearResourceView(
     case IResourceView::Type::UnorderedAccess:
     {
         ID3D12Resource* d3dResource = nullptr;
+        D3D12Descriptor descriptor = viewImpl->m_descriptor;
         switch (viewImpl->m_resource->getType())
         {
         case IResource::Type::Buffer:
             d3dResource = static_cast<BufferResourceImpl*>(viewImpl->m_resource.Ptr())
                 ->m_resource.getResource();
+            // D3D12 requires a UAV descriptor with zero buffer stride for calling ClearUnorderedAccessViewUint/Float.
+            viewImpl->getBufferDescriptorForBinding(m_commandBuffer->m_renderer, viewImpl, 0, descriptor);
             break;
         default:
             d3dResource = static_cast<TextureResourceImpl*>(viewImpl->m_resource.Ptr())
@@ -407,7 +410,7 @@ void ResourceCommandEncoderImpl::clearResourceView(
         this->m_commandBuffer->m_renderer->m_device->CopyDescriptorsSimple(
             1,
             m_commandBuffer->m_transientHeap->getCurrentViewHeap().getCpuHandle(gpuHandleIndex),
-            viewImpl->m_descriptor.cpuHandle,
+            descriptor.cpuHandle,
             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
         if (flags & ClearResourceViewFlags::FloatClearValues)
@@ -415,7 +418,7 @@ void ResourceCommandEncoderImpl::clearResourceView(
             m_commandBuffer->m_cmdList->ClearUnorderedAccessViewFloat(
                 m_commandBuffer->m_transientHeap->getCurrentViewHeap().getGpuHandle(
                     gpuHandleIndex),
-                viewImpl->m_descriptor.cpuHandle,
+                descriptor.cpuHandle,
                 d3dResource,
                 clearValue->color.floatValues,
                 0,
@@ -426,7 +429,7 @@ void ResourceCommandEncoderImpl::clearResourceView(
             m_commandBuffer->m_cmdList->ClearUnorderedAccessViewUint(
                 m_commandBuffer->m_transientHeap->getCurrentViewHeap().getGpuHandle(
                     gpuHandleIndex),
-                viewImpl->m_descriptor.cpuHandle,
+                descriptor.cpuHandle,
                 d3dResource,
                 clearValue->color.uintValues,
                 0,
@@ -1339,10 +1342,10 @@ void RayTracingCommandEncoderImpl::deserializeAccelerationStructure(
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_DESERIALIZE);
 }
 
-void RayTracingCommandEncoderImpl::bindPipeline(
+Result RayTracingCommandEncoderImpl::bindPipeline(
     IPipelineState* state, IShaderObject** outRootObject)
 {
-    bindPipelineImpl(state, outRootObject);
+    return bindPipelineImpl(state, outRootObject);
 }
 
 Result RayTracingCommandEncoderImpl::dispatchRays(
@@ -1404,6 +1407,15 @@ Result RayTracingCommandEncoderImpl::dispatchRays(
         dispatchDesc.HitGroupTable.SizeInBytes =
             shaderTableImpl->m_hitGroupCount * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
         dispatchDesc.HitGroupTable.StrideInBytes = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    }
+
+    if (shaderTableImpl->m_callableShaderCount > 0)
+    {
+        dispatchDesc.CallableShaderTable.StartAddress =
+            shaderTableAddr + shaderTableImpl->m_callableTableOffset;
+        dispatchDesc.CallableShaderTable.SizeInBytes =
+            shaderTableImpl->m_callableShaderCount * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+        dispatchDesc.CallableShaderTable.StrideInBytes = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
     }
 
     dispatchDesc.Width = (UINT)width;

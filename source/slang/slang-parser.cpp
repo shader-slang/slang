@@ -4536,7 +4536,6 @@ namespace Slang
         parser->pendingModifiers = &modifiers;
 
         auto loc = parser->tokenReader.peekLoc();
-        auto ptoken = parser->tokenReader.peekToken();
         switch (peekTokenType(parser))
         {
         case TokenType::Identifier:
@@ -5075,6 +5074,12 @@ namespace Slang
         parser->ReadToken();
         
         stmt->asmText = getStringLiteralTokenValue(parser->ReadToken(TokenType::StringLiteral));
+
+        while (AdvanceIf(parser, TokenType::Comma))
+        {
+            stmt->args.add(parser->ParseArgExpr());
+        }
+
         parser->ReadToken(TokenType::Semicolon);
         return stmt;
     }

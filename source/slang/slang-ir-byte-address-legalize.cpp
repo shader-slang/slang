@@ -15,6 +15,8 @@
 namespace Slang
 {
 
+bool isCPUTarget(TargetRequest* targetReq);
+
 // As is typical for IR passes in Slang, we will encapsulate the state
 // while we process the code in a context type.
 //
@@ -28,6 +30,7 @@ struct ByteAddressBufferLegalizationContext
     TargetRequest* m_target = nullptr;
     ByteAddressBufferLegalizationOptions m_options;
 
+    DiagnosticSink* m_sink = nullptr;
     // We will also use a central IR builder when generating new
     // code as part of legalization (rather than create/destroy
     // IR builders on the fly).
@@ -124,14 +127,15 @@ struct ByteAddressBufferLegalizationContext
         //
         auto buffer = load->getOperand(0);
         auto offset = load->getOperand(1);
-        auto legalLoad = emitLegalLoad(type, buffer, offset, 0);
+        auto alignment = load->getOperand(2);
+        auto legalLoad = emitLegalLoad(type, buffer, offset, 0, alignment);
 
         // If it currently possible for the legalization
         // to fail (perhaps because of something else that
         // is invalid in the IR), so we will defensively
         // leave the code along in that case.
         //
-        if(!legalLoad)
+        if (!legalLoad)
             return;
 
         // If we were able to generate a legal load operation,
@@ -154,21 +158,21 @@ struct ByteAddressBufferLegalizationContext
         // operations, then that means *no* type is
         // legal for byte-address load/store.
         //
-        if(m_options.translateToStructuredBufferOps)
+        if (m_options.translateToStructuredBufferOps)
             return false;
 
         // Basic types are usually legal to load/store
         // on all targets.
         //
-        if( auto basicType = as<IRBasicType>(type) )
+        if (auto basicType = as<IRBasicType>(type))
         {
             // On targets that require translation to
             // make all load/store use `uint` values,
             // any scalar type that isn't `uint` is
             // illegal.
             //
-            if( m_options.useBitCastFromUInt
-                && basicType->getBaseType() != BaseType::UInt )
+            if (m_options.useBitCastFromUInt
+                && basicType->getBaseType() != BaseType::UInt)
             {
                 return false;
             }
@@ -181,13 +185,13 @@ struct ByteAddressBufferLegalizationContext
 
         // Vector types also depend on the options.
         //
-        if( as<IRVectorType>(type) )
+        if (as<IRVectorType>(type))
         {
             // If we've been asked to scalarize all
             // vector load/store, then we need to
             // tread them as illegal.
             //
-            if(m_options.scalarizeVectorLoadStore)
+            if (m_options.scalarizeVectorLoadStore)
                 return false;
 
         }
@@ -205,17 +209,35 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    bool checkUnaligned(IRInst* baseOffset, IRIntegerValue immediateOffset, IRType* elementType, IRIntegerValue elementCount)
+    // Helper function to check if the alignment value passed is
+    // divisible by the offset at which the resource is indexed into
+    // in order to ensure if the load or store can be vectorized.
+    bool isAligned(IRInst* offset, IRInst* unknownOffsetAlignment, IRIntegerValue alignmentVal)
     {
-        // Check whether the given composite resource type is aligned to the baseOffset
-        IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_FALSE_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
-        IRIntegerValue elementStride = elementLayout.getStride();
-        bool isUnaligned = true;
-        if (auto baseOffsetVal = as<IRIntLit>(baseOffset)) {
-            isUnaligned = ((baseOffsetVal->getValue() + immediateOffset) % (elementStride * elementCount)) != 0;
+        if (auto baseOffsetVal = as<IRIntLit>(offset))
+        {
+            // If the offset is a constant known at compile time, simply check if it aligned to
+            // the elementsize of the underlying resource.
+            return (baseOffsetVal->getValue() % alignmentVal) == 0;
         }
-        return isUnaligned;
+        else if (auto alignInst = as<IRIntLit>(unknownOffsetAlignment))
+        {
+            // If the offset is not known during compile time, use the explicit align
+            // field of the overloaded `Load` or `Store` operation or vi `LoadAligned`
+            // or `StoreAligned` function.
+            //
+            // Unaligned `Load`s or `Store`s are identified with 0 alignment, to prevent
+            // accidentally issuing a wide vectorized operations.
+            if (!alignInst->getValue())
+                return false;
+
+            if ((alignInst->getValue() % alignmentVal) == 0)
+            {
+                return true;
+            }
+            m_sink->diagnose(offset->sourceLoc, Slang::Diagnostics::byteAddressBufferUnaligned, alignInst->getValue(), alignmentVal);
+        }
+        return false;
     }
 
     SlangResult getOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
@@ -241,7 +263,7 @@ struct ByteAddressBufferLegalizationContext
     // given `type` from the given `buffer` at the required `baseOffset`
     // plus the `immediateOffset` if any.
     //
-    IRInst* emitLegalLoad(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset)
+    IRInst* emitLegalLoad(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* alignment)
     {
         // The right way to load a value depends primarily
         // on the type, and secondarily on the options
@@ -299,7 +321,7 @@ struct ByteAddressBufferLegalizationContext
                 // for earlier fields will be left behind but can be eliminated
                 // as dead code.
                 //
-                auto fieldVal = emitLegalLoad(fieldType, buffer, baseOffset, immediateOffset + fieldOffset);
+                auto fieldVal = emitLegalLoad(fieldType, buffer, baseOffset, immediateOffset + fieldOffset, alignment);
                 if(!fieldVal)
                     return nullptr;
 
@@ -324,9 +346,23 @@ struct ByteAddressBufferLegalizationContext
             // legalization if the array type isn't in the right form
             // for us to proceed.
             //
+
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
-                return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeArray, arrayType->getElementType(), elementCountInst->getValue());
+                // Emit an aligned load operation on an array when using a LoadAligned inst.
+                // Else, fallback to scalarizing the loads.
+                IRSizeAndAlignment elementLayout;
+                SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), arrayType->getElementType(), &elementLayout));
+                IRIntegerValue elementStride = elementLayout.getStride();
+                auto alignmentVal = elementStride * elementCountInst->getValue();
+                if (!isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
+                {
+                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeArray, arrayType->getElementType(), elementCountInst->getValue(), alignment);
+                }
+                else
+                {
+                    return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
+                }
             }
         }
         else if( auto matType = as<IRMatrixType>(type) )
@@ -341,7 +377,7 @@ struct ByteAddressBufferLegalizationContext
                 if( rowCountInst )
                 {
                     auto rowType = m_builder.getVectorType(matType->getElementType(), matType->getColumnCount());
-                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeMatrix, rowType, rowCountInst->getValue());
+                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeMatrix, rowType, rowCountInst->getValue(), alignment);
                 }
             }
             else
@@ -354,7 +390,7 @@ struct ByteAddressBufferLegalizationContext
                 getSizeAndAlignment(m_targetProgram, colVectorType, &colVectorSizeAlignment);
                 for (Index c = 0; c < colCount; c++)
                 {
-                    auto colVector = emitLegalLoad(colVectorType, buffer, baseOffset, immediateOffset);
+                    auto colVector = emitLegalLoad(colVectorType, buffer, baseOffset, immediateOffset, alignment);
                     for (Index r = 0; r < rowCount; r++)
                     {
                         elements.add(m_builder.emitElementExtract(colVector, (IRIntegerValue)r));
@@ -382,11 +418,15 @@ struct ByteAddressBufferLegalizationContext
             //
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                // Emit an aligned vector load operation when the data (elementCount * elementSize) is divisible
-                // by the offset. Else, fallback to scalarizing the loads.
-                if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, vecType->getElementType(), elementCountInst->getValue()))
+                // Emit an aligned vector load operation when using a LoadAligned inst.
+                // Else, fallback to scalarizing the loads.
+                IRSizeAndAlignment elementLayout;
+                SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), vecType->getElementType(), &elementLayout));
+                IRIntegerValue elementStride = elementLayout.getStride();
+                auto alignmentVal = elementStride * elementCountInst->getValue();
+                if (m_options.scalarizeVectorLoadStore || !isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
                 {
-                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue());
+                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue(), alignment);
                 }
                 else
                 {
@@ -464,7 +504,7 @@ struct ByteAddressBufferLegalizationContext
     // Loading of sequences for arrays, matrices, and vectors is
     // bottlenecked through a single function.
     //
-    IRInst* emitLegalSequenceLoad(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IROp op, IRType* elementType, IRIntegerValue elementCount)
+    IRInst* emitLegalSequenceLoad(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IROp op, IRType* elementType, IRIntegerValue elementCount, IRInst* alignment)
     {
         // Or goal here is to produce a value of the given `type`, loaded from `buffer`
         // at `baseOffset` plus `immediateOffset`.
@@ -486,7 +526,7 @@ struct ByteAddressBufferLegalizationContext
         List<IRInst*> elementVals;
         for( IRIntegerValue ii = 0; ii < elementCount; ++ii )
         {
-            auto elementVal = emitLegalLoad(elementType, buffer, baseOffset, immediateOffset + ii*elementStride);
+            auto elementVal = emitLegalLoad(elementType, buffer, baseOffset, immediateOffset + ii*elementStride, alignment);
             if(!elementVal)
                 return nullptr;
 
@@ -579,6 +619,66 @@ struct ByteAddressBufferLegalizationContext
             }
         }
 
+        if (m_options.lowerBasicTypeOps)
+        {
+            // Some platforms e.g. Metal does not allow loading basic types that are not 4-byte sized.
+            // We need to lower such loads.
+            IRSizeAndAlignment sizeAlignment;
+            SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &sizeAlignment));
+            if (sizeAlignment.size == 8)
+            {
+                // We need to load the value as two 4-byte values and then combine them.
+                auto loOffset = offset;
+                auto hiOffset = emitOffsetAddIfNeeded(offset, 4);
+                IRInst* loadLoArgs[] = { buffer, loOffset };
+                IRInst* loadHiArgs[] = { buffer, hiOffset };
+                auto loLoad = m_builder.emitIntrinsicInst(m_builder.getUIntType(), kIROp_ByteAddressBufferLoad, 2, loadLoArgs);
+                auto hiLoad = m_builder.emitIntrinsicInst(m_builder.getUIntType(), kIROp_ByteAddressBufferLoad, 2, loadHiArgs);
+                auto lo64 = m_builder.emitCast(m_builder.getUInt64Type(), loLoad);
+                auto hi64 = m_builder.emitCast(m_builder.getUInt64Type(), hiLoad);
+                auto shift = m_builder.emitShl(m_builder.getUInt64Type(), hi64, m_builder.getIntValue(m_builder.getUInt64Type(), 32));
+                auto fullValue = m_builder.emitBitOr(m_builder.getUInt64Type(), lo64, shift);
+                return m_builder.emitBitCast(type, fullValue);
+            }
+            else if (sizeAlignment.size < 4)
+            {
+                auto alignedOffset = m_builder.emitDiv(offset->getDataType(), offset, m_builder.getIntValue(offset->getDataType(), 4));
+                alignedOffset = m_builder.emitMul(offset->getDataType(), alignedOffset, m_builder.getIntValue(offset->getDataType(), 4));
+                IRInst* loadArgs[] = { buffer, alignedOffset };
+                auto val = m_builder.emitIntrinsicInst(m_builder.getUIntType(), kIROp_ByteAddressBufferLoad, 2, loadArgs);
+                auto shiftAmount = m_builder.emitSub(offset->getDataType(), offset, alignedOffset);
+                shiftAmount = m_builder.emitMul(offset->getDataType(), shiftAmount, m_builder.getIntValue(offset->getDataType(), 8));
+                IRInst* mask = nullptr;
+                switch (sizeAlignment.size)
+                {
+                case 1:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFF);
+                    break;
+                case 2:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFFFF);
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unexpected size");
+                    break;
+                }
+                auto shift = m_builder.emitShr(m_builder.getUIntType(), val, shiftAmount);
+                auto masked = m_builder.emitBitAnd(m_builder.getUIntType(), shift, mask);
+                IRInst* casted = nullptr;
+                switch (sizeAlignment.size)
+                {
+                case 1:
+                    casted = m_builder.emitCast(m_builder.getUInt8Type(), masked);
+                    break;
+                case 2:
+                    casted = m_builder.emitCast(m_builder.getUInt16Type(), masked);
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unexpected size");
+                    break;
+                }
+                return m_builder.emitBitCast(type, casted);
+            }
+        }
         // When we finally run out of special cases to handle, we just emit
         // a byte-address buffer load operation directly, assuming it will
         // work for the chosen target.
@@ -634,7 +734,25 @@ struct ByteAddressBufferLegalizationContext
             // the load was already for a `uint`.
             //
             return BaseType::UInt;
-
+        case kIROp_Int8Type:
+        case kIROp_UInt8Type:
+            return BaseType::UInt8;
+        case kIROp_Int16Type:
+        case kIROp_UInt16Type:
+        case kIROp_HalfType:
+            return BaseType::UInt16;
+        case kIROp_Int64Type:
+        case kIROp_UInt64Type:
+        case kIROp_DoubleType:
+            return BaseType::UInt64;
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
+        case kIROp_RawPointerType:
+        case kIROp_PtrType:
+            if (isCPUTarget(m_target) && sizeof(void*) == 4)
+                return BaseType::UInt;
+            else
+                return BaseType::UInt64;
         default:
             // All other types map to a sentinel value of `Void` to
             // indicate that a bit-cast solution shouldn't be attempted:
@@ -844,7 +962,7 @@ struct ByteAddressBufferLegalizationContext
         // the type of the store operation, but instead the operand
         // that represents the value to be stored.
         //
-        auto value = store->getOperand(2);
+        auto value = store->getOperand(3);
         auto type = value->getDataType();
 
         // Types that are already legal to use don't require any processing.
@@ -863,14 +981,14 @@ struct ByteAddressBufferLegalizationContext
         // performance issue, but we should still consider trying to
         // tighten this up and make all uhandled cases be hard errors).
         //
-        auto result = emitLegalStore(type, store->getOperand(0), store->getOperand(1), 0, value);
+        auto result = emitLegalStore(type, store->getOperand(0), store->getOperand(1), 0, store->getOperand(2), value);
         if(SLANG_FAILED(result))
             return;
 
         store->removeAndDeallocate();
     }
 
-    Result emitLegalStore(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value)
+    Result emitLegalStore(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* alignment, IRInst* value)
     {
         // The flow for emitting a legal store is very similar to that for
         // legal loads; we will recurse on the structure of `type` and
@@ -889,7 +1007,7 @@ struct ByteAddressBufferLegalizationContext
                 SLANG_RETURN_ON_FAIL(getOffset(m_targetProgram, field, &fieldOffset));
 
                 auto fieldVal = m_builder.emitFieldExtract(fieldType, value, field->getKey());
-                SLANG_RETURN_ON_FAIL(emitLegalStore(fieldType, buffer, baseOffset, immediateOffset + fieldOffset, fieldVal));
+                SLANG_RETURN_ON_FAIL(emitLegalStore(fieldType, buffer, baseOffset, immediateOffset + fieldOffset, alignment, fieldVal));
             }
             return SLANG_OK;
         }
@@ -900,7 +1018,20 @@ struct ByteAddressBufferLegalizationContext
             //
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
-                return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, arrayType->getElementType(), elementCountInst->getValue());
+                // Emit an aligned store operation on an array when using a StoreAligned inst.
+                // Else, fallback to scalarizing the stores.
+                IRSizeAndAlignment elementLayout;
+				SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), arrayType->getElementType(), &elementLayout));
+                IRIntegerValue elementStride = elementLayout.getStride();
+                auto alignmentVal = elementStride * elementCountInst->getValue();
+                if (!isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
+                {
+                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, arrayType->getElementType(), elementCountInst->getValue(), alignment);
+                }
+                else
+                {
+                    return emitSimpleStore(value->getDataType(), buffer, baseOffset, immediateOffset, value);
+                }
             }
         }
         else if( auto matType = as<IRMatrixType>(type) )
@@ -912,7 +1043,7 @@ struct ByteAddressBufferLegalizationContext
                 if( rowCountInst )
                 {
                     auto rowType = m_builder.getVectorType(matType->getElementType(), matType->getColumnCount());
-                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, rowType, rowCountInst->getValue());
+                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, rowType, rowCountInst->getValue(), alignment);
                 }
             }
             else
@@ -935,7 +1066,7 @@ struct ByteAddressBufferLegalizationContext
                     auto colVector = m_builder.emitMakeVector(colVectorType, colVectorArgs);
                     IRSizeAndAlignment colVectorSizeAlignment;
                     getSizeAndAlignment(m_targetProgram, colVectorType, &colVectorSizeAlignment);
-                    emitLegalStore(colVectorType, buffer, baseOffset, immediateOffset, colVector);
+                    emitLegalStore(colVectorType, buffer, baseOffset, immediateOffset, alignment, colVector);
                     immediateOffset += colVectorSizeAlignment.getStride();
                 }
                 return SLANG_OK;
@@ -945,11 +1076,16 @@ struct ByteAddressBufferLegalizationContext
         {
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                // Emit an aligned vector store operation when the data (elementCount * elementSize) is divisible
-                // by the offset. Else, fallback to scalarizing the stores.
-                if (m_options.scalarizeVectorLoadStore || checkUnaligned(baseOffset, immediateOffset, vecType->getElementType(), elementCountInst->getValue()))
+                // Emit an aligned vector store operation when using a StoreAligned inst.
+                // Else, fallback to scalarizing the stores.
+
+                IRSizeAndAlignment elementLayout;
+				SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), vecType->getElementType(), &elementLayout));
+                IRIntegerValue elementStride = elementLayout.getStride();
+                auto alignmentVal = elementStride * elementCountInst->getValue();
+                if (m_options.scalarizeVectorLoadStore || !isAligned(emitOffsetAddIfNeeded(baseOffset, immediateOffset), alignment, alignmentVal))
                 {
-                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue());
+                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, vecType->getElementType(), elementCountInst->getValue(), alignment);
                 }
                 else
                 {
@@ -1015,7 +1151,62 @@ struct ByteAddressBufferLegalizationContext
             }
 
         }
-
+        if (m_options.lowerBasicTypeOps)
+        {
+            // Some platforms e.g. Metal does not allow storing basic types that are not 4-byte sized.
+            // We need to lower such loads.
+            IRSizeAndAlignment sizeAlignment;
+            SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &sizeAlignment));
+            if (sizeAlignment.size == 8)
+            {
+                // We need to store the value as two 4-byte values.
+                auto uint64Val = m_builder.emitBitCast(m_builder.getUInt64Type(), value);
+                auto loVal = m_builder.emitCast(m_builder.getUIntType(), uint64Val);
+                auto hiVal = m_builder.emitCast(
+                    m_builder.getUIntType(),
+                    m_builder.emitShr(m_builder.getUInt64Type(),
+                        uint64Val, m_builder.getIntValue(m_builder.getUInt64Type(), 32)));
+                auto loOffset = offset;
+                auto hiOffset = emitOffsetAddIfNeeded(offset, 4);
+                IRInst* storeLoArgs[] = { buffer, loOffset, loVal };
+                IRInst* storeHiArgs[] = { buffer, hiOffset, hiVal };
+                m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeLoArgs);
+                m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeHiArgs);
+                return SLANG_OK;
+            }
+            else if (sizeAlignment.size < 4)
+            {
+                IRInst* loadArgs[] = {buffer, offset};
+                auto existingVal = m_builder.emitIntrinsicInst(m_builder.getUIntType(), kIROp_ByteAddressBufferLoad, 2, loadArgs);
+                auto alignedOffset = m_builder.emitDiv(offset->getDataType(), offset, m_builder.getIntValue(offset->getDataType(), 4));
+                alignedOffset = m_builder.emitMul(offset->getDataType(), alignedOffset, m_builder.getIntValue(offset->getDataType(), 4));
+                auto shiftAmount = m_builder.emitSub(offset->getDataType(), offset, alignedOffset);
+                shiftAmount = m_builder.emitMul(offset->getDataType(), shiftAmount, m_builder.getIntValue(offset->getDataType(), 8));
+                auto uintVal = m_builder.emitCast(m_builder.getUIntType(),
+                    m_builder.emitBitCast(getSameSizeUIntType(value->getDataType()), value));
+                auto shiftedData = m_builder.emitShl(m_builder.getUIntType(), uintVal, shiftAmount);
+                IRInst* mask = nullptr;
+                switch (sizeAlignment.size)
+                {
+                case 1:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFF);
+                    break;
+                case 2:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFFFF);
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unexpected size");
+                    return SLANG_FAIL;
+                }
+                mask = m_builder.emitShl(m_builder.getUIntType(), mask, shiftAmount);
+                mask = m_builder.emitBitNot(m_builder.getUIntType(), mask);
+                auto maskedData = m_builder.emitBitAnd(m_builder.getUIntType(), existingVal, mask);
+                auto newData = m_builder.emitBitOr(m_builder.getUIntType(), maskedData, shiftedData);
+                IRInst* storeArgs[] = { buffer, alignedOffset, newData };
+                m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeArgs);
+                return SLANG_OK;
+            }
+        }
         {
             IRInst* storeArgs[] = { buffer, offset, value };
             m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeArgs);
@@ -1023,7 +1214,7 @@ struct ByteAddressBufferLegalizationContext
         }
     }
 
-    Result emitLegalSequenceStore(IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount)
+    Result emitLegalSequenceStore(IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOffset, IRInst* value, IRType* elementType, IRIntegerValue elementCount, IRInst* alignment)
     {
         // The store case for sequences is similar to the load case.
         //
@@ -1038,7 +1229,7 @@ struct ByteAddressBufferLegalizationContext
         {
             auto elementIndex = m_builder.getIntValue(indexType, ii);
             auto elementVal = m_builder.emitElementExtract(elementType, value, elementIndex);
-            SLANG_RETURN_ON_FAIL(emitLegalStore(elementType, buffer, baseOffset, immediateOffset + ii*elementStride, elementVal));
+            SLANG_RETURN_ON_FAIL(emitLegalStore(elementType, buffer, baseOffset, immediateOffset + ii*elementStride, alignment, elementVal));
         }
 
         return SLANG_OK;
@@ -1050,6 +1241,7 @@ void legalizeByteAddressBufferOps(
     Session*                                    session,
     TargetProgram*                              program,
     IRModule*                                   module,
+    DiagnosticSink*                             sink,
     ByteAddressBufferLegalizationOptions const& options)
 {
     ByteAddressBufferLegalizationContext context;
@@ -1057,6 +1249,7 @@ void legalizeByteAddressBufferOps(
     context.m_target = program->getTargetReq();
     context.m_options = options;
     context.m_targetProgram = program;
+    context.m_sink = sink;
     context.processModule(module);
 }
 

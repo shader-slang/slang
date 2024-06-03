@@ -808,6 +808,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         default:
             context->requireGLSLVersion(ProfileVersion::GLSL_450);
+            context->requireSPIRVVersion(SemanticVersion(1, 5, 0));
             context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_shader_viewport_layer_array"));
             break;
         }
@@ -2945,6 +2946,23 @@ void legalizeEntryPointForGLSL(
     // and as an ordinary function.
     SLANG_ASSERT(!func->firstUse);
 
+    // Require SPIRV version based on the stage.
+    switch (stage)
+    {
+    case Stage::Mesh:
+    case Stage::Amplification:
+        glslExtensionTracker->requireSPIRVVersion(SemanticVersion(1, 4, 0));
+        break;
+    case Stage::AnyHit:
+    case Stage::Callable:
+    case Stage::Miss:
+    case Stage::RayGeneration:
+    case Stage::Intersection:
+    case Stage::ClosestHit:
+        glslExtensionTracker->requireSPIRVVersion(SemanticVersion(1, 4, 0));
+        break;
+    }
+
     // We create a dummy IR builder, since some of
     // the functions require it.
     //
@@ -3137,6 +3155,31 @@ void legalizeEntryPointForGLSL(
     }
 }
 
+void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersion)
+{
+    CapabilityName atom = CapabilityName::spirv_1_0;
+    switch (spirvVersion.m_major)
+    {
+        case 1:
+        {
+            switch (spirvVersion.m_minor)
+            {
+                case 0: atom = CapabilityName::spirv_1_0; break;
+                case 1: atom = CapabilityName::spirv_1_1; break;
+                case 2: atom = CapabilityName::spirv_1_2; break;
+                case 3: atom = CapabilityName::spirv_1_3; break;
+                case 4: atom = CapabilityName::spirv_1_4; break;
+                case 5: atom = CapabilityName::spirv_1_5; break;
+                case 6: atom = CapabilityName::spirv_1_6; break;
+                default: SLANG_UNEXPECTED("Unknown SPIRV version");
+            }
+            break;
+        }
+    }
+    IRBuilder builder(module);
+    builder.addRequireCapabilityAtomDecoration(module->getModuleInst(), atom);
+}
+
 void legalizeEntryPointsForGLSL(
     Session*                session,
     IRModule*               module,
@@ -3150,6 +3193,8 @@ void legalizeEntryPointsForGLSL(
     }
 
     assignRayPayloadHitObjectAttributeLocations(module);
+
+    decorateModuleWithSPIRVVersion(module, glslExtensionTracker->getSPIRVVersion());
 }
 
 void legalizeConstantBufferLoadForGLSL(IRModule* module)
