@@ -10984,13 +10984,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         //
         eliminateDeadCode(module, dceOptions);
 
+        if (stripOptions.shouldStripNameHints && linkage->m_optionSet.shouldHaveSourceMap())
+        {
+            // The obfuscated source map is stored on the module
+            obfuscateModuleLocs(module, compileRequest->getSourceManager());
+        }
     }
 
-    if (linkage->m_optionSet.shouldObfuscateCode())
-    {
-        // The obfuscated source map is stored on the module
-        obfuscateModuleLocs(module, compileRequest->getSourceManager());
-    }
 
     // TODO: consider doing some more aggressive optimizations
     // (in particular specialization of generics) here, so
