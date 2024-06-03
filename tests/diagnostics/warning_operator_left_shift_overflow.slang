@@ -17,9 +17,9 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         + (u8 << 6)
         + (u8 << 7)
         // CHECK-NOT: warning 41030:
-        // CHECK: ([[#@LINE+1]]): warning 41030: {{.*}}8{{.*}}uint8
+        // CHECK: ([[#@LINE+1]]): warning 41030: {{.*}}uint8{{.*}}8
         + (u8 << 8)
-        // CHECK: ([[#@LINE+1]]): warning 41030: {{.*}}9{{.*}}uint8
+        // CHECK: ([[#@LINE+1]]): warning 41030: {{.*}}uint8{{.*}}9
         + (u8 << 9)
         ;
 
