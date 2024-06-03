@@ -165,7 +165,7 @@ struct IntroduceExplicitGlobalContextPass
         // type with a name hint of `KernelContext`.
         //
         m_contextStructType = builder.createStructType();
-        builder.addExternCppDecoration(m_contextStructType, UnownedStringSlice(""));
+        builder.addExternCppDecoration(m_contextStructType, UnownedStringSlice("KernelContext"));
         builder.addNameHintDecoration(m_contextStructType, UnownedTerminatedStringSlice("KernelContext"));
 
         // The context will usually be passed around by pointer,
@@ -279,6 +279,7 @@ struct IntroduceExplicitGlobalContextPass
         // Clone all original decorations to the new struct key.
         IRCloneEnv cloneEnv;
         cloneInstDecorationsAndChildren(&cloneEnv, m_module, originalInst, key);
+        builder.addExternCppDecoration(key, originalInst->findDecoration<IRNameHintDecoration>()->getName());
 
         // We end by making note of the key that was created
         // for the instruction, so that we can use the key
