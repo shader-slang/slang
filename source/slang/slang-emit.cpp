@@ -669,7 +669,7 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
-        // lowerBuiltinTypesForKernelEntryPoints(irModule, sink); // TODO: fix this somehow later
+        lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
         removeTorchKernels(irModule);
         handleAutoBindNames(irModule);
         break;
