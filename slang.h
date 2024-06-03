@@ -864,6 +864,7 @@ extern "C"
             DisableShortCircuit,   // bool
             MinimumSlangOptimization, // bool
             DisableNonEssentialValidations, // bool
+            DisableSourceMap,       // bool
 
             // Target
 
