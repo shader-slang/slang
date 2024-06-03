@@ -13,6 +13,7 @@ namespace Slang {
 
     void checkForOperatorShiftOverflowRecursive(
         IRInst* inst,
+        CompilerOptionSet& optionSet,
         DiagnosticSink* sink)
     {
         if (auto code = as<IRGlobalValueWithCode>(inst))
@@ -31,47 +32,16 @@ namespace Slang {
                     if (!rhsLit)
                         continue;
 
-                    IRIntegerValue shiftAmount = rhsLit->getValue();
                     IRInst* lhs = opShiftLeft->getOperand(0);
                     IRType* lhsType = lhs->getDataType();
 
-                    IRIntegerValue sizeofLhs;
-                    switch (lhsType->getOp())
-                    {
-                    case kIROp_BoolType:
-                    case kIROp_Int8Type:
-                    case kIROp_UInt8Type:
-                    case kIROp_CharType:
-                        sizeofLhs = 1;
-                        break;
-
-                    case kIROp_Int16Type:
-                    case kIROp_UInt16Type:
-                        sizeofLhs = 2;
-                        break;
-
-                    case kIROp_IntType:
-                    case kIROp_UIntType:
-                        sizeofLhs = 4;
-                        break;
-
-                    case kIROp_Int64Type:
-                    case kIROp_UInt64Type:
-                        sizeofLhs = 8;
-                        break;
-
-                    case kIROp_IntPtrType:
-                    case kIROp_UIntPtrType:
-                        sizeofLhs = 8;
-                        break;
-
-                    default:
+                    IRSizeAndAlignment sizeAlignment;
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(optionSet, lhsType, &sizeAlignment)))
                         continue;
-                    }
 
-                    if (sizeofLhs * 8 <= shiftAmount)
+                    IRIntegerValue shiftAmount = rhsLit->getValue();
+                    if (sizeAlignment.size * 8 <= shiftAmount)
                     {
-                        (void)lhsType;
                         sink->diagnose(opShiftLeft, Diagnostics::operatorShiftLeftOverflow, lhsType, shiftAmount);
                     }
                 }
@@ -80,16 +50,17 @@ namespace Slang {
 
         for (auto childInst : inst->getChildren())
         {
-            checkForOperatorShiftOverflowRecursive(childInst, sink);
+            checkForOperatorShiftOverflowRecursive(childInst, optionSet, sink);
         }
     }
 
     void checkForOperatorShiftOverflow(
         IRModule* module,
+        CompilerOptionSet& optionSet,
         DiagnosticSink* sink)
     {
         // Look for `operator<<` instructions
-        checkForOperatorShiftOverflowRecursive(module->getModuleInst(), sink);
+        checkForOperatorShiftOverflowRecursive(module->getModuleInst(), optionSet, sink);
     }
 
 }

@@ -10938,7 +10938,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
 
-        checkForOperatorShiftOverflow(module, compileRequest->getSink());
+        checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
     }
 
     // The "mandatory" optimization passes may make use of the
