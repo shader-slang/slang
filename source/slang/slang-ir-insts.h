@@ -351,6 +351,18 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
     }
 };
 
+struct IRRequireCapabilityAtomDecoration : IRDecoration
+{
+    enum { kOp = kIROp_RequireCapabilityAtomDecoration };
+    IR_LEAF_ISA(RequireCapabilityAtomDecoration)
+
+    IRConstant* getCapabilityAtomOperand() { return cast<IRConstant>(getOperand(0)); }
+    CapabilityName getAtom()
+    {
+        return (CapabilityName)getCapabilityAtomOperand()->value.intVal;
+    }
+};
+
 struct IRRequireCUDASMVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireCUDASMVersionDecoration };
@@ -3579,6 +3591,11 @@ public:
         return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
     }
 
+    IRMetalMeshGridPropertiesType* getMetalMeshGridPropertiesType()
+    {
+        return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
+    }
+
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
     IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex = nullptr);
@@ -4527,6 +4544,11 @@ public:
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
         addDecoration(value, kIROp_RequireCUDASMVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
+    }
+
+    void addRequireCapabilityAtomDecoration(IRInst* value, CapabilityName atom)
+    {
+        addDecoration(value, kIROp_RequireCapabilityAtomDecoration, getIntValue(getUIntType(), IRIntegerValue(atom)));
     }
 
     void addPatchConstantFuncDecoration(IRInst* value, IRInst* patchConstantFunc)

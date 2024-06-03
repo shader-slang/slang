@@ -526,8 +526,8 @@ namespace Slang
                 // TODO: provedence should have a way to filter out for provenance that are missing X capabilitySet from their caps, else in big functions we get junk errors
                 // This is specifically a problem for when a function is missing a target but otherwise has identical capabilities.
                 
-                const auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getAtomSets();
-                const auto& compileCaps = targetCaps.getAtomSets();
+                const auto interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getAtomSets();
+                const auto compileCaps = targetCaps.getAtomSets();
                 if (compileCaps && interredCapConjunctions)
                 {
                     for (auto inferredAtom : *interredCapConjunctions.begin())

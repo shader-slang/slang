@@ -1997,13 +1997,23 @@ namespace Slang
             // and filtering them to ones that are applicable
             // to our "call site" with zero arguments.
             //
-            auto type = varDecl->getType();
-
             OverloadResolveContext overloadContext;
             overloadContext.loc = varDecl->nameAndLoc.loc;
             overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
             overloadContext.sourceScope = m_outerScope;
-            AddTypeOverloadCandidates(type, overloadContext);
+
+            auto type = varDecl->getType();
+            ImplicitCastMethodKey key = ImplicitCastMethodKey(QualType(), type, nullptr);
+            auto ctorMethod = getShared()->tryGetImplicitCastMethod(key);
+            if (ctorMethod)
+            {
+                overloadContext.bestCandidateStorage = ctorMethod->conversionFuncOverloadCandidate;
+                overloadContext.bestCandidate = &overloadContext.bestCandidateStorage;
+            }
+            else
+            {
+                AddTypeOverloadCandidates(type, overloadContext);
+            }
 
             if(overloadContext.bestCandidates.getCount() != 0)
             {
@@ -2015,8 +2025,11 @@ namespace Slang
                 // because if they aren't then we actually just have
                 // an uninitialized varaible.
                 //
-                if(overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
+                if (overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
+                {
+                    getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
                     return;
+                }
 
                 getSink()->diagnose(varDecl, Diagnostics::ambiguousDefaultInitializerForType, type);
             }
@@ -2028,8 +2041,11 @@ namespace Slang
                 // of a type that *doesn't* have a default initializer
                 // isn't actually an error.
                 //
-                if(overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
+                if (overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
+                {
+                    getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
                     return;
+                }
 
                 // If we had a single best candidate *and* it was applicable,
                 // then we use it to construct a new initial-value expression
@@ -2037,6 +2053,7 @@ namespace Slang
                 // code generation.
                 //
                 varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+                getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{ *overloadContext.bestCandidate, 0});
             }
         }
 
@@ -8847,17 +8864,120 @@ namespace Slang
         // extensions, and force it to rebuild its cache to include the
         // new extension we just added.
         //
-        // TODO: We should probably just go ahead and add `extDecl` directly
-        // into the appropriate entry here, and do a similar step on each
-        // `import`.
-        //
-        m_candidateExtensionListsBuilt = false;
-        m_mapTypeDeclToCandidateExtensions.clear();
+        _getCandidateExtensionList(typeDecl, m_mapTypeDeclToCandidateExtensions).add(extDecl);
 
-        // Invalidate the cached inheritanceInfo.
-        m_mapTypeToInheritanceInfo.clear();
-        m_mapDeclRefToInheritanceInfo.clear();
-        m_mapTypePairToSubtypeWitness.clear();
+        // Remove the cached inheritanceInfo about typeDecl, if `extDecl` inherits new types.
+        bool invalidateSubtypes = false;
+        if (as<InterfaceDecl>(typeDecl))
+        {
+            // If we are extending an interface, we are effectively extending all types
+            // that inherits the interface. So we need to remove all inheritance info
+            // that is related to the interface.
+            invalidateSubtypes = true;
+        }
+        bool hasInheritanceMember = false;
+        bool hasImplicitCastMember = false;
+        for (auto member : extDecl->members)
+        {
+            if (as<InheritanceDecl>(member))
+            {
+                hasInheritanceMember = true;
+            }
+            else if (auto ctorDecl = as<ConstructorDecl>(member))
+            {
+                if (ctorDecl->hasModifier<ImplicitConversionModifier>())
+                    hasImplicitCastMember = true;
+            }
+        }
+        auto isTypeUpToDate = [this](Type* type)
+            {
+                if (auto declRefType = as<DeclRefType>(type))
+                {
+                    return m_mapDeclRefToInheritanceInfo.containsKey(declRefType->getDeclRef());
+                }
+                return m_mapTypeToInheritanceInfo.containsKey(type);
+            };
+        auto isInheritanceInfoAffected = [typeDecl](InheritanceInfo& info)
+            {
+                for (auto f : info.facets)
+                    if (f.getImpl()->getDeclRef().getDecl() == typeDecl)
+                    {
+                        return true;
+                    }
+                return false;
+            };
+        if (invalidateSubtypes)
+        {
+            decltype(m_mapTypeToInheritanceInfo) newMapTypeToInheritanceInfo;
+            for (auto& kv : m_mapTypeToInheritanceInfo)
+            {
+                if (!isInheritanceInfoAffected(kv.second))
+                {
+                    newMapTypeToInheritanceInfo.add(kv.first, kv.second);
+                }
+            }
+            m_mapTypeToInheritanceInfo = _Move(newMapTypeToInheritanceInfo);
+        }
+
+        ShortList<DeclRef<Decl>, 16> keysToRemove;
+        for (auto& kv : m_mapDeclRefToInheritanceInfo)
+        {
+            // We can confirm the type is affected by the new extension,
+            // if the declref type points to typeDecl.
+            if (kv.first.getDecl() == typeDecl)
+            {
+                keysToRemove.add(kv.first);
+                continue;
+            }
+
+            // If we are extending interface types (and in the future any struct type
+            // if we decide to have full inheritance support),
+            // we also need to account for conformant that implements the interface.
+            if (invalidateSubtypes && isInheritanceInfoAffected(kv.second))
+            {
+                keysToRemove.add(kv.first);
+            }
+        }
+        for (auto& key : keysToRemove)
+        {
+            m_mapDeclRefToInheritanceInfo.remove(key);
+        }
+
+        if (hasInheritanceMember || invalidateSubtypes)
+        {
+            ShortList<TypePair, 16> typePairsToRemove;
+            for (auto& kv : m_mapTypePairToSubtypeWitness)
+            {
+                if (!isTypeUpToDate(kv.first.type0) || !isTypeUpToDate(kv.first.type1))
+                {
+                    typePairsToRemove.add(kv.first);
+                }
+            }
+            for (auto& key : typePairsToRemove)
+            {
+                m_mapTypePairToSubtypeWitness.remove(key);
+            }
+        }
+
+        if (hasImplicitCastMember)
+        {
+            ShortList<ImplicitCastMethodKey> entriesToRemove;
+            for (auto& kv : m_mapTypePairToImplicitCastMethod)
+            {
+                // Since implicit casts are defined as constructors on the toType,
+                // we only need to check if the toType is affected by the new extension.
+                auto declRefType = as<DeclRefType>(kv.first.toType);
+
+                if (!declRefType || declRefType->getDeclRef().getDecl() == typeDecl)
+                {
+                    entriesToRemove.add(kv.first);
+                }
+            }
+            for (auto& key : entriesToRemove)
+            {
+                m_mapTypePairToImplicitCastMethod.remove(key);
+            }
+        }
     }
     
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)

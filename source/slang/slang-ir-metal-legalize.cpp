@@ -1,5 +1,6 @@
 #include "slang-ir-metal-legalize.h"
 
+#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir-clone.h"
@@ -137,6 +138,8 @@ namespace Slang
             if (!layout)
                 continue;
             if (!layout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+                continue;
+            if(param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
                 continue;
             paramsToPack.add(param);
         }
@@ -306,6 +309,98 @@ namespace Slang
         fixUpFuncType(func, structType);
     }
 
+    void legalizeMeshEntryPoint(EntryPointInfo entryPoint)
+    {
+        auto func = entryPoint.entryPointFunc;
+
+        if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Mesh)
+        {
+            return;
+        }
+
+        IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
+        for (auto param : func->getParams())
+        {
+            if(param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
+            {
+                IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+                varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+                auto paramVarLayout = varLayoutBuilder.build();
+                builder.addLayoutDecoration(param, paramVarLayout);
+            }
+        }
+
+    }
+
+    void legalizeDispatchMeshPayloadForMetal(EntryPointInfo entryPoint)
+    {
+        if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Amplification)
+        {
+            return;
+        }
+        // Find out DispatchMesh function
+        IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
+        for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
+        {
+            if (const auto func = as<IRGlobalValueWithCode>(globalInst))
+            {
+                if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
+                {
+                    if (dec->getName() == "DispatchMesh")
+                    {
+                        SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
+                        dispatchMeshFunc = func;
+                    }
+                }
+            }
+        }
+
+        if (!dispatchMeshFunc)
+            return;
+
+        IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
+
+        // We'll rewrite the call to use mesh_grid_properties.set_threadgroups_per_grid
+        traverseUses(dispatchMeshFunc, [&](const IRUse* use) {
+            if (const auto call = as<IRCall>(use->getUser()))
+            {
+                SLANG_ASSERT(call->getArgCount() == 4);
+                const auto payload = call->getArg(3);
+
+                const auto payloadPtrType = composeGetters<IRPtrType>(
+                    payload,
+                    &IRInst::getDataType
+                );
+                SLANG_ASSERT(payloadPtrType);
+                const auto payloadType = payloadPtrType->getValueType();
+                SLANG_ASSERT(payloadType);
+
+                builder.setInsertBefore(entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+                const auto annotatedPayloadType =
+                    builder.getPtrType(
+                        kIROp_RefType,
+                        payloadPtrType->getValueType(),
+                        AddressSpace::MetalObjectData
+                    );
+                auto packedParam = builder.emitParam(annotatedPayloadType);
+                builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
+                IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+                // Add the MetalPayload resource info, so we can emit [[payload]]
+                varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+                auto paramVarLayout = varLayoutBuilder.build();
+                builder.addLayoutDecoration(packedParam, paramVarLayout);
+
+                // Now we replace the call to DispatchMesh with a call to the mesh grid properties
+                // But first we need to create the parameter
+                const auto meshGridPropertiesType = builder.getMetalMeshGridPropertiesType();
+                auto mgp = builder.emitParam(meshGridPropertiesType);
+                builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
+                }
+            });
+    }
+
     void legalizeEntryPointForMetal(EntryPointInfo entryPoint, DiagnosticSink* sink)
     {
         SLANG_UNUSED(sink);
@@ -313,7 +408,10 @@ namespace Slang
         hoistEntryPointParameterFromStruct(entryPoint);
         packStageInParameters(entryPoint);
         wrapReturnValueInStruct(entryPoint);
+        legalizeMeshEntryPoint(entryPoint);
+        legalizeDispatchMeshPayloadForMetal(entryPoint);
     }
+
 
     void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
     {
@@ -337,4 +435,6 @@ namespace Slang
 
         specializeAddressSpace(module);
     }
+
 }
+
