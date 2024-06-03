@@ -31,28 +31,28 @@ static void addExternCppDecorationTransitively_(IRBuilder & builder, IRInst * in
         // If it's a struct type, mark for py-export.
         if (auto structType = as<IRStructType>(type))
         {
-            IRBuilder builder(structType->getModule());
+            IRBuilder structBuilder(structType->getModule());
 
             // If it already has a header-export decoration, we're done.
             if (!structType->findDecoration<IRExternCppDecoration>())
             {    
-                builder.addExternCppDecoration(structType, UnownedStringSlice(""));
+                structBuilder.addExternCppDecoration(structType, UnownedStringSlice(""));
             }
 
             for (auto field : structType->getFields())
             {
-                addExternCppDecorationTransitively_(builder, field->getFieldType());
+                addExternCppDecorationTransitively_(structBuilder, field->getFieldType());
             }
             return;
         }
         else if (auto arrayType = as<IRArrayType>(type))
         {
             // TODO: not sure about this
-            IRBuilder builder(arrayType->getModule());
+            IRBuilder arrayBuilder(arrayType->getModule());
             if (!arrayType->findDecoration<IRExternCppDecoration>())
-                builder.addExternCppDecoration(arrayType, UnownedStringSlice(""));
+                arrayBuilder.addExternCppDecoration(arrayType, UnownedStringSlice(""));
 
-            addExternCppDecorationTransitively_(builder, arrayType->getElementType());
+            addExternCppDecorationTransitively_(arrayBuilder, arrayType->getElementType());
             return;
         }
     }
@@ -63,7 +63,7 @@ struct HeaderExportContext
     IRModule* module;
     DiagnosticSink* diagnosticSink;
 
-    void processInst(IRInst* inst, IRExternCppDecoration* externCppDecoration)
+    void processInst(IRInst* inst, IRExternCppDecoration* /*externCppDecoration*/)
     {
         IRBuilder builder(module);
         addExternCppDecorationTransitively_(builder, inst);
