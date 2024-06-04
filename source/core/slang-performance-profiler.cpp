@@ -1,14 +1,8 @@
 #include "slang-performance-profiler.h"
 #include "slang-dictionary.h"
-#include <unordered_map>
 
 namespace Slang
 {
-    struct FuncProfileInfo
-    {
-        int invocationCount = 0;
-        std::chrono::nanoseconds duration = std::chrono::nanoseconds::zero();
-    };
     class PerformanceProfilerImpl : public PerformanceProfiler
     {
     public:
@@ -44,53 +38,77 @@ namespace Slang
                 out << func.value.invocationCount << "\t" << milliseconds.count() << "ms\n";
             }
         }
+        virtual void clear() override
+        {
+            data.clear();
+        }
     };
-
-    class SerialPerformaceProfilerImpl : public SerialPerformaceProfiler
-    {
-    public:
-       void accumulateResults(StringBuilder& out, PerformanceProfiler* profile)
-       {
-            PerformanceProfilerImpl* profilerImpl = static_cast<PerformanceProfilerImpl*>(profile);
-            const std::lock_guard<std::mutex> scopeLock(m_mutex);
-
-            for (auto func : profilerImpl->data)
-            {
-                std::chrono::nanoseconds ns = func.value.duration;
-
-                auto entry = m_compileTimeProfiler.find(func.key);
-                if (entry == m_compileTimeProfiler.end())
-                {
-                    m_compileTimeProfiler.emplace(std::make_pair(func.key, FuncProfileInfo()));
-                    entry = m_compileTimeProfiler.find(func.key);
-                }
-                entry->second.invocationCount += func.value.invocationCount;
-                entry->second.duration += ns;
-            }
-
-            for (auto entry : m_compileTimeProfiler)
-            {
-                auto milliseconds = std::chrono::duration_cast< std::chrono::milliseconds >(entry.second.duration);
-                out << entry.first.c_str() << ": \t" << entry.second.invocationCount << "\t" << milliseconds.count() << " ms\n";
-            }
-       }
-    private:
-        // Those are supposed to accumulate the time spent in each thread
-        std::unordered_map<std::string, FuncProfileInfo> m_compileTimeProfiler;
-        std::mutex m_mutex;
-    };
-
-    // SerialPerformaceProfilerImpl profiler is intent to be shared by all threads, it's thread safe object
-    // because the only member function is re-entrant function, all the member variables are atomic.
-    SerialPerformaceProfiler* Slang::SerialPerformaceProfiler::getProfiler()
-    {
-        static SerialPerformaceProfilerImpl profiler = SerialPerformaceProfilerImpl();
-        return &profiler;
-    }
 
     PerformanceProfiler* Slang::PerformanceProfiler::getProfiler()
     {
         thread_local static PerformanceProfilerImpl profiler = PerformanceProfilerImpl();
         return &profiler;
+    }
+
+    SlangProfiler::SlangProfiler(PerformanceProfiler* profiler)
+    {
+        PerformanceProfilerImpl* profilerImpl = static_cast<PerformanceProfilerImpl*>(profiler);
+        size_t entryCount = profilerImpl->data.getCount();
+
+        m_profilEntries.resize(entryCount);
+
+        int index = 0;
+        for (auto func : profilerImpl->data)
+        {
+            ProfileInfo profileEntry {};
+            size_t strSize = std::min(sizeof(profileEntry.funcName) - 1, strlen(func.key));
+
+            if (strSize > 0)
+            {
+                strncpy(profileEntry.funcName, func.key, strSize);
+            }
+            profileEntry.invocationCount = func.value.invocationCount;
+            profileEntry.duration = func.value.duration;
+
+            m_profilEntries[index++] = profileEntry;
+        }
+    }
+
+    ISlangUnknown* SlangProfiler::getInterface(const Guid& guid)
+    {
+        if(guid == SlangProfiler::getTypeGuid())
+            return static_cast<ISlangUnknown*>(this);
+        else
+            return nullptr;
+    }
+
+    size_t SlangProfiler::getEntryCount()
+    {
+        return m_profilEntries.size();
+    }
+
+    const char* SlangProfiler::getEntryName(uint32_t index)
+    {
+        if (index >= m_profilEntries.size())
+            return nullptr;
+
+        return m_profilEntries[index].funcName;
+    }
+
+    long SlangProfiler::getEntryTimeMS(uint32_t index)
+    {
+        if (index >= m_profilEntries.size())
+            return 0;
+
+        auto milliseconds = std::chrono::duration_cast< std::chrono::milliseconds >(m_profilEntries[index].duration);
+        return (long)milliseconds.count();
+    }
+
+    uint32_t SlangProfiler::getEntryInvocationTimes(uint32_t index)
+    {
+        if (index >= m_profilEntries.size())
+            return 0;
+
+        return m_profilEntries[index].invocationCount;
     }
 }

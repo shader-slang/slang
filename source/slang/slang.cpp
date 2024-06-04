@@ -6137,7 +6137,6 @@ SlangResult EndToEndCompileRequest::compile()
         getSession()->getCompilerElapsedTime(&totalEndTime, &downstreamEndTime);
         double downstreamTime = downstreamEndTime - downstreamStartTime;
         String downstreamTimeStr = String(downstreamTime, "%.2f");
-
         getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
     }
     if (getOptionSet().getBoolOption(CompilerOptionName::ReportPerfBenchmark))
@@ -6246,18 +6245,22 @@ void const* EndToEndCompileRequest::getEntryPointCode(int entryPointIndex, size_
     return (void*)blob->getBufferPointer();
 }
 
-SlangResult EndToEndCompileRequest::getCompileTimeProfile(ISlangBlob** compileTimeProfile)
+SlangResult EndToEndCompileRequest::getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool isClear)
 {
     if (compileTimeProfile == nullptr)
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    StringBuilder outString;
-    SerialPerformaceProfiler::getProfiler()->accumulateResults(outString, PerformanceProfiler::getProfiler());
+    SlangProfiler* profiler = new SlangProfiler(PerformanceProfiler::getProfiler());
 
-    ComPtr<ISlangBlob> resultBlob = StringUtil::createStringBlob(outString.produceString());
-    *compileTimeProfile = resultBlob.detach();
+    if (isClear)
+    {
+        PerformanceProfiler::getProfiler()->clear();
+    }
+
+    ComPtr<ISlangProfiler> result(profiler);
+    *compileTimeProfile = result.detach();
     return SLANG_OK;
 }
 

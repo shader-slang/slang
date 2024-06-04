@@ -1574,6 +1574,16 @@ extern "C"
     
     #define SLANG_UUID_ISlangWriter ISlangWriter::getTypeGuid()
 
+    struct ISlangProfiler : public ISlangUnknown
+    {
+        SLANG_COM_INTERFACE(0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 })
+        virtual SLANG_NO_THROW size_t SLANG_MCALL getEntryCount() = 0;
+        virtual SLANG_NO_THROW const char* SLANG_MCALL getEntryName(uint32_t index) = 0;
+        virtual SLANG_NO_THROW long SLANG_MCALL getEntryTimeMS(uint32_t index) = 0;
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryInvocationTimes(uint32_t index) = 0;
+    };
+    #define SLANG_UUID_ISlangProfiler ISlangProfiler::getTypeGuid()
+
     namespace slang {
     struct IGlobalSession;
     struct ICompileRequest;
@@ -2030,7 +2040,8 @@ extern "C"
     /*! @see slang::ICompileRequest::getCompileTimeProfile */
     SLANG_API SlangResult spGetCompileTimeProfile(
         SlangCompileRequest* request,
-        ISlangBlob** compileTimeProfile);
+        ISlangProfiler** compileTimeProfile,
+        bool isClear);
 
 
     /** Extract contents of a repro.
@@ -4430,7 +4441,7 @@ namespace slang
 
         virtual SLANG_NO_THROW void SLANG_MCALL setIgnoreCapabilityCheck(bool value) = 0;
 
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCompileTimeProfile(ISlangBlob** compileTimeProfile) = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool isClear) = 0;
 
     };
 

@@ -801,10 +801,11 @@ SLANG_API SlangResult spCompileRequest_getEntryPoint(
 /*! @see slang::ICompileRequest::getCompileTimeProfile */
 SLANG_API SlangResult spGetCompileTimeProfile(
     slang::ICompileRequest* request,
-    ISlangBlob** compileTimeProfile)
+    ISlangProfiler** compileTimeProfile,
+    bool isClear)
 {
     SLANG_ASSERT(request);
-    return request->getCompileTimeProfile(compileTimeProfile);
+    return request->getCompileTimeProfile(compileTimeProfile, isClear);
 }
 
 // Get the output code associated with a specific translation unit
