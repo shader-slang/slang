@@ -292,6 +292,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::IgnoreCapabilities,"-ignore-capabilities", nullptr, "Do not warn or error if capabilities are violated"},
         { OptionKind::MinimumSlangOptimization, "-minimum-slang-optimization", nullptr, "Perform minimum code optimization in Slang to favor compilation time."},
         { OptionKind::DisableNonEssentialValidations, "-disable-non-essential-validations", nullptr, "Disable non-essential IR validations such as use of uninitialized variables."},
+        { OptionKind::DisableSourceMap, "-disable-source-map", nullptr, "Disable source mapping in the Obfuscation."},
         { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
         "Set the module name to use when compiling multiple .slang source files into a single module."},
         { OptionKind::Output, "-o", "-o <path>", 
@@ -1686,6 +1687,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::IgnoreCapabilities:
             case OptionKind::MinimumSlangOptimization:
             case OptionKind::DisableNonEssentialValidations:
+            case OptionKind::DisableSourceMap:
             case OptionKind::DefaultImageFormatUnknown:
             case OptionKind::Obfuscate:
             case OptionKind::OutputIncludes:

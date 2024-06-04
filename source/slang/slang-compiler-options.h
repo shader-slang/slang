@@ -371,6 +371,11 @@ namespace Slang
             return !getBoolOption(CompilerOptionName::DisableNonEssentialValidations);
         }
 
+        bool shouldHaveSourceMap()
+        {
+            return !getBoolOption(CompilerOptionName::DisableSourceMap);
+        }
+
         FloatingPointMode getFloatingPointMode()
         {
             return getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
