@@ -664,7 +664,7 @@ void outputLocalUIntSetBuffer(const String& nameOfBuffer, StringBuilder& resultB
     resultBuilder << "    " << nameOfBuffer << ".resizeBackingBufferDirectly(" << set.getBuffer().getCount() << ");\n";
     for (Index i = 0; i < set.getBuffer().getCount(); i++)
     {
-        resultBuilder << "    " << nameOfBuffer << ".addRawElement(UIntSet::Element(" << set.getBuffer()[i] << "), " << i << "); \n";
+        resultBuilder << "    " << nameOfBuffer << ".addRawElement(UIntSet::Element(" << set.getBuffer()[i] << "UL), " << i << "); \n";
     }
 }
 
@@ -847,7 +847,7 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>
     sbCpp << "static CapabilityAtomSet* kCapabilityConjunctions[] = {\n";
     for (auto c : serializedAtomDisjunctions)
     {
-        sbCpp << "    { kCapabilityArray + " << c << "}, \n";
+        sbCpp << "    kCapabilityArray + " << c << ", \n";
     }
     sbCpp << "};\n";
 
