@@ -236,7 +236,7 @@ class ShortList_synthetic:
         self.data_size = self.data_type.GetByteSize()
 
 
-# Slang::Dictionary synthetic provider
+# Slang::ShortList synthetic provider
 class ShortList_synthetic:
     def __init__(self, valobj, dict):
         self.valobj = valobj
