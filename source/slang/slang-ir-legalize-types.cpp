@@ -2113,6 +2113,7 @@ static LegalVal legalizeLocalVar(
         return newVal;
     }
     }
+    return LegalVal(); // avoid warning
 }
 
 static LegalVal legalizeParam(
