@@ -788,7 +788,7 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>
         SerializedConjunction() 
         {
         }
-        SerializedConjunction(String& initFunctionName, UIntSet& data) : 
+        SerializedConjunction(const String& initFunctionName, UIntSet& data) : 
             m_initFunctionName(initFunctionName), m_data(data)
         {
         }
