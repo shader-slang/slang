@@ -236,43 +236,6 @@ class ShortList_synthetic:
         self.data_size = self.data_type.GetByteSize()
 
 
-# Slang::ShortList synthetic provider
-class ShortList_synthetic:
-    def __init__(self, valobj, dict):
-        self.valobj = valobj
-
-    def has_children(self):
-        return True
-
-    def num_children(self):
-        return self.count.GetValueAsUnsigned(0)
-
-    def get_child_index(self, name):
-        return int(name.lstrip("[").rstrip("]"))
-
-    def get_child_at_index(self, index):
-        if index >= 0 and index < self.short_count:
-            offset = index * self.data_size
-            return self.short_buffer.CreateChildAtOffset(
-                "[" + str(index) + "]", offset, self.data_type
-            )
-        elif index >= self.short_count and index < self.num_children():
-            offset = (index - self.short_count) * self.data_size
-            return self.buffer.CreateChildAtOffset(
-                "[" + str(index) + "]", offset, self.data_type
-            )
-        else:
-            return None
-
-    def update(self):
-        self.count = self.valobj.GetChildMemberWithName("m_count")
-        self.buffer = self.valobj.GetChildMemberWithName("m_buffer")
-        self.short_buffer = self.valobj.GetChildMemberWithName("m_shortBuffer")
-        self.short_count = self.short_buffer.GetNumChildren()
-        self.data_type = self.buffer.GetType().GetPointeeType()
-        self.data_size = self.data_type.GetByteSize()
-
-
 def __lldb_init_module(debugger, internal_dict):
     if ENABLE_LOGGING:
         lldb.formatters.Logger._lldb_formatters_debug_level = 2
