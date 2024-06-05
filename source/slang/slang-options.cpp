@@ -2545,19 +2545,19 @@ SlangResult OptionsParser::_parse(
                     auto impliedFormat = rawOutput.impliedFormat;
                     if (impliedFormat == CodeGenTarget::Unknown)
                         continue;
-    
+
                     int targetIndex = 0;
                     if (!mapFormatToTargetIndex.tryGetValue(impliedFormat, targetIndex))
                     {
                         targetIndex = (int)m_rawTargets.getCount();
-    
+
                         RawTarget rawTarget;
                         rawTarget.format = impliedFormat;
                         m_rawTargets.add(rawTarget);
-    
+
                         mapFormatToTargetIndex[impliedFormat] = targetIndex;
                     }
-    
+
                     rawOutput.targetIndex = targetIndex;
                 }
             }
@@ -2573,7 +2573,7 @@ SlangResult OptionsParser::_parse(
             for (int targetIndex = 0; targetIndex < targetCount; ++targetIndex)
             {
                 auto format = m_rawTargets[targetIndex].format;
-    
+
                 if (mapFormatToTargetIndex.containsKey(format))
                 {
                     m_sink->diagnose(SourceLoc(), Diagnostics::duplicateTargets, format);

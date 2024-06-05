@@ -2097,6 +2097,7 @@ static LegalVal legalizeLocalVar(
     default:
     {
         // TODO: We don't handle rates in this path.
+
         context->insertBeforeLocalVar = irLocalVar;
 
         LegalVarChainLink varChain(LegalVarChain(), varLayout);
