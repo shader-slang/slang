@@ -167,6 +167,11 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
 
 //// CapabiltySet
 
+// MSVC incorrectly throws warning
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable:4702)
+#endif
 CapabilityAtom getTargetAtomInSet(const CapabilityAtomSet& atomSet)
 {
     auto targetSet = getAtomSetOfTargets();
@@ -186,6 +191,9 @@ CapabilityAtom getStageAtomInSet(const CapabilityAtomSet& atomSet)
         return (CapabilityAtom)i;
     return CapabilityAtom::Invalid;
 }
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 template<CapabilityName keyholeAtomToPermuteWith>
 void CapabilitySet::addPermutationsOfConjunctionForEachInContainer(CapabilityAtomSet& setToPermutate, const CapabilityAtomSet& elementsToPermutateWith, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom)
