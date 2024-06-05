@@ -205,7 +205,6 @@ void CapabilitySet::addPermutationsOfConjunctionForEachInContainer(CapabilityAto
         }
         else if constexpr (keyholeAtomToPermuteWith == CapabilityName::stage)
         {
-
             addConjunction(conjunctionPermutation, knownTargetAtom, (CapabilityAtom)atom);
         }
         else
