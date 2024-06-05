@@ -23,6 +23,7 @@
 #include "slang-ir-check-differentiability.h"
 #include "slang-ir-check-recursive-type.h"
 #include "slang-ir-missing-return.h"
+#include "slang-ir-operator-shift-overflow.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-strip.h"
@@ -10917,13 +10918,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             break;
     }
 
-    // Check for using uninitialized out parameters.
     if (compileRequest->getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
         // Propagate `constexpr`-ness through the dataflow graph (and the
         // call graph) based on constraints imposed by different instructions.
         propagateConstExpr(module, compileRequest->getSink());
 
+        // Check for using uninitialized out parameters.
         checkForUsingUninitializedOutParams(module, compileRequest->getSink());
         
         // TODO: give error messages if any `undefined` or
@@ -10936,6 +10937,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
+
+        checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
     }
 
     // The "mandatory" optimization passes may make use of the
@@ -10984,13 +10987,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         //
         eliminateDeadCode(module, dceOptions);
 
+        if (stripOptions.shouldStripNameHints && linkage->m_optionSet.shouldHaveSourceMap())
+        {
+            // The obfuscated source map is stored on the module
+            obfuscateModuleLocs(module, compileRequest->getSourceManager());
+        }
     }
 
-    if (linkage->m_optionSet.shouldObfuscateCode())
-    {
-        // The obfuscated source map is stored on the module
-        obfuscateModuleLocs(module, compileRequest->getSourceManager());
-    }
 
     // TODO: consider doing some more aggressive optimizations
     // (in particular specialization of generics) here, so
