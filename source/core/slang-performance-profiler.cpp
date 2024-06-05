@@ -69,7 +69,7 @@ namespace Slang
 
             if (strSize > 0)
             {
-                strncpy_s(profileEntry.funcName, strSize, func.Key, strSize);
+                memcpy(profileEntry.funcName, func.Key, strSize);
             }
             profileEntry.invocationCount = func.Value.invocationCount;
             profileEntry.duration = func.Value.duration;
