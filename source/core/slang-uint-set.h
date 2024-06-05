@@ -25,17 +25,15 @@ static inline Index bitscanForward(uint64_t in)
 
 #ifdef _WIN64
     uint64_t out = 0;
-    _BitScanForward64((unsigned long*)&out, in);
+    assert(_BitScanForward64((unsigned long*)&out, in));
     return Index(out);
 #else
-    constexpr uint32_t bitsInType = sizeof(uint32_t) * 8;
     uint32_t out;
     // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
-    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in) + 1));
-    if (out != bitsInType)
+    if (_BitScanForward((unsigned long*)&out, *(((uint32_t*)&in) + 1)))
         return Index(out);
-    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
-    return Index(out + bitsInType);
+    assert(_BitScanForward((unsigned long*)&out, *(((uint32_t*)&in))));
+    return Index(out);
 #endif// #ifdef _WIN64
 
 #else 
