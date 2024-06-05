@@ -2228,14 +2228,14 @@ public float texture(sampler2DShadow sampler, vec3 p, float bias)
     }
 }
 
-[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p)
 {
     return sampler.SampleCmp(p.xyz, p.w);
 }
 
-[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p, float bias)
 {
@@ -2294,7 +2294,7 @@ public float texture(sampler2DArrayShadow sampler, vec4 p)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(samplerCubeArrayShadow sampler, vec4 p, float compare)
 {
     return sampler.SampleCmp(p, compare);
@@ -3648,7 +3648,7 @@ public float textureGrad(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
 }
 
 [ForceInline]
-[require(glsl_spirv, texture_shadowlod_cube)]
+[require(glsl_spirv, texture_shadowlod)]
 public float textureGrad(samplerCubeShadow sampler, vec4 p, vec3 dPdx, vec3 dPdy)
 {
     __requireComputeDerivative();

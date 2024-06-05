@@ -3085,8 +3085,6 @@ ${{{{
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
 
         StringBuilder requireStringBuilder;
-        if (shape == kStdlibShapeIndexCube)
-            requireStringBuilder << "[require(any_target, texture_cube)]";
         auto requireString = requireStringBuilder.toString();
 }}}}
 $(requireString)

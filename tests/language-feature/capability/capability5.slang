@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=PASS): -target glsl -entry main -stage compute -allow-glsl
 //TEST:SIMPLE(filecheck=PASS): -target glsl -entry main -stage compute -allow-glsl -capability sm_4_0
+//TEST:SIMPLE(filecheck=PASS): -target glsl -entry main -stage compute -allow-glsl -profile sm_6_0
 //TEST:SIMPLE(filecheck=WARN): -target glsl -entry main -stage compute -allow-glsl -capability GLSL_130
 //TEST:SIMPLE(filecheck=ERROR): -target glsl -entry main -stage compute -allow-glsl -capability GLSL_130 -restrictive-capability-check
 // CHECK_IGNORE_CAPS-NOT: error 36104

@@ -206,25 +206,29 @@ alias raytracingstages_compute_fragment_geometry_vertex = raytracing_stages | co
 // SPIRV extensions.
 
 def SPV_EXT_fragment_shader_interlock : spirv_1_0;
-def SPV_KHR_fragment_shader_barycentric : spirv_1_0;
+def SPV_EXT_physical_storage_buffer : spirv_1_3;
 def SPV_EXT_fragment_fully_covered : spirv_1_0;
 def SPV_EXT_descriptor_indexing : spirv_1_0;
 def SPV_EXT_shader_atomic_float_add : spirv_1_0;
 def SPV_EXT_shader_atomic_float16_add : SPV_EXT_shader_atomic_float_add;
 def SPV_EXT_shader_atomic_float_min_max : spirv_1_0;
-def SPV_KHR_non_semantic_info : spirv_1_0;
-def SPV_NV_shader_subgroup_partitioned : spirv_1_0;
-def SPV_NV_ray_tracing_motion_blur : spirv_1_0;
 def SPV_EXT_mesh_shader : spirv_1_4;
+def SPV_EXT_demote_to_helper_invocation : spirv_1_4;
+
+def SPV_KHR_fragment_shader_barycentric : spirv_1_0;
+def SPV_KHR_non_semantic_info : spirv_1_0;
 def SPV_KHR_ray_tracing : spirv_1_4;
 def SPV_KHR_ray_query : spirv_1_0;
 def SPV_KHR_ray_tracing_position_fetch : SPV_KHR_ray_tracing + SPV_KHR_ray_query;
-def SPV_NV_shader_invocation_reorder : spirv_1_5 + SPV_KHR_ray_tracing;
 def SPV_KHR_shader_clock : spirv_1_0;
+
+def SPV_NV_shader_subgroup_partitioned : spirv_1_0;
+def SPV_NV_ray_tracing_motion_blur : spirv_1_0;
+def SPV_NV_shader_invocation_reorder : spirv_1_5 + SPV_KHR_ray_tracing;
 def SPV_NV_shader_image_footprint : spirv_1_0;
-def SPV_GOOGLE_user_type : spirv_1_0;
 def SPV_NV_compute_shader_derivatives : spirv_1_0;
-def SPV_EXT_demote_to_helper_invocation : spirv_1_4;
+
+def SPV_GOOGLE_user_type : spirv_1_0;
 
 // SPIRV Capabilities.
 
@@ -271,64 +275,65 @@ def spvDemoteToHelperInvocationEXT : SPV_EXT_demote_to_helper_invocation;
 // extensions, the `EXT` extension will be favored over the `NV` extension, if
 // all other factors are equal.
 //
+// If a user enabled a GL_ARB/GL_NV/GL_KHR, the user will also be-able to enable any equal GL_EXT
+// To describe this relationship, all GL_EXT which were promoted (or originally not an EXT)
+// will be set as a derived atom.
 
-def _GL_ARB_derivative_control : glsl;
-def _GL_ARB_fragment_shader_interlock : glsl;
-def _GL_ARB_gpu_shader5 : glsl;
-def _GL_ARB_shader_image_size : glsl;
-def _GL_ARB_shader_texture_image_samples : glsl;
-def _GL_ARB_sparse_texture_clamp : glsl;
-def _GL_EXT_texture_query_lod : glsl;
-def _GL_ARB_texture_query_levels : glsl;
-def _GL_ARB_texture_cube_map : glsl;
-def _GL_ARB_texture_gather : glsl;
-def _GL_EXT_buffer_reference : glsl;
-def _GL_EXT_buffer_reference_uvec2 : glsl;
+def _GL_EXT_buffer_reference : _GLSL_450;
+def _GL_EXT_buffer_reference_uvec2 : _GLSL_450;
 def _GL_EXT_debug_printf : glsl;
-def _GL_EXT_fragment_shader_barycentric : glsl;
-def _GL_EXT_mesh_shader : glsl;
+def _GL_EXT_fragment_shader_barycentric : _GLSL_450;
+def _GL_EXT_mesh_shader : _GLSL_450;
 def _GL_EXT_nonuniform_qualifier : glsl;
-def _GL_EXT_ray_query : glsl_spirv_1_4;
-def _GL_EXT_ray_tracing : glsl_spirv_1_4;
-def _GL_EXT_ray_tracing_position_fetch : glsl_spirv_1_4;
-def _GL_EXT_samplerless_texture_functions : glsl;
+def _GL_EXT_ray_query : glsl_spirv_1_4 + _GLSL_450;
+def _GL_EXT_ray_tracing : glsl_spirv_1_4 + _GLSL_450;
+def _GL_EXT_ray_tracing_position_fetch : glsl_spirv_1_4 + _GLSL_450;
+def _GL_EXT_samplerless_texture_functions : _GLSL_140;
 def _GL_EXT_shader_atomic_float : glsl;
+def _GL_EXT_shader_atomic_float_min_max : glsl;
 def _GL_EXT_shader_atomic_float2 : glsl;
 def _GL_EXT_shader_atomic_int64 : glsl;
-def _GL_EXT_shader_atomic_float_min_max : glsl;
-def _GL_EXT_shader_explicit_arithmetic_types_int64 : glsl;
-def _GL_EXT_shader_image_load_store : glsl;
+def _GL_EXT_shader_explicit_arithmetic_types_int64 : _GLSL_140;
+def _GL_EXT_shader_image_load_store : _GLSL_130;
 def _GL_EXT_shader_realtime_clock : glsl;
-def _GL_EXT_texture_shadow_lod : glsl;
-def _GL_KHR_memory_scope_semantics : glsl;
-def _GL_KHR_shader_subgroup_arithmetic : glsl;
-def _GL_KHR_shader_subgroup_basic : glsl;
-def _GL_KHR_shader_subgroup_ballot : glsl;
-def _GL_KHR_shader_subgroup_quad : glsl;
-def _GL_KHR_shader_subgroup_shuffle : glsl;
-def _GL_KHR_shader_subgroup_shuffle_relative : glsl;
-def _GL_KHR_shader_subgroup_shuffle_clustered : glsl;
-def _GL_KHR_shader_subgroup_vote : glsl;
-def _GL_NV_compute_shader_derivatives : glsl;
-def _GL_NV_shader_subgroup_partitioned : glsl;
-def _GL_NV_ray_tracing_motion_blur : glsl_spirv_1_4;
-def _GL_NV_shader_atomic_fp16_vector : glsl;
-def _GL_NV_shader_invocation_reorder : glsl_spirv_1_4;
-def _GL_NV_shader_texture_footprint : glsl;
+def _GL_EXT_texture_query_lod : glsl;
+def _GL_EXT_texture_shadow_lod : _GLSL_130;
+
+def _GL_ARB_derivative_control : _GLSL_400;
+def _GL_ARB_fragment_shader_interlock : _GLSL_450;
+def _GL_ARB_gpu_shader5 : _GLSL_150;
+def _GL_ARB_shader_image_load_store : _GL_EXT_shader_image_load_store;
+def _GL_ARB_shader_image_size : _GLSL_420;
+def _GL_ARB_texture_multisample : _GLSL_140;
+def _GL_ARB_shader_texture_image_samples : _GLSL_150;
+def _GL_ARB_sparse_texture : glsl;
+def _GL_ARB_sparse_texture2 : _GL_ARB_sparse_texture;
+def _GL_ARB_sparse_texture_clamp : _GL_ARB_sparse_texture2;
+def _GL_ARB_texture_gather : _GLSL_130;
+def _GL_ARB_texture_query_levels : _GLSL_130;
+
+def _GL_KHR_memory_scope_semantics : _GLSL_420;
+def _GL_KHR_shader_subgroup_arithmetic : _GLSL_140 + glsl_spirv_1_3;
+def _GL_KHR_shader_subgroup_ballot : _GLSL_140 + glsl_spirv_1_3;
+def _GL_KHR_shader_subgroup_basic : _GLSL_140 + glsl_spirv_1_3;
+def _GL_KHR_shader_subgroup_clustered : _GLSL_140 + glsl_spirv_1_3;
+def _GL_KHR_shader_subgroup_quad : _GLSL_140 + glsl_spirv_1_3;
+def _GL_KHR_shader_subgroup_shuffle : _GLSL_140 + glsl_spirv_1_3;
+def _GL_KHR_shader_subgroup_shuffle_relative : _GLSL_140 + glsl_spirv_1_3;
+def _GL_KHR_shader_subgroup_vote : _GLSL_140 + glsl_spirv_1_3;
+
+def _GL_NV_compute_shader_derivatives : _GLSL_450;
+def _GL_NV_fragment_shader_barycentric : _GL_EXT_fragment_shader_barycentric;
 def _GL_NV_gpu_shader5 : _GL_ARB_gpu_shader5;
-alias _GL_NV_fragment_shader_barycentric = _GL_EXT_fragment_shader_barycentric;
-alias _GL_NV_ray_tracing = _GL_EXT_ray_tracing;
+def _GL_NV_ray_tracing : _GL_EXT_ray_tracing;
+def _GL_NV_ray_tracing_motion_blur : _GLSL_460 + glsl_spirv_1_4;
+def _GL_NV_shader_atomic_fp16_vector : _GL_NV_gpu_shader5;
+def _GL_NV_shader_invocation_reorder : _GLSL_460 + glsl_spirv_1_4;
+def _GL_NV_shader_subgroup_partitioned : _GLSL_140;
+def _GL_NV_shader_texture_footprint : _GLSL_450;
 
 // GLSL extension and SPV extension associations.
-alias GL_ARB_derivative_control = _GL_ARB_derivative_control | spvDerivativeControl;
-alias GL_ARB_fragment_shader_interlock = _GL_ARB_fragment_shader_interlock | spvFragmentShaderPixelInterlockEXT;
-alias GL_ARB_gpu_shader5 = _GL_ARB_gpu_shader5 | spirv_1_0;
-alias GL_ARB_sparse_texture_clamp = _GL_ARB_fragment_shader_interlock | spirv_1_0;
-alias GL_EXT_texture_query_lod = _GL_EXT_texture_query_lod | spvImageQuery | metal;
-alias GL_ARB_texture_query_levels = _GL_ARB_texture_query_levels | spvImageQuery | metal;
-alias GL_ARB_texture_cube_map = _GL_ARB_texture_cube_map | spirv_1_0;
-alias GL_ARB_texture_gather = _GL_ARB_texture_gather | spirv_1_0 | metal;
-alias GL_EXT_buffer_reference = _GL_ARB_fragment_shader_interlock | spirv_1_5;
+alias GL_EXT_buffer_reference = _GL_EXT_buffer_reference | SPV_EXT_physical_storage_buffer;
 alias GL_EXT_buffer_reference_uvec2 = _GL_EXT_buffer_reference_uvec2 | spirv_1_0;
 alias GL_EXT_debug_printf = _GL_EXT_debug_printf | SPV_KHR_non_semantic_info;
 alias GL_EXT_fragment_shader_barycentric = _GL_EXT_fragment_shader_barycentric | spvFragmentBarycentricKHR;
@@ -339,33 +344,45 @@ alias GL_EXT_ray_tracing = _GL_EXT_ray_tracing | spvRayTracingKHR + spvRayQueryK
 alias GL_EXT_ray_tracing_position_fetch = _GL_EXT_ray_tracing_position_fetch | spvRayTracingPositionFetchKHR + spvRayQueryPositionFetchKHR;
 alias GL_EXT_samplerless_texture_functions = _GL_EXT_samplerless_texture_functions | spirv_1_0;
 alias GL_EXT_shader_atomic_float = _GL_EXT_shader_atomic_float | spvAtomicFloat32AddEXT + spvAtomicFloat32MinMaxEXT;
+alias GL_EXT_shader_atomic_float_min_max = _GL_EXT_shader_atomic_float_min_max | spvAtomicFloat32MinMaxEXT + spvAtomicFloat16MinMaxEXT;
 alias GL_EXT_shader_atomic_float2 = _GL_EXT_shader_atomic_float2 | spvAtomicFloat32AddEXT + spvAtomicFloat32MinMaxEXT + spvAtomicFloat16AddEXT + spvAtomicFloat16MinMaxEXT;
 alias GL_EXT_shader_atomic_int64 = _GL_EXT_shader_atomic_int64 | spvInt64Atomics;
-alias GL_EXT_shader_atomic_float_min_max = _GL_EXT_shader_atomic_float_min_max | spvAtomicFloat32MinMaxEXT + spvAtomicFloat16MinMaxEXT;
 alias GL_EXT_shader_explicit_arithmetic_types_int64 = _GL_EXT_shader_explicit_arithmetic_types_int64 | spirv_1_0;
 alias GL_EXT_shader_image_load_store = _GL_EXT_shader_image_load_store | spirv_1_0;
 alias GL_EXT_shader_realtime_clock = _GL_EXT_shader_realtime_clock | spvShaderClockKHR;
+alias GL_EXT_texture_query_lod = _GL_EXT_texture_query_lod | spvImageQuery | metal;
 alias GL_EXT_texture_shadow_lod = _GL_EXT_texture_shadow_lod + _GLSL_400 | spirv_1_0;
+
+alias GL_ARB_derivative_control = _GL_ARB_derivative_control | spvDerivativeControl;
+alias GL_ARB_fragment_shader_interlock = _GL_ARB_fragment_shader_interlock | spvFragmentShaderPixelInterlockEXT;
+alias GL_ARB_gpu_shader5 = _GL_ARB_gpu_shader5 | spirv_1_0;
+alias GL_ARB_shader_image_load_store = GL_EXT_shader_image_load_store;
+alias GL_ARB_shader_image_size = _GL_ARB_shader_image_size | spvImageQuery | metal;
+alias GL_ARB_texture_multisample = _GL_ARB_texture_multisample | spirv_1_0;
+alias GL_ARB_shader_texture_image_samples = _GL_ARB_shader_texture_image_samples | spvImageQuery | metal;
+alias GL_ARB_sparse_texture_clamp = _GL_ARB_sparse_texture_clamp | spirv_1_0;
+alias GL_ARB_texture_gather = _GL_ARB_texture_gather | spirv_1_0 | metal;
+alias GL_ARB_texture_query_levels = _GL_ARB_texture_query_levels | spvImageQuery | metal;
+
 alias GL_KHR_memory_scope_semantics = _GL_KHR_memory_scope_semantics | spirv_1_0;
 alias GL_KHR_shader_subgroup_arithmetic = _GL_KHR_shader_subgroup_arithmetic | spvGroupNonUniformArithmetic;
-alias GL_KHR_shader_subgroup_basic = _GL_KHR_shader_subgroup_basic | spvGroupNonUniformBallot;
 alias GL_KHR_shader_subgroup_ballot = _GL_KHR_shader_subgroup_ballot | spvGroupNonUniformBallot;
-alias GL_KHR_shader_subgroup_clustered = _GL_KHR_shader_subgroup_shuffle_clustered | spvGroupNonUniformShuffle;
+alias GL_KHR_shader_subgroup_basic = _GL_KHR_shader_subgroup_basic | spvGroupNonUniformBallot;
+alias GL_KHR_shader_subgroup_clustered = _GL_KHR_shader_subgroup_clustered | spvGroupNonUniformShuffle;
+alias GL_KHR_shader_subgroup_quad = _GL_KHR_shader_subgroup_quad | spvGroupNonUniformQuad;
 alias GL_KHR_shader_subgroup_shuffle = _GL_KHR_shader_subgroup_shuffle | spvGroupNonUniformShuffle;
 alias GL_KHR_shader_subgroup_shuffle_relative = _GL_KHR_shader_subgroup_shuffle_relative | spvGroupNonUniformShuffle;
 alias GL_KHR_shader_subgroup_vote = _GL_KHR_shader_subgroup_vote | spvGroupNonUniformVote;
-alias GL_KHR_shader_subgroup_quad = _GL_KHR_shader_subgroup_quad | spvGroupNonUniformQuad;
-alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SPV_NV_compute_shader_derivatives | _sm_6_6;
-alias GL_ARB_shader_image_size = _GL_ARB_shader_image_size | spvImageQuery | metal;
-alias GL_ARB_shader_texture_image_samples = _GL_ARB_shader_texture_image_samples | spvImageQuery | metal;
-alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | spirv_1_0;
-alias GL_NV_shader_subgroup_partitioned = _GL_NV_shader_subgroup_partitioned | spvGroupNonUniformPartitionedNV;
-alias GL_NV_ray_tracing_motion_blur = _GL_NV_ray_tracing_motion_blur | spvRayTracingMotionBlurNV;
-alias GL_NV_shader_invocation_reorder = _GL_NV_shader_invocation_reorder + _GL_EXT_buffer_reference_uvec2 | spvShaderInvocationReorderNV;
-alias GL_NV_shader_texture_footprint = _GL_NV_shader_texture_footprint | spvImageFootprintNV;
 
+alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SPV_NV_compute_shader_derivatives | _sm_6_6;
 alias GL_NV_fragment_shader_barycentric = GL_EXT_fragment_shader_barycentric;
+alias GL_NV_gpu_shader5 = GL_ARB_gpu_shader5;
 alias GL_NV_ray_tracing = GL_EXT_ray_tracing;
+alias GL_NV_ray_tracing_motion_blur = _GL_NV_ray_tracing_motion_blur | spvRayTracingMotionBlurNV;
+alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | spirv_1_0;
+alias GL_NV_shader_invocation_reorder = _GL_NV_shader_invocation_reorder + _GL_EXT_buffer_reference_uvec2 | spvShaderInvocationReorderNV;
+alias GL_NV_shader_subgroup_partitioned = _GL_NV_shader_subgroup_partitioned | spvGroupNonUniformPartitionedNV;
+alias GL_NV_shader_texture_footprint = _GL_NV_shader_texture_footprint | spvImageFootprintNV;
 
 // Define feature names
 
@@ -512,6 +529,8 @@ alias GLSL_140 = _GLSL_140
                | spirv_1_0
                 | metal
                | cpp
+               // previous
+               | GLSL_130
                ;
 alias GLSL_150 = _GLSL_150
                | _sm_4_1
@@ -519,6 +538,10 @@ alias GLSL_150 = _GLSL_150
                | spirv_1_0
                | metal
                | cpp
+               // extensions to propagate
+               | glsl_spirv + GL_ARB_texture_multisample
+               // previous
+               | GLSL_140
                ;
 alias GLSL_330 = _GLSL_330
                | _sm_5_0
@@ -526,6 +549,8 @@ alias GLSL_330 = _GLSL_330
                | spirv_1_0
                | metal
                | cpp
+               // previous
+               | GLSL_150
                ;
 alias GLSL_400 = _GLSL_400
                | _sm_5_1
@@ -533,6 +558,10 @@ alias GLSL_400 = _GLSL_400
                | spirv_1_3
                | metal
                | cpp
+               // extensions to propagate
+               | glsl_spirv + GL_ARB_gpu_shader5 + GL_ARB_texture_gather
+               // previous
+               | GLSL_330
                ;
 alias GLSL_410 = _GLSL_410
                | _sm_5_1
@@ -540,6 +569,8 @@ alias GLSL_410 = _GLSL_410
                | spirv_1_3
                | metal
                | cpp
+               // previous
+               | GLSL_400
                ;
 alias GLSL_420 = _GLSL_420
                | _sm_5_1
@@ -547,6 +578,10 @@ alias GLSL_420 = _GLSL_420
                | spirv_1_3
                | metal
                | cpp
+               // extensions to propagate
+               | glsl_spirv + GL_ARB_shader_image_load_store
+               // previous
+               | GLSL_410
                ;
 alias GLSL_430 = _GLSL_430
                | _sm_5_1
@@ -554,6 +589,10 @@ alias GLSL_430 = _GLSL_430
                | spirv_1_3
                | metal
                | cpp
+               // extensions to propagate
+               | glsl_spirv + GL_ARB_shader_image_size + GL_ARB_texture_query_levels
+               // previous
+               | GLSL_420
                ;
 alias GLSL_440 = _GLSL_440
                | _sm_6_0
@@ -561,13 +600,19 @@ alias GLSL_440 = _GLSL_440
                | spirv_1_5
                | metal
                | cpp
+               // previous
+               | GLSL_430
                ;
-alias GLSL_450 = _GLSL_450
+alias GLSL_450 = _GLSL_450 
                | _sm_6_0
                | _cuda_sm_6_0
                | spirv_1_5
                | metal
                | cpp
+               // extensions to propagate
+               | glsl_spirv + GL_ARB_derivative_control + GL_ARB_shader_texture_image_samples
+               // previous
+               | GLSL_440
                ;
 alias GLSL_460 = _GLSL_460
                | _sm_6_6
@@ -575,6 +620,8 @@ alias GLSL_460 = _GLSL_460
                | spirv_1_5
                | metal
                | cpp
+               // previous
+               | GLSL_450
                ;
 
 alias GLSL_410_SPIRV_1_0 = _GLSL_410 | spirv_1_0;
@@ -670,9 +717,6 @@ alias texture_querylod = texture_sm_4_1 + GL_EXT_texture_query_lod;
 alias texture_querylevels = texture_sm_4_1 + GL_ARB_texture_query_levels;
 alias texture_shadowlod = texture_sm_4_1 + GL_EXT_texture_shadow_lod
                         | texture_sm_4_1;
-alias texture_shadowlod_cube = texture_shadowlod | texture_shadowlod + GL_ARB_texture_cube_map;
-alias texture_cube = texture_sm_4_1 + GL_ARB_texture_cube_map | texture_sm_4_1;
-alias texture_querylevels_cube = texture_querylevels + GL_ARB_texture_cube_map | texture_querylevels;
 
 alias atomic_glsl_float1 = GL_EXT_shader_atomic_float;
 alias atomic_glsl_float2 = GL_EXT_shader_atomic_float2;
