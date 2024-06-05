@@ -167,19 +167,15 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
 
 //// CapabiltySet
 
-// MSVC incorrectly throws warning
-#if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable:4702)
-#endif
 CapabilityAtom getTargetAtomInSet(const CapabilityAtomSet& atomSet)
 {
     auto targetSet = getAtomSetOfTargets();
     CapabilityAtomSet out;
     CapabilityAtomSet::calcIntersection(out, targetSet, atomSet);
-    for (auto i : out)
-        return (CapabilityAtom)i;
-    return CapabilityAtom::Invalid;
+    auto iter = out.begin();
+    if (iter == out.end())
+        return CapabilityAtom::Invalid;
+    return (CapabilityAtom)*iter;
 }
 
 CapabilityAtom getStageAtomInSet(const CapabilityAtomSet& atomSet)
@@ -187,13 +183,11 @@ CapabilityAtom getStageAtomInSet(const CapabilityAtomSet& atomSet)
     auto stageSet = getAtomSetOfStages();
     CapabilityAtomSet out;
     CapabilityAtomSet::calcIntersection(out, stageSet, atomSet);
-    for(auto i : out)
-        return (CapabilityAtom)i;
-    return CapabilityAtom::Invalid;
+    auto iter = out.begin();
+    if (iter == out.end())
+        return CapabilityAtom::Invalid;
+    return (CapabilityAtom)*iter;
 }
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
 template<CapabilityName keyholeAtomToPermuteWith>
 void CapabilitySet::addPermutationsOfConjunctionForEachInContainer(CapabilityAtomSet& setToPermutate, const CapabilityAtomSet& elementsToPermutateWith, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom)
@@ -209,16 +203,14 @@ void CapabilitySet::addPermutationsOfConjunctionForEachInContainer(CapabilityAto
         {
             addConjunction(conjunctionPermutation, (CapabilityAtom)atom, knownStageAtom);
         }
-        else 
+        else if constexpr (keyholeAtomToPermuteWith == CapabilityName::stage)
         {
-            if constexpr (keyholeAtomToPermuteWith == CapabilityName::stage)
-            {
-                addConjunction(conjunctionPermutation, knownTargetAtom, (CapabilityAtom)atom);
-            }
-            else
-            {
-                addConjunction(conjunctionPermutation, knownTargetAtom, knownStageAtom);
-            }
+
+            addConjunction(conjunctionPermutation, knownTargetAtom, (CapabilityAtom)atom);
+        }
+        else
+        {
+            addConjunction(conjunctionPermutation, knownTargetAtom, knownStageAtom);
         }
     }
 }
