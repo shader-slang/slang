@@ -34,7 +34,7 @@ static inline Index bitscanForward(uint64_t in)
     // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
     if (_BitScanForward((unsigned long*)&out, *(((uint32_t*)&in) + 1)))
         return Index(out);
-    auo ret = _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
+    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
     return Index(out);
 #endif// #ifdef _WIN64
 
