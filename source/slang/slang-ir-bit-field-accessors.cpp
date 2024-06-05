@@ -79,7 +79,7 @@ static void synthesizeBitFieldGetter(IRFunc* func, IRBitFieldAccessorDecoration*
 static IRIntegerValue setLowBits(IRIntegerValue bits)
 {
     SLANG_ASSERT(bits >= 0 && bits <= 64);
-    return ~(bits >= 64 ? 0 : (~0 << bits));
+    return ~(bits >= 64 ? 0 : (~0UL << bits));
 }
 
 static void synthesizeBitFieldSetter(IRFunc* func, IRBitFieldAccessorDecoration* dec)

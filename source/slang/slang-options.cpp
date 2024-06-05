@@ -2527,37 +2527,37 @@ SlangResult OptionsParser::_parse(
         // target that handles that format.
         Dictionary<CodeGenTarget, int> mapFormatToTargetIndex;
 
-    // If there was no explicit `-target` specified, then we will look
-    // at the `-o` options to see what we can infer.
-    //
-    if (m_rawTargets.getCount() == 0)
-    {
-        // If there are no targets and no outputs
-        if (m_rawOutputs.getCount() == 0)
+        // If there was no explicit `-target` specified, then we will look
+        // at the `-o` options to see what we can infer.
+        //
+        if (m_rawTargets.getCount() == 0)
         {
-            m_requestImpl->m_emitIr = true;
-        }
-        else
-        {
-            for (auto& rawOutput : m_rawOutputs)
+            // If there are no targets and no outputs
+            if (m_rawOutputs.getCount() == 0)
             {
-                // Some outputs don't imply a target format, and we shouldn't use those for inference.
-                auto impliedFormat = rawOutput.impliedFormat;
-                if (impliedFormat == CodeGenTarget::Unknown)
-                    continue;
-
+                m_requestImpl->m_emitIr = true;
+            }
+            else
+            {
+                for (auto& rawOutput : m_rawOutputs)
+                {
+                    // Some outputs don't imply a target format, and we shouldn't use those for inference.
+                    auto impliedFormat = rawOutput.impliedFormat;
+                    if (impliedFormat == CodeGenTarget::Unknown)
+                        continue;
+    
                     int targetIndex = 0;
                     if (!mapFormatToTargetIndex.tryGetValue(impliedFormat, targetIndex))
                     {
                         targetIndex = (int)m_rawTargets.getCount();
-
+    
                         RawTarget rawTarget;
                         rawTarget.format = impliedFormat;
                         m_rawTargets.add(rawTarget);
-
+    
                         mapFormatToTargetIndex[impliedFormat] = targetIndex;
                     }
-
+    
                     rawOutput.targetIndex = targetIndex;
                 }
             }
@@ -2573,7 +2573,7 @@ SlangResult OptionsParser::_parse(
             for (int targetIndex = 0; targetIndex < targetCount; ++targetIndex)
             {
                 auto format = m_rawTargets[targetIndex].format;
-
+    
                 if (mapFormatToTargetIndex.containsKey(format))
                 {
                     m_sink->diagnose(SourceLoc(), Diagnostics::duplicateTargets, format);
