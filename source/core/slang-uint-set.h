@@ -19,20 +19,22 @@ constexpr Index intLog2(unsigned x)
     return x == 1 ? 0 : 1 + intLog2(x >> 1);
 }
 
+// if `in` is 0, result is undefined behavior
 static inline Index bitscanForward(uint64_t in)
 {
+    assert(in != 0);
 #if defined(_MSC_VER)
 
 #ifdef _WIN64
     uint64_t out = 0;
-    assert(_BitScanForward64((unsigned long*)&out, in));
+    _BitScanForward64((unsigned long*)&out, in);
     return Index(out);
 #else
     uint32_t out;
     // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
     if (_BitScanForward((unsigned long*)&out, *(((uint32_t*)&in) + 1)))
         return Index(out);
-    assert(_BitScanForward((unsigned long*)&out, *(((uint32_t*)&in))));
+    auo ret = _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
     return Index(out);
 #endif// #ifdef _WIN64
 
