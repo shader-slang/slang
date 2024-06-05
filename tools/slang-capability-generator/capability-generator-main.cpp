@@ -661,6 +661,7 @@ void calcCanonicalRepresentations(DiagnosticSink* sink, List<RefPtr<CapabilityDe
 void outputLocalUIntSetBuffer(const String& nameOfBuffer, StringBuilder& resultBuilder, UIntSet& set)
 {
     resultBuilder << "    CapabilityAtomSet " << nameOfBuffer << ";\n";
+    resultBuilder << "    " << nameOfBuffer << ".resizeBackingBufferDirectly(" << set.getBuffer().getCount() << ");\n";
     for (Index i = 0; i < set.getBuffer().getCount(); i++)
     {
         resultBuilder << "    " << nameOfBuffer << ".addRawElement(UIntSet::Element(" << set.getBuffer()[i] << "), " << i << "); \n";
