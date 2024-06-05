@@ -345,6 +345,8 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
 SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 {
+    SLANG_PROFILE;
+
     if (m_builtinLinkage->mapNameToLoadedModules.Count())
     {
         // Already have a StdLib loaded
@@ -5138,18 +5140,22 @@ void const* EndToEndCompileRequest::getEntryPointCode(int entryPointIndex, size_
     return (void*)blob->getBufferPointer();
 }
 
-SlangResult EndToEndCompileRequest::getCompileTimeProfile(ISlangBlob** compileTimeProfile)
+SlangResult EndToEndCompileRequest::getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool shouldClear)
 {
     if (compileTimeProfile == nullptr)
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    StringBuilder outString;
-    SerialPerformaceProfiler::getProfiler()->accumulateResults(outString, PerformanceProfiler::getProfiler());
+    SlangProfiler* profiler = new SlangProfiler(PerformanceProfiler::getProfiler());
 
-    ComPtr<ISlangBlob> resultBlob = StringUtil::createStringBlob(outString.ProduceString());
-    *compileTimeProfile = resultBlob.detach();
+    if (shouldClear)
+    {
+        PerformanceProfiler::getProfiler()->clear();
+    }
+
+    ComPtr<ISlangProfiler> result(profiler);
+    *compileTimeProfile = result.detach();
     return SLANG_OK;
 }
 

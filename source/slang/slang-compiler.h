@@ -2596,7 +2596,7 @@ namespace Slang
             SlangSeverity overrideSeverity) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangDiagnosticFlags SLANG_MCALL getDiagnosticFlags() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCompileTimeProfile(ISlangBlob** compileTimeProfile);
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool isClear);
 
         EndToEndCompileRequest(
             Session* session);
