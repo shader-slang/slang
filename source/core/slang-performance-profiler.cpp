@@ -55,7 +55,7 @@ namespace Slang
         PerformanceProfilerImpl* profilerImpl = static_cast<PerformanceProfilerImpl*>(profiler);
         size_t entryCount = profilerImpl->data.getCount();
 
-        m_profilEntries.resize(entryCount);
+        m_profilEntries.reserve(entryCount);
 
         int index = 0;
         for (auto func : profilerImpl->data)
@@ -65,12 +65,13 @@ namespace Slang
 
             if (strSize > 0)
             {
-                strncpy(profileEntry.funcName, func.key, strSize);
+                strncpy_s(profileEntry.funcName, strSize, func.key, strSize);
             }
             profileEntry.invocationCount = func.value.invocationCount;
             profileEntry.duration = func.value.duration;
 
-            m_profilEntries[index++] = profileEntry;
+            m_profilEntries.insert(index, profileEntry);
+            index++;
         }
     }
 
@@ -84,12 +85,12 @@ namespace Slang
 
     size_t SlangProfiler::getEntryCount()
     {
-        return m_profilEntries.size();
+        return m_profilEntries.getCount();
     }
 
     const char* SlangProfiler::getEntryName(uint32_t index)
     {
-        if (index >= m_profilEntries.size())
+        if (index >= (uint32_t)m_profilEntries.getCount())
             return nullptr;
 
         return m_profilEntries[index].funcName;
@@ -97,7 +98,7 @@ namespace Slang
 
     long SlangProfiler::getEntryTimeMS(uint32_t index)
     {
-        if (index >= m_profilEntries.size())
+        if (index >= (uint32_t)m_profilEntries.getCount())
             return 0;
 
         auto milliseconds = std::chrono::duration_cast< std::chrono::milliseconds >(m_profilEntries[index].duration);
@@ -106,7 +107,7 @@ namespace Slang
 
     uint32_t SlangProfiler::getEntryInvocationTimes(uint32_t index)
     {
-        if (index >= m_profilEntries.size())
+        if (index >= (uint32_t)m_profilEntries.getCount())
             return 0;
 
         return m_profilEntries[index].invocationCount;

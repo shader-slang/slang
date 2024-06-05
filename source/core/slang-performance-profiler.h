@@ -5,6 +5,7 @@
 #include <chrono>
 #include <vector>
 #include "../../slang-com-helper.h"
+#include "../core/slang-list.h"
 
 namespace Slang
 {
@@ -63,7 +64,7 @@ public:
     virtual SLANG_NO_THROW long SLANG_MCALL getEntryTimeMS(uint32_t index) override;
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryInvocationTimes(uint32_t index) override;
 private:
-    std::vector<ProfileInfo> m_profilEntries;
+    List<ProfileInfo> m_profilEntries;
 };
 
 #define SLANG_PROFILE PerformanceProfilerFuncRAIIContext _profileContext(__func__)

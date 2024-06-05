@@ -6245,7 +6245,7 @@ void const* EndToEndCompileRequest::getEntryPointCode(int entryPointIndex, size_
     return (void*)blob->getBufferPointer();
 }
 
-SlangResult EndToEndCompileRequest::getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool isClear)
+SlangResult EndToEndCompileRequest::getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool shouldClear)
 {
     if (compileTimeProfile == nullptr)
     {
@@ -6254,7 +6254,7 @@ SlangResult EndToEndCompileRequest::getCompileTimeProfile(ISlangProfiler** compi
 
     SlangProfiler* profiler = new SlangProfiler(PerformanceProfiler::getProfiler());
 
-    if (isClear)
+    if (shouldClear)
     {
         PerformanceProfiler::getProfiler()->clear();
     }
