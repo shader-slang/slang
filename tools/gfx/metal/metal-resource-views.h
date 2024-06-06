@@ -22,7 +22,6 @@ public:
         Texture,
         Buffer,
         TexelBuffer,
-        PlainBuffer,
     };
 
 public:
@@ -50,7 +49,7 @@ class BufferResourceViewImpl : public ResourceViewImpl
 {
 public:
     BufferResourceViewImpl(DeviceImpl* device)
-        : ResourceViewImpl(ViewType::Texture, device)
+        : ResourceViewImpl(ViewType::Buffer, device)
     {}
     ~BufferResourceViewImpl();
     RefPtr<BufferResourceImpl> m_buffer;
@@ -66,15 +65,6 @@ public:
     TexelBufferResourceViewImpl(DeviceImpl* device);
     ~TexelBufferResourceViewImpl();
     RefPtr<BufferResourceImpl> m_buffer;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
-};
-
-class PlainBufferResourceViewImpl : public ResourceViewImpl
-{
-public:
-    PlainBufferResourceViewImpl(DeviceImpl* device);
-    RefPtr<BufferResourceImpl> m_buffer;
-
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };
 
