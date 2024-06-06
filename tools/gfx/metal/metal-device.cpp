@@ -142,6 +142,8 @@ Result DeviceImpl::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQ
 Result DeviceImpl::createSwapchain(
     const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain)
 {
+    AUTORELEASEPOOL
+
     RefPtr<SwapchainImpl> sc = new SwapchainImpl();
     SLANG_RETURN_ON_FAIL(sc->init(this, desc, window));
     returnComPtr(outSwapchain, sc);

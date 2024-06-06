@@ -129,8 +129,6 @@ public:
 public:
     DeviceInfo m_info;
     String m_adapterName;
-    MTL::Drawable* m_drawable = nullptr;
-    CA::MetalLayer* m_metalLayer = nullptr;
 
     bool captureEnabled() const { return std::getenv("MTL_CAPTURE") != nullptr; }
 
