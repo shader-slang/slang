@@ -30,5 +30,20 @@ struct MetalUtil
         }
         return false;
     }
+
+    static MTL::SamplerMinMagFilter translateSamplerMinMagFilter(TextureFilteringMode mode);
+    static MTL::SamplerMipFilter translateSamplerMipFilter(TextureFilteringMode mode);
+    static MTL::SamplerAddressMode translateSamplerAddressMode(TextureAddressingMode mode);
+    static MTL::CompareFunction translateCompareFunction(ComparisonFunc func); 
 };
+
+struct ScopedAutoreleasePool
+{
+    ScopedAutoreleasePool() { m_pool = NS::AutoreleasePool::alloc()->init(); }
+    ~ScopedAutoreleasePool() { m_pool->drain(); }
+    NS::AutoreleasePool* m_pool;
+};
+
+#define AUTORELEASEPOOL ScopedAutoreleasePool _pool_;
+
 } // namespace gfx

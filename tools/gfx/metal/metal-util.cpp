@@ -178,4 +178,74 @@ MTL::VertexFormat MetalUtil::getMetalVertexFormat(Format format)
     }
 }
 
+MTL::SamplerMinMagFilter MetalUtil::translateSamplerMinMagFilter(TextureFilteringMode mode)
+{
+    switch (mode)
+    {
+    case TextureFilteringMode::Point:
+        return MTL::SamplerMinMagFilterNearest;
+    case TextureFilteringMode::Linear:
+        return MTL::SamplerMinMagFilterLinear;
+    default:
+        return MTL::SamplerMinMagFilter(0);
+    }
+}
+
+MTL::SamplerMipFilter MetalUtil::translateSamplerMipFilter(TextureFilteringMode mode)
+{
+    switch (mode)
+    {
+    case TextureFilteringMode::Point:
+        return MTL::SamplerMipFilterNearest;
+    case TextureFilteringMode::Linear:
+        return MTL::SamplerMipFilterLinear;
+    default:
+        return MTL::SamplerMipFilter(0);
+    }    
+}
+
+MTL::SamplerAddressMode MetalUtil::translateSamplerAddressMode(TextureAddressingMode mode)
+{
+    switch (mode)
+    {
+    case TextureAddressingMode::Wrap:
+        return MTL::SamplerAddressModeRepeat;
+    case TextureAddressingMode::ClampToEdge:
+        return MTL::SamplerAddressModeClampToEdge;
+    case TextureAddressingMode::ClampToBorder:
+        return MTL::SamplerAddressModeClampToBorderColor;
+    case TextureAddressingMode::MirrorRepeat:
+        return MTL::SamplerAddressModeMirrorRepeat;
+    case TextureAddressingMode::MirrorOnce:
+        return MTL::SamplerAddressModeMirrorClampToEdge;
+    default:
+        return MTL::SamplerAddressMode(0);
+    }
+}
+
+MTL::CompareFunction MetalUtil::translateCompareFunction(ComparisonFunc func)
+{
+    switch (func)
+    {
+    case ComparisonFunc::Never:
+        return MTL::CompareFunctionNever;
+    case ComparisonFunc::Less:
+        return MTL::CompareFunctionLess;
+    case ComparisonFunc::Equal:
+        return MTL::CompareFunctionEqual;
+    case ComparisonFunc::LessEqual:
+        return MTL::CompareFunctionLessEqual;
+    case ComparisonFunc::Greater:
+        return MTL::CompareFunctionGreater;
+    case ComparisonFunc::NotEqual:
+        return MTL::CompareFunctionNotEqual;
+    case ComparisonFunc::GreaterEqual:
+        return MTL::CompareFunctionGreaterEqual;
+    case ComparisonFunc::Always:
+        return MTL::CompareFunctionAlways;
+    default:
+        return MTL::CompareFunction(0);
+    }
+}
+
 } // namespace gfx

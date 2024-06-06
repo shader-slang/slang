@@ -13,7 +13,7 @@
 //#include "metal-fence.h"
 //#include "metal-query.h"
 //#include "metal-resource-views.h"
-//#include "metal-sampler.h"
+#include "metal-sampler.h"
 #include "metal-shader-object.h"
 #include "metal-shader-object-layout.h"
 //#include "metal-shader-table.h"
@@ -307,7 +307,12 @@ Result DeviceImpl::createBufferFromNativeHandle(
 
 Result DeviceImpl::createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    RefPtr<SamplerStateImpl> samplerImpl = new SamplerStateImpl();
+    SLANG_RETURN_ON_FAIL(samplerImpl->init(this, desc));
+    returnComPtr(outSampler, samplerImpl);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::createTextureView(
