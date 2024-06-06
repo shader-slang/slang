@@ -10,7 +10,7 @@
 #include "metal-shader-program.h"
 #include "metal-buffer.h"
 //#include "metal-command-queue.h"
-//#include "metal-fence.h"
+#include "metal-fence.h"
 //#include "metal-query.h"
 //#include "metal-resource-views.h"
 #include "metal-sampler.h"
@@ -494,7 +494,12 @@ Result DeviceImpl::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** ou
 
 Result DeviceImpl::createFence(const IFence::Desc& desc, IFence** outFence)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    RefPtr<FenceImpl> fenceImpl = new FenceImpl();
+    SLANG_RETURN_ON_FAIL(fenceImpl->init(this, desc));
+    returnComPtr(outFence, fenceImpl);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::waitForFences(
