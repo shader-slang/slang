@@ -62,7 +62,7 @@ The second attribute `[AutoPyBindCUDA]` allows us to call `square` directly from
 
 You can now simply invoke this kernel from python:
 
-``` Python
+```python
 import torch
 import slangtorch
 
