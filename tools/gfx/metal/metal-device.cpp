@@ -43,13 +43,15 @@ DeviceImpl::~DeviceImpl()
 
 Result DeviceImpl::getNativeDeviceHandles(InteropHandles* outHandles)
 {
-    outHandles->handles[0].handleValue = reinterpret_cast<intptr_t>(m_device);
     outHandles->handles[0].api = InteropHandleAPI::Metal;
+    outHandles->handles[0].handleValue = reinterpret_cast<intptr_t>(m_device.get());
     return SLANG_OK;
 }
 
 SlangResult DeviceImpl::initialize(const Desc& desc)
 {
+    AUTORELEASEPOOL
+
     // Initialize device info.
     {
         m_info.apiName = "Metal";
@@ -66,8 +68,8 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
     SlangResult initDeviceResult = SLANG_OK;
 
-    m_device = MTL::CreateSystemDefaultDevice();
-    m_commandQueue = m_device->newCommandQueue();
+    m_device = NS::TransferPtr(MTL::CreateSystemDefaultDevice());
+    m_commandQueue = NS::TransferPtr(m_device->newCommandQueue(64));
 
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
@@ -89,11 +91,10 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
             exit(1);
         }
         d->setDestination(MTL::CaptureDestinationGPUTraceDocument);
-        d->setCaptureObject(m_device);
-        std::string cpath("frame.gputrace");
-        NS::String* path = NS::String::alloc()->init(cpath.c_str(), NS::UTF8StringEncoding);
-        NS::URL* url = NS::URL::alloc()->initFileURLWithPath(path);
-        d->setOutputURL(url);
+        d->setCaptureObject(m_device.get());
+        NS::SharedPtr<NS::String> path = MetalUtil::createString("frame.gputrace");
+        NS::SharedPtr<NS::URL> url = NS::TransferPtr(NS::URL::alloc()->initFileURLWithPath(path.get()));
+        d->setOutputURL(url.get());
         NS::Error* errorCode = NS::Error::alloc();
         if (!captureManager->startCapture(d, &errorCode))
         {
@@ -109,7 +110,10 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
 //void DeviceImpl::waitForGpu() { m_deviceQueue.flushAndWait(); }
 
 
-SLANG_NO_THROW const DeviceInfo& SLANG_MCALL DeviceImpl::getDeviceInfo() const { return m_info; }
+const DeviceInfo& DeviceImpl::getDeviceInfo() const
+{
+    return m_info;
+}
 
 Result DeviceImpl::createTransientResourceHeap(
     const ITransientResourceHeap::Desc& desc, ITransientResourceHeap** outHeap)
@@ -177,9 +181,31 @@ SlangResult DeviceImpl::readTextureResource(
 }
 
 SlangResult DeviceImpl::readBufferResource(
-    IBufferResource* inBuffer, Offset offset, Size size, ISlangBlob** outBlob)
+    IBufferResource* buffer, Offset offset, Size size, ISlangBlob** outBlob)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    // create staging buffer
+    NS::SharedPtr<MTL::Buffer> stagingBuffer = NS::TransferPtr(m_device->newBuffer(size, MTL::StorageModeShared));
+    if (!stagingBuffer)
+    {
+        return SLANG_FAIL;
+    }
+
+    MTL::CommandBuffer* commandBuffer = m_commandQueue->commandBuffer();
+    MTL::BlitCommandEncoder* blitEncoder = commandBuffer->blitCommandEncoder();
+    blitEncoder->copyFromBuffer(static_cast<BufferResourceImpl*>(buffer)->m_buffer.get(), offset, stagingBuffer.get(), 0, size);
+    blitEncoder->endEncoding();
+    commandBuffer->commit();
+    commandBuffer->waitUntilCompleted();
+
+    List<uint8_t> blobData;
+    blobData.setCount(size);
+    ::memcpy(blobData.getBuffer(), stagingBuffer->contents(), size);
+    auto blob = ListBlob::moveCreate(blobData);
+
+    returnComPtr(outBlob, blob);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::getAccelerationStructurePrebuildInfo(
@@ -406,7 +432,7 @@ Result DeviceImpl::createTextureView(
     }
 
     bool isArray = resourceImpl->getDesc()->arraySize > 1;
-    MTL::PixelFormat pixelFormat = MetalUtil::getMetalPixelFormat(desc.format);
+    MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
     NS::Range levelRange(desc.subresourceRange.baseArrayLayer, std::max(desc.subresourceRange.layerCount, 1));
     NS::Range sliceRange(desc.subresourceRange.mipLevel, std::max(desc.subresourceRange.mipLevelCount, 1));
     MTL::TextureType textureType;

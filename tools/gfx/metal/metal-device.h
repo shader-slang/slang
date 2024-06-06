@@ -128,18 +128,16 @@ public:
     ~DeviceImpl();
 
 public:
-    
     DeviceInfo m_info;
     String m_adapterName;
-    MTL::CaptureManager* m_captureManager = nullptr;
     MTL::Drawable* m_drawable = nullptr;
     CA::MetalLayer* m_metalLayer = nullptr;
 
     bool captureEnabled() const { return std::getenv("MTL_CAPTURE") != nullptr; }
 
     Desc m_desc;
-    MTL::Device* m_device = nullptr;
-    MTL::CommandQueue* m_commandQueue = nullptr;
+    NS::SharedPtr<MTL::Device> m_device;
+    NS::SharedPtr<MTL::CommandQueue> m_commandQueue;
 
     //DescriptorSetAllocator descriptorSetAllocator;
 
