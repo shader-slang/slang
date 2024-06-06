@@ -5,6 +5,7 @@
 #include "metal-shader-program.h"
 #include "metal-shader-object-layout.h"
 #include "metal-vertex-layout.h"
+#include "metal-util.h"
 
 namespace gfx
 {
@@ -15,51 +16,41 @@ namespace metal
 {
 
 PipelineStateImpl::PipelineStateImpl(DeviceImpl* device)
+    : m_device(device)
 {
-    // Only weakly reference `device` at start.
-    // We make it a strong reference only when the pipeline state is exposed to the user.
-    // Note that `PipelineState`s may also be created via implicit specialization that
-    // happens behind the scenes, and the user will not have access to those specialized
-    // pipeline states. Only those pipeline states that are returned to the user needs to
-    // hold a strong reference to `device`.
-    m_device.setWeakReference(device);
 }
 
 PipelineStateImpl::~PipelineStateImpl()
 {
 }
 
-void PipelineStateImpl::establishStrongDeviceReference() { m_device.establishStrongReference(); }
-
-void PipelineStateImpl::comFree() { m_device.breakStrongReference(); }
-
-void PipelineStateImpl::init(const GraphicsPipelineStateDesc& inDesc)
+void PipelineStateImpl::init(const GraphicsPipelineStateDesc& desc)
 {
     PipelineStateDesc pipelineDesc;
     pipelineDesc.type = PipelineType::Graphics;
-    pipelineDesc.graphics = inDesc;
+    pipelineDesc.graphics = desc;
     initializeBase(pipelineDesc);
 }
 
-void PipelineStateImpl::init(const ComputePipelineStateDesc& inDesc)
+void PipelineStateImpl::init(const ComputePipelineStateDesc& desc)
 {
     PipelineStateDesc pipelineDesc;
     pipelineDesc.type = PipelineType::Compute;
-    pipelineDesc.compute = inDesc;
+    pipelineDesc.compute = desc;
     initializeBase(pipelineDesc);
 }
 
-void PipelineStateImpl::init(const RayTracingPipelineStateDesc& inDesc)
+void PipelineStateImpl::init(const RayTracingPipelineStateDesc& desc)
 {
     PipelineStateDesc pipelineDesc;
     pipelineDesc.type = PipelineType::RayTracing;
-    pipelineDesc.rayTracing.set(inDesc);
+    pipelineDesc.rayTracing.set(desc);
     initializeBase(pipelineDesc);
 }
 
 Result PipelineStateImpl::createMetalRenderPipelineState()
 {
-    MTL::RenderPipelineDescriptor* pd = MTL::RenderPipelineDescriptor::alloc()->init();
+    NS::SharedPtr<MTL::RenderPipelineDescriptor> pd = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
     auto programImpl = static_cast<ShaderProgramImpl*>(m_program.Ptr());
     if (programImpl)
     {
@@ -94,8 +85,8 @@ Result PipelineStateImpl::createMetalRenderPipelineState()
     // Set default rasterization state
     // Set default framebuffer layout
     NS::Error* error;
-    m_renderState = m_device->m_device->newRenderPipelineState(pd, &error);
-    if (m_renderState == nullptr)
+    m_renderPipelineState = NS::TransferPtr(m_device->m_device->newRenderPipelineState(pd.get(), &error));
+    if (!m_renderPipelineState)
     {
         std::cout << error->localizedDescription()->utf8String() << std::endl;
         return SLANG_E_INVALID_ARG;
@@ -105,20 +96,36 @@ Result PipelineStateImpl::createMetalRenderPipelineState()
 
 Result PipelineStateImpl::createMetalComputePipelineState()
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    auto programImpl = static_cast<ShaderProgramImpl*>(m_program.Ptr());
+    if (!programImpl)
+        return SLANG_FAIL;
+
+    NS::SharedPtr<MTL::ComputePipelineDescriptor> pd = NS::TransferPtr(MTL::ComputePipelineDescriptor::alloc()->init());
+
+    auto functionName = MetalUtil::createString(programImpl->m_entryPointNames[0].getBuffer());
+    NS::SharedPtr<MTL::Function> function = NS::TransferPtr(programImpl->m_modules[0]->newFunction(functionName.get()));
+    if (!function)
+        return SLANG_FAIL;
+
+    NS::Error *error;
+    m_computePipelineState = NS::TransferPtr(m_device->m_device->newComputePipelineState(function.get(), &error));
+
+    // Query thread group size for use during dispatch.
+    SlangUInt threadGroupSize[3];
+    programImpl->linkedProgram->getLayout()->getEntryPointByIndex(0)->getComputeThreadGroupSize(3, threadGroupSize);
+    m_threadGroupSize = MTL::Size(threadGroupSize[0], threadGroupSize[1], threadGroupSize[2]);
+
+    return m_computePipelineState ? SLANG_OK : SLANG_FAIL;
 }
 
 Result PipelineStateImpl::ensureAPIPipelineStateCreated()
 {
-    if (m_renderState)
-        return SLANG_OK;
-
     switch (desc.type)
     {
     case PipelineType::Compute:
-        return createMetalComputePipelineState();
+        return m_computePipelineState ? SLANG_OK : createMetalComputePipelineState();
     case PipelineType::Graphics:
-        return createMetalRenderPipelineState();
+        return m_renderPipelineState ? SLANG_OK : createMetalRenderPipelineState();
     default:
         SLANG_UNREACHABLE("Unknown pipeline type.");
         return SLANG_FAIL;

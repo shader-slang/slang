@@ -3,7 +3,6 @@
 
 #include "metal-base.h"
 #include "metal-device.h"
-#include "metal-command-buffer.h"
 #include "../simple-transient-resource-heap.h"
 #include "metal-framebuffer.h"
 
@@ -19,7 +18,6 @@ class DeviceImpl : public RendererBase
 {
 public:
     // Renderer implementation
-    using TransientResourceHeapImpl = SimpleTransientResourceHeap<DeviceImpl, CommandBufferImpl>;
     virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates) override;
@@ -128,18 +126,14 @@ public:
     ~DeviceImpl();
 
 public:
-    
     DeviceInfo m_info;
     String m_adapterName;
-    MTL::CaptureManager* m_captureManager = nullptr;
-    MTL::Drawable* m_drawable = nullptr;
-    CA::MetalLayer* m_metalLayer = nullptr;
 
     bool captureEnabled() const { return std::getenv("MTL_CAPTURE") != nullptr; }
 
     Desc m_desc;
-    MTL::Device* m_device = nullptr;
-    MTL::CommandQueue* m_commandQueue = nullptr;
+    NS::SharedPtr<MTL::Device> m_device;
+    NS::SharedPtr<MTL::CommandQueue> m_commandQueue;
 
     //DescriptorSetAllocator descriptorSetAllocator;
 

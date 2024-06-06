@@ -15,15 +15,16 @@ namespace metal
 class QueryPoolImpl : public QueryPoolBase
 {
 public:
-    Result init(const IQueryPool::Desc& desc, DeviceImpl* device);
+    RefPtr<DeviceImpl> m_device;
+    NS::SharedPtr<MTL::CounterSampleBuffer> m_counterSampleBuffer;
+
     ~QueryPoolImpl();
 
-public:
+    Result init(DeviceImpl* device, const IQueryPool::Desc& desc);
+
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getResult(GfxIndex index, GfxCount count, uint64_t* data) override;
 
-public:
-    RefPtr<DeviceImpl> m_device;
 };
 
 } // namespace metal

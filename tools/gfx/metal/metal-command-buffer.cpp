@@ -21,12 +21,10 @@ ICommandBuffer* CommandBufferImpl::getInterface(const Guid& guid)
     return nullptr;
 }
 
-void CommandBufferImpl::comFree() { }
-
-Result CommandBufferImpl::init(DeviceImpl* renderer, TransientResourceHeapImpl* transientHeap)
+Result CommandBufferImpl::init(DeviceImpl* device, TransientResourceHeapImpl* transientHeap)
 {
-    m_renderer = renderer;
-    m_commandBuffer = m_renderer->m_commandQueue->commandBuffer();
+    m_device = device;
+    m_commandBuffer = NS::RetainPtr(m_device->m_commandQueue->commandBuffer());
     return SLANG_OK;
 }
 
@@ -81,6 +79,56 @@ Result CommandBufferImpl::getNativeHandle(InteropHandle* outHandle)
 {
     return SLANG_E_NOT_IMPLEMENTED;
 }
+
+MTL::RenderCommandEncoder* CommandBufferImpl::getMetalRenderCommandEncoder()
+{
+    if (!m_metalRenderCommandEncoder)
+    {
+        endMetalCommandEncoder();
+        // m_metalRenderCommandEncoder = NS::RetainPtr(m_commandBuffer->renderCommandEncoder());
+    }
+    return m_metalRenderCommandEncoder.get();
+}
+
+MTL::ComputeCommandEncoder* CommandBufferImpl::getMetalComputeCommandEncoder()
+{
+    if (!m_metalComputeCommandEncoder)
+    {
+        endMetalCommandEncoder();
+        m_metalComputeCommandEncoder = NS::RetainPtr(m_commandBuffer->computeCommandEncoder());
+    }
+    return m_metalComputeCommandEncoder.get();
+}
+
+MTL::BlitCommandEncoder* CommandBufferImpl::getMetalBlitCommandEncoder()
+{
+    if (!m_metalBlitCommandEncoder)
+    {
+        endMetalCommandEncoder();
+        m_metalBlitCommandEncoder = NS::RetainPtr(m_commandBuffer->blitCommandEncoder());
+    }
+    return m_metalBlitCommandEncoder.get();
+}
+
+void CommandBufferImpl::endMetalCommandEncoder()
+{
+    if (m_metalRenderCommandEncoder)
+    {
+        m_metalRenderCommandEncoder->endEncoding();
+        m_metalRenderCommandEncoder.reset();
+    }
+    if (m_metalComputeCommandEncoder)
+    {
+        m_metalComputeCommandEncoder->endEncoding();
+        m_metalComputeCommandEncoder.reset();
+    }
+    if (m_metalBlitCommandEncoder)
+    {
+        m_metalBlitCommandEncoder->endEncoding();
+        m_metalBlitCommandEncoder.reset();
+    }
+}
+
 
 } // namespace metal
 } // namespace gfx
