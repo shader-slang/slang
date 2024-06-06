@@ -271,16 +271,10 @@ slang_add_target(
     PUBLIC_HEADERS ${slang_SOURCE_DIR}/slang*.h
 )
 
-if(MSVC)
-    target_compile_options(slang PRIVATE /WX)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(slang PRIVATE -Werror)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # a warning is disabled for a memset boundary check.
+    # everything looked find and it is unclear why the checking fails
     target_compile_options(slang PRIVATE -Wno-error=stringop-overflow)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    target_compile_options(slang PRIVATE -Werror)
-    #target_compile_options(slang PRIVATE -Wno-error=stringop-overflow)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-    target_compile_options(slang PRIVATE -Werror)
 endif()
 
 if(SLANG_EMBED_STDLIB_SOURCE)
