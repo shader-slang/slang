@@ -328,18 +328,18 @@ Result DeviceImpl::createBufferResource(
     }
     resourceOptions |= (desc.memoryType == MemoryType::DeviceLocal) ? MTL::ResourceStorageModePrivate : MTL::ResourceStorageModeShared;
 
-    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(desc, this));
+    RefPtr<BufferResourceImpl> bufferImpl(new BufferResourceImpl(desc, this));
 
     if (initData)
     {
-        buffer->m_buffer = NS::TransferPtr(m_device->newBuffer(initData, bufferSize, resourceOptions));
+        bufferImpl->m_buffer = NS::TransferPtr(m_device->newBuffer(initData, bufferSize, resourceOptions));
     }
     else
     {
-        buffer->m_buffer = NS::TransferPtr(m_device->newBuffer(bufferSize, resourceOptions));
+        bufferImpl->m_buffer = NS::TransferPtr(m_device->newBuffer(bufferSize, resourceOptions));
     }
 
-    returnComPtr(outResource, buffer);
+    returnComPtr(outResource, bufferImpl);
     return SLANG_OK;
 }
 
