@@ -1,5 +1,6 @@
 // metal-buffer.cpp
 #include "metal-buffer.h"
+#include "metal-util.h"
 
 namespace gfx
 {
@@ -9,48 +10,49 @@ using namespace Slang;
 namespace metal
 {
 
-BufferResourceImpl::BufferResourceImpl(const IBufferResource::Desc& desc, DeviceImpl* renderer)
+BufferResourceImpl::BufferResourceImpl(const IBufferResource::Desc& desc, DeviceImpl* device)
     : Parent(desc)
-    , m_renderer(renderer)
+    , m_device(device)
 {
-    assert(renderer);
 }
 
 BufferResourceImpl::~BufferResourceImpl()
 {
-    if (sharedHandle.handleValue != 0)
-    {
-    }
 }
 
 DeviceAddress BufferResourceImpl::getDeviceAddress()
 {
-    return (DeviceAddress)0;
+    return m_buffer->gpuAddress();
 }
 
 Result BufferResourceImpl::getNativeResourceHandle(InteropHandle* outHandle)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    outHandle->api = InteropHandleAPI::Metal;
+    outHandle->handleValue = reinterpret_cast<intptr_t>(m_buffer.get());
+    return SLANG_OK;
 }
 
 Result BufferResourceImpl::getSharedHandle(InteropHandle* outHandle)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 Result BufferResourceImpl::map(MemoryRange* rangeToRead, void** outPointer)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    *outPointer = m_buffer->contents();
+    return SLANG_OK;
 }
 
 Result BufferResourceImpl::unmap(MemoryRange* writtenRange)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    return SLANG_OK;
 }
 
 Result BufferResourceImpl::setDebugName(const char* name)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    Parent::setDebugName(name);
+    m_buffer->addDebugMarker(MetalUtil::createString(name).get(), NS::Range(0, m_desc.sizeInBytes));
+    return SLANG_OK;
 }
 
 } // namespace metal

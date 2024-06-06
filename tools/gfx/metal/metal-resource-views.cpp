@@ -18,6 +18,15 @@ Result TextureResourceViewImpl::getNativeHandle(InteropHandle* outHandle)
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
+BufferResourceViewImpl::~BufferResourceViewImpl()
+{
+}
+
+Result BufferResourceViewImpl::getNativeHandle(InteropHandle* outHandle)
+{
+    return SLANG_E_NOT_IMPLEMENTED;
+}
+
 TexelBufferResourceViewImpl::TexelBufferResourceViewImpl(DeviceImpl* device)
     : ResourceViewImpl(ViewType::TexelBuffer, device)
 {}
@@ -29,15 +38,6 @@ TexelBufferResourceViewImpl::~TexelBufferResourceViewImpl()
 Result TexelBufferResourceViewImpl::getNativeHandle(InteropHandle* outHandle)
 {
     return SLANG_E_NOT_IMPLEMENTED;
-}
-
-PlainBufferResourceViewImpl::PlainBufferResourceViewImpl(DeviceImpl* device)
-    : ResourceViewImpl(ViewType::PlainBuffer, device)
-{}
-
-Result PlainBufferResourceViewImpl::getNativeHandle(InteropHandle* outHandle)
-{
-    return m_buffer->getNativeResourceHandle(outHandle);
 }
 
 DeviceAddress AccelerationStructureImpl::getDeviceAddress()
