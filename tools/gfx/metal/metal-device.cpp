@@ -391,14 +391,17 @@ Result DeviceImpl::createBufferResource(
     resourceOptions |= (desc.memoryType == MemoryType::DeviceLocal) ? MTL::ResourceStorageModePrivate : MTL::ResourceStorageModeShared;
 
     RefPtr<BufferResourceImpl> bufferImpl(new BufferResourceImpl(desc, this));
+    bufferImpl->m_buffer = NS::TransferPtr(m_device->newBuffer(bufferSize, resourceOptions));
 
     if (initData)
     {
-        bufferImpl->m_buffer = NS::TransferPtr(m_device->newBuffer(initData, bufferSize, resourceOptions));
-    }
-    else
-    {
-        bufferImpl->m_buffer = NS::TransferPtr(m_device->newBuffer(bufferSize, resourceOptions));
+        NS::SharedPtr<MTL::Buffer> stagingBuffer = NS::TransferPtr(m_device->newBuffer(
+            initData, bufferSize, MTL::ResourceStorageModeShared | MTL::CPUCacheModeWriteCombined));
+        MTL::CommandBuffer* commandBuffer = m_commandQueue->commandBuffer();
+        MTL::BlitCommandEncoder* encoder = commandBuffer->blitCommandEncoder();
+        encoder->copyFromBuffer(stagingBuffer.get(), 0, bufferImpl->m_buffer.get(), 0, bufferSize);
+        encoder->endEncoding();
+        commandBuffer->commit();
     }
 
     returnComPtr(outResource, bufferImpl);
