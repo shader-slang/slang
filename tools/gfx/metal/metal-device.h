@@ -3,7 +3,6 @@
 
 #include "metal-base.h"
 #include "metal-device.h"
-#include "metal-command-buffer.h"
 #include "../simple-transient-resource-heap.h"
 #include "metal-framebuffer.h"
 

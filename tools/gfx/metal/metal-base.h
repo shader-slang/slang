@@ -21,6 +21,7 @@ namespace metal
     class TextureResourceImpl;
     class SamplerStateImpl;
     class ResourceViewImpl;
+    class BufferResourceViewImpl;
     class TextureResourceViewImpl;
     class TexelBufferResourceViewImpl;
     class PlainBufferResourceViewImpl;
@@ -32,12 +33,12 @@ namespace metal
     class RayTracingPipelineStateImpl;
     class ShaderObjectLayoutImpl;
     class EntryPointLayout;
-    class RootShaderObjectLayout;
+    class RootShaderObjectLayoutImpl;
     class ShaderProgramImpl;
     class PipelineCommandEncoder;
     class ShaderObjectImpl;
     class MutableShaderObjectImpl;
-    //class RootShaderObjectImpl;
+    class RootShaderObjectImpl;
     class ShaderTableImpl;
     class ResourceCommandEncoder;
     class RenderCommandEncoder;

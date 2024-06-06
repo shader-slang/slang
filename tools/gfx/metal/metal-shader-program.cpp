@@ -24,11 +24,12 @@ Result ShaderProgramImpl::createShaderModule(slang::EntryPointReflection* entryP
 {
     m_codeBlobs.add(kernelCode);
     const char* realEntryPointName = entryPointInfo->getNameOverride();
-    NS::SharedPtr<NS::String> source = MetalUtil::createStringView((void*)kernelCode->getBufferPointer(), kernelCode->getBufferSize());;
+    dispatch_data_t data = dispatch_data_create(kernelCode->getBufferPointer(), kernelCode->getBufferSize(), dispatch_get_main_queue(), NULL);
     NS::Error* error;
-    NS::SharedPtr<MTL::Library> library = NS::TransferPtr(m_device->m_device->newLibrary(source.get(), nullptr, &error));
+    NS::SharedPtr<MTL::Library> library = NS::TransferPtr(m_device->m_device->newLibrary(data, &error));
     if (!library)
     {
+        // TODO use better mechanism for reporting errors
         std::cout << error->localizedDescription()->utf8String() << std::endl;
         return SLANG_E_INVALID_ARG;
     }

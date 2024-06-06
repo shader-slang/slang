@@ -36,7 +36,7 @@ void PipelineCommandEncoder::endEncodingImpl()
 Result PipelineCommandEncoder::setPipelineStateImpl(IPipelineState* state, IShaderObject** outRootObject)
 {
     m_currentPipeline = static_cast<PipelineStateImpl*>(state);
-    m_commandBuffer->m_mutableRootShaderObject = nullptr;
+    // m_commandBuffer->m_mutableRootShaderObject = nullptr;
     SLANG_RETURN_ON_FAIL(m_commandBuffer->m_rootObject.init(
         m_commandBuffer->m_device,
         m_currentPipeline->getProgram<ShaderProgramImpl>()->m_rootObjectLayout));
@@ -437,7 +437,10 @@ Result RenderCommandEncoder::drawMeshTasks(int x, int y, int z)
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
-void ComputeCommandEncoder::endEncoding() { }
+void ComputeCommandEncoder::endEncoding()
+{
+    ResourceCommandEncoder::endEncoding();
+}
 
 Result ComputeCommandEncoder::bindPipeline(
     IPipelineState* pipelineState, IShaderObject** outRootObject)
@@ -454,10 +457,15 @@ Result ComputeCommandEncoder::bindPipelineWithRootObject(
 Result ComputeCommandEncoder::dispatchCompute(int x, int y, int z)
 {
     auto pipeline = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
-    if (!pipeline)
-    {
-        return SLANG_FAIL;
-    }
+    pipeline->ensureAPIPipelineStateCreated();
+
+    auto metalComputeCommandEncoder = m_commandBuffer->getMetalComputeCommandEncoder();
+    metalComputeCommandEncoder->setComputePipelineState(pipeline->m_computePipelineState.get());
+    ComputeBindingContext bindingContext;
+    bindingContext.init(m_commandBuffer->m_device, metalComputeCommandEncoder);
+    auto program = static_cast<ShaderProgramImpl*>(m_currentPipeline->m_program.get());
+    m_commandBuffer->m_rootObject.bindAsRoot(&bindingContext, program->m_rootObjectLayout);
+    metalComputeCommandEncoder->dispatchThreadgroups(MTL::Size(x, y, z), pipeline->m_threadGroupSize);
 
     // Also create descriptor sets based on the given pipeline layout
     return SLANG_E_NOT_IMPLEMENTED;

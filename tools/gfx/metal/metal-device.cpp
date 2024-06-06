@@ -75,8 +75,8 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
         desc.slang,
         desc.extendedDescCount,
         desc.extendedDescs,
-        SLANG_METAL,
-        "sm_5_1",
+        SLANG_METAL_LIB,
+        "",
         makeArray(slang::PreprocessorMacroDesc{ "__METAL__", "1" }).getView()));
 
     // TODO: expose via some other means
@@ -610,7 +610,7 @@ Result DeviceImpl::createProgram(
     RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(this);
     shaderProgram->init(desc);
 
-    RootShaderObjectLayout::create(
+    RootShaderObjectLayoutImpl::create(
         this,
         shaderProgram->linkedProgram,
         shaderProgram->linkedProgram->getLayout(),
@@ -632,14 +632,22 @@ Result DeviceImpl::createShaderObjectLayout(
 {
     AUTORELEASEPOOL
 
-    return SLANG_E_NOT_IMPLEMENTED;
+    RefPtr<ShaderObjectLayoutImpl> layout;
+    SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(
+        this, session, typeLayout, layout.writeRef()));
+    returnRefPtrMove(outLayout, layout);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
 {
     AUTORELEASEPOOL
 
-    return SLANG_E_NOT_IMPLEMENTED;
+    RefPtr<ShaderObjectImpl> shaderObject;
+    SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(this,
+        static_cast<ShaderObjectLayoutImpl*>(layout), shaderObject.writeRef()));
+    returnComPtr(outObject, shaderObject);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::createMutableShaderObject(

@@ -107,9 +107,15 @@ Result PipelineStateImpl::createMetalComputePipelineState()
     if (!function)
         return SLANG_FAIL;
 
-    // m_computePipelineState = NS::TransferPtr(m_device->m_device->newComputePipelineState(function.get(), )
+    NS::Error *error;
+    m_computePipelineState = NS::TransferPtr(m_device->m_device->newComputePipelineState(function.get(), &error));
 
-    return SLANG_E_NOT_IMPLEMENTED;
+    // Query thread group size for use during dispatch.
+    SlangUInt threadGroupSize[3];
+    programImpl->linkedProgram->getLayout()->getEntryPointByIndex(0)->getComputeThreadGroupSize(3, threadGroupSize);
+    m_threadGroupSize = MTL::Size(threadGroupSize[0], threadGroupSize[1], threadGroupSize[2]);
+
+    return m_computePipelineState ? SLANG_OK : SLANG_FAIL;
 }
 
 Result PipelineStateImpl::ensureAPIPipelineStateCreated()
