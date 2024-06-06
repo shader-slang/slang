@@ -2774,6 +2774,26 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     {
         break; //should already have been parsed and used.
     }
+    case kIROp_StaticAssert:
+    {
+        IRInst* condi = inst->getOperand(0);
+        if (auto condiLit = as<IRBoolLit>(condi))
+        {
+            if (!condiLit->getValue())
+            {
+                IRInst* msg = inst->getOperand(1);
+                if (auto msgLit = as<IRStringLit>(msg))
+                {
+                    getSink()->diagnose(inst, Diagnostics::staticAssertionFailure, msgLit->getStringSlice());
+                }
+                else
+                {
+                    getSink()->diagnose(inst, Diagnostics::staticAssertionFailure, "");
+                }
+            }
+        }
+        break;
+    }
     default:
         diagnoseUnhandledInst(inst);
         break;

@@ -760,6 +760,9 @@ DIAGNOSTIC(41202, Error, notEqualBitCastSize, "invalid to bit_cast differently s
 DIAGNOSTIC(41203, Warning, notEqualReinterpretCastSize, "reinterpret<> into not equally sized types: '$0' with size '$1' casted into '$2' with size '$3'")
 
 DIAGNOSTIC(41300, Error, byteAddressBufferUnaligned, "invalid alignment `$0` specified for the byte address buffer resource with the element size of `$1`")
+
+DIAGNOSTIC(41400, Error, staticAssertionFailure, "static assertion failed, $0")
+
 //
 // 5xxxx - Target code generation.
 //
