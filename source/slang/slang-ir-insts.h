@@ -3236,6 +3236,11 @@ struct IRRequireComputeDerivative : IRInst
     IR_LEAF_ISA(RequireComputeDerivative)
 };
 
+struct IRStaticAssert : IRInst
+{
+    IR_LEAF_ISA(StaticAssert)
+};
+
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder

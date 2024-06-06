@@ -362,6 +362,38 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
     }
 }
 
+void checkStaticAssert(CodeGenContext* codeGenContext, IRInst* inst, DiagnosticSink* sink)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_StaticAssert:
+    {
+        IRInst* condi = inst->getOperand(0);
+        if (auto condiLit = as<IRBoolLit>(condi))
+        {
+            if (!condiLit->getValue())
+            {
+                IRInst* msg = inst->getOperand(1);
+                if (auto msgLit = as<IRStringLit>(msg))
+                {
+                    sink->diagnose(inst, Diagnostics::staticAssertionFailure, msgLit->getStringSlice());
+                }
+                else
+                {
+                    sink->diagnose(inst, Diagnostics::staticAssertionFailure, "");
+                }
+            }
+        }
+        break;
+    }
+    }
+
+    for (auto child : inst->getDecorationsAndChildren())
+    {
+        checkStaticAssert(codeGenContext, child, sink);
+    }
+}
+
 Result linkAndOptimizeIR(
     CodeGenContext*                         codeGenContext,
     LinkingAndOptimizationOptions const&    options,
@@ -880,6 +912,8 @@ Result linkAndOptimizeIR(
 #endif
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    checkStaticAssert(codeGenContext, irModule->getModuleInst(), sink);
 
     // For HLSL (and fxc/dxc) only, we need to "wrap" any
     // structured buffers defined over matrix types so

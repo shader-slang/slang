@@ -1691,6 +1691,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         {
             case cpp:
             case hlsl:
+                static_assert(T is IFloat, "HLSL doesn't support texture sampling for integer types.");
                 __intrinsic_asm ".SampleLevel";
             case metal:
                 if (isArray == 1)
