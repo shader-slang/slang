@@ -9,7 +9,7 @@ namespace gfx {
 
 using namespace MTL;
 
-MTL::VertexFormat MetalUtil::getMetalVertexFormat(Format format)
+MTL::VertexFormat MetalUtil::translateVertexFormat(Format format)
 {
     switch (format)
     {
@@ -245,6 +245,19 @@ MTL::CompareFunction MetalUtil::translateCompareFunction(ComparisonFunc func)
         return MTL::CompareFunctionAlways;
     default:
         return MTL::CompareFunction(0);
+    }
+}
+
+MTL::VertexStepFunction MetalUtil::translateVertexStepFunction(InputSlotClass slotClass)
+{
+    switch (slotClass)
+    {
+    case InputSlotClass::PerVertex:
+        return MTL::VertexStepFunctionPerVertex;
+    case InputSlotClass::PerInstance:
+        return MTL::VertexStepFunctionPerInstance;
+    default:
+        return MTL::VertexStepFunctionPerVertex;
     }
 }
 

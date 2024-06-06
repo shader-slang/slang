@@ -382,52 +382,34 @@ Result DeviceImpl::createBufferView(
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
-static MTL::VertexStepFunction translateVertexStepFunction(const InputSlotClass& slotClass)
-{
-    switch (slotClass)
-    {
-    case InputSlotClass::PerInstance:       return MTL::VertexStepFunctionPerInstance;
-    case InputSlotClass::PerVertex:
-    default:                                return MTL::VertexStepFunctionPerVertex;
-    }
-}
-
 Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout)
 {
+    AUTORELEASEPOOL
+
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
-    List<MTL::VertexDescriptor*>& dstAttributes = layout->m_vertexDescs;
-    List<MTL::VertexBufferLayoutDescriptor*>& dstBufferLayouts = layout->m_bufferLayoutDescs;
+    layout->m_vertexDescriptor = NS::TransferPtr(MTL::VertexDescriptor::alloc()->init());
 
-    const InputElementDesc* srcElements = desc.inputElements;
-    Int numElements = desc.inputElementCount;
-
-    const VertexStreamDesc* srcVertexStreams = desc.vertexStreams;
-    Int vertexStreamCount = desc.vertexStreamCount;
-
-    dstAttributes.setCount(numElements);
-    dstBufferLayouts.setCount(vertexStreamCount);
-
-    for (Int i = 0; i < vertexStreamCount; ++i)
+    for (Int i = 0; i < desc.inputElementCount; ++i)
     {
-        auto& vbld = dstBufferLayouts[i];
-        auto& srcStream = srcVertexStreams[i];
-        vbld->setStepFunction(translateVertexStepFunction(srcStream.slotClass));
-        vbld->setStepRate(srcStream.instanceDataStepRate);
-        vbld->setStride(srcStream.stride);
-    }
-
-    for (Int i = 0; i < numElements; ++i)
-    {
-        auto& srcAttrib = srcElements[i];
-        auto& dstAttrib = dstAttributes[i];
-        dstAttrib->attributes()->object(i)->setOffset(srcAttrib.offset);
-        dstAttrib->attributes()->object(i)->setBufferIndex(srcAttrib.bufferSlotIndex);
-        MTL::VertexFormat metalFormat = MetalUtil::getMetalVertexFormat(srcAttrib.format);
+        const auto& inputElement = desc.inputElements[i];
+        MTL::VertexAttributeDescriptor* desc = layout->m_vertexDescriptor->attributes()->object(i);
+        desc->setOffset(inputElement.offset);
+        desc->setBufferIndex(inputElement.bufferSlotIndex);
+        MTL::VertexFormat metalFormat = MetalUtil::translateVertexFormat(inputElement.format);
         if (metalFormat == MTL::VertexFormatInvalid)
         {
             return SLANG_FAIL;
         }
-        dstAttrib->attributes()->object(i)->setFormat(metalFormat);
+        desc->setFormat(metalFormat);
+    }
+
+    for (Int i = 0; i < desc.vertexStreamCount; ++i)
+    {
+        const auto& vertexStream = desc.vertexStreams[i];
+        MTL::VertexBufferLayoutDescriptor* desc = layout->m_vertexDescriptor->layouts()->object(i);
+        desc->setStepFunction(MetalUtil::translateVertexStepFunction(vertexStream.slotClass));
+        desc->setStepRate(vertexStream.instanceDataStepRate);
+        desc->setStride(vertexStream.stride);
     }
 
     return SLANG_OK;

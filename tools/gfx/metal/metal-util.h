@@ -11,7 +11,7 @@ namespace gfx {
 struct MetalUtil 
 {
     static MTL::PixelFormat getMetalPixelFormat(Format format);
-    static MTL::VertexFormat getMetalVertexFormat(Format format);
+    static MTL::VertexFormat translateVertexFormat(Format format);
 
     static inline bool isDepthFormat(MTL::PixelFormat format)
     {
@@ -35,6 +35,9 @@ struct MetalUtil
     static MTL::SamplerMipFilter translateSamplerMipFilter(TextureFilteringMode mode);
     static MTL::SamplerAddressMode translateSamplerAddressMode(TextureAddressingMode mode);
     static MTL::CompareFunction translateCompareFunction(ComparisonFunc func); 
+
+    static MTL::VertexStepFunction translateVertexStepFunction(InputSlotClass slotClass);
+
 };
 
 struct ScopedAutoreleasePool
