@@ -319,6 +319,19 @@ namespace Slang
         }
 
         IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
+        auto outputDeco = (IROutputTopologyDecoration*)func->findDecorationImpl(kIROp_OutputTopologyDecoration);
+        SLANG_ASSERT(outputDeco);
+        auto topology = outputDeco->getTopology();
+        IRType* vertexType = nullptr;
+        IRType* indicesType = nullptr;
+        IRType* primitiveType = nullptr;
+
+        IRInst* maxVertices = nullptr;
+        IRInst* maxPrimitives = nullptr;
+        
+        IRInst* verticesParam = nullptr;
+        IRInst* indicesParam = nullptr;
+        IRInst* primitivesParam = nullptr;
         for (auto param : func->getParams())
         {
             if(param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
@@ -329,8 +342,43 @@ namespace Slang
                 auto paramVarLayout = varLayoutBuilder.build();
                 builder.addLayoutDecoration(param, paramVarLayout);
             }
-        }
+            if(param->findDecorationImpl(kIROp_VerticesDecoration))
+            {
+                auto vertexRefType = (IRConstRefType*)param->getDataType();
+                auto vertexOutputType = (IRVerticesType*)vertexRefType->getValueType();
+                vertexType = vertexOutputType->getElementType();
+                maxVertices = vertexOutputType->getMaxElementCount();
+                SLANG_ASSERT(vertexType);
 
+                verticesParam = param;
+            }
+            if(param->findDecorationImpl(kIROp_IndicesDecoration))
+            {
+                auto indicesRefType = (IRConstRefType*)param->getDataType();
+                auto indicesOutputType = (IRIndicesType*)indicesRefType->getValueType();
+                indicesType = indicesOutputType->getElementType();
+                maxPrimitives = indicesOutputType->getMaxElementCount();
+                SLANG_ASSERT(indicesType);
+
+                indicesParam = param;
+            }
+            if(param->findDecorationImpl(kIROp_PrimitivesDecoration))
+            {
+                auto primitivesRefType = (IRConstRefType*)param->getDataType();
+                auto primitivesOutputType = (IRPrimitivesType*)primitivesRefType->getValueType();
+                primitiveType = primitivesOutputType->getElementType();
+                SLANG_ASSERT(primitiveType);
+
+                primitivesParam = param;
+            }
+        }
+        if(primitiveType == nullptr)
+        {
+            primitiveType = builder.getVoidType();
+        }
+        builder.setInsertBefore(entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+        auto meshParam = builder.emitParam(builder.getMetalMeshType(vertexType, primitiveType, maxVertices, maxPrimitives, topology));
+        builder.addExternCppDecoration(meshParam, toSlice("_slang_mesh"));    
     }
 
     void legalizeDispatchMeshPayloadForMetal(EntryPointInfo entryPoint)

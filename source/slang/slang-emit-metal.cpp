@@ -653,6 +653,23 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("mesh_grid_properties ");
             return;
         }
+        case kIROp_MetalMeshType:
+        {
+            auto meshType = cast<IRMetalMeshType>(type);
+            m_writer->emit("metal::mesh<");
+            emitType(meshType->getVertexType());
+            m_writer->emit(", ");
+            emitType(meshType->getPrimitiveType());
+            m_writer->emit(", ");
+            emitSimpleValue(meshType->getMaxNumVertices());
+            m_writer->emit(", ");
+            emitSimpleValue(meshType->getMaxNumPrimitives());
+            m_writer->emit(", metal::topology::");
+            // TODO: this is pretty hacky, there has to be a better way to do this, but I dont see why this wouldn't work
+            m_writer->emitRawTextSpan(meshType->getTopology()->getStringSlice().begin(), meshType->getTopology()->getStringSlice().end());
+            m_writer->emit(">");
+            return;
+        }
         default:
             break;
     }

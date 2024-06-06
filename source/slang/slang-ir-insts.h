@@ -3596,6 +3596,12 @@ public:
         return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
     }
 
+    IRMetalMeshType* getMetalMeshType(IRType* vertexType, IRType* primitiveType, IRInst* maxVertices, IRInst* maxPrimitives, IRStringLit* topology)
+    {
+        IRInst* operands[] = {vertexType, primitiveType, maxVertices, maxPrimitives, topology};
+        return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, operands);
+    }
+
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
     IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex = nullptr);
