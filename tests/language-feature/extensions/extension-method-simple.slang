@@ -3,6 +3,7 @@
 // Test that an `extension` applied to an interface type works as users expect
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 struct MyType
 {

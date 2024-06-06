@@ -9,6 +9,7 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute,compatibility-issue):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -xslang -matrix-layout-row-major -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 // Not testing on Vulkan because of lack of support
 // for integer matrices in GLSL. Slang needs to
