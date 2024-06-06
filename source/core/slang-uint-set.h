@@ -22,8 +22,9 @@ constexpr Index intLog2(unsigned x)
 // if `in` is 0, result is undefined behavior
 static inline Index bitscanForward(uint64_t in)
 {
-    assert(in != 0);
+    SLANG_ASSERT(in != 0);
 #if defined(_MSC_VER)
+
 #ifdef _WIN64
     uint64_t out = 0;
     _BitScanForward64((unsigned long*)&out, in);
