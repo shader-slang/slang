@@ -441,6 +441,8 @@ extern "C"
             return "OpenGL";
         case gfx::DeviceType::Vulkan:
             return "Vulkan";
+        case gfx::DeviceType::Metal:
+            return "Metal";
         case gfx::DeviceType::CPU:
             return "CPU";
         case gfx::DeviceType::CUDA:
