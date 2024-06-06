@@ -388,7 +388,7 @@ namespace Slang
                                 addToWorkList(callInst);
                                 for (UInt argi = 0; argi < callInst->getArgCount(); argi++)
                                 {
-                                    if (auto ptrType = as<IRPtrTypeBase>(callInst->getArg(argi)->getDataType()))
+                                    if (as<IRPtrTypeBase>(callInst->getArg(argi)->getDataType()))
                                     {
                                         addToWorkList(callInst->getArg(argi));
                                         // Conservatively treat the entire composite at root addr as non-uniform.
@@ -424,7 +424,7 @@ namespace Slang
                         nonUniformInsts.add(code);
                     }
                 }
-                if (auto entryPointDecor = globalInst->findDecoration<IREntryPointDecoration>())
+                if (globalInst->findDecoration<IREntryPointDecoration>())
                 {
                     auto func = as<IRFunc>(globalInst);
                     if (!func)

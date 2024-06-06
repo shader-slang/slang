@@ -2112,8 +2112,8 @@ static LegalVal legalizeLocalVar(
         context->replacedInstructions.add(irLocalVar);
         return newVal;
     }
-    break;
     }
+    UNREACHABLE_RETURN(LegalVal());
 }
 
 static LegalVal legalizeParam(
@@ -3539,6 +3539,7 @@ static LegalVal legalizeGlobalVar(
         }
         break;
     }
+    UNREACHABLE_RETURN(LegalVal());
 }
 
 static LegalVal legalizeGlobalParam(
@@ -3588,6 +3589,7 @@ static LegalVal legalizeGlobalParam(
         }
         break;
     }
+    UNREACHABLE_RETURN(LegalVal());
 }
 
 static constexpr int kHasBeenAddedOrProcessedScratchBitIndex = 0;

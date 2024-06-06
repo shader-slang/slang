@@ -6240,21 +6240,6 @@ struct SPIRVEmitContext
         }
     } 
 
-    template<typename T1, typename T2, typename T3>
-    SpvInst* emitOpExecutionModeLocalSizeId(
-        IRInst* inst,
-        SpvWord entryPoint,
-        const T1& xSize,
-        const T2& ySize,
-        const T3& zSize
-    )
-    {
-        static_assert(isSingular<T1>);
-        static_assert(isSingular<T2>);
-        static_assert(isSingular<T3>);
-        requireSPIRVExecutionMode(inst, entryPoint, SpvExecutionModeLocalSizeId, xSize, ySize, zSize);
-    }
-
     SPIRVEmitContext(IRModule* module, TargetProgram* program, DiagnosticSink* sink)
         : SPIRVEmitSharedContext(module, program, sink)
         , m_irModule(module)
