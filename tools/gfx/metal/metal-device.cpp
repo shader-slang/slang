@@ -17,7 +17,7 @@
 #include "metal-shader-object.h"
 #include "metal-shader-object-layout.h"
 //#include "metal-shader-table.h"
-//#include "metal-transient-heap.h"
+#include "metal-transient-heap.h"
 //#include "metal-pipeline-dump-layer.h"
 //#include "metal-helper-functions.h"
 
@@ -115,21 +115,25 @@ const DeviceInfo& DeviceImpl::getDeviceInfo() const
     return m_info;
 }
 
-Result DeviceImpl::createTransientResourceHeap(
-    const ITransientResourceHeap::Desc& desc, ITransientResourceHeap** outHeap)
+Result DeviceImpl::createTransientResourceHeap(const ITransientResourceHeap::Desc& desc, ITransientResourceHeap** outHeap)
 {
+    AUTORELEASEPOOL
+
     RefPtr<TransientResourceHeapImpl> result = new TransientResourceHeapImpl();
-    SLANG_RETURN_ON_FAIL(result->init(this, desc));
+    SLANG_RETURN_ON_FAIL(result->init(desc, this));
     returnComPtr(outHeap, result);
     return SLANG_OK;
 }
 
 Result DeviceImpl::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue)
 {
+    AUTORELEASEPOOL
+
     if (m_queueAllocCount != 0)
         return SLANG_FAIL;
+
     RefPtr<CommandQueueImpl> result = new CommandQueueImpl;
-    result->init(this);
+    result->init(this, m_commandQueue);
     returnComPtr(outQueue, result);
     m_queueAllocCount++;
     return SLANG_OK;

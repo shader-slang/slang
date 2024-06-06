@@ -21,12 +21,12 @@ public:
     ICommandQueue* getInterface(const Guid& guid);
 
 public:
+    RefPtr<DeviceImpl> m_device;
     Desc m_desc;
-    RefPtr<DeviceImpl> m_renderer;
-    MTL::CommandQueue* m_commandQueue = nullptr;
+    NS::SharedPtr<MTL::CommandQueue> m_commandQueue;
     ~CommandQueueImpl();
 
-    void init(DeviceImpl* renderer);
+    void init(DeviceImpl* device, NS::SharedPtr<MTL::CommandQueue> commandQueue);
 
     virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override;
 

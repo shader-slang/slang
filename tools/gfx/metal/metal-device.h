@@ -19,7 +19,6 @@ class DeviceImpl : public RendererBase
 {
 public:
     // Renderer implementation
-    using TransientResourceHeapImpl = SimpleTransientResourceHeap<DeviceImpl, CommandBufferImpl>;
     virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates) override;

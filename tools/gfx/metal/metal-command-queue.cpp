@@ -23,12 +23,10 @@ CommandQueueImpl::~CommandQueueImpl()
 {
 }
 
-void CommandQueueImpl::init(DeviceImpl* renderer)
+void CommandQueueImpl::init(DeviceImpl* device, NS::SharedPtr<MTL::CommandQueue> commandQueue)
 {
-    m_renderer = renderer;
-
-    MTL::Device* device = m_renderer->m_device;
-    m_commandQueue = device->newCommandQueue(8);
+    m_device = device;
+    m_commandQueue = commandQueue;
 }
 
 void CommandQueueImpl::waitOnHost()
@@ -38,7 +36,7 @@ void CommandQueueImpl::waitOnHost()
 Result CommandQueueImpl::getNativeHandle(InteropHandle* outHandle)
 {
     outHandle->api = InteropHandleAPI::Metal;
-    outHandle->handleValue = reinterpret_cast<intptr_t>(m_commandQueue);
+    outHandle->handleValue = reinterpret_cast<intptr_t>(m_commandQueue.get());
     return SLANG_OK;
 }
 
@@ -56,7 +54,6 @@ void CommandQueueImpl::queueSubmitImpl(
     for (uint32_t i = 0; i < count; ++i)
     {
         CommandBufferImpl* cmdBufImpl = static_cast<CommandBufferImpl*>(commandBuffers[i]);
-        cmdBufImpl->m_commandBuffer->presentDrawable(m_renderer->m_drawable);
         cmdBufImpl->m_commandBuffer->commit();
     }
 }

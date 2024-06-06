@@ -10,6 +10,7 @@
 #include "metal-shader-program.h"
 #include "metal-shader-table.h"
 #include "metal-texture.h"
+#include "metal-util.h"
 
 #include "metal-helper-functions.h"
 
@@ -24,37 +25,24 @@ namespace metal
 void PipelineCommandEncoder::init(CommandBufferImpl* commandBuffer)
 {
     m_commandBuffer = commandBuffer;
-    m_device = commandBuffer->m_renderer;
-    m_metalCommandBuffer = m_commandBuffer->m_commandBuffer;
+    m_metalCommandBuffer = m_commandBuffer->m_commandBuffer.get();
+}
+
+void PipelineCommandEncoder::endEncodingImpl()
+{
+    m_commandBuffer->endMetalCommandEncoder();
 }
 
 void ResourceCommandEncoder::copyBuffer(
     IBufferResource* dst, Offset dstOffset, IBufferResource* src, Offset srcOffset, Size size)
 {
-}
-
-void ResourceCommandEncoder::uploadBufferData(
-    IBufferResource* buffer, Offset offset, Size size, void* data)
-{
-}
-
-void ResourceCommandEncoder::textureBarrier(
-    GfxCount count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
-{
-}
-
-// TODO: Change size_t to Count?
-void ResourceCommandEncoder::bufferBarrier(
-    GfxCount count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
-{
-}
-
-void ResourceCommandEncoder::endEncoding()
-{
-}
-
-void ResourceCommandEncoder::writeTimestamp(IQueryPool* queryPool, GfxIndex index)
-{
+    auto encoder = m_commandBuffer->getMetalBlitCommandEncoder();
+    encoder->copyFromBuffer(
+        static_cast<BufferResourceImpl*>(src)->m_buffer.get(),
+        srcOffset,
+        static_cast<BufferResourceImpl*>(dst)->m_buffer.get(),
+        dstOffset,
+        size);
 }
 
 void ResourceCommandEncoder::copyTexture(
@@ -68,37 +56,30 @@ void ResourceCommandEncoder::copyTexture(
     ITextureResource::Offset3D srcOffset,
     ITextureResource::Extents extent)
 {
-}
+    auto encoder = m_commandBuffer->getMetalBlitCommandEncoder();
 
-void ResourceCommandEncoder::uploadTextureData(
-    ITextureResource* dst,
-    SubresourceRange subResourceRange,
-    ITextureResource::Offset3D offset,
-    ITextureResource::Extents extend,
-    ITextureResource::SubresourceData* subResourceData,
-    GfxCount subResourceDataCount)
-{
-}
-
-
-void ResourceCommandEncoder::clearResourceView(
-    IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
-{
-}
-
-void ResourceCommandEncoder::resolveResource(
-    ITextureResource* source,
-    ResourceState sourceState,
-    SubresourceRange sourceRange,
-    ITextureResource* dest,
-    ResourceState destState,
-    SubresourceRange destRange)
-{
-}
-
-void ResourceCommandEncoder::resolveQuery(
-    IQueryPool* queryPool, GfxIndex index, GfxCount count, IBufferResource* buffer, Offset offset)
-{
+    if (dstSubresource.layerCount == 0 && dstSubresource.mipLevelCount == 0 && srcSubresource.layerCount == 0 && srcSubresource.mipLevelCount == 0)
+    {
+        encoder->copyFromTexture(
+            static_cast<TextureResourceImpl*>(src)->m_texture.get(),
+            static_cast<TextureResourceImpl*>(dst)->m_texture.get());
+    }
+    else
+    {
+        for (GfxIndex layer = 0; layer < dstSubresource.layerCount; layer++)
+        {
+            encoder->copyFromTexture(
+                static_cast<TextureResourceImpl*>(src)->m_texture.get(),
+                srcSubresource.baseArrayLayer + layer,
+                srcSubresource.mipLevel,
+                MTL::Origin(srcOffset.x, srcOffset.y, srcOffset.z),
+                MTL::Size(extent.width, extent.height, extent.depth),
+                static_cast<TextureResourceImpl*>(dst)->m_texture.get(),
+                dstSubresource.baseArrayLayer + layer,
+                dstSubresource.mipLevel,
+                MTL::Origin(dstOffset.x, dstOffset.y, dstOffset.z));
+        }
+    }
 }
 
 void ResourceCommandEncoder::copyTextureToBuffer(
@@ -113,6 +94,87 @@ void ResourceCommandEncoder::copyTextureToBuffer(
     ITextureResource::Extents extent)
 {
     assert(srcSubresource.mipLevelCount <= 1);
+
+    auto encoder = m_commandBuffer->getMetalBlitCommandEncoder();
+    encoder->copyFromTexture(
+        static_cast<TextureResourceImpl*>(src)->m_texture.get(),
+        srcSubresource.baseArrayLayer,
+        srcSubresource.mipLevel,
+        MTL::Origin(srcOffset.x, srcOffset.y, srcOffset.z),
+        MTL::Size(extent.width, extent.height, extent.depth),
+        static_cast<BufferResourceImpl*>(dst)->m_buffer.get(),
+        dstOffset,
+        dstRowStride,
+        dstSize);
+}
+
+void ResourceCommandEncoder::uploadBufferData(
+    IBufferResource* buffer, Offset offset, Size size, void* data)
+{
+    assert(0);
+}
+
+void ResourceCommandEncoder::uploadTextureData(
+    ITextureResource* dst,
+    SubresourceRange subResourceRange,
+    ITextureResource::Offset3D offset,
+    ITextureResource::Extents extend,
+    ITextureResource::SubresourceData* subResourceData,
+    GfxCount subResourceDataCount)
+{
+    assert(0);
+}
+
+void ResourceCommandEncoder::textureBarrier(
+    GfxCount count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
+{
+    assert(0);
+}
+
+// TODO: Change size_t to Count?
+void ResourceCommandEncoder::bufferBarrier(
+    GfxCount count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
+{
+    assert(0);
+}
+
+void ResourceCommandEncoder::endEncoding()
+{
+    PipelineCommandEncoder::endEncodingImpl();
+}
+
+void ResourceCommandEncoder::writeTimestamp(IQueryPool* queryPool, GfxIndex index)
+{
+    auto encoder = m_commandBuffer->getMetalBlitCommandEncoder();
+    encoder->sampleCountersInBuffer(static_cast<QueryPoolImpl*>(queryPool)->m_counterSampleBuffer.get(), index, true);
+}
+
+void ResourceCommandEncoder::clearResourceView(
+    IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
+{
+    assert(0);
+}
+
+void ResourceCommandEncoder::resolveResource(
+    ITextureResource* source,
+    ResourceState sourceState,
+    SubresourceRange sourceRange,
+    ITextureResource* dest,
+    ResourceState destState,
+    SubresourceRange destRange)
+{
+    assert(0);
+}
+
+void ResourceCommandEncoder::resolveQuery(
+    IQueryPool* queryPool, GfxIndex index, GfxCount count, IBufferResource* buffer, Offset offset)
+{
+    auto encoder = m_commandBuffer->getMetalBlitCommandEncoder();
+    encoder->resolveCounters(
+        static_cast<QueryPoolImpl*>(queryPool)->m_counterSampleBuffer.get(),
+        NS::Range(index, count),
+        static_cast<BufferResourceImpl*>(buffer)->m_buffer.get(),
+        offset);
 }
 
 void ResourceCommandEncoder::textureSubresourceBarrier(
@@ -121,14 +183,18 @@ void ResourceCommandEncoder::textureSubresourceBarrier(
     ResourceState src,
     ResourceState dst)
 {
+    assert(0);
 }
 
 void ResourceCommandEncoder::beginDebugEvent(const char* name, float rgbColor[3])
 {
+    NS::SharedPtr<NS::String> string = MetalUtil::createString(name);
+    m_commandBuffer->m_commandBuffer->pushDebugGroup(string.get());
 }
 
 void ResourceCommandEncoder::endDebugEvent()
 {
+    m_commandBuffer->m_commandBuffer->popDebugGroup();
 }
 
 void RenderCommandEncoder::beginPass(IRenderPassLayout* renderPass, IFramebuffer* framebuffer)
@@ -145,7 +211,7 @@ void RenderCommandEncoder::beginPass(IRenderPassLayout* renderPass, IFramebuffer
     if (rpd->depthAttachment() && false)
     {
         TextureResourceViewImpl* depthView = static_cast<TextureResourceViewImpl*>(fb->depthStencilView.get());
-        rpd->depthAttachment()->setTexture(depthView->m_texture->m_texture);
+        rpd->depthAttachment()->setTexture(depthView->m_texture->m_texture.get());
     }
     const int colorTargetCount = fb->renderTargetViews.getCount();
     for (int i = 0; i < colorTargetCount; ++i)
@@ -155,12 +221,12 @@ void RenderCommandEncoder::beginPass(IRenderPassLayout* renderPass, IFramebuffer
         assert(texView->m_texture);
         if (texView->m_texture->m_isCurrentDrawable)
         {
-            CA::MetalDrawable* drawable = static_cast<CA::MetalDrawable*>(fb->m_renderer->m_drawable);
+            CA::MetalDrawable* drawable = static_cast<CA::MetalDrawable*>(fb->m_device->m_drawable);
             tex = drawable->texture();
         }
         else
         {
-            tex = texView->m_texture->m_texture;
+            tex = texView->m_texture->m_texture.get();
         }
         rpd->colorAttachments()->object(i)->setTexture(tex);
         rpd->colorAttachments()->object(i)->setClearColor(MTL::ClearColor(0.2, 0.4, 0.9, 1.0));
@@ -181,7 +247,7 @@ Result RenderCommandEncoder::bindPipeline(
 {
     m_currentPipeline = static_cast<PipelineStateImpl*>(pipelineState);
     // Initialize the root object
-    SLANG_RETURN_ON_FAIL(m_commandBuffer->m_rootObject.init(m_commandBuffer->m_renderer,
+    SLANG_RETURN_ON_FAIL(m_commandBuffer->m_rootObject.init(m_commandBuffer->m_device,
         m_currentPipeline->getProgram<ShaderProgramImpl>()->m_rootObjectLayout));
     *outRootObject = &m_commandBuffer->m_rootObject;
     //if (pPipelineState->m_renderState == nullptr) return SLANG_ERROR_INVALID_PARAMETER;
@@ -249,8 +315,8 @@ void RenderCommandEncoder::setVertexBuffers(
         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
         if (buffer)
         {
-            MTL::Buffer* vertexBuffers = {buffer->m_buffer};
-            m_encoder->setVertexBuffer(buffer->m_buffer, offsets[i], slotIndex);
+            MTL::Buffer* vertexBuffers = {buffer->m_buffer.get()};
+            m_encoder->setVertexBuffer(buffer->m_buffer.get(), offsets[i], slotIndex);
             // ...
         }
     }
