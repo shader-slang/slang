@@ -10,7 +10,7 @@ namespace gfx {
 // Utility functions for Metal
 struct MetalUtil 
 {
-    static MTL::PixelFormat getMetalPixelFormat(Format format);
+    static MTL::PixelFormat translatePixelFormat(Format format);
     static MTL::VertexFormat translateVertexFormat(Format format);
 
     static inline bool isDepthFormat(MTL::PixelFormat format)

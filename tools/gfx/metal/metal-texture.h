@@ -16,17 +16,18 @@ class TextureResourceImpl : public TextureResource
 {
 public:
     typedef TextureResource Parent;
+
     TextureResourceImpl(const Desc& desc, DeviceImpl* device);
     ~TextureResourceImpl();
 
-    MTL::Texture* m_texture = nullptr;
-    //MTL::PixelFormat m_metalFormat = MTL::PixelFormat::PixelFormatInvalid;
-    //bool m_isWeakImageReference = false;
-    bool m_isCurrentDrawable = false;
     RefPtr<DeviceImpl> m_device;
+    NS::SharedPtr<MTL::Texture> m_texture;
+    // TODO still needed?
+    // MTL::PixelFormat m_metalFormat = MTL::PixelFormat::PixelFormatInvalid;
+    // bool m_isWeakImageReference = false;
+    bool m_isCurrentDrawable = false;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        getNativeResourceHandle(InteropHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override;
 

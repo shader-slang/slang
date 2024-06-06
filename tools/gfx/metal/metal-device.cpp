@@ -212,66 +212,95 @@ Result DeviceImpl::createTextureResource(
     const ITextureResource::SubresourceData* initData,
     ITextureResource** outResource)
 {
+    AUTORELEASEPOOL
+
     TextureResource::Desc desc = fixupTextureDesc(descIn);
 
-    const MTL::PixelFormat format = MetalUtil::getMetalPixelFormat(desc.format);
-    if (format == MTL::PixelFormat::PixelFormatInvalid)
+    const MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
+    if (pixelFormat == MTL::PixelFormat::PixelFormatInvalid)
     {
         assert(!"Unsupported texture format");
         return SLANG_FAIL;
     }
 
-    RefPtr<TextureResourceImpl> textureResource(new TextureResourceImpl(desc, this));
-    //textureResource->m_metalFormat = format;
-    MTL::TextureDescriptor* metalDesc = MTL::TextureDescriptor::alloc()->init();
-    metalDesc->setStorageMode(MTL::StorageMode::StorageModePrivate);
-    // Create the texture
+    RefPtr<TextureResourceImpl> textureImpl(new TextureResourceImpl(desc, this));
+
+    NS::SharedPtr<MTL::TextureDescriptor> textureDesc = NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
+    switch (desc.memoryType)
+    {
+    case MemoryType::DeviceLocal:
+        textureDesc->setStorageMode(MTL::StorageModePrivate);
+        break;
+    case MemoryType::Upload:
+        textureDesc->setStorageMode(MTL::StorageModeShared);
+        textureDesc->setCpuCacheMode(MTL::CPUCacheModeWriteCombined);
+        break;
+    case MemoryType::ReadBack:
+        textureDesc->setStorageMode(MTL::StorageModeShared);
+        break;
+    }
+
+    NS::UInteger arrayLength = calcEffectiveArraySize(desc);
+
     switch (desc.type)
     {
     case IResource::Type::Texture1D:
-    {
-        metalDesc->setTextureType(MTL::TextureType::TextureType1D);
-        metalDesc->setWidth(descIn.size.width);
+        textureDesc->setTextureType(arrayLength > 1 ? MTL::TextureType1DArray : MTL::TextureType1D);
+        textureDesc->setWidth(desc.size.width);
         break;
-    }
     case IResource::Type::Texture2D:
-    {
-        metalDesc->setTextureType(MTL::TextureType::TextureType2D);
-        metalDesc->setWidth(descIn.size.width);
-        metalDesc->setHeight(descIn.size.height);
+        if (desc.sampleDesc.numSamples > 1)
+        {
+            textureDesc->setTextureType(arrayLength > 1 ? MTL::TextureType2DMultisampleArray : MTL::TextureType2DMultisample);
+            textureDesc->setSampleCount(desc.sampleDesc.numSamples);
+        }
+        else
+        {
+            textureDesc->setTextureType(arrayLength > 1 ? MTL::TextureType2DArray : MTL::TextureType2D);
+        }
+        textureDesc->setWidth(descIn.size.width);
+        textureDesc->setHeight(descIn.size.height);
         break;
-    }
     case IResource::Type::TextureCube:
-    {
-        metalDesc->setTextureType(MTL::TextureType::TextureTypeCube);
-        metalDesc->setWidth(descIn.size.width);
-        metalDesc->setHeight(descIn.size.height);
+        textureDesc->setTextureType(arrayLength > 6 ? MTL::TextureTypeCubeArray : MTL::TextureTypeCube);
+        textureDesc->setWidth(descIn.size.width);
+        textureDesc->setHeight(descIn.size.height);
         break;
-    }
     case IResource::Type::Texture3D:
-    {
-        metalDesc->setTextureType(MTL::TextureType::TextureType3D);
-        metalDesc->setWidth(descIn.size.width);
-        metalDesc->setHeight(descIn.size.height);
-        metalDesc->setDepth(descIn.size.depth);
+        textureDesc->setTextureType(MTL::TextureType::TextureType3D);
+        textureDesc->setWidth(descIn.size.width);
+        textureDesc->setHeight(descIn.size.height);
+        textureDesc->setDepth(descIn.size.depth);
         break;
-    }
     default:
-    {
         assert("!Unsupported texture type");
         return SLANG_FAIL;
     }
-    }
-    metalDesc->setMipmapLevelCount(desc.numMipLevels);
-    const int arraySize(calcEffectiveArraySize(desc));
-    metalDesc->setArrayLength(arraySize);
-    metalDesc->setPixelFormat(format);
-    //metalDesc.setResourceOptions();
-    metalDesc->setUsage(MTL::TextureUsageUnknown);
-    metalDesc->setSampleCount(desc.sampleDesc.numSamples);
-    textureResource->m_texture = m_device->newTexture(metalDesc);
 
-    returnComPtr(outResource, textureResource);
+    MTL::TextureUsage textureUsage = MTL::TextureUsageUnknown;
+    if (desc.allowedStates.contains(ResourceState::RenderTarget))
+    {
+        textureUsage |= MTL::TextureUsageRenderTarget;
+    }
+    if (desc.allowedStates.contains(ResourceState::ShaderResource))
+    {
+        textureUsage |= MTL::TextureUsageShaderRead;
+    }
+    if (desc.allowedStates.contains(ResourceState::UnorderedAccess))
+    {
+        textureUsage |= MTL::TextureUsageShaderWrite;
+        textureUsage |= MTL::TextureUsageShaderAtomic;
+    }
+
+    textureDesc->setMipmapLevelCount(desc.numMipLevels);
+    textureDesc->setArrayLength(arrayLength);
+    textureDesc->setPixelFormat(pixelFormat);
+    textureDesc->setUsage(textureUsage);
+    textureDesc->setSampleCount(desc.sampleDesc.numSamples);
+    textureDesc->setAllowGPUOptimizedContents(desc.memoryType == MemoryType::DeviceLocal);
+
+    textureImpl->m_texture = NS::TransferPtr(m_device->newTexture(textureDesc.get()));
+    returnComPtr(outResource, textureImpl);
     return SLANG_OK;
 }
 
