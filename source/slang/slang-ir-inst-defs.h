@@ -198,6 +198,8 @@ INST(Nop, nop, 0, 0)
         /* Metal Mesh Grid Properties */
             INST(MetalMeshGridPropertiesType, mesh_grid_properties, 0, HOISTABLE)
     
+        /* Metal Mesh set_vertex inst */
+            INST(MetalSetVertex, set_vertex, 2, HOISTABLE)
 
         /* HLSLStructuredBufferTypeBase */
             INST(HLSLStructuredBufferType,                  StructuredBuffer,                   0, HOISTABLE)

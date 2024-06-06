@@ -409,6 +409,16 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
             return true;
         }
+        case kIROp_MetalSetVertex:
+        {
+            auto setVertex = as<IRMetalSetVertex>(inst);
+            m_writer->emit("_slang_mesh.set_vertex(");
+            emitOperand(setVertex->getIndex(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(setVertex->getVertex(), getInfo(EmitOp::General));
+            m_writer->emit(");");
+            return true;
+        }
         default: break;
     }
     // Not handled

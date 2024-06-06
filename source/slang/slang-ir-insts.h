@@ -3213,6 +3213,13 @@ struct IRSPIRVAsm : IRInst
     }
 };
 
+struct IRMetalSetVertex : IRInst
+{
+    IR_LEAF_ISA(MetalSetVertex)
+    IRInst* getIndex() { return getOperand(0); }
+    IRInst* getVertex() { return getOperand(1); }
+}; 
+
 struct IRGenericAsm : IRTerminatorInst
 {
     IR_LEAF_ISA(GenericAsm)
@@ -4233,6 +4240,8 @@ public:
     IRBindGlobalGenericParam* emitBindGlobalGenericParam(
         IRInst* param,
         IRInst* val);
+
+    IRInst* emitMetalSetVertex(IRInst* baseIndex, IRInst* vertex);
 
     IRDecoration* addBindExistentialSlotsDecoration(
         IRInst*         value,

@@ -378,7 +378,25 @@ namespace Slang
         }
         builder.setInsertBefore(entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
         auto meshParam = builder.emitParam(builder.getMetalMeshType(vertexType, primitiveType, maxVertices, maxPrimitives, topology));
-        builder.addExternCppDecoration(meshParam, toSlice("_slang_mesh"));    
+        builder.addExternCppDecoration(meshParam, toSlice("_slang_mesh"));
+
+        
+        traverseUsers(verticesParam, [&](IRInst* inst){
+            auto meshRef = as<IRMeshOutputRef>(inst);
+            traverseUsers(inst, [&](IRInst* user){
+                if(auto store = as<IRStore>(user))
+                {
+                    IRInst* vertex = store->ptr.getUser();
+                    IRInst* lastUse = nullptr;
+                    // This assumes that traverseUsers goes from front to back, dont know how to do it otherwise
+                    traverseUsers(vertex, [&](IRInst* vertexRef){
+                        lastUse = vertexRef;
+                    });
+                    builder.setInsertAfter(lastUse);
+                    builder.emitMetalSetVertex(meshRef->getIndex(), vertex);
+                }
+            });
+        });
     }
 
     void legalizeDispatchMeshPayloadForMetal(EntryPointInfo entryPoint)
