@@ -278,21 +278,36 @@ Result DeviceImpl::createTextureResource(
 Result DeviceImpl::createBufferResource(
     const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
+    AUTORELEASEPOOL
+
     BufferResource::Desc desc = fixupBufferDesc(descIn);
 
     const Size bufferSize = desc.sizeInBytes;
 
-    MTL::ResourceOptions opts = (desc.memoryType == MemoryType::DeviceLocal ? MTL::ResourceStorageModePrivate : 0);
+    MTL::ResourceOptions resourceOptions = MTL::ResourceOptions(0);
+    switch (desc.memoryType)
+    {
+    case MemoryType::DeviceLocal:
+        resourceOptions = MTL::ResourceStorageModePrivate;
+        break;
+    case MemoryType::Upload:
+        resourceOptions = MTL::ResourceStorageModeShared | MTL::CPUCacheModeWriteCombined;
+        break;
+    case MemoryType::ReadBack:
+        resourceOptions = MTL::ResourceStorageModeShared;
+        break;
+    }
+    resourceOptions |= (desc.memoryType == MemoryType::DeviceLocal) ? MTL::ResourceStorageModePrivate : MTL::ResourceStorageModeShared;
 
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(desc, this));
 
     if (initData)
     {
-        buffer->m_buffer = m_device->newBuffer(initData, bufferSize, opts);
+        buffer->m_buffer = NS::TransferPtr(m_device->newBuffer(initData, bufferSize, resourceOptions));
     }
     else
     {
-        buffer->m_buffer = m_device->newBuffer(bufferSize, opts);
+        buffer->m_buffer = NS::TransferPtr(m_device->newBuffer(bufferSize, resourceOptions));
     }
 
     returnComPtr(outResource, buffer);
