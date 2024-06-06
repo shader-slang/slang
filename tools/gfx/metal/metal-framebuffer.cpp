@@ -17,11 +17,11 @@ FramebufferLayoutImpl::~FramebufferLayoutImpl()
     //m_renderPass->release();
 }
 
-Result FramebufferLayoutImpl::init(DeviceImpl* renderer, const IFramebufferLayout::Desc& desc)
+Result FramebufferLayoutImpl::init(DeviceImpl* device, const IFramebufferLayout::Desc& desc)
 {
     // Metal doesn't have a notion of Framebuffers or FramebufferLayouts per se.
     // We simply stash the desc and use it when creating the (convenience) Framebuffer
-    m_renderer = renderer;
+    m_device = device;
     m_desc = desc;
     return SLANG_OK;
 }
@@ -30,9 +30,9 @@ FramebufferImpl::~FramebufferImpl()
 {
 }
 
-Result FramebufferImpl::init(DeviceImpl* renderer, const IFramebuffer::Desc& desc)
+Result FramebufferImpl::init(DeviceImpl* device, const IFramebuffer::Desc& desc)
 {
-    m_renderer = renderer;
+    m_device = device;
     m_layout = static_cast<FramebufferLayoutImpl*>(desc.layout);
     m_width = m_height = 1;
 

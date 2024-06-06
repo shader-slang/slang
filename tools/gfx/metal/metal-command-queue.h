@@ -24,6 +24,14 @@ public:
     RefPtr<DeviceImpl> m_device;
     Desc m_desc;
     NS::SharedPtr<MTL::CommandQueue> m_commandQueue;
+
+    struct FenceWaitInfo
+    {
+        RefPtr<FenceImpl> fence;
+        uint64_t waitValue;
+    };
+    List<FenceWaitInfo> m_pendingWaitFences;
+
     ~CommandQueueImpl();
 
     void init(DeviceImpl* device, NS::SharedPtr<MTL::CommandQueue> commandQueue);

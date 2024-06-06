@@ -1,7 +1,7 @@
 // metal-shader-program.cpp
 #include "metal-shader-program.h"
-
 #include "metal-device.h"
+#include "metal-util.h"
 
 namespace gfx
 {
@@ -20,22 +20,14 @@ ShaderProgramImpl::~ShaderProgramImpl()
 {
 }
 
-void ShaderProgramImpl::comFree() { }
-
-Result ShaderProgramImpl::createShaderModule(
-    slang::EntryPointReflection* entryPointInfo, ComPtr<ISlangBlob> kernelCode)
+Result ShaderProgramImpl::createShaderModule(slang::EntryPointReflection* entryPointInfo, ComPtr<ISlangBlob> kernelCode)
 {
-    if (entryPointInfo == nullptr || kernelCode == nullptr || kernelCode->getBufferSize() == 0)
-    {
-        return SLANG_E_INVALID_ARG;
-    }
-
-    auto realEntryPointName = entryPointInfo->getNameOverride();
-    std::string sourceStr(static_cast<const char*>(kernelCode->getBufferPointer()), kernelCode->getBufferSize());
-    NS::String *nsSourceString = NS::String::alloc()->init(sourceStr.c_str(), NS::UTF8StringEncoding);
+    m_codeBlobs.add(kernelCode);
+    const char* realEntryPointName = entryPointInfo->getNameOverride();
+    NS::SharedPtr<NS::String> source = MetalUtil::createStringView((void*)kernelCode->getBufferPointer(), kernelCode->getBufferSize());;
     NS::Error* error;
-    MTL::Library* library = m_device->m_device->newLibrary(nsSourceString, nullptr, &error);
-    if (library == nullptr)
+    NS::SharedPtr<MTL::Library> library = NS::TransferPtr(m_device->m_device->newLibrary(source.get(), nullptr, &error));
+    if (!library)
     {
         std::cout << error->localizedDescription()->utf8String() << std::endl;
         return SLANG_E_INVALID_ARG;

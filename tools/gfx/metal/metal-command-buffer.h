@@ -26,6 +26,7 @@ public:
     RefPtr<DeviceImpl> m_device;
     NS::SharedPtr<MTL::CommandBuffer> m_commandBuffer;
     RootShaderObjectImpl m_rootObject;
+    RefPtr<MutableRootShaderObjectImpl> m_mutableRootShaderObject;
 
     ResourceCommandEncoder* m_resourceCommandEncoder = nullptr;
     ComputeCommandEncoder* m_computeCommandEncoder = nullptr;

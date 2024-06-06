@@ -25,7 +25,6 @@ public:
     // TODO still needed?
     // MTL::PixelFormat m_metalFormat = MTL::PixelFormat::PixelFormatInvalid;
     // bool m_isWeakImageReference = false;
-    bool m_isCurrentDrawable = false;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override;
 

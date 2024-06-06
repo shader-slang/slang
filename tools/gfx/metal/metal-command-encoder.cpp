@@ -33,6 +33,28 @@ void PipelineCommandEncoder::endEncodingImpl()
     m_commandBuffer->endMetalCommandEncoder();
 }
 
+Result PipelineCommandEncoder::setPipelineStateImpl(IPipelineState* state, IShaderObject** outRootObject)
+{
+    m_currentPipeline = static_cast<PipelineStateImpl*>(state);
+    m_commandBuffer->m_mutableRootShaderObject = nullptr;
+    SLANG_RETURN_ON_FAIL(m_commandBuffer->m_rootObject.init(
+        m_commandBuffer->m_device,
+        m_currentPipeline->getProgram<ShaderProgramImpl>()->m_rootObjectLayout));
+    *outRootObject = &m_commandBuffer->m_rootObject;
+    return SLANG_OK;
+}
+
+void ResourceCommandEncoder::endEncoding()
+{
+    PipelineCommandEncoder::endEncodingImpl();
+}
+
+void ResourceCommandEncoder::writeTimestamp(IQueryPool* queryPool, GfxIndex index)
+{
+    auto encoder = m_commandBuffer->getMetalBlitCommandEncoder();
+    encoder->sampleCountersInBuffer(static_cast<QueryPoolImpl*>(queryPool)->m_counterSampleBuffer.get(), index, true);
+}
+
 void ResourceCommandEncoder::copyBuffer(
     IBufferResource* dst, Offset dstOffset, IBufferResource* src, Offset srcOffset, Size size)
 {
@@ -125,28 +147,25 @@ void ResourceCommandEncoder::uploadTextureData(
     assert(0);
 }
 
-void ResourceCommandEncoder::textureBarrier(
-    GfxCount count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
-{
-    assert(0);
-}
-
-// TODO: Change size_t to Count?
 void ResourceCommandEncoder::bufferBarrier(
     GfxCount count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
 {
-    assert(0);
+    // We use automatic hazard tracking for now, no need for barriers.
 }
 
-void ResourceCommandEncoder::endEncoding()
+void ResourceCommandEncoder::textureBarrier(
+    GfxCount count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
 {
-    PipelineCommandEncoder::endEncodingImpl();
+    // We use automatic hazard tracking for now, no need for barriers.
 }
 
-void ResourceCommandEncoder::writeTimestamp(IQueryPool* queryPool, GfxIndex index)
+void ResourceCommandEncoder::textureSubresourceBarrier(
+    ITextureResource* texture,
+    SubresourceRange subresourceRange,
+    ResourceState src,
+    ResourceState dst)
 {
-    auto encoder = m_commandBuffer->getMetalBlitCommandEncoder();
-    encoder->sampleCountersInBuffer(static_cast<QueryPoolImpl*>(queryPool)->m_counterSampleBuffer.get(), index, true);
+    // We use automatic hazard tracking for now, no need for barriers.
 }
 
 void ResourceCommandEncoder::clearResourceView(
@@ -175,15 +194,6 @@ void ResourceCommandEncoder::resolveQuery(
         NS::Range(index, count),
         static_cast<BufferResourceImpl*>(buffer)->m_buffer.get(),
         offset);
-}
-
-void ResourceCommandEncoder::textureSubresourceBarrier(
-    ITextureResource* texture,
-    SubresourceRange subresourceRange,
-    ResourceState src,
-    ResourceState dst)
-{
-    assert(0);
 }
 
 void ResourceCommandEncoder::beginDebugEvent(const char* name, float rgbColor[3])
@@ -219,15 +229,7 @@ void RenderCommandEncoder::beginPass(IRenderPassLayout* renderPass, IFramebuffer
         TextureResourceViewImpl* texView = static_cast<TextureResourceViewImpl*>(fb->renderTargetViews[i].get());
         MTL::Texture* tex = nullptr;
         assert(texView->m_texture);
-        if (texView->m_texture->m_isCurrentDrawable)
-        {
-            CA::MetalDrawable* drawable = static_cast<CA::MetalDrawable*>(fb->m_device->m_drawable);
-            tex = drawable->texture();
-        }
-        else
-        {
-            tex = texView->m_texture->m_texture.get();
-        }
+        tex = texView->m_texture->m_texture.get();
         rpd->colorAttachments()->object(i)->setTexture(tex);
         rpd->colorAttachments()->object(i)->setClearColor(MTL::ClearColor(0.2, 0.4, 0.9, 1.0));
     }
@@ -440,7 +442,7 @@ void ComputeCommandEncoder::endEncoding() { }
 Result ComputeCommandEncoder::bindPipeline(
     IPipelineState* pipelineState, IShaderObject** outRootObject)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    return setPipelineStateImpl(pipelineState, outRootObject);
 }
 
 Result ComputeCommandEncoder::bindPipelineWithRootObject(

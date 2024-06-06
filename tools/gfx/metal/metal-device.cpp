@@ -150,18 +150,20 @@ Result DeviceImpl::createSwapchain(
     return SLANG_OK;
 }
 
-Result DeviceImpl::createFramebufferLayout(
-    const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout)
+Result DeviceImpl::createFramebufferLayout(const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout)
 {
+    AUTORELEASEPOOL
+
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl;
     SLANG_RETURN_ON_FAIL(layout->init(this, desc));
     returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
 
-Result DeviceImpl::createRenderPassLayout(
-    const IRenderPassLayout::Desc& desc, IRenderPassLayout** outRenderPassLayout)
+Result DeviceImpl::createRenderPassLayout(const IRenderPassLayout::Desc& desc, IRenderPassLayout** outRenderPassLayout)
 {
+    AUTORELEASEPOOL
+
     RefPtr<RenderPassLayoutImpl> result = new RenderPassLayoutImpl;
     SLANG_RETURN_ON_FAIL(result->init(this, desc));
     returnComPtr(outRenderPassLayout, result);
@@ -170,6 +172,8 @@ Result DeviceImpl::createRenderPassLayout(
 
 Result DeviceImpl::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer)
 {
+    AUTORELEASEPOOL
+
     RefPtr<FramebufferImpl> fb = new FramebufferImpl;
     SLANG_RETURN_ON_FAIL(fb->init(this, desc));
     returnComPtr(outFramebuffer, fb);
@@ -183,6 +187,8 @@ SlangResult DeviceImpl::readTextureResource(
     Size* outRowPitch,
     Size* outPixelSize)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
@@ -218,12 +224,16 @@ Result DeviceImpl::getAccelerationStructurePrebuildInfo(
     const IAccelerationStructure::BuildInputs& buildInputs,
     IAccelerationStructure::PrebuildInfo* outPrebuildInfo)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 Result DeviceImpl::createAccelerationStructure(
     const IAccelerationStructure::CreateDesc& desc, IAccelerationStructure** outAS)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
@@ -267,6 +277,8 @@ Result DeviceImpl::getTextureAllocationInfo(
 
 Result DeviceImpl::getTextureRowAlignment(Size* outAlignment)
 {
+    AUTORELEASEPOOL
+
     *outAlignment = 1;
     return SLANG_E_NOT_IMPLEMENTED;
 }
@@ -426,6 +438,8 @@ Result DeviceImpl::createBufferResource(
 Result DeviceImpl::createBufferFromNativeHandle(
     InteropHandle handle, const IBufferResource::Desc& srcDesc, IBufferResource** outResource)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
@@ -442,6 +456,8 @@ Result DeviceImpl::createSamplerState(ISamplerState::Desc const& desc, ISamplerS
 Result DeviceImpl::createTextureView(
     ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView)
 {
+    AUTORELEASEPOOL
+
     auto resourceImpl = static_cast<TextureResourceImpl*>(texture);
     RefPtr<TextureResourceViewImpl> view = new TextureResourceViewImpl(this);
     view->m_desc = desc;
@@ -485,8 +501,7 @@ Result DeviceImpl::createTextureView(
 
     view->m_type = ResourceViewImpl::ViewType::Texture;
     view->m_texture = resourceImpl; //new TextureResourceImpl(newDesc, this);
-    view->m_texture->m_isCurrentDrawable = resourceImpl->m_isCurrentDrawable;
-    view->m_texture->m_texture = resourceImpl->m_texture->newTextureView(pixelFormat, textureType, levelRange, sliceRange);
+    view->m_texture->m_texture = NS::TransferPtr(resourceImpl->m_texture->newTextureView(pixelFormat, textureType, levelRange, sliceRange));
     returnComPtr(outView, view);
 
     return SLANG_OK;
@@ -590,19 +605,23 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
 Result DeviceImpl::createProgram(
     const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnosticBlob)
 {
-    // TODO:
+    AUTORELEASEPOOL
+
     RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(this);
     shaderProgram->init(desc);
-
-    //m_deviceObjectsWithPotentialBackReferences.add(shaderProgram);
 
     RootShaderObjectLayout::create(
         this,
         shaderProgram->linkedProgram,
         shaderProgram->linkedProgram->getLayout(),
         shaderProgram->m_rootObjectLayout.writeRef());
-    returnComPtr(outProgram, shaderProgram);
 
+    if (!shaderProgram->isSpecializable())
+    {
+        SLANG_RETURN_ON_FAIL(shaderProgram->compileShaders(this));
+    }
+
+    returnComPtr(outProgram, shaderProgram);
     return SLANG_OK;
 }
 
@@ -611,51 +630,65 @@ Result DeviceImpl::createShaderObjectLayout(
     slang::TypeLayoutReflection* typeLayout,
     ShaderObjectLayoutBase** outLayout)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 Result DeviceImpl::createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 Result DeviceImpl::createMutableShaderObject(
     ShaderObjectLayoutBase* layout, IShaderObject** outObject)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 Result DeviceImpl::createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 Result DeviceImpl::createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outShaderTable)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
-Result DeviceImpl::createGraphicsPipelineState(
-    const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
+Result DeviceImpl::createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, IPipelineState** outState)
 {
-    GraphicsPipelineStateDesc desc = inDesc;
+    AUTORELEASEPOOL
+
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
     pipelineStateImpl->init(desc);
-    pipelineStateImpl->establishStrongDeviceReference();
-    //m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
     returnComPtr(outState, pipelineStateImpl);
     return SLANG_OK;
 }
 
-Result DeviceImpl::createComputePipelineState(
-    const ComputePipelineStateDesc& inDesc, IPipelineState** outState)
+Result DeviceImpl::createComputePipelineState(const ComputePipelineStateDesc& desc, IPipelineState** outState)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
+    pipelineStateImpl->init(desc);
+    m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
+    returnComPtr(outState, pipelineStateImpl);
+    return SLANG_OK;
 }
 
-Result DeviceImpl::createRayTracingPipelineState(
-    const RayTracingPipelineStateDesc& desc, IPipelineState** outState)
+Result DeviceImpl::createRayTracingPipelineState(const RayTracingPipelineStateDesc& desc, IPipelineState** outState)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
