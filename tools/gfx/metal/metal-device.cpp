@@ -198,7 +198,39 @@ Result DeviceImpl::createAccelerationStructure(
 Result DeviceImpl::getTextureAllocationInfo(
     const ITextureResource::Desc& descIn, Size* outSize, Size* outAlignment)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    auto alignTo = [&](Size size, Size alignment) -> Size {
+        return ((size + alignment - 1) / alignment) * alignment;
+    };
+
+    TextureResource::Desc desc = fixupTextureDesc(descIn);
+    FormatInfo formatInfo;
+    gfxGetFormatInfo(desc.format, &formatInfo);
+    MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
+    Size alignment = m_device->minimumLinearTextureAlignmentForPixelFormat(pixelFormat);
+    Size size = 0;
+    ITextureResource::Extents extents = desc.size;
+    extents.width = extents.width ? extents.width : 1;
+    extents.height = extents.height ? extents.height : 1;
+    extents.depth = extents.depth ? extents.depth : 1;
+
+    for (Int i = 0; i < desc.numMipLevels; ++i)
+    {
+        Size rowSize = ((extents.width + formatInfo.blockWidth - 1) / formatInfo.blockWidth) * formatInfo.blockSizeInBytes;
+        rowSize = alignTo(rowSize, alignment);
+        Size sliceSize = rowSize * alignTo(extents.height, formatInfo.blockHeight);
+        size += sliceSize * extents.depth;
+        extents.width = Math::Max(1, extents.width / 2);
+        extents.height = Math::Max(1, extents.height / 2);
+        extents.depth = Math::Max(1, extents.depth / 2);
+    }
+    size *= desc.arraySize ? desc.arraySize : 1;
+
+    *outSize = size;
+    *outAlignment = alignment;
+
+    return SLANG_OK;
 }
 
 Result DeviceImpl::getTextureRowAlignment(Size* outAlignment)
@@ -414,7 +446,29 @@ Result DeviceImpl::createTextureView(
 
 Result DeviceImpl::getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    // TODO - add table based on https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
+    ResourceStateSet allowedStates;
+    allowedStates.add(ResourceState::VertexBuffer);
+    allowedStates.add(ResourceState::IndexBuffer);
+    allowedStates.add(ResourceState::ConstantBuffer);
+    allowedStates.add(ResourceState::ShaderResource);
+    allowedStates.add(ResourceState::UnorderedAccess);
+    allowedStates.add(ResourceState::RenderTarget);
+    allowedStates.add(ResourceState::DepthRead);
+    allowedStates.add(ResourceState::DepthWrite);
+    allowedStates.add(ResourceState::Present);
+    allowedStates.add(ResourceState::IndirectArgument);
+    allowedStates.add(ResourceState::CopySource);
+    allowedStates.add(ResourceState::ResolveSource);
+    allowedStates.add(ResourceState::CopyDestination);
+    allowedStates.add(ResourceState::ResolveDestination);
+    allowedStates.add(ResourceState::AccelerationStructure);
+    allowedStates.add(ResourceState::AccelerationStructureBuildInput);
+
+    *outStates = allowedStates;
+    return SLANG_OK;
 }
 
 Result DeviceImpl::createBufferView(
