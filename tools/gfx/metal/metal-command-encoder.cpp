@@ -133,7 +133,7 @@ void ResourceCommandEncoder::copyTextureToBuffer(
 void ResourceCommandEncoder::uploadBufferData(
     IBufferResource* buffer, Offset offset, Size size, void* data)
 {
-    assert(0);
+    SLANG_UNIMPLEMENTED_X("uploadBufferData");
 }
 
 void ResourceCommandEncoder::uploadTextureData(
@@ -144,7 +144,7 @@ void ResourceCommandEncoder::uploadTextureData(
     ITextureResource::SubresourceData* subResourceData,
     GfxCount subResourceDataCount)
 {
-    assert(0);
+    SLANG_UNIMPLEMENTED_X("uploadTextureData");
 }
 
 void ResourceCommandEncoder::bufferBarrier(
@@ -171,7 +171,7 @@ void ResourceCommandEncoder::textureSubresourceBarrier(
 void ResourceCommandEncoder::clearResourceView(
     IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
 {
-    assert(0);
+    SLANG_UNIMPLEMENTED_X("clearResourceView");
 }
 
 void ResourceCommandEncoder::resolveResource(
@@ -182,7 +182,7 @@ void ResourceCommandEncoder::resolveResource(
     ResourceState destState,
     SubresourceRange destRange)
 {
-    assert(0);
+    SLANG_UNIMPLEMENTED_X("resolveResource");
 }
 
 void ResourceCommandEncoder::resolveQuery(
