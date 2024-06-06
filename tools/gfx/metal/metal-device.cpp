@@ -11,7 +11,7 @@
 #include "metal-buffer.h"
 //#include "metal-command-queue.h"
 #include "metal-fence.h"
-//#include "metal-query.h"
+#include "metal-query.h"
 //#include "metal-resource-views.h"
 #include "metal-sampler.h"
 #include "metal-shader-object.h"
@@ -641,7 +641,12 @@ Result DeviceImpl::createRayTracingPipelineState(
 
 Result DeviceImpl::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** outPool)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    RefPtr<QueryPoolImpl> poolImpl = new QueryPoolImpl();
+    SLANG_RETURN_ON_FAIL(poolImpl->init(this, desc));
+    returnComPtr(outPool, poolImpl);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::createFence(const IFence::Desc& desc, IFence** outFence)
