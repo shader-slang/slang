@@ -667,7 +667,7 @@ void outputUIntSetAsBufferValues(const String& nameOfBuffer, StringBuilder& resu
 
     for (Index i = 0; i < set.getBuffer().getCount(); i++)
     {
-        resultBuilder << "    generatedSet.addRawElement(UIntSet::Element(" << set.getBuffer()[i] << "), " << i << ");\n";
+        resultBuilder << "    generatedSet.addRawElement(UIntSet::Element(" << set.getBuffer()[i] << "UL), " << i << ");\n";
     }
     resultBuilder << "    return generatedSet;\n";
     resultBuilder << "}\n";

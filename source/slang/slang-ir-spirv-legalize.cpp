@@ -1844,8 +1844,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (oldValueType != newValueType || !ptrType->hasAddressSpace())
             {
                 IRBuilder builder(m_module);
-                return builder.getPtrType(ptrType->getOp(), newValueType,
-                    ptrType->hasAddressSpace() ? ptrType->getAddressSpace() : SpvStorageClassPhysicalStorageBuffer);
+                IRIntegerValue addressSpace = (ptrType->hasAddressSpace() ? ptrType->getAddressSpace() : IRIntegerValue(SpvStorageClassPhysicalStorageBuffer));
+                return builder.getPtrType(ptrType->getOp(), newValueType, addressSpace);
             }
             return ptrType;
         }
