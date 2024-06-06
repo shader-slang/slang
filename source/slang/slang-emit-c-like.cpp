@@ -2774,10 +2774,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     {
         break; //should already have been parsed and used.
     }
-    case kIROp_StaticAssert:
-    {
-        break; //should already have been parsed and used.
-    }
     default:
         diagnoseUnhandledInst(inst);
         break;
