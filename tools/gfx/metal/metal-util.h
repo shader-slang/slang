@@ -10,6 +10,18 @@ namespace gfx {
 // Utility functions for Metal
 struct MetalUtil 
 {
+    static NS::SharedPtr<NS::String> createString(const char* str, NS::StringEncoding encoding = NS::UTF8StringEncoding)
+    {
+        NS::SharedPtr<NS::String> nsString = NS::TransferPtr(NS::String::alloc()->init(str, encoding));
+        return nsString;
+    }
+
+    static NS::SharedPtr<NS::String> createStringView(void* bytes, size_t len, NS::StringEncoding encoding = NS::UTF8StringEncoding)
+    {
+        NS::SharedPtr<NS::String> nsString = NS::TransferPtr(NS::String::alloc()->init(bytes, len, encoding, false));
+        return nsString;
+    }
+
     static MTL::PixelFormat translatePixelFormat(Format format);
     static MTL::VertexFormat translateVertexFormat(Format format);
 
