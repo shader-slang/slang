@@ -18,6 +18,15 @@ Result TextureResourceViewImpl::getNativeHandle(InteropHandle* outHandle)
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
+BufferResourceViewImpl::~BufferResourceViewImpl()
+{
+}
+
+Result BufferResourceViewImpl::getNativeHandle(InteropHandle* outHandle)
+{
+    return SLANG_E_NOT_IMPLEMENTED;
+}
+
 TexelBufferResourceViewImpl::TexelBufferResourceViewImpl(DeviceImpl* device)
     : ResourceViewImpl(ViewType::TexelBuffer, device)
 {}
