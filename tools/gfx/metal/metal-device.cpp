@@ -362,6 +362,11 @@ Result DeviceImpl::createTextureResource(
     textureDesc->setAllowGPUOptimizedContents(desc.memoryType == MemoryType::DeviceLocal);
 
     textureImpl->m_texture = NS::TransferPtr(m_device->newTexture(textureDesc.get()));
+    if (!textureImpl->m_texture)
+    {
+        return SLANG_FAIL;
+    }
+
     returnComPtr(outResource, textureImpl);
     return SLANG_OK;
 }
@@ -392,6 +397,10 @@ Result DeviceImpl::createBufferResource(
 
     RefPtr<BufferResourceImpl> bufferImpl(new BufferResourceImpl(desc, this));
     bufferImpl->m_buffer = NS::TransferPtr(m_device->newBuffer(bufferSize, resourceOptions));
+    if (!bufferImpl->m_buffer)
+    {
+        return SLANG_FAIL;
+    }
 
     if (initData)
     {
@@ -399,6 +408,10 @@ Result DeviceImpl::createBufferResource(
             initData, bufferSize, MTL::ResourceStorageModeShared | MTL::CPUCacheModeWriteCombined));
         MTL::CommandBuffer* commandBuffer = m_commandQueue->commandBuffer();
         MTL::BlitCommandEncoder* encoder = commandBuffer->blitCommandEncoder();
+        if (!stagingBuffer || !commandBuffer || !encoder)
+        {
+            return SLANG_FAIL;
+        }
         encoder->copyFromBuffer(stagingBuffer.get(), 0, bufferImpl->m_buffer.get(), 0, bufferSize);
         encoder->endEncoding();
         commandBuffer->commit();
@@ -540,6 +553,10 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
 
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
     layout->m_vertexDescriptor = NS::TransferPtr(MTL::VertexDescriptor::alloc()->init());
+    if (!layout->m_vertexDescriptor)
+    {
+        return SLANG_FAIL;
+    }
 
     for (Int i = 0; i < desc.inputElementCount; ++i)
     {
@@ -564,6 +581,7 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
         desc->setStride(vertexStream.stride);
     }
 
+    returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
 
