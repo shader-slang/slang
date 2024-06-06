@@ -16,8 +16,12 @@ class SamplerStateImpl : public SamplerStateBase
 {
 public:
     RefPtr<DeviceImpl> m_device;
-    SamplerStateImpl(DeviceImpl* device);
+    NS::SharedPtr<MTL::SamplerState> m_samplerState;
+
     ~SamplerStateImpl();
+
+    Result init(DeviceImpl* device, const ISamplerState::Desc& desc);
+    
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };
 

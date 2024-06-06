@@ -1828,6 +1828,7 @@ namespace Slang
                     case LayoutResourceKind::ShaderResource:
                     case LayoutResourceKind::DescriptorTableSlot:
                     case LayoutResourceKind::Uniform:
+                    case LayoutResourceKind::ConstantBuffer: // for metal
                         resInfo = info;
                         break;
                     }

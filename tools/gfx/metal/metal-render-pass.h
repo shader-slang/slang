@@ -21,11 +21,12 @@ public:
     IRenderPassLayout* getInterface(const Guid& guid);
 
 public:
-    MTL::RenderPassDescriptor* m_renderPassDesc = nullptr;
-    RefPtr<DeviceImpl> m_renderer;
+    RefPtr<DeviceImpl> m_device;
+    NS::SharedPtr<MTL::RenderPassDescriptor> m_renderPassDesc;
+
     ~RenderPassLayoutImpl();
 
-    Result init(DeviceImpl* renderer, const IRenderPassLayout::Desc& desc);
+    Result init(DeviceImpl* device, const IRenderPassLayout::Desc& desc);
 };
 
 } // namespace metal

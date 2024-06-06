@@ -17,22 +17,19 @@ class BufferResourceImpl : public BufferResource
 public:
     typedef BufferResource Parent;
 
-    BufferResourceImpl(const IBufferResource::Desc& desc, DeviceImpl* renderer);
+    RefPtr<DeviceImpl> m_device;
+    NS::SharedPtr<MTL::Buffer> m_buffer;
 
+    BufferResourceImpl(const IBufferResource::Desc& desc, DeviceImpl* device);
     ~BufferResourceImpl();
-
-    DeviceImpl* m_renderer;
-    MTL::Buffer* m_buffer = nullptr;
 
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        getNativeResourceHandle(InteropHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        map(MemoryRange* rangeToRead, void** outPointer) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL map(MemoryRange* rangeToRead, void** outPointer) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override;
 

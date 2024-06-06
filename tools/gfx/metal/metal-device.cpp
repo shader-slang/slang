@@ -10,14 +10,14 @@
 #include "metal-shader-program.h"
 #include "metal-buffer.h"
 //#include "metal-command-queue.h"
-//#include "metal-fence.h"
-//#include "metal-query.h"
+#include "metal-fence.h"
+#include "metal-query.h"
 //#include "metal-resource-views.h"
-//#include "metal-sampler.h"
+#include "metal-sampler.h"
 #include "metal-shader-object.h"
 #include "metal-shader-object-layout.h"
 //#include "metal-shader-table.h"
-//#include "metal-transient-heap.h"
+#include "metal-transient-heap.h"
 //#include "metal-pipeline-dump-layer.h"
 //#include "metal-helper-functions.h"
 
@@ -43,13 +43,15 @@ DeviceImpl::~DeviceImpl()
 
 Result DeviceImpl::getNativeDeviceHandles(InteropHandles* outHandles)
 {
-    outHandles->handles[0].handleValue = reinterpret_cast<intptr_t>(m_device);
     outHandles->handles[0].api = InteropHandleAPI::Metal;
+    outHandles->handles[0].handleValue = reinterpret_cast<intptr_t>(m_device.get());
     return SLANG_OK;
 }
 
 SlangResult DeviceImpl::initialize(const Desc& desc)
 {
+    AUTORELEASEPOOL
+
     // Initialize device info.
     {
         m_info.apiName = "Metal";
@@ -66,15 +68,15 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
     SlangResult initDeviceResult = SLANG_OK;
 
-    m_device = MTL::CreateSystemDefaultDevice();
-    m_commandQueue = m_device->newCommandQueue();
+    m_device = NS::TransferPtr(MTL::CreateSystemDefaultDevice());
+    m_commandQueue = NS::TransferPtr(m_device->newCommandQueue(64));
 
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
         desc.extendedDescCount,
         desc.extendedDescs,
-        SLANG_METAL,
-        "sm_5_1",
+        SLANG_METAL_LIB,
+        "",
         makeArray(slang::PreprocessorMacroDesc{ "__METAL__", "1" }).getView()));
 
     // TODO: expose via some other means
@@ -89,11 +91,10 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
             exit(1);
         }
         d->setDestination(MTL::CaptureDestinationGPUTraceDocument);
-        d->setCaptureObject(m_device);
-        std::string cpath("frame.gputrace");
-        NS::String* path = NS::String::alloc()->init(cpath.c_str(), NS::UTF8StringEncoding);
-        NS::URL* url = NS::URL::alloc()->initFileURLWithPath(path);
-        d->setOutputURL(url);
+        d->setCaptureObject(m_device.get());
+        NS::SharedPtr<NS::String> path = MetalUtil::createString("frame.gputrace");
+        NS::SharedPtr<NS::URL> url = NS::TransferPtr(NS::URL::alloc()->initFileURLWithPath(path.get()));
+        d->setOutputURL(url.get());
         NS::Error* errorCode = NS::Error::alloc();
         if (!captureManager->startCapture(d, &errorCode))
         {
@@ -109,23 +110,30 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
 //void DeviceImpl::waitForGpu() { m_deviceQueue.flushAndWait(); }
 
 
-SLANG_NO_THROW const DeviceInfo& SLANG_MCALL DeviceImpl::getDeviceInfo() const { return m_info; }
-
-Result DeviceImpl::createTransientResourceHeap(
-    const ITransientResourceHeap::Desc& desc, ITransientResourceHeap** outHeap)
+const DeviceInfo& DeviceImpl::getDeviceInfo() const
 {
+    return m_info;
+}
+
+Result DeviceImpl::createTransientResourceHeap(const ITransientResourceHeap::Desc& desc, ITransientResourceHeap** outHeap)
+{
+    AUTORELEASEPOOL
+
     RefPtr<TransientResourceHeapImpl> result = new TransientResourceHeapImpl();
-    SLANG_RETURN_ON_FAIL(result->init(this, desc));
+    SLANG_RETURN_ON_FAIL(result->init(desc, this));
     returnComPtr(outHeap, result);
     return SLANG_OK;
 }
 
 Result DeviceImpl::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue)
 {
+    AUTORELEASEPOOL
+
     if (m_queueAllocCount != 0)
         return SLANG_FAIL;
+
     RefPtr<CommandQueueImpl> result = new CommandQueueImpl;
-    result->init(this);
+    result->init(this, m_commandQueue);
     returnComPtr(outQueue, result);
     m_queueAllocCount++;
     return SLANG_OK;
@@ -134,24 +142,28 @@ Result DeviceImpl::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQ
 Result DeviceImpl::createSwapchain(
     const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain)
 {
+    AUTORELEASEPOOL
+
     RefPtr<SwapchainImpl> sc = new SwapchainImpl();
     SLANG_RETURN_ON_FAIL(sc->init(this, desc, window));
     returnComPtr(outSwapchain, sc);
     return SLANG_OK;
 }
 
-Result DeviceImpl::createFramebufferLayout(
-    const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout)
+Result DeviceImpl::createFramebufferLayout(const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout)
 {
+    AUTORELEASEPOOL
+
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl;
     SLANG_RETURN_ON_FAIL(layout->init(this, desc));
     returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
 
-Result DeviceImpl::createRenderPassLayout(
-    const IRenderPassLayout::Desc& desc, IRenderPassLayout** outRenderPassLayout)
+Result DeviceImpl::createRenderPassLayout(const IRenderPassLayout::Desc& desc, IRenderPassLayout** outRenderPassLayout)
 {
+    AUTORELEASEPOOL
+
     RefPtr<RenderPassLayoutImpl> result = new RenderPassLayoutImpl;
     SLANG_RETURN_ON_FAIL(result->init(this, desc));
     returnComPtr(outRenderPassLayout, result);
@@ -160,6 +172,8 @@ Result DeviceImpl::createRenderPassLayout(
 
 Result DeviceImpl::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer)
 {
+    AUTORELEASEPOOL
+
     RefPtr<FramebufferImpl> fb = new FramebufferImpl;
     SLANG_RETURN_ON_FAIL(fb->init(this, desc));
     returnComPtr(outFramebuffer, fb);
@@ -173,36 +187,98 @@ SlangResult DeviceImpl::readTextureResource(
     Size* outRowPitch,
     Size* outPixelSize)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 SlangResult DeviceImpl::readBufferResource(
-    IBufferResource* inBuffer, Offset offset, Size size, ISlangBlob** outBlob)
+    IBufferResource* buffer, Offset offset, Size size, ISlangBlob** outBlob)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    // create staging buffer
+    NS::SharedPtr<MTL::Buffer> stagingBuffer = NS::TransferPtr(m_device->newBuffer(size, MTL::StorageModeShared));
+    if (!stagingBuffer)
+    {
+        return SLANG_FAIL;
+    }
+
+    MTL::CommandBuffer* commandBuffer = m_commandQueue->commandBuffer();
+    MTL::BlitCommandEncoder* blitEncoder = commandBuffer->blitCommandEncoder();
+    blitEncoder->copyFromBuffer(static_cast<BufferResourceImpl*>(buffer)->m_buffer.get(), offset, stagingBuffer.get(), 0, size);
+    blitEncoder->endEncoding();
+    commandBuffer->commit();
+    commandBuffer->waitUntilCompleted();
+
+    List<uint8_t> blobData;
+    blobData.setCount(size);
+    ::memcpy(blobData.getBuffer(), stagingBuffer->contents(), size);
+    auto blob = ListBlob::moveCreate(blobData);
+
+    returnComPtr(outBlob, blob);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::getAccelerationStructurePrebuildInfo(
     const IAccelerationStructure::BuildInputs& buildInputs,
     IAccelerationStructure::PrebuildInfo* outPrebuildInfo)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 Result DeviceImpl::createAccelerationStructure(
     const IAccelerationStructure::CreateDesc& desc, IAccelerationStructure** outAS)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 Result DeviceImpl::getTextureAllocationInfo(
     const ITextureResource::Desc& descIn, Size* outSize, Size* outAlignment)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    auto alignTo = [&](Size size, Size alignment) -> Size {
+        return ((size + alignment - 1) / alignment) * alignment;
+    };
+
+    TextureResource::Desc desc = fixupTextureDesc(descIn);
+    FormatInfo formatInfo;
+    gfxGetFormatInfo(desc.format, &formatInfo);
+    MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
+    Size alignment = m_device->minimumLinearTextureAlignmentForPixelFormat(pixelFormat);
+    Size size = 0;
+    ITextureResource::Extents extents = desc.size;
+    extents.width = extents.width ? extents.width : 1;
+    extents.height = extents.height ? extents.height : 1;
+    extents.depth = extents.depth ? extents.depth : 1;
+
+    for (Int i = 0; i < desc.numMipLevels; ++i)
+    {
+        Size rowSize = ((extents.width + formatInfo.blockWidth - 1) / formatInfo.blockWidth) * formatInfo.blockSizeInBytes;
+        rowSize = alignTo(rowSize, alignment);
+        Size sliceSize = rowSize * alignTo(extents.height, formatInfo.blockHeight);
+        size += sliceSize * extents.depth;
+        extents.width = Math::Max(1, extents.width / 2);
+        extents.height = Math::Max(1, extents.height / 2);
+        extents.depth = Math::Max(1, extents.depth / 2);
+    }
+    size *= desc.arraySize ? desc.arraySize : 1;
+
+    *outSize = size;
+    *outAlignment = alignment;
+
+    return SLANG_OK;
 }
 
 Result DeviceImpl::getTextureRowAlignment(Size* outAlignment)
 {
+    AUTORELEASEPOOL
+
     *outAlignment = 1;
     return SLANG_E_NOT_IMPLEMENTED;
 }
@@ -212,107 +288,176 @@ Result DeviceImpl::createTextureResource(
     const ITextureResource::SubresourceData* initData,
     ITextureResource** outResource)
 {
+    AUTORELEASEPOOL
+
     TextureResource::Desc desc = fixupTextureDesc(descIn);
 
-    const MTL::PixelFormat format = MetalUtil::getMetalPixelFormat(desc.format);
-    if (format == MTL::PixelFormat::PixelFormatInvalid)
+    const MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
+    if (pixelFormat == MTL::PixelFormat::PixelFormatInvalid)
     {
         assert(!"Unsupported texture format");
         return SLANG_FAIL;
     }
 
-    RefPtr<TextureResourceImpl> textureResource(new TextureResourceImpl(desc, this));
-    //textureResource->m_metalFormat = format;
-    MTL::TextureDescriptor* metalDesc = MTL::TextureDescriptor::alloc()->init();
-    metalDesc->setStorageMode(MTL::StorageMode::StorageModePrivate);
-    // Create the texture
+    RefPtr<TextureResourceImpl> textureImpl(new TextureResourceImpl(desc, this));
+
+    NS::SharedPtr<MTL::TextureDescriptor> textureDesc = NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
+    switch (desc.memoryType)
+    {
+    case MemoryType::DeviceLocal:
+        textureDesc->setStorageMode(MTL::StorageModePrivate);
+        break;
+    case MemoryType::Upload:
+        textureDesc->setStorageMode(MTL::StorageModeShared);
+        textureDesc->setCpuCacheMode(MTL::CPUCacheModeWriteCombined);
+        break;
+    case MemoryType::ReadBack:
+        textureDesc->setStorageMode(MTL::StorageModeShared);
+        break;
+    }
+
+    NS::UInteger arrayLength = calcEffectiveArraySize(desc);
+
     switch (desc.type)
     {
     case IResource::Type::Texture1D:
-    {
-        metalDesc->setTextureType(MTL::TextureType::TextureType1D);
-        metalDesc->setWidth(descIn.size.width);
+        textureDesc->setTextureType(arrayLength > 1 ? MTL::TextureType1DArray : MTL::TextureType1D);
+        textureDesc->setWidth(desc.size.width);
         break;
-    }
     case IResource::Type::Texture2D:
-    {
-        metalDesc->setTextureType(MTL::TextureType::TextureType2D);
-        metalDesc->setWidth(descIn.size.width);
-        metalDesc->setHeight(descIn.size.height);
+        if (desc.sampleDesc.numSamples > 1)
+        {
+            textureDesc->setTextureType(arrayLength > 1 ? MTL::TextureType2DMultisampleArray : MTL::TextureType2DMultisample);
+            textureDesc->setSampleCount(desc.sampleDesc.numSamples);
+        }
+        else
+        {
+            textureDesc->setTextureType(arrayLength > 1 ? MTL::TextureType2DArray : MTL::TextureType2D);
+        }
+        textureDesc->setWidth(descIn.size.width);
+        textureDesc->setHeight(descIn.size.height);
         break;
-    }
     case IResource::Type::TextureCube:
-    {
-        metalDesc->setTextureType(MTL::TextureType::TextureTypeCube);
-        metalDesc->setWidth(descIn.size.width);
-        metalDesc->setHeight(descIn.size.height);
+        textureDesc->setTextureType(arrayLength > 6 ? MTL::TextureTypeCubeArray : MTL::TextureTypeCube);
+        textureDesc->setWidth(descIn.size.width);
+        textureDesc->setHeight(descIn.size.height);
         break;
-    }
     case IResource::Type::Texture3D:
-    {
-        metalDesc->setTextureType(MTL::TextureType::TextureType3D);
-        metalDesc->setWidth(descIn.size.width);
-        metalDesc->setHeight(descIn.size.height);
-        metalDesc->setDepth(descIn.size.depth);
+        textureDesc->setTextureType(MTL::TextureType::TextureType3D);
+        textureDesc->setWidth(descIn.size.width);
+        textureDesc->setHeight(descIn.size.height);
+        textureDesc->setDepth(descIn.size.depth);
         break;
-    }
     default:
-    {
         assert("!Unsupported texture type");
         return SLANG_FAIL;
     }
-    }
-    metalDesc->setMipmapLevelCount(desc.numMipLevels);
-    const int arraySize(calcEffectiveArraySize(desc));
-    metalDesc->setArrayLength(arraySize);
-    metalDesc->setPixelFormat(format);
-    //metalDesc.setResourceOptions();
-    metalDesc->setUsage(MTL::TextureUsageUnknown);
-    metalDesc->setSampleCount(desc.sampleDesc.numSamples);
-    textureResource->m_texture = m_device->newTexture(metalDesc);
 
-    returnComPtr(outResource, textureResource);
+    MTL::TextureUsage textureUsage = MTL::TextureUsageUnknown;
+    if (desc.allowedStates.contains(ResourceState::RenderTarget))
+    {
+        textureUsage |= MTL::TextureUsageRenderTarget;
+    }
+    if (desc.allowedStates.contains(ResourceState::ShaderResource))
+    {
+        textureUsage |= MTL::TextureUsageShaderRead;
+    }
+    if (desc.allowedStates.contains(ResourceState::UnorderedAccess))
+    {
+        textureUsage |= MTL::TextureUsageShaderWrite;
+        textureUsage |= MTL::TextureUsageShaderAtomic;
+    }
+
+    textureDesc->setMipmapLevelCount(desc.numMipLevels);
+    textureDesc->setArrayLength(arrayLength);
+    textureDesc->setPixelFormat(pixelFormat);
+    textureDesc->setUsage(textureUsage);
+    textureDesc->setSampleCount(desc.sampleDesc.numSamples);
+    textureDesc->setAllowGPUOptimizedContents(desc.memoryType == MemoryType::DeviceLocal);
+
+    textureImpl->m_texture = NS::TransferPtr(m_device->newTexture(textureDesc.get()));
+    if (!textureImpl->m_texture)
+    {
+        return SLANG_FAIL;
+    }
+
+    returnComPtr(outResource, textureImpl);
     return SLANG_OK;
 }
 
 Result DeviceImpl::createBufferResource(
     const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
+    AUTORELEASEPOOL
+
     BufferResource::Desc desc = fixupBufferDesc(descIn);
 
     const Size bufferSize = desc.sizeInBytes;
 
-    MTL::ResourceOptions opts = (desc.memoryType == MemoryType::DeviceLocal ? MTL::ResourceStorageModePrivate : 0);
+    MTL::ResourceOptions resourceOptions = MTL::ResourceOptions(0);
+    switch (desc.memoryType)
+    {
+    case MemoryType::DeviceLocal:
+        resourceOptions = MTL::ResourceStorageModePrivate;
+        break;
+    case MemoryType::Upload:
+        resourceOptions = MTL::ResourceStorageModeShared | MTL::CPUCacheModeWriteCombined;
+        break;
+    case MemoryType::ReadBack:
+        resourceOptions = MTL::ResourceStorageModeShared;
+        break;
+    }
+    resourceOptions |= (desc.memoryType == MemoryType::DeviceLocal) ? MTL::ResourceStorageModePrivate : MTL::ResourceStorageModeShared;
 
-    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(desc, this));
+    RefPtr<BufferResourceImpl> bufferImpl(new BufferResourceImpl(desc, this));
+    bufferImpl->m_buffer = NS::TransferPtr(m_device->newBuffer(bufferSize, resourceOptions));
+    if (!bufferImpl->m_buffer)
+    {
+        return SLANG_FAIL;
+    }
 
     if (initData)
     {
-        buffer->m_buffer = m_device->newBuffer(initData, bufferSize, opts);
-    }
-    else
-    {
-        buffer->m_buffer = m_device->newBuffer(bufferSize, opts);
+        NS::SharedPtr<MTL::Buffer> stagingBuffer = NS::TransferPtr(m_device->newBuffer(
+            initData, bufferSize, MTL::ResourceStorageModeShared | MTL::CPUCacheModeWriteCombined));
+        MTL::CommandBuffer* commandBuffer = m_commandQueue->commandBuffer();
+        MTL::BlitCommandEncoder* encoder = commandBuffer->blitCommandEncoder();
+        if (!stagingBuffer || !commandBuffer || !encoder)
+        {
+            return SLANG_FAIL;
+        }
+        encoder->copyFromBuffer(stagingBuffer.get(), 0, bufferImpl->m_buffer.get(), 0, bufferSize);
+        encoder->endEncoding();
+        commandBuffer->commit();
     }
 
-    returnComPtr(outResource, buffer);
+    returnComPtr(outResource, bufferImpl);
     return SLANG_OK;
 }
 
 Result DeviceImpl::createBufferFromNativeHandle(
     InteropHandle handle, const IBufferResource::Desc& srcDesc, IBufferResource** outResource)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 Result DeviceImpl::createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    RefPtr<SamplerStateImpl> samplerImpl = new SamplerStateImpl();
+    SLANG_RETURN_ON_FAIL(samplerImpl->init(this, desc));
+    returnComPtr(outSampler, samplerImpl);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::createTextureView(
     ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView)
 {
+    AUTORELEASEPOOL
+
     auto resourceImpl = static_cast<TextureResourceImpl*>(texture);
     RefPtr<TextureResourceViewImpl> view = new TextureResourceViewImpl(this);
     view->m_desc = desc;
@@ -325,7 +470,7 @@ Result DeviceImpl::createTextureView(
     }
 
     bool isArray = resourceImpl->getDesc()->arraySize > 1;
-    MTL::PixelFormat pixelFormat = MetalUtil::getMetalPixelFormat(desc.format);
+    MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
     NS::Range levelRange(desc.subresourceRange.baseArrayLayer, std::max(desc.subresourceRange.layerCount, 1));
     NS::Range sliceRange(desc.subresourceRange.mipLevel, std::max(desc.subresourceRange.mipLevelCount, 1));
     MTL::TextureType textureType;
@@ -356,8 +501,7 @@ Result DeviceImpl::createTextureView(
 
     view->m_type = ResourceViewImpl::ViewType::Texture;
     view->m_texture = resourceImpl; //new TextureResourceImpl(newDesc, this);
-    view->m_texture->m_isCurrentDrawable = resourceImpl->m_isCurrentDrawable;
-    view->m_texture->m_texture = resourceImpl->m_texture->newTextureView(pixelFormat, textureType, levelRange, sliceRange);
+    view->m_texture->m_texture = NS::TransferPtr(resourceImpl->m_texture->newTextureView(pixelFormat, textureType, levelRange, sliceRange));
     returnComPtr(outView, view);
 
     return SLANG_OK;
@@ -365,7 +509,29 @@ Result DeviceImpl::createTextureView(
 
 Result DeviceImpl::getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    // TODO - add table based on https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
+    ResourceStateSet allowedStates;
+    allowedStates.add(ResourceState::VertexBuffer);
+    allowedStates.add(ResourceState::IndexBuffer);
+    allowedStates.add(ResourceState::ConstantBuffer);
+    allowedStates.add(ResourceState::ShaderResource);
+    allowedStates.add(ResourceState::UnorderedAccess);
+    allowedStates.add(ResourceState::RenderTarget);
+    allowedStates.add(ResourceState::DepthRead);
+    allowedStates.add(ResourceState::DepthWrite);
+    allowedStates.add(ResourceState::Present);
+    allowedStates.add(ResourceState::IndirectArgument);
+    allowedStates.add(ResourceState::CopySource);
+    allowedStates.add(ResourceState::ResolveSource);
+    allowedStates.add(ResourceState::CopyDestination);
+    allowedStates.add(ResourceState::ResolveDestination);
+    allowedStates.add(ResourceState::AccelerationStructure);
+    allowedStates.add(ResourceState::AccelerationStructureBuildInput);
+
+    *outStates = allowedStates;
+    return SLANG_OK;
 }
 
 Result DeviceImpl::createBufferView(
@@ -374,76 +540,88 @@ Result DeviceImpl::createBufferView(
     IResourceView::Desc const& desc,
     IResourceView** outView)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
-}
+    AUTORELEASEPOOL
 
-static MTL::VertexStepFunction translateVertexStepFunction(const InputSlotClass& slotClass)
-{
-    switch (slotClass)
+    // Counter buffers are not supported on metal.
+    if (counterBuffer)
     {
-    case InputSlotClass::PerInstance:       return MTL::VertexStepFunctionPerInstance;
-    case InputSlotClass::PerVertex:
-    default:                                return MTL::VertexStepFunctionPerVertex;
+        return SLANG_FAIL;
     }
+
+    if (desc.type != IResourceView::Type::UnorderedAccess && desc.type != IResourceView::Type::ShaderResource)
+    {
+        return SLANG_FAIL;
+    }
+
+    auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
+
+    RefPtr<BufferResourceViewImpl> viewImpl = new BufferResourceViewImpl(this);
+    viewImpl->m_desc = desc;
+    viewImpl->m_buffer = bufferImpl;
+    viewImpl->m_offset = desc.bufferRange.offset;;
+    viewImpl->m_size = desc.bufferRange.size == 0 ? bufferImpl->getDesc()->sizeInBytes : desc.bufferRange.size;;
+    returnComPtr(outView, viewImpl);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout)
 {
+    AUTORELEASEPOOL
+
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
-    List<MTL::VertexDescriptor*>& dstAttributes = layout->m_vertexDescs;
-    List<MTL::VertexBufferLayoutDescriptor*>& dstBufferLayouts = layout->m_bufferLayoutDescs;
-
-    const InputElementDesc* srcElements = desc.inputElements;
-    Int numElements = desc.inputElementCount;
-
-    const VertexStreamDesc* srcVertexStreams = desc.vertexStreams;
-    Int vertexStreamCount = desc.vertexStreamCount;
-
-    dstAttributes.setCount(numElements);
-    dstBufferLayouts.setCount(vertexStreamCount);
-
-    for (Int i = 0; i < vertexStreamCount; ++i)
+    layout->m_vertexDescriptor = NS::TransferPtr(MTL::VertexDescriptor::alloc()->init());
+    if (!layout->m_vertexDescriptor)
     {
-        auto& vbld = dstBufferLayouts[i];
-        auto& srcStream = srcVertexStreams[i];
-        vbld->setStepFunction(translateVertexStepFunction(srcStream.slotClass));
-        vbld->setStepRate(srcStream.instanceDataStepRate);
-        vbld->setStride(srcStream.stride);
+        return SLANG_FAIL;
     }
 
-    for (Int i = 0; i < numElements; ++i)
+    for (Int i = 0; i < desc.inputElementCount; ++i)
     {
-        auto& srcAttrib = srcElements[i];
-        auto& dstAttrib = dstAttributes[i];
-        dstAttrib->attributes()->object(i)->setOffset(srcAttrib.offset);
-        dstAttrib->attributes()->object(i)->setBufferIndex(srcAttrib.bufferSlotIndex);
-        MTL::VertexFormat metalFormat = MetalUtil::getMetalVertexFormat(srcAttrib.format);
+        const auto& inputElement = desc.inputElements[i];
+        MTL::VertexAttributeDescriptor* desc = layout->m_vertexDescriptor->attributes()->object(i);
+        desc->setOffset(inputElement.offset);
+        desc->setBufferIndex(inputElement.bufferSlotIndex);
+        MTL::VertexFormat metalFormat = MetalUtil::translateVertexFormat(inputElement.format);
         if (metalFormat == MTL::VertexFormatInvalid)
         {
             return SLANG_FAIL;
         }
-        dstAttrib->attributes()->object(i)->setFormat(metalFormat);
+        desc->setFormat(metalFormat);
     }
 
+    for (Int i = 0; i < desc.vertexStreamCount; ++i)
+    {
+        const auto& vertexStream = desc.vertexStreams[i];
+        MTL::VertexBufferLayoutDescriptor* desc = layout->m_vertexDescriptor->layouts()->object(i);
+        desc->setStepFunction(MetalUtil::translateVertexStepFunction(vertexStream.slotClass));
+        desc->setStepRate(vertexStream.instanceDataStepRate);
+        desc->setStride(vertexStream.stride);
+    }
+
+    returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
 
 Result DeviceImpl::createProgram(
     const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnosticBlob)
 {
-    // TODO:
+    AUTORELEASEPOOL
+
     RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(this);
     shaderProgram->init(desc);
 
-    //m_deviceObjectsWithPotentialBackReferences.add(shaderProgram);
-
-    RootShaderObjectLayout::create(
+    RootShaderObjectLayoutImpl::create(
         this,
         shaderProgram->linkedProgram,
         shaderProgram->linkedProgram->getLayout(),
         shaderProgram->m_rootObjectLayout.writeRef());
-    returnComPtr(outProgram, shaderProgram);
 
+    if (!shaderProgram->isSpecializable())
+    {
+        SLANG_RETURN_ON_FAIL(shaderProgram->compileShaders(this));
+    }
+
+    returnComPtr(outProgram, shaderProgram);
     return SLANG_OK;
 }
 
@@ -452,62 +630,94 @@ Result DeviceImpl::createShaderObjectLayout(
     slang::TypeLayoutReflection* typeLayout,
     ShaderObjectLayoutBase** outLayout)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    RefPtr<ShaderObjectLayoutImpl> layout;
+    SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(
+        this, session, typeLayout, layout.writeRef()));
+    returnRefPtrMove(outLayout, layout);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    RefPtr<ShaderObjectImpl> shaderObject;
+    SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(this,
+        static_cast<ShaderObjectLayoutImpl*>(layout), shaderObject.writeRef()));
+    returnComPtr(outObject, shaderObject);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::createMutableShaderObject(
     ShaderObjectLayoutBase* layout, IShaderObject** outObject)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 Result DeviceImpl::createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 Result DeviceImpl::createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outShaderTable)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
-Result DeviceImpl::createGraphicsPipelineState(
-    const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
+Result DeviceImpl::createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, IPipelineState** outState)
 {
-    GraphicsPipelineStateDesc desc = inDesc;
+    AUTORELEASEPOOL
+
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
     pipelineStateImpl->init(desc);
-    pipelineStateImpl->establishStrongDeviceReference();
-    //m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
     returnComPtr(outState, pipelineStateImpl);
     return SLANG_OK;
 }
 
-Result DeviceImpl::createComputePipelineState(
-    const ComputePipelineStateDesc& inDesc, IPipelineState** outState)
+Result DeviceImpl::createComputePipelineState(const ComputePipelineStateDesc& desc, IPipelineState** outState)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
+    pipelineStateImpl->init(desc);
+    m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
+    returnComPtr(outState, pipelineStateImpl);
+    return SLANG_OK;
 }
 
-Result DeviceImpl::createRayTracingPipelineState(
-    const RayTracingPipelineStateDesc& desc, IPipelineState** outState)
+Result DeviceImpl::createRayTracingPipelineState(const RayTracingPipelineStateDesc& desc, IPipelineState** outState)
 {
+    AUTORELEASEPOOL
+
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 Result DeviceImpl::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** outPool)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    RefPtr<QueryPoolImpl> poolImpl = new QueryPoolImpl();
+    SLANG_RETURN_ON_FAIL(poolImpl->init(this, desc));
+    returnComPtr(outPool, poolImpl);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::createFence(const IFence::Desc& desc, IFence** outFence)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    AUTORELEASEPOOL
+
+    RefPtr<FenceImpl> fenceImpl = new FenceImpl();
+    SLANG_RETURN_ON_FAIL(fenceImpl->init(this, desc));
+    returnComPtr(outFence, fenceImpl);
+    return SLANG_OK;
 }
 
 Result DeviceImpl::waitForFences(
