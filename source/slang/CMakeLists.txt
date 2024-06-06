@@ -273,7 +273,7 @@ slang_add_target(
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # a warning is disabled for a memset boundary check.
-    # everything looked find and it is unclear why the checking fails
+    # everything looked fine and it is unclear why the checking fails
     target_compile_options(slang PRIVATE -Wno-error=stringop-overflow)
 endif()
 
