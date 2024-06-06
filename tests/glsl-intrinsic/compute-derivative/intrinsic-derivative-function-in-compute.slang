@@ -49,8 +49,8 @@ buffer MyBlockName
 
 uniform sampler1D uniform_sampler1D;
 
-__generic<T : __BuiltinFloatingPointType, let N : int>
-bool textureFuncs(Sampler1D<vector<T,N>> gsampler1D)
+__generic<T : __BuiltinFloatingPointType>
+bool textureFuncs(Sampler1D<vector<T,4>> gsampler1D)
 {
     typealias gvec4 = vector<T,4>;
 

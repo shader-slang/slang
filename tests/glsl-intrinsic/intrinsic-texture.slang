@@ -61,18 +61,18 @@ uniform usamplerBuffer uniform_usamplerBuffer;
 uniform usampler2DMS uniform_usampler2DMS;
 uniform usampler2DMSArray uniform_usampler2DMSArray;
 
-__generic<T : __BuiltinFloatingPointType, let N : int>
-bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
-    , Sampler2D<vector<T,N>> gsampler2D
-    , Sampler2DRect<vector<T,N>> gsampler2DRect
-    , Sampler3D<vector<T,N>> gsampler3D
-    , SamplerCube<vector<T,N>> gsamplerCube
-    , Sampler1DArray<vector<T,N>> gsampler1DArray
-    , Sampler2DArray<vector<T,N>> gsampler2DArray
-    , SamplerCubeArray<vector<T,N>> gsamplerCubeArray
-    , SamplerBuffer<vector<T,N>> gsamplerBuffer
-    , Sampler2DMS<vector<T,N>> gsampler2DMS
-    , Sampler2DMSArray<vector<T,N>> gsampler2DMSArray
+__generic<T : __BuiltinFloatingPointType>
+bool textureFuncs( Sampler1D<vector<T,4>> gsampler1D
+    , Sampler2D<vector<T,4>> gsampler2D
+    , Sampler2DRect<vector<T,4>> gsampler2DRect
+    , Sampler3D<vector<T,4>> gsampler3D
+    , SamplerCube<vector<T,4>> gsamplerCube
+    , Sampler1DArray<vector<T,4>> gsampler1DArray
+    , Sampler2DArray<vector<T,4>> gsampler2DArray
+    , SamplerCubeArray<vector<T,4>> gsamplerCubeArray
+    , SamplerBuffer<vector<T,4>> gsamplerBuffer
+    , Sampler2DMS<vector<T,4>> gsampler2DMS
+    , Sampler2DMSArray<vector<T,4>> gsampler2DMSArray
 )
 {
     // GLSL-LABEL: textureFuncs_0
@@ -1341,18 +1341,18 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         ;
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
-bool itextureFuncs(Sampler1D<vector<T, N>> gsampler1D
-    , Sampler2D<vector<T, N>> gsampler2D
-    , Sampler2DRect<vector<T, N>> gsampler2DRect
-    , Sampler3D<vector<T, N>> gsampler3D
-    , SamplerCube<vector<T, N>> gsamplerCube
-    , Sampler1DArray<vector<T, N>> gsampler1DArray
-    , Sampler2DArray<vector<T, N>> gsampler2DArray
-    , SamplerCubeArray<vector<T, N>> gsamplerCubeArray
-    , SamplerBuffer<vector<T, N>> gsamplerBuffer
-    , Sampler2DMS<vector<T, N>> gsampler2DMS
-    , Sampler2DMSArray<vector<T, N>> gsampler2DMSArray
+__generic<T : __BuiltinArithmeticType>
+bool itextureFuncs(Sampler1D<vector<T, 4>> gsampler1D
+    , Sampler2D<vector<T, 4>> gsampler2D
+    , Sampler2DRect<vector<T, 4>> gsampler2DRect
+    , Sampler3D<vector<T, 4>> gsampler3D
+    , SamplerCube<vector<T, 4>> gsamplerCube
+    , Sampler1DArray<vector<T, 4>> gsampler1DArray
+    , Sampler2DArray<vector<T, 4>> gsampler2DArray
+    , SamplerCubeArray<vector<T, 4>> gsamplerCubeArray
+    , SamplerBuffer<vector<T, 4>> gsamplerBuffer
+    , Sampler2DMS<vector<T, 4>> gsampler2DMS
+    , Sampler2DMSArray<vector<T, 4>> gsampler2DMSArray
 )
 {
     // GLSL-LABEL: itextureFuncs_0
