@@ -429,6 +429,7 @@ Result DeviceImpl::createBufferResource(
         encoder->copyFromBuffer(stagingBuffer.get(), 0, bufferImpl->m_buffer.get(), 0, bufferSize);
         encoder->endEncoding();
         commandBuffer->commit();
+        commandBuffer->waitUntilCompleted();
     }
 
     returnComPtr(outResource, bufferImpl);
