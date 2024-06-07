@@ -380,9 +380,13 @@ void checkStaticAssert(CodeGenContext* codeGenContext, IRInst* inst, DiagnosticS
                 }
                 else
                 {
-                    sink->diagnose(inst, Diagnostics::staticAssertionFailure, "");
+                    sink->diagnose(inst, Diagnostics::staticAssertionFailureWithoutMessage);
                 }
             }
+        }
+        else
+        {
+            sink->diagnose(condi, Diagnostics::staticAssertionConditionNotConstant);
         }
         break;
     }

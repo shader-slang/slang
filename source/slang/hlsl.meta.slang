@@ -1656,33 +1656,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    void __checkSupportedType()
-    {
-        __target_switch
-        {
-        case glsl:
-            static_assert(!(T is double)
-                && !(T is vector<double,1>)
-                && !(T is vector<double,2>)
-                && !(T is vector<double,3>)
-                && !(T is vector<double,4>),
-                "GLSL doesn't support texture sampling for double types.");
-            return;
-        case hlsl:
-            static_assert(T is IFloat, "HLSL doesn't support texture sampling for integer types.");
-            static_assert(!(T is double)
-                && !(T is vector<double,1>)
-                && !(T is vector<double,2>)
-                && !(T is vector<double,3>)
-                && !(T is vector<double,4>),
-                "HLSL doesn't support texture sampling for double types.");
-            return;
-        default: return;
-        }
-    }
-
-    [__readNone]
-    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
     {
@@ -1691,7 +1664,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         {
             case cpp:
             case hlsl:
-                static_assert(T is IFloat, "HLSL doesn't support texture sampling for integer types.");
                 __intrinsic_asm ".SampleLevel";
             case metal:
                 if (isArray == 1)

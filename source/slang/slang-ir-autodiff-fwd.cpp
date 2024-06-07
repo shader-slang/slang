@@ -1911,6 +1911,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_NonUniformResourceIndex:
     case kIROp_IsType:
+    case kIROp_StaticAssert:
     case kIROp_ImageSubscript:
     case kIROp_ImageLoad:
     case kIROp_ImageStore:
