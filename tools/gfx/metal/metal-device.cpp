@@ -558,8 +558,8 @@ Result DeviceImpl::createBufferView(
     RefPtr<BufferResourceViewImpl> viewImpl = new BufferResourceViewImpl(this);
     viewImpl->m_desc = desc;
     viewImpl->m_buffer = bufferImpl;
-    viewImpl->m_offset = desc.bufferRange.offset;;
-    viewImpl->m_size = desc.bufferRange.size == 0 ? bufferImpl->getDesc()->sizeInBytes : desc.bufferRange.size;;
+    viewImpl->m_offset = desc.bufferRange.offset;
+    viewImpl->m_size = desc.bufferRange.size == 0 ? bufferImpl->getDesc()->sizeInBytes : desc.bufferRange.size;
     returnComPtr(outView, viewImpl);
     return SLANG_OK;
 }
