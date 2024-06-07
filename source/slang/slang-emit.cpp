@@ -388,11 +388,6 @@ void checkStaticAssert(CodeGenContext* codeGenContext, IRInst* inst, DiagnosticS
         {
             sink->diagnose(condi, Diagnostics::staticAssertionConditionNotConstant);
         }
-
-        // Remove StaticAssert once processed.
-        // We need to keep StaticAssert in stdlib and we cannot remove it in deadcodeEliminate(),
-        // because DCE will remove it from stdlib before the linking happens.
-        inst->removeAndDeallocate();
         break;
     }
     }
