@@ -2837,6 +2837,13 @@ namespace Slang
 
     DeclVisibility getDeclVisibility(Decl* decl);
 
+    // If `type` is unsized, return the trailing unsized array field that makes it so.
+    VarDeclBase* getTrailingUnsizedArrayElement(Type* type, VarDeclBase* rootObject, ArrayExpressionType*& outArrayType);
+
+    // Test if `type` can be an opaque handle on certain targets, this includes
+    // texture, buffer, sampler, acceleration structure, etc.
+    bool isOpaqueHandleType(Type* type);
+
     void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl = false);
 
     void _ensureAllDeclsRec(

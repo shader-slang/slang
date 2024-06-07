@@ -1483,8 +1483,11 @@ struct SPIRVEmitContext
                     IRBuilder builder(inst);
                     if (isSpirv14OrLater() || !inst->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
                     {
-                        auto decoration = builder.addDecoration(inst, kIROp_SPIRVBlockDecoration);
-                        emitDecoration(getID(spvStructType), decoration);
+                        if (!inst->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+                        {
+                            auto decoration = builder.addDecoration(inst, kIROp_SPIRVBlockDecoration);
+                            emitDecoration(getID(spvStructType), decoration);
+                        }
                     }
                 }
                 emitLayoutDecorations(as<IRStructType>(inst), getID(spvStructType));
@@ -2308,7 +2311,6 @@ struct SPIRVEmitContext
         maybeEmitPointerDecoration(varInst, param);
         if (auto layout = getVarLayout(param))
             emitVarLayout(param, varInst, layout);
-        maybeEmitName(varInst, param);
         emitDecorations(param, getID(varInst));
         return varInst;
     }
@@ -2332,7 +2334,6 @@ struct SPIRVEmitContext
         maybeEmitPointerDecoration(varInst, globalVar);
         if(layout)
             emitVarLayout(globalVar, varInst, layout);
-        maybeEmitName(varInst, globalVar);
         emitDecorations(globalVar, getID(varInst));
         return varInst;
     }
