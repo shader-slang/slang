@@ -330,7 +330,7 @@ struct mat2
 //      }
 //
 // Instead, we will define an ordinary function for the one case that
-// we 've run into in a test effect so far:
+// we've run into in a test effect so far:
 //
 void mulAssign(inout vec2 left, mat2 right)
 {
