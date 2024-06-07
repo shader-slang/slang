@@ -1109,6 +1109,11 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
             nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
             passThru = SLANG_PASS_THROUGH_GLSLANG;
             break;
+        case RenderApiType::Metal:
+            target = SLANG_METAL_LIB;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_METAL;
+            passThru = SLANG_PASS_THROUGH_METAL;
+            break;
         case RenderApiType::CPU:
             target = SLANG_SHADER_HOST_CALLABLE;
             nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;

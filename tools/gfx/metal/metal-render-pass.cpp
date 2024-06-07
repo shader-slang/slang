@@ -48,15 +48,15 @@ static inline MTL::StoreAction translateStoreOp(IRenderPassLayout::TargetStoreOp
     }
 }
 
-Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout::Desc& desc)
+Result RenderPassLayoutImpl::init(DeviceImpl* device, const IRenderPassLayout::Desc& desc)
 {
-    m_renderer = renderer;
+    m_device = device;
 
     FramebufferLayoutImpl* framebufferLayout = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
     assert(framebufferLayout);
 
     // Initialize render pass descriptor, filling in attachment metadata, but leaving texture data unbound.
-    m_renderPassDesc = MTL::RenderPassDescriptor::alloc()->init();
+    m_renderPassDesc = NS::TransferPtr(MTL::RenderPassDescriptor::alloc()->init());
     m_renderPassDesc->setRenderTargetArrayLength(desc.renderTargetCount);
 
     MTL::RenderPassColorAttachmentDescriptorArray* colorAttachments = m_renderPassDesc->colorAttachments();

@@ -6247,6 +6247,25 @@ void const* EndToEndCompileRequest::getEntryPointCode(int entryPointIndex, size_
     return (void*)blob->getBufferPointer();
 }
 
+SlangResult EndToEndCompileRequest::getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool shouldClear)
+{
+    if (compileTimeProfile == nullptr)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    SlangProfiler* profiler = new SlangProfiler(PerformanceProfiler::getProfiler());
+
+    if (shouldClear)
+    {
+        PerformanceProfiler::getProfiler()->clear();
+    }
+
+    ComPtr<ISlangProfiler> result(profiler);
+    *compileTimeProfile = result.detach();
+    return SLANG_OK;
+}
+
 static SlangResult _getEntryPointResult(
     EndToEndCompileRequest* req,
     int                     entryPointIndex,

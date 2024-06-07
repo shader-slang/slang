@@ -292,6 +292,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::IgnoreCapabilities,"-ignore-capabilities", nullptr, "Do not warn or error if capabilities are violated"},
         { OptionKind::MinimumSlangOptimization, "-minimum-slang-optimization", nullptr, "Perform minimum code optimization in Slang to favor compilation time."},
         { OptionKind::DisableNonEssentialValidations, "-disable-non-essential-validations", nullptr, "Disable non-essential IR validations such as use of uninitialized variables."},
+        { OptionKind::DisableSourceMap, "-disable-source-map", nullptr, "Disable source mapping in the Obfuscation."},
         { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
         "Set the module name to use when compiling multiple .slang source files into a single module."},
         { OptionKind::Output, "-o", "-o <path>", 
@@ -1686,6 +1687,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::IgnoreCapabilities:
             case OptionKind::MinimumSlangOptimization:
             case OptionKind::DisableNonEssentialValidations:
+            case OptionKind::DisableSourceMap:
             case OptionKind::DefaultImageFormatUnknown:
             case OptionKind::Obfuscate:
             case OptionKind::OutputIncludes:
@@ -2525,24 +2527,24 @@ SlangResult OptionsParser::_parse(
         // target that handles that format.
         Dictionary<CodeGenTarget, int> mapFormatToTargetIndex;
 
-    // If there was no explicit `-target` specified, then we will look
-    // at the `-o` options to see what we can infer.
-    //
-    if (m_rawTargets.getCount() == 0)
-    {
-        // If there are no targets and no outputs
-        if (m_rawOutputs.getCount() == 0)
+        // If there was no explicit `-target` specified, then we will look
+        // at the `-o` options to see what we can infer.
+        //
+        if (m_rawTargets.getCount() == 0)
         {
-            m_requestImpl->m_emitIr = true;
-        }
-        else
-        {
-            for (auto& rawOutput : m_rawOutputs)
+            // If there are no targets and no outputs
+            if (m_rawOutputs.getCount() == 0)
             {
-                // Some outputs don't imply a target format, and we shouldn't use those for inference.
-                auto impliedFormat = rawOutput.impliedFormat;
-                if (impliedFormat == CodeGenTarget::Unknown)
-                    continue;
+                m_requestImpl->m_emitIr = true;
+            }
+            else
+            {
+                for (auto& rawOutput : m_rawOutputs)
+                {
+                    // Some outputs don't imply a target format, and we shouldn't use those for inference.
+                    auto impliedFormat = rawOutput.impliedFormat;
+                    if (impliedFormat == CodeGenTarget::Unknown)
+                        continue;
 
                     int targetIndex = 0;
                     if (!mapFormatToTargetIndex.tryGetValue(impliedFormat, targetIndex))

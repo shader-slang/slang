@@ -517,7 +517,7 @@ struct CapabilityDisjunction
             return;
         for (auto& conjunction : conjunctions)
         {
-            if (c.implies(conjunction))
+            if (conjunction.implies(c))
                 return;
         }
         for (Index i = 0; i < conjunctions.getCount();)
@@ -667,7 +667,7 @@ void outputUIntSetAsBufferValues(const String& nameOfBuffer, StringBuilder& resu
 
     for (Index i = 0; i < set.getBuffer().getCount(); i++)
     {
-        resultBuilder << "    generatedSet.addRawElement(UIntSet::Element(" << set.getBuffer()[i] << "), " << i << ");\n";
+        resultBuilder << "    generatedSet.addRawElement(UIntSet::Element(" << set.getBuffer()[i] << "UL), " << i << ");\n";
     }
     resultBuilder << "    return generatedSet;\n";
     resultBuilder << "}\n";

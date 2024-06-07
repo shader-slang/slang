@@ -552,7 +552,7 @@ namespace Slang
         /// Cached information about how to convert between two types.
     struct ImplicitCastMethod
     {
-        OverloadCandidate conversionFuncOverloadCandidate;
+        OverloadCandidate conversionFuncOverloadCandidate = OverloadCandidate();
         ConversionCost cost = kConversionCost_Impossible;
         bool isAmbiguous = false;
     };

@@ -2449,6 +2449,9 @@ namespace Slang
 
     void Module::_discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets)
     {
+        if (m_entryPoints.getCount() > 0)
+            return;
+
         for (auto globalDecl : m_moduleDecl->members)
         {
             auto maybeFuncDecl = globalDecl;

@@ -21,27 +21,34 @@ class CommandBufferImpl
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     ICommandBuffer* getInterface(const Guid& guid);
-    virtual void comFree() override;
 
 public:
-    MTL::CommandBuffer* m_commandBuffer = nullptr;
-    DeviceImpl* m_renderer;
-    //bool m_isPreCommandBufferEmpty = true;
+    RefPtr<DeviceImpl> m_device;
+    NS::SharedPtr<MTL::CommandBuffer> m_commandBuffer;
     RootShaderObjectImpl m_rootObject;
+    // RefPtr<MutableRootShaderObjectImpl> m_mutableRootShaderObject;
 
     ResourceCommandEncoder* m_resourceCommandEncoder = nullptr;
     ComputeCommandEncoder* m_computeCommandEncoder = nullptr;
     RenderCommandEncoder* m_renderCommandEncoder = nullptr;
     RayTracingCommandEncoder* m_rayTracingCommandEncoder = nullptr;
 
+    NS::SharedPtr<MTL::RenderCommandEncoder> m_metalRenderCommandEncoder;
+    NS::SharedPtr<MTL::ComputeCommandEncoder> m_metalComputeCommandEncoder;
+    NS::SharedPtr<MTL::BlitCommandEncoder> m_metalBlitCommandEncoder;
+
     // Command buffers are deallocated by its command pool,
     // so no need to free individually.
     ~CommandBufferImpl() = default;
 
-    using TransientResourceHeapImpl = gfx::SimpleTransientResourceHeap<DeviceImpl, CommandBufferImpl>;
-    Result init(DeviceImpl* renderer, TransientResourceHeapImpl* transientHeap);
+    Result init(DeviceImpl* device, TransientResourceHeapImpl* transientHeap);
 
     void beginCommandBuffer();
+
+    MTL::RenderCommandEncoder* getMetalRenderCommandEncoder();
+    MTL::ComputeCommandEncoder* getMetalComputeCommandEncoder();
+    MTL::BlitCommandEncoder* getMetalBlitCommandEncoder();
+    void endMetalCommandEncoder();
 
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL encodeRenderCommands(
