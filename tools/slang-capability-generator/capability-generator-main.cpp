@@ -517,7 +517,7 @@ struct CapabilityDisjunction
             return;
         for (auto& conjunction : conjunctions)
         {
-            if (c.implies(conjunction))
+            if (conjunction.implies(c))
                 return;
         }
         for (Index i = 0; i < conjunctions.getCount();)
