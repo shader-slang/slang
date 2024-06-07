@@ -388,6 +388,11 @@ void checkStaticAssert(CodeGenContext* codeGenContext, IRInst* inst, DiagnosticS
         {
             sink->diagnose(condi, Diagnostics::staticAssertionConditionNotConstant);
         }
+
+        // Remove StaticAssert once processed.
+        // We need to keep StaticAssert in stdlib and we cannot remove it in deadcodeEliminate(),
+        // because DCE will remove it from stdlib before the linking happens.
+        inst->removeAndDeallocate();
         break;
     }
     }
@@ -917,6 +922,8 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // Process `static_assert` after the specialization is done.
+    // Some information for `static_assert` is available only after the specialization.
     checkStaticAssert(codeGenContext, irModule->getModuleInst(), sink);
 
     // For HLSL (and fxc/dxc) only, we need to "wrap" any

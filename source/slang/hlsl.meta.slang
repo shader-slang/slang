@@ -1659,7 +1659,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
     {
-        __checkSupportedType();
         __target_switch
         {
             case cpp:
