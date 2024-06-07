@@ -657,22 +657,36 @@ void calcCanonicalRepresentations(DiagnosticSink* sink, List<RefPtr<CapabilityDe
         calcCanonicalRepresentation(sink, def, mapEnumValueToDef);
 }
 
-void outputUIntSetAsBufferValues(const String& nameOfBuffer, StringBuilder& resultBuilder, UIntSet& set)
+// Create a local UIntSet with data
+void outputLocalUIntSetBuffer(const String& nameOfBuffer, StringBuilder& resultBuilder, UIntSet& set)
 {
-    // store UIntSet::Element as uint8_t to stay sizeof(UIntSet::Element) independent.
-    // underlying type may change, bits stay the same.
-    resultBuilder << "inline static CapabilityAtomSet generate_" << nameOfBuffer << "()\n";
-    resultBuilder << "{\n";
-    resultBuilder << "    CapabilityAtomSet generatedSet;\n";
-
+    resultBuilder << "    CapabilityAtomSet " << nameOfBuffer << ";\n";
+    resultBuilder << "    " << nameOfBuffer << ".resizeBackingBufferDirectly(" << set.getBuffer().getCount() << ");\n";
     for (Index i = 0; i < set.getBuffer().getCount(); i++)
     {
-        resultBuilder << "    generatedSet.addRawElement(UIntSet::Element(" << set.getBuffer()[i] << "UL), " << i << ");\n";
+        resultBuilder << "    " << nameOfBuffer << ".addRawElement(UIntSet::Element(" << set.getBuffer()[i] << "UL), " << i << "); \n";
     }
-    resultBuilder << "    return generatedSet;\n";
-    resultBuilder << "}\n";
+}
 
-    resultBuilder << "const static CapabilityAtomSet " << nameOfBuffer << " = generate_" << nameOfBuffer << "();\n";
+// Create function to generate a UIntSet with initial data
+void outputUIntSetGenerator(const String& nameOfGenerator, StringBuilder & resultBuilder, UIntSet & set)
+{
+    resultBuilder << "inline static CapabilityAtomSet " << nameOfGenerator << "()\n";
+    resultBuilder << "{\n";
+    auto nameOfBackingData = nameOfGenerator + "_data";
+    outputLocalUIntSetBuffer(nameOfBackingData, resultBuilder, set);
+    resultBuilder << "    return " << nameOfBackingData << ";\n";
+    resultBuilder << "}\n";
+}
+
+
+UIntSet atomSetToUIntSet(const List<CapabilityDef*>& atomSet)
+{
+    UIntSet set{};
+    // Last element is generally a larger number. Start from there to minimize reallocations.
+    for (Index i = atomSet.getCount()-1; i >= 0; i--)
+        set.add(atomSet[i]->enumValue);
+    return set;
 }
 
 SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>>& defs, StringBuilder& sbHeader, StringBuilder& sbCpp)
@@ -755,50 +769,56 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>
             anyStageAtomSet.add(def->enumValue);
         }
     }
-    outputUIntSetAsBufferValues("kAnyTargetUIntSetBuffer", anyTargetUIntSetHash, anyTargetAtomSet);
-    outputUIntSetAsBufferValues("kAnyStageUIntSetBuffer", anyStageUIntSetHash, anyStageAtomSet);
-    
+    outputUIntSetGenerator("generatorOf_kAnyTargetUIntSetBuffer", anyTargetUIntSetHash, anyTargetAtomSet);
+    anyTargetUIntSetHash << "const static CapabilityAtomSet kAnyTargetUIntSetBuffer = generatorOf_kAnyTargetUIntSetBuffer();\n";
+    sbCpp << anyTargetUIntSetHash;
+
+    outputUIntSetGenerator("generatorOf_kAnyStageUIntSetBuffer", anyStageUIntSetHash, anyStageAtomSet);
+    anyStageUIntSetHash << "const static CapabilityAtomSet kAnyStageUIntSetBuffer = generatorOf_kAnyStageUIntSetBuffer();\n";
+    sbCpp << anyStageUIntSetHash;
+
     sbHeader << "\nenum {\n";
     sbHeader << "    kCapabilityTargetCount = " << targetCount << ",\n";
     sbHeader << "    kCapabilityStageCount = " << stageCount << ",\n";
     sbHeader << "};\n\n";
 
     calcCanonicalRepresentations(sink, defs, mapEnumValueToDef);
-    List<String> capabiltiyNameArray;
-    List<SerializedArrayView> serializedCapabilityArrays;
 
-    List<SerializedArrayView> serializedAtomDisjunctions;
-    auto serializeConjunction = [&](const List<CapabilityDef*>& capabilities) -> SerializedArrayView
+    struct SerializedConjunction
+    {
+        SerializedConjunction() 
         {
+        }
+        SerializedConjunction(const String& initFunctionName, UIntSet& data) : 
+            m_initFunctionName(initFunctionName), m_data(data)
+        {
+        }
+        String m_initFunctionName;
+        UIntSet m_data;
+    };
+    List<SerializedConjunction> serializedCapabilitesCache;
+
+    List<Index> serializedAtomDisjunctions;
+    auto serializeConjunction = [&](const List<CapabilityDef*>& capabilities, CapabilityDef* parentDef, Index conjunctionNumber) -> Index
+        {
+            auto capabilitiesAsUIntSet = atomSetToUIntSet(capabilities);
             // Do we already have a serialized capability array that is the same the one we are trying to serialize?
-            for (auto existingArray : serializedCapabilityArrays)
+            for (Index i = 0; i < serializedCapabilitesCache.getCount(); i++)
             {
-                if (existingArray.count == capabilities.getCount())
+                auto& existingSet = serializedCapabilitesCache[i].m_data;
+                if (existingSet == capabilitiesAsUIntSet)
                 {
-                    bool match = true;
-                    for (Index i = 0; i < capabilities.getCount(); i++)
-                    {
-                        if (capabiltiyNameArray[existingArray.first+i] != capabilities[i]->name)
-                        {
-                            match = false;
-                            break;
-                        }
-                    }
-                    if (match)
-                        return existingArray;
+                    return i;
                 }
             }
-            SerializedArrayView result;
-            result.first = capabiltiyNameArray.getCount();
-            for (auto capability : capabilities)
-            {
-                capabiltiyNameArray.add(capability->name);
-            }
-            result.count = capabilities.getCount();
-            serializedCapabilityArrays.add(result);
+            auto initName = "generatorOf_" + parentDef->name + "_conjunction"+String(conjunctionNumber);
+            outputUIntSetGenerator(initName, sbCpp, capabilitiesAsUIntSet);
+
+            auto result = serializedCapabilitesCache.getCount();
+            serializedCapabilitesCache.add(SerializedConjunction(initName + "()", capabilitiesAsUIntSet));
             return result;
         };
-    auto serializeDisjunction = [&](const List<SerializedArrayView>& conjunctions) -> SerializedArrayView
+    auto serializeDisjunction = [&](const List<Index>& conjunctions) -> SerializedArrayView
         {
             SerializedArrayView result;
             result.first = serializedAtomDisjunctions.getCount();
@@ -811,35 +831,23 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>
         };
     for (auto def : defs)
     {
-        List<SerializedArrayView> conjunctions;
+        List<Index> conjunctions;
         for (auto& c : def->canonicalRepresentation)
-            conjunctions.add(serializeConjunction(c));
+            conjunctions.add(serializeConjunction(c, def, conjunctions.getCount()));
         def->serializedCanonicalRepresentation = serializeDisjunction(conjunctions);
     }
     
-    sbCpp << anyTargetUIntSetHash;
-    sbCpp << anyStageUIntSetHash;
-
-    sbCpp << "static CapabilityName kCapabilityArray[] = {\n";
+    sbCpp << "static CapabilityAtomSet kCapabilityArray[] = {\n";
     Index arrayIndex = 0;
-    sbCpp << "    /* [0] @0: */ ";
-    for (Index i = 0; i < capabiltiyNameArray.getCount(); ++i)
+    for (Index i = 0; i < serializedCapabilitesCache.getCount(); ++i)
     {
-        sbCpp << " CapabilityName::" << capabiltiyNameArray[i] << ",";
-        if (i + 1 == serializedCapabilityArrays[arrayIndex].first + serializedCapabilityArrays[arrayIndex].count)
-        {
-            arrayIndex++;
-            if (arrayIndex == serializedCapabilityArrays.getCount())
-                sbCpp << "\n";
-            else
-                sbCpp << "\n    /* [" << arrayIndex << "] @" << serializedCapabilityArrays[arrayIndex].first <<": */ ";
-        }
+        sbCpp << "    " << serializedCapabilitesCache[i].m_initFunctionName << ",\n";
     }
     sbCpp << "};\n";
-    sbCpp << "static ArrayView<CapabilityName> kCapabilityConjunctions[] = {\n";
+    sbCpp << "static CapabilityAtomSet* kCapabilityConjunctions[] = {\n";
     for (auto c : serializedAtomDisjunctions)
     {
-        sbCpp << "    { kCapabilityArray + " << c.first << ", " << c.count << " },\n";
+        sbCpp << "    kCapabilityArray + " << c << ", \n";
     }
     sbCpp << "};\n";
 
@@ -882,8 +890,12 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>
         }
         sbCpp << ", ";
 
+        // rank
+        sbCpp << def->rank;
+        sbCpp << ", ";
+
         // canonnical representation.
-        sbCpp << def->rank << ", { kCapabilityConjunctions + " << def->serializedCanonicalRepresentation.first << ", " << def->serializedCanonicalRepresentation.count << "} },\n";
+        sbCpp << "{ kCapabilityConjunctions + " << def->serializedCanonicalRepresentation.first << ", " << def->serializedCanonicalRepresentation.count << "} },\n";
     }
     
     sbCpp << "};\n";

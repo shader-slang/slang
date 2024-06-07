@@ -19,8 +19,10 @@ constexpr Index intLog2(unsigned x)
     return x == 1 ? 0 : 1 + intLog2(x >> 1);
 }
 
+// if `in` is 0, result is undefined behavior
 static inline Index bitscanForward(uint64_t in)
 {
+    SLANG_ASSERT(in != 0);
 #if defined(_MSC_VER)
 
 #ifdef _WIN64
@@ -28,14 +30,12 @@ static inline Index bitscanForward(uint64_t in)
     _BitScanForward64((unsigned long*)&out, in);
     return Index(out);
 #else
-    constexpr uint32_t bitsInType = sizeof(uint32_t) * 8;
     uint32_t out;
     // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
-    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in) + 1));
-    if (out != bitsInType)
+    if (_BitScanForward((unsigned long*)&out, *(((uint32_t*)&in) + 1)))
         return Index(out);
     _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
-    return Index(out + bitsInType);
+    return Index(out);
 #endif// #ifdef _WIN64
 
 #else 
