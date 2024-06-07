@@ -26,6 +26,8 @@ protected:
 
     void ensurePrelude(const char* preludeText);
 
+    virtual bool shouldEmitOnlyHeader() SLANG_OVERRIDE { return m_target == CodeGenTarget::MetalHeader; }
+
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
     

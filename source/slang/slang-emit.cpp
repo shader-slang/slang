@@ -769,6 +769,7 @@ Result linkAndOptimizeIR(
         [[fallthrough]];
     case CodeGenTarget::HLSL:
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         if (requiredLoweringPassSet.combinedTextureSamplers)
@@ -975,6 +976,7 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions.translateToStructuredBufferOps = true;
             break;
         case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalHeader:
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
             byteAddressBufferOptions.scalarizeVectorLoadStore = true;
@@ -1075,6 +1077,7 @@ Result linkAndOptimizeIR(
     }
     break;
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     {
         legalizeIRForMetal(irModule, sink);
     }
@@ -1128,6 +1131,7 @@ Result linkAndOptimizeIR(
         moveGlobalVarInitializationToEntryPoints(irModule);
         break;
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:

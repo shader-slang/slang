@@ -65,6 +65,7 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] =
     { SLANG_OBJECT_CODE,    "obj,o",                                            "object-code",              "Object code" },
     { SLANG_HOST_HOST_CALLABLE, "",                                             "host-host-callable",       "Host callable for host execution" },
     { SLANG_METAL,          "metal",                                            "metal",                    "Metal shader source" },
+    { SLANG_METAL_HEADER,   "metal.hpp",                                        "metal.hpp",                "Metal shader header" },
     { SLANG_METAL_LIB,      "metallib",                                         "metallib",                 "Metal Library Bytecode" },
     { SLANG_METAL_LIB_ASM,  "metallib-asm"                                      "metallib-asm",             "Metal Library Bytecode assembly" },
 };

@@ -505,6 +505,7 @@ namespace Slang
             case CodeGenTarget::PyTorchCppBinding:
             case CodeGenTarget::CSource:
             case CodeGenTarget::Metal:
+            case CodeGenTarget::MetalHeader:
             {
                 return PassThroughMode::None;
             }
@@ -1647,6 +1648,7 @@ namespace Slang
         case CodeGenTarget::PyTorchCppBinding:
         case CodeGenTarget::CSource:
         case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalHeader:
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
                 

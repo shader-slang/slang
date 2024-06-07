@@ -612,6 +612,7 @@ extern "C"
         SLANG_HOST_HOST_CALLABLE,       ///< Host callable host code (ie non kernel/shader) 
         SLANG_CPP_PYTORCH_BINDING,      ///< C++ PyTorch binding code.
         SLANG_METAL,                    ///< Metal shading language
+        SLANG_METAL_HEADER,             ///< Metal shading language header
         SLANG_METAL_LIB,                ///< Metal library
         SLANG_METAL_LIB_ASM,            ///< Metal library assembly
         SLANG_HOST_SHARED_LIBRARY,      ///< A shared library/Dll for host code (for hosting CPU/OS)

@@ -947,6 +947,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         }
         break;
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         if (targetProfile.getFamily() != ProfileFamily::METAL)
@@ -1787,6 +1788,7 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
 
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         atoms.add(CapabilityName::metal);
