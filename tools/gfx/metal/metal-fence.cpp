@@ -10,38 +10,44 @@ using namespace Slang;
 namespace metal
 {
 
-FenceImpl::FenceImpl(DeviceImpl* device)
-    : m_device(device)
-{}
-
 FenceImpl::~FenceImpl()
 {
 }
 
-Result FenceImpl::init(const IFence::Desc& desc)
+Result FenceImpl::init(DeviceImpl* device, const IFence::Desc& desc)
 {
-    return SLANG_FAIL;
+    m_device = device;
+    m_event = NS::TransferPtr(m_device->m_device->newSharedEvent());
+    if (!m_event)
+    {
+        return SLANG_FAIL;
+    }
+    m_event->setSignaledValue(desc.initialValue);
+    return SLANG_OK;
 }
 
 Result FenceImpl::getCurrentValue(uint64_t* outValue)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    *outValue = m_event->signaledValue();
+    return SLANG_OK;
 }
 
 Result FenceImpl::setCurrentValue(uint64_t value)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    m_event->setSignaledValue(value);
+    return SLANG_OK;
 }
 
 Result FenceImpl::getSharedHandle(InteropHandle* outHandle)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 Result FenceImpl::getNativeHandle(InteropHandle* outNativeHandle)
 {
-    outNativeHandle->handleValue = 0;
-    return SLANG_FAIL;
+    outNativeHandle->api = InteropHandleAPI::Metal;
+    outNativeHandle->handleValue = reinterpret_cast<intptr_t>(m_event.get());
+    return SLANG_OK;
 }
 
 } // namespace metal
