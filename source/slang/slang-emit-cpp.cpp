@@ -1737,6 +1737,13 @@ void CPPSourceEmitter::emitPreModuleImpl()
     Super::emitPreModuleImpl();
 }
 
+void CPPSourceEmitter::emitFrontMatterImpl(TargetRequest*)
+{
+    if (shouldEmitOnlyHeader())
+    {
+        m_writer->emit("#pragma once\n\n");
+    }
+}
 
 void CPPSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {

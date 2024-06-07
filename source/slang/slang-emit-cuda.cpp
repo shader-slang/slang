@@ -794,6 +794,14 @@ void CUDASourceEmitter::emitSimpleValueImpl(IRInst* inst)
     Super::emitSimpleValueImpl(inst);
 }
 
+void CUDASourceEmitter::emitFrontMatterImpl(TargetRequest*)
+{
+    if (shouldEmitOnlyHeader())
+    {
+        m_writer->emit("#pragma once\n\n");
+    }
+}
+
 
 void CUDASourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout)
 {
