@@ -3,6 +3,7 @@
 // Test that `using` can bring declarations from a namespace into scope
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 namespace X
 {

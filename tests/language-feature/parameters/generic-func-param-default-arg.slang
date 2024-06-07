@@ -4,6 +4,7 @@
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST_DISABLED:SIMPLE:-target hlsl -entry computeMain -dump-ir
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 
 interface IValue

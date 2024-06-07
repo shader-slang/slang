@@ -8,6 +8,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 
 // matrix<R, C>

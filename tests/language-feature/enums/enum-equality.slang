@@ -4,6 +4,7 @@
 // types works as expected.
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 enum Channel
 {
