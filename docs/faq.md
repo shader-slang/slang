@@ -8,7 +8,7 @@ In particular, Slang aims to take the lessons learned in that research effort (a
 
 ### Why should I use Slang instead of glslang, hlsl2glslfork, the Microsoft open-source HLSL compiler, etc.?
 
-If you are mostly just shoping around for a tool to get HLSL shaders working on other graphics APIs, then [this](http://aras-p.info/blog/2014/03/28/cross-platform-shaders-in-2014/) blog post is probably a good place to start.
+If you are mostly just shopping around for a tool to get HLSL shaders working on other graphics APIs, then [this](http://aras-p.info/blog/2014/03/28/cross-platform-shaders-in-2014/) blog post is probably a good place to start.
 
 If one of those tools meets your requirements, then you should probably use it.
 Slang is a small project, and early in development, so you might find that you hit fewer bumps in the road with one of the more established tools out there.
