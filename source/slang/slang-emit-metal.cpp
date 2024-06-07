@@ -181,6 +181,12 @@ void MetalSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUnifor
 
 void MetalSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
 {
+    if (shouldEmitOnlyHeader()) 
+    {
+        // comment out entry points for now in the header
+        m_writer->emit("// ");
+    }
+
     auto stage = entryPointDecor->getProfile().getStage();
 
     switch (stage)
@@ -994,10 +1000,29 @@ void MetalSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 
 void MetalSourceEmitter::emitFrontMatterImpl(TargetRequest*)
 {
-    m_writer->emit("#include <metal_stdlib>\n");
-    m_writer->emit("#include <metal_math>\n");
-    m_writer->emit("#include <metal_texture>\n");
-    m_writer->emit("using namespace metal;\n");
+    if (shouldEmitOnlyHeader())
+    {
+        m_writer->emit("#pragma once\n\n");
+        // use std::array for the header
+        m_writer->emit("#include <array>\n");
+        m_writer->emit("using std::array;\n");
+        // use simd for float3 etc. types
+        m_writer->emit("#include <simd/simd.h>\n");
+        m_writer->emit("using namespace simd;\n\n");
+        // ignore AddressSpace for the header
+        m_writer->emit("#define device\n");
+        m_writer->emit("#define constant\n");
+        m_writer->emit("#define thread\n");
+        m_writer->emit("#define threadgroup\n");
+        m_writer->emit("#define object_data\n\n");
+    }
+    else 
+    {
+        m_writer->emit("#include <metal_stdlib>\n");
+        m_writer->emit("#include <metal_math>\n");
+        m_writer->emit("#include <metal_texture>\n");
+        m_writer->emit("using namespace metal;\n");
+    }
 }
 
 void MetalSourceEmitter::emitGlobalInstImpl(IRInst* inst)
