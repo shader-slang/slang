@@ -60,23 +60,11 @@ struct CapabilityAtomInfo
     /// Ranking to use when deciding if this atom is a "better" one to select.
     uint32_t                    rank;
 
-    /// Canonical representation in the form of disjunction-of-conjunction of atoms.
-    ArrayView<ArrayView<CapabilityName>> canonicalRepresentation;
+    /// Canonical representation of atoms in the form of disjoint conjunctions of atoms.
+    ArrayView<CapabilityAtomSet*> canonicalRepresentation;
 };
 
 #include "slang-generated-capability-defs-impl.h"
-
-static UInt asAtomUInt(CapabilityName name)
-{
-    SLANG_ASSERT((CapabilityAtom)name < CapabilityAtom::Count);
-    return (UInt)((CapabilityAtom)name);
-}
-
-static CapabilityAtom asAtom(CapabilityName name)
-{
-    SLANG_ASSERT((CapabilityAtom)name < CapabilityAtom::Count);
-    return (CapabilityAtom)name;
-}
 
 /// Get the extended information structure for the given capability `atom`
 static CapabilityAtomInfo const& _getInfo(CapabilityName atom)
@@ -170,9 +158,8 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
     const auto& info = kCapabilityNameInfos[Index(atom)];
     for (auto cur : info.canonicalRepresentation)
     {
-        for (auto cbase : cur)
-            if (asAtom(cbase) == base)
-                return true;
+        if (cur->contains((UInt)base))
+            return true;
     }
 
     return false;
@@ -180,111 +167,89 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
 
 //// CapabiltySet
 
-void CapabilitySet::addToTargetCapabilityWithValidUIntSetAndTargetAndStage(CapabilityName target, CapabilityName stage, CapabilityAtomSet setToAdd)
+CapabilityAtom getTargetAtomInSet(const CapabilityAtomSet& atomSet)
 {
-    SLANG_ASSERT(target != CapabilityName::Invalid && stage != CapabilityName::Invalid);
-    auto stageAtom = asAtom(stage);
-    auto targetAtom = asAtom(target);
-    CapabilityTargetSet& targetSet = m_targetSets[targetAtom];
-    targetSet.target = targetAtom;
-    targetSet.shaderStageSets.reserve(kCapabilityStageCount);
-
-    auto& localStageSets = targetSet.shaderStageSets[stageAtom];
-    localStageSets.stage = stageAtom;
-
-    localStageSets.addNewSet(std::move(setToAdd));
+    auto targetSet = getAtomSetOfTargets();
+    CapabilityAtomSet out;
+    CapabilityAtomSet::calcIntersection(out, targetSet, atomSet);
+    auto iter = out.begin();
+    if (iter == out.end())
+        return CapabilityAtom::Invalid;
+    return (CapabilityAtom)*iter;
 }
 
-void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation)
+CapabilityAtom getStageAtomInSet(const CapabilityAtomSet& atomSet)
 {
-    // If no provided 'stage', set the capability as a target of all stages
-    if (stage == CapabilityName::Invalid)
+    auto stageSet = getAtomSetOfStages();
+    CapabilityAtomSet out;
+    CapabilityAtomSet::calcIntersection(out, stageSet, atomSet);
+    auto iter = out.begin();
+    if (iter == out.end())
+        return CapabilityAtom::Invalid;
+    return (CapabilityAtom)*iter;
+}
+
+template<CapabilityName keyholeAtomToPermuteWith>
+void CapabilitySet::addPermutationsOfConjunctionForEachInContainer(CapabilityAtomSet& setToPermutate, const CapabilityAtomSet& elementsToPermutateWith, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom)
+{
+    for(auto i : elementsToPermutateWith)
     {
-        auto info = _getInfo(CapabilityName::any_stage);
-        List<CapabilityName> newArr;
-        auto count = canonicalRepresentation.getCount();
-        newArr.setCount(count + 1);
-        memcpy(newArr.getBuffer(), canonicalRepresentation.getBuffer(), count * sizeof(CapabilityName));
-        m_targetSets[asAtom(target)].shaderStageSets.reserve(info.canonicalRepresentation.getCount());
-        for (auto i : info.canonicalRepresentation)
+        CapabilityName atom = (CapabilityName)i;
+        CapabilityAtomSet conjunctionPermutation = setToPermutate;
+        auto targetInfo = _getInfo(atom);
+        conjunctionPermutation.add(*targetInfo.canonicalRepresentation[0]);
+
+        if constexpr (keyholeAtomToPermuteWith == CapabilityName::target)
         {
-            newArr[count] = i[0];
-            addToTargetCapabilityWithTargetAndStageAtom(target, i[0], newArr.getArrayView());
+            addConjunction(conjunctionPermutation, (CapabilityAtom)atom, knownStageAtom);
         }
-        return;
-    }
-    
-    CapabilityAtomSet setToAdd = CapabilityAtomSet((UInt)CapabilityAtom::Count);
-    for(auto i : canonicalRepresentation)
-        setToAdd.add(asAtomUInt(i));
-
-    addToTargetCapabilityWithValidUIntSetAndTargetAndStage(target, stage, setToAdd);
-}
-
-// No targets atoms have been defined on yet, set stage to target any_target capability 
-void CapabilitySet::addToTargetCapabilityWithStageAtom(CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation)
-{
-    
-    if (m_targetSets.getCount() == 0)
-    {
-        const auto anyTargetInfo = _getInfo(CapabilityName::any_target);
-        CapabilityAtomSet setToAdd;
-        setToAdd.resize((UInt)CapabilityAtom::Count);
-        for (int i = 0; i < canonicalRepresentation.getCount(); i++)
-            setToAdd.add((UInt)canonicalRepresentation[i]);
-        CapabilityName targetAtom{};
-        for (const auto& targetAtomCanonicalRep : anyTargetInfo.canonicalRepresentation)
+        else if constexpr (keyholeAtomToPermuteWith == CapabilityName::stage)
         {
-            for (auto anyTargetAtom : targetAtomCanonicalRep)
-            {
-                setToAdd.add((UInt)anyTargetAtom);
-                if (_getInfo(anyTargetAtom).abstractBase == CapabilityName::target)
-                    targetAtom = anyTargetAtom;
-            }
-            addToTargetCapabilityWithValidUIntSetAndTargetAndStage(targetAtom, stage, setToAdd);
-            for (auto anyTargetAtom : targetAtomCanonicalRep)
-                setToAdd.remove((UInt)anyTargetAtom);
+            addConjunction(conjunctionPermutation, knownTargetAtom, (CapabilityAtom)atom);
+        }
+        else
+        {
+            addConjunction(conjunctionPermutation, knownTargetAtom, knownStageAtom);
         }
     }
 }
 
-void CapabilitySet::addToTargetCapabilityWithTargetAndOrStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation)
+void CapabilitySet::addConjunction(CapabilityAtomSet conjunction, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom)
 {
-    if(target != CapabilityName::Invalid)
-        addToTargetCapabilityWithTargetAndStageAtom(target, stage, canonicalRepresentation);
-    else if(stage != CapabilityName::Invalid)
-        addToTargetCapabilityWithStageAtom(stage, canonicalRepresentation);
-}
-
-void CapabilitySet::addToTargetCapabilitesWithCanonicalRepresentation(const ArrayView<CapabilityName>& canonicalRepresentation)
-{
-    // only need to search i == 0/1 to find a relevant node
-    // target node should ALWAYS be first, so if we find a node, we stop searching. This is the most important node. We assume only stage+target with this logic.
-    // canonicalRepresentation of node has optionally 0-1 abstract node of each type, with a minimum of 1 abstract node total.
-    CapabilityName target = CapabilityName::Invalid;
-    CapabilityName stage = CapabilityName::Invalid;
-    for (const auto& i : canonicalRepresentation)
+    if (knownTargetAtom == CapabilityAtom::Invalid)
     {
-        const auto info = _getInfo(i);
-        if (info.abstractBase == CapabilityName::Invalid)
-            continue;
-        else if (info.abstractBase == CapabilityName::target)
-            target = i;
-        else if (info.abstractBase == CapabilityName::stage)
-            stage = i;
-
-        if (target != CapabilityName::Invalid && stage != CapabilityName::Invalid)
-            break;
+        knownTargetAtom = getTargetAtomInSet(conjunction);
+        // if no target in conjunction, add a permutation of the conjunction with every target
+        if (knownTargetAtom == CapabilityAtom::Invalid)
+        {
+            addPermutationsOfConjunctionForEachInContainer<CapabilityName::target>(conjunction, getAtomSetOfTargets(), CapabilityAtom::Invalid, getStageAtomInSet(conjunction));
+            return;
+        }
     }
+    auto& capabilitySetToTargetSet = m_targetSets[knownTargetAtom];
+    capabilitySetToTargetSet.target = knownTargetAtom;
 
-    addToTargetCapabilityWithTargetAndOrStageAtom(target, stage, canonicalRepresentation);
+    if (knownStageAtom == CapabilityAtom::Invalid)
+    {
+        knownStageAtom = getStageAtomInSet(conjunction);
+        // if no target in conjunction, add a permutation of the conjunction with every stage
+        if (knownStageAtom == CapabilityAtom::Invalid)
+        {
+            capabilitySetToTargetSet.shaderStageSets.reserve(kCapabilityStageCount);
+            addPermutationsOfConjunctionForEachInContainer<CapabilityName::stage>(conjunction, getAtomSetOfStages(), knownTargetAtom, CapabilityAtom::Invalid);
+            return;
+        }
+    }
+    auto& targetSetToStageSet = capabilitySetToTargetSet.shaderStageSets[knownStageAtom];
+    targetSetToStageSet.stage = knownStageAtom;
+    targetSetToStageSet.addNewSet(std::move(conjunction));
 }
 
 void CapabilitySet::addUnexpandedCapabilites(CapabilityName atom)
 {
     auto info = _getInfo(atom);
-    for (const auto& cr : info.canonicalRepresentation)
-        addToTargetCapabilitesWithCanonicalRepresentation(cr);
+    for (const auto cr : info.canonicalRepresentation)
+        addConjunction(*cr, CapabilityAtom::Invalid, CapabilityAtom::Invalid);
 }
 
 CapabilitySet::CapabilitySet()
@@ -506,12 +471,6 @@ void CapabilitySet::nonDestructiveJoin(const CapabilitySet& other)
     }
 }
 
-void CapabilitySet::addCapability(List<List<CapabilityAtom>>& atomLists)
-{
-    for (const auto& cr : atomLists)
-        addToTargetCapabilitesWithCanonicalRepresentation( (*(List<CapabilityName>*)(&cr)).getArrayView());
-}
-
 CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySet& other)
 {
     CapabilitySet newSet{};
@@ -520,10 +479,7 @@ CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySe
         if (other.m_targetSets.tryGetValue(i.first))
             continue;
 
-        newSet.m_targetSets[i.first].target = i.first;
-        auto info = _getInfo(i.first);
-        if(info.canonicalRepresentation.getCount() > 0)
-            newSet.addToTargetCapabilityWithTargetAndStageAtom((CapabilityName)i.first, CapabilityName::Invalid, info.canonicalRepresentation[0]);
+        newSet.m_targetSets[i.first] = this->m_targetSets[i.first];
     }
     return newSet;
 }

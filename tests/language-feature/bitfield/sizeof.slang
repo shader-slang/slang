@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 // CHECK:      1
 // CHECK-NEXT: 1

@@ -3,6 +3,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -render-features half
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0  0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
