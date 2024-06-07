@@ -55,7 +55,8 @@ enum PrintingOp
 //
 // The core allocation operation here is `_allocatePrintWords()`
 
-    // Allocate space for one or more print commands.
+// Allocate space for one or more print commands.
+//
 uint _allocatePrintWords(uint wordCount)
 {
     // We allocate the required number of words with an atomic, and
@@ -214,12 +215,12 @@ extension String : IPrintable
 // to scale up to a two-argument `println()` function that can
 // work for any combination of printable types.
 
-    // Print two values, `a` and `b`.
-    //
-    // This function ensures that the values of `a` and `b`
-    // are written out atomically, without values printed
-    // from other threads spliced in between.
-    //
+// Print two values, `a` and `b`.
+//
+// This function ensures that the values of `a` and `b`
+// are written out atomically, without values printed
+// from other threads spliced in between.
+//
 void println<A : IPrintable, B : IPrintable>(A a, B b)
 {
     // To print two values atomically, we must first

@@ -4,7 +4,7 @@ Frequently Asked Questions
 ### How did this project start?
 
 The Slang project forked off from the ["Spire"](https://github.com/spire-lang/spire) shading language research project.
-In particular, Slang aims to take the lessons learned in that research effort (about how to make more productive shader compilation languages and tools) and apply them to a stystem that is easier to adopt, and hopefully moreamenable to production use.
+In particular, Slang aims to take the lessons learned in that research effort (about how to make more productive shader compilation languages and tools) and apply them to a stystem that is easier to adopt, and hopefully more amenable to production use.
 
 ### Why should I use Slang instead of glslang, hlsl2glslfork, the Microsoft open-source HLSL compiler, etc.?
 
