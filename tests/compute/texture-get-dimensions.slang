@@ -6,6 +6,7 @@
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 // TODO(JS): Doesn't work on CUDA as there aren't any CUDA functions to get dimensions.
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 //TEST_INPUT: Texture1D(size=4, content = one):name t1D
 Texture1D<float> t1D;
