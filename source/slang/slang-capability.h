@@ -184,6 +184,9 @@ public:
     CapabilityTargetSets& getCapabilityTargetSets() { return m_targetSets; }
     const CapabilityTargetSets& getCapabilityTargetSets() const { return m_targetSets; }
 
+    // If this capability set uniquely implies one stage atom, return it. Otherwise returns CapabilityAtom::Invalid.
+    CapabilityAtom getUniquelyImpliedStageAtom() const;
+
     struct AtomSets
     {
         struct Iterator

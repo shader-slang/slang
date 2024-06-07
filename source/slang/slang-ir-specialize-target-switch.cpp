@@ -31,6 +31,7 @@ namespace Slang
                     bool isBetterForTarget = capSet.isBetterForTarget(bestCapSet, target->getTargetCaps(), isEqual);
                     if (isBetterForTarget)
                     {
+                        capSet.join(target->getTargetCaps());
                         bool targetImpliesCapSet = (target->getTargetCaps().implies(capSet, true) || capSet.isEmpty());
                         if (targetImpliesCapSet)
                         {
