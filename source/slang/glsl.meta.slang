@@ -152,7 +152,7 @@ public in int gl_ViewportIndex : SV_ViewportArrayIndex;
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<float, N, N> m2)
 {
     return mul(m2, m1);
@@ -160,7 +160,7 @@ public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<f
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<half, N, N> m2)
 {
     return mul(m2, m1);
@@ -168,7 +168,7 @@ public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<hal
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix<double, N, N> m2)
 {
     return mul(m2, m1);
@@ -176,7 +176,7 @@ public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public matrix<T, R, L> operator*<T:__BuiltinFloatingPointType, let L : int, let C : int, let R : int>(matrix<T, C, L> m1, matrix<T, R, C> m2)
 {
     return mul(m2, m1);
@@ -184,7 +184,7 @@ public matrix<T, R, L> operator*<T:__BuiltinFloatingPointType, let L : int, let 
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, R> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(vector<T, C> v, matrix<T, R, C> m)
 {
     return mul(m, v);
@@ -192,7 +192,7 @@ public vector<T, R> operator*<T:__BuiltinFloatingPointType, let C : int, let R :
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, C> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(matrix<T, R, C> m, vector<T, R> v)
 {
     return mul(v, m);
@@ -306,7 +306,7 @@ ${{{{
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public T atan(T y, T x)
 {
     return atan2(y, x);
@@ -315,7 +315,7 @@ public T atan(T y, T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
 {
     return atan2(y, x);
@@ -328,7 +328,7 @@ public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public T inversesqrt(T x)
 {
     return rsqrt(x);
@@ -337,7 +337,7 @@ public T inversesqrt(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> inversesqrt(vector<T, N> x)
 {
     return rsqrt(x);
@@ -350,7 +350,7 @@ public vector<T, N> inversesqrt(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 public T roundEven(T x)
 {
     return rint(x);
@@ -359,7 +359,7 @@ public T roundEven(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 public vector<T,N> roundEven(vector<T,N> x)
 {
     return rint(x);
@@ -368,7 +368,7 @@ public vector<T,N> roundEven(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public T mod(T x, T y)
 {
     // SPIR-V doesn't have "modulus".
@@ -385,7 +385,7 @@ public T mod(T x, T y)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> mod(vector<T, N> x, T y)
 {
     __target_switch
@@ -399,7 +399,7 @@ public vector<T, N> mod(vector<T, N> x, T y)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -412,7 +412,7 @@ public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T,N> min(vector<T,N> x, T y)
 {
     __target_switch
@@ -425,7 +425,7 @@ public vector<T,N> min(vector<T,N> x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T,N> max(vector<T,N> x, T y)
 {
     __target_switch
@@ -438,7 +438,7 @@ public vector<T,N> max(vector<T,N> x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T,N> clamp(vector<T,N> x, T minBound, T maxBound)
 {
     __target_switch
@@ -452,7 +452,7 @@ public vector<T,N> clamp(vector<T,N> x, T minBound, T maxBound)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public T mix(T x, T y, T a)
 {
     return lerp(x, y, a);
@@ -461,7 +461,7 @@ public T mix(T x, T y, T a)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, T a)
 {
     __target_switch
@@ -475,7 +475,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, T a)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<T, N> a)
 {
     return lerp(x, y, a);
@@ -484,7 +484,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<T, N> a)
 __generic<T>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public T mix(T x, T y, bool a)
 {
     __target_switch
@@ -501,7 +501,7 @@ public T mix(T x, T y, bool a)
 __generic<T, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
 {
     __target_switch

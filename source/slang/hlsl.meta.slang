@@ -37,12 +37,12 @@ struct GLSLShaderStorageBuffer {}
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, appendstructuredbuffer)]
 uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T,L> buffer);
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, consumestructuredbuffer)]
 uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
@@ -3565,13 +3565,13 @@ uint64_t __atomicExchange(__ref uint64_t ioValue, uint64_t value)
 
 // Conversion between uint64_t and uint2
 
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 uint2 __asuint2(uint64_t i)
 {
     return uint2(uint(i), uint(uint64_t(i) >> 32));
 }
 
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 uint64_t __asuint64(uint2 i)
 {
     return (uint64_t(i.y) << 32) | i.x;
@@ -5033,7 +5033,7 @@ void abort();
 
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T abs(T x)
 {
     __target_switch
@@ -5054,7 +5054,7 @@ T abs(T x)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> abs(vector<T, N> x)
 {
     __target_switch
@@ -5072,7 +5072,7 @@ vector<T, N> abs(vector<T, N> x)
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
     __target_switch
@@ -5085,7 +5085,7 @@ matrix<T,N,M> abs(matrix<T,N,M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T abs(T x)
 {
     __target_switch
@@ -5103,7 +5103,7 @@ T abs(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> abs(vector<T, N> x)
 {
     __target_switch
@@ -5121,7 +5121,7 @@ vector<T, N> abs(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
     __target_switch
@@ -5135,7 +5135,7 @@ matrix<T,N,M> abs(matrix<T,N,M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T fabs(T x)
 {
     __target_switch
@@ -5149,7 +5149,7 @@ T fabs(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> fabs(vector<T, N> x)
 {
     __target_switch
@@ -5165,7 +5165,7 @@ vector<T, N> fabs(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T acos(T x)
 {
     __target_switch
@@ -5183,7 +5183,7 @@ T acos(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> acos(vector<T, N> x)
 {
     __target_switch
@@ -5201,7 +5201,7 @@ vector<T, N> acos(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> acos(matrix<T, N, M> x)
 {
     __target_switch
@@ -5217,7 +5217,7 @@ matrix<T, N, M> acos(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T acosh(T x)
 {
     __target_switch
@@ -5237,7 +5237,7 @@ T acosh(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> acosh(vector<T,N> x)
 {
     __target_switch
@@ -5600,28 +5600,28 @@ matrix<float,N,M> asfloat(matrix<uint,N,M> x)
 // No op
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 float asfloat(float x)
 { return x; }
 
 __generic<let N : int>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 vector<float,N> asfloat(vector<float,N> x)
 { return x; }
 
 __generic<let N : int, let M : int>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 matrix<float,N,M> asfloat(matrix<float,N,M> x)
 { return x; }
 
 // Inverse sine (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T asin(T x)
 {
     __target_switch
@@ -5639,7 +5639,7 @@ T asin(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> asin(vector<T, N> x)
 {
     __target_switch
@@ -5657,7 +5657,7 @@ vector<T, N> asin(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> asin(matrix<T, N, M> x)
 {
     __target_switch
@@ -5673,7 +5673,7 @@ matrix<T, N, M> asin(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T asinh(T x)
 {
     __target_switch
@@ -5693,7 +5693,7 @@ T asinh(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> asinh(vector<T,N> x)
 {
     __target_switch
@@ -6151,7 +6151,7 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> va
 // Inverse tangent (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T atan(T x)
 {
     __target_switch
@@ -6169,7 +6169,7 @@ T atan(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> atan(vector<T, N> x)
 {
     __target_switch
@@ -6187,7 +6187,7 @@ vector<T, N> atan(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> atan(matrix<T, N, M> x)
 {
     __target_switch
@@ -6200,7 +6200,7 @@ matrix<T, N, M> atan(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T atan2(T y, T x)
 {
     __target_switch
@@ -6218,7 +6218,7 @@ T atan2(T y, T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 {
     __target_switch
@@ -6236,7 +6236,7 @@ vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
 {
     __target_switch
@@ -6252,7 +6252,7 @@ matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T atanh(T x)
 {
     __target_switch
@@ -6272,7 +6272,7 @@ T atanh(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> atanh(vector<T,N> x)
 {
     __target_switch
@@ -6290,7 +6290,7 @@ vector<T,N> atanh(vector<T,N> x)
 // Ceiling (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T ceil(T x)
 {
     __target_switch
@@ -6308,7 +6308,7 @@ T ceil(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> ceil(vector<T, N> x)
 {
     __target_switch
@@ -6326,7 +6326,7 @@ vector<T, N> ceil(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> ceil(matrix<T, N, M> x)
 {
     __target_switch
@@ -6425,7 +6425,7 @@ bool CheckAccessFullyMapped(uint status);
 // Clamp (HLSL SM 1.0)
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T clamp(T x, T minBound, T maxBound)
 {
     __target_switch
@@ -6449,7 +6449,7 @@ T clamp(T x, T minBound, T maxBound)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
     __target_switch
@@ -6473,7 +6473,7 @@ vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
     __target_switch
@@ -6486,7 +6486,7 @@ matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBo
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T clamp(T x, T minBound, T maxBound)
 {
     __target_switch
@@ -6504,7 +6504,7 @@ T clamp(T x, T minBound, T maxBound)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
     __target_switch
@@ -6522,7 +6522,7 @@ vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
     __target_switch
@@ -6573,7 +6573,7 @@ void clip(matrix<T,N,M> x)
 // Cosine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T cos(T x)
 {
     __target_switch
@@ -6591,7 +6591,7 @@ T cos(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> cos(vector<T, N> x)
 {
     __target_switch
@@ -6609,7 +6609,7 @@ vector<T, N> cos(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> cos(matrix<T, N, M> x)
 {
     __target_switch
@@ -6623,7 +6623,7 @@ matrix<T, N, M> cos(matrix<T, N, M> x)
 // Hyperbolic cosine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T cosh(T x)
 {
     __target_switch
@@ -6641,7 +6641,7 @@ T cosh(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> cosh(vector<T,N> x)
 {
     __target_switch
@@ -6659,7 +6659,7 @@ vector<T,N> cosh(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> cosh(matrix<T, N, M> x)
 {
     __target_switch
@@ -6674,7 +6674,7 @@ matrix<T, N, M> cosh(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T cospi(T x)
 {
     __target_switch
@@ -6687,7 +6687,7 @@ T cospi(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> cospi(vector<T,N> x)
 {
     __target_switch
@@ -6724,7 +6724,7 @@ uint countbits(uint value)
 // TODO: SPIRV does not support integer vectors.
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 {
     __target_switch
@@ -6745,7 +6745,7 @@ vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, 3> cross(vector<T, 3> left, vector<T, 3> right)
 {
     __target_switch
@@ -6765,7 +6765,7 @@ vector<T, 3> cross(vector<T, 3> left, vector<T, 3> right)
 
 // Convert encoded color
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 int4 D3DCOLORtoUBYTE4(float4 color)
 {
     __target_switch
@@ -7041,7 +7041,7 @@ void DeviceMemoryBarrierWithGroupSync()
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T distance(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -7059,7 +7059,7 @@ T distance(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T distance(T x, T y)
 {
     __target_switch
@@ -7077,7 +7077,7 @@ T distance(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T fdim(T x, T y)
 {
     __target_switch
@@ -7090,7 +7090,7 @@ T fdim(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> fdim(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -7135,7 +7135,7 @@ vector<T,N> divide(vector<T,N> x, vector<T,N> y)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T dot(T x, T y)
 {
     __target_switch
@@ -7149,7 +7149,7 @@ T dot(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -7170,7 +7170,7 @@ T dot(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -7360,7 +7360,7 @@ matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T exp(T x)
 {
     __target_switch
@@ -7378,7 +7378,7 @@ T exp(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> exp(vector<T, N> x)
 {
     __target_switch
@@ -7396,7 +7396,7 @@ vector<T, N> exp(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> exp(matrix<T, N, M> x)
 {
     __target_switch
@@ -7411,7 +7411,7 @@ matrix<T, N, M> exp(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T exp2(T x)
 {
     __target_switch
@@ -7443,7 +7443,7 @@ T exp2(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> exp2(vector<T,N> x)
 {
     __target_switch
@@ -7462,7 +7462,7 @@ vector<T,N> exp2(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> exp2(matrix<T,N,M> x)
 {
     __target_switch
@@ -7477,7 +7477,7 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T exp10(T x)
 {
     __target_switch
@@ -7491,7 +7491,7 @@ T exp10(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> exp10(vector<T,N> x)
 {
     __target_switch
@@ -7675,7 +7675,7 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
 // Flip surface normal to face forward, if needed
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 {
     __target_switch
@@ -7828,7 +7828,7 @@ vector<uint,N> firstbitlow(vector<uint,N> value)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T floor(T x)
 {
     __target_switch
@@ -7846,7 +7846,7 @@ T floor(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> floor(vector<T, N> x)
 {
     __target_switch
@@ -7864,7 +7864,7 @@ vector<T, N> floor(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> floor(matrix<T, N, M> x)
 {
     __target_switch
@@ -7935,7 +7935,7 @@ matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T fmod(T x, T y)
 {
     // In HLSL, `fmod` returns a remainder.
@@ -8006,7 +8006,7 @@ T fmod(T x, T y)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -8023,7 +8023,7 @@ vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     __target_switch
@@ -8037,7 +8037,7 @@ matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
 // Fractional part
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T frac(T x)
 {
     __target_switch
@@ -8055,7 +8055,7 @@ T frac(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> frac(vector<T, N> x)
 {
     __target_switch
@@ -8081,7 +8081,7 @@ matrix<T, N, M> frac(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T fract(T x)
 {
     return frac(x);
@@ -8090,7 +8090,7 @@ T fract(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> fract(vector<T, N> x)
 {
     return frac(x);
@@ -8100,7 +8100,7 @@ vector<T, N> fract(vector<T, N> x)
 // Split float into mantissa and exponent
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T frexp(T x, out int exp)
 {
     __target_switch
@@ -8118,7 +8118,7 @@ T frexp(T x, out int exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
 {
     __target_switch
@@ -8136,7 +8136,7 @@ vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 {
     __target_switch
@@ -9271,7 +9271,7 @@ void InterlockedXor(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 bool isfinite(T x)
 {
     __target_switch
@@ -9289,7 +9289,7 @@ bool isfinite(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<bool, N> isfinite(vector<T, N> x)
 {
     __target_switch
@@ -9307,7 +9307,7 @@ vector<bool, N> isfinite(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<bool, N, M> isfinite(matrix<T, N, M> x)
 {
     __target_switch
@@ -9321,7 +9321,7 @@ matrix<bool, N, M> isfinite(matrix<T, N, M> x)
 // Is floating-point value infinite?
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 bool isinf(T x)
 {
     __target_switch
@@ -9340,7 +9340,7 @@ bool isinf(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<bool, N> isinf(vector<T, N> x)
 {
     __target_switch
@@ -9358,7 +9358,7 @@ vector<bool, N> isinf(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<bool, N, M> isinf(matrix<T, N, M> x)
 {
     __target_switch
@@ -9372,7 +9372,7 @@ matrix<bool, N, M> isinf(matrix<T, N, M> x)
 // Is floating-point value not-a-number?
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 bool isnan(T x)
 {
     __target_switch
@@ -9391,7 +9391,7 @@ bool isnan(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<bool, N> isnan(vector<T, N> x)
 {
     __target_switch
@@ -9409,7 +9409,7 @@ vector<bool, N> isnan(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<bool, N, M> isnan(matrix<T, N, M> x)
 {
     __target_switch
@@ -9424,7 +9424,7 @@ matrix<bool, N, M> isnan(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T ldexp(T x, T exp)
 {
     __target_switch
@@ -9437,7 +9437,7 @@ T ldexp(T x, T exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 {
     __target_switch
@@ -9450,7 +9450,7 @@ vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
 {
     __target_switch
@@ -9463,7 +9463,7 @@ matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
 
 __generic<T : __BuiltinFloatingPointType, E : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T ldexp(T x, E exp)
 {
     __target_switch
@@ -9481,7 +9481,7 @@ T ldexp(T x, E exp)
 
 __generic<T : __BuiltinFloatingPointType, E : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
 {
     __target_switch
@@ -9505,7 +9505,7 @@ vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
 // Vector length
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T length(vector<T, N> x)
 {
     __target_switch
@@ -9523,7 +9523,7 @@ T length(vector<T, N> x)
 
 // Scalar float length
 __generic<T : __BuiltinFloatingPointType>
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T length(T x)
 {
     __target_switch
@@ -9540,7 +9540,7 @@ T length(T x)
 // Linear interpolation
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T lerp(T x, T y, T s)
 {
     __target_switch
@@ -9558,7 +9558,7 @@ T lerp(T x, T y, T s)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> lerp(vector<T, N> x, vector<T, N> y, vector<T, N> s)
 {
     __target_switch
@@ -9576,7 +9576,7 @@ vector<T, N> lerp(vector<T, N> x, vector<T, N> y, vector<T, N> s)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
 {
     __target_switch
@@ -9589,7 +9589,7 @@ matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
 
 // Legacy lighting function (obsolete)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 float4 lit(float n_dot_l, float n_dot_h, float m)
 {
     __target_switch
@@ -9606,7 +9606,7 @@ float4 lit(float n_dot_l, float n_dot_h, float m)
 // Base-e logarithm
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T log(T x)
 {
     __target_switch
@@ -9624,7 +9624,7 @@ T log(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> log(vector<T, N> x)
 {
     __target_switch
@@ -9642,7 +9642,7 @@ vector<T, N> log(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> log(matrix<T, N, M> x)
 {
     __target_switch
@@ -9656,7 +9656,7 @@ matrix<T, N, M> log(matrix<T, N, M> x)
 // Base-10 logarithm
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T log10(T x)
 {
     __target_switch
@@ -9679,7 +9679,7 @@ T log10(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> log10(vector<T,N> x)
 {
     __target_switch
@@ -9702,7 +9702,7 @@ vector<T,N> log10(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> log10(matrix<T,N,M> x)
 {
     __target_switch
@@ -9716,7 +9716,7 @@ matrix<T,N,M> log10(matrix<T,N,M> x)
 // Base-2 logarithm
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T log2(T x)
 {
     __target_switch
@@ -9734,7 +9734,7 @@ T log2(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> log2(vector<T,N> x)
 {
     __target_switch
@@ -9752,7 +9752,7 @@ vector<T,N> log2(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> log2(matrix<T,N,M> x)
 {
     __target_switch
@@ -9865,7 +9865,7 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 // maximum
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T max(T x, T y)
 {
     // Note: a stdlib implementation of `max` (or `min`) will require splitting
@@ -9900,7 +9900,7 @@ T max(T x, T y)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -9930,7 +9930,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     __target_switch
@@ -9943,7 +9943,7 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T max(T x, T y)
 {
     __target_switch
@@ -9961,7 +9961,7 @@ T max(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -9979,7 +9979,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     __target_switch
@@ -9992,7 +9992,7 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T max3(T x, T y, T z)
 {
     __target_switch
@@ -10005,7 +10005,7 @@ T max3(T x, T y, T z)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> max3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -10018,7 +10018,7 @@ vector<T,N> max3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T fmax(T x, T y)
 {
     __target_switch
@@ -10032,7 +10032,7 @@ T fmax(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> fmax(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -10045,7 +10045,7 @@ vector<T,N> fmax(vector<T,N> x, vector<T,N> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T fmax3(T x, T y, T z)
 {
     __target_switch
@@ -10079,7 +10079,7 @@ T fmax3(T x, T y, T z)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -10094,7 +10094,7 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 // minimum
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T min(T x, T y)
 {
     __target_switch
@@ -10122,7 +10122,7 @@ T min(T x, T y)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -10148,7 +10148,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     __target_switch
@@ -10161,7 +10161,7 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T min(T x, T y)
 {
     __target_switch
@@ -10179,7 +10179,7 @@ T min(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -10197,7 +10197,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     __target_switch
@@ -10210,7 +10210,7 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T min3(T x, T y, T z)
 {
     __target_switch
@@ -10223,7 +10223,7 @@ T min3(T x, T y, T z)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> min3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -10236,7 +10236,7 @@ vector<T,N> min3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T fmin(T x, T y)
 {
     __target_switch
@@ -10250,7 +10250,7 @@ T fmin(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> fmin(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -10264,7 +10264,7 @@ vector<T,N> fmin(vector<T,N> x, vector<T,N> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T fmin3(T x, T y, T z)
 {
     __target_switch
@@ -10298,7 +10298,7 @@ T fmin3(T x, T y, T z)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> fmin3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -10313,7 +10313,7 @@ vector<T,N> fmin3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 // Median
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T median3(T x, T y, T z)
 {
     __target_switch
@@ -10341,7 +10341,7 @@ T median3(T x, T y, T z)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> median3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -10360,7 +10360,7 @@ vector<T,N> median3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T fmedian3(T x, T y, T z)
 {
     __target_switch
@@ -10389,7 +10389,7 @@ T fmedian3(T x, T y, T z)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> fmedian3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -10404,7 +10404,7 @@ vector<T,N> fmedian3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 // split into integer and fractional parts (both with same sign)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T modf(T x, out T ip)
 {
     __target_switch
@@ -10422,7 +10422,7 @@ T modf(T x, out T ip)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
 {
     __target_switch
@@ -10440,7 +10440,7 @@ vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 {
     __target_switch
@@ -10453,7 +10453,7 @@ matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 
 // msad4 (whatever that is)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 uint4 msad4(uint reference, uint2 source, uint4 accum)
 {
     __target_switch
@@ -10481,39 +10481,39 @@ uint4 msad4(uint reference, uint2 source, uint4 accum)
 __generic<T : __BuiltinArithmeticType>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T mul(T x, T y);
 
 // scalar-vector and vector-scalar
 __generic<T : __BuiltinArithmeticType, let N : int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> mul(vector<T, N> x, T y);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> mul(T x, vector<T, N> y);
 
 // scalar-matrix and matrix-scalar
 __generic<T : __BuiltinArithmeticType, let N : int, let M :int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> mul(matrix<T, N, M> x, T y);
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M :int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> mul(T x, matrix<T, N, M> y);
 
 // vector-vector (dot product)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T mul(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -10527,7 +10527,7 @@ T mul(vector<T, N> x, vector<T, N> y)
 }
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T mul(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -10541,7 +10541,7 @@ T mul(vector<T, N> x, vector<T, N> y)
 // vector-matrix
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
     __target_switch
@@ -10568,7 +10568,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
     __target_switch
@@ -10592,7 +10592,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
     __target_switch
@@ -10618,7 +10618,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 // matrix-vector
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
     __target_switch
@@ -10645,7 +10645,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
     __target_switch
@@ -10669,7 +10669,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
     __target_switch
@@ -10695,7 +10695,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 // matrix-matrix
 __generic<T : __BuiltinFloatingPointType, let R : int, let N : int, let C : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     __target_switch
@@ -10723,7 +10723,7 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 }
 __generic<T : __BuiltinIntegerType, let R : int, let N : int, let C : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     __target_switch
@@ -10748,7 +10748,7 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 }
 __generic<T : __BuiltinLogicalType, let R : int, let N : int, let C : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     __target_switch
@@ -10879,7 +10879,7 @@ T NonUniformResourceIndex<T>(T value) { return value; }
 // Normalize a vector
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> normalize(vector<T,N> x)
 {
     __target_switch
@@ -10897,7 +10897,7 @@ vector<T,N> normalize(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T normalize(T x)
 {
     __target_switch
@@ -10916,7 +10916,7 @@ T normalize(T x)
 // Raise to a power
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T pow(T x, T y)
 {
     __target_switch
@@ -10934,7 +10934,7 @@ T pow(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -10952,7 +10952,7 @@ vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     __target_switch
@@ -10965,7 +10965,7 @@ matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T powr(T x, T y)
 {
     __target_switch
@@ -10978,7 +10978,7 @@ T powr(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -11124,7 +11124,7 @@ void ProcessTriTessFactorsMin(
 // Degrees to radians
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T radians(T x)
 {
     __target_switch
@@ -11141,7 +11141,7 @@ T radians(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> radians(vector<T, N> x)
 {
     __target_switch
@@ -11158,7 +11158,7 @@ vector<T, N> radians(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> radians(matrix<T, N, M> x)
 {
     __target_switch
@@ -11172,7 +11172,7 @@ matrix<T, N, M> radians(matrix<T, N, M> x)
 // Approximate reciprocal
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T rcp(T x)
 {
     __target_switch
@@ -11185,7 +11185,7 @@ T rcp(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> rcp(vector<T, N> x)
 {
     __target_switch
@@ -11201,7 +11201,7 @@ vector<T, N> rcp(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> rcp(matrix<T, N, M> x)
 {
     __target_switch
@@ -11215,7 +11215,7 @@ matrix<T, N, M> rcp(matrix<T, N, M> x)
 // Reflect incident vector across plane with given normal
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T reflect(T i, T n)
 {
     __target_switch
@@ -11233,7 +11233,7 @@ T reflect(T i, T n)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> reflect(vector<T,N> i, vector<T,N> n)
 {
     __target_switch
@@ -11252,7 +11252,7 @@ vector<T,N> reflect(vector<T,N> i, vector<T,N> n)
 // Refract incident vector given surface normal and index of refraction
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> refract(vector<T,N> i, vector<T,N> n, T eta)
 {
     __target_switch
@@ -11273,7 +11273,7 @@ vector<T,N> refract(vector<T,N> i, vector<T,N> n, T eta)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T refract(T i, T n, T eta)
 {
     __target_switch
@@ -11335,7 +11335,7 @@ vector<uint, N> reversebits(vector<uint, N> value)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T rint(T x)
 {
     __target_switch
@@ -11366,7 +11366,7 @@ T rint(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> rint(vector<T,N> x)
 {
     __target_switch
@@ -11384,7 +11384,7 @@ vector<T,N> rint(vector<T,N> x)
 // Round-to-nearest
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T round(T x)
 {
     __target_switch
@@ -11402,7 +11402,7 @@ T round(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> round(vector<T, N> x)
 {
     __target_switch
@@ -11420,7 +11420,7 @@ vector<T, N> round(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> round(matrix<T,N,M> x)
 {
     __target_switch
@@ -11434,7 +11434,7 @@ matrix<T,N,M> round(matrix<T,N,M> x)
 // Reciprocal of square root
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T rsqrt(T x)
 {
     __target_switch
@@ -11454,7 +11454,7 @@ T rsqrt(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> rsqrt(vector<T, N> x)
 {
     __target_switch
@@ -11472,7 +11472,7 @@ vector<T, N> rsqrt(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> rsqrt(matrix<T, N, M> x)
 {
     __target_switch
@@ -11487,7 +11487,7 @@ matrix<T, N, M> rsqrt(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T saturate(T x)
 {
     __target_switch
@@ -11501,7 +11501,7 @@ T saturate(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> saturate(vector<T,N> x)
 {
     __target_switch
@@ -11517,7 +11517,7 @@ vector<T,N> saturate(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> saturate(matrix<T,N,M> x)
 {
     __target_switch
@@ -11586,7 +11586,7 @@ vector<int, N> sign(vector<T, N> x)
 
 __generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 matrix<int, N, M> sign(matrix<T, N, M> x)
 {
     __target_switch
@@ -11601,7 +11601,7 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T sin(T x)
 {
     __target_switch
@@ -11619,7 +11619,7 @@ T sin(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> sin(vector<T, N> x)
 {
     __target_switch
@@ -11637,7 +11637,7 @@ vector<T, N> sin(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> sin(matrix<T, N, M> x)
 {
     __target_switch
@@ -11674,7 +11674,7 @@ vector<T,N> __sincos_metal(vector<T,N> x, out vector<T,N> c)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 void sincos(T x, out T s, out T c)
 {
     __target_switch
@@ -11694,7 +11694,7 @@ void sincos(T x, out T s, out T c)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
 {
     __target_switch
@@ -11713,7 +11713,7 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1: int, let L2 : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
 {
     __target_switch
@@ -11728,7 +11728,7 @@ void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
 // Hyperbolic Sine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T sinh(T x)
 {
     __target_switch
@@ -11746,7 +11746,7 @@ T sinh(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> sinh(vector<T, N> x)
 {
     __target_switch
@@ -11764,7 +11764,7 @@ vector<T, N> sinh(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> sinh(matrix<T, N, M> x)
 {
     __target_switch
@@ -11779,7 +11779,7 @@ matrix<T, N, M> sinh(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T sinpi(T x)
 {
     __target_switch
@@ -11792,7 +11792,7 @@ T sinpi(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> sinpi(vector<T,N> x)
 {
     __target_switch
@@ -11807,7 +11807,7 @@ vector<T,N> sinpi(vector<T,N> x)
 // Smooth step (Hermite interpolation)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T smoothstep(T min, T max, T x)
 {
     __target_switch
@@ -11826,7 +11826,7 @@ T smoothstep(T min, T max, T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> smoothstep(vector<T, N> min, vector<T, N> max, vector<T, N> x)
 {
     __target_switch
@@ -11844,7 +11844,7 @@ vector<T, N> smoothstep(vector<T, N> min, vector<T, N> max, vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N, M> x)
 {
     __target_switch
@@ -11858,7 +11858,7 @@ matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N
 // Square root
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T sqrt(T x)
 {
     __target_switch
@@ -11876,7 +11876,7 @@ T sqrt(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> sqrt(vector<T, N> x)
 {
     __target_switch
@@ -11894,7 +11894,7 @@ vector<T, N> sqrt(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> sqrt(matrix<T, N, M> x)
 {
     __target_switch
@@ -11908,7 +11908,7 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
 // Step function
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T step(T y, T x)
 {
     __target_switch
@@ -11926,7 +11926,7 @@ T step(T y, T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> step(vector<T,N> y, vector<T,N> x)
 {
     __target_switch
@@ -11944,7 +11944,7 @@ vector<T,N> step(vector<T,N> y, vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
 {
     __target_switch
@@ -11958,7 +11958,7 @@ matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
 // Tangent
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T tan(T x)
 {
     __target_switch
@@ -11976,7 +11976,7 @@ T tan(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> tan(vector<T, N> x)
 {
     __target_switch
@@ -11994,7 +11994,7 @@ vector<T, N> tan(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> tan(matrix<T, N, M> x)
 {
     __target_switch
@@ -12008,7 +12008,7 @@ matrix<T, N, M> tan(matrix<T, N, M> x)
 // Hyperbolic tangent
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T tanh(T x)
 {
     __target_switch
@@ -12026,7 +12026,7 @@ T tanh(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> tanh(vector<T,N> x)
 {
     __target_switch
@@ -12044,7 +12044,7 @@ vector<T,N> tanh(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> tanh(matrix<T,N,M> x)
 {
     __target_switch
@@ -12059,7 +12059,7 @@ matrix<T,N,M> tanh(matrix<T,N,M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T tanpi(T x)
 {
     __target_switch
@@ -12072,7 +12072,7 @@ T tanpi(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> tanpi(vector<T,N> x)
 {
     __target_switch
@@ -12087,7 +12087,7 @@ vector<T,N> tanpi(vector<T,N> x)
 // Matrix transpose
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
@@ -12108,7 +12108,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
@@ -12129,7 +12129,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 [PreferRecompute]
 [OverloadRank(-1)]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
@@ -12153,7 +12153,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 // Truncate to integer
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T trunc(T x)
 {
     __target_switch
@@ -12171,7 +12171,7 @@ T trunc(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> trunc(vector<T, N> x)
 {
     __target_switch
@@ -12189,7 +12189,7 @@ vector<T, N> trunc(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T, N, M> trunc(matrix<T, N, M> x)
 {
     __target_switch
@@ -16710,7 +16710,6 @@ ${{{{
             return spirv_asm
             {
                 OpCapability RayQueryKHR;
-                OpCapability RayTracingPositionFetchKHR;
                 OpCapability RayQueryPositionFetchKHR;
                 OpExtension "SPV_KHR_ray_query";
                 OpExtension "SPV_KHR_ray_tracing_position_fetch";
