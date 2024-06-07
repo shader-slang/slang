@@ -5,6 +5,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -shaderobj
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

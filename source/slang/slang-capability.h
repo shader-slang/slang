@@ -179,11 +179,12 @@ public:
     /// Find any capability sets which are in 'available' but not in 'required'. Return false if this situation occurs. 
     static bool checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, CapabilityAtomSet& outFailedAvailableSet);
 
-    inline void addToTargetCapabilityWithValidUIntSetAndTargetAndStage(CapabilityName target, CapabilityName stage, CapabilityAtomSet setToAdd);
-    inline void addToTargetCapabilityWithTargetAndStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
-    inline void addToTargetCapabilityWithTargetAndOrStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
-    inline void addToTargetCapabilityWithStageAtom(CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
-    inline void addToTargetCapabilitesWithCanonicalRepresentation(const ArrayView<CapabilityName>& atom);
+    // For each element in `elementsToPermutateWith`, create and add a different conjunction permutation by adding to `setToPermutate`. 
+    template<CapabilityName keyholeAtomToPermuteWith>
+    void addPermutationsOfConjunctionForEachInContainer(CapabilityAtomSet& setToPermutate, const CapabilityAtomSet& elementsToPermutateWith, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom);
+    // This is used for adding conjunctions directly and efficently, this is not functionally a join.
+    // if `knownStage`/`knownTarget` is not CapabilityAtom::Invalid, the given atom will be assumed as an assigned key atom (faster)
+    inline void addConjunction(CapabilityAtomSet conjunction, CapabilityAtom knownTarget, CapabilityAtom knownStage);
     inline void addUnexpandedCapabilites(CapabilityName atom);
     
     CapabilityTargetSets& getCapabilityTargetSets() { return m_targetSets; }

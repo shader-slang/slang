@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 [Flags]
 enum MyFlags

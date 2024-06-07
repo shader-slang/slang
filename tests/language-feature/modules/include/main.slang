@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 module main;
 

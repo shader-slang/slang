@@ -740,6 +740,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
@@ -799,6 +800,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
@@ -1325,6 +1327,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
@@ -1426,6 +1429,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
