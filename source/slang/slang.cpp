@@ -1795,6 +1795,7 @@ CapabilitySet TargetRequest::getTargetCaps()
     }
 
     CapabilitySet targetCap = CapabilitySet(atoms);
+    targetCap.join(profileCaps);
 
     CapabilityName latestSpirvAtom = getLatestSpirvAtom();
 
@@ -1818,8 +1819,8 @@ CapabilitySet TargetRequest::getTargetCaps()
             atoms.add(atom);
         }
     }
-
-    cookedCapabilities = CapabilitySet(atoms);
+    targetCap.join(CapabilitySet(atoms));
+    cookedCapabilities = targetCap;
     return cookedCapabilities;
 }
 

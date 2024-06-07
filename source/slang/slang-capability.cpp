@@ -384,6 +384,9 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(CapabilitySet const& o
     bool onlyRequireSingleImply = ((int)flags & (int)ImpliesFlags::OnlyRequireASingleValidImply);
     int flagsCollected = (int)CapabilitySet::ImpliesReturnFlags::NotImplied;
 
+    if (otherSet.isEmpty())
+        return CapabilitySet::ImpliesReturnFlags::Implied;
+
     for (const auto& otherTarget : otherSet.m_targetSets)
     {
         auto thisTarget = this->m_targetSets.tryGetValue(otherTarget.first);

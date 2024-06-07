@@ -1265,7 +1265,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 	{
 		case DeviceType::DirectX11:
 			input.target = SLANG_DXBC;
-            input.profile = "sm_5_0";
+            input.profile = "";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
             slangPassThrough = SLANG_PASS_THROUGH_FXC;
             
@@ -1273,28 +1273,28 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
 		case DeviceType::DirectX12:
 			input.target = SLANG_DXBC;
-            input.profile = "sm_5_0";
+            input.profile = "";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
             slangPassThrough = SLANG_PASS_THROUGH_FXC;
             
             if( options.useDXIL )
             {
                 input.target = SLANG_DXIL;
-                input.profile = "sm_6_0";
+                input.profile = "";
                 slangPassThrough = SLANG_PASS_THROUGH_DXC;
             }
 			break;
 
 		case DeviceType::OpenGl:
 			input.target = SLANG_GLSL;
-            input.profile = "glsl_430";
+            input.profile = "";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
             slangPassThrough = SLANG_PASS_THROUGH_GLSLANG;
 			break;
 
 		case DeviceType::Vulkan:
 			input.target = SLANG_SPIRV;
-            input.profile = "glsl_430";
+            input.profile = "";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
             slangPassThrough = SLANG_PASS_THROUGH_GLSLANG;
 			break;

@@ -201,10 +201,16 @@ namespace Slang
         Name* getName() { return m_name; }
 
             /// Get the stage that the entry point is to be compiled for
-        Stage getStage() { return m_profile.getStage(); }
+        Stage getStage() 
+        {
+            return m_profile.getStage();
+        }
 
             /// Get the profile that the entry point is to be compiled for
-        Profile getProfile() { return m_profile; }
+        Profile getProfile()
+        {
+            return m_profile;
+        }
 
             /// Get the index to the translation unit
         int getTranslationUnitIndex() const { return m_translationUnitIndex; }
