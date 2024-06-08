@@ -1481,9 +1481,8 @@ struct SPIRVEmitContext
                 if (structSize >= (uint64_t)IRSizeAndAlignment::kIndeterminateSize)
                 {
                     IRBuilder builder(inst);
-                    if (isSpirv14OrLater() ||
-                        (!inst->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration) &&
-                        !inst->findDecorationImpl(kIROp_SPIRVBlockDecoration)))
+                    if ((isSpirv14OrLater() || !inst->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+                        && !inst->findDecorationImpl(kIROp_SPIRVBlockDecoration))
                     {
                         auto decoration = builder.addDecoration(inst, kIROp_SPIRVBlockDecoration);
                         emitDecoration(getID(spvStructType), decoration);
