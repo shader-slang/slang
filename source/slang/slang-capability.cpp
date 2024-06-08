@@ -252,6 +252,23 @@ void CapabilitySet::addUnexpandedCapabilites(CapabilityName atom)
         addConjunction(*cr, CapabilityAtom::Invalid, CapabilityAtom::Invalid);
 }
 
+CapabilityAtom CapabilitySet::getUniquelyImpliedStageAtom() const
+{
+    CapabilityAtom result = CapabilityAtom::Invalid;
+    for (auto& targetKV : m_targetSets)
+    {
+        if (targetKV.second.shaderStageSets.getCount() == 1)
+        {
+            auto thisStage = targetKV.second.shaderStageSets.begin()->first;
+            if (result == CapabilityAtom::Invalid)
+                result = thisStage;
+            else if (result != thisStage)
+                return CapabilityAtom::Invalid;
+        }
+    }
+    return result;
+}
+
 CapabilitySet::CapabilitySet()
 {}
 

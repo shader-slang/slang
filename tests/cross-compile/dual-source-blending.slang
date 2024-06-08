@@ -4,8 +4,12 @@
 // `vk::index` attributes to compile
 // for dual-source color blending.
 
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry main -stage fragment
 //TEST_DISABLED:SIMPLE:-target glsl
+
+// CHECK: OpDecorate %{{.*}}main_a Location 0
+// CHECK: OpDecorate %{{.*}}main_b Location 0
+// CHECK: OpDecorate %{{.*}}main_b Index 1
 
 struct FragmentOutput
 {
