@@ -3050,6 +3050,37 @@ ${{{{
 } // for (access).
 }}}}
 
+// Definitions to support the legacy texture .mips[][] operator.
+struct __TextureMip<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    int mip;
+    __subscript(vector<int, isArray + Shape.dimensions> pos)->T
+    {
+        [__unsafeForceInlineEarly]
+        get { return tex.Load(__makeVector(pos, mip)); }
+    }
+}
+struct __TextureMips<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    __subscript(int mip)->__TextureMip<T, Shape, isArray, isCombined, format>
+    {
+        [__unsafeForceInlineEarly]
+        get { return { tex, mip }; }
+    }
+}
+
+__generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+extension __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
+{
+    property __TextureMips<T, Shape, isArray, isCombined, format> mips
+    {
+        [__unsafeForceInlineEarly]
+        get { return { this }; }
+    }
+}
+
 // Texture type aliases.
 // T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int
 ${{{{
