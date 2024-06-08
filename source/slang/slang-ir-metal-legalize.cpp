@@ -307,7 +307,7 @@ namespace Slang
         else if (semanticName == "sv_instanceid")
         {
             result.metalSystemValueName = toSlice("instance_id");
-            result.requiredType = builder.getBasicType(BaseType::Int);
+            result.requiredType = builder.getBasicType(BaseType::UInt);
         }
         else if (semanticName == "sv_isfrontface")
         {
