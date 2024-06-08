@@ -4776,7 +4776,10 @@ struct SPIRVEmitContext
 
         IRBuilder builder(m_irModule);
         builder.setInsertBefore(inst);
-        if (auto index = as<IRIntLit>(inst->getIndex()))
+        auto indexOperand = inst->getIndex();
+        if (auto globalValueRef = as<IRGlobalValueRef>(indexOperand))
+            indexOperand = globalValueRef->getValue();
+        if (auto index = as<IRIntLit>(indexOperand))
         {
             return emitOpCompositeExtract(
                 parent,
