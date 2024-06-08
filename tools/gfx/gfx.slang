@@ -47,6 +47,7 @@ public enum class DeviceType
     DirectX12,
     OpenGl,
     Vulkan,
+    Metal,
     CPU,
     CUDA,
     CountOf,
@@ -58,6 +59,7 @@ public enum class ProjectionStyle
     OpenGl,
     DirectX,
     Vulkan,
+    Metal,
     CountOf,
 };
 
@@ -67,6 +69,7 @@ public enum class BindingStyle
     DirectX,
     OpenGl,
     Vulkan,
+    Metal,
     CPU,
     CUDA,
     CountOf,
@@ -336,6 +339,7 @@ public enum class InteropHandleAPI
     FileDescriptor,           // A file descriptor.
     DeviceAddress,            // A device address.
     D3D12CpuDescriptorHandle, // A D3D12_CPU_DESCRIPTOR_HANDLE value.
+    Metal,                    // A general Metal object handle.
 };
 
 public struct InteropHandle

@@ -192,6 +192,9 @@ INST(Nop, nop, 0, 0)
             INST(PrimitivesType, Primitives, 2, HOISTABLE)
         INST_RANGE(MeshOutputType, VerticesType, PrimitivesType)
 
+        /* Metal Mesh Grid Properties */
+            INST(MetalMeshGridPropertiesType, mesh_grid_properties, 0, HOISTABLE)
+
         /* HLSLStructuredBufferTypeBase */
             INST(HLSLStructuredBufferType,                  StructuredBuffer,                   0, HOISTABLE)
             INST(HLSLRWStructuredBufferType,                RWStructuredBuffer,                 0, HOISTABLE)
@@ -585,14 +588,14 @@ INST(TargetSwitch, targetSwitch, 1, 0)
 // A generic asm inst has an return semantics that terminates the control flow.
 INST(GenericAsm, GenericAsm, 1, 0)
 
-INST(discard, discard, 0, 0)
-
 /* IRUnreachable */
 INST(MissingReturn, missingReturn, 0, 0)
 INST(Unreachable, unreachable, 0, 0)
 INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
 INST_RANGE(TerminatorInst, Return, Unreachable)
+
+INST(discard, discard, 0, 0)
 
 INST(RequirePrelude, RequirePrelude, 1, 0)
 INST(RequireGLSLExtension, RequireGLSLExtension, 1, 0)
@@ -712,6 +715,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST_RANGE(TargetSpecificDecoration, TargetDecoration, RequirePreludeDecoration)
     INST(GLSLOuterArrayDecoration,          glslOuterArray,         1, 0)
     
+    INST(TargetSystemValueDecoration,       TargetSystemValue,      2, 0)
+
     INST(InterpolationModeDecoration,       interpolationMode,      1, 0)
     INST(NameHintDecoration,                nameHint,               1, 0)
 
@@ -735,6 +740,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
     INST(RequireCUDASMVersionDecoration,    requireCUDASMVersion,   1, 0)
+    INST(RequireCapabilityAtomDecoration,   requireCapabilityAtom, 1, 0)
 
     INST(HasExplicitHLSLBindingDecoration, HasExplicitHLSLBinding, 0, 0)
 

@@ -3,11 +3,6 @@
 
 namespace Slang
 {
-    struct FuncProfileInfo
-    {
-        int invocationCount = 0;
-        std::chrono::nanoseconds duration = std::chrono::nanoseconds::zero();
-    };
     class PerformanceProfilerImpl : public PerformanceProfiler
     {
     public:
@@ -39,8 +34,13 @@ namespace Slang
             for (auto func : data)
             {
                 out << func.key << ": \t";
-                out << func.value.invocationCount << "\t" << func.value.duration.count()/1000000 << "\n";
+                auto milliseconds = std::chrono::duration_cast< std::chrono::milliseconds >(func.value.duration);
+                out << func.value.invocationCount << "\t" << milliseconds.count() << "ms\n";
             }
+        }
+        virtual void clear() override
+        {
+            data.clear();
         }
     };
 
@@ -48,5 +48,68 @@ namespace Slang
     {
         thread_local static PerformanceProfilerImpl profiler = PerformanceProfilerImpl();
         return &profiler;
+    }
+
+    SlangProfiler::SlangProfiler(PerformanceProfiler* profiler)
+    {
+        PerformanceProfilerImpl* profilerImpl = static_cast<PerformanceProfilerImpl*>(profiler);
+        size_t entryCount = profilerImpl->data.getCount();
+
+        m_profilEntries.reserve(entryCount);
+
+        int index = 0;
+        for (auto func : profilerImpl->data)
+        {
+            ProfileInfo profileEntry {};
+            size_t strSize = std::min(sizeof(profileEntry.funcName) - 1, strlen(func.key));
+
+            if (strSize > 0)
+            {
+                memcpy(profileEntry.funcName, func.key, strSize);
+            }
+            profileEntry.invocationCount = func.value.invocationCount;
+            profileEntry.duration = func.value.duration;
+
+            m_profilEntries.insert(index, profileEntry);
+            index++;
+        }
+    }
+
+    ISlangUnknown* SlangProfiler::getInterface(const Guid& guid)
+    {
+        if(guid == SlangProfiler::getTypeGuid())
+            return static_cast<ISlangUnknown*>(this);
+        else
+            return nullptr;
+    }
+
+    size_t SlangProfiler::getEntryCount()
+    {
+        return m_profilEntries.getCount();
+    }
+
+    const char* SlangProfiler::getEntryName(uint32_t index)
+    {
+        if (index >= (uint32_t)m_profilEntries.getCount())
+            return nullptr;
+
+        return m_profilEntries[index].funcName;
+    }
+
+    long SlangProfiler::getEntryTimeMS(uint32_t index)
+    {
+        if (index >= (uint32_t)m_profilEntries.getCount())
+            return 0;
+
+        auto milliseconds = std::chrono::duration_cast< std::chrono::milliseconds >(m_profilEntries[index].duration);
+        return (long)milliseconds.count();
+    }
+
+    uint32_t SlangProfiler::getEntryInvocationTimes(uint32_t index)
+    {
+        if (index >= (uint32_t)m_profilEntries.getCount())
+            return 0;
+
+        return m_profilEntries[index].invocationCount;
     }
 }

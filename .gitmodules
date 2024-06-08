@@ -32,3 +32,6 @@
 [submodule "external/vulkan-headers"]
 	path = external/vulkan
 	url = https://github.com/KhronosGroup/Vulkan-Headers
+[submodule "external/metal-cpp"]
+	path = external/metal-cpp
+	url = https://github.com/bkaradzic/metal-cpp

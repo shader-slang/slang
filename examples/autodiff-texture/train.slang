@@ -2,12 +2,12 @@
 
 // This class encapsulates a differentiable texture object that uses
 // hardware sampling for the primal version, but substitutes a reference
-// interpolation implementation to generate backward pass. 
-// 
+// interpolation implementation to generate backward pass.
+//
 // This specific implementation also makes the choice to use fast fixed point
 // atomics to accumulate the derivative (suitable for this example, but maybe
 // not in general)
-// 
+//
 struct DifferentiableTexture
 {
     RWStructuredBuffer<int> accumulateBuffer; // Per-mip-level accumulate buffer

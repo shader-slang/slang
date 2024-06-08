@@ -5,7 +5,7 @@
 //TEST:SIMPLE(filecheck=SPIR): -stage compute -entry computeMain -target spirv -emit-spirv-directly -DEMIT_SOURCE
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-slang -compute -dx12 -profile cs_6_6 -use-dxil -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DEXCLUDE_DEPTH_TEXTURE
 
 // METAL_CAPS_ERROR: error 36107
 
@@ -450,10 +450,10 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.sample_texture_2d_array.v4f32(
         && all(Tv(1) == t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1)))
 
+#ifndef EXCLUDE_DEPTH_TEXTURE // Our vulkan backend don't support SampleCmp from a rgb texture.
         // ==================
         // float SampleCmp()
         // ==================
-
         // METAL: d2D{{.*}}.sample_compare(
         // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
         && float(1) == d2D.SampleCmp(shadowSampler, float2(u, u), 0)
@@ -501,7 +501,7 @@ bool TEST_texture_float()
         // METAL: d2D{{.*}}.sample_compare(
         // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
         && float(1) == d2D.SampleCmpLevelZero(shadowSampler, float2(u2, u), 0, int2(0, 0))
-
+#endif
         // ==================================
         //  vector<T,4> Gather()
         // ==================================

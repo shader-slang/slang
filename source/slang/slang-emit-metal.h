@@ -76,7 +76,8 @@ protected:
     void _emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
 
     void _emitStageAccessSemantic(IRStageAccessDecoration* decoration, const char* name);
-    void _emitSystemSemantic(UnownedStringSlice semanticName, IRIntegerValue semanticIndex);
+    void _emitUserSemantic(UnownedStringSlice semanticName, IRIntegerValue semanticIndex);
+    bool maybeEmitSystemSemantic(IRInst* inst);
 };
 
 }

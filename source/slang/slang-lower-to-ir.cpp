@@ -23,6 +23,7 @@
 #include "slang-ir-check-differentiability.h"
 #include "slang-ir-check-recursive-type.h"
 #include "slang-ir-missing-return.h"
+#include "slang-ir-operator-shift-overflow.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-strip.h"
@@ -4412,6 +4413,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             if (auto enumType = declRef.as<EnumDecl>())
             {
                 return LoweredValInfo::simple(getBuilder()->getIntValue(irType, 0));
+            }
+            else if (declRef.as<InterfaceDecl>())
+            {
+                return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
             }
             else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
@@ -10708,6 +10713,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     auto session = translationUnit->getSession();
     auto compileRequest = translationUnit->compileRequest;
+    Linkage* linkage = compileRequest->getLinkage();
 
     SharedIRGenContext sharedContextStorage(
         session,
@@ -10823,36 +10829,36 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // Generate DebugValue insts to store values into debug variables,
     // if debug symbols are enabled.
-    if (compileRequest->getLinkage()->m_optionSet.getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation) != DebugInfoLevel::None)
+    if (context->includeDebugInfo)
     {
         insertDebugValueStore(module);
     }
+
 
     // Next, attempt to promote local variables to SSA
     // temporaries and do basic simplifications.
     //
     constructSSA(module);
-    simplifyCFG(module, CFGSimplificationOptions::getDefault());
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-    peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
+    
+    bool minimumOptimizations = linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
+    if (!minimumOptimizations)
+    {
+        simplifyCFG(module, CFGSimplificationOptions::getDefault());
+        auto peepholeOptions = PeepholeOptimizationOptions::getPrelinking();
+        peepholeOptimize(nullptr, module, peepholeOptions);
+    }
+
+    IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
+    dceOptions.keepExportsAlive = true;
+    dceOptions.keepLayoutsAlive = true;
+    dceOptions.useFastAnalysis = true;
 
     for (auto inst : module->getGlobalInsts())
     {
         if (auto func = as<IRGlobalValueWithCode>(inst))
-            eliminateDeadCode(func);
+            eliminateDeadCode(func, dceOptions);
     }
-    // Next, inline calls to any functions that have been
-    // marked for mandatory "early" inlining.
-    //
-    // Note: We performed certain critical simplifications
-    // above, before this step, so that the body of functions
-    // subject to mandatory inlining can be simplified ahead
-    // of time. By simplifying the body before inlining it,
-    // we can make sure that things like superfluous temporaries
-    // are eliminated from the callee, and not copied into
-    // call sites.
-    //
-    performMandatoryEarlyInlining(module);
 
     // Where possible, move loop condition checks to the end of loops, and wrap
     // the loop in an 'if(condition)'.
@@ -10875,43 +10881,65 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         invertLoops(module);
     }
 
-    // Next, attempt to promote local variables to SSA
-    // temporaries and do basic simplifications.
+    // Next, inline calls to any functions that have been
+    // marked for mandatory "early" inlining.
     //
+    // Note: We performed certain critical simplifications
+    // above, before this step, so that the body of functions
+    // subject to mandatory inlining can be simplified ahead
+    // of time. By simplifying the body before inlining it,
+    // we can make sure that things like superfluous temporaries
+    // are eliminated from the callee, and not copied into
+    // call sites.
+    //
+    InstHashSet modifiedFuncs(module);
     for (;;)
     {
         bool changed = false;
-        performMandatoryEarlyInlining(module);
-        changed |= constructSSA(module);
-        simplifyCFG(module, CFGSimplificationOptions::getDefault());
-        changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-        changed |= peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
-        for (auto inst : module->getGlobalInsts())
+        modifiedFuncs.clear();
+        changed = performMandatoryEarlyInlining(module, &modifiedFuncs.getHashSet());
+        if (changed)
         {
-            if (auto func = as<IRGlobalValueWithCode>(inst))
-                eliminateDeadCode(func);
+            changed = peepholeOptimizeGlobalScope(nullptr, module);
+            if (!minimumOptimizations)
+            {
+                for (auto func : modifiedFuncs.getHashSet())
+                {
+                    auto codeInst = as<IRGlobalValueWithCode>(func);
+                    changed |= constructSSA(func);
+                    changed |= applySparseConditionalConstantPropagation(func, compileRequest->getSink());
+                    changed |= peepholeOptimize(nullptr, func);
+                    changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
+                    eliminateDeadCode(func, dceOptions);
+                }
+            }
         }
         if (!changed)
             break;
     }
 
-    // Propagate `constexpr`-ness through the dataflow graph (and the
-    // call graph) based on constraints imposed by different instructions.
-    propagateConstExpr(module, compileRequest->getSink());
+    if (compileRequest->getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
+    {
+        // Propagate `constexpr`-ness through the dataflow graph (and the
+        // call graph) based on constraints imposed by different instructions.
+        propagateConstExpr(module, compileRequest->getSink());
 
-    // TODO: give error messages if any `undefined` or
-    // `unreachable` instructions remain.
+        // Check for using uninitialized out parameters.
+        checkForUsingUninitializedOutParams(module, compileRequest->getSink());
+        
+        // TODO: give error messages if any `undefined` or
+        // instructions remain.
 
-    // Check for using uninitialized out parameters.
-    checkForUsingUninitializedOutParams(module, compileRequest->getSink());
+        checkForMissingReturns(module, compileRequest->getSink());
 
-    checkForMissingReturns(module, compileRequest->getSink());
+        // We don't allow recursive types.
+        checkForRecursiveTypes(module, compileRequest->getSink());
 
-    // We don't allow recursive types.
-    checkForRecursiveTypes(module, compileRequest->getSink());
+        // Check for invalid differentiable function body.
+        checkAutoDiffUsages(module, compileRequest->getSink());
 
-    // Check for invalid differentiable function body.
-    checkAutoDiffUsages(module, compileRequest->getSink());
+        checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
+    }
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions
@@ -10937,8 +10965,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         //
         IRStripOptions stripOptions;
 
-        Linkage* linkage = compileRequest->getLinkage();
-
         stripOptions.shouldStripNameHints = linkage->m_optionSet.shouldObfuscateCode();
 
         // If we are generating an obfuscated source map, we don't want to strip locs, 
@@ -10959,16 +10985,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // pass here, but make sure to set our options so that we don't
         // eliminate anything that has been marked for export.
         //
-        IRDeadCodeEliminationOptions options;
-        options.keepExportsAlive = true;
-        eliminateDeadCode(module, options);
+        eliminateDeadCode(module, dceOptions);
 
-        if (linkage->m_optionSet.shouldObfuscateCode())
+        if (stripOptions.shouldStripNameHints && linkage->m_optionSet.shouldHaveSourceMap())
         {
             // The obfuscated source map is stored on the module
             obfuscateModuleLocs(module, compileRequest->getSourceManager());
         }
     }
+
 
     // TODO: consider doing some more aggressive optimizations
     // (in particular specialization of generics) here, so
@@ -11577,6 +11602,9 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
     builder->addLayoutDecoration(irModule->getModuleInst(), irGlobalScopeVarLayout);
 
+    auto latestSpirvAtom = getLatestSpirvAtom();
+    auto latestMetalAtom = getLatestMetalAtom();
+
     for( auto entryPointLayout : programLayout->entryPoints )
     {
         auto funcDeclRef = entryPointLayout->entryPoint;
@@ -11593,6 +11621,19 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         if( !irFunc->findDecoration<IRLinkageDecoration>() )
         {
             builder->addImportDecoration(irFunc, getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
+        }
+
+        for (auto atomSet : as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements.getAtomSets())
+        {
+            for (auto atomVal : atomSet)
+            {
+                auto atom = (CapabilityName)atomVal;
+                if (atom >= CapabilityName::spirv_1_0 && atom <= latestSpirvAtom ||
+                    atom >= CapabilityName::metallib_2_3 && atom <= latestMetalAtom)
+                {
+                    builder->addRequireCapabilityAtomDecoration(irFunc, atom);
+                }
+            }
         }
 
         auto irEntryPointLayout = lowerEntryPointLayout(context, entryPointLayout);

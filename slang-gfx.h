@@ -89,6 +89,7 @@ enum class DeviceType
     DirectX12,
     OpenGl,
     Vulkan,
+    Metal,
     CPU,
     CUDA,
     CountOf,
@@ -101,6 +102,7 @@ enum class ProjectionStyle
     OpenGl,
     DirectX,
     Vulkan,
+    Metal,
     CountOf,
 };
 
@@ -112,6 +114,7 @@ enum class BindingStyle
     DirectX,
     OpenGl,
     Vulkan,
+    Metal,
     CPU,
     CUDA,
     CountOf,
@@ -545,6 +548,7 @@ enum class InteropHandleAPI
     FileDescriptor, // A file descriptor.
     DeviceAddress, // A device address.
     D3D12CpuDescriptorHandle, // A D3D12_CPU_DESCRIPTOR_HANDLE value.
+    Metal, // A general Metal object handle.
 };
 
 struct InteropHandle
@@ -1405,6 +1409,10 @@ public:
         GfxCount hitGroupCount;
         const char** hitGroupNames;
         const ShaderRecordOverwrite* hitGroupRecordOverwrites;
+
+        GfxCount callableShaderCount;
+        const char** callableShaderEntryPointNames;
+        const ShaderRecordOverwrite* callableShaderRecordOverwrites;
 
         IShaderProgram* program;
     };

@@ -14,23 +14,15 @@
 namespace Slang
 {
 
-template<typename T>
-constexpr static Index computeElementShift()
+constexpr Index intLog2(unsigned x)
 {
-    Index currentShift = 0;
-    Index currentShiftValue = 1;
-
-    while (currentShiftValue != sizeof(T) * 8)
-    {
-        currentShift++;
-        currentShiftValue *= 2;
-    }
-
-    return currentShift;
+    return x == 1 ? 0 : 1 + intLog2(x >> 1);
 }
 
+// if `in` is 0, result is undefined behavior
 static inline Index bitscanForward(uint64_t in)
 {
+    SLANG_ASSERT(in != 0);
 #if defined(_MSC_VER)
 
 #ifdef _WIN64
@@ -38,14 +30,12 @@ static inline Index bitscanForward(uint64_t in)
     _BitScanForward64((unsigned long*)&out, in);
     return Index(out);
 #else
-    constexpr uint32_t bitsInType = sizeof(uint32_t) * 8;
     uint32_t out;
     // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
-    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in) + 1));
-    if (out != bitsInType)
+    if (_BitScanForward((unsigned long*)&out, *(((uint32_t*)&in) + 1)))
         return Index(out);
     _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
-    return Index(out + bitsInType);
+    return Index(out);
 #endif// #ifdef _WIN64
 
 #else 
@@ -65,13 +55,12 @@ public:
     
     constexpr static Index kElementSize = sizeof(Element) * 8; ///< The number of bits in an element. This also determines how many values a element can hold.
     constexpr static Index kElementMask = kElementSize - 1; ///< Mask to get shift from an index
-    constexpr static Index kElementShift = computeElementShift<Element>(); ///< How many bits to shift to get Element index from an index. 5 for 2^5=32 elements in a uint32_t. 6 for 2^6=64 in a uint64_t.
+    constexpr static Index kElementShift = intLog2(sizeof(Element)*8); ///< How many bits to shift to get Element index from an index. 5 for 2^5=32 elements in a uint32_t. 6 for 2^6=64 in a uint64_t.
 
     UIntSet() {}
     UIntSet(const UIntSet& other) { m_buffer = other.m_buffer; }
     UIntSet(UIntSet && other) { *this = (_Move(other)); }
     UIntSet(UInt maxVal) { resizeAndClear(maxVal); }
-    UIntSet(List<UIntSet::Element> buffer) { m_buffer = buffer; }
 
     UIntSet& operator=(UIntSet&& other);
     UIntSet& operator=(const UIntSet& other);
@@ -81,7 +70,7 @@ public:
     /// Return the count of all bits directly represented
     Int getCount() const { return Int(m_buffer.getCount()) * kElementSize; }
 
-    List<Element>& getBuffer() { return m_buffer; }
+    const List<Element>& getBuffer() const { return m_buffer; }
 
         /// Resize such that val can be stored and clear contents
     void resizeAndClear(UInt val);
@@ -101,6 +90,9 @@ public:
         /// Add a value
     inline void add(UInt val);
     inline void add(const UIntSet& val);
+    inline void addRange(const List<UInt>& other);
+
+    inline void addRawElement(Element val, Index bitOffset);
 
         /// Remove a value
     inline void remove(UInt val);
@@ -145,37 +137,38 @@ public:
     {
         friend class UIntSet;
     private:
-        const List<Element>* context;
-        Index block = 0;
-        Element processedElement = 0;
-        uint64_t LSB = 0;
+        const List<Element>* m_context;
+        Index m_block = 0;
+        Element m_processedElement = 0;
+        uint64_t m_LSB = 0;
 
         void clearLSB()
         {
-            LSB = bitscanForward(processedElement);
-            processedElement &= processedElement - 1;
+            m_LSB = bitscanForward(m_processedElement);
+            m_processedElement &= m_processedElement - 1;
+        }
+
+        Iterator(const List<Element>* context)
+        {
+            m_context = context;
         }
     public:
-        Iterator(const List<Element>* inContext)
-        {
-            context = inContext;
-        }
 
         Element operator*()
         {
-            return Element(LSB + (kElementSize * block));
+            return Element(m_LSB + (kElementSize * m_block));
         }
 
         Iterator& operator++()
         {
-            while (processedElement == 0)
+            while (m_processedElement == 0)
             {
-                block++;
-                if (block >= context->getCount())
+                m_block++;
+                if (m_block >= m_context->getCount())
                 {
                     return *this;
                 }
-                processedElement = (*context)[block];
+                m_processedElement = (*m_context)[m_block];
             }
             clearLSB();
             return *this;
@@ -186,8 +179,8 @@ public:
         }
         bool operator==(const Iterator& other) const
         {
-            return other.block == this->block
-                && other.processedElement == this->processedElement;
+            return other.m_block == this->m_block
+                && other.m_processedElement == this->m_processedElement;
         }
         bool operator!=(const Iterator& other) const
         {
@@ -200,19 +193,21 @@ public:
         if (m_buffer.getCount() == 0)
             return tmp;
 
-        tmp.processedElement = m_buffer[0];
-        if (tmp.processedElement == 0)
+        tmp.m_processedElement = m_buffer[0];
+        if (tmp.m_processedElement == 0)
+        {
             tmp++;
+            return tmp;
+        }
 
         tmp.clearLSB();
-
         return tmp;
     }
     Iterator end() const
     {
         Iterator tmp(&m_buffer);
-        tmp.block = m_buffer.getCount();
-        tmp.processedElement = 0;
+        tmp.m_block = m_buffer.getCount();
+        tmp.m_processedElement = 0;
         return tmp;
     }
 
@@ -305,6 +300,19 @@ inline void UIntSet::add(const UIntSet& other)
 
     for (auto i = 0; i < otherCount; i++)
         m_buffer[i] |= other.m_buffer[i];
+}
+
+inline void UIntSet::addRange(const List<UInt>& other)
+{
+    for (auto i : other)
+        add(i);
+}
+
+inline void UIntSet::addRawElement(Element other, Index elementIndex)
+{
+    if(this->m_buffer.getCount() <= elementIndex)
+        resizeBackingBufferDirectly(elementIndex+1);
+    m_buffer[elementIndex] |= other;
 }
 
 template<typename T>

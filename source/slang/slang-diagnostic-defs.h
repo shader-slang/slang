@@ -740,6 +740,8 @@ DIAGNOSTIC(41021, Error, differentiableFuncMustHaveOutput, "a differentiable fun
 DIAGNOSTIC(41022, Error, differentiableFuncMustHaveInput, "a differentiable function must have at least one differentiable input.")
 DIAGNOSTIC(41023, Error, getStringHashMustBeOnStringLiteral, "getStringHash can only be called when argument is statically resolvable to a string literal")
 
+DIAGNOSTIC(41030, Warning, operatorShiftLeftOverflow, "left shift amount exceeds the number of bits and the result will be always zero, (`$0` << `$1`).")
+
 DIAGNOSTIC(41901, Error, unsupportedUseOfLValueForAutoDiff, "unsupported use of L-value for auto differentiation.")
 DIAGNOSTIC(41902, Error, cannotDifferentiateDynamicallyIndexedData, "cannot auto-differentiate mixed read/write access to dynamically indexed data in '$0'.")
 
@@ -763,7 +765,8 @@ DIAGNOSTIC(41300, Error, byteAddressBufferUnaligned, "invalid alignment `$0` spe
 //
 
 DIAGNOSTIC(50010, Internal, missingExistentialBindingsForParameter, "missing argument for existential parameter slot")
-
+DIAGNOSTIC(50011, Warning, spirvVersionNotSupported, "Slang's SPIR-V backend only supports SPIR-V version 1.3 and later."
+                                                   " Use `-emit-spirv-via-glsl` option to produce SPIR-V 1.0 through 1.2.")
 DIAGNOSTIC(50020, Error, invalidTessCoordType, "TessCoord must have vec2 or vec3 type.")
 DIAGNOSTIC(50020, Error, invalidFragCoordType, "FragCoord must be a vec4.")
 DIAGNOSTIC(50020, Error, invalidInvocationIdType, "InvocationId must have int type.")
@@ -825,7 +828,10 @@ DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid param
 
 DIAGNOSTIC(55200, Error, unsupportedBuiltinType, "'$0' is not a supported builtin type for the target.")
 DIAGNOSTIC(55201, Error, unsupportedRecursion, "recursion detected in call to '$0', but the current code generation target does not allow recursion.")
+DIAGNOSTIC(55202, Error, systemValueAttributeNotSupported, "system value semantic '$0' is not supported for the current target.")
+DIAGNOSTIC(55203, Error, systemValueTypeIncompatible, "system value semantic '$0' should have type '$1' or convertible to type '$1'.")
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
+
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 

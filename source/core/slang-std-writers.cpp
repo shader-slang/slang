@@ -10,8 +10,8 @@ namespace Slang
 {
     RefPtr<StdWriters> stdWriters(new StdWriters);
 
-    RefPtr<FileWriter> stdError(new FileWriter(stderr, WriterFlag::AutoFlush));
-    RefPtr<FileWriter> stdOut(new FileWriter(stdout, WriterFlag::AutoFlush));
+    RefPtr<FileWriter> stdError(new FileWriter(stderr, WriterFlag::AutoFlush | WriterFlag::IsUnowned));
+    RefPtr<FileWriter> stdOut(new FileWriter(stdout, WriterFlag::AutoFlush | WriterFlag::IsUnowned));
 
     stdWriters->setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, stdError);
     stdWriters->setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, stdOut);

@@ -1,6 +1,7 @@
 // simple-namespace.slang
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 // Test that simple `namespace` declarations work as expected
 

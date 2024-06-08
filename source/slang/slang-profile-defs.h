@@ -87,6 +87,7 @@ PROFILE_STAGE_ALIAS(Fragment, fragment, Pixel)
 PROFILE_FAMILY(DX)
 PROFILE_FAMILY(GLSL)
 PROFILE_FAMILY(METAL)
+PROFILE_FAMILY(SPIRV)
 
 // Profile versions
 PROFILE_VERSION(DX_4_0,             DX)
@@ -115,6 +116,13 @@ PROFILE_VERSION(GLSL_460,           GLSL)
 PROFILE_VERSION(METAL_2_3,          METAL)
 PROFILE_VERSION(METAL_2_4,          METAL)
 
+PROFILE_VERSION(SPIRV_1_0,          SPIRV)
+PROFILE_VERSION(SPIRV_1_1,          SPIRV)
+PROFILE_VERSION(SPIRV_1_2,          SPIRV)
+PROFILE_VERSION(SPIRV_1_3,          SPIRV)
+PROFILE_VERSION(SPIRV_1_4,          SPIRV)
+PROFILE_VERSION(SPIRV_1_5,          SPIRV)
+PROFILE_VERSION(SPIRV_1_6,          SPIRV)
 
 // Specific profiles
 PROFILE(DX_Compute_4_0,				cs_4_0,				Compute,	DX_4_0)
@@ -235,6 +243,14 @@ PROFILE_ALIAS(DX_None_6_7,  DX_Lib_6_7,     sm_6_7)
 
 PROFILE(METAL_LIB_2_3,            metallib_2_3,       Unknown, METAL_2_3)
 PROFILE(METAL_LIB_2_4,            metallib_2_4,       Unknown, METAL_2_4)
+
+PROFILE(SPIRV_LIB_1_0,            spirv_1_0,          Unknown, SPIRV_1_0)
+PROFILE(SPIRV_LIB_1_1,            spirv_1_1,          Unknown, SPIRV_1_1)
+PROFILE(SPIRV_LIB_1_2,            spirv_1_2,          Unknown, SPIRV_1_2)
+PROFILE(SPIRV_LIB_1_3,            spirv_1_3,          Unknown, SPIRV_1_3)
+PROFILE(SPIRV_LIB_1_4,            spirv_1_4,          Unknown, SPIRV_1_4)
+PROFILE(SPIRV_LIB_1_5,            spirv_1_5,          Unknown, SPIRV_1_5)
+PROFILE(SPIRV_LIB_1_6,            spirv_1_6,          Unknown, SPIRV_1_6)
 
 // Define all the GLSL profiles
 
