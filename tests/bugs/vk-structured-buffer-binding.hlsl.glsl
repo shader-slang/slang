@@ -17,7 +17,7 @@ in vec3 uv_0;
 
 void main()
 {
-    main_0 = vec4(float(gDoneGroups_0._data[uint(int(uv_0.z))]));
+    main_0 = vec4(float(gDoneGroups_0._data[int(uv_0.z)]));
     return;
 }
 
