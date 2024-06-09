@@ -10,47 +10,26 @@
 //static_assert(false, "FAIL_global");
 
 __generic<T:IArithmetic>
-void TEST_specialize_float()
+void TEST_specialize()
 {
-    //CHK-NOT:PASS_specialize_float
-    static_assert(T is float, "PASS_specialize_float");
-
-    //CHK: ([[#@LINE+1]]): error 41400:
-    static_assert(T is int, "FAIL_specialize_float");
-}
-
-__generic<T:IArithmetic>
-void TEST_specialize_int()
-{
-    //CHK: ([[#@LINE+1]]): error 41400:
-    static_assert(T is float, "FAIL_specialize_int");
-
-    //CHK-NOT:PASS_specialize_int
-    static_assert(T is int, "PASS_specialize_int");
+    static_assert(true,   "TEST_specialize true");
+    static_assert(T is float, "TEST_specialize T_is_float");
+    static_assert(T is int,   "TEST_specialize T_is_int");
 }
 
 void TEST_target_switch()
 {
-    // We should hit only one for the given target
+    static_assert(false, "TEST_target_switch all");
     __target_switch
     {
     case hlsl:
-        //HLSL: error {{.*}} FAIL_HLSL
-        //HLSL-NOT: error {{.*}} FAIL_GLSL
-        //HLSL-NOT: error {{.*}} FAIL_SPV
-        static_assert(false, "FAIL_HLSL");
+        static_assert(false, "TEST_target_switch hlsl");
         return;
     case glsl:
-        //GLSL: error {{.*}} FAIL_GLSL
-        //GLSL-NOT: error {{.*}} FAIL_HLSL
-        //GLSL-NOT: error {{.*}} FAIL_SPV
-        static_assert(false, "FAIL_GLSL");
+        static_assert(false, "TEST_target_switch glsl");
         return;
     default:
-        //SPV: error {{.*}} FAIL_SPV
-        //SPV-NOT: error {{.*}} FAIL_HLSL
-        //SPV-NOT: error {{.*}} FAIL_GLSL
-        static_assert(false, "FAIL_SPV");
+        static_assert(false, "TEST_target_switch default");
         return;
     }
 }
@@ -64,11 +43,8 @@ struct MyType
 
     __init()
     {
-        //CHK-NOT:PASS_init
-        static_assert(true, "PASS_init");
-
-        //CHK: ([[#@LINE+1]]): error 41400:
-        static_assert(false, "FAIL_init");
+        static_assert(true, "MyType init true");
+        static_assert(false, "MyType init false");
     }
 };
 
@@ -80,12 +56,38 @@ extension MyType<T>
 [numthreads(1,1,1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    TEST_specialize_float<float>();
-    TEST_specialize_int<int>();
+    //CHK-NOT:error {{.*}} TEST_specialize
+    //CHK: error {{.*}} TEST_specialize T_is_int
+    //CHK-NOT:error {{.*}} TEST_specialize
+    TEST_specialize<float>();
+
+    //CHK-NOT:error {{.*}} TEST_specialize
+    //CHK: error 41400: {{.*}} TEST_specialize T_is_float
+    //CHK-NOT:error {{.*}} TEST_specialize
+    TEST_specialize<int>();
+
+    //HLSL: error {{.*}} TEST_target_switch all
+    //HLSL: error {{.*}} TEST_target_switch hlsl
+    //HLSL-NOT: error {{.*}} TEST_target_switch glsl
+    //HLSL-NOT: error {{.*}} TEST_target_switch default
+    //
+    //GLSL: error {{.*}} TEST_target_switch all
+    //GLSL-NOT: error {{.*}} TEST_target_switch hlsl
+    //GLSL: error {{.*}} TEST_target_switch glsl
+    //GLSL-NOT: error {{.*}} TEST_target_switch default
+    //
+    //SPV: error {{.*}} TEST_target_switch all
+    //SPV-NOT: error {{.*}} TEST_target_switch hlsl
+    //SPV-NOT: error {{.*}} TEST_target_switch glsl
+    //SPV: error {{.*}} TEST_target_switch default
+    //
     TEST_target_switch();
+
+    //CHK-NOT: error {{.*}} MyType init true
+    //CHK: error {{.*}} MyType init false
     MyType<float> obj;
 
-    //CHK: ([[#@LINE+1]]): error 41402:
-    static_assert(dispatchThreadID.x == 0, "FAIL_not_constant");
+    //CHK: ([[#@LINE+1]]): error
+    static_assert(dispatchThreadID.x == 0, "not constant");
 }
 

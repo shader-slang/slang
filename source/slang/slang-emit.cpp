@@ -362,7 +362,7 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
     }
 }
 
-void checkStaticAssert(CodeGenContext* codeGenContext, IRInst* inst, DiagnosticSink* sink)
+bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
 {
     switch (inst->getOp())
     {
@@ -388,14 +388,23 @@ void checkStaticAssert(CodeGenContext* codeGenContext, IRInst* inst, DiagnosticS
         {
             sink->diagnose(condi, Diagnostics::staticAssertionConditionNotConstant);
         }
-        break;
+
+        return true;
     }
     }
 
-    for (auto child : inst->getDecorationsAndChildren())
+    List<IRInst*> removeList;
+    for (auto child : inst->getChildren())
     {
-        checkStaticAssert(codeGenContext, child, sink);
+        if (checkStaticAssert(child, sink))
+            removeList.add(child);
     }
+    for (auto child : removeList)
+    {
+        child->removeAndDeallocate();
+    }
+
+    return false;
 }
 
 Result linkAndOptimizeIR(
@@ -919,7 +928,7 @@ Result linkAndOptimizeIR(
 
     // Process `static_assert` after the specialization is done.
     // Some information for `static_assert` is available only after the specialization.
-    checkStaticAssert(codeGenContext, irModule->getModuleInst(), sink);
+    checkStaticAssert(irModule->getModuleInst(), sink);
 
     // For HLSL (and fxc/dxc) only, we need to "wrap" any
     // structured buffers defined over matrix types so
