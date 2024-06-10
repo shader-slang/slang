@@ -3194,7 +3194,7 @@ public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 
 
 __generic<T:__BuiltinFloatingPointType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0)]
 public vector<T,4> textureLodOffset(Sampler1D<vector<T,N>> sampler, float p, float lod, constexpr int offset)
 {
     return __vectorReshape<4>(sampler.SampleLevel(p, lod, offset));
@@ -3202,7 +3202,7 @@ public vector<T,4> textureLodOffset(Sampler1D<vector<T,N>> sampler, float p, flo
 
 __generic<T:__BuiltinFloatingPointType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0)]
 public vector<T,4> textureLodOffset(__TextureImpl<
         vector<T,N>,
         Shape,
