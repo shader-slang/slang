@@ -415,13 +415,25 @@ alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmeti
 
 // Define what each shader model means on different targets.
 
-alias spirv_1_0 = _spirv_1_0;
-alias spirv_1_1 = _spirv_1_1;
-alias spirv_1_2 = _spirv_1_2;
-alias spirv_1_3 = _spirv_1_3;
-alias spirv_1_4 = _spirv_1_4;
-alias spirv_1_5 = _spirv_1_5 + GL_EXT_nonuniform_qualifier + GL_EXT_buffer_reference;
-alias spirv_1_6 = _spirv_1_6 + GL_EXT_debug_printf + GL_EXT_demote_to_helper_invocation;
+alias spirv_1_0 = _spirv_1_0 | any_target;
+alias spirv_1_1 = _spirv_1_1
+                | spirv_1_0
+                ;
+alias spirv_1_2 = _spirv_1_2
+                | spirv_1_1
+                ;
+alias spirv_1_3 = _spirv_1_3
+                | spirv_1_2
+                ;
+alias spirv_1_4 = _spirv_1_4
+                | spirv_1_3
+                ;
+alias spirv_1_5 = _spirv_1_5 + GL_EXT_nonuniform_qualifier + GL_EXT_buffer_reference
+                | spirv_1_4
+                ;
+alias spirv_1_6 = _spirv_1_6 + GL_EXT_debug_printf + GL_EXT_demote_to_helper_invocation
+                | spirv_1_5
+                ;
 alias spirv_latest = _spirv_1_6;
 
 alias sm_4_0_version = _sm_4_0

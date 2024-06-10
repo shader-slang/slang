@@ -1701,8 +1701,6 @@ CapabilitySet TargetRequest::getTargetCaps()
     // If the user specified a explicit profile, we should pull
     // a corresponding atom representing the target version from the profile.
     CapabilitySet profileCaps = CapabilitySet(optionSet.getProfile().getCapabilityName());
-    for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
-        profileCaps.join(CapabilitySet((CapabilityName)atomVal.intValue));
 
     bool isGLSLTarget = false;
     switch(getTarget())
@@ -1756,11 +1754,6 @@ CapabilitySet TargetRequest::getTargetCaps()
         {
             isGLSLTarget = true;
             atoms.add(CapabilityName::glsl);
-
-            // find all spirv version capabilities in `profileCaps`, translate to glsl_spirv version capabilities 
-            // and add them to the related glsl capability set
-            profileCaps.AddSpirvVersionFromOtherAsGlslSpirvVersion(profileCaps);
-
         }
         break;
 
@@ -1804,7 +1797,24 @@ CapabilitySet TargetRequest::getTargetCaps()
     CapabilitySet targetCap = CapabilitySet(atoms);
     targetCap.join(profileCaps);
     
+    for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
+    {
+        auto toAdd = CapabilitySet((CapabilityName)atomVal.intValue);
+        if (!targetCap.isIncompatibleWith(toAdd))
+            targetCap.join(toAdd);
+    }
+
+    if (isGLSLTarget)
+    {
+        // find all spirv version capabilities in `profileCaps`, translate to glsl_spirv version capabilities 
+        // and add them to the related glsl capability set
+        profileCaps.AddSpirvVersionFromOtherAsGlslSpirvVersion(profileCaps);
+    }
+
     cookedCapabilities = targetCap;
+    
+    SLANG_ASSERT(!cookedCapabilities.isInvalid());
+        
     return cookedCapabilities;
 }
 
