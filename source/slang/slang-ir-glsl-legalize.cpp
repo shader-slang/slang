@@ -1093,10 +1093,11 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             {
             case GlobalVaryingDeclarator::Flavor::array:
                 {
-                    auto arrayType = as<IRArrayTypeBase>(type);
-                    SLANG_RELEASE_ASSERT(arrayType);
-                    type = arrayType->getElementType();
-                    peeledRequiredType = type;
+                    if (auto arrayType = as<IRArrayTypeBase>(type))
+                    {
+                        type = arrayType->getElementType();
+                        peeledRequiredType = type;
+                    }
                     break;
                 }
             }
