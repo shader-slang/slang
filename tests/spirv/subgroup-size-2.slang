@@ -19,7 +19,7 @@ void compute1()
     const int x = f().x;
     outputBuffer[0] = x;
 
-    // CHECK-DAG: %[[PTR:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_int %outputBuffer %int_0 %uint_1
+    // CHECK-DAG: %[[PTR:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_int %outputBuffer %int_0 %int_1
     // CHECK: OpStore %[[PTR]] %int_2
     outputBuffer[1] = WorkgroupSize().y;
 }

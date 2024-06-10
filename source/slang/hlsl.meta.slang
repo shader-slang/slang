@@ -3655,13 +3655,14 @@ struct StructuredBuffer
     __intrinsic_op($(kIROp_StructuredBufferLoad))
     [__readNone]
     [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
-    T Load(int location);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
     [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
-    T Load(int location, out uint status);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    __subscript(uint index) -> T
+    __generic<TIndex : __BuiltinIntegerType>
+    __subscript(TIndex index) -> T
     {
         [__readNone]
         __intrinsic_op($(kIROp_StructuredBufferLoad))
@@ -4940,13 +4941,14 @@ struct $(item.name)
 
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoad))
-    T Load(int location);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoadStatus))
-    T Load(int location, out uint status);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    __subscript(uint index) -> T
+    __generic<TIndex : __BuiltinIntegerType>
+    __subscript(TIndex index) -> T
     {
         [__NoSideEffect]
         __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
