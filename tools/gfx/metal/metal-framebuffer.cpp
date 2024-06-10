@@ -39,17 +39,30 @@ Result FramebufferImpl::init(DeviceImpl* device, const IFramebuffer::Desc& desc)
         m_renderTargetViews[i] = static_cast<TextureResourceViewImpl*>(desc.renderTargetViews[i]);
     }
     m_depthStencilView = static_cast<TextureResourceViewImpl*>(desc.depthStencilView);
+    
+    // Determine framebuffer dimensions & sample count;
+    m_width = 1;
+    m_height = 1;
+    m_sampleCount = 1;
 
-    // Compute framebuffer dimensions from either the first render target view or the depth stencil view.
-    TextureResourceViewImpl* view = (m_renderTargetViews.getCount() > 0) ? m_renderTargetViews[0] : m_depthStencilView;
-    if (!view)
+    auto visitView = [this](TextureResourceViewImpl* view)
     {
-        return SLANG_FAIL;
+        const ITextureResource::Desc* textureDesc = view->m_texture->getDesc();
+        const IResourceView::Desc* viewDesc = view->getViewDesc();
+        m_width = Math::Max(1u, uint32_t(textureDesc->size.width >> viewDesc->subresourceRange.mipLevel));
+        m_height = Math::Max(1u, uint32_t(textureDesc->size.height >> viewDesc->subresourceRange.mipLevel));
+        m_sampleCount = Math::Max(m_sampleCount, uint32_t(textureDesc->sampleDesc.numSamples));
+        return SLANG_OK;
+    };
+
+    for (auto view : m_renderTargetViews)
+    {
+        visitView(view);
     }
-    auto size = view->m_texture->getDesc()->size;
-    auto viewDesc = view->getViewDesc();
-    m_width = Math::Max(1u, uint32_t(size.width >> viewDesc->subresourceRange.mipLevel));
-    m_height = Math::Max(1u, uint32_t(size.height >> viewDesc->subresourceRange.mipLevel));
+    if (m_depthStencilView)
+    {
+        visitView(m_depthStencilView);
+    }
 
     return SLANG_OK;
 }

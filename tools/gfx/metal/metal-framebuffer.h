@@ -36,6 +36,7 @@ public:
     RefPtr<TextureResourceViewImpl> m_depthStencilView;
     uint32_t m_width;
     uint32_t m_height;
+    uint32_t m_sampleCount;
 
 public:
     Result init(DeviceImpl* device, const IFramebuffer::Desc& desc);
