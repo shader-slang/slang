@@ -569,37 +569,9 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
 {
     AUTORELEASEPOOL
 
-    RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
-    layout->m_vertexDescriptor = NS::TransferPtr(MTL::VertexDescriptor::alloc()->init());
-    if (!layout->m_vertexDescriptor)
-    {
-        return SLANG_FAIL;
-    }
-
-    for (Int i = 0; i < desc.inputElementCount; ++i)
-    {
-        const auto& inputElement = desc.inputElements[i];
-        MTL::VertexAttributeDescriptor* desc = layout->m_vertexDescriptor->attributes()->object(i);
-        desc->setOffset(inputElement.offset);
-        desc->setBufferIndex(inputElement.bufferSlotIndex);
-        MTL::VertexFormat metalFormat = MetalUtil::translateVertexFormat(inputElement.format);
-        if (metalFormat == MTL::VertexFormatInvalid)
-        {
-            return SLANG_FAIL;
-        }
-        desc->setFormat(metalFormat);
-    }
-
-    for (Int i = 0; i < desc.vertexStreamCount; ++i)
-    {
-        const auto& vertexStream = desc.vertexStreams[i];
-        MTL::VertexBufferLayoutDescriptor* desc = layout->m_vertexDescriptor->layouts()->object(i);
-        desc->setStepFunction(MetalUtil::translateVertexStepFunction(vertexStream.slotClass));
-        desc->setStepRate(vertexStream.instanceDataStepRate);
-        desc->setStride(vertexStream.stride);
-    }
-
-    returnComPtr(outLayout, layout);
+    RefPtr<InputLayoutImpl> layoutImpl(new InputLayoutImpl);
+    SLANG_RETURN_ON_FAIL(layoutImpl->init(desc));
+    returnComPtr(outLayout, layoutImpl);
     return SLANG_OK;
 }
 
