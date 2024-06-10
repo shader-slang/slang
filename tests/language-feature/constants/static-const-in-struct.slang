@@ -1,7 +1,6 @@
 // static-const-in-struct.slang
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 // Test that `static const` variable declarations inside of
 // a `struct` type correctly translate to constants in
