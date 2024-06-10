@@ -24,6 +24,26 @@ void SwapchainImpl::getWindowSize(int& widthOut, int& heightOut) const
     CocoaUtil::getNSWindowContentSize((void*)m_windowHandle.handleValues[0], &widthOut, &heightOut);
 }
 
+void SwapchainImpl::createImages()
+{
+    m_images.setCount(m_desc.imageCount);
+    for (GfxCount i = 0; i < m_desc.imageCount; ++i)
+    {
+        ITextureResource::Desc imageDesc = {};
+        imageDesc.allowedStates = ResourceStateSet(
+            ResourceState::Present, ResourceState::RenderTarget, ResourceState::CopyDestination, ResourceState::CopySource);
+        imageDesc.type = IResource::Type::Texture2D;
+        imageDesc.arraySize = 0;
+        imageDesc.format = m_desc.format;
+        imageDesc.size.width = m_desc.width;
+        imageDesc.size.height = m_desc.height;
+        imageDesc.size.depth = 1;
+        imageDesc.numMipLevels = 1;
+        imageDesc.defaultState = ResourceState::Present;
+        m_device->createTextureResource(imageDesc, nullptr, (gfx::ITextureResource**)m_images[i].writeRef());
+    }
+}
+
 SwapchainImpl::~SwapchainImpl()
 {
     m_images.clear();
@@ -36,7 +56,7 @@ Result SwapchainImpl::init(DeviceImpl* device, const ISwapchain::Desc& desc, Win
     m_desc = desc;
     m_windowHandle = window;
     m_metalFormat = MetalUtil::translatePixelFormat(desc.format);
-    m_currentImageIndex = 0;
+    m_currentImageIndex = -1;
 
     getWindowSize(m_desc.width, m_desc.height);
 
@@ -48,14 +68,17 @@ Result SwapchainImpl::init(DeviceImpl* device, const ISwapchain::Desc& desc, Win
     m_metalLayer->setPixelFormat(m_metalFormat);
     m_metalLayer->setDevice(m_device->m_device.get());
     m_metalLayer->setDrawableSize(CGSize{(float)m_desc.width, (float)m_desc.height});
-    m_metalLayer->setFramebufferOnly(true);
+    // We need to be able to copy from a texture.
+    m_metalLayer->setFramebufferOnly(false);
+
+    createImages();
 
     return SLANG_OK;
 }
 
 Result SwapchainImpl::getImage(GfxIndex index, ITextureResource** outResource)
 {
-    if (index < 0 || index != m_currentImageIndex)
+    if (index < 0 || index >= m_desc.imageCount)
         return SLANG_FAIL;
     returnComPtr(outResource, m_images[index]);
     return SLANG_OK;
@@ -63,24 +86,27 @@ Result SwapchainImpl::getImage(GfxIndex index, ITextureResource** outResource)
 
 Result SwapchainImpl::resize(GfxCount width, GfxCount height)
 {
-    SLANG_UNUSED(width);
-    SLANG_UNUSED(height);
-    m_images.clear();
     m_currentImageIndex = -1;
     m_currentDrawable.reset();
     getWindowSize(m_desc.width, m_desc.height);
     m_metalLayer->setDrawableSize(CGSize{(float)m_desc.width, (float)m_desc.height});
+    createImages();
     return SLANG_OK;
 }
 
 Result SwapchainImpl::present()
 {
+    AUTORELEASEPOOL
+
     if (!m_currentDrawable)
     {
         return SLANG_FAIL;
     }
 
     MTL::CommandBuffer* commandBuffer = m_device->m_commandQueue->commandBuffer();
+    MTL::BlitCommandEncoder* encoder = commandBuffer->blitCommandEncoder();
+    encoder->copyFromTexture(m_images[m_currentImageIndex]->m_texture.get(), m_currentDrawable->texture());
+    encoder->endEncoding();
     commandBuffer->presentDrawable(m_currentDrawable.get());
     commandBuffer->commit();
     m_currentDrawable.reset();
@@ -103,48 +129,22 @@ int SwapchainImpl::acquireNextImage()
 {
     AUTORELEASEPOOL
 
-    CA::MetalDrawable* drawable = m_metalLayer->nextDrawable();
-    if (drawable == nullptr)
+    m_currentDrawable = NS::RetainPtr(m_metalLayer->nextDrawable());
+    if (m_currentDrawable)
     {
-        return -1;
+        m_currentImageIndex = (m_currentImageIndex + 1) % m_desc.imageCount;
     }
-
-    m_currentDrawable = NS::RetainPtr(drawable);
-    MTL::Texture* texture = drawable->texture();
-
-    // Check if we got a texture we've seen before.
-    for (Index i = 0; i < m_images.getCount(); i++)
+    else
     {
-        if (m_images[i]->m_texture.get() == texture)
-        {
-            m_currentImageIndex = i;
-            return m_currentImageIndex;
-        }
+        m_currentImageIndex = -1;
     }
-
-    // Create a new texture object to wrap the drawable's texture.
-
-    ITextureResource::Desc desc = {};
-    desc.allowedStates = ResourceStateSet(
-        ResourceState::Present, ResourceState::RenderTarget, ResourceState::CopyDestination);
-    desc.type = IResource::Type::Texture2D;
-    desc.arraySize = 0;
-    desc.format = m_desc.format; // TODO use actual pixelformat
-    desc.size.width = texture->width();
-    desc.size.height = texture->height();
-    desc.size.depth = 1;
-    desc.numMipLevels = 1;
-    desc.defaultState = ResourceState::Present;
-    RefPtr<TextureResourceImpl> image = new TextureResourceImpl(desc, m_device);
-    image->m_texture = NS::RetainPtr(texture);
-
-    m_currentImageIndex = m_images.getCount();
-    m_images.add(image);
-
     return m_currentImageIndex;
 }
 
-Result SwapchainImpl::setFullScreenMode(bool mode) { return SLANG_FAIL; }
+Result SwapchainImpl::setFullScreenMode(bool mode)
+{
+    return SLANG_E_NOT_AVAILABLE;
+}
 
 } // namespace metal 
 } // namespace gfx

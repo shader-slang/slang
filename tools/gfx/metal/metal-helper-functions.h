@@ -53,7 +53,6 @@ struct BindingOffset
 struct BindingContext
 {
     DeviceImpl* device = nullptr;
-    virtual void setData(const void* data, NS::UInteger length, NS::UInteger index) = 0;
     virtual void setBuffer(MTL::Buffer* buffer, NS::UInteger index) = 0;
     virtual void setTexture(MTL::Texture* texture, NS::UInteger index) = 0;
     virtual void setSampler(MTL::SamplerState* sampler, NS::UInteger index) = 0;
@@ -70,11 +69,6 @@ struct ComputeBindingContext : public BindingContext
         return SLANG_OK;
     }
 
-    void setData(const void* data, NS::UInteger length, NS::UInteger index) override
-    {
-        encoder->setBytes(data, length, index);
-    }
-
     void setBuffer(MTL::Buffer* buffer, NS::UInteger index) override
     {
         encoder->setBuffer(buffer, 0, index);
@@ -88,6 +82,60 @@ struct ComputeBindingContext : public BindingContext
     void setSampler(MTL::SamplerState* sampler, NS::UInteger index) override
     {
         encoder->setSamplerState(sampler, index);
+    }
+};
+
+struct VertexBindingContext : public BindingContext
+{
+    MTL::RenderCommandEncoder* encoder;
+
+    Result init(DeviceImpl* device, MTL::RenderCommandEncoder* encoder)
+    {
+        this->device = device;
+        this->encoder = encoder;
+        return SLANG_OK;
+    }
+
+    void setBuffer(MTL::Buffer* buffer, NS::UInteger index) override
+    {
+        encoder->setVertexBuffer(buffer, 0, index);
+    }
+
+    void setTexture(MTL::Texture* texture, NS::UInteger index) override
+    {
+        encoder->setVertexTexture(texture, index);
+    }
+
+    void setSampler(MTL::SamplerState* sampler, NS::UInteger index) override
+    {
+        encoder->setVertexSamplerState(sampler, index);
+    }
+};
+
+struct FragmentBindingContext : public BindingContext
+{
+    MTL::RenderCommandEncoder* encoder;
+
+    Result init(DeviceImpl* device, MTL::RenderCommandEncoder* encoder)
+    {
+        this->device = device;
+        this->encoder = encoder;
+        return SLANG_OK;
+    }
+
+    void setBuffer(MTL::Buffer* buffer, NS::UInteger index) override
+    {
+        encoder->setFragmentBuffer(buffer, 0, index);
+    }
+
+    void setTexture(MTL::Texture* texture, NS::UInteger index) override
+    {
+        encoder->setFragmentTexture(texture, index);
+    }
+
+    void setSampler(MTL::SamplerState* sampler, NS::UInteger index) override
+    {
+        encoder->setFragmentSamplerState(sampler, index);
     }
 };
 
