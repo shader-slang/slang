@@ -1,5 +1,7 @@
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment
-//TEST:CROSS_COMPILE:-profile ps_6_0 -target dxil-assembly -entry main 
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage fragment
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage fragment -emit-spirv-via-glsl
+
+// SPIRV: OpExecutionMode %main EarlyFragmentTests
 
 [earlydepthstencil]
 float4 main(): SV_Target

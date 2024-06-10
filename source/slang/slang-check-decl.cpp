@@ -2101,6 +2101,19 @@ namespace Slang
             {
                 getSink()->diagnose(varDecl->type.exp->loc, Diagnostics::incompleteTypeCannotBeUsedInBuffer, elementType);
             }
+            if (doesTypeHaveTag(elementType, TypeTag::Unsized))
+            {
+                // If the element type is unsized, it can only be an array of resource types that we can legalize out.
+                // Ordinary unsized arrays are not allowed in a constant buffer since we cannot translate it to
+                // valid HLSL or SPIRV.
+                ArrayExpressionType* trailingArrayType = nullptr;
+                VarDeclBase* trailingArrayField = getTrailingUnsizedArrayElement(elementType, varDecl, trailingArrayType);
+                if (trailingArrayField && !isOpaqueHandleType(trailingArrayType->getElementType()))
+                {
+                    getSink()->diagnose(trailingArrayField->loc, Diagnostics::cannotUseUnsizedTypeInConstantBuffer, trailingArrayType);
+                    getSink()->diagnose(varDecl->loc, Diagnostics::seeConstantBufferDefinition);
+                }
+            }
         }
         else if (varDecl->findModifier<HLSLUniformModifier>())
         {
@@ -10418,6 +10431,80 @@ namespace Slang
             return DeclVisibility::Public;
         }
         return defaultVis;
+    }
+
+    VarDeclBase* getTrailingUnsizedArrayElement(Type* type, VarDeclBase* parentVar, ArrayExpressionType*& outArrayType)
+    {
+        while (auto modifiedType = as<ModifiedType>(type))
+            type = modifiedType->getBase();
+        HashSet<Type*> seenTypes;
+        for (;;)
+        {
+            if (auto arrayType = as<ArrayExpressionType>(type))
+            {
+                if (arrayType->isUnsized())
+                {
+                    outArrayType = arrayType;
+                    return parentVar;
+                }
+                else
+                    return nullptr;
+            }
+            else if (auto declRefType = as<DeclRefType>(type))
+            {
+                if (auto aggTypeDecl = declRefType->getDeclRef().as<AggTypeDecl>())
+                {
+                    auto varDecls = aggTypeDecl.getDecl()->getMembersOfType<VarDeclBase>();
+                    if (varDecls.getCount() == 0)
+                        return nullptr;
+                    VarDeclBase* lastVarDecl = nullptr;
+                    for (auto varDecl : varDecls)
+                    {
+                        if (isEffectivelyStatic(varDecl))
+                            continue;
+                        lastVarDecl = varDecl;
+                    }
+                    auto lastMember = _getMemberDeclRef(
+                        getCurrentASTBuilder(), aggTypeDecl, lastVarDecl).as<VarDeclBase>();
+                    auto varType = getType(getCurrentASTBuilder(), lastMember);
+                    if (!varType)
+                        return nullptr;
+                    if (!seenTypes.add(type))
+                        return nullptr;
+                    type = varType;
+                    parentVar = lastMember.getDecl();
+                    continue;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    bool isOpaqueHandleType(Type* type)
+    {
+        while (auto modifiedType = as<ModifiedType>(type))
+            type = modifiedType->getBase();
+        if (as<ResourceType>(type))
+            return true;
+        if (as<SamplerStateType>(type))
+            return true;
+        if (as<UniformParameterGroupType>(type))
+            return true;
+        if (as<HLSLStructuredBufferTypeBase>(type))
+            return true;
+        if (as<UntypedBufferResourceType>(type))
+            return true;
+        if (as<GLSLShaderStorageBufferType>(type))
+            return true;
+        if (as<FeedbackType>(type))
+            return true;
+        if (as<HLSLPatchType>(type))
+            return true;
+        if (as<HLSLStreamOutputType>(type))
+            return true;
+        if (as<MeshOutputType>(type))
+            return true;
+        return false;
     }
 
     void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl)
