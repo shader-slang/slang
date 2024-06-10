@@ -1,6 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 T simpleTest<T : IArithmetic>(T v0, T v1)
 {
     if (v0 > T(0))

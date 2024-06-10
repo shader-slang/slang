@@ -1,6 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):SIMPLE(filecheck=GLSL): -stage compute -entry computeMain -target glsl
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 // Note: spirv_by_reference is only supported for passing opaque types, so this test won't produce
 // expected result on vulkan.
