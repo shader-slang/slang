@@ -415,7 +415,7 @@ alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmeti
 
 // Define what each shader model means on different targets.
 
-alias spirv_1_0 = _spirv_1_0 | any_target;
+alias spirv_1_0 = _spirv_1_0;
 alias spirv_1_1 = _spirv_1_1
                 | spirv_1_0
                 ;
