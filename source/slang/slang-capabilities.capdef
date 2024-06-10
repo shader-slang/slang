@@ -288,8 +288,8 @@ def _GL_EXT_demote_to_helper_invocation : _GLSL_140;
 def _GL_EXT_fragment_shader_barycentric : _GLSL_450;
 def _GL_EXT_mesh_shader : _GLSL_450;
 def _GL_EXT_nonuniform_qualifier : glsl;
-def _GL_EXT_ray_query : _GLSL_450;
-def _GL_EXT_ray_tracing : _GLSL_450;
+def _GL_EXT_ray_query : _GLSL_460 + glsl_spirv_1_4; // spirv_1_4 is required due to glslang bug which enables `SPV_KHR_ray_tracing` regardless of context
+def _GL_EXT_ray_tracing : _GLSL_460;
 def _GL_EXT_ray_tracing_position_fetch : _GL_EXT_ray_query; // requires _GL_EXT_ray_tracing or _GL_EXT_ray_query
 def _GL_EXT_samplerless_texture_functions : _GLSL_140;
 def _GL_EXT_shader_atomic_float : glsl;
@@ -802,7 +802,6 @@ alias atomic_glsl_hlsl_cuda9_int64 = atomic_glsl_int64 | atomic_hlsl_nvapi | _cu
 
 alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp;
 
-alias rayobject = raytracing | rayquery;
 alias raytracing_allstages = raytracing_stages + raytracing;
 alias raytracing_anyhit = anyhit + raytracing;
 alias raytracing_intersection = intersection + raytracing;
