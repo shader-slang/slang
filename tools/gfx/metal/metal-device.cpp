@@ -293,6 +293,8 @@ Result DeviceImpl::createTextureResource(
     TextureResource::Desc desc = fixupTextureDesc(descIn);
 
     // Metal doesn't support mip-mapping for 1D textures
+    // However, we still need to use the provided mip level count when initializing the texture
+    Count initMipLevels = desc.numMipLevels;
     desc.numMipLevels = desc.type == IResource::Type::Texture1D ? 1 : desc.numMipLevels;
 
     const MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
@@ -387,6 +389,48 @@ Result DeviceImpl::createTextureResource(
     textureImpl->m_pixelFormat = textureDesc->pixelFormat();
 
     // TODO: handle initData
+    if (initData)
+    {
+        textureDesc->setStorageMode(MTL::StorageModeManaged);
+        textureDesc->setCpuCacheMode(MTL::CPUCacheModeDefaultCache);
+        NS::SharedPtr<MTL::Texture> stagingTexture = NS::TransferPtr(m_device->newTexture(textureDesc.get()));
+
+        MTL::CommandBuffer* commandBuffer = m_commandQueue->commandBuffer();
+        MTL::BlitCommandEncoder* encoder = commandBuffer->blitCommandEncoder();
+        if (!stagingTexture || !commandBuffer || !encoder)
+        {
+            return SLANG_FAIL;
+        }
+
+        Count sliceCount = isArray ? desc.arraySize : 1;
+        if (desc.type == IResource::Type::TextureCube)
+        {
+            sliceCount *= 6;
+        }
+
+        for (Index slice = 0; slice < sliceCount; ++slice)
+        {
+            MTL::Region region;
+            region.origin = MTL::Origin(0, 0, 0);
+            region.size = MTL::Size(desc.size.width, desc.size.height, desc.size.depth);
+            for (Index level = 0; level < initMipLevels; ++level)
+            {
+                if (level >= desc.numMipLevels)
+                    continue;
+                const ITextureResource::SubresourceData& subresourceData = initData[slice * initMipLevels + level];
+                stagingTexture->replaceRegion(region, level, slice, subresourceData.data, subresourceData.strideY, subresourceData.strideZ);
+                encoder->synchronizeTexture(stagingTexture.get(), slice, level);
+                region.size.width = region.size.width > 0 ? Math::Max(1ul, region.size.width >> 1) : 0;
+                region.size.height = region.size.height > 0 ? Math::Max(1ul, region.size.height >> 1) : 0;
+                region.size.depth = region.size.depth > 0 ? Math::Max(1ul, region.size.depth >> 1) : 0;
+            }
+        }
+
+        encoder->copyFromTexture(stagingTexture.get(), textureImpl->m_texture.get());
+        encoder->endEncoding();
+        commandBuffer->commit();
+        commandBuffer->waitUntilCompleted();
+    }
 
     returnComPtr(outResource, textureImpl);
     return SLANG_OK;
