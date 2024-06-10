@@ -16,8 +16,10 @@ class PipelineStateImpl : public PipelineStateBase
 public:
     RefPtr<DeviceImpl> m_device;
     NS::SharedPtr<MTL::RenderPipelineState> m_renderPipelineState;
+    NS::SharedPtr<MTL::DepthStencilState> m_depthStencilState;
     NS::SharedPtr<MTL::ComputePipelineState> m_computePipelineState;
     MTL::Size m_threadGroupSize;
+    NS::UInteger m_vertexBufferOffset;
 
     PipelineStateImpl(DeviceImpl* device);
     ~PipelineStateImpl();

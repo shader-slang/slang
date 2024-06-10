@@ -18,21 +18,18 @@ IRenderPassLayout* RenderPassLayoutImpl::getInterface(const Guid& guid)
     return nullptr;
 }
 
-RenderPassLayoutImpl::~RenderPassLayoutImpl()
-{
-}
-
 static inline MTL::LoadAction translateLoadOp(IRenderPassLayout::TargetLoadOp loadOp)
 {
     switch (loadOp)
     {
-    case IRenderPassLayout::TargetLoadOp::Clear:
-        return MTL::LoadAction::LoadActionClear;
     case IRenderPassLayout::TargetLoadOp::Load:
-        return MTL::LoadAction::LoadActionLoad;
+        return MTL::LoadActionLoad;
+    case IRenderPassLayout::TargetLoadOp::Clear:
+        return MTL::LoadActionClear;
     case IRenderPassLayout::TargetLoadOp::DontCare:
+        return MTL::LoadActionDontCare;
     default:
-        return MTL::LoadAction::LoadActionDontCare;
+        return MTL::LoadAction(0);
     }
 }
 
@@ -41,10 +38,11 @@ static inline MTL::StoreAction translateStoreOp(IRenderPassLayout::TargetStoreOp
     switch (storeOp)
     {
     case IRenderPassLayout::TargetStoreOp::Store:
-        return MTL::StoreAction::StoreActionStore;
+        return MTL::StoreActionStore;
     case IRenderPassLayout::TargetStoreOp::DontCare:
+        return MTL::StoreActionDontCare;
     default:
-        return MTL::StoreAction::StoreActionDontCare;
+        return MTL::StoreAction(0);
     }
 }
 
@@ -57,27 +55,21 @@ Result RenderPassLayoutImpl::init(DeviceImpl* device, const IRenderPassLayout::D
 
     // Initialize render pass descriptor, filling in attachment metadata, but leaving texture data unbound.
     m_renderPassDesc = NS::TransferPtr(MTL::RenderPassDescriptor::alloc()->init());
-    m_renderPassDesc->setRenderTargetArrayLength(desc.renderTargetCount);
 
-    MTL::RenderPassColorAttachmentDescriptorArray* colorAttachments = m_renderPassDesc->colorAttachments();
+    m_renderPassDesc->setRenderTargetArrayLength(desc.renderTargetCount);
     for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
-        MTL::RenderPassColorAttachmentDescriptor* colorAttach = MTL::RenderPassColorAttachmentDescriptor::alloc()->init();
-        colorAttach->setLoadAction(translateLoadOp(desc.renderTargetAccess[i].loadOp));
-        colorAttach->setStoreAction(translateStoreOp(desc.renderTargetAccess[i].storeOp));
-        // We set the texture when the render pass is executed, using the associated framebuffer.
-        colorAttach->setTexture(nullptr);
-        colorAttachments->setObject(colorAttach, i);
+        MTL::RenderPassColorAttachmentDescriptor* colorAttachment = m_renderPassDesc->colorAttachments()->object(i);
+        colorAttachment->setLoadAction(translateLoadOp(desc.renderTargetAccess[i].loadOp));
+        colorAttachment->setStoreAction(translateStoreOp(desc.renderTargetAccess[i].storeOp));
     }
+
     m_renderPassDesc->depthAttachment()->setLoadAction(translateLoadOp(desc.depthStencilAccess->loadOp));
     m_renderPassDesc->depthAttachment()->setStoreAction(translateStoreOp(desc.depthStencilAccess->storeOp));
-    // We set the depth texture when the render pass is executed, using the associated framebuffer.
-    m_renderPassDesc->depthAttachment()->setTexture(nullptr);
-    //m_renderPassDesc->depthAttachment()->setClearDepth(1000000.);
+
     m_renderPassDesc->stencilAttachment()->setLoadAction(translateLoadOp(desc.depthStencilAccess->loadOp));
     m_renderPassDesc->stencilAttachment()->setStoreAction(translateStoreOp(desc.depthStencilAccess->storeOp));
-    // We set the stencil texture when the render pass is executed, using the associated framebuffer.
-    m_renderPassDesc->stencilAttachment()->setTexture(nullptr);
+
     return SLANG_OK;
 }
 

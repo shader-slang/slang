@@ -80,12 +80,12 @@ Result CommandBufferImpl::getNativeHandle(InteropHandle* outHandle)
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
-MTL::RenderCommandEncoder* CommandBufferImpl::getMetalRenderCommandEncoder()
+MTL::RenderCommandEncoder* CommandBufferImpl::getMetalRenderCommandEncoder(MTL::RenderPassDescriptor* renderPassDesc)
 {
     if (!m_metalRenderCommandEncoder)
     {
         endMetalCommandEncoder();
-        // m_metalRenderCommandEncoder = NS::RetainPtr(m_commandBuffer->renderCommandEncoder());
+        m_metalRenderCommandEncoder = NS::RetainPtr(m_commandBuffer->renderCommandEncoder(renderPassDesc));
     }
     return m_metalRenderCommandEncoder.get();
 }
