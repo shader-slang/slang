@@ -1,7 +1,6 @@
 // property-decl.slang
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 // Test that users can declare properties and access them
 // with ordinary dot syntax.
