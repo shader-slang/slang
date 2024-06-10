@@ -464,6 +464,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.variablePointersFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.variablePointersFeatures;
         
+        // Compute shader derivative features.
+        extendedFeatures.computeShaderDerivativeFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.computeShaderDerivativeFeatures;
+
         // Extended dynamic states
         extendedFeatures.extendedDynamicStateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.extendedDynamicStateFeatures;
@@ -695,6 +699,13 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             variablePointers,
             VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME,
             "variable-pointer"
+        );
+        
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.computeShaderDerivativeFeatures,
+            computeDerivativeGroupLinear,
+            VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
+            "computeDerivativeGroupLinear"
         );
 
 #undef SIMPLE_EXTENSION_FEATURE
