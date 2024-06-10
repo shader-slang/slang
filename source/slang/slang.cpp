@@ -1754,6 +1754,7 @@ CapabilitySet TargetRequest::getTargetCaps()
         {
             isGLSLTarget = true;
             atoms.add(CapabilityName::glsl);
+            profileCaps.AddSpirvVersionFromOtherAsGlslSpirvVersion(profileCaps);
         }
         break;
 
@@ -1795,20 +1796,18 @@ CapabilitySet TargetRequest::getTargetCaps()
     }
 
     CapabilitySet targetCap = CapabilitySet(atoms);
+
     targetCap.join(profileCaps);
     
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
         auto toAdd = CapabilitySet((CapabilityName)atomVal.intValue);
+        
+        if(isGLSLTarget)
+            targetCap.AddSpirvVersionFromOtherAsGlslSpirvVersion(toAdd);
+
         if (!targetCap.isIncompatibleWith(toAdd))
             targetCap.join(toAdd);
-    }
-
-    if (isGLSLTarget)
-    {
-        // find all spirv version capabilities in `profileCaps`, translate to glsl_spirv version capabilities 
-        // and add them to the related glsl capability set
-        profileCaps.AddSpirvVersionFromOtherAsGlslSpirvVersion(profileCaps);
     }
 
     cookedCapabilities = targetCap;
