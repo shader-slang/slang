@@ -25,23 +25,8 @@ struct MetalUtil
     static MTL::PixelFormat translatePixelFormat(Format format);
     static MTL::VertexFormat translateVertexFormat(Format format);
 
-    static inline bool isDepthFormat(MTL::PixelFormat format)
-    {
-        switch (format)
-        {
-            return true;
-        }
-        return false;
-    }
-
-    static inline bool isStencilFormat(MTL::PixelFormat format)
-    {
-        switch (format)
-        {
-            return true;
-        }
-        return false;
-    }
+    static bool isDepthFormat(MTL::PixelFormat format);
+    static bool isStencilFormat(MTL::PixelFormat format);
 
     static MTL::SamplerMinMagFilter translateSamplerMinMagFilter(TextureFilteringMode mode);
     static MTL::SamplerMipFilter translateSamplerMipFilter(TextureFilteringMode mode);
@@ -51,6 +36,7 @@ struct MetalUtil
     static MTL::VertexStepFunction translateVertexStepFunction(InputSlotClass slotClass);
 
     static MTL::PrimitiveType translatePrimitiveType(PrimitiveTopology topology);
+    static MTL::PrimitiveTopologyClass translatePrimitiveTopologyClass(PrimitiveType type);
 
     static MTL::BlendFactor translateBlendFactor(BlendFactor factor);
     static MTL::BlendOperation translateBlendOperation(BlendOp op);

@@ -176,6 +176,35 @@ MTL::VertexFormat MetalUtil::translateVertexFormat(Format format)
     }
 }
 
+bool MetalUtil::isDepthFormat(MTL::PixelFormat format)
+{
+    switch (format)
+    {
+    case MTL::PixelFormatDepth16Unorm:
+    case MTL::PixelFormatDepth32Float:
+    case MTL::PixelFormatDepth24Unorm_Stencil8:
+    case MTL::PixelFormatDepth32Float_Stencil8:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool MetalUtil::isStencilFormat(MTL::PixelFormat format)
+{
+    switch (format)
+    {
+    case MTL::PixelFormatStencil8:
+    case MTL::PixelFormatDepth24Unorm_Stencil8:
+    case MTL::PixelFormatDepth32Float_Stencil8:
+    case MTL::PixelFormatX32_Stencil8:
+    case MTL::PixelFormatX24_Stencil8:
+        return true;
+    default:
+        return false;
+    }
+}
+
 MTL::SamplerMinMagFilter MetalUtil::translateSamplerMinMagFilter(TextureFilteringMode mode)
 {
     switch (mode)
@@ -275,6 +304,22 @@ MTL::PrimitiveType MetalUtil::translatePrimitiveType(PrimitiveTopology topology)
         return MTL::PrimitiveTypeLineStrip;
     default:
         return MTL::PrimitiveType(0);
+    }
+}
+
+MTL::PrimitiveTopologyClass MetalUtil::translatePrimitiveTopologyClass(PrimitiveType type)
+{
+    switch (type)
+    {
+    case PrimitiveType::Point:
+        return MTL::PrimitiveTopologyClassPoint;
+    case PrimitiveType::Line: 
+        return MTL::PrimitiveTopologyClassLine;
+    case PrimitiveType::Triangle:
+        return MTL::PrimitiveTopologyClassTriangle;
+    case PrimitiveType::Patch:
+    default:
+        return MTL::PrimitiveTopologyClassUnspecified;
     }
 }
 

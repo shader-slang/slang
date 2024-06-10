@@ -18,6 +18,7 @@ public:
     NS::SharedPtr<MTL::RenderPipelineState> m_renderPipelineState;
     NS::SharedPtr<MTL::ComputePipelineState> m_computePipelineState;
     MTL::Size m_threadGroupSize;
+    NS::UInteger m_vertexBufferOffset;
 
     PipelineStateImpl(DeviceImpl* device);
     ~PipelineStateImpl();
