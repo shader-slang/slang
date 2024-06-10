@@ -16,11 +16,17 @@ class ShaderProgramImpl : public ShaderProgramBase
 {
 public:
     BreakableReference<DeviceImpl> m_device;
-
-    List<String> m_entryPointNames;
-    List<ComPtr<ISlangBlob>> m_codeBlobs; //< To keep storage of code in scope
-    List<NS::SharedPtr<MTL::Library>> m_modules;
     RefPtr<RootShaderObjectLayoutImpl> m_rootObjectLayout;
+
+    struct Module
+    {
+        SlangStage stage;
+        String entryPointName;
+        ComPtr<ISlangBlob> code;
+        NS::SharedPtr<MTL::Library> library;
+    };
+
+    List<Module> m_modules;
 
     ShaderProgramImpl(DeviceImpl* device);
     ~ShaderProgramImpl();

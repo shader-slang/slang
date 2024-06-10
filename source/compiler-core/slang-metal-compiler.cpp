@@ -63,7 +63,7 @@ namespace Slang
     {
         ComPtr<IDownstreamCompiler> innerCppCompiler;
 
-        ExecutableLocation metalcLocation = ExecutableLocation(path, "metal");;
+        ExecutableLocation metalcLocation = ExecutableLocation(path, "metal");
         
         String metalSDKPath = path;
 

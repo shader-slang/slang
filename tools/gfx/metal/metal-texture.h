@@ -20,7 +20,7 @@ public:
     TextureResourceImpl(const Desc& desc, DeviceImpl* device);
     ~TextureResourceImpl();
 
-    RefPtr<DeviceImpl> m_device;
+    BreakableReference<DeviceImpl> m_device;
     NS::SharedPtr<MTL::Texture> m_texture;
     // TODO still needed?
     // MTL::PixelFormat m_metalFormat = MTL::PixelFormat::PixelFormatInvalid;

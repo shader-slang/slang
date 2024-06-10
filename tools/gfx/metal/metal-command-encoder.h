@@ -3,6 +3,7 @@
 
 #include "metal-base.h"
 #include "metal-pipeline-state.h"
+#include "metal-render-pass.h"
 
 namespace gfx
 {
@@ -159,9 +160,22 @@ class RenderCommandEncoder
         return nullptr;
     }
 public:
-    MTL::RenderCommandEncoder* m_encoder;
-    List<MTL::ScissorRect> m_scissorRects;
-    List<MTL::Viewport> m_viewports;
+    RefPtr<RenderPassLayoutImpl> m_renderPassLayout;
+    RefPtr<FramebufferImpl> m_framebuffer;
+    NS::SharedPtr<MTL::RenderPassDescriptor> m_renderPassDesc;
+
+    ShortList<MTL::Viewport, 16> m_viewports;
+    ShortList<MTL::ScissorRect, 16> m_scissorRects;
+    MTL::PrimitiveType m_primitiveType = MTL::PrimitiveTypeTriangle;
+
+    ShortList<MTL::Buffer*, 16> m_vertexBuffers;
+    ShortList<NS::UInteger, 16> m_vertexBufferOffsets;
+
+    MTL::Buffer* m_indexBuffer = nullptr;
+    NS::UInteger m_indexBufferOffset = 0;
+    MTL::IndexType m_indexBufferType = MTL::IndexTypeUInt16;
+
+    uint32_t m_stencilReferenceValue = 0;
 
 public:
     void beginPass(IRenderPassLayout* renderPass, IFramebuffer* framebuffer);
@@ -192,14 +206,19 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset = 0) override;
 
-    Result prepareDraw();
+    virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
+        GfxCount samplesPerPixel,
+        GfxCount pixelCount,
+        const SamplePosition* samplePositions) override;
+
+    Result prepareDraw(MTL::RenderCommandEncoder*& encoder);
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         draw(GfxCount vertexCount, GfxIndex startVertex = 0) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         drawIndexed(GfxCount indexCount, GfxIndex startIndex = 0, GfxIndex baseVertex = 0) override;
-
-    virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL drawIndirect(
         GfxCount maxDrawCount,
@@ -214,11 +233,6 @@ public:
         Offset argOffset,
         IBufferResource* countBuffer,
         Offset countOffset) override;
-
-    virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
-        GfxCount samplesPerPixel,
-        GfxCount pixelCount,
-        const SamplePosition* samplePositions) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL drawInstanced(
         GfxCount vertexCount,
