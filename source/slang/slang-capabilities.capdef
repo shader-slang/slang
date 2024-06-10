@@ -743,6 +743,8 @@ alias getattributeatvertex = fragment + _sm_6_1 | fragment + GL_EXT_fragment_sha
 alias memorybarrier = sm_5_0_version;
 alias structuredbuffer = sm_4_0_version;
 alias structuredbuffer_rw = sm_4_0_version;
+alias texture_sm_4_0 = sm_4_0_version | GL_ARB_sparse_texture_clamp + GL_EXT_texture_query_lod
+                     ;
 alias texture_sm_4_1 = sm_4_1_version | GL_ARB_sparse_texture_clamp + GL_EXT_texture_query_lod
                      ;
 alias texture_sm_4_1_samplerless = texture_sm_4_1
@@ -752,8 +754,8 @@ alias texture_sm_4_1_samplerless = texture_sm_4_1
 
 // supposedly works on only limited stages, support all stages for now
 alias texture_sm_4_1_compute_fragment = texture_sm_4_1;
-alias texture_sm_4_1_fragment = texture_sm_4_1;
-alias texture_sm_4_1_clamp_fragment = texture_sm_4_1_fragment + GL_ARB_sparse_texture_clamp;
+alias texture_sm_4_0_fragment = texture_sm_4_0;
+alias texture_sm_4_1_clamp_fragment = texture_sm_4_0_fragment + GL_ARB_sparse_texture_clamp;
 alias texture_sm_4_1_vertex_fragment_geometry = texture_sm_4_1;
 alias texture_gather = texture_sm_4_1_vertex_fragment_geometry + GL_ARB_texture_gather;
 alias image_samples = texture_sm_4_1_compute_fragment + GL_ARB_shader_texture_image_samples;

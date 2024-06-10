@@ -575,7 +575,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location)
     {
         __requireComputeDerivative();
@@ -627,7 +627,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -652,7 +652,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __requireComputeDerivative();
@@ -676,7 +676,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __target_switch
@@ -690,7 +690,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __requireComputeDerivative();
@@ -714,7 +714,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -853,7 +853,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -876,7 +876,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
     {
         __target_switch
@@ -899,7 +899,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
     {
         __target_switch
@@ -922,7 +922,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_0)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level)
     {
         __target_switch
@@ -975,7 +975,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1053,7 +1053,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
     {
         __requireComputeDerivative();
@@ -1133,7 +1133,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1177,7 +1177,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [__readNone]
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __requireComputeDerivative();
@@ -1221,7 +1221,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __target_switch
@@ -1235,7 +1235,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __requireComputeDerivative();
@@ -1281,7 +1281,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1520,7 +1520,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -1567,7 +1567,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
     {
         __target_switch
@@ -1612,7 +1612,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [__readNone]
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
     {
         __target_switch
@@ -1656,7 +1656,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
     {
         __target_switch
@@ -1732,7 +1732,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+
+    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch

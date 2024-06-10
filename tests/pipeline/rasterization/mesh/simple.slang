@@ -1,6 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mesh -output-using-type -dx12 -use-dxil -profile sm_6_6 -render-features mesh-shader
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mesh -output-using-type -vk -render-features mesh-shader
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mesh -output-using-type -vk -profile GL_EXT_mesh_shader -render-features mesh-shader
+//T-EST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mesh -output-using-type -dx12 -use-dxil -profile sm_6_6 -render-features mesh-shader
+//T-EST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mesh -output-using-type -vk -render-features mesh-shader
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mesh -output-using-type -vk -profile sm_6_5 -render-features mesh-shader
 
 // To test a simple mesh shader, we'll generate 4 triangles, the vertices of
 // each one will hold the triangle index and a value (the square). The fragment
