@@ -2755,6 +2755,11 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         {
             prefix = toSlice("hitAttribute");
         }
+        else if (as<IRPerVertexDecoration>(decoration))
+        {
+            _requireGLSLExtension(toSlice("GL_EXT_fragment_shader_barycentric"));
+            prefix = toSlice("pervertex");
+        }
         else
         {
             IRIntegerValue locationValue = -1;

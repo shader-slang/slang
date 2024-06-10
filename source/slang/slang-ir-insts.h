@@ -326,6 +326,7 @@ IR_SIMPLE_DECORATION(VulkanHitAttributesDecoration)
 /// to it.
 IR_SIMPLE_DECORATION(VulkanHitObjectAttributesDecoration)
 
+IR_SIMPLE_DECORATION(PerVertexDecoration)
 
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {

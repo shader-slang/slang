@@ -2676,6 +2676,8 @@ namespace Slang
 
         Expr* visitAsTypeExpr(AsTypeExpr* expr);
 
+        void maybeCheckKnownBuiltinInvocation(Expr* invokeExpr);
+
         //
         // Some syntax nodes should not occur in the concrete input syntax,
         // and will only appear *after* checking is complete. We need to
