@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=PASS): -target glsl -entry main -stage compute -allow-glsl
-//TEST:SIMPLE(filecheck=PASS): -target glsl -entry main -stage compute -allow-glsl -capability sm_4_0
+//TEST:SIMPLE(filecheck=PASS): -target glsl -entry main -stage compute -allow-glsl -capability shader5_sm_5_0
 //TEST:SIMPLE(filecheck=PASS): -target glsl -entry main -stage compute -allow-glsl -profile sm_6_0
 //TEST:SIMPLE(filecheck=WARN): -target glsl -entry main -stage compute -allow-glsl -capability GLSL_130
 //TEST:SIMPLE(filecheck=ERROR): -target glsl -entry main -stage compute -allow-glsl -capability GLSL_130 -restrictive-capability-check
@@ -19,11 +19,11 @@
 
 buffer MyBlockName
 {
-    float data;
+    int data;
 } inputBuffer;
 
 [numthreads(1,1,1)]
 void main()
 {
-    inputBuffer.data = exp(2.0f);
+    inputBuffer.data = firstbithigh(1);
 }

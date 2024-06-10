@@ -932,10 +932,17 @@ void printDiagnosticArg(StringBuilder& sb, CapabilityName name)
     sb << _getInfo(name).name;
 }
 
-void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& set)
+void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)
 {
-    for (auto i : set)
-        printDiagnosticArg(sb, i);
+    sb << "{";
+    auto count = list.getCount();
+    for(Index i = 0; i < count; i++)
+    {
+        printDiagnosticArg(sb, list[i]);
+        if (i + 1 != count)
+            sb << ", ";
+    }
+    sb << "}";
 }
 
 

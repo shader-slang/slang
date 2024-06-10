@@ -540,39 +540,41 @@ namespace Slang
                     }
                 }
             }
-
-            // if profile was implicitly upgraded:
-            // A = entry point, B = target
-            // 1. if(!B.implies(A)) => disjoint sets, missing capabilities, error
-
-            if (
-                (
-                    target->getOptionSet().hasOption(CompilerOptionName::Capability)
-                    ||
-                    target->getOptionSet().hasOption(CompilerOptionName::Profile)
-                )
-                && targetCaps.atLeastOneSetImpliedInOther(entryPointFuncDecl->inferredCapabilityRequirements) == CapabilitySet::ImpliesReturnFlags::NotImplied
-               )
+            else
             {
-                CapabilitySet combinedSets = targetCaps;
-                combinedSets.join(entryPointFuncDecl->inferredCapabilityRequirements);
-                CapabilityAtomSet addedAtoms{};
-                if (auto targetCapSet = targetCaps.getAtomSets())
+
+                // if profile was implicitly upgraded:
+                // A = entry point, B = target
+                // 1. if(!B.implies(A)) => disjoint sets, missing capabilities, error
+
+                if (
+                    (
+                        target->getOptionSet().hasOption(CompilerOptionName::Capability)
+                        ||
+                        target->getOptionSet().hasOption(CompilerOptionName::Profile)
+                        )
+                    && targetCaps.atLeastOneSetImpliedInOther(entryPointFuncDecl->inferredCapabilityRequirements) == CapabilitySet::ImpliesReturnFlags::NotImplied
+                    )
                 {
-                    if(auto combinedSet = combinedSets.getAtomSets())
+                    CapabilitySet combinedSets = targetCaps;
+                    combinedSets.join(entryPointFuncDecl->inferredCapabilityRequirements);
+                    CapabilityAtomSet addedAtoms{};
+                    if (auto targetCapSet = targetCaps.getAtomSets())
                     {
-                        CapabilityAtomSet::calcSubtract(addedAtoms, (*combinedSet), (*targetCapSet));
-                        break;
+                        if (auto combinedSet = combinedSets.getAtomSets())
+                        {
+                            CapabilityAtomSet::calcSubtract(addedAtoms, (*combinedSet), (*targetCapSet));
+                        }
                     }
+                    maybeDiagnoseWarningOrError(
+                        sink,
+                        target->getOptionSet(),
+                        TypeOfErrorToDiagnose::Capability,
+                        entryPointFuncDecl->loc,
+                        Diagnostics::profileImplicitlyUpgraded,
+                        Diagnostics::profileImplicitlyUpgradedRestrictive,
+                        addedAtoms.getElements<CapabilityAtom>());
                 }
-                maybeDiagnoseWarningOrError(
-                    sink,
-                    target->getOptionSet(),
-                    TypeOfErrorToDiagnose::Capability,
-                    entryPointFuncDecl->loc,
-                    Diagnostics::profileImplicitlyUpgraded,
-                    Diagnostics::profileImplicitlyUpgradedRestrictive,
-                    addedAtoms.getElements<CapabilityAtom>());
             }
         }
     }
