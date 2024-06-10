@@ -381,6 +381,8 @@ Result DeviceImpl::createTextureResource(
         return SLANG_FAIL;
     }
 
+    // TODO: handle initData
+
     returnComPtr(outResource, textureImpl);
     return SLANG_OK;
 }
