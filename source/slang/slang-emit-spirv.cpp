@@ -2100,7 +2100,7 @@ struct SPIRVEmitContext
         return result;
     }
 
-    bool _maybeEmitInterpolationModifierDecoration(IRInterpolationMode mode, SpvInst* varInst)
+    bool _maybeEmitInterpolationModifierDecoration(IRInterpolationMode mode, SpvId varInst)
     {
         switch (mode)
         {
@@ -2234,16 +2234,7 @@ struct SPIRVEmitContext
                 SpvLiteralInteger::from32(int32_t(0)));
         }
 
-        bool anyModifiers = false;
-        for (auto dd : var->getDecorations())
-        {
-            if (dd->getOp() != kIROp_InterpolationModeDecoration)
-                continue;
-
-            auto decoration = (IRInterpolationModeDecoration*)dd;
-
-            anyModifiers |= _maybeEmitInterpolationModifierDecoration(decoration->getMode(), varInst);
-        }
+        bool anyModifiers = (var->findDecoration<IRInterpolationModeDecoration>() != nullptr);
 
         // If the user didn't explicitly qualify a varying
         // with integer type, then we need to explicitly
@@ -2341,7 +2332,7 @@ struct SPIRVEmitContext
         const auto kind = (SpvBuiltIn)(getIntVal(spvAsmBuiltinVar->getOperand(0)));
         IRBuilder builder(spvAsmBuiltinVar);
         builder.setInsertBefore(spvAsmBuiltinVar);
-        auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, spvAsmBuiltinVar->getDataType(), SpvStorageClassInput), kind);
+        auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, spvAsmBuiltinVar->getDataType(), SpvStorageClassInput), kind, spvAsmBuiltinVar);
         registerInst(spvAsmBuiltinVar, varInst);
         return varInst;
     }
@@ -3539,6 +3530,11 @@ struct SPIRVEmitContext
             requireSPIRVCapability(SpvCapabilityRayQueryKHR);
             isRayTracingObject = true;
             break;
+        case kIROp_InterpolationModeDecoration:
+            _maybeEmitInterpolationModifierDecoration(
+                (IRInterpolationMode)getIntVal(decoration->getOperand(0)),
+                dstID);
+            break;
         case kIROp_MemoryQualifierSetDecoration:
         {
             auto collection = as<IRMemoryQualifierSetDecoration>(decoration);
@@ -3873,7 +3869,45 @@ struct SPIRVEmitContext
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
 
-    SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal)
+
+    bool isInstUsedInStage(IRInst* inst, Stage s)
+    {
+        auto* referencingEntryPoints = m_referencingEntryPoints.tryGetValue(inst);
+        if (!referencingEntryPoints)
+            return false;
+        for (auto entryPoint : *referencingEntryPoints)
+        {
+            if (auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>())
+            {
+                if (entryPointDecor->getProfile().getStage() == s)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    void maybeEmitFlatDecorationForBuiltinVar(IRInst* irInst, SpvInst* spvInst)
+    {
+        if (!irInst)
+            return;
+        if (irInst->getOp() != kIROp_GlobalVar &&
+            irInst->getOp() != kIROp_GlobalParam)
+            return;
+        auto ptrType = as<IRPtrType>(irInst->getDataType());
+        if (!ptrType)
+            return;
+        auto addrSpace = ptrType->getAddressSpace();
+        if (addrSpace == SpvStorageClassInput)
+        {
+            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
+            {
+                if (isInstUsedInStage(irInst, Stage::Fragment))
+                    _maybeEmitInterpolationModifierDecoration(IRInterpolationMode::NoInterpolation, getID(spvInst));
+            }
+        }
+    }
+
+    SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal, IRInst* irInst)
     {
         SpvInst* result = nullptr;
         auto ptrType = as<IRPtrTypeBase>(type);
@@ -3899,6 +3933,9 @@ struct SPIRVEmitContext
             builtinVal
         );
         m_builtinGlobalVars[key] = varInst;
+
+        maybeEmitFlatDecorationForBuiltinVar(irInst, varInst);
+
         return varInst;
     }
 
@@ -3916,9 +3953,9 @@ struct SPIRVEmitContext
                 {
                     auto importDecor = inst->findDecoration<IRImportDecoration>();
                     if (importDecor->getMangledName() == "gl_FragCoord")
-                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragCoord);
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragCoord, inst);
                     else
-                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPosition);
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPosition, inst);
                 }
                 else if (semanticName == "sv_target")
                 {
@@ -3930,75 +3967,75 @@ struct SPIRVEmitContext
                 }
                 else if (semanticName == "sv_clipdistance")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInClipDistance);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInClipDistance, inst);
                 }
                 else if (semanticName == "sv_culldistance")
                 {
                     requireSPIRVCapability(SpvCapabilityCullDistance);
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInCullDistance);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInCullDistance, inst);
                 }
                 else if (semanticName == "sv_coverage")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInSampleMask);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInSampleMask, inst);
                 }
                 else if (semanticName == "sv_innercoverage")
                 {
                     requireSPIRVCapability(SpvCapabilityFragmentFullyCoveredEXT);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_fragment_fully_covered"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFullyCoveredEXT);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFullyCoveredEXT, inst);
                 }
                 else if (semanticName == "sv_depth")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth, inst);
                 }
                 else if (semanticName == "sv_depthgreaterequal")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth, inst);
                 }
                 else if (semanticName == "sv_depthlessequal")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth, inst);
                 }
                 else if (semanticName == "sv_dispatchthreadid")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInGlobalInvocationId);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInGlobalInvocationId, inst);
                 }
                 else if (semanticName == "sv_domainlocation")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInTessCoord);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInTessCoord, inst);
                 }
                 else if (semanticName == "sv_groupid")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInWorkgroupId);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInWorkgroupId, inst);
                 }
                 else if (semanticName == "sv_groupindex")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLocalInvocationIndex);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLocalInvocationIndex, inst);
                 }
                 else if (semanticName == "sv_groupthreadid")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLocalInvocationId);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLocalInvocationId, inst);
                 }
                 else if (semanticName == "sv_gsinstanceid")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInvocationId);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInvocationId, inst);
                 }
                 else if (semanticName == "sv_instanceid")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInstanceIndex);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInstanceIndex, inst);
                 }
                 else if (semanticName == "sv_isfrontface")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFrontFacing);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFrontFacing, inst);
                 }
                 else if (semanticName == "sv_outputcontrolpointid")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInvocationId);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInvocationId, inst);
                 }
                 else if (semanticName == "sv_pointsize")
                 {
                     // float in hlsl & glsl
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPointSize);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPointSize, inst);
                 }
                 else if (semanticName == "sv_primitiveid")
                 {
@@ -4033,7 +4070,7 @@ struct SPIRVEmitContext
                     }
                     if (needGeometryCapability)
                         requireSPIRVCapability(SpvCapabilityGeometry);
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveId);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveId, inst);
                 }
                 else if (semanticName == "sv_rendertargetarrayindex")
                 {
@@ -4041,37 +4078,42 @@ struct SPIRVEmitContext
                         requireSPIRVCapability(SpvCapabilityShaderLayer);
                     else
                         requireSPIRVCapability(SpvCapabilityGeometry);
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLayer);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLayer, inst);
                 }
                 else if (semanticName == "sv_sampleindex")
                 {
                     requireSPIRVCapability(SpvCapabilitySampleRateShading);
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInSampleId);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInSampleId, inst);
                 }
                 else if (semanticName == "sv_stencilref")
                 {
                     requireSPIRVCapability(SpvCapabilityStencilExportEXT);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_stencil_export"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragStencilRefEXT);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragStencilRefEXT, inst);
                 }
                 else if (semanticName == "sv_tessfactor")
                 {
                     requireSPIRVCapability(SpvCapabilityTessellation);
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInTessLevelOuter);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInTessLevelOuter, inst);
+                }
+                else if (semanticName == "sv_insidetessfactor")
+                {
+                    requireSPIRVCapability(SpvCapabilityTessellation);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInTessLevelInner, inst);
                 }
                 else if (semanticName == "sv_vertexid")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInVertexIndex);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInVertexIndex, inst);
                 }
                 else if (semanticName == "sv_viewid")
                 {
                     requireSPIRVCapability(SpvCapabilityMultiView);
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewIndex);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewIndex, inst);
                 }
                 else if (semanticName == "sv_viewportarrayindex")
                 {
                     requireSPIRVCapability(SpvCapabilityShaderViewportIndex);
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewportIndex);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewportIndex, inst);
                 }
                 else if (semanticName == "nv_x_right")
                 {
@@ -4081,13 +4123,13 @@ struct SPIRVEmitContext
                 {
                     requireSPIRVCapability(SpvCapabilityPerViewAttributesNV);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_mesh_shader"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewportMaskPerViewNV);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewportMaskPerViewNV, inst);
                 }
                 else if (semanticName == "sv_barycentrics")
                 {
                     requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR, inst);
 
                     // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
                     // we ought to use if the `noperspective` modifier has been
@@ -4097,7 +4139,7 @@ struct SPIRVEmitContext
                 {
                     requireSPIRVCapability(SpvCapabilityMeshShadingEXT);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_mesh_shader"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInCullPrimitiveEXT);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInCullPrimitiveEXT, inst);
                 }
                 else if (semanticName == "sv_shadingrate")
                 {
@@ -4105,9 +4147,9 @@ struct SPIRVEmitContext
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_fragment_shading_rate"));
                     auto importDecor = inst->findDecoration<IRImportDecoration>();
                     if (importDecor && importDecor->getMangledName() == "gl_PrimitiveShadingRateEXT")
-                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveShadingRateKHR);
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveShadingRateKHR, inst);
                     else
-                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInShadingRateKHR);
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInShadingRateKHR, inst);
                 }
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
@@ -4122,11 +4164,11 @@ struct SPIRVEmitContext
         {
             const auto name = linkageDecoration->getMangledName();
             if(name == "gl_PrimitiveTriangleIndicesEXT")
-                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveTriangleIndicesEXT);
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveTriangleIndicesEXT, inst);
             if(name == "gl_PrimitiveLineIndicesEXT")
-                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveLineIndicesEXT);
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveLineIndicesEXT, inst);
             if(name == "gl_PrimitivePointIndicesEXT")
-                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitivePointIndicesEXT);
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitivePointIndicesEXT, inst);
         }
 
         return nullptr;
@@ -6251,22 +6293,6 @@ struct SPIRVEmitContext
     }
 };
 
-bool isInstUsedInStage(SPIRVEmitContext& context, IRInst* inst, Stage s)
-{
-    auto* referencingEntryPoints = context.m_referencingEntryPoints.tryGetValue(inst);
-    if (!referencingEntryPoints)
-        return false;
-    for (auto entryPoint : *referencingEntryPoints)
-    {
-        if (auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>())
-        {
-            if (entryPointDecor->getProfile().getStage() == s)
-                return true;
-        }
-    }
-    return false;
-}
-
 SlangResult emitSPIRVFromIR(
     CodeGenContext*         codeGenContext,
     IRModule*               irModule,
@@ -6331,28 +6357,6 @@ SlangResult emitSPIRVFromIR(
         context.ensureInst(irEntryPoint);
     }
 
-    // Declare integral input builtins as Flat if necessary.
-    for (auto globalInst : context.m_irModule->getGlobalInsts())
-    {
-        if (globalInst->getOp() != kIROp_GlobalVar &&
-            globalInst->getOp() != kIROp_GlobalParam)
-            continue;
-        auto spvVar = context.m_mapIRInstToSpvInst.tryGetValue(globalInst);
-        if (!spvVar)
-            continue;
-        auto ptrType = as<IRPtrType>(globalInst->getDataType());
-        if (!ptrType)
-            continue;
-        auto addrSpace = ptrType->getAddressSpace();
-        if (addrSpace == SpvStorageClassInput)
-        {
-            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
-            {
-                if (isInstUsedInStage(context, globalInst, Stage::Fragment))
-                    context._maybeEmitInterpolationModifierDecoration(IRInterpolationMode::NoInterpolation, *spvVar);
-            }
-        }
-    }
 
     // Move forward delcared pointers to the end.
     do
