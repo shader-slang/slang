@@ -129,9 +129,12 @@ void CLikeSourceEmitter::emitPreModuleImpl()
         m_writer->emit(prelude->getStringSlice());
         m_writer->emit("\n");
     }
-    for (auto prelude : m_requiredPreludesRaw)
+}
+void CLikeSourceEmitter::emitPostModuleImpl()
+{
+    for (auto interlude : m_requiredAfterRaw)
     {
-        m_writer->emit(prelude);
+        m_writer->emit(interlude);
         m_writer->emit("\n");
     }
 }

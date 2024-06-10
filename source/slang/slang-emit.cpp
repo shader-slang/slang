@@ -1343,6 +1343,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     // Append the modules output code
     finalResult.append(code);
 
+    // Append all content that should be at the end of a module
+    sourceEmitter->emitPostModule();
+    finalResult.append(sourceWriter.getContentAndClear());
+
     // Write out the result
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(target));

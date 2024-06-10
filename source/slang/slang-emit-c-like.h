@@ -431,7 +431,7 @@ public:
     void emitFrontMatter(TargetRequest* targetReq) { emitFrontMatterImpl(targetReq); }
 
     void emitPreModule() { emitPreModuleImpl(); }
-
+    void emitPostModule() { emitPostModuleImpl(); }
     void emitModule(IRModule* module, DiagnosticSink* sink)
         { m_irModule = module; emitModuleImpl(module, sink); }
 
@@ -476,6 +476,7 @@ public:
         /// For example on targets that don't have built in vector/matrix support, this is where
         /// the appropriate generated declarations occur.
     virtual void emitPreModuleImpl();
+    virtual void emitPostModuleImpl();
 
     virtual void beforeComputeEmitActions(IRModule* module) { SLANG_UNUSED(module); };
 
@@ -590,7 +591,7 @@ public:
     // to use for it when emitting code.
     Dictionary<IRInst*, String> m_mapInstToName;
 
-    OrderedHashSet<String> m_requiredPreludesRaw;
+    HashSet<String> m_requiredAfterRaw;
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
 };
 

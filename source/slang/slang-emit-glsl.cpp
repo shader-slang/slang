@@ -2208,8 +2208,8 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
         {
             // only allowed 1 of derivative_group_quadsNV or derivative_group_linearNV
             if (m_entryPointStage != Stage::Compute
-                || m_requiredPreludesRaw.contains("layout(derivative_group_quadsNV) in;")
-                || m_requiredPreludesRaw.contains("layout(derivative_group_linearNV) in;")
+                || m_requiredAfterRaw.contains("layout(derivative_group_quadsNV) in;")
+                || m_requiredAfterRaw.contains("layout(derivative_group_linearNV) in;")
                 )
                 return;
 
@@ -2225,12 +2225,12 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
                 if (isQuad)
                 {
                     verifyComputeDerivativeGroupModifiers(getSink(), inst->sourceLoc, true, false, numThreadsDecor);
-                    m_requiredPreludesRaw.add("layout(derivative_group_quadsNV) in;");
+                    m_requiredAfterRaw.add("layout(derivative_group_quadsNV) in;");
                 }
                 else
                 {
                     verifyComputeDerivativeGroupModifiers(getSink(), inst->sourceLoc, false, true, numThreadsDecor);
-                    m_requiredPreludesRaw.add("layout(derivative_group_linearNV) in;");
+                    m_requiredAfterRaw.add("layout(derivative_group_linearNV) in;");
                 }
             }
         }
