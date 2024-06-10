@@ -2105,25 +2105,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto spirvAtom = ((CapabilityName)atom);
                 switch (spirvAtom)
                 {
-                case CapabilityName::spirv_1_0:
+                case CapabilityName::_spirv_1_0:
                     m_sharedContext->requireSpirvVersion(0x10000);
                     break;
-                case CapabilityName::spirv_1_1:
+                case CapabilityName::_spirv_1_1:
                     m_sharedContext->requireSpirvVersion(0x10100);
                     break;
-                case CapabilityName::spirv_1_2:
+                case CapabilityName::_spirv_1_2:
                     m_sharedContext->requireSpirvVersion(0x10200);
                     break;
-                case CapabilityName::spirv_1_3:
+                case CapabilityName::_spirv_1_3:
                     m_sharedContext->requireSpirvVersion(0x10300);
                     break;
-                case CapabilityName::spirv_1_4:
+                case CapabilityName::_spirv_1_4:
                     m_sharedContext->requireSpirvVersion(0x10400);
                     break;
-                case CapabilityName::spirv_1_5:
+                case CapabilityName::_spirv_1_5:
                     m_sharedContext->requireSpirvVersion(0x10500);
                     break;
-                case CapabilityName::spirv_1_6:
+                case CapabilityName::_spirv_1_6:
                     m_sharedContext->requireSpirvVersion(0x10600);
                     break;
                 case CapabilityName::SPV_EXT_demote_to_helper_invocation:
