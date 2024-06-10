@@ -1,6 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 struct S
 {

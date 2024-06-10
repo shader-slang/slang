@@ -362,6 +362,51 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
     }
 }
 
+bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_StaticAssert:
+    {
+        IRInst* condi = inst->getOperand(0);
+        if (auto condiLit = as<IRBoolLit>(condi))
+        {
+            if (!condiLit->getValue())
+            {
+                IRInst* msg = inst->getOperand(1);
+                if (auto msgLit = as<IRStringLit>(msg))
+                {
+                    sink->diagnose(inst, Diagnostics::staticAssertionFailure, msgLit->getStringSlice());
+                }
+                else
+                {
+                    sink->diagnose(inst, Diagnostics::staticAssertionFailureWithoutMessage);
+                }
+            }
+        }
+        else
+        {
+            sink->diagnose(condi, Diagnostics::staticAssertionConditionNotConstant);
+        }
+
+        return true;
+    }
+    }
+
+    List<IRInst*> removeList;
+    for (auto child : inst->getChildren())
+    {
+        if (checkStaticAssert(child, sink))
+            removeList.add(child);
+    }
+    for (auto child : removeList)
+    {
+        child->removeAndDeallocate();
+    }
+
+    return false;
+}
+
 Result linkAndOptimizeIR(
     CodeGenContext*                         codeGenContext,
     LinkingAndOptimizationOptions const&    options,
@@ -880,6 +925,10 @@ Result linkAndOptimizeIR(
 #endif
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    // Process `static_assert` after the specialization is done.
+    // Some information for `static_assert` is available only after the specialization.
+    checkStaticAssert(irModule->getModuleInst(), sink);
 
     // For HLSL (and fxc/dxc) only, we need to "wrap" any
     // structured buffers defined over matrix types so

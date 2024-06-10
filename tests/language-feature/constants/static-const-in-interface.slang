@@ -1,7 +1,6 @@
 // static-const-in-interface.slang
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 // Test that `static const` variable declarations inside of
 // a `interface` type correctly translate to interface requirements.
