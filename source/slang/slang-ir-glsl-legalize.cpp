@@ -1262,7 +1262,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
     if (systemValueInfo)
     {
-        if (auto fromType = systemValueInfo->requiredType)
+        if (systemValueInfo->requiredType)
         {
             // We may need to adapt from the declared type to/from
             // the actual type of the GLSL global.
