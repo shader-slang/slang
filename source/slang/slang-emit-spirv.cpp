@@ -2632,6 +2632,7 @@ struct SPIRVEmitContext
             }
         case kIROp_Specialize:
         case kIROp_MissingReturn:
+        case kIROp_StaticAssert:
             break;
         case kIROp_Var:
             result = emitVar(parent, inst);
