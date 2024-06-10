@@ -77,7 +77,7 @@ capability opengl : khronos;
 
 Here we are saying that `sm_5_1` supports everything `sm_5_0` supports, and potentially more. We are saying that `d3d12` supports `sm_6_0` but maybe not, e.g., `sm_6_3`.
 We are expressing that fact that having a `glsl_*` capability means you are on some Khronos API target, but that it doesn't specify which one.
-(The extact details of these declarations obviously aren't the point; getting a good hierarchy of capabilites will take time)
+(The extact details of these declarations obviously aren't the point; getting a good hierarchy of capabilites will take time.)
 
 Capability Composition
 ----------------------
@@ -119,7 +119,7 @@ void myFunc();
 ```
 
 This function should be equivalent to one with just a single `[availableFor((vulkan & fragment) | (d3d12 & fragment))]` which is equivalent to `[availableFor((vulkan | d3d12) & fragment)]`.
-Simplification should generally push toward "disjunctive normal form," though, rather than puruse simplifications like that.
+Simplification should generally push toward "disjunctive normal form," though, rather than pursue simplifications like that.
 Note that we do *not* include negation, so that capabilities are not general Boolean expressions.
 
 Validation
@@ -130,7 +130,7 @@ For a given function definition `F`, the front end will scan its body and see wh
 If `F` doesn't have an `[availableFor(...)]` attribute, then we can derive its *effective* `[availableFor(...)]` capability as `R` (this probably needs to be expressed as an iterative dataflow problem over the call graph, to handle cycles).
 
 If `F` *does* have one or more `[availabelFor(...)]` clauses that amount to a declared capability `C` (again in disjunctive normal form), then we can check that `C` implies `R` and error out if it is not the case.
-A reasonable implementation would track which calls introduced with requirements, and be able to explain *why* `C` does not capture the stated requirements.
+A reasonable implementation would track which calls introduced which requirements, and be able to explain *why* `C` does not capture the stated requirements.
 
 For a shader entry point, we should check it as if it had an `[availableFor(...)]` that is the OR of all the specified target profiles (e.g., `sm_5_0 | glsl_450 | ...`) ANDed with the specified stage (e.g., `fragment`).
 Any error here should be reported to the user.
@@ -151,7 +151,7 @@ It should be possible to define multiple versions of a function, having differen
 [availableFor(d3d12)] void myFunc() { ... }
 ```
 
-For front-end checking, these should be treated as if they were a single definition of `myFunc` with a ORed capability (e.g., `vulkan | d3d12`).
+For front-end checking, these should be treated as if they were a single definition of `myFunc` with an ORed capability (e.g., `vulkan | d3d12`).
 Overload resoultion will pick the "best" candidate at a call site based *only* on the signatures of the function (note that this differs greatly from how profile-specific function overloading works in Cg).
 
 The front-end will then generate initial IR code for each definition of `myFunc`.
@@ -177,7 +177,7 @@ So far I've talked about capabilities on functions, but they should also be allo
 
 We should also provide a way to specify that a `register` or other layout modifier is only applicable for specific targets/stages. Such a capability nominally exists in HLSL today, but it would be much more useful if it could be applied to specify target-API-specific bindings.
 
-Only functions should support overloading based on capability. in all other cases there can only be one definition of an entity, and capabilities just decide when it is available.
+Only functions should support overloading based on capability. In all other cases there can only be one definition of an entity, and capabilities just decide when it is available.
 
 API Extensions as Capabilities
 ------------------------------
@@ -192,14 +192,14 @@ capability KHR_secret_sauce : vulkan;
 void improveShadows();
 ```
 
-When generating code for Vulkan, we should be able to tell the user that the `improveShadows()` function requires the given extension. The user should be able to expression compositions of capabilities in their `-profile` option (and similarly for the API):
+When generating code for Vulkan, we should be able to tell the user that the `improveShadows()` function requires the given extension. The user should be able to express compositions of capabilities in their `-profile` option (and similarly for the API):
 
 ```
 slangc code.slang -profile vulkan+KHR_secret_sauce
 ```
 (Note that for the command line, it is beneficial to use `+` instead of `&` to avoid conflicts with shell interpreters)
 
-And important question is whether the compiler should automatically infer required extensions without them being specified, so that it produces SPIR-V that requires extensions the user didn't ask for.
+An important question is whether the compiler should automatically infer required extensions without them being specified, so that it produces SPIR-V that requires extensions the user didn't ask for.
 The argument against such inference is that users should opt in to non-standard capabilities they are using, but it would be unfortunate if this in turn requires verbose command lines when invoking the compiler.
 It should be possible to indicate the capabilities that a module or entry point should be compiled to use without command-line complications.
 
@@ -268,4 +268,4 @@ Conclusion
 ----------
 
 Overall, the hope is that in many cases developers will be able to use capability-based partitioning and overloading of APIs to build code that only has to pass through the Slang front-end once, but that can then go through back-end code generation for each target.
-In cases where this can't be achieved, the way that capability-based overloading is built into the Slang ir design means that we should be able to merge multiple target-specific definitions into one IR module, so that a library can employ target-specific specializations while still presenting a single API to consumers.
+In cases where this can't be achieved, the way that capability-based overloading is built into the Slang IR design means that we should be able to merge multiple target-specific definitions into one IR module, so that a library can employ target-specific specializations while still presenting a single API to consumers.

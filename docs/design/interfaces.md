@@ -226,7 +226,7 @@ Bot the use of `&` and `where` are advanced features that we might cut due to im
 
 ### Value Parameters
 
-Because HLSL has generics like `vector<float,3>` that already take non-type parameters, the language will need *some* degree of support for generic parameters that arent' types (at least integers need to be supported).
+Because HLSL has generics like `vector<float,3>` that already take non-type parameters, the language will need *some* degree of support for generic parameters that aren't types (at least integers need to be supported).
 We need syntax for this that doesn't bloat the common case.
 
 In this case, I think that what I've used in the current Slang implementation is reasonable, where a value parameter needs a `let` prefix:
