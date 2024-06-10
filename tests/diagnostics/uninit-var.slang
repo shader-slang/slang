@@ -1,24 +1,30 @@
 // uninit-var.slang
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -profile cs_6_0
+//TEST:SIMPLE(filecheck=CHECK_INITIALIZED): -target hlsl -entry computeMain -profile cs_6_0 -DINITIALIZED
 
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj
 
+
 struct Data
 {
-    float3 value;
+    float value;
 };
 
 RWStructuredBuffer<Data>  inputBuffer;
 RWStructuredBuffer<Data> outputBuffer;
 
-float foo(out float3 v)
+float foo(out float v)
 {
+//CHECK_INITIALIZED-NOT: error 41015
+#ifdef INITIALIZED
+    float uninitializedVariable = 0;
+#else 
     float uninitializedVariable;
-
-    // CHECK: warning
-    float r = v.x + uninitializedVariable;
+#endif
+    // CHECK: ([[ # @LINE+1]]): warning {{.*}} uninitializedVariable
+    float r = v + uninitializedVariable;
     return r;
 }
 
