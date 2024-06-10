@@ -259,4 +259,23 @@ MTL::VertexStepFunction MetalUtil::translateVertexStepFunction(InputSlotClass sl
     }
 }
 
+MTL::PrimitiveType MetalUtil::translatePrimitiveType(PrimitiveTopology topology)
+{
+    switch (topology)
+    {
+    case PrimitiveTopology::TriangleList:
+        return MTL::PrimitiveTypeTriangle;
+    case PrimitiveTopology::TriangleStrip:
+        return MTL::PrimitiveTypeTriangleStrip;
+    case PrimitiveTopology::PointList:
+        return MTL::PrimitiveTypePoint;
+    case PrimitiveTopology::LineList:
+        return MTL::PrimitiveTypeLine;
+    case PrimitiveTopology::LineStrip:
+        return MTL::PrimitiveTypeLineStrip;
+    default:
+        return MTL::PrimitiveType(0);
+    }
+}
+
 } // namespace gfx

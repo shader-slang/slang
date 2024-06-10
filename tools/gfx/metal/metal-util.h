@@ -50,6 +50,8 @@ struct MetalUtil
 
     static MTL::VertexStepFunction translateVertexStepFunction(InputSlotClass slotClass);
 
+    static MTL::PrimitiveType translatePrimitiveType(PrimitiveTopology topology);
+
 };
 
 struct ScopedAutoreleasePool
