@@ -554,7 +554,7 @@ alias sm_6_5 = sm_6_5_version
 
 alias sm_6_6_version = _sm_6_6
              | _GLSL_460
-             | spirv_1_5
+             | spirv_1_4
              | _cuda_sm_9_0
              | metal
              | cpp
@@ -566,7 +566,7 @@ alias sm_6_6 = sm_6_6_version
 
 alias sm_6_7_version = _sm_6_7
              | _GLSL_460
-             | spirv_1_5
+             | spirv_1_4
              | _cuda_sm_9_0
              | metal
              | cpp
@@ -657,7 +657,7 @@ alias GLSL_430 = _GLSL_430
 alias GLSL_440 = _GLSL_440
                | _sm_6_0
                | _cuda_sm_6_0
-               | spirv_1_5
+               | spirv_1_3
                | metal
                | cpp
                // previous
@@ -666,7 +666,7 @@ alias GLSL_440 = _GLSL_440
 alias GLSL_450 = _GLSL_450 
                | _sm_6_0
                | _cuda_sm_6_0
-               | spirv_1_5
+               | spirv_1_3
                | metal
                | cpp
                // extensions to propagate
@@ -677,7 +677,7 @@ alias GLSL_450 = _GLSL_450
 alias GLSL_460 = _GLSL_460
                | _sm_6_6
                | _cuda_sm_6_0
-               | spirv_1_5
+               | spirv_1_3
                | metal
                | cpp
                // previous
