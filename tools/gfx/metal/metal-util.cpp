@@ -278,4 +278,80 @@ MTL::PrimitiveType MetalUtil::translatePrimitiveType(PrimitiveTopology topology)
     }
 }
 
+MTL::BlendFactor MetalUtil::translateBlendFactor(BlendFactor factor)
+{
+    switch (factor)
+    {
+    case BlendFactor::Zero:
+        return MTL::BlendFactorZero;
+    case BlendFactor::One:
+        return MTL::BlendFactorOne;
+    case BlendFactor::SrcColor:
+        return MTL::BlendFactorSourceColor;
+    case BlendFactor::InvSrcColor:
+        return MTL::BlendFactorOneMinusSourceColor;
+    case BlendFactor::SrcAlpha:
+        return MTL::BlendFactorSourceAlpha;
+    case BlendFactor::InvSrcAlpha:
+        return MTL::BlendFactorOneMinusSourceAlpha;
+    case BlendFactor::DestAlpha:
+        return MTL::BlendFactorDestinationAlpha;
+    case BlendFactor::InvDestAlpha:
+        return MTL::BlendFactorOneMinusDestinationAlpha;
+    case BlendFactor::DestColor:
+        return MTL::BlendFactorDestinationColor;
+    case BlendFactor::InvDestColor:
+        return MTL::BlendFactorOneMinusDestinationColor;
+    case BlendFactor::SrcAlphaSaturate:
+        return MTL::BlendFactorSourceAlphaSaturated;
+    case BlendFactor::BlendColor:
+        return MTL::BlendFactorBlendColor;
+    case BlendFactor::InvBlendColor:
+        return MTL::BlendFactorOneMinusBlendColor;
+    case BlendFactor::SecondarySrcColor:
+        return MTL::BlendFactorSource1Color;
+    case BlendFactor::InvSecondarySrcColor:
+        return MTL::BlendFactorOneMinusSource1Color;
+    case BlendFactor::SecondarySrcAlpha:
+        return MTL::BlendFactorSource1Alpha;
+    case BlendFactor::InvSecondarySrcAlpha:
+        return MTL::BlendFactorOneMinusSource1Alpha;
+    default:
+        return MTL::BlendFactor(0);
+    }
+}
+
+MTL::BlendOperation MetalUtil::translateBlendOperation(BlendOp op)
+{
+    switch (op)
+    {
+    case BlendOp::Add:
+        return MTL::BlendOperationAdd;
+    case BlendOp::Subtract:
+        return MTL::BlendOperationSubtract;
+    case BlendOp::ReverseSubtract:
+        return MTL::BlendOperationReverseSubtract;
+    case BlendOp::Min:
+        return MTL::BlendOperationMin;
+    case BlendOp::Max:
+        return MTL::BlendOperationMax;
+    default:
+        return MTL::BlendOperation(0);
+    }
+}
+
+MTL::ColorWriteMask MetalUtil::translateColorWriteMask(RenderTargetWriteMask::Type mask)
+{
+    MTL::ColorWriteMask result = MTL::ColorWriteMaskNone;
+    if (mask & RenderTargetWriteMask::EnableRed)
+        result |= MTL::ColorWriteMaskRed;
+    if (mask & RenderTargetWriteMask::EnableGreen)
+        result |= MTL::ColorWriteMaskGreen;
+    if (mask & RenderTargetWriteMask::EnableBlue)
+        result |= MTL::ColorWriteMaskBlue;
+    if (mask & RenderTargetWriteMask::EnableAlpha)
+        result |= MTL::ColorWriteMaskAlpha;
+    return result;
+}
+
 } // namespace gfx

@@ -52,6 +52,10 @@ struct MetalUtil
 
     static MTL::PrimitiveType translatePrimitiveType(PrimitiveTopology topology);
 
+    static MTL::BlendFactor translateBlendFactor(BlendFactor factor);
+    static MTL::BlendOperation translateBlendOperation(BlendOp op);
+    static MTL::ColorWriteMask translateColorWriteMask(RenderTargetWriteMask::Type mask);
+
 };
 
 struct ScopedAutoreleasePool
