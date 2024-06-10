@@ -29,47 +29,27 @@ Result FramebufferLayoutImpl::init(const IFramebufferLayout::Desc& desc)
     return SLANG_OK;
 }
 
-FramebufferImpl::~FramebufferImpl()
-{
-}
-
 Result FramebufferImpl::init(DeviceImpl* device, const IFramebuffer::Desc& desc)
 {
     m_device = device;
     m_layout = static_cast<FramebufferLayoutImpl*>(desc.layout);
-    m_width = m_height = 1;
-
-    TextureResourceViewImpl* dsv = static_cast<TextureResourceViewImpl*>(desc.depthStencilView);
-
-    // Get frame dimensions from attachments.
-    if (dsv)
+    m_renderTargetViews.setCount(desc.renderTargetCount);
+    for (Index i = 0; i < desc.renderTargetCount; ++i)
     {
-        // If we have a depth attachment, get frame size from there.
-        auto size = dsv->m_texture->getDesc()->size;
-        auto viewDesc = dsv->getViewDesc();
-        m_width = Math::Max(1u, uint32_t(size.width >> viewDesc->subresourceRange.mipLevel));
-        m_height = Math::Max(1u, uint32_t(size.height >> viewDesc->subresourceRange.mipLevel));
+        m_renderTargetViews[i] = static_cast<TextureResourceViewImpl*>(desc.renderTargetViews[i]);
     }
-    else if (desc.renderTargetCount > 0)
-    {
-        // If we don't have a depth attachment, then we must have at least
-        // one color attachment. Get frame dimension from there.
-        auto viewImpl = static_cast<TextureResourceViewImpl*>(desc.renderTargetViews[0]);
-        auto resourceDesc = viewImpl->m_texture->getDesc();
-        auto viewDesc = viewImpl->getViewDesc();
-        auto size = resourceDesc->size;
-        m_width = Math::Max(1u, uint32_t(size.width >> viewDesc->subresourceRange.mipLevel));
-        m_height = Math::Max(1u, uint32_t(size.height >> viewDesc->subresourceRange.mipLevel));
-    }
+    m_depthStencilView = static_cast<TextureResourceViewImpl*>(desc.depthStencilView);
 
-    // Initialize depthstencil and render target views
-    depthStencilView = desc.depthStencilView;
-
-    renderTargetViews.setCount(desc.renderTargetCount);
-    for (int i = 0; i < desc.renderTargetCount; ++i)
+    // Compute framebuffer dimensions from either the first render target view or the depth stencil view.
+    TextureResourceViewImpl* view = (m_renderTargetViews.getCount() > 0) ? m_renderTargetViews[0] : m_depthStencilView;
+    if (!view)
     {
-        renderTargetViews[i] = desc.renderTargetViews[i];
+        return SLANG_FAIL;
     }
+    auto size = view->m_texture->getDesc()->size;
+    auto viewDesc = view->getViewDesc();
+    m_width = Math::Max(1u, uint32_t(size.width >> viewDesc->subresourceRange.mipLevel));
+    m_height = Math::Max(1u, uint32_t(size.height >> viewDesc->subresourceRange.mipLevel));
 
     return SLANG_OK;
 }

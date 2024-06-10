@@ -144,9 +144,9 @@ Result DeviceImpl::createSwapchain(
 {
     AUTORELEASEPOOL
 
-    RefPtr<SwapchainImpl> sc = new SwapchainImpl();
-    SLANG_RETURN_ON_FAIL(sc->init(this, desc, window));
-    returnComPtr(outSwapchain, sc);
+    RefPtr<SwapchainImpl> swapchainImpl = new SwapchainImpl();
+    SLANG_RETURN_ON_FAIL(swapchainImpl->init(this, desc, window));
+    returnComPtr(outSwapchain, swapchainImpl);
     return SLANG_OK;
 }
 
@@ -164,9 +164,9 @@ Result DeviceImpl::createRenderPassLayout(const IRenderPassLayout::Desc& desc, I
 {
     AUTORELEASEPOOL
 
-    RefPtr<RenderPassLayoutImpl> result = new RenderPassLayoutImpl;
-    SLANG_RETURN_ON_FAIL(result->init(this, desc));
-    returnComPtr(outRenderPassLayout, result);
+    RefPtr<RenderPassLayoutImpl> renderPassLayoutImpl = new RenderPassLayoutImpl;
+    SLANG_RETURN_ON_FAIL(renderPassLayoutImpl->init(this, desc));
+    returnComPtr(outRenderPassLayout, renderPassLayoutImpl);
     return SLANG_OK;
 }
 
@@ -174,9 +174,9 @@ Result DeviceImpl::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffe
 {
     AUTORELEASEPOOL
 
-    RefPtr<FramebufferImpl> fb = new FramebufferImpl;
-    SLANG_RETURN_ON_FAIL(fb->init(this, desc));
-    returnComPtr(outFramebuffer, fb);
+    RefPtr<FramebufferImpl> framebufferImpl = new FramebufferImpl;
+    SLANG_RETURN_ON_FAIL(framebufferImpl->init(this, desc));
+    returnComPtr(outFramebuffer, framebufferImpl);
     return SLANG_OK;
 }
 

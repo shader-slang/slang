@@ -31,21 +31,13 @@ class FramebufferImpl : public FramebufferBase
 {
 public:
     BreakableReference<DeviceImpl> m_device;
-    ShortList<ComPtr<IResourceView>> renderTargetViews;
-    ComPtr<IResourceView> depthStencilView;
+    RefPtr<FramebufferLayoutImpl> m_layout;
+    ShortList<RefPtr<TextureResourceViewImpl>> m_renderTargetViews;
+    RefPtr<TextureResourceViewImpl> m_depthStencilView;
     uint32_t m_width;
     uint32_t m_height;
-    MTL::ClearColor m_clearValues[kMaxTargets];
-    RefPtr<FramebufferLayoutImpl> m_layout;
-#if 0
-    Array<MTL::RenderPassColorAttachmentDescriptor*, kMaxTargets> m_colorTargetDescs;
-    MTL::RenderPassDepthAttachmentDescriptor* m_depthAttachmentDesc = nullptr;
-    MTL::RenderPassStencilAttachmentDescriptor* m_stencilAttachmentDesc = nullptr;
-#endif
 
 public:
-    ~FramebufferImpl();
-
     Result init(DeviceImpl* device, const IFramebuffer::Desc& desc);
 };
 
