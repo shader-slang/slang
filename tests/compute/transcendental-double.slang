@@ -6,6 +6,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE: -dx12 -output-using-type -shaderobj
 // When using double on vulkan the values are incorrect(!)
 //DISABLE_TEST(compute,vulkan):COMPARE_COMPUTE:-vk -output-using-type -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

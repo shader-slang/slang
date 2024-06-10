@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE: 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -profile cs_5_0
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 int check<let b : bool>(int x)
 {

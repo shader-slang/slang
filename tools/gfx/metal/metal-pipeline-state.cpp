@@ -50,40 +50,84 @@ void PipelineStateImpl::init(const RayTracingPipelineStateDesc& desc)
 
 Result PipelineStateImpl::createMetalRenderPipelineState()
 {
-    NS::SharedPtr<MTL::RenderPipelineDescriptor> pd = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
     auto programImpl = static_cast<ShaderProgramImpl*>(m_program.Ptr());
-    if (programImpl)
+    if (!programImpl)
+        return SLANG_FAIL;
+
+    NS::SharedPtr<MTL::RenderPipelineDescriptor> pd = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+
+    for (const ShaderProgramImpl::Module& module : programImpl->m_modules)
     {
-        SLANG_RETURN_ON_FAIL(programImpl->compileShaders(m_device));
+        auto functionName = MetalUtil::createString(module.entryPointName.getBuffer());
+        NS::SharedPtr<MTL::Function> function = NS::TransferPtr(module.library->newFunction(functionName.get()));
+        if (!function)
+            return SLANG_FAIL;
+
+        switch (module.stage)
+        {
+        case SLANG_STAGE_VERTEX:
+            pd->setVertexFunction(function.get());
+            break;
+        case SLANG_STAGE_FRAGMENT:
+            pd->setFragmentFunction(function.get());
+            break;
+        default:
+            return SLANG_FAIL;
+        }
     }
 
-    const auto& programReflection = m_program->linkedProgram->getLayout();
-    const auto& composedProgram = m_program->linkedProgram;
-    for (SlangUInt i = 0; i < programReflection->getEntryPointCount(); ++i)
+    // Offset vertex buffer indices in vertex layout.
+    // They need to be in a range not used by other buffer bindings.
+    m_vertexBufferOffset = 10; // TODO get from layout
+    auto inputLayoutImpl = static_cast<InputLayoutImpl*>(desc.graphics.inputLayout);
+    NS::SharedPtr<MTL::VertexDescriptor> vertexDescriptor = inputLayoutImpl->createVertexDescriptor(m_vertexBufferOffset);
+    pd->setVertexDescriptor(vertexDescriptor.get());
+    pd->setInputPrimitiveTopology(MetalUtil::translatePrimitiveTopologyClass(desc.graphics.primitiveType));
+
+    // Set rasterization state
+    auto framebufferLayoutImpl = static_cast<FramebufferLayoutImpl*>(desc.graphics.framebufferLayout);
+    const auto& blend = desc.graphics.blend;
+    GfxCount sampleCount = 1;
+
+    pd->setAlphaToCoverageEnabled(blend.alphaToCoverageEnable);
+    // pd->setAlphaToOneEnabled(); // Currently not supported by gfx
+    // pd->setRasterizationEnabled(true); // Enabled by default
+
+    for (Index i = 0; i < framebufferLayoutImpl->m_renderTargets.getCount(); ++i)
     {
-        SlangStage stage = programReflection->getEntryPointByIndex(i)->getStage();
-        if (stage == SLANG_STAGE_VERTEX)
+        const IFramebufferLayout::TargetLayout& targetLayout = framebufferLayoutImpl->m_renderTargets[i];
+        MTL::RenderPipelineColorAttachmentDescriptor* colorAttachment = pd->colorAttachments()->object(i);
+        colorAttachment->setPixelFormat(MetalUtil::translatePixelFormat(targetLayout.format));
+        if (i < blend.targetCount)
         {
-            ComPtr<slang::IBlob> metalCode;
-            {
-                ComPtr<slang::IBlob> diagnosticsBlob;
-                SlangResult result = composedProgram->getEntryPointCode(i, 0, metalCode.writeRef(), diagnosticsBlob.writeRef());
-                if (diagnosticsBlob)
-                {
-                    std::cout << diagnosticsBlob->getBufferPointer() << std::endl;
-                }
-                //MTL::Function* f = ...
-                //RETURN_ON_FAIL(result);
-                //pd->setVertexFunction();
-            }
+            const TargetBlendDesc& targetBlendDesc = blend.targets[i];
+            colorAttachment->setBlendingEnabled(targetBlendDesc.enableBlend);
+            colorAttachment->setSourceRGBBlendFactor(MetalUtil::translateBlendFactor(targetBlendDesc.color.srcFactor));
+            colorAttachment->setDestinationRGBBlendFactor(MetalUtil::translateBlendFactor(targetBlendDesc.color.dstFactor));
+            colorAttachment->setRgbBlendOperation(MetalUtil::translateBlendOperation(targetBlendDesc.color.op));
+            colorAttachment->setSourceAlphaBlendFactor(MetalUtil::translateBlendFactor(targetBlendDesc.alpha.srcFactor));
+            colorAttachment->setDestinationAlphaBlendFactor(MetalUtil::translateBlendFactor(targetBlendDesc.alpha.dstFactor));
+            colorAttachment->setAlphaBlendOperation(MetalUtil::translateBlendOperation(targetBlendDesc.alpha.op));
+            colorAttachment->setWriteMask(MetalUtil::translateColorWriteMask(targetBlendDesc.writeMask));
         }
-        //pd->setFragmentFunction();
+        sampleCount = Math::Max(sampleCount, targetLayout.sampleCount);
     }
-    // pd->colorAttachments()->object(0)->setPixelFormat(...);
-    // pd->setDepthAttachmentPixelFormat(...);
-    // Set deftault viewport and scissor
-    // Set default rasterization state
-    // Set default framebuffer layout
+    if (framebufferLayoutImpl->m_depthStencil.format != Format::Unknown)
+    {
+        const IFramebufferLayout::TargetLayout& depthStencil = framebufferLayoutImpl->m_depthStencil;
+        MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(depthStencil.format);
+        if (MetalUtil::isDepthFormat(pixelFormat))
+        {
+            pd->setDepthAttachmentPixelFormat(MetalUtil::translatePixelFormat(depthStencil.format));
+        }
+        if (MetalUtil::isStencilFormat(pixelFormat))
+        {
+            pd->setStencilAttachmentPixelFormat(MetalUtil::translatePixelFormat(depthStencil.format));
+        }
+    }
+
+    pd->setRasterSampleCount(sampleCount);
+    
     NS::Error* error;
     m_renderPipelineState = NS::TransferPtr(m_device->m_device->newRenderPipelineState(pd.get(), &error));
     if (!m_renderPipelineState)
@@ -91,6 +135,38 @@ Result PipelineStateImpl::createMetalRenderPipelineState()
         std::cout << error->localizedDescription()->utf8String() << std::endl;
         return SLANG_E_INVALID_ARG;
     }
+
+    // Create depth stencil state
+    auto createStencilDesc = [](const DepthStencilOpDesc& desc, uint32_t readMask, uint32_t writeMask) -> NS::SharedPtr<MTL::StencilDescriptor>
+    {
+        NS::SharedPtr<MTL::StencilDescriptor> stencilDesc = NS::TransferPtr(MTL::StencilDescriptor::alloc()->init());
+        stencilDesc->setStencilCompareFunction(MetalUtil::translateCompareFunction(desc.stencilFunc));
+        stencilDesc->setStencilFailureOperation(MetalUtil::translateStencilOperation(desc.stencilFailOp));
+        stencilDesc->setDepthFailureOperation(MetalUtil::translateStencilOperation(desc.stencilDepthFailOp));
+        stencilDesc->setDepthStencilPassOperation(MetalUtil::translateStencilOperation(desc.stencilPassOp));
+        stencilDesc->setReadMask(readMask);
+        stencilDesc->setWriteMask(writeMask);
+        return stencilDesc;
+    };
+
+    const auto& depthStencil = desc.graphics.depthStencil;
+    NS::SharedPtr<MTL::DepthStencilDescriptor> depthStencilDesc = NS::TransferPtr(MTL::DepthStencilDescriptor::alloc()->init());
+    m_depthStencilState = NS::TransferPtr(m_device->m_device->newDepthStencilState(depthStencilDesc.get()));
+    if (!m_depthStencilState)
+    {
+        return SLANG_FAIL;
+    }
+    if (depthStencil.depthTestEnable)
+    {
+        depthStencilDesc->setDepthCompareFunction(MetalUtil::translateCompareFunction(depthStencil.depthFunc));
+    }
+    depthStencilDesc->setDepthWriteEnabled(depthStencil.depthWriteEnable);
+    if (depthStencil.stencilEnable)
+    {
+        depthStencilDesc->setFrontFaceStencil(createStencilDesc(depthStencil.frontFace, depthStencil.stencilReadMask, depthStencil.stencilWriteMask).get());
+        depthStencilDesc->setBackFaceStencil(createStencilDesc(depthStencil.backFace, depthStencil.stencilReadMask, depthStencil.stencilWriteMask).get());
+    }
+
     return SLANG_OK;
 }
 
@@ -100,10 +176,9 @@ Result PipelineStateImpl::createMetalComputePipelineState()
     if (!programImpl)
         return SLANG_FAIL;
 
-    NS::SharedPtr<MTL::ComputePipelineDescriptor> pd = NS::TransferPtr(MTL::ComputePipelineDescriptor::alloc()->init());
-
-    auto functionName = MetalUtil::createString(programImpl->m_entryPointNames[0].getBuffer());
-    NS::SharedPtr<MTL::Function> function = NS::TransferPtr(programImpl->m_modules[0]->newFunction(functionName.get()));
+    const ShaderProgramImpl::Module& module = programImpl->m_modules[0];
+    auto functionName = MetalUtil::createString(module.entryPointName.getBuffer());
+    NS::SharedPtr<MTL::Function> function = NS::TransferPtr(module.library->newFunction(functionName.get()));
     if (!function)
         return SLANG_FAIL;
 
@@ -120,6 +195,8 @@ Result PipelineStateImpl::createMetalComputePipelineState()
 
 Result PipelineStateImpl::ensureAPIPipelineStateCreated()
 {
+    AUTORELEASEPOOL
+    
     switch (desc.type)
     {
     case PipelineType::Compute:

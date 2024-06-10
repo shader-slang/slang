@@ -1525,6 +1525,8 @@ ScalarizedVal createGLSLGlobalVaryings(
     StringBuilder namehintSB;
     if (auto nameHint = leafVar->findDecoration<IRNameHintDecoration>())
     {
+        if (leafVar->getOp() == kIROp_Func)
+            namehintSB << "entryPointParam_";
         namehintSB << nameHint->getName();
     }
     OuterParamInfoLink outerParamInfo;

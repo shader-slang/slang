@@ -24,8 +24,6 @@ public:
     RefPtr<DeviceImpl> m_device;
     NS::SharedPtr<MTL::RenderPassDescriptor> m_renderPassDesc;
 
-    ~RenderPassLayoutImpl();
-
     Result init(DeviceImpl* device, const IRenderPassLayout::Desc& desc);
 };
 

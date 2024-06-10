@@ -4213,13 +4213,8 @@ namespace Slang
             case ASTNodeType::SubscriptDecl:
             case ASTNodeType::PropertyDecl:
             case ASTNodeType::AssocTypeDecl:
-            case ASTNodeType::TypeAliasDecl:
-            case ASTNodeType::TypeDefDecl:
             case ASTNodeType::VarDecl:
             case ASTNodeType::LetDecl:
-            case ASTNodeType::StructDecl:
-            case ASTNodeType::ClassDecl:
-            case ASTNodeType::EnumDecl:
             case ASTNodeType::GenericDecl:
             case ASTNodeType::ConstructorDecl:
                 return true;

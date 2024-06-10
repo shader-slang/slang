@@ -1481,7 +1481,8 @@ struct SPIRVEmitContext
                 if (structSize >= (uint64_t)IRSizeAndAlignment::kIndeterminateSize)
                 {
                     IRBuilder builder(inst);
-                    if (isSpirv14OrLater() || !inst->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+                    if ((isSpirv14OrLater() || !inst->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+                        && !inst->findDecorationImpl(kIROp_SPIRVBlockDecoration))
                     {
                         auto decoration = builder.addDecoration(inst, kIROp_SPIRVBlockDecoration);
                         emitDecoration(getID(spvStructType), decoration);
@@ -2308,7 +2309,6 @@ struct SPIRVEmitContext
         maybeEmitPointerDecoration(varInst, param);
         if (auto layout = getVarLayout(param))
             emitVarLayout(param, varInst, layout);
-        maybeEmitName(varInst, param);
         emitDecorations(param, getID(varInst));
         return varInst;
     }
@@ -2332,7 +2332,6 @@ struct SPIRVEmitContext
         maybeEmitPointerDecoration(varInst, globalVar);
         if(layout)
             emitVarLayout(globalVar, varInst, layout);
-        maybeEmitName(varInst, globalVar);
         emitDecorations(globalVar, getID(varInst));
         return varInst;
     }
@@ -4777,7 +4776,10 @@ struct SPIRVEmitContext
 
         IRBuilder builder(m_irModule);
         builder.setInsertBefore(inst);
-        if (auto index = as<IRIntLit>(inst->getIndex()))
+        auto indexOperand = inst->getIndex();
+        if (auto globalValueRef = as<IRGlobalValueRef>(indexOperand))
+            indexOperand = globalValueRef->getValue();
+        if (auto index = as<IRIntLit>(indexOperand))
         {
             return emitOpCompositeExtract(
                 parent,

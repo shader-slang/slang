@@ -118,6 +118,19 @@ struct IRTargetDecoration : IRTargetSpecificDefinitionDecoration
     IR_LEAF_ISA(TargetDecoration)
 };
 
+struct IRTargetSystemValueDecoration : IRDecoration
+{
+    enum { kOp = kIROp_TargetSystemValueDecoration };
+    IR_LEAF_ISA(TargetSystemValueDecoration)
+
+    IRStringLit* getSemanticOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getSemantic()
+    {
+        return getSemanticOperand()->getStringSlice();
+    }
+};
+
 struct IRTargetIntrinsicDecoration : IRTargetSpecificDefinitionDecoration
 {
     enum { kOp = kIROp_TargetIntrinsicDecoration };
@@ -4355,6 +4368,12 @@ public:
     }
 
     void addHighLevelDeclDecoration(IRInst* value, Decl* decl);
+
+    IRDecoration* addTargetSystemValueDecoration(IRInst* value, UnownedStringSlice sysValName, UInt index = 0)
+    {
+        IRInst* operands[] = { getStringValue(sysValName), getIntValue(getIntType(), index)};
+        return addDecoration(value, kIROp_TargetSystemValueDecoration, operands, SLANG_COUNT_OF(operands));
+    }
 
 //    void addLayoutDecoration(IRInst* value, Layout* layout);
     void addLayoutDecoration(IRInst* value, IRLayout* layout);

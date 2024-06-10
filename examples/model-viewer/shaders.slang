@@ -90,7 +90,7 @@ struct BlinnPhong : IBRDF
         // for our example cube, and the result is a non-finite value
         // coming out of `evaluate()` if we include the specular term.
 
-//        return kd*nDotL + ks*pow(nDotH, specularity);
+        // return kd*nDotL + ks*pow(nDotH, specularity);
         return kd*nDotL;
     }
 };
@@ -141,7 +141,6 @@ interface IMaterial
 // shader parameter `gMaterial` is declared, so that there is no
 // assumption in the shader code that `gMaterial` will be plugged
 // in using an instance of `SimpleMaterial`
-//
 //
 struct SimpleMaterial : IMaterial
 {
@@ -200,7 +199,7 @@ interface ILightEnv
     float3 illuminate<B:IBRDF>(SurfaceGeometry g, B brdf, float3 wo);
     //
     // Note that the `illuminate()` method is allowed as an interface
-    // requirement in Slang even though it is a generic. Constract that
+    // requirement in Slang even though it is a generic. Contrast that
     // with C++ where a `template` method cannot be `virtual`.
 };
 

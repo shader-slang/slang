@@ -144,9 +144,9 @@ Result DeviceImpl::createSwapchain(
 {
     AUTORELEASEPOOL
 
-    RefPtr<SwapchainImpl> sc = new SwapchainImpl();
-    SLANG_RETURN_ON_FAIL(sc->init(this, desc, window));
-    returnComPtr(outSwapchain, sc);
+    RefPtr<SwapchainImpl> swapchainImpl = new SwapchainImpl();
+    SLANG_RETURN_ON_FAIL(swapchainImpl->init(this, desc, window));
+    returnComPtr(outSwapchain, swapchainImpl);
     return SLANG_OK;
 }
 
@@ -154,9 +154,9 @@ Result DeviceImpl::createFramebufferLayout(const IFramebufferLayout::Desc& desc,
 {
     AUTORELEASEPOOL
 
-    RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl;
-    SLANG_RETURN_ON_FAIL(layout->init(this, desc));
-    returnComPtr(outLayout, layout);
+    RefPtr<FramebufferLayoutImpl> layoutImpl = new FramebufferLayoutImpl;
+    SLANG_RETURN_ON_FAIL(layoutImpl->init(desc));
+    returnComPtr(outLayout, layoutImpl);
     return SLANG_OK;
 }
 
@@ -164,9 +164,9 @@ Result DeviceImpl::createRenderPassLayout(const IRenderPassLayout::Desc& desc, I
 {
     AUTORELEASEPOOL
 
-    RefPtr<RenderPassLayoutImpl> result = new RenderPassLayoutImpl;
-    SLANG_RETURN_ON_FAIL(result->init(this, desc));
-    returnComPtr(outRenderPassLayout, result);
+    RefPtr<RenderPassLayoutImpl> renderPassLayoutImpl = new RenderPassLayoutImpl;
+    SLANG_RETURN_ON_FAIL(renderPassLayoutImpl->init(this, desc));
+    returnComPtr(outRenderPassLayout, renderPassLayoutImpl);
     return SLANG_OK;
 }
 
@@ -174,9 +174,9 @@ Result DeviceImpl::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffe
 {
     AUTORELEASEPOOL
 
-    RefPtr<FramebufferImpl> fb = new FramebufferImpl;
-    SLANG_RETURN_ON_FAIL(fb->init(this, desc));
-    returnComPtr(outFramebuffer, fb);
+    RefPtr<FramebufferImpl> framebufferImpl = new FramebufferImpl;
+    SLANG_RETURN_ON_FAIL(framebufferImpl->init(this, desc));
+    returnComPtr(outFramebuffer, framebufferImpl);
     return SLANG_OK;
 }
 
@@ -381,6 +381,8 @@ Result DeviceImpl::createTextureResource(
         return SLANG_FAIL;
     }
 
+    // TODO: handle initData
+
     returnComPtr(outResource, textureImpl);
     return SLANG_OK;
 }
@@ -429,6 +431,7 @@ Result DeviceImpl::createBufferResource(
         encoder->copyFromBuffer(stagingBuffer.get(), 0, bufferImpl->m_buffer.get(), 0, bufferSize);
         encoder->endEncoding();
         commandBuffer->commit();
+        commandBuffer->waitUntilCompleted();
     }
 
     returnComPtr(outResource, bufferImpl);
@@ -558,8 +561,8 @@ Result DeviceImpl::createBufferView(
     RefPtr<BufferResourceViewImpl> viewImpl = new BufferResourceViewImpl(this);
     viewImpl->m_desc = desc;
     viewImpl->m_buffer = bufferImpl;
-    viewImpl->m_offset = desc.bufferRange.offset;;
-    viewImpl->m_size = desc.bufferRange.size == 0 ? bufferImpl->getDesc()->sizeInBytes : desc.bufferRange.size;;
+    viewImpl->m_offset = desc.bufferRange.offset;
+    viewImpl->m_size = desc.bufferRange.size == 0 ? bufferImpl->getDesc()->sizeInBytes : desc.bufferRange.size;
     returnComPtr(outView, viewImpl);
     return SLANG_OK;
 }
@@ -568,37 +571,9 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
 {
     AUTORELEASEPOOL
 
-    RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
-    layout->m_vertexDescriptor = NS::TransferPtr(MTL::VertexDescriptor::alloc()->init());
-    if (!layout->m_vertexDescriptor)
-    {
-        return SLANG_FAIL;
-    }
-
-    for (Int i = 0; i < desc.inputElementCount; ++i)
-    {
-        const auto& inputElement = desc.inputElements[i];
-        MTL::VertexAttributeDescriptor* desc = layout->m_vertexDescriptor->attributes()->object(i);
-        desc->setOffset(inputElement.offset);
-        desc->setBufferIndex(inputElement.bufferSlotIndex);
-        MTL::VertexFormat metalFormat = MetalUtil::translateVertexFormat(inputElement.format);
-        if (metalFormat == MTL::VertexFormatInvalid)
-        {
-            return SLANG_FAIL;
-        }
-        desc->setFormat(metalFormat);
-    }
-
-    for (Int i = 0; i < desc.vertexStreamCount; ++i)
-    {
-        const auto& vertexStream = desc.vertexStreams[i];
-        MTL::VertexBufferLayoutDescriptor* desc = layout->m_vertexDescriptor->layouts()->object(i);
-        desc->setStepFunction(MetalUtil::translateVertexStepFunction(vertexStream.slotClass));
-        desc->setStepRate(vertexStream.instanceDataStepRate);
-        desc->setStride(vertexStream.stride);
-    }
-
-    returnComPtr(outLayout, layout);
+    RefPtr<InputLayoutImpl> layoutImpl(new InputLayoutImpl);
+    SLANG_RETURN_ON_FAIL(layoutImpl->init(desc));
+    returnComPtr(outLayout, layoutImpl);
     return SLANG_OK;
 }
 

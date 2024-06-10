@@ -1,5 +1,7 @@
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -profile ps_5_0
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry main -profile ps_5_0
 
+// CHECK: OpDecorate %pblock Binding 0
+// CHECK: OpDecorate %pblock DescriptorSet 0
 struct E
 {
 };

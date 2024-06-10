@@ -1298,6 +1298,12 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
             slangPassThrough = SLANG_PASS_THROUGH_GLSLANG;
 			break;
+        case DeviceType::Metal:
+            input.target = SLANG_METAL_LIB;
+            input.profile = "";
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_METAL;
+            slangPassThrough = SLANG_PASS_THROUGH_METAL;
+            break;
         case DeviceType::CPU:
             input.target = SLANG_SHADER_HOST_CALLABLE;
             input.profile = "";

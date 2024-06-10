@@ -1,4 +1,7 @@
-//TEST:CROSS_COMPILE: -profile ps_5_0 -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK): -profile ps_5_0 -entry main -target spirv-assembly
+
+// CHECK: OpDecorate %gTest Binding 0
+// CHECK: OpDecorate %gTest DescriptorSet 0
 
 struct Test
 {

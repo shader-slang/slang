@@ -64,7 +64,7 @@ The Slang IR strives for an extremely high degree of uniformity, so almost every
 
 This uniformity greatly simplifies the task of supporting generics, and also means that operations that need to work over all instructions, such as cloning and serialization, can work with a single uniform representation and avoid special-casing particular opcodes.
 
-The decision to use an extremely uniform deisgn, even going as far to treat types as "ordinary" instructions, is similar to SPIR-V, although we do not enforce many of the constraints SPIR-V does on how type and value instructions can be mixed.
+The decision to use an extremely uniform design, even going as far to treat types as "ordinary" instructions, is similar to SPIR-V, although we do not enforce many of the constraints SPIR-V does on how type and value instructions can be mixed.
 
 ### Instructions Have a Uniform Structure
 
@@ -95,14 +95,14 @@ There are some subtleties to how the opcodes are ordered to deal with the fact t
 
 ### A Simpler Encoding of SSA
 
-The traditional encoding of SSA form involves placing "phi" instructions at the start of blocks that represent control-flow join points where a variable will take on different values depend on the incoming edge that is taken.
+The traditional encoding of SSA form involves placing "phi" instructions at the start of blocks that represent control-flow join points where a variable will take on different values depending on the incoming edge that is taken.
 There are of course benefits to sticking with tradition, but phi instructions also have a few downsides:
 
 - The operands to phi instructions are the one case where the "def dominates use" constraint of SSA appears to be violated. I say "appears" because officially the action of a phi occurs on the incoming edge (not in the target block) and that edge will of course be dominated by the predecessor block. It still creates a special case that programmers need to be careful about. This also complicates serialization in that there is no order in which the blocks/instructions of a function can be emitted that guarantees that every instruction always precedes all of its uses in the stream.
 
 - All of the phi instructions at the start of the block must effectively operate in parallel, so that they all "read" from the correct operand before "writing" to the target variable. Like the above special case, this is only a problem for a phi related to a loop back-edge. It is of course possible to always remember the special interpretation of phi instructions (that they don't actually execute sequentially like every other instruction in a block), but its another special case.
 
-- The order of operands to a phi instruction needs to be related back to the predecessor blocks, so that one can determine which value is to be used for which incoming edge. Any transformation that modifies the CFG of a function needs to be careful to rewrite phi instructions to match the order in which predecessors are list, or else the compiler must maintain a side data structure that remembers the mapping (and update it instead).
+- The order of operands to a phi instruction needs to be related back to the predecessor blocks, so that one can determine which value is to be used for which incoming edge. Any transformation that modifies the CFG of a function needs to be careful to rewrite phi instructions to match the order in which predecessors are listed, or else the compiler must maintain a side data structure that remembers the mapping (and update it instead).
 
 - Directly interpreting/executing code in an SSA IR with phi instructions is made more difficult because when branching to a block we need to immediately execute any phi instructions based on the block from which we just came. The above issues around phis needing to be executed in parallel, and needing to track how phi operands relate to predecessor blocks also add complexity to an interpreter.
 
@@ -115,13 +115,13 @@ The first N instructions in a Slang basic block are its parameters, each of whic
 A block that would have had N phi instrutions now has N parameters, but the parameters do not have operands.
 Instead, a branch instruction that targets that block will have N *arguments* to match the parameters, representing the values to be assigned to the parameters when this control-flow edge is taken.
 
-This encoding is equivalent in what it represents to traditional phi instructions, but nicely solves the problems outlines above:
+This encoding is equivalent in what it represents to traditional phi instructions, but nicely solves the problems outlined above:
 
 - The phi operands in the successor block are now arguments in the *predecessor* block, so that the "def dominates use" property can be enforced without any special cases.
 
 - The "assignment" of the argument values to parameters is now encoded with a single instruction, so that the simultaneity of all the assignments is more clear. We still need to be careful when leaving SSA form to obey those semantics, but there are no tricky issues when looking at the IR itself.
 
-- There is no special work required to track which phi operands come from which predecessor block, since the operands are attached to the terminator instruction of the predecessor block itself. There is no need to update phi instructions after a CFG change that might affect the predecessor list of a block. The trade-off is that any change the *number* of parameters of a block now requires changes to the terminator of each predecessor, but that is a less common change (isolated to passes that can introduce or eliminate block parameters/phis).
+- There is no special work required to track which phi operands come from which predecessor block, since the operands are attached to the terminator instruction of the predecessor block itself. There is no need to update phi instructions after a CFG change that might affect the predecessor list of a block. The trade-off is that any change in the *number* of parameters of a block now requires changes to the terminator of each predecessor, but that is a less common change (isolated to passes that can introduce or eliminate block parameters/phis).
 
 - It it much more clear how to give an operational semantics to a "branch with arguments" instead of phi instructions: compute the target block, copy the argumenst to temporary storage (because of the simultaneity requirement), and then copy the temporaries over the parameters of the target block.
 
@@ -178,7 +178,7 @@ D;
 Note that (unlike what some programming models would say) a join point is *not* necessarily a postdominator of the conditional branch. In the example above the block with `D` does not postdominate the block with `someCondition` nor the one with `B`. It is even possible to construct cases where the high-level join point of a control-flow construct is unreachable (e.g., the block after an infinite loop).
 
 The Slang IR encodes structured control flow by making the join point be an explicit operand of a structured conditional branch operation. Note that a join-point operand is *not* used when computing the successor list of a block, since it does not represent a control-flow edge.
-This is slightly different from SPIR-V where joint points ("merge points" in SPIR-V) are encoded using a metadata instruction that precedes a branch. Keeping the information on the instruction itself avoids cases where we move one but not the other of the instructions, or where we might accidentally insert code between the metadata instruction and the terminator it modifies.
+This is slightly different from SPIR-V where join points ("merge points" in SPIR-V) are encoded using a metadata instruction that precedes a branch. Keeping the information on the instruction itself avoids cases where we move one but not the other of the instructions, or where we might accidentally insert code between the metadata instruction and the terminator it modifies.
 In the future we might consider using a decoration to represent join points.
 
 When using a loop instruction, the join point is also the `break` label. The SPIR-V `OpLoopMerge` includes not only the join point (`break` target) but also a `continue` target. We do not currently represent structured information for `continue` blocks.
@@ -188,16 +188,16 @@ The approach we use today means that the code in "continue clause" might end up 
 When it comes time to re-form higher-level structured control flow from Slang IR, we use the structuring information in the IR to form single-entry "regions" of code that map to existing high-level control-flow constructs (things like `if` statements, loops, `break` or `continue` statements, etc.).
 The current approach we use requires the structuring information to be maintained by all IR transformations, and also currently relies on some invariants about what optimizations are allowed to do (e.g., we had better not introduce multi-level `break`s into the IR).
 
-In the future, it would be good to investigate adapting the "Relooper" algorithm used in Emscripten so that we can reover valid structured control flow from an arbitrary CFG; for now we put off that work.
+In the future, it would be good to investigate adapting the "Relooper" algorithm used in Emscripten so that we can recover valid structured control flow from an arbitrary CFG; for now we put off that work.
 If we had a more powerful restructuring algorithm at hand, we could start to support things like multi-level `break`, and also ensure that `continue` clauses don't lead to code duplication any more.
 
 ## IR Global and Hoistable Value Deduplication
 
-Types, constants and certain operations on constants are considered "global value" in the Slang IR. Some other insts like `Specialize()` and `Ptr(x)` are considered as "hoistable" insts, in that they will be defined at the outer most scope where their operands are available. For example, `Ptr(int)` will always be defined at global scope(as direct children of `IRModuleInst`) because its only operand, `int`, is defined at global scope. However if we have `Ptr(T)` where `T` is a generic parameter, then this `Ptr(T)` inst will be always be defined in the block of the generic. Global and hoistable values are always deduplicated and we can always assume two hoistable values with different pointer addresses are distinct values.
+Types, constants and certain operations on constants are considered "global value" in the Slang IR. Some other insts like `Specialize()` and `Ptr(x)` are considered as "hoistable" insts, in that they will be defined at the outer most scope where their operands are available. For example, `Ptr(int)` will always be defined at global scope (as direct children of `IRModuleInst`) because its only operand, `int`, is defined at global scope. However if we have `Ptr(T)` where `T` is a generic parameter, then this `Ptr(T)` inst will be always be defined in the block of the generic. Global and hoistable values are always deduplicated and we can always assume two hoistable values with different pointer addresses are distinct values.
 
 The `IRBuilder` class is responsible for ensuring the uniqueness of global/hoistable values. If you call any `IRBuilder` methods that creates a new hoistable instruction, e.g.  `IRBuilder::createIntrinsicInst`, `IRBuilder::emitXXX` or `IRBuilder::getType`, `IRBuilder` will check if an equivalent value already exists, and if so it returns the existing inst instead of creating a new one.
 
-The trickier part here is to always maintain the uniqueness when we modify the IR. When we update the operand of an inst from a non-hoistable-value to a hoistable-value, we may need to hoist `inst` itself as a result. For example, considered the following code:
+The trickier part here is to always maintain the uniqueness when we modify the IR. When we update the operand of an inst from a non-hoistable-value to a hoistable-value, we may need to hoist `inst` itself as a result. For example, consider the following code:
 ```
 %1 = IntType
 %p = Ptr(%1)
@@ -264,7 +264,7 @@ auto ptr = builder.getPtrType(x);  // create ptr(x).
 x->replaceUsesWith(intType); // this renders `ptr` obsolete!!
 auto var = builder.emitVar(ptr); // use the obsolete inst to create another inst.
 ```
-In this example, calling `replaceUsesWith` will cause `ptr` to represent `Ptr(int)`, which may already exist in the global scope. After this call, all uses of `ptr` should be replaced with the global `Ptr(int)` inst instead. `IRBuilder` has provided the mechanism to track all the insts that are removed due to deduplication, and map those removed but not yet deleted inst to the existing inst. When using `ptr` to create a new inst, `IRBuilder` will first check if `ptr` should map to some existing hoistable inst in the global deduplication map and replace it if possible. This means that after the call to `builder.emitVar`, `var->type` is not equal to to `ptr`.
+In this example, calling `replaceUsesWith` will cause `ptr` to represent `Ptr(int)`, which may already exist in the global scope. After this call, all uses of `ptr` should be replaced with the global `Ptr(int)` inst instead. `IRBuilder` has provided the mechanism to track all the insts that are removed due to deduplication, and map those removed but not yet deleted insts to the existing inst. When using `ptr` to create a new inst, `IRBuilder` will first check if `ptr` should map to some existing hoistable inst in the global deduplication map and replace it if possible. This means that after the call to `builder.emitVar`, `var->type` is not equal to to `ptr`.
 
 ### Best Practices
 

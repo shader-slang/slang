@@ -176,6 +176,35 @@ MTL::VertexFormat MetalUtil::translateVertexFormat(Format format)
     }
 }
 
+bool MetalUtil::isDepthFormat(MTL::PixelFormat format)
+{
+    switch (format)
+    {
+    case MTL::PixelFormatDepth16Unorm:
+    case MTL::PixelFormatDepth32Float:
+    case MTL::PixelFormatDepth24Unorm_Stencil8:
+    case MTL::PixelFormatDepth32Float_Stencil8:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool MetalUtil::isStencilFormat(MTL::PixelFormat format)
+{
+    switch (format)
+    {
+    case MTL::PixelFormatStencil8:
+    case MTL::PixelFormatDepth24Unorm_Stencil8:
+    case MTL::PixelFormatDepth32Float_Stencil8:
+    case MTL::PixelFormatX32_Stencil8:
+    case MTL::PixelFormatX24_Stencil8:
+        return true;
+    default:
+        return false;
+    }
+}
+
 MTL::SamplerMinMagFilter MetalUtil::translateSamplerMinMagFilter(TextureFilteringMode mode)
 {
     switch (mode)
@@ -246,6 +275,31 @@ MTL::CompareFunction MetalUtil::translateCompareFunction(ComparisonFunc func)
     }
 }
 
+MTL::StencilOperation MetalUtil::translateStencilOperation(StencilOp op)
+{
+    switch (op)
+    {
+    case StencilOp::Keep:
+        return MTL::StencilOperationKeep;
+    case StencilOp::Zero:
+        return MTL::StencilOperationZero;
+    case StencilOp::Replace:
+        return MTL::StencilOperationReplace;
+    case StencilOp::IncrementSaturate:
+        return MTL::StencilOperationIncrementClamp;
+    case StencilOp::DecrementSaturate:
+        return MTL::StencilOperationDecrementClamp;
+    case StencilOp::Invert:
+        return MTL::StencilOperationInvert;
+    case StencilOp::IncrementWrap:
+        return MTL::StencilOperationIncrementWrap;
+    case StencilOp::DecrementWrap:
+        return MTL::StencilOperationDecrementWrap;
+    default:
+        return MTL::StencilOperation(0);
+    }
+}
+
 MTL::VertexStepFunction MetalUtil::translateVertexStepFunction(InputSlotClass slotClass)
 {
     switch (slotClass)
@@ -256,6 +310,158 @@ MTL::VertexStepFunction MetalUtil::translateVertexStepFunction(InputSlotClass sl
         return MTL::VertexStepFunctionPerInstance;
     default:
         return MTL::VertexStepFunctionPerVertex;
+    }
+}
+
+MTL::PrimitiveType MetalUtil::translatePrimitiveType(PrimitiveTopology topology)
+{
+    switch (topology)
+    {
+    case PrimitiveTopology::TriangleList:
+        return MTL::PrimitiveTypeTriangle;
+    case PrimitiveTopology::TriangleStrip:
+        return MTL::PrimitiveTypeTriangleStrip;
+    case PrimitiveTopology::PointList:
+        return MTL::PrimitiveTypePoint;
+    case PrimitiveTopology::LineList:
+        return MTL::PrimitiveTypeLine;
+    case PrimitiveTopology::LineStrip:
+        return MTL::PrimitiveTypeLineStrip;
+    default:
+        return MTL::PrimitiveType(0);
+    }
+}
+
+MTL::PrimitiveTopologyClass MetalUtil::translatePrimitiveTopologyClass(PrimitiveType type)
+{
+    switch (type)
+    {
+    case PrimitiveType::Point:
+        return MTL::PrimitiveTopologyClassPoint;
+    case PrimitiveType::Line: 
+        return MTL::PrimitiveTopologyClassLine;
+    case PrimitiveType::Triangle:
+        return MTL::PrimitiveTopologyClassTriangle;
+    case PrimitiveType::Patch:
+    default:
+        return MTL::PrimitiveTopologyClassUnspecified;
+    }
+}
+
+MTL::BlendFactor MetalUtil::translateBlendFactor(BlendFactor factor)
+{
+    switch (factor)
+    {
+    case BlendFactor::Zero:
+        return MTL::BlendFactorZero;
+    case BlendFactor::One:
+        return MTL::BlendFactorOne;
+    case BlendFactor::SrcColor:
+        return MTL::BlendFactorSourceColor;
+    case BlendFactor::InvSrcColor:
+        return MTL::BlendFactorOneMinusSourceColor;
+    case BlendFactor::SrcAlpha:
+        return MTL::BlendFactorSourceAlpha;
+    case BlendFactor::InvSrcAlpha:
+        return MTL::BlendFactorOneMinusSourceAlpha;
+    case BlendFactor::DestAlpha:
+        return MTL::BlendFactorDestinationAlpha;
+    case BlendFactor::InvDestAlpha:
+        return MTL::BlendFactorOneMinusDestinationAlpha;
+    case BlendFactor::DestColor:
+        return MTL::BlendFactorDestinationColor;
+    case BlendFactor::InvDestColor:
+        return MTL::BlendFactorOneMinusDestinationColor;
+    case BlendFactor::SrcAlphaSaturate:
+        return MTL::BlendFactorSourceAlphaSaturated;
+    case BlendFactor::BlendColor:
+        return MTL::BlendFactorBlendColor;
+    case BlendFactor::InvBlendColor:
+        return MTL::BlendFactorOneMinusBlendColor;
+    case BlendFactor::SecondarySrcColor:
+        return MTL::BlendFactorSource1Color;
+    case BlendFactor::InvSecondarySrcColor:
+        return MTL::BlendFactorOneMinusSource1Color;
+    case BlendFactor::SecondarySrcAlpha:
+        return MTL::BlendFactorSource1Alpha;
+    case BlendFactor::InvSecondarySrcAlpha:
+        return MTL::BlendFactorOneMinusSource1Alpha;
+    default:
+        return MTL::BlendFactor(0);
+    }
+}
+
+MTL::BlendOperation MetalUtil::translateBlendOperation(BlendOp op)
+{
+    switch (op)
+    {
+    case BlendOp::Add:
+        return MTL::BlendOperationAdd;
+    case BlendOp::Subtract:
+        return MTL::BlendOperationSubtract;
+    case BlendOp::ReverseSubtract:
+        return MTL::BlendOperationReverseSubtract;
+    case BlendOp::Min:
+        return MTL::BlendOperationMin;
+    case BlendOp::Max:
+        return MTL::BlendOperationMax;
+    default:
+        return MTL::BlendOperation(0);
+    }
+}
+
+MTL::ColorWriteMask MetalUtil::translateColorWriteMask(RenderTargetWriteMask::Type mask)
+{
+    MTL::ColorWriteMask result = MTL::ColorWriteMaskNone;
+    if (mask & RenderTargetWriteMask::EnableRed)
+        result |= MTL::ColorWriteMaskRed;
+    if (mask & RenderTargetWriteMask::EnableGreen)
+        result |= MTL::ColorWriteMaskGreen;
+    if (mask & RenderTargetWriteMask::EnableBlue)
+        result |= MTL::ColorWriteMaskBlue;
+    if (mask & RenderTargetWriteMask::EnableAlpha)
+        result |= MTL::ColorWriteMaskAlpha;
+    return result;
+}
+
+MTL::Winding MetalUtil::translateWinding(FrontFaceMode mode)
+{
+    switch (mode)
+    {
+    case FrontFaceMode::CounterClockwise:
+        return MTL::WindingCounterClockwise;
+    case FrontFaceMode::Clockwise:
+        return MTL::WindingClockwise;
+    default:
+        return MTL::Winding(0);
+    }
+}
+
+MTL::CullMode MetalUtil::translateCullMode(CullMode mode)
+{
+    switch (mode)
+    {
+    case CullMode::None:
+        return MTL::CullModeNone;
+    case CullMode::Front:
+        return MTL::CullModeFront;
+    case CullMode::Back:
+        return MTL::CullModeBack;
+    default:
+        return MTL::CullMode(0);
+    }
+}
+
+MTL::TriangleFillMode MetalUtil::translateTriangleFillMode(FillMode mode)
+{
+    switch (mode)
+    {
+    case FillMode::Solid:
+        return MTL::TriangleFillModeFill;
+    case FillMode::Wireframe:
+        return MTL::TriangleFillModeLines;
+    default:
+        return MTL::TriangleFillMode(0);
     }
 }
 
