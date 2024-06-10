@@ -20,8 +20,8 @@ public:
     enum class ViewType
     {
         Texture,
+        Buffer,
         TexelBuffer,
-        PlainBuffer,
     };
 
 public:
@@ -45,21 +45,26 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };
 
+class BufferResourceViewImpl : public ResourceViewImpl
+{
+public:
+    BufferResourceViewImpl(DeviceImpl* device)
+        : ResourceViewImpl(ViewType::Buffer, device)
+    {}
+    ~BufferResourceViewImpl();
+    RefPtr<BufferResourceImpl> m_buffer;
+    Offset m_offset;
+    Size m_size;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
+};
+
 class TexelBufferResourceViewImpl : public ResourceViewImpl
 {
 public:
     TexelBufferResourceViewImpl(DeviceImpl* device);
     ~TexelBufferResourceViewImpl();
     RefPtr<BufferResourceImpl> m_buffer;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
-};
-
-class PlainBufferResourceViewImpl : public ResourceViewImpl
-{
-public:
-    PlainBufferResourceViewImpl(DeviceImpl* device);
-    RefPtr<BufferResourceImpl> m_buffer;
-
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };
 

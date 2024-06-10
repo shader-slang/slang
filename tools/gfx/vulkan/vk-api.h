@@ -315,6 +315,10 @@ struct VulkanExtendedFeatureProperties
     VkPhysicalDeviceVulkan12Features vulkan12Features = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
     };
+
+    VkPhysicalDeviceComputeShaderDerivativesFeaturesNV computeShaderDerivativesFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_NV
+    };
 };
 
 struct VulkanApi

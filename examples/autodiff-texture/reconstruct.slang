@@ -28,8 +28,8 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID)
         newDstValToAdd = (float3)dstVal.xyz * float3(1.0 / (dstVal.w * 65536.0));
 
     float4 existingVal = 0.0;
-    
-    if (dstLayer < layerCount - 1 )
+
+    if (dstLayer < layerCount - 1)
     {
         uint parentOffset = mipOffset[(dstLayer + 1) / 4][(dstLayer + 1) % 4];
         uint parentW = dstW / 2;

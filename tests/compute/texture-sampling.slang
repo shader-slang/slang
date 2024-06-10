@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type
 //TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -vk
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 
 //TEST_INPUT: Texture1D(size=4, content = one):name=t1D

@@ -549,6 +549,45 @@ namespace Slang
         FacetList facets;
     };
 
+        /// Cached information about how to convert between two types.
+    struct ImplicitCastMethod
+    {
+        OverloadCandidate conversionFuncOverloadCandidate = OverloadCandidate();
+        ConversionCost cost = kConversionCost_Impossible;
+        bool isAmbiguous = false;
+    };
+
+    struct ImplicitCastMethodKey
+    {
+        Type* fromType; // nullptr means default construct.
+        bool isLValue;
+        Type* toType;
+        uint64_t constantVal;
+        bool isConstant;
+        HashCode getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(fromType), Slang::getHashCode(toType), Slang::getHashCode(constantVal), (HashCode32)isConstant, (HashCode32)isLValue);
+        }
+        bool operator == (const ImplicitCastMethodKey& other) const
+        {
+            return fromType == other.fromType && toType == other.toType && isConstant == other.isConstant && constantVal == other.constantVal && isLValue == other.isLValue;
+        }
+        ImplicitCastMethodKey() = default;
+        ImplicitCastMethodKey(QualType fromType, Type* toType, Expr* fromExpr)
+            : fromType(fromType)
+            , toType(toType)
+            , constantVal(0)
+            , isConstant(false)
+            , isLValue(fromType.isLeftValue)
+        {
+            if (auto constInt = as<IntegerLiteralExpr>(fromExpr))
+            {
+                constantVal = constInt->value;
+                isConstant = true;
+            }
+        }
+    };
+
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
@@ -656,6 +695,14 @@ namespace Slang
         {
             auto pair = TypePair{ sub, sup };
             m_mapTypePairToSubtypeWitness[pair] = outWitness;
+        }
+        ImplicitCastMethod* tryGetImplicitCastMethod(ImplicitCastMethodKey key)
+        {
+            return m_mapTypePairToImplicitCastMethod.tryGetValue(key);
+        }
+        void cacheImplicitCastMethod(ImplicitCastMethodKey key, ImplicitCastMethod candidate)
+        {
+            m_mapTypePairToImplicitCastMethod[key] = candidate;
         }
 
     private:
@@ -776,6 +823,7 @@ namespace Slang
         Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
         Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
         Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
+        Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
     };
 
         /// Local/scoped state of the semantic-checking system
@@ -2788,6 +2836,13 @@ namespace Slang
     EnumDecl* isEnumType(Type* type);
 
     DeclVisibility getDeclVisibility(Decl* decl);
+
+    // If `type` is unsized, return the trailing unsized array field that makes it so.
+    VarDeclBase* getTrailingUnsizedArrayElement(Type* type, VarDeclBase* rootObject, ArrayExpressionType*& outArrayType);
+
+    // Test if `type` can be an opaque handle on certain targets, this includes
+    // texture, buffer, sampler, acceleration structure, etc.
+    bool isOpaqueHandleType(Type* type);
 
     void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl = false);
 

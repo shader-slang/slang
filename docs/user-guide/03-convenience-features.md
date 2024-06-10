@@ -422,6 +422,23 @@ int test(MyType* pObj)
     MyType* pNext2 = &pNext[1];
     return pNext.a + pNext->a + (*pNext2).a + pNext2[0].a;
 }
+
+cbuffer Constants
+{
+    MyType *ptr;
+};
+
+int validTest()
+{
+    return test(ptr);
+}
+
+int invalidTest()
+{
+    // cannot produce a pointer from a local variable 
+    MyType obj;
+    return test(&obj); // !! ERROR !!
+}
 ```
 
 Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is equivalent to `MyType*`.
@@ -430,9 +447,13 @@ Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is e
 
 - Slang supports pointers to global memory, but not shared or local memory. For example, it is invalid to define a pointer to a local variable.
 
-- Coherent load/stores are unsupported
+- Slang supports pointers that are defined as shader parameters (e.g. as a constant buffer field).
 
-- Custom alignment specification is unsupported.
+- Slang can produce pointers using the & operator from data in global memory.
+
+- Slang doesn't support coherent load/stores.
+
+- Slang doesn't support custom alignment specification.
 
 - Slang currently does not support pointers to immutable values, i.e. `const T*`.
 

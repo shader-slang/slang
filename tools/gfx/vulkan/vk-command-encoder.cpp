@@ -1480,11 +1480,10 @@ Result RayTracingCommandEncoder::dispatchRays(
     hitSBT.stride = alignedHandleSize;
     hitSBT.size = shaderTableImpl->m_hitTableSize;
 
-    // TODO: Are callable shaders needed?
     VkStridedDeviceAddressRegionKHR callableSBT;
-    callableSBT.deviceAddress = 0;
-    callableSBT.stride = 0;
-    callableSBT.size = 0;
+    callableSBT.deviceAddress = hitSBT.deviceAddress + hitSBT.size;
+    callableSBT.stride = alignedHandleSize;
+    callableSBT.size = shaderTableImpl->m_callableTableSize;
 
     vkApi.vkCmdTraceRaysKHR(
         vkCommandBuffer,

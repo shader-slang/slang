@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 //TEST_INPUT: uniform(data=[1 2 3 4]):name=C.p.c
 //TEST_INPUT: Texture2D(size=4, content = one):name=C.p.t

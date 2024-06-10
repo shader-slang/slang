@@ -1189,8 +1189,11 @@ bool specializeResourceUsage(
             // and turned into SSA temporaries. Such optimization may enable
             // the following passes to "see" and specialize more cases.
             //
-            simplifyIR(codeGenContext->getTargetProgram(), irModule,
-                IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
+            if (changed)
+            {
+                simplifyIR(codeGenContext->getTargetProgram(), irModule,
+                    IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
+            }
             result |= changed;
         }
         if (unspecializableFuncs.getCount() == 0)

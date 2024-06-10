@@ -25,7 +25,7 @@ struct Fragment
 struct VertexStageOutput
 {
     float2 uv : UV;
-    float4          sv_position     : SV_Position;
+    float4 sv_position : SV_Position;
 };
 
 [shader("vertex")]

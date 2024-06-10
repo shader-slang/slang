@@ -165,10 +165,16 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
         case LayoutResourceKind::VaryingInput:
             m_writer->emit(" [[stage_in]]");
             break;
+        case LayoutResourceKind::MetalPayload:
+            m_writer->emit(" [[payload]]");
+            break;
         }
     }
-    if (auto sysSemanticAttr = layout->findSystemValueSemanticAttr())
-       _emitSystemSemantic(sysSemanticAttr->getName(), sysSemanticAttr->getIndex());
+    if (!maybeEmitSystemSemantic(param))
+    {
+        if (auto sysSemanticAttr = layout->findSystemValueSemanticAttr())
+            _emitUserSemantic(sysSemanticAttr->getName(), sysSemanticAttr->getIndex());
+    }
 }
 
 void MetalSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
@@ -190,6 +196,12 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoi
         break;
     case Stage::Compute:
         m_writer->emit("[[kernel]] ");
+        break;
+    case Stage::Mesh:
+        m_writer->emit("[[mesh]] ");
+        break;
+    case Stage::Amplification:
+        m_writer->emit("[[object]] ");
         break;
     default:
         SLANG_ABORT_COMPILATION("unsupported stage.");
@@ -608,18 +620,26 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             {
             case AddressSpace::Global:
                 m_writer->emit(" device");
+                m_writer->emit("*");
                 break;
             case AddressSpace::Uniform:
                 m_writer->emit(" constant");
+                m_writer->emit("*");
                 break;
             case AddressSpace::ThreadLocal:
                 m_writer->emit(" thread");
+                m_writer->emit("*");
                 break;
             case AddressSpace::GroupShared:
                 m_writer->emit(" threadgroup");
+                m_writer->emit("*");
+                break;
+            case AddressSpace::MetalObjectData:
+                m_writer->emit(" object_data");
+                // object data is passed by reference
+                m_writer->emit("&");
                 break;
             }
-            m_writer->emit("*");
             return;
         }
         case kIROp_ArrayType:
@@ -629,6 +649,11 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(", ");
             emitVal(type->getOperand(1), getInfo(EmitOp::General));
             m_writer->emit(">");
+            return;
+        }
+        case kIROp_MetalMeshGridPropertiesType:
+        {
+            m_writer->emit("mesh_grid_properties ");
             return;
         }
         default:
@@ -719,84 +744,24 @@ void MetalSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
     }
 }
 
-void MetalSourceEmitter::_emitSystemSemantic(UnownedStringSlice semanticName, IRIntegerValue semanticIndex)
+bool MetalSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
 {
-    if (semanticName.caseInsensitiveEquals(toSlice("SV_POSITION")))
+    if (auto sysSemanticDecor = inst->findDecoration<IRTargetSystemValueDecoration>())
     {
-        m_writer->emit(" [[position]]");
+        m_writer->emit(" [[");
+        m_writer->emit(sysSemanticDecor->getSemantic());
+        m_writer->emit("]]");
+        return true;
     }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_VERTEXID")))
-    {
-        m_writer->emit(" [[vertex_id]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_INSTANCEID")))
-    {
-        m_writer->emit(" [[instance_id]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_Target")))
-    {
-        m_writer->emit(" [[color(");
-        m_writer->emit(semanticIndex);
-        m_writer->emit(")]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_PRIMITIVEID")))
-    {
-        m_writer->emit(" [[primitive_id]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_GROUPID")))
-    {
-        // TODO: not supported by metal.
-        // We need to implement the transformation logic in slang-ir-metal-legalize.cpp
-        // to convert SV_GroupID to something like METAL_threadgroup_position_in_grid.
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_GROUPINDEX")))
-    {
-        // TODO: not supported by metal.
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_DISPATCHTHREADID")))
-    {
-        m_writer->emit(" [[thread_position_in_grid]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_GROUPTHREADID")))
-    {
-        m_writer->emit(" [[thread_position_in_threadgroup]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_CLIPDISTANCE")))
-    {
-        m_writer->emit(" [[clip_distance]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_RENDERTARGETARRAYINDEX")))
-    {
-        m_writer->emit(" [[render_target_array_index]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_VIEWPORTARRAYINDEX")))
-    {
-        m_writer->emit(" [[viewport_array_index]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_Depth")))
-    {
-        m_writer->emit(" [[depth(any)]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_DepthGreaterEqual")))
-    {
-        m_writer->emit(" [[depth(greater)]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_DepthLessEqual")))
-    {
-        m_writer->emit(" [[depth(less)]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_Coverage")))
-    {
-        m_writer->emit(" [[sample_mask]]");
-    }
-    else if (semanticName.caseInsensitiveEquals(toSlice("SV_StencilRef")))
-    {
-        m_writer->emit(" [[stencil]]");
-    }
-    else
+    return false;
+}
+
+void MetalSourceEmitter::_emitUserSemantic(UnownedStringSlice semanticName, IRIntegerValue semanticIndex)
+{
+    if (!semanticName.startsWithCaseInsensitive(toSlice("SV_")))
     {
         m_writer->emit(" [[user(");
-        m_writer->emit(semanticName);
+        m_writer->emit(String(semanticName).toUpper());
         if (semanticIndex != 0)
         {
             m_writer->emit("_");
@@ -812,6 +777,10 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
     if (inst->getOp() == kIROp_StructKey)
     {
         // Only emit [[attribute(n)]] on struct keys.
+        
+        if (maybeEmitSystemSemantic(inst))
+            return;
+
         bool hasSemanticFromLayout = false;
         if (auto varLayout = findVarLayout(inst))
         {
@@ -829,7 +798,7 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
                 else if (auto semanticAttr = as<IRSemanticAttr>(attr))
                 {
                     auto semanticName = String(semanticAttr->getName()).toUpper();
-                    _emitSystemSemantic(semanticAttr->getName(), semanticAttr->getIndex());
+                    _emitUserSemantic(semanticAttr->getName(), semanticAttr->getIndex());
                     hasSemanticFromLayout = true;
                 }
             }
@@ -839,7 +808,7 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
         {
             if (auto semanticDecor = inst->findDecoration<IRSemanticDecoration>())
             {
-                _emitSystemSemantic(semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
+                _emitUserSemantic(semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
             }
         }
     }
@@ -938,6 +907,9 @@ void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRI
         break;
     case AddressSpace::ThreadLocal:
         m_writer->emit("thread ");
+        break;
+    case AddressSpace::MetalObjectData:
+        m_writer->emit("object_data ");
         break;
     default:
         break;

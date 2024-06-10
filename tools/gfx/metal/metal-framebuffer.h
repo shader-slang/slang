@@ -20,6 +20,8 @@ enum
 class FramebufferLayoutImpl : public FramebufferLayoutBase
 {
 public:
+    RefPtr<DeviceImpl> m_device;
+    Desc m_desc;
 #if 0
     MTL::RenderPassDescriptor* m_renderPass = nullptr;
     Array<MTL::RenderPassColorAttachmentDescriptor*, kMaxTargets> m_targetDescs;
@@ -28,22 +30,20 @@ public:
     bool m_hasDepthStencilTarget = false;
     uint32_t m_renderTargetCount = 0;
 #endif
-    DeviceImpl* m_renderer = nullptr;
-    Desc m_desc;
 
 public:
     ~FramebufferLayoutImpl();
-    Result init(DeviceImpl* renderer, const IFramebufferLayout::Desc& desc);
+    Result init(DeviceImpl* device, const IFramebufferLayout::Desc& desc);
 };
 
 class FramebufferImpl : public FramebufferBase
 {
 public:
+    BreakableReference<DeviceImpl> m_device;
     ShortList<ComPtr<IResourceView>> renderTargetViews;
     ComPtr<IResourceView> depthStencilView;
     uint32_t m_width;
     uint32_t m_height;
-    BreakableReference<DeviceImpl> m_renderer;
     MTL::ClearColor m_clearValues[kMaxTargets];
     RefPtr<FramebufferLayoutImpl> m_layout;
 #if 0
@@ -55,7 +55,7 @@ public:
 public:
     ~FramebufferImpl();
 
-    Result init(DeviceImpl* renderer, const IFramebuffer::Desc& desc);
+    Result init(DeviceImpl* device, const IFramebuffer::Desc& desc);
 };
 
 } // namespace metal

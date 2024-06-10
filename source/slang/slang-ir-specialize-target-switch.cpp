@@ -31,7 +31,9 @@ namespace Slang
                     bool isBetterForTarget = capSet.isBetterForTarget(bestCapSet, target->getTargetCaps(), isEqual);
                     if (isBetterForTarget)
                     {
-                        bool targetImpliesCapSet = (target->getTargetCaps().implies(capSet, true) || capSet.isEmpty());
+                        CapabilitySet joinedCapSet = capSet;
+                        joinedCapSet.join(target->getTargetCaps());
+                        bool targetImpliesCapSet = target->getTargetCaps().implies(joinedCapSet, true);
                         if (targetImpliesCapSet)
                         {
                             // Now check if bestCapSet contains targetCaps. If it does not then this is an invalid target

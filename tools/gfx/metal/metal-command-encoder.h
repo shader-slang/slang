@@ -15,12 +15,15 @@ namespace metal
 class PipelineCommandEncoder : public ComObject
 {
 public:
+    CommandBufferImpl* m_commandBuffer;
+    MTL::CommandBuffer* m_metalCommandBuffer;
+    RefPtr<PipelineStateImpl> m_currentPipeline;
 
     void init(CommandBufferImpl* commandBuffer);
-    CommandBufferImpl* m_commandBuffer;
-    MTL::CommandBuffer* m_metalCommandBuffer = nullptr;
-    DeviceImpl* m_device = nullptr;
-    RefPtr<PipelineStateImpl> m_currentPipeline;
+    void endEncodingImpl();
+
+    Result setPipelineStateImpl(IPipelineState* state, IShaderObject** outRootObject);
+
 };
 
 class ResourceCommandEncoder
@@ -47,28 +50,17 @@ public:
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
+    virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        writeTimestamp(IQueryPool* queryPool, GfxIndex index) override;
+
     virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
         IBufferResource* dst,
         Offset dstOffset,
         IBufferResource* src,
         Offset srcOffset,
         Size size) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        uploadBufferData(IBufferResource* buffer, Offset offset, Size size, void* data) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
-        GfxCount count,
-        ITextureResource* const* textures,
-        ResourceState src,
-        ResourceState dst) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
-        GfxCount count,
-        IBufferResource* const* buffers,
-        ResourceState src,
-        ResourceState dst) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
-
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        writeTimestamp(IQueryPool* queryPool, GfxIndex index) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
         ITextureResource* dst,
@@ -81,6 +73,20 @@ public:
         ITextureResource::Offset3D srcOffset,
         ITextureResource::Extents extent) override;
 
+    virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
+        IBufferResource* dst,
+        Offset dstOffset,
+        Size dstSize,
+        Size dstRowStride,
+        ITextureResource* src,
+        ResourceState srcState,
+        SubresourceRange srcSubresource,
+        ITextureResource::Offset3D srcOffset,
+        ITextureResource::Extents extent) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        uploadBufferData(IBufferResource* buffer, Offset offset, Size size, void* data) override;
+
     virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
         ITextureResource* dst,
         SubresourceRange subResourceRange,
@@ -88,6 +94,24 @@ public:
         ITextureResource::Extents extend,
         ITextureResource::SubresourceData* subResourceData,
         GfxCount subResourceDataCount) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
+        GfxCount count,
+        IBufferResource* const* buffers,
+        ResourceState src,
+        ResourceState dst) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
+        GfxCount count,
+        ITextureResource* const* textures,
+        ResourceState src,
+        ResourceState dst) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
+        ITextureResource* texture,
+        SubresourceRange subresourceRange,
+        ResourceState src,
+        ResourceState dst) override;
 
     void _clearColorImage(TextureResourceViewImpl* viewImpl, ClearValue* clearValue);
 
@@ -114,22 +138,7 @@ public:
         IBufferResource* buffer,
         Offset offset) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
-        IBufferResource* dst,
-        Offset dstOffset,
-        Size dstSize,
-        Size dstRowStride,
-        ITextureResource* src,
-        ResourceState srcState,
-        SubresourceRange srcSubresource,
-        ITextureResource::Offset3D srcOffset,
-        ITextureResource::Extents extent) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
-        ITextureResource* texture,
-        SubresourceRange subresourceRange,
-        ResourceState src,
-        ResourceState dst) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL
         beginDebugEvent(const char* name, float rgbColor[3]) override;

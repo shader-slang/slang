@@ -1997,13 +1997,23 @@ namespace Slang
             // and filtering them to ones that are applicable
             // to our "call site" with zero arguments.
             //
-            auto type = varDecl->getType();
-
             OverloadResolveContext overloadContext;
             overloadContext.loc = varDecl->nameAndLoc.loc;
             overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
             overloadContext.sourceScope = m_outerScope;
-            AddTypeOverloadCandidates(type, overloadContext);
+
+            auto type = varDecl->getType();
+            ImplicitCastMethodKey key = ImplicitCastMethodKey(QualType(), type, nullptr);
+            auto ctorMethod = getShared()->tryGetImplicitCastMethod(key);
+            if (ctorMethod)
+            {
+                overloadContext.bestCandidateStorage = ctorMethod->conversionFuncOverloadCandidate;
+                overloadContext.bestCandidate = &overloadContext.bestCandidateStorage;
+            }
+            else
+            {
+                AddTypeOverloadCandidates(type, overloadContext);
+            }
 
             if(overloadContext.bestCandidates.getCount() != 0)
             {
@@ -2015,8 +2025,11 @@ namespace Slang
                 // because if they aren't then we actually just have
                 // an uninitialized varaible.
                 //
-                if(overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
+                if (overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
+                {
+                    getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
                     return;
+                }
 
                 getSink()->diagnose(varDecl, Diagnostics::ambiguousDefaultInitializerForType, type);
             }
@@ -2028,8 +2041,11 @@ namespace Slang
                 // of a type that *doesn't* have a default initializer
                 // isn't actually an error.
                 //
-                if(overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
+                if (overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
+                {
+                    getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
                     return;
+                }
 
                 // If we had a single best candidate *and* it was applicable,
                 // then we use it to construct a new initial-value expression
@@ -2037,6 +2053,7 @@ namespace Slang
                 // code generation.
                 //
                 varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+                getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{ *overloadContext.bestCandidate, 0});
             }
         }
 
@@ -2083,6 +2100,19 @@ namespace Slang
             if (doesTypeHaveTag(elementType, TypeTag::Incomplete))
             {
                 getSink()->diagnose(varDecl->type.exp->loc, Diagnostics::incompleteTypeCannotBeUsedInBuffer, elementType);
+            }
+            if (doesTypeHaveTag(elementType, TypeTag::Unsized))
+            {
+                // If the element type is unsized, it can only be an array of resource types that we can legalize out.
+                // Ordinary unsized arrays are not allowed in a constant buffer since we cannot translate it to
+                // valid HLSL or SPIRV.
+                ArrayExpressionType* trailingArrayType = nullptr;
+                VarDeclBase* trailingArrayField = getTrailingUnsizedArrayElement(elementType, varDecl, trailingArrayType);
+                if (trailingArrayField && !isOpaqueHandleType(trailingArrayType->getElementType()))
+                {
+                    getSink()->diagnose(trailingArrayField->loc, Diagnostics::cannotUseUnsizedTypeInConstantBuffer, trailingArrayType);
+                    getSink()->diagnose(varDecl->loc, Diagnostics::seeConstantBufferDefinition);
+                }
             }
         }
         else if (varDecl->findModifier<HLSLUniformModifier>())
@@ -8847,17 +8877,120 @@ namespace Slang
         // extensions, and force it to rebuild its cache to include the
         // new extension we just added.
         //
-        // TODO: We should probably just go ahead and add `extDecl` directly
-        // into the appropriate entry here, and do a similar step on each
-        // `import`.
-        //
-        m_candidateExtensionListsBuilt = false;
-        m_mapTypeDeclToCandidateExtensions.clear();
+        _getCandidateExtensionList(typeDecl, m_mapTypeDeclToCandidateExtensions).add(extDecl);
 
-        // Invalidate the cached inheritanceInfo.
-        m_mapTypeToInheritanceInfo.clear();
-        m_mapDeclRefToInheritanceInfo.clear();
-        m_mapTypePairToSubtypeWitness.clear();
+        // Remove the cached inheritanceInfo about typeDecl, if `extDecl` inherits new types.
+        bool invalidateSubtypes = false;
+        if (as<InterfaceDecl>(typeDecl))
+        {
+            // If we are extending an interface, we are effectively extending all types
+            // that inherits the interface. So we need to remove all inheritance info
+            // that is related to the interface.
+            invalidateSubtypes = true;
+        }
+        bool hasInheritanceMember = false;
+        bool hasImplicitCastMember = false;
+        for (auto member : extDecl->members)
+        {
+            if (as<InheritanceDecl>(member))
+            {
+                hasInheritanceMember = true;
+            }
+            else if (auto ctorDecl = as<ConstructorDecl>(member))
+            {
+                if (ctorDecl->hasModifier<ImplicitConversionModifier>())
+                    hasImplicitCastMember = true;
+            }
+        }
+        auto isTypeUpToDate = [this](Type* type)
+            {
+                if (auto declRefType = as<DeclRefType>(type))
+                {
+                    return m_mapDeclRefToInheritanceInfo.containsKey(declRefType->getDeclRef());
+                }
+                return m_mapTypeToInheritanceInfo.containsKey(type);
+            };
+        auto isInheritanceInfoAffected = [typeDecl](InheritanceInfo& info)
+            {
+                for (auto f : info.facets)
+                    if (f.getImpl()->getDeclRef().getDecl() == typeDecl)
+                    {
+                        return true;
+                    }
+                return false;
+            };
+        if (invalidateSubtypes)
+        {
+            decltype(m_mapTypeToInheritanceInfo) newMapTypeToInheritanceInfo;
+            for (auto& kv : m_mapTypeToInheritanceInfo)
+            {
+                if (!isInheritanceInfoAffected(kv.second))
+                {
+                    newMapTypeToInheritanceInfo.add(kv.first, kv.second);
+                }
+            }
+            m_mapTypeToInheritanceInfo = _Move(newMapTypeToInheritanceInfo);
+        }
+
+        ShortList<DeclRef<Decl>, 16> keysToRemove;
+        for (auto& kv : m_mapDeclRefToInheritanceInfo)
+        {
+            // We can confirm the type is affected by the new extension,
+            // if the declref type points to typeDecl.
+            if (kv.first.getDecl() == typeDecl)
+            {
+                keysToRemove.add(kv.first);
+                continue;
+            }
+
+            // If we are extending interface types (and in the future any struct type
+            // if we decide to have full inheritance support),
+            // we also need to account for conformant that implements the interface.
+            if (invalidateSubtypes && isInheritanceInfoAffected(kv.second))
+            {
+                keysToRemove.add(kv.first);
+            }
+        }
+        for (auto& key : keysToRemove)
+        {
+            m_mapDeclRefToInheritanceInfo.remove(key);
+        }
+
+        if (hasInheritanceMember || invalidateSubtypes)
+        {
+            ShortList<TypePair, 16> typePairsToRemove;
+            for (auto& kv : m_mapTypePairToSubtypeWitness)
+            {
+                if (!isTypeUpToDate(kv.first.type0) || !isTypeUpToDate(kv.first.type1))
+                {
+                    typePairsToRemove.add(kv.first);
+                }
+            }
+            for (auto& key : typePairsToRemove)
+            {
+                m_mapTypePairToSubtypeWitness.remove(key);
+            }
+        }
+
+        if (hasImplicitCastMember)
+        {
+            ShortList<ImplicitCastMethodKey> entriesToRemove;
+            for (auto& kv : m_mapTypePairToImplicitCastMethod)
+            {
+                // Since implicit casts are defined as constructors on the toType,
+                // we only need to check if the toType is affected by the new extension.
+                auto declRefType = as<DeclRefType>(kv.first.toType);
+
+                if (!declRefType || declRefType->getDeclRef().getDecl() == typeDecl)
+                {
+                    entriesToRemove.add(kv.first);
+                }
+            }
+            for (auto& key : entriesToRemove)
+            {
+                m_mapTypePairToImplicitCastMethod.remove(key);
+            }
+        }
     }
     
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
@@ -10298,6 +10431,80 @@ namespace Slang
             return DeclVisibility::Public;
         }
         return defaultVis;
+    }
+
+    VarDeclBase* getTrailingUnsizedArrayElement(Type* type, VarDeclBase* parentVar, ArrayExpressionType*& outArrayType)
+    {
+        while (auto modifiedType = as<ModifiedType>(type))
+            type = modifiedType->getBase();
+        HashSet<Type*> seenTypes;
+        for (;;)
+        {
+            if (auto arrayType = as<ArrayExpressionType>(type))
+            {
+                if (arrayType->isUnsized())
+                {
+                    outArrayType = arrayType;
+                    return parentVar;
+                }
+                else
+                    return nullptr;
+            }
+            else if (auto declRefType = as<DeclRefType>(type))
+            {
+                if (auto aggTypeDecl = declRefType->getDeclRef().as<AggTypeDecl>())
+                {
+                    auto varDecls = aggTypeDecl.getDecl()->getMembersOfType<VarDeclBase>();
+                    if (varDecls.getCount() == 0)
+                        return nullptr;
+                    VarDeclBase* lastVarDecl = nullptr;
+                    for (auto varDecl : varDecls)
+                    {
+                        if (isEffectivelyStatic(varDecl))
+                            continue;
+                        lastVarDecl = varDecl;
+                    }
+                    auto lastMember = _getMemberDeclRef(
+                        getCurrentASTBuilder(), aggTypeDecl, lastVarDecl).as<VarDeclBase>();
+                    auto varType = getType(getCurrentASTBuilder(), lastMember);
+                    if (!varType)
+                        return nullptr;
+                    if (!seenTypes.add(type))
+                        return nullptr;
+                    type = varType;
+                    parentVar = lastMember.getDecl();
+                    continue;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    bool isOpaqueHandleType(Type* type)
+    {
+        while (auto modifiedType = as<ModifiedType>(type))
+            type = modifiedType->getBase();
+        if (as<ResourceType>(type))
+            return true;
+        if (as<SamplerStateType>(type))
+            return true;
+        if (as<UniformParameterGroupType>(type))
+            return true;
+        if (as<HLSLStructuredBufferTypeBase>(type))
+            return true;
+        if (as<UntypedBufferResourceType>(type))
+            return true;
+        if (as<GLSLShaderStorageBufferType>(type))
+            return true;
+        if (as<FeedbackType>(type))
+            return true;
+        if (as<HLSLPatchType>(type))
+            return true;
+        if (as<HLSLStreamOutputType>(type))
+            return true;
+        if (as<MeshOutputType>(type))
+            return true;
+        return false;
     }
 
     void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl)

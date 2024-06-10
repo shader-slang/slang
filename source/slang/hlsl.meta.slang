@@ -150,7 +150,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __alignOf_intrinsic<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
         }
     }
 
@@ -192,7 +192,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __alignOf_intrinsic<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
         }
     }
 
@@ -234,7 +234,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __alignOf_intrinsic<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
         }
     }
 
@@ -259,7 +259,7 @@ struct ByteAddressBuffer
     [ForceInline]
     T LoadAligned<T>(int location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __alignOf_intrinsic<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
 };
 
@@ -740,6 +740,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
@@ -799,6 +800,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
@@ -1325,6 +1327,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
@@ -1426,6 +1429,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
@@ -2153,7 +2157,7 @@ ${{{{
     {
 }}}}
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetTexture))
-    __TextureImpl<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> __getTexture();
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, 0, isShadow, 0, format> __getTexture();
 
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
     SamplerState __getSampler();
@@ -3046,6 +3050,37 @@ ${{{{
 } // for (access).
 }}}}
 
+// Definitions to support the legacy texture .mips[][] operator.
+struct __TextureMip<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    int mip;
+    __subscript(vector<int, isArray + Shape.dimensions> pos)->T
+    {
+        [__unsafeForceInlineEarly]
+        get { return tex.Load(__makeVector(pos, mip)); }
+    }
+}
+struct __TextureMips<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    __subscript(int mip)->__TextureMip<T, Shape, isArray, isCombined, format>
+    {
+        [__unsafeForceInlineEarly]
+        get { return { tex, mip }; }
+    }
+}
+
+__generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+extension __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
+{
+    property __TextureMips<T, Shape, isArray, isCombined, format> mips
+    {
+        [__unsafeForceInlineEarly]
+        get { return { this }; }
+    }
+}
+
 // Texture type aliases.
 // T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int
 ${{{{
@@ -3665,7 +3700,7 @@ struct InputPatch
 };
 
 __generic<T, let N : int>
-[require(glsl_hlsl_spirv, shader_stages_domain_hull)]
+[require(glsl_hlsl_spirv, domain_hull)]
 __magic_type(HLSLOutputPatchType)
 __intrinsic_type($(kIROp_HLSLOutputPatchType))
 struct OutputPatch
@@ -3758,7 +3793,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __alignOf_intrinsic<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
         }
     }
 
@@ -3800,7 +3835,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __alignOf_intrinsic<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
         }
     }
 
@@ -3842,7 +3877,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __alignOf_intrinsic<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
         }
     }
 
@@ -3870,7 +3905,7 @@ struct $(item.name)
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     T LoadAligned<T>(int location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __alignOf_intrinsic<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
 
 ${{{{
@@ -4763,7 +4798,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store2";
         default:
-            __byteAddressBufferStore(this, address, __alignOf_intrinsic<uint2>(), value);
+            __byteAddressBufferStore(this, address, __naturalStrideOf<uint2>(), value);
         }
     }
 
@@ -4800,7 +4835,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store3";
         default:
-            __byteAddressBufferStore(this, address, __alignOf_intrinsic<uint3>(), value);
+            __byteAddressBufferStore(this, address, __naturalStrideOf<uint3>(), value);
         }
     }
 
@@ -4837,7 +4872,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store4";
         default:
-            __byteAddressBufferStore(this, address, __alignOf_intrinsic<uint4>(), value);
+            __byteAddressBufferStore(this, address, __naturalStrideOf<uint4>(), value);
         }
     }
 
@@ -4856,7 +4891,7 @@ ${{{{
     [ForceInline]
     void StoreAligned<T>(int offset, T value)
     {
-        __byteAddressBufferStore(this, offset, __alignOf_intrinsic<T>(), value);
+        __byteAddressBufferStore(this, offset, __naturalStrideOf<T>(), value);
     }
 };
 
@@ -15737,6 +15772,8 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
         // This intrinsic doesn't take into account writing meshPayload. That
         // is dealt with separately by 'legalizeDispatchMeshPayloadForGLSL'.
         __intrinsic_asm "EmitMeshTasksEXT($0, $1, $2)";
+    case metal:
+        __intrinsic_asm "_slang_mesh_payload = *$3; _slang_mgp.set_threadgroups_per_grid(uint3($0, $1, $2)); return;";
     case spirv:
         return spirv_asm
         {

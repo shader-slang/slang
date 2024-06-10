@@ -3,6 +3,7 @@
 // Test that we can compose interfaces with `&`
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 interface IFirst
 {
