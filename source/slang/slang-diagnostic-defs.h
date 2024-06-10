@@ -28,6 +28,7 @@ DIAGNOSTIC(-1, Note, implicitParameterMatchingFailedBecauseShaderDoesNotDefineCo
 DIAGNOSTIC(-1, Note, implicitParameterMatchingFailedBecauseTypeMismatch, "implicit parameter matching failed because the component of the same name does not match parameter type '$0'.")
 DIAGNOSTIC(-1, Note, noteShaderIsTargetingPipeine, "shader '$0' is targeting pipeline '$1'")
 DIAGNOSTIC(-1, Note, seeDefinitionOf, "see definition of '$0'")
+DIAGNOSTIC(-1, Note, seeConstantBufferDefinition, "see constant buffer definition.")
 DIAGNOSTIC(-1, Note, seeInterfaceDefinitionOf, "see interface definition of '$0'")
 DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
 DIAGNOSTIC(-1, Note, seeDefinitionOfShader, "see definition of shader '$0'")
@@ -459,6 +460,7 @@ DIAGNOSTIC(31211, Error, derivativeGroupLinearMustBeMultiple4ForTotalThreadCount
 DIAGNOSTIC(31212, Error, onlyOneOfDerivativeGroupLinearOrQuadCanBeSet, "cannot set compute derivative group linear and compute derivative group quad at the same time")
 DIAGNOSTIC(31213, Error, cudaKernelMustReturnVoid, "return type of a CUDA kernel function cannot be non-void.")
 DIAGNOSTIC(31214, Error, differentiableKernelEntryPointCannotHaveDifferentiableParams, "differentiable kernel entry point cannot have differentiable parameters. Consider using DiffTensorView to pass differentiable data, or marking this parameter with 'no_diff'")
+DIAGNOSTIC(31215, Error, cannotUseUnsizedTypeInConstantBuffer, "cannot use unsized type '$0' in a constant buffer.")
 
 // Enums
 
@@ -830,7 +832,10 @@ DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid param
 
 DIAGNOSTIC(55200, Error, unsupportedBuiltinType, "'$0' is not a supported builtin type for the target.")
 DIAGNOSTIC(55201, Error, unsupportedRecursion, "recursion detected in call to '$0', but the current code generation target does not allow recursion.")
+DIAGNOSTIC(55202, Error, systemValueAttributeNotSupported, "system value semantic '$0' is not supported for the current target.")
+DIAGNOSTIC(55203, Error, systemValueTypeIncompatible, "system value semantic '$0' should have type '$1' or convertible to type '$1'.")
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
+
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 

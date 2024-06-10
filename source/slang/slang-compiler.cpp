@@ -433,6 +433,44 @@ namespace Slang
         return UnownedStringSlice();
     }
 
+    Stage getStageFromAtom(CapabilityAtom atom)
+    {
+        switch (atom)
+        {
+        case CapabilityAtom::vertex:
+            return Stage::Vertex;
+        case CapabilityAtom::hull:
+            return Stage::Hull;
+        case CapabilityAtom::domain:
+            return Stage::Domain;
+        case CapabilityAtom::geometry:
+            return Stage::Geometry;
+        case CapabilityAtom::fragment:
+            return Stage::Fragment;
+        case CapabilityAtom::compute:
+            return Stage::Compute;
+        case CapabilityAtom::mesh:
+            return Stage::Mesh;
+        case CapabilityAtom::amplification:
+            return Stage::Amplification;
+        case CapabilityAtom::anyhit:
+            return Stage::AnyHit;
+        case CapabilityAtom::closesthit:
+            return Stage::ClosestHit;
+        case CapabilityAtom::intersection:
+            return Stage::Intersection;
+        case CapabilityAtom::raygen:
+            return Stage::RayGeneration;
+        case CapabilityAtom::miss:
+            return Stage::Miss;
+        case CapabilityAtom::callable:
+            return Stage::Callable;
+        default:
+            SLANG_UNEXPECTED("unknown stage atom");
+            UNREACHABLE_RETURN(Stage::Unknown);
+        }
+    }
+
     SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
     {
         // Check if the type is supported on this compile
