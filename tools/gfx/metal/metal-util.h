@@ -32,6 +32,7 @@ struct MetalUtil
     static MTL::SamplerMipFilter translateSamplerMipFilter(TextureFilteringMode mode);
     static MTL::SamplerAddressMode translateSamplerAddressMode(TextureAddressingMode mode);
     static MTL::CompareFunction translateCompareFunction(ComparisonFunc func); 
+    static MTL::StencilOperation translateStencilOperation(StencilOp op);
 
     static MTL::VertexStepFunction translateVertexStepFunction(InputSlotClass slotClass);
 
@@ -41,6 +42,10 @@ struct MetalUtil
     static MTL::BlendFactor translateBlendFactor(BlendFactor factor);
     static MTL::BlendOperation translateBlendOperation(BlendOp op);
     static MTL::ColorWriteMask translateColorWriteMask(RenderTargetWriteMask::Type mask);
+
+    static MTL::Winding translateWinding(FrontFaceMode mode);
+    static MTL::CullMode translateCullMode(CullMode mode);
+    static MTL::TriangleFillMode translateTriangleFillMode(FillMode mode);
 
 };
 

@@ -86,10 +86,10 @@ Result PipelineStateImpl::createMetalRenderPipelineState()
 
     // Set rasterization state
     auto framebufferLayoutImpl = static_cast<FramebufferLayoutImpl*>(desc.graphics.framebufferLayout);
-    const auto& blendDesc = desc.graphics.blend;
+    const auto& blend = desc.graphics.blend;
     GfxCount sampleCount = 1;
 
-    pd->setAlphaToCoverageEnabled(blendDesc.alphaToCoverageEnable);
+    pd->setAlphaToCoverageEnabled(blend.alphaToCoverageEnable);
     // pd->setAlphaToOneEnabled(); // Currently not supported by gfx
     // pd->setRasterizationEnabled(true); // Enabled by default
 
@@ -98,9 +98,9 @@ Result PipelineStateImpl::createMetalRenderPipelineState()
         const IFramebufferLayout::TargetLayout& targetLayout = framebufferLayoutImpl->m_renderTargets[i];
         MTL::RenderPipelineColorAttachmentDescriptor* colorAttachment = pd->colorAttachments()->object(i);
         colorAttachment->setPixelFormat(MetalUtil::translatePixelFormat(targetLayout.format));
-        if (i < blendDesc.targetCount)
+        if (i < blend.targetCount)
         {
-            const TargetBlendDesc& targetBlendDesc = blendDesc.targets[i];
+            const TargetBlendDesc& targetBlendDesc = blend.targets[i];
             colorAttachment->setBlendingEnabled(targetBlendDesc.enableBlend);
             colorAttachment->setSourceRGBBlendFactor(MetalUtil::translateBlendFactor(targetBlendDesc.color.srcFactor));
             colorAttachment->setDestinationRGBBlendFactor(MetalUtil::translateBlendFactor(targetBlendDesc.color.dstFactor));
@@ -135,6 +135,38 @@ Result PipelineStateImpl::createMetalRenderPipelineState()
         std::cout << error->localizedDescription()->utf8String() << std::endl;
         return SLANG_E_INVALID_ARG;
     }
+
+    // Create depth stencil state
+    auto createStencilDesc = [](const DepthStencilOpDesc& desc, uint32_t readMask, uint32_t writeMask) -> NS::SharedPtr<MTL::StencilDescriptor>
+    {
+        NS::SharedPtr<MTL::StencilDescriptor> stencilDesc = NS::TransferPtr(MTL::StencilDescriptor::alloc()->init());
+        stencilDesc->setStencilCompareFunction(MetalUtil::translateCompareFunction(desc.stencilFunc));
+        stencilDesc->setStencilFailureOperation(MetalUtil::translateStencilOperation(desc.stencilFailOp));
+        stencilDesc->setDepthFailureOperation(MetalUtil::translateStencilOperation(desc.stencilDepthFailOp));
+        stencilDesc->setDepthStencilPassOperation(MetalUtil::translateStencilOperation(desc.stencilPassOp));
+        stencilDesc->setReadMask(readMask);
+        stencilDesc->setWriteMask(writeMask);
+        return stencilDesc;
+    };
+
+    const auto& depthStencil = desc.graphics.depthStencil;
+    NS::SharedPtr<MTL::DepthStencilDescriptor> depthStencilDesc = NS::TransferPtr(MTL::DepthStencilDescriptor::alloc()->init());
+    m_depthStencilState = NS::TransferPtr(m_device->m_device->newDepthStencilState(depthStencilDesc.get()));
+    if (!m_depthStencilState)
+    {
+        return SLANG_FAIL;
+    }
+    if (depthStencil.depthTestEnable)
+    {
+        depthStencilDesc->setDepthCompareFunction(MetalUtil::translateCompareFunction(depthStencil.depthFunc));
+    }
+    depthStencilDesc->setDepthWriteEnabled(depthStencil.depthWriteEnable);
+    if (depthStencil.stencilEnable)
+    {
+        depthStencilDesc->setFrontFaceStencil(createStencilDesc(depthStencil.frontFace, depthStencil.stencilReadMask, depthStencil.stencilWriteMask).get());
+        depthStencilDesc->setBackFaceStencil(createStencilDesc(depthStencil.backFace, depthStencil.stencilReadMask, depthStencil.stencilWriteMask).get());
+    }
+
     return SLANG_OK;
 }
 

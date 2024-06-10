@@ -275,6 +275,31 @@ MTL::CompareFunction MetalUtil::translateCompareFunction(ComparisonFunc func)
     }
 }
 
+MTL::StencilOperation MetalUtil::translateStencilOperation(StencilOp op)
+{
+    switch (op)
+    {
+    case StencilOp::Keep:
+        return MTL::StencilOperationKeep;
+    case StencilOp::Zero:
+        return MTL::StencilOperationZero;
+    case StencilOp::Replace:
+        return MTL::StencilOperationReplace;
+    case StencilOp::IncrementSaturate:
+        return MTL::StencilOperationIncrementClamp;
+    case StencilOp::DecrementSaturate:
+        return MTL::StencilOperationDecrementClamp;
+    case StencilOp::Invert:
+        return MTL::StencilOperationInvert;
+    case StencilOp::IncrementWrap:
+        return MTL::StencilOperationIncrementWrap;
+    case StencilOp::DecrementWrap:
+        return MTL::StencilOperationDecrementWrap;
+    default:
+        return MTL::StencilOperation(0);
+    }
+}
+
 MTL::VertexStepFunction MetalUtil::translateVertexStepFunction(InputSlotClass slotClass)
 {
     switch (slotClass)
@@ -397,6 +422,47 @@ MTL::ColorWriteMask MetalUtil::translateColorWriteMask(RenderTargetWriteMask::Ty
     if (mask & RenderTargetWriteMask::EnableAlpha)
         result |= MTL::ColorWriteMaskAlpha;
     return result;
+}
+
+MTL::Winding MetalUtil::translateWinding(FrontFaceMode mode)
+{
+    switch (mode)
+    {
+    case FrontFaceMode::CounterClockwise:
+        return MTL::WindingCounterClockwise;
+    case FrontFaceMode::Clockwise:
+        return MTL::WindingClockwise;
+    default:
+        return MTL::Winding(0);
+    }
+}
+
+MTL::CullMode MetalUtil::translateCullMode(CullMode mode)
+{
+    switch (mode)
+    {
+    case CullMode::None:
+        return MTL::CullModeNone;
+    case CullMode::Front:
+        return MTL::CullModeFront;
+    case CullMode::Back:
+        return MTL::CullModeBack;
+    default:
+        return MTL::CullMode(0);
+    }
+}
+
+MTL::TriangleFillMode MetalUtil::translateTriangleFillMode(FillMode mode)
+{
+    switch (mode)
+    {
+    case FillMode::Solid:
+        return MTL::TriangleFillModeFill;
+    case FillMode::Wireframe:
+        return MTL::TriangleFillModeLines;
+    default:
+        return MTL::TriangleFillMode(0);
+    }
 }
 
 } // namespace gfx

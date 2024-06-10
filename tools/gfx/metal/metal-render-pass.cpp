@@ -18,10 +18,6 @@ IRenderPassLayout* RenderPassLayoutImpl::getInterface(const Guid& guid)
     return nullptr;
 }
 
-RenderPassLayoutImpl::~RenderPassLayoutImpl()
-{
-}
-
 static inline MTL::LoadAction translateLoadOp(IRenderPassLayout::TargetLoadOp loadOp)
 {
     switch (loadOp)
