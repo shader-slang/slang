@@ -852,6 +852,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // float[4] on glsl
         requiredType = builder->getArrayType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 4));
     }
+    else if (semanticName == "sv_insidetessfactor")
+    {
+        name = "gl_TessLevelInner";
+
+        // float[2] on glsl
+        requiredType = builder->getArrayType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 2));
+    }
     else if (semanticName == "sv_vertexid")
     {
         // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
@@ -1077,6 +1084,21 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     if( systemValueInfo && systemValueInfo->requiredType )
     {
         type = systemValueInfo->requiredType;
+
+        // Unpeel `type` using declarators so that it matches `inType`.
+        for (auto dd = declarator; dd; dd = dd->next)
+        {
+            switch (dd->flavor)
+            {
+            case GlobalVaryingDeclarator::Flavor::array:
+                {
+                    auto arrayType = as<IRArrayTypeBase>(type);
+                    SLANG_RELEASE_ASSERT(arrayType);
+                    type = arrayType->getElementType();
+                    break;
+                }
+            }
+        }
     }
 
     // If we have a declarator, we just use the normal logic, as that seems to work correctly
@@ -1241,13 +1263,13 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         {
             // We may need to adapt from the declared type to/from
             // the actual type of the GLSL global.
-            auto toType = inType;
+            auto toType = type;
 
             if (!isTypeEqual(fromType, toType))
             {
                 RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter = new ScalarizedTypeAdapterValImpl;
                 typeAdapter->actualType = systemValueInfo->requiredType;
-                typeAdapter->pretendType = inType;
+                typeAdapter->pretendType = type;
                 typeAdapter->val = val;
 
                 val = ScalarizedVal::typeAdapter(typeAdapter);
