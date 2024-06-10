@@ -5353,7 +5353,7 @@ bool all(matrix<T,N,M> x)
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void AllMemoryBarrier()
 {
     __target_switch
@@ -5371,7 +5371,7 @@ void AllMemoryBarrier()
 
 // Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void AllMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -7008,7 +7008,7 @@ T determinant(matrix<T,N,N> m)
 
 // Barrier for device memory
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void DeviceMemoryBarrier()
 {
     __target_switch
@@ -7025,7 +7025,7 @@ void DeviceMemoryBarrier()
 }
 
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void DeviceMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -8338,7 +8338,7 @@ float2 GetRenderTargetSamplePosition(int Index)
 
 // Group memory barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void GroupMemoryBarrier()
 {
     __target_switch
@@ -8355,7 +8355,7 @@ void GroupMemoryBarrier()
     }
 }
 
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void __subgroupBarrier()
 {
     __target_switch
@@ -8373,7 +8373,7 @@ void __subgroupBarrier()
 }
 
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void GroupMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -12374,7 +12374,7 @@ uint WaveMaskCountBits(WaveMask mask, bool value)
 // It seems this can only mean the active threads are the "threads the program flow would lead to". This implies a lockstep
 // "straight SIMD" style interpretation. That being the case this op on HLSL is just a memory barrier without any Sync.
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_spirv, memorybarrier)]
 void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
     __target_switch
@@ -12406,7 +12406,7 @@ void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 // aspect of HLSL seems to make everything in lock step - but that's not quite so, it only has to apparently be that way as far as the programmers
 // model appears - divergence could perhaps potentially still happen.
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_spirv, memorybarrier)]
 void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
     __target_switch
@@ -12422,7 +12422,7 @@ void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
     }
 }
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_spirv, memorybarrier)]
 void AllMemoryBarrierWithWaveSync()
 {
     __target_switch
@@ -12438,7 +12438,7 @@ void AllMemoryBarrierWithWaveSync()
     }
 }
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier_compute)]
+[require(cuda_glsl_hlsl_spirv, memorybarrier)]
 void GroupMemoryBarrierWithWaveSync()
 {
     __target_switch
@@ -14921,7 +14921,7 @@ struct RaytracingAccelerationStructure {};
 // 10.1.5 - Intersection Attributes Structure
 
 __target_intrinsic(hlsl, BuiltInTriangleIntersectionAttributes)
-[require(cpp_cuda_glsl_hlsl_spirv, rayobject)]
+[require(cpp_cuda_glsl_hlsl_spirv, raytracing)]
 struct BuiltInTriangleIntersectionAttributes
 {
     __target_intrinsic(hlsl, barycentrics)

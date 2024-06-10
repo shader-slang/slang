@@ -292,6 +292,10 @@ public:
     /// Get access to the raw atomic capabilities that define this set.
     /// Get all bottom level UIntSets for each CapabilityTargetSet.
     CapabilitySet::AtomSets::Iterator getAtomSets() const;
+
+    /// Add spirv version capabilities from 'spirv CapabilityTargetSet' as glsl_spirv version capability in 'glsl CapabilityTargetSet'
+    void AddSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& other);
+
 private:
     /// underlying data of CapabilitySet.
     CapabilityTargetSets m_targetSets{};
@@ -303,7 +307,7 @@ private:
     enum class ImpliesFlags
     {
         None = 0,
-        OnlyRequireASingleValidImply = 1 << 1,
+        OnlyRequireASingleValidImply = 1 << 0,
     };
     ImpliesReturnFlags _implies(CapabilitySet const& other, ImpliesFlags flags) const;
 };
@@ -314,8 +318,15 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base);
     /// Find a capability atom with the given `name`, or return CapabilityAtom::Invalid.
 CapabilityName findCapabilityName(UnownedStringSlice const& name);
 
-CapabilityName getLatestSpirvAtom();
-CapabilityName getLatestMetalAtom();
+CapabilityAtom getLatestSpirvAtom();
+CapabilityAtom getLatestMetalAtom();
+
+template<typename T>
+inline CapabilityAtom asAtom(T name)
+{
+    SLANG_ASSERT((UInt)name < (UInt)CapabilityAtom::Count);
+    return CapabilityAtom(name);
+}
 
     /// Gets the capability names.
 void getCapabilityNames(List<UnownedStringSlice>& ioNames);
@@ -326,8 +337,8 @@ bool isDirectChildOfAbstractAtom(CapabilityAtom name);
 
 
     /// Return true if `name` represents an atom for a target version, e.g. spirv_1_5.
-bool isTargetVersionAtom(CapabilityName name);
-bool isSpirvExtensionAtom(CapabilityName name);
+bool isTargetVersionAtom(CapabilityAtom name);
+bool isSpirvExtensionAtom(CapabilityAtom name);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);

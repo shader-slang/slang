@@ -9389,7 +9389,7 @@ public vec4 noise4(vector<float, N> x)
 // TODO: if called after a return, error.
 
 [ForceInline]
-[require(glsl_hlsl_spirv, glsl_barrier)]
+[require(glsl_hlsl_spirv, memorybarrier)]
 public void barrier()
 {
     __target_switch

@@ -10494,7 +10494,7 @@ namespace Slang
                 
                 for (auto atom : targetsNotUsedSet)
                 {
-                    CapabilityAtom formattedAtom = (CapabilityAtom)atom;
+                    CapabilityAtom formattedAtom = asAtom(atom);
                     diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, true);
                 }
                 return;
@@ -10517,7 +10517,7 @@ namespace Slang
         // can come from multiple referenced items in a function body.
         for (auto i : failedAtomsInsideAvailableSet)
         {
-            CapabilityAtom formattedAtom = (CapabilityAtom)i;
+            CapabilityAtom formattedAtom = asAtom(i);
             maybeDiagnose(getSink(), this->getOptionSet(), TypeOfErrorToDiagnose::Capability, decl->loc, diagnosticInfo, decl, formattedAtom);
             // Print provenances.
             diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom);

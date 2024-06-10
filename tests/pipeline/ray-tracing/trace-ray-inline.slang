@@ -1,7 +1,7 @@
 // trace-ray-inline.slang
 
 //TEST:CROSS_COMPILE:-target dxil-asm -stage compute -profile sm_6_5 -entry main -line-directive-mode none
-//TEST:CROSS_COMPILE:-target spirv-asm -stage compute -profile glsl_460+spirv_1_4 -entry main -line-directive-mode none
+//TEST:CROSS_COMPILE:-target spirv-asm -stage compute -profile glsl_460+GL_EXT_ray_query -entry main -line-directive-mode none
 
 // The goal of this shader is to use all the main pieces
 // of functionality in DXR 1.1's `TraceRayInline` feature,

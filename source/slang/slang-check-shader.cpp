@@ -532,7 +532,7 @@ namespace Slang
                 {
                     for (auto inferredAtom : *interredCapConjunctions.begin())
                     {
-                        CapabilityAtom inferredAtomFormatted = (CapabilityAtom)inferredAtom;
+                        CapabilityAtom inferredAtomFormatted = asAtom(inferredAtom);
                         if (!compileCaps->contains((UInt)inferredAtom))
                         {
                             diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtomFormatted);
@@ -554,6 +554,17 @@ namespace Slang
                 && targetCaps.atLeastOneSetImpliedInOther(entryPointFuncDecl->inferredCapabilityRequirements) == CapabilitySet::ImpliesReturnFlags::NotImplied
                )
             {
+                CapabilitySet combinedSets = targetCaps;
+                combinedSets.join(entryPointFuncDecl->inferredCapabilityRequirements);
+                CapabilityAtomSet addedAtoms{};
+                if (auto targetCapSet = targetCaps.getAtomSets())
+                {
+                    if(auto combinedSet = combinedSets.getAtomSets())
+                    {
+                        CapabilityAtomSet::calcSubtract(addedAtoms, (*combinedSet), (*targetCapSet));
+                        break;
+                    }
+                }
                 maybeDiagnoseWarningOrError(
                     sink,
                     target->getOptionSet(),
@@ -561,8 +572,7 @@ namespace Slang
                     entryPointFuncDecl->loc,
                     Diagnostics::profileImplicitlyUpgraded,
                     Diagnostics::profileImplicitlyUpgradedRestrictive,
-                    (*targetCaps.getCapabilityTargetSets().begin()).second,
-                    entryPointFuncDecl->inferredCapabilityRequirements.getCapabilityTargetSets()[(*targetCaps.getCapabilityTargetSets().begin()).first]);
+                    addedAtoms.getElements<CapabilityAtom>());
             }
         }
     }
