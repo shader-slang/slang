@@ -1078,13 +1078,14 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         &systemValueInfoStorage);
 
     IRType* type = inType;
+    IRType* peeledRequiredType = nullptr;
 
     // A system-value semantic might end up needing to override the type
     // that the user specified.
     if( systemValueInfo && systemValueInfo->requiredType )
     {
         type = systemValueInfo->requiredType;
-
+        peeledRequiredType = type;
         // Unpeel `type` using declarators so that it matches `inType`.
         for (auto dd = declarator; dd; dd = dd->next)
         {
@@ -1095,6 +1096,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                     auto arrayType = as<IRArrayTypeBase>(type);
                     SLANG_RELEASE_ASSERT(arrayType);
                     type = arrayType->getElementType();
+                    peeledRequiredType = type;
                     break;
                 }
             }
@@ -1263,13 +1265,11 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         {
             // We may need to adapt from the declared type to/from
             // the actual type of the GLSL global.
-            auto toType = type;
-
-            if (!isTypeEqual(fromType, toType))
+            if (!isTypeEqual(peeledRequiredType, inType))
             {
                 RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter = new ScalarizedTypeAdapterValImpl;
-                typeAdapter->actualType = systemValueInfo->requiredType;
-                typeAdapter->pretendType = type;
+                typeAdapter->actualType = peeledRequiredType;
+                typeAdapter->pretendType = inType;
                 typeAdapter->val = val;
 
                 val = ScalarizedVal::typeAdapter(typeAdapter);
