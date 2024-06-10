@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -entry main -stage fragment
 struct PerPrimitive {
     int primitive_id : SV_PrimitiveID;
-    nointerpolation int layer : SV_RenderTargetArrayIndex;
+    int layer : SV_RenderTargetArrayIndex;
 };
 
 // CHECK: OpDecorate %gl_PrimitiveID Flat
