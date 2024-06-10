@@ -9,7 +9,6 @@
 //TEST(compute):COMPARE_COMPUTE: -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 
 

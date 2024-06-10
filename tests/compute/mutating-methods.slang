@@ -3,7 +3,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -xslang -serial-ir -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -serial-ir -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -xslang -serial-ir -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 interface IAccumulator
 {
