@@ -2234,6 +2234,25 @@ struct SPIRVEmitContext
                 SpvLiteralInteger::from32(int32_t(0)));
         }
 
+        bool anyModifiers = (var->findDecoration<IRInterpolationModeDecoration>() != nullptr);
+
+        // If the user didn't explicitly qualify a varying
+        // with integer type, then we need to explicitly
+        // add the `flat` modifier for GLSL.
+        if (!anyModifiers)
+        {
+            // Only emit a default `flat` for fragment
+            // stage varying inputs.
+            if (layout
+                && layout->getStage() == Stage::Fragment
+                && layout->usesResourceKind(LayoutResourceKind::VaryingInput))
+            {
+                const auto ptrType = as<IRPtrTypeBase>(var->getDataType());
+                if (ptrType && isIntegralScalarOrCompositeType(ptrType->getValueType()))
+                    emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, SpvDecorationFlat);
+            }
+        }
+
         for (auto decor : var->getDecorations())
         {
             switch (decor->getOp())
