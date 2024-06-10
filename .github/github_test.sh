@@ -30,6 +30,10 @@ else
     SLANG_TEST_CATEGORY=smoke
 fi
 
+if [ "${PLATFORM}" != "macosx" ]; then
+    SLANG_TEST_CATEGORY=full
+fi
+
 TARGET=${PLATFORM}-${ARCHITECTURE}
 
 OUTPUTDIR=bin/${TARGET}/${CONFIGURATION}/
