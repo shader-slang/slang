@@ -25,10 +25,10 @@ T myGenF<T : __BuiltinIntegerType>(inout T a, T b)
         return a - b;
     }
 }
-// CHECK: result{{.*}}[0{{U?}}] = 1
-// CHECK: result{{.*}}[1{{U?}}] = 4
-// CHECK: result{{.*}}[2{{U?}}] = 1
-// CHECK: result{{.*}}[3{{U?}}] = 4
+// CHECK: result{{.*}}[int(0)] = 1
+// CHECK: result{{.*}}[int(1)] = 4
+// CHECK: result{{.*}}[int(2)] = 1
+// CHECK: result{{.*}}[int(3)] = 4
 [numthreads(1,1,1)]
 void main()
 {
