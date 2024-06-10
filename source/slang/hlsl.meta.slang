@@ -510,10 +510,6 @@ float __glsl_texture_offset_level_zero_1d_shadow<TTexture, TCoord, TOffset>(TTex
     }
 }
 
-// TODO: Need to replace with a real static_assert when it is implemented.
-// This is a placeholder implementation
-void static_assert(constexpr bool condi, NativeString msg) {}
-
 __generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 {
