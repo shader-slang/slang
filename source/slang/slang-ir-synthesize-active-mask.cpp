@@ -1047,25 +1047,6 @@ struct SynthesizeActiveMaskForFunctionContext
             //
         case kIROp_conditionalBranch:
             //
-            // A `discard` instruction can only appear in fragment shaders,
-            // and this pass is currently only being applied for the CUDA
-            // target (which doesn't support rasterization stages).
-            //
-            // The difficulty with `discard` is that a `discard` operation
-            // in a subroutine can affect the active mask seen by code
-            // after a call to that subroutine. Thus, the `discard` operation
-            // would violate our assumption that the active mask cannot change
-            // inside of a single basic block.
-            //
-            // Devising a solution to synthesize the active mask in the presence
-            // of `discard` would seem to require a different approach to this
-            // pass *or* some new constraints on the front-end representation
-            // (e.g., a `discard` is really more akin to a `throw` or other
-            // error-propagation operation, and might need to be explicit in
-            // the signature of any function that may `discard`).
-            //
-        case kIROp_discard:
-            //
             // Finally, we also don't handle any control-flow op we might not
             // have introduced at the time this pass was created.
             //

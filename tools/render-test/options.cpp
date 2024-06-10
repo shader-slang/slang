@@ -31,6 +31,7 @@ static gfx::DeviceType _toRenderType(Slang::RenderApiType apiType)
     case RenderApiType::D3D12:  return gfx::DeviceType::DirectX12;
     case RenderApiType::OpenGl: return gfx::DeviceType::OpenGl;
     case RenderApiType::Vulkan: return gfx::DeviceType::Vulkan;
+    case RenderApiType::Metal:  return gfx::DeviceType::Metal;
     case RenderApiType::CPU:    return gfx::DeviceType::CPU;
     case RenderApiType::CUDA:   return gfx::DeviceType::CUDA;
     default:

@@ -73,6 +73,10 @@ struct CapabilityStageSet
         else
             atomSet->add(setToAdd);
     }
+
+    /// Join `this` with a compatble stage set of `CapabilityTargetSet other`.
+    /// Return false when `other` is fully incompatible.
+    /// incompatability is when `this->stage` is not a supported stage by `other.shaderStageSets`.
     bool tryJoin(const CapabilityTargetSet& other);
 };
 
@@ -85,6 +89,11 @@ struct CapabilityTargetSet
 
     CapabilityStageSets shaderStageSets{};
 
+    /// Join a compatable target set from `this` with `CapabilityTargetSet other`.
+    /// Return false when `other` is fully incompatible.
+    /// incompatability is when one of 2 senarios are true:
+    /// 1. `this->target` is not a supported target by `other.shaderStageSets`
+    /// 2. `this` has completly disjoint shader stages from other.
     bool tryJoin(const CapabilityTargetSets& other);
     void unionWith(const CapabilityTargetSet& other);
 };
@@ -157,20 +166,26 @@ public:
     void addCapability(List<List<CapabilityAtom>>& atomLists);
     /// Calculate a list of "compacted" atoms, which excludes any atoms from the expanded list that are implies by another item in the list.
 
+    /// returns true if 'this' is a better target for 'targetCaps' than 'that'
+    /// isEqual: is `this` and `that` equal
     bool isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const;
 
     /// Find any capability sets which are in 'available' but not in 'required'. Return false if this situation occurs. 
     static bool checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, CapabilityAtomSet& outFailedAvailableSet);
 
-    inline void addToTargetCapabilityWithValidUIntSetAndTargetAndStage(CapabilityName target, CapabilityName stage, CapabilityAtomSet setToAdd);
-    inline void addToTargetCapabilityWithTargetAndStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
-    inline void addToTargetCapabilityWithTargetAndOrStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
-    inline void addToTargetCapabilityWithStageAtom(CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation);
-    inline void addToTargetCapabilitesWithCanonicalRepresentation(const ArrayView<CapabilityName>& atom);
+    // For each element in `elementsToPermutateWith`, create and add a different conjunction permutation by adding to `setToPermutate`. 
+    template<CapabilityName keyholeAtomToPermuteWith>
+    void addPermutationsOfConjunctionForEachInContainer(CapabilityAtomSet& setToPermutate, const CapabilityAtomSet& elementsToPermutateWith, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom);
+    // This is used for adding conjunctions directly and efficently, this is not functionally a join.
+    // if `knownStage`/`knownTarget` is not CapabilityAtom::Invalid, the given atom will be assumed as an assigned key atom (faster)
+    inline void addConjunction(CapabilityAtomSet conjunction, CapabilityAtom knownTarget, CapabilityAtom knownStage);
     inline void addUnexpandedCapabilites(CapabilityName atom);
     
     CapabilityTargetSets& getCapabilityTargetSets() { return m_targetSets; }
     const CapabilityTargetSets& getCapabilityTargetSets() const { return m_targetSets; }
+
+    // If this capability set uniquely implies one stage atom, return it. Otherwise returns CapabilityAtom::Invalid.
+    CapabilityAtom getUniquelyImpliedStageAtom() const;
 
     struct AtomSets
     {
@@ -180,7 +195,7 @@ public:
             const CapabilityTargetSets* context;
             CapabilityTargetSets::ConstIterator targetNode{};
             CapabilityStageSets::ConstIterator stageNode{};
-            const std::optional<CapabilityAtomSet>* atomSetNode;
+            const std::optional<CapabilityAtomSet>* atomSetNode = {};
 
         public:
             operator bool() const
@@ -247,10 +262,12 @@ public:
                 if (tmp.targetNode == this->context->end())
                     return tmp;
                 tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
-                if (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
+                while (tmp.stageNode == (*tmp.targetNode).second.shaderStageSets.end())
                 {
-                    tmp++;
-                    return tmp;
+                    tmp.targetNode++;
+                    if (tmp.targetNode == this->context->end())
+                        return end();
+                    tmp.stageNode = (*tmp.targetNode).second.shaderStageSets.begin();
                 }
                 tmp.atomSetNode = &(*tmp.stageNode).second.atomSet;
                 if (!tmp.atomSetNode->has_value())
@@ -287,12 +304,20 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base);
     /// Find a capability atom with the given `name`, or return CapabilityAtom::Invalid.
 CapabilityName findCapabilityName(UnownedStringSlice const& name);
 
+CapabilityName getLatestSpirvAtom();
+CapabilityName getLatestMetalAtom();
+
     /// Gets the capability names.
 void getCapabilityNames(List<UnownedStringSlice>& ioNames);
 
 UnownedStringSlice capabilityNameToString(CapabilityName name);
 
 bool isDirectChildOfAbstractAtom(CapabilityAtom name);
+
+
+    /// Return true if `name` represents an atom for a target version, e.g. spirv_1_5.
+bool isTargetVersionAtom(CapabilityName name);
+bool isSpirvExtensionAtom(CapabilityName name);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);

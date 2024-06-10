@@ -558,7 +558,6 @@ namespace Slang
         case kIROp_Return:
         case kIROp_Unreachable:
         case kIROp_MissingReturn:
-        case kIROp_discard:
         case kIROp_GenericAsm:
             break;
 
@@ -854,7 +853,6 @@ namespace Slang
         case kIROp_conditionalBranch:
         case kIROp_loop:
         case kIROp_ifElse:
-        case kIROp_discard:
         case kIROp_Switch:
         case kIROp_Unreachable:
         case kIROp_MissingReturn:
@@ -8530,6 +8528,18 @@ namespace Slang
             parent = parent->getParent();
         }
         return nullptr;
+    }
+
+    bool hasDescendent(IRInst* inst, IRInst* child)
+    {
+        auto parent = child->getParent();
+        while (parent)
+        {
+            if (inst == parent)
+                return true;
+            parent = parent->getParent();
+        }
+        return false;
     }
 
     IRInst* getGenericReturnVal(IRInst* inst)

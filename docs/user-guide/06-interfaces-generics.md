@@ -220,7 +220,7 @@ void g<T:IFoo>()
 Associated Types
 -------------------------
 
-When writing code using interfaces and generics, there are some situations where the an interface method needs to return an object whose type is implementation-dependent. For example, consider the following `IFloatContainer` interface that represents a container of `float` values:
+When writing code using interfaces and generics, there are some situations where an interface method needs to return an object whose type is implementation-dependent. For example, consider the following `IFloatContainer` interface that represents a container of `float` values:
 ```csharp
 // Represents a container of float values.
 interface IFloatContainer

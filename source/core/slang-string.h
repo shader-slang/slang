@@ -672,11 +672,11 @@ namespace Slang
             Index startIndex = 0;
             const char*const data = getData();
             while (startIndex < getLength() &&
-                (data[startIndex] == ' ' || data[startIndex] == '\t'))
+                (data[startIndex] == ' ' || data[startIndex] == '\t' || data[startIndex] == '\r' || data[startIndex] == '\n'))
                 startIndex++;
             Index endIndex = getLength();
             while (endIndex > startIndex &&
-                (data[endIndex-1] == ' ' || data[endIndex-1] == '\t'))
+                (data[endIndex-1] == ' ' || data[endIndex-1] == '\t' || data[endIndex-1] == '\r' || data[endIndex-1] == '\n'))
                 endIndex--;
 
             return StringSlice(m_buffer, startIndex, endIndex);

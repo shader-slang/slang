@@ -17,6 +17,7 @@
 // when trying out the feature.
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 import struct_generic_value_param_import;
 

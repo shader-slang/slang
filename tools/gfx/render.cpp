@@ -20,6 +20,7 @@ Result SLANG_MCALL createCPUDevice(const IDevice::Desc* desc, IDevice** outDevic
 Result SLANG_MCALL getD3D11Adapters(List<AdapterInfo>& outAdapters);
 Result SLANG_MCALL getD3D12Adapters(List<AdapterInfo>& outAdapters);
 Result SLANG_MCALL getVKAdapters(List<AdapterInfo>& outAdapters);
+Result SLANG_MCALL getMetalAdapters(List<AdapterInfo>& outAdapters);
 Result SLANG_MCALL getCUDAAdapters(List<AdapterInfo>& outAdapters);
 
 Result SLANG_MCALL reportD3DLiveObjects();
@@ -275,6 +276,14 @@ extern "C"
             SLANG_RETURN_ON_FAIL(getCUDAAdapters(adapters));
             break;
 #endif
+#if SLANG_APPLE_FAMILY
+        case DeviceType::Vulkan:
+            SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
+            break;
+        case DeviceType::Metal:
+            SLANG_RETURN_ON_FAIL(getMetalAdapters(adapters));
+            break;
+#endif
         case DeviceType::CPU:
             return SLANG_E_NOT_IMPLEMENTED;
         default:
@@ -330,20 +339,37 @@ extern "C"
             }
             break;
 #elif SLANG_APPLE_FAMILY
-        case DeviceType::Default:
+        case DeviceType::Vulkan:
+        {
+            return createVKDevice(desc, outDevice);
+        }
         case DeviceType::Metal:
         {
             return createMetalDevice(desc, outDevice);
         }
+        case DeviceType::Default:
+        {
+            IDevice::Desc newDesc = *desc;
+            newDesc.deviceType = DeviceType::Metal;
+            if (_createDevice(&newDesc, outDevice) == SLANG_OK)
+                return SLANG_OK;
+            newDesc.deviceType = DeviceType::Vulkan;
+            if (_createDevice(&newDesc, outDevice) == SLANG_OK)
+                return SLANG_OK;
+            return SLANG_FAIL;
+        }
+#elif SLANG_LINUX_FAMILY && !defined(__CYGWIN__)
         case DeviceType::Vulkan:
         {
             return createVKDevice(desc, outDevice);
         }
-#elif SLANG_LINUX_FAMILY && !defined(__CYGWIN__)
         case DeviceType::Default:
-        case DeviceType::Vulkan:
         {
-            return createVKDevice(desc, outDevice);
+            IDevice::Desc newDesc = *desc;
+            newDesc.deviceType = DeviceType::Vulkan;
+            if (_createDevice(&newDesc, outDevice) == SLANG_OK)
+                return SLANG_OK;
+            return SLANG_FAIL;
         }
 #endif
         case DeviceType::CUDA:
@@ -415,6 +441,8 @@ extern "C"
             return "OpenGL";
         case gfx::DeviceType::Vulkan:
             return "Vulkan";
+        case gfx::DeviceType::Metal:
+            return "Metal";
         case gfx::DeviceType::CPU:
             return "CPU";
         case gfx::DeviceType::CUDA:

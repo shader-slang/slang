@@ -3,6 +3,7 @@
 // Test enums defined nested in a struct work as expected. 
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 struct Outer
 {

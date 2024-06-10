@@ -212,7 +212,7 @@ struct LegalCallBuilder
     IRCall* m_call = nullptr;
 
         /// The legalized arguments for the call
-    List<IRInst*> m_args;
+    ShortList<IRInst*> m_args;
 
         /// Add a logical argument to the call (which may map to zero or mmore actual arguments)
     void addArg(
@@ -463,7 +463,7 @@ private:
             resultType,
             m_call->getCallee(),
             m_args.getCount(),
-            m_args.getBuffer());
+            m_args.getArrayView().getBuffer());
     }
 };
 
@@ -706,7 +706,7 @@ static LegalVal legalizeRetVal(
     return LegalVal();
 }
 
-static void _addVal(List<IRInst*>& rs, const LegalVal& legalVal)
+static void _addVal(ShortList<IRInst*>& rs, const LegalVal& legalVal)
 {
     switch (legalVal.flavor)
     {
@@ -733,7 +733,7 @@ static LegalVal legalizeUnconditionalBranch(
     ArrayView<LegalVal>        args,
     IRUnconditionalBranch*     branchInst)
 {
-    List<IRInst*> newArgs;
+    ShortList<IRInst*> newArgs;
     for (auto arg : args)
     {
         switch (arg.flavor)
@@ -757,7 +757,7 @@ static LegalVal legalizeUnconditionalBranch(
                 SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor.");
         }
     }
-    context->builder->emitIntrinsicInst(nullptr, branchInst->getOp(), newArgs.getCount(), newArgs.getBuffer());
+    context->builder->emitIntrinsicInst(nullptr, branchInst->getOp(), newArgs.getCount(), newArgs.getArrayView().getBuffer());
     return LegalVal();
 }
 
@@ -861,7 +861,7 @@ static LegalVal legalizeDebugVar(IRTypeLegalizationContext* context, LegalType t
 static LegalVal legalizeDebugValue(IRTypeLegalizationContext* context, LegalVal debugVar, LegalVal debugValue, IRDebugValue* originalInst)
 {
     // For now we just discard any special part and keep the ordinary part.
-    List<IRInst*> accessChain;
+    ShortList<IRInst*> accessChain;
     for (UInt i = 0; i < originalInst->getAccessChainCount(); i++)
     {
         accessChain.add(originalInst->getAccessChain(i));
@@ -873,7 +873,7 @@ static LegalVal legalizeDebugValue(IRTypeLegalizationContext* context, LegalVal 
             context->builder->emitDebugValue(
                 debugVar.getSimple(),
                 debugValue.getSimple(),
-                accessChain.getArrayView()));
+                accessChain.getArrayView().arrayView));
     case LegalType::Flavor::none:
         return LegalVal();
     case LegalType::Flavor::pair:
@@ -2112,8 +2112,8 @@ static LegalVal legalizeLocalVar(
         context->replacedInstructions.add(irLocalVar);
         return newVal;
     }
-    break;
     }
+    UNREACHABLE_RETURN(LegalVal());
 }
 
 static LegalVal legalizeParam(
@@ -2205,7 +2205,7 @@ static LegalVal legalizeInst(
     // value of each, and collect them in an array for subsequent use.
     //
     auto argCount = inst->getOperandCount();
-    List<LegalVal> legalArgs;
+    ShortList<LegalVal> legalArgs;
     //
     // Along the way we will also note whether there were any operands
     // with non-simple legalized values.
@@ -2277,7 +2277,7 @@ static LegalVal legalizeInst(
         context,
         inst,
         legalType,
-        legalArgs.getArrayView());
+        legalArgs.getArrayView().arrayView);
 
     if (legalVal.flavor == LegalVal::Flavor::simple)
     {
@@ -3539,6 +3539,7 @@ static LegalVal legalizeGlobalVar(
         }
         break;
     }
+    UNREACHABLE_RETURN(LegalVal());
 }
 
 static LegalVal legalizeGlobalParam(
@@ -3588,6 +3589,7 @@ static LegalVal legalizeGlobalParam(
         }
         break;
     }
+    UNREACHABLE_RETURN(LegalVal());
 }
 
 static constexpr int kHasBeenAddedOrProcessedScratchBitIndex = 0;

@@ -191,8 +191,9 @@ namespace Slang
 
         void propagateNonUniform(IRFunc* root, List<IRInst*>& workList)
         {
-            List<IRInst*>& nextWorkList = *module->getContainerPool().getList<IRInst>();
-            HashSet<IRInst*>& workListSet = *module->getContainerPool().getHashSet<IRInst>();
+            InstWorkList nextWorkList(module);
+            InstHashSet workListSet(module);
+
             auto addToWorkList = [&](IRInst* inst)
                 {
                     if (workListSet.add(inst))
@@ -387,7 +388,7 @@ namespace Slang
                                 addToWorkList(callInst);
                                 for (UInt argi = 0; argi < callInst->getArgCount(); argi++)
                                 {
-                                    if (auto ptrType = as<IRPtrTypeBase>(callInst->getArg(argi)->getDataType()))
+                                    if (as<IRPtrTypeBase>(callInst->getArg(argi)->getDataType()))
                                     {
                                         addToWorkList(callInst->getArg(argi));
                                         // Conservatively treat the entire composite at root addr as non-uniform.
@@ -404,14 +405,15 @@ namespace Slang
                         addToWorkList(user);
                     }
                 }
-                workList.swapWith(nextWorkList);
+                workList.swapWith(nextWorkList.getList());
                 nextWorkList.clear();
             }
         }
 
         void analyzeModule()
         {
-            List<IRInst*>& workList = *module->getContainerPool().getList<IRInst>();
+            InstWorkList workList(module);
+
             for (auto globalInst : module->getGlobalInsts())
             {
                 if (auto code = as<IRGlobalValueWithCode>(globalInst))
@@ -422,7 +424,7 @@ namespace Slang
                         nonUniformInsts.add(code);
                     }
                 }
-                if (auto entryPointDecor = globalInst->findDecoration<IREntryPointDecoration>())
+                if (globalInst->findDecoration<IREntryPointDecoration>())
                 {
                     auto func = as<IRFunc>(globalInst);
                     if (!func)
@@ -438,7 +440,7 @@ namespace Slang
                     }
                     currentCallee = func;
                     call = nullptr;
-                    propagateNonUniform(func, workList);
+                    propagateNonUniform(func, workList.getList());
                 }
             }
             workList.clear();
@@ -448,7 +450,7 @@ namespace Slang
 
         void eliminateAsDynamicUniformInst()
         {
-            List<IRInst*>& workList = *module->getContainerPool().getList<IRInst>();
+            InstWorkList workList(module);
             workList.add(module->getModuleInst());
             for (Index i = 0; i < workList.getCount(); i++)
             {

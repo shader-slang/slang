@@ -512,6 +512,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.fragmentShadingRateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.fragmentShadingRateFeatures;
 
+        // Compute Quad Derivative features
+        extendedFeatures.computeShaderDerivativesFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.computeShaderDerivativesFeatures;
+
         if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_2)
         {
             extendedFeatures.vulkan12Features.pNext = deviceFeatures2.pNext;
@@ -604,6 +608,13 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             extendedDynamicState,
             VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
             "extended-dynamic-states"
+        );
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.computeShaderDerivativesFeatures,
+            computeDerivativeGroupQuads,
+            VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
+            "compute-shader-derivative"
         );
 
         if (extendedFeatures.accelerationStructureFeatures.accelerationStructure

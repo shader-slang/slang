@@ -2592,7 +2592,6 @@ public vector<T,4> textureLod(__TextureImpl<
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureLod";
@@ -2612,7 +2611,6 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureLod";
@@ -2632,7 +2630,6 @@ public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureLod";
@@ -3225,7 +3222,6 @@ public vector<T,4> textureLodOffset(__TextureImpl<
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, constexpr int offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureLodOffset";
@@ -3246,7 +3242,6 @@ public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, conste
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, constexpr ivec2 offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureLodOffset";
@@ -3267,7 +3262,6 @@ public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, conste
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, constexpr int offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureLodOffset";
@@ -3293,7 +3287,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLod(Sampler1D<vector<T,N>> sampler, vec2 p, float lod)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLod";
@@ -3310,7 +3303,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLod(Sampler1D<vector<T,N>> sampler, vec4 p, float lod)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLod";
@@ -3331,7 +3323,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLod(Sampler2D<vector<T,N>> sampler, vec3 p, float lod)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLod";
@@ -3348,7 +3339,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLod(Sampler2D<vector<T,N>> sampler, vec4 p, float lod)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLod";
@@ -3369,7 +3359,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLod(Sampler3D<vector<T,N>> sampler, vec4 p, float lod)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLod";
@@ -3385,7 +3374,6 @@ public vector<T,4> textureProjLod(Sampler3D<vector<T,N>> sampler, vec4 p, float 
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLod(sampler1DShadow sampler, vec4 p, float lod)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLod";
@@ -3406,7 +3394,6 @@ public float textureProjLod(sampler1DShadow sampler, vec4 p, float lod)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLod(sampler2DShadow sampler, vec4 p, float lod)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLod";
@@ -3432,7 +3419,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler1D<vector<T,N>> sampler, vec2 p, float lod, constexpr int offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLodOffset";
@@ -3449,7 +3435,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler1D<vector<T,N>> sampler, vec4 p, float lod, constexpr int offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLodOffset";
@@ -3470,7 +3455,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler2D<vector<T,N>> sampler, vec3 p, float lod, constexpr ivec2 offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLodOffset";
@@ -3487,7 +3471,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler2D<vector<T,N>> sampler, vec4 p, float lod, constexpr ivec2 offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLodOffset";
@@ -3508,7 +3491,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler3D<vector<T,N>> sampler, vec4 p, float lod, constexpr ivec3 offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLodOffset";
@@ -3524,7 +3506,6 @@ public vector<T,4> textureProjLodOffset(Sampler3D<vector<T,N>> sampler, vec4 p, 
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLodOffset(sampler1DShadow sampler, vec4 p, float lod, constexpr int offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLodOffset";
@@ -3545,7 +3526,6 @@ public float textureProjLodOffset(sampler1DShadow sampler, vec4 p, float lod, co
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjLodOffset(sampler2DShadow sampler, vec4 p, float lod, constexpr ivec2 offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLodOffset";
@@ -3597,7 +3577,6 @@ public vector<T,4> textureGrad(__TextureImpl<
 [require(glsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureGrad";
@@ -3615,7 +3594,6 @@ public float textureGrad(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy
 [require(glsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler1DArrayShadow sampler, vec3 p, float dPdx, float dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureGrad";
@@ -3633,7 +3611,6 @@ public float textureGrad(sampler1DArrayShadow sampler, vec3 p, float dPdx, float
 [require(glsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureGrad";
@@ -3651,7 +3628,6 @@ public float textureGrad(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
 [require(glsl_spirv, texture_shadowlod_cube)]
 public float textureGrad(samplerCubeShadow sampler, vec4 p, vec3 dPdx, vec3 dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureGrad";
@@ -3669,7 +3645,6 @@ public float textureGrad(samplerCubeShadow sampler, vec4 p, vec3 dPdx, vec3 dPdy
 [require(glsl_spirv, texture_shadowlod)]
 public float textureGrad(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureGrad";
@@ -3717,7 +3692,6 @@ public vector<T,4> textureGradOffset(__TextureImpl<
 [require(glsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy, constexpr int offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureGradOffset";
@@ -3735,7 +3709,6 @@ public float textureGradOffset(sampler1DShadow sampler, vec3 p, float dPdx, floa
 [require(glsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureGradOffset";
@@ -3753,7 +3726,6 @@ public float textureGradOffset(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 
 [require(glsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler1DArrayShadow sampler, vec3 p, float dPdx, float dPdy, constexpr int offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureGradOffset";
@@ -3771,7 +3743,6 @@ public float textureGradOffset(sampler1DArrayShadow sampler, vec3 p, float dPdx,
 [require(glsl_spirv, texture_shadowlod)]
 public float textureGradOffset(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureGradOffset";
@@ -3794,7 +3765,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler1D<vector<T,N>> sampler, vec2 p, float dPdx, float dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGrad";
@@ -3811,7 +3781,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler1D<vector<T,N>> sampler, vec4 p, float dPdx, float dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGrad";
@@ -3832,7 +3801,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler2D<vector<T,N>> sampler, vec3 p, vec2 dPdx, vec2 dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGrad";
@@ -3849,7 +3817,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler2D<vector<T,N>> sampler, vec4 p, vec2 dPdx, vec2 dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGrad";
@@ -3870,7 +3837,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 dPdx, vec3 dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGrad";
@@ -3886,7 +3852,6 @@ public vector<T,4> textureProjGrad(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 
 [require(glsl_spirv, texture_shadowlod)]
 public float textureProjGrad(sampler1DShadow sampler, vec4 p, float dPdx, float dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGrad";
@@ -3907,7 +3872,6 @@ public float textureProjGrad(sampler1DShadow sampler, vec4 p, float dPdx, float 
 [require(glsl_spirv, texture_shadowlod)]
 public float textureProjGrad(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGrad";
@@ -3933,7 +3897,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler1D<vector<T,N>> sampler, vec2 p, float dPdx, float dPdy, constexpr int offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGradOffset";
@@ -3950,7 +3913,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler1D<vector<T,N>> sampler, vec4 p, float dPdx, float dPdy, constexpr int offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGradOffset";
@@ -3971,7 +3933,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler2D<vector<T,N>> sampler, vec3 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGradOffset";
@@ -3988,7 +3949,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler2D<vector<T,N>> sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGradOffset";
@@ -4009,7 +3969,6 @@ __generic<T:__BuiltinFloatingPointType, let N:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 dPdx, vec3 dPdy, constexpr ivec3 offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGradOffset";
@@ -4025,7 +3984,6 @@ public vector<T,4> textureProjGradOffset(Sampler3D<vector<T,N>> sampler, vec4 p,
 [require(glsl_spirv, texture_shadowlod)]
 public float textureProjGradOffset(sampler1DShadow sampler, vec4 p, float dPdx, float dPdy, constexpr int offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGradOffset";
@@ -4046,7 +4004,6 @@ public float textureProjGradOffset(sampler1DShadow sampler, vec4 p, float dPdx, 
 [require(glsl_spirv, texture_shadowlod)]
 public float textureProjGradOffset(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
-    __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGradOffset";

@@ -118,6 +118,19 @@ struct IRTargetDecoration : IRTargetSpecificDefinitionDecoration
     IR_LEAF_ISA(TargetDecoration)
 };
 
+struct IRTargetSystemValueDecoration : IRDecoration
+{
+    enum { kOp = kIROp_TargetSystemValueDecoration };
+    IR_LEAF_ISA(TargetSystemValueDecoration)
+
+    IRStringLit* getSemanticOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getSemantic()
+    {
+        return getSemanticOperand()->getStringSlice();
+    }
+};
+
 struct IRTargetIntrinsicDecoration : IRTargetSpecificDefinitionDecoration
 {
     enum { kOp = kIROp_TargetIntrinsicDecoration };
@@ -348,6 +361,18 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
     IntegerLiteralValue getSPIRVVersion()
     {
         return getSPIRVVersionOperand()->value.intVal;
+    }
+};
+
+struct IRRequireCapabilityAtomDecoration : IRDecoration
+{
+    enum { kOp = kIROp_RequireCapabilityAtomDecoration };
+    IR_LEAF_ISA(RequireCapabilityAtomDecoration)
+
+    IRConstant* getCapabilityAtomOperand() { return cast<IRConstant>(getOperand(0)); }
+    CapabilityName getAtom()
+    {
+        return (CapabilityName)getCapabilityAtomOperand()->value.intVal;
     }
 };
 
@@ -3579,6 +3604,11 @@ public:
         return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
     }
 
+    IRMetalMeshGridPropertiesType* getMetalMeshGridPropertiesType()
+    {
+        return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
+    }
+
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
     IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex = nullptr);
@@ -3678,6 +3708,13 @@ public:
         IRType*                 type,
         IRInst*                 func,
         List<IRInst*> const&    args)
+    {
+        return emitCallInst(type, func, args.getCount(), args.getBuffer());
+    }
+    IRCall* emitCallInst(
+        IRType* type,
+        IRInst* func,
+        ArrayView<IRInst*> args)
     {
         return emitCallInst(type, func, args.getCount(), args.getBuffer());
     }
@@ -4327,6 +4364,12 @@ public:
 
     void addHighLevelDeclDecoration(IRInst* value, Decl* decl);
 
+    IRDecoration* addTargetSystemValueDecoration(IRInst* value, UnownedStringSlice sysValName, UInt index = 0)
+    {
+        IRInst* operands[] = { getStringValue(sysValName), getIntValue(getIntType(), index)};
+        return addDecoration(value, kIROp_TargetSystemValueDecoration, operands, SLANG_COUNT_OF(operands));
+    }
+
 //    void addLayoutDecoration(IRInst* value, Layout* layout);
     void addLayoutDecoration(IRInst* value, IRLayout* layout);
 
@@ -4520,6 +4563,11 @@ public:
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
         addDecoration(value, kIROp_RequireCUDASMVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
+    }
+
+    void addRequireCapabilityAtomDecoration(IRInst* value, CapabilityName atom)
+    {
+        addDecoration(value, kIROp_RequireCapabilityAtomDecoration, getIntValue(getUIntType(), IRIntegerValue(atom)));
     }
 
     void addPatchConstantFuncDecoration(IRInst* value, IRInst* patchConstantFunc)

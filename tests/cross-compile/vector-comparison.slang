@@ -1,9 +1,16 @@
 // vector-comparison.slang
 
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment -Wno-use-of-non-short-circuiting-operator
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry main -stage fragment -Wno-use-of-non-short-circuiting-operator
 
 // This test ensures that we cross-compile vector comparison operators
 // correctly to GLSL
+
+// CHECK: OpFOrdEqual %v4bool
+// CHECK: OpFOrdLessThan %v4bool
+// CHECK: OpFOrdGreaterThan %v4bool
+// CHECK: OpFOrdLessThanEqual %v4bool
+// CHECK: OpFOrdGreaterThanEqual %v4bool
+// CHECK: OpFUnordNotEqual %v4bool
 
 struct Param
 {
