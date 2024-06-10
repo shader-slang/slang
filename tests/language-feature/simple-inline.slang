@@ -3,7 +3,6 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 [ForceInline]
 int test(int r)

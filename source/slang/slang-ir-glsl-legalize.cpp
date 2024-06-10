@@ -852,6 +852,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // float[4] on glsl
         requiredType = builder->getArrayType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 4));
     }
+    else if (semanticName == "sv_insidetessfactor")
+    {
+        name = "gl_TessLevelInner";
+
+        // float[2] on glsl
+        requiredType = builder->getArrayType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 2));
+    }
     else if (semanticName == "sv_vertexid")
     {
         // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
@@ -1071,12 +1078,30 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         &systemValueInfoStorage);
 
     IRType* type = inType;
+    IRType* peeledRequiredType = nullptr;
 
     // A system-value semantic might end up needing to override the type
     // that the user specified.
     if( systemValueInfo && systemValueInfo->requiredType )
     {
         type = systemValueInfo->requiredType;
+        peeledRequiredType = type;
+        // Unpeel `type` using declarators so that it matches `inType`.
+        for (auto dd = declarator; dd; dd = dd->next)
+        {
+            switch (dd->flavor)
+            {
+            case GlobalVaryingDeclarator::Flavor::array:
+                {
+                    if (auto arrayType = as<IRArrayTypeBase>(type))
+                    {
+                        type = arrayType->getElementType();
+                        peeledRequiredType = type;
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     // If we have a declarator, we just use the normal logic, as that seems to work correctly
@@ -1237,16 +1262,14 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
     if (systemValueInfo)
     {
-        if (auto fromType = systemValueInfo->requiredType)
+        if (systemValueInfo->requiredType)
         {
             // We may need to adapt from the declared type to/from
             // the actual type of the GLSL global.
-            auto toType = inType;
-
-            if (!isTypeEqual(fromType, toType))
+            if (!isTypeEqual(peeledRequiredType, inType))
             {
                 RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter = new ScalarizedTypeAdapterValImpl;
-                typeAdapter->actualType = systemValueInfo->requiredType;
+                typeAdapter->actualType = peeledRequiredType;
                 typeAdapter->pretendType = inType;
                 typeAdapter->val = val;
 
