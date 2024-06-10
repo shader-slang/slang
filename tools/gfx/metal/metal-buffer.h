@@ -17,7 +17,7 @@ class BufferResourceImpl : public BufferResource
 public:
     typedef BufferResource Parent;
 
-    RefPtr<DeviceImpl> m_device;
+    BreakableReference<DeviceImpl> m_device;
     NS::SharedPtr<MTL::Buffer> m_buffer;
 
     BufferResourceImpl(const IBufferResource::Desc& desc, DeviceImpl* device);

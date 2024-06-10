@@ -28,11 +28,12 @@ public:
     WindowHandle m_windowHandle;
     CA::MetalLayer* m_metalLayer = nullptr;
     ShortList<RefPtr<TextureResourceImpl>> m_images;
-    NS::SharedPtr<MTL::Drawable> m_currentDrawable;
+    NS::SharedPtr<CA::MetalDrawable> m_currentDrawable;
     Index m_currentImageIndex = -1;
     MTL::PixelFormat m_metalFormat = MTL::PixelFormat::PixelFormatInvalid;
 
     void getWindowSize(int& widthOut, int& heightOut) const;
+    void createImages();
 
 public:
     ~SwapchainImpl();
