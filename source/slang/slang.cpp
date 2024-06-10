@@ -1797,7 +1797,8 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     CapabilitySet targetCap = CapabilitySet(atoms);
 
-    targetCap.join(profileCaps);
+    if (!targetCap.isIncompatibleWith(profileCaps))
+        targetCap.join(profileCaps);
     
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
