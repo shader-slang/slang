@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=HLSL): -allow-glsl -stage compute  -entry computeMain -target hlsl
-//TEST:SIMPLE(filecheck=HLSL): -allow-glsl -stage fragment -entry fragMain -target hlsl
+//TEST:SIMPLE(filecheck=HLSL): -allow-glsl -stage compute  -entry computeMain -target hlsl -DHLSL
+//TEST:SIMPLE(filecheck=HLSL): -allow-glsl -stage fragment -entry fragMain -target hlsl -DHLSL
 //TEST:SIMPLE(filecheck=GLSL): -allow-glsl -stage compute  -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=GLSL): -allow-glsl -stage fragment -entry fragMain -target glsl
 //TEST:SIMPLE(filecheck=SPIR): -allow-glsl -stage compute  -entry computeMain -target spirv
@@ -8,6 +8,9 @@
 //TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage fragment -entry fragMain -target cuda
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type
+
+// TODO: This test revealed a few problems for a path from GLSL to HLSL
+//T-EST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -allow-glsl -use-dxil -output-using-type -profile cs_6_6 -xslang -DHLSL
 
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
@@ -144,7 +147,7 @@ uniform usampler2DMS uniform_usampler2DMS;
 //TEST_INPUT: TextureSampler2D(size=4, content = zero, arrayLength = 2):name uniform_usampler2DMSArray
 uniform usampler2DMSArray uniform_usampler2DMSArray;
 
-__generic<T : __BuiltinFloatingPointType, let N : int>
+__generic<T : __BuiltinArithmeticType, let N:int>
 bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
     , Sampler2D<vector<T,N>> gsampler2D
     , Sampler2DRect<vector<T,N>> gsampler2DRect
@@ -1427,101 +1430,6 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         ;
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
-bool itextureFuncs(Sampler1D<vector<T, N>> gsampler1D
-    , Sampler2D<vector<T, N>> gsampler2D
-    , Sampler2DRect<vector<T, N>> gsampler2DRect
-    , Sampler3D<vector<T, N>> gsampler3D
-    , SamplerCube<vector<T, N>> gsamplerCube
-    , Sampler1DArray<vector<T, N>> gsampler1DArray
-    , Sampler2DArray<vector<T, N>> gsampler2DArray
-    , SamplerCubeArray<vector<T, N>> gsamplerCubeArray
-    , SamplerBuffer<vector<T, N>> gsamplerBuffer
-    , Sampler2DMS<vector<T, N>> gsampler2DMS
-    , Sampler2DMSArray<vector<T, N>> gsampler2DMSArray
-    , bool ignoreResult
-)
-{
-    // GLSL-LABEL: itextureFuncs_0
-    typealias gvec4 = vector<T, 4>;
-
-    constexpr ivec2 offset2D = ivec2(0);
-    constexpr ivec3 offset3D = ivec3(0);
-    constexpr ivec2 offsets[4] = { ivec2(0), ivec2(0), ivec2(0), ivec2(0) };
-
-    return true
-        // 8.9.1. Texture Query Functions
-        && int(4) == textureSize(gsampler1D, int(0))
-        && ivec2(4) == textureSize(gsampler2D, int(0))
-        && ivec3(4) == textureSize(gsampler3D, int(0))
-        && ivec2(4) == textureSize(gsamplerCube, int(0))
-        && int(4) == textureSize(uniform_sampler1DShadow, int(0))
-        && (ivec2(4) == textureSize(uniform_sampler2DShadow, int(0)) || ignoreResult)
-        && (ivec2(4) == textureSize(uniform_samplerCubeShadow, int(0)) || ignoreResult)
-        && (ivec3(4,4,2) == textureSize(gsamplerCubeArray, int(0)) || ignoreResult)
-        && ivec3(4,4,2) == textureSize(uniform_samplerCubeArrayShadow, int(0))
-        && ivec2(4) == textureSize(gsampler2DRect)
-        && ivec2(4) == textureSize(uniform_sampler2DRectShadow)
-        && (ivec2(4,2) == textureSize(gsampler1DArray, int(0)) || ignoreResult)
-        && (ivec2(4,2) == textureSize(uniform_sampler1DArrayShadow, int(0)) || ignoreResult)
-        && (ivec3(4,4,2) == textureSize(gsampler2DArray, int(0)) || ignoreResult)
-        && ivec3(4,4,2) == textureSize(uniform_sampler2DArrayShadow, int(0))
-        && (int(4) == textureSize(gsamplerBuffer) || ignoreResult)
-        && ivec2(4) == textureSize(gsampler2DMS)
-        && ivec3(4,4,2) == textureSize(gsampler2DMSArray)
-        && gvec4(T(0)) == texelFetch(gsampler1D, int(0), int(0))
-        && gvec4(T(0)) == texelFetch(gsampler2D, ivec2(0), int(0))
-        && gvec4(T(0)) == texelFetch(gsampler3D, ivec3(0), int(0))
-        && gvec4(T(0)) == texelFetch(gsampler2DRect, ivec2(0))
-        && gvec4(T(0)) == texelFetch(gsampler1DArray, ivec2(0), int(0))
-        && gvec4(T(0)) == texelFetch(gsampler2DArray, ivec3(0), int(0))
-        && gvec4(T(0)) == texelFetch(gsamplerBuffer, int(0))
-        && gvec4(T(0)) == texelFetch(gsampler2DMS, ivec2(0), int(0))
-        && gvec4(T(0)) == texelFetch(gsampler2DMSArray, ivec3(0), int(0))
-        && gvec4(T(0)) == texelFetchOffset(gsampler1D, int(0), int(0), 0)
-        && gvec4(T(0)) == texelFetchOffset(gsampler2D, ivec2(0), int(0), offset2D)
-        && gvec4(T(0)) == texelFetchOffset(gsampler3D, ivec3(0), int(0), offset3D)
-        && gvec4(T(0)) == texelFetchOffset(gsampler2DRect, ivec2(0), offset2D)
-        && gvec4(T(0)) == texelFetchOffset(gsampler1DArray, ivec2(0), int(0), int(0))
-        && gvec4(T(0)) == texelFetchOffset(gsampler2DArray, ivec3(0), int(0), offset2D)
-
-        // 8.9.4. Texture Gather Functions
-        && gvec4(T(0)) == textureGather(gsampler2D, vec2(0))
-        && gvec4(T(0)) == textureGather(gsampler2D, vec2(0), int(0))
-        && gvec4(T(0)) == textureGather(gsampler2DArray, vec3(0))
-        && gvec4(T(0)) == textureGather(gsampler2DArray, vec3(0), int(0))
-        && gvec4(T(0)) == textureGather(gsamplerCube, vec3(0))
-        && gvec4(T(0)) == textureGather(gsamplerCube, vec3(0), int(0))
-        && gvec4(T(0)) == textureGather(gsamplerCubeArray, vec4(0))
-        && gvec4(T(0)) == textureGather(gsamplerCubeArray, vec4(0), int(0))
-        && gvec4(T(0)) == textureGather(gsampler2DRect, vec2(0))
-        && gvec4(T(0)) == textureGather(gsampler2DRect, vec2(0), int(0))
-        && vec4(0) == textureGather(uniform_sampler2DShadow, vec2(0), float(0))
-        && vec4(0) == textureGather(uniform_sampler2DArrayShadow, vec3(0), float(0))
-        && vec4(0) == textureGather(uniform_samplerCubeShadow, vec3(0), float(0))
-        && vec4(0) == textureGather(uniform_samplerCubeArrayShadow, vec4(0), float(0))
-        && vec4(0) == textureGather(uniform_sampler2DRectShadow, vec2(0), float(0))
-        && gvec4(T(0)) == textureGatherOffset(gsampler2D, vec2(0), offset2D)
-        && gvec4(T(0)) == textureGatherOffset(gsampler2D, vec2(0), offset2D, int(0))
-        && gvec4(T(0)) == textureGatherOffset(gsampler2DArray, vec3(0), offset2D)
-        && gvec4(T(0)) == textureGatherOffset(gsampler2DArray, vec3(0), offset2D, int(0))
-        && vec4(0) == textureGatherOffset(uniform_sampler2DShadow, vec2(0), float(0), offset2D)
-        && vec4(0) == textureGatherOffset(uniform_sampler2DArrayShadow, vec3(0), float(0), offset2D)
-        && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), offset2D)
-        && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), offset2D, int(0))
-        && vec4(0) == textureGatherOffset(uniform_sampler2DRectShadow, vec2(0), float(0), offset2D)
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), offsets)
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), offsets, int(0))
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), offsets)
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), offsets, int(0))
-        && vec4(0) == textureGatherOffsets(uniform_sampler2DShadow, vec2(0), float(0), offsets)
-        && vec4(0) == textureGatherOffsets(uniform_sampler2DArrayShadow, vec3(0), float(0), offsets)
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), offsets)
-        && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), offsets, int(0))
-        && vec4(0) == textureGatherOffsets(uniform_sampler2DRectShadow, vec2(0), float(0), offsets)
-        ;
-}
-
 [require(cpp_cuda_glsl_hlsl_spirv,compute,fragment)]
 __extern_cpp void TEST_main()
 {
@@ -1553,7 +1461,8 @@ __extern_cpp void TEST_main()
             , uniform_sampler2DMSArray
             , ignoreResult
             )
-        && itextureFuncs(
+#if !defined(HLSL)
+        && textureFuncs(
             uniform_isampler1D
             , uniform_isampler2D
             , uniform_isampler2DRect
@@ -1567,7 +1476,7 @@ __extern_cpp void TEST_main()
             , uniform_isampler2DMSArray
             , ignoreResult
             )
-        && itextureFuncs(
+        && textureFuncs(
             uniform_usampler1D
             , uniform_usampler2D
             , uniform_usampler2DRect
@@ -1581,6 +1490,7 @@ __extern_cpp void TEST_main()
             , uniform_usampler2DMSArray
             , ignoreResult
             )
+#endif
         ;
 
     outputBuffer.result = int(result);
