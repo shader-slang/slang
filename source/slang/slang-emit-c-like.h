@@ -591,8 +591,11 @@ public:
     // to use for it when emitting code.
     Dictionary<IRInst*, String> m_mapInstToName;
 
-    HashSet<String> m_requiredAfterRaw;
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
+    struct RequiredAfter
+    {
+        String requireComputeDerivatives;
+    }m_requiredAfter;
 };
 
 }

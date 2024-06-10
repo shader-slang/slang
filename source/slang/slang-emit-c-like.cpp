@@ -131,10 +131,10 @@ void CLikeSourceEmitter::emitPreModuleImpl()
     }
 }
 void CLikeSourceEmitter::emitPostModuleImpl()
-{
-    for (auto interlude : m_requiredAfterRaw)
+{   
+    if(m_requiredAfter.requireComputeDerivatives.getLength() > 0)
     {
-        m_writer->emit(interlude);
+        m_writer->emit(m_requiredAfter.requireComputeDerivatives);
         m_writer->emit("\n");
     }
 }
