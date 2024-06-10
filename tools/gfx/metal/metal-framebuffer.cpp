@@ -12,17 +12,20 @@ using namespace Slang;
 namespace metal
 {
 
-FramebufferLayoutImpl::~FramebufferLayoutImpl()
+Result FramebufferLayoutImpl::init(const IFramebufferLayout::Desc& desc)
 {
-    //m_renderPass->release();
-}
-
-Result FramebufferLayoutImpl::init(DeviceImpl* device, const IFramebufferLayout::Desc& desc)
-{
-    // Metal doesn't have a notion of Framebuffers or FramebufferLayouts per se.
-    // We simply stash the desc and use it when creating the (convenience) Framebuffer
-    m_device = device;
-    m_desc = desc;
+    for (Index i = 0; i < desc.renderTargetCount; ++i)
+    {
+        m_renderTargets.add(desc.renderTargets[i]);
+    }
+    if (desc.depthStencil)
+    {
+        m_depthStencil = *desc.depthStencil;
+    }
+    else
+    {
+        m_depthStencil = {};
+    }
     return SLANG_OK;
 }
 

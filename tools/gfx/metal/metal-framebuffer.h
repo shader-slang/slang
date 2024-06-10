@@ -20,20 +20,11 @@ enum
 class FramebufferLayoutImpl : public FramebufferLayoutBase
 {
 public:
-    RefPtr<DeviceImpl> m_device;
-    Desc m_desc;
-#if 0
-    MTL::RenderPassDescriptor* m_renderPass = nullptr;
-    Array<MTL::RenderPassColorAttachmentDescriptor*, kMaxTargets> m_targetDescs;
-    MTL::RenderPassDepthAttachmentDescriptor* m_depthAttachmentDesc = nullptr;
-    MTL::RenderPassStencilAttachmentDescriptor* m_stencilAttachmentDesc = nullptr;
-    bool m_hasDepthStencilTarget = false;
-    uint32_t m_renderTargetCount = 0;
-#endif
+    List<IFramebufferLayout::TargetLayout> m_renderTargets;
+    IFramebufferLayout::TargetLayout m_depthStencil;
 
 public:
-    ~FramebufferLayoutImpl();
-    Result init(DeviceImpl* device, const IFramebufferLayout::Desc& desc);
+    Result init(const IFramebufferLayout::Desc& desc);
 };
 
 class FramebufferImpl : public FramebufferBase

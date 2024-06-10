@@ -154,9 +154,9 @@ Result DeviceImpl::createFramebufferLayout(const IFramebufferLayout::Desc& desc,
 {
     AUTORELEASEPOOL
 
-    RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl;
-    SLANG_RETURN_ON_FAIL(layout->init(this, desc));
-    returnComPtr(outLayout, layout);
+    RefPtr<FramebufferLayoutImpl> layoutImpl = new FramebufferLayoutImpl;
+    SLANG_RETURN_ON_FAIL(layoutImpl->init(desc));
+    returnComPtr(outLayout, layoutImpl);
     return SLANG_OK;
 }
 
