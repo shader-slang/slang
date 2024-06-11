@@ -3190,7 +3190,10 @@ struct IRSPIRVAsmInst : IRInst
 
     IRSPIRVAsmOperand* getOpcodeOperand()
     {
-        const auto opcodeOperand = cast<IRSPIRVAsmOperand>(getOperand(0));
+        auto operand = getOperand(0);
+        if (auto globalRef = as<IRGlobalValueRef>(operand))
+            operand = globalRef->getValue();
+        const auto opcodeOperand = cast<IRSPIRVAsmOperand>(operand);
         // This must be either:
         // - An enum, such as 'OpNop'
         // - The __truncate pseudo-instruction
