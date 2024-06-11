@@ -189,7 +189,53 @@ SlangResult DeviceImpl::readTextureResource(
 {
     AUTORELEASEPOOL
 
+    TextureResourceImpl* textureImpl = static_cast<TextureResourceImpl*>(texture);
+
+    if (textureImpl->getDesc()->sampleDesc.numSamples > 1)
+    {
     return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+    NS::SharedPtr<MTL::Texture> srcTexture = textureImpl->m_texture;
+
+    const ITextureResource::Desc& desc = *textureImpl->getDesc();
+    Count width = Math::Max(desc.size.width, 1);
+    Count height = Math::Max(desc.size.height, 1);
+    Count depth = Math::Max(desc.size.depth, 1);
+    FormatInfo formatInfo;
+    gfxGetFormatInfo(desc.format, &formatInfo);
+    Size bytesPerPixel = formatInfo.blockSizeInBytes / formatInfo.pixelsPerBlock;
+    Size bytesPerRow = Size(width) * bytesPerPixel;
+    Size bytesPerSlice = Size(height) * bytesPerRow;
+    Size bufferSize = Size(depth) * bytesPerSlice;
+    if (outRowPitch)
+        *outRowPitch = bytesPerRow;
+    if (outPixelSize)
+        *outPixelSize = bytesPerPixel;
+
+    // create staging buffer
+    NS::SharedPtr<MTL::Buffer> stagingBuffer = NS::TransferPtr(m_device->newBuffer(bufferSize, MTL::StorageModeShared));
+    if (!stagingBuffer)
+    {
+        return SLANG_FAIL;
+    }
+
+    MTL::CommandBuffer* commandBuffer = m_commandQueue->commandBuffer();
+    MTL::BlitCommandEncoder* encoder = commandBuffer->blitCommandEncoder();
+    encoder->copyFromTexture(
+        srcTexture.get(), 0, 0, MTL::Origin(0, 0, 0), MTL::Size(width, height, depth),
+        stagingBuffer.get(), 0, bytesPerRow, bytesPerSlice);
+    encoder->endEncoding();
+    commandBuffer->commit();
+    commandBuffer->waitUntilCompleted();
+
+    List<uint8_t> blobData;
+    blobData.setCount(bufferSize);
+    ::memcpy(blobData.getBuffer(), stagingBuffer->contents(), bufferSize);
+    auto blob = ListBlob::moveCreate(blobData);
+
+    returnComPtr(outBlob, blob);
+    return SLANG_OK;
 }
 
 SlangResult DeviceImpl::readBufferResource(

@@ -2536,12 +2536,27 @@ namespace Slang
                 if (allTargetsCUDARelated && targets.getCount() > 0)
                     continue;
 
-                auto numThreadsAttr = funcDecl->findModifier<NumThreadsAttribute>();
-                if (numThreadsAttr)
-                    profile.setStage(Stage::Compute);
-                else
+                bool canDetermineStage = false;
+                for (auto modifier : funcDecl->modifiers)
+                {
+                    if (as<NumThreadsAttribute>(modifier))
+                    {
+                        if (funcDecl->findModifier<OutputTopologyAttribute>())
+                            profile.setStage(Stage::Mesh);
+                        else
+                            profile.setStage(Stage::Compute);
+                        canDetermineStage = true;
+                        break;
+                    }
+                    else if (as<PatchConstantFuncAttribute>(modifier))
+                    {
+                        profile.setStage(Stage::Hull);
+                        canDetermineStage = true;
+                        break;
+                    }
+                }
+                if (!canDetermineStage)
                     continue;
-                
             }
 
             RefPtr<EntryPoint> entryPoint = EntryPoint::create(

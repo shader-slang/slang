@@ -1,4 +1,4 @@
-// metal-gfence.cpp
+// metal-fence.cpp
 #include "metal-fence.h"
 #include "metal-device.h"
 

@@ -552,13 +552,17 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_UInt64Type:
         case kIROp_FloatType:
         case kIROp_DoubleType:
-        case kIROp_Int16Type:
-        case kIROp_UInt16Type:
         case kIROp_HalfType:
         {
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
+        case kIROp_Int16Type:
+            m_writer->emit("short");
+            return;
+        case kIROp_UInt16Type:
+            m_writer->emit("ushort");
+            return;
         case kIROp_IntPtrType:
             m_writer->emit("int64_t");
             return;
