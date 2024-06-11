@@ -5,11 +5,6 @@
 // related to computing linearized inheritance
 // information for types and decalrations.
 
-//#include "slang-lookup.h"
-//#include "slang-syntax.h"
-//#include "slang-ast-synthesis.h"
-//#include <limits>
-
 namespace Slang
 {
     InheritanceInfo SharedSemanticsContext::getInheritanceInfo(Type* type)
@@ -17,7 +12,12 @@ namespace Slang
         // We cache the computed inheritance information for types,
         // and re-use that information whenever possible.
 
-        if(auto found = m_mapTypeToInheritanceInfo.tryGetValue(type))
+        // DeclRefTypes will have their inheritance info cached in m_mapDeclRefToInheritanceInfo.
+        if (auto declRefType = as<DeclRefType>(type))
+            return _getInheritanceInfo(declRefType->getDeclRef(), declRefType);
+        
+        // Non ordinary types are cached on m_mapTypeToInheritanceInfo.
+        if (auto found = m_mapTypeToInheritanceInfo.tryGetValue(type))
             return *found;
 
         // Note: we install a null pointer into the dictionary to act
@@ -31,9 +31,6 @@ namespace Slang
 
         auto info = _calcInheritanceInfo(type);
         m_mapTypeToInheritanceInfo[type] = info;
-
-        getSession()->m_typeDictionarySize = Math::Max(
-            getSession()->m_typeDictionarySize, (int)m_mapTypeToInheritanceInfo.getCount());
 
         return info;
     }
@@ -67,6 +64,9 @@ namespace Slang
 
         auto info = _calcInheritanceInfo(declRef, declRefType);
         m_mapDeclRefToInheritanceInfo[declRef] = info;
+
+        getSession()->m_typeDictionarySize = Math::Max(
+            getSession()->m_typeDictionarySize, (int)m_mapDeclRefToInheritanceInfo.getCount());
 
         return info;
     }

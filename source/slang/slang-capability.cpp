@@ -25,11 +25,11 @@ enum class CapabilityNameFlavor : int32_t
     Concrete,
 
     // An abstract capability represents a class of feature
-    // where multiple different implementations might be possible.
-    // For example, "ray tracing" might be an abstract feature
-    // that a function can require, but a specific target will
-    // only be able to provide that abstract feature via some
-    // specific concrete feature (e.g., `GL_EXT_ray_tracing`).
+    // where multiple distinct implementations might be possible.
+    // 'raytracing' may be allowed with a 'raygen' "stage", but 
+    // not a 'vertex' "stage"
+    // For more information (and a clearer description of the rules), 
+    // read `slang-capabilities.capdef`
     Abstract,
 
     // An alias capability atom is one that is exactly equivalent
@@ -60,23 +60,11 @@ struct CapabilityAtomInfo
     /// Ranking to use when deciding if this atom is a "better" one to select.
     uint32_t                    rank;
 
-    /// Canonical representation in the form of disjunction-of-conjunction of atoms.
-    ArrayView<ArrayView<CapabilityName>> canonicalRepresentation;
+    /// Canonical representation of atoms in the form of disjoint conjunctions of atoms.
+    ArrayView<CapabilityAtomSet*> canonicalRepresentation;
 };
 
 #include "slang-generated-capability-defs-impl.h"
-
-static UInt asAtomUInt(CapabilityName name)
-{
-    SLANG_ASSERT((CapabilityAtom)name < CapabilityAtom::Count);
-    return (UInt)((CapabilityAtom)name);
-}
-
-static CapabilityAtom asAtom(CapabilityName name)
-{
-    SLANG_ASSERT((CapabilityAtom)name < CapabilityAtom::Count);
-    return (CapabilityAtom)name;
-}
 
 /// Get the extended information structure for the given capability `atom`
 static CapabilityAtomInfo const& _getInfo(CapabilityName atom)
@@ -112,6 +100,20 @@ bool isDirectChildOfAbstractAtom(CapabilityAtom name)
     return _getInfo(name).abstractBase != CapabilityName::Invalid;
 }
 
+bool isTargetVersionAtom(CapabilityName name)
+{
+    if (name >= CapabilityName::spirv_1_0 && name <= getLatestSpirvAtom())
+        return true;
+    if (name >= CapabilityName::metallib_2_3 && name <= getLatestMetalAtom())
+        return true;
+    return false;
+}
+
+bool isSpirvExtensionAtom(CapabilityName name)
+{
+    return UnownedStringSlice(_getInfo(name).name).startsWith("SPV_");
+}
+
 bool lookupCapabilityName(const UnownedStringSlice& str, CapabilityName& value);
 
 CapabilityName findCapabilityName(UnownedStringSlice const& name)
@@ -119,6 +121,30 @@ CapabilityName findCapabilityName(UnownedStringSlice const& name)
     CapabilityName result{};
     if (!lookupCapabilityName(name, result))
         return CapabilityName::Invalid;
+    return result;
+}
+
+CapabilityName getLatestSpirvAtom()
+{
+    static CapabilityName result = CapabilityName::Invalid;
+    if (result == CapabilityName::Invalid)
+    {
+        CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
+        auto latestSpirvCapSetElements = latestSpirvCapSet.getAtomSets()->getElements<CapabilityAtom>();
+        result = (CapabilityName)latestSpirvCapSetElements[latestSpirvCapSetElements.getCount() - 2]; //-1 gets shader stage
+    }
+    return result;
+}
+
+CapabilityName getLatestMetalAtom()
+{
+    static CapabilityName result = CapabilityName::Invalid;
+    if (result == CapabilityName::Invalid)
+    {
+        CapabilitySet latestMetalCapSet = CapabilitySet(CapabilityName::metallib_latest);
+        auto latestMetalCapSetElements = latestMetalCapSet.getAtomSets()->getElements<CapabilityAtom>();
+        result = (CapabilityName)latestMetalCapSetElements[latestMetalCapSetElements.getCount() - 2]; //-1 gets shader stage
+    }
     return result;
 }
 
@@ -132,9 +158,8 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
     const auto& info = kCapabilityNameInfos[Index(atom)];
     for (auto cur : info.canonicalRepresentation)
     {
-        for (auto cbase : cur)
-            if (asAtom(cbase) == base)
-                return true;
+        if (cur->contains((UInt)base))
+            return true;
     }
 
     return false;
@@ -142,111 +167,106 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
 
 //// CapabiltySet
 
-void CapabilitySet::addToTargetCapabilityWithValidUIntSetAndTargetAndStage(CapabilityName target, CapabilityName stage, CapabilityAtomSet setToAdd)
+CapabilityAtom getTargetAtomInSet(const CapabilityAtomSet& atomSet)
 {
-    SLANG_ASSERT(target != CapabilityName::Invalid && stage != CapabilityName::Invalid);
-    auto stageAtom = asAtom(stage);
-    auto targetAtom = asAtom(target);
-    CapabilityTargetSet& targetSet = m_targetSets[targetAtom];
-    targetSet.target = targetAtom;
-    targetSet.shaderStageSets.reserve(kCapabilityStageCount);
-
-    auto& localStageSets = targetSet.shaderStageSets[stageAtom];
-    localStageSets.stage = stageAtom;
-
-    localStageSets.addNewSet(std::move(setToAdd));
+    auto targetSet = getAtomSetOfTargets();
+    CapabilityAtomSet out;
+    CapabilityAtomSet::calcIntersection(out, targetSet, atomSet);
+    auto iter = out.begin();
+    if (iter == out.end())
+        return CapabilityAtom::Invalid;
+    return (CapabilityAtom)*iter;
 }
 
-void CapabilitySet::addToTargetCapabilityWithTargetAndStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation)
+CapabilityAtom getStageAtomInSet(const CapabilityAtomSet& atomSet)
 {
-    // If no provided 'stage', set the capability as a target of all stages
-    if (stage == CapabilityName::Invalid)
+    auto stageSet = getAtomSetOfStages();
+    CapabilityAtomSet out;
+    CapabilityAtomSet::calcIntersection(out, stageSet, atomSet);
+    auto iter = out.begin();
+    if (iter == out.end())
+        return CapabilityAtom::Invalid;
+    return (CapabilityAtom)*iter;
+}
+
+template<CapabilityName keyholeAtomToPermuteWith>
+void CapabilitySet::addPermutationsOfConjunctionForEachInContainer(CapabilityAtomSet& setToPermutate, const CapabilityAtomSet& elementsToPermutateWith, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom)
+{
+    for(auto i : elementsToPermutateWith)
     {
-        auto info = _getInfo(CapabilityName::any_stage);
-        List<CapabilityName> newArr;
-        auto count = canonicalRepresentation.getCount();
-        newArr.setCount(count + 1);
-        memcpy(newArr.getBuffer(), canonicalRepresentation.getBuffer(), count * sizeof(CapabilityName));
-        m_targetSets[asAtom(target)].shaderStageSets.reserve(info.canonicalRepresentation.getCount());
-        for (auto i : info.canonicalRepresentation)
+        CapabilityName atom = (CapabilityName)i;
+        CapabilityAtomSet conjunctionPermutation = setToPermutate;
+        auto targetInfo = _getInfo(atom);
+        conjunctionPermutation.add(*targetInfo.canonicalRepresentation[0]);
+
+        if constexpr (keyholeAtomToPermuteWith == CapabilityName::target)
         {
-            newArr[count] = i[0];
-            addToTargetCapabilityWithTargetAndStageAtom(target, i[0], newArr.getArrayView());
+            addConjunction(conjunctionPermutation, (CapabilityAtom)atom, knownStageAtom);
         }
-        return;
-    }
-    
-    CapabilityAtomSet setToAdd = CapabilityAtomSet((UInt)CapabilityAtom::Count);
-    for(auto i : canonicalRepresentation)
-        setToAdd.add(asAtomUInt(i));
-
-    addToTargetCapabilityWithValidUIntSetAndTargetAndStage(target, stage, setToAdd);
-}
-
-// No targets atoms have been defined on yet, set stage to target any_target capability 
-void CapabilitySet::addToTargetCapabilityWithStageAtom(CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation)
-{
-    
-    if (m_targetSets.getCount() == 0)
-    {
-        const auto anyTargetInfo = _getInfo(CapabilityName::any_target);
-        CapabilityAtomSet setToAdd;
-        setToAdd.resize((UInt)CapabilityAtom::Count);
-        for (int i = 0; i < canonicalRepresentation.getCount(); i++)
-            setToAdd.add((UInt)canonicalRepresentation[i]);
-        CapabilityName targetAtom{};
-        for (const auto& targetAtomCanonicalRep : anyTargetInfo.canonicalRepresentation)
+        else if constexpr (keyholeAtomToPermuteWith == CapabilityName::stage)
         {
-            for (auto anyTargetAtom : targetAtomCanonicalRep)
-            {
-                setToAdd.add((UInt)anyTargetAtom);
-                if (_getInfo(anyTargetAtom).abstractBase == CapabilityName::target)
-                    targetAtom = anyTargetAtom;
-            }
-            addToTargetCapabilityWithValidUIntSetAndTargetAndStage(targetAtom, stage, setToAdd);
-            for (auto anyTargetAtom : targetAtomCanonicalRep)
-                setToAdd.remove((UInt)anyTargetAtom);
+            addConjunction(conjunctionPermutation, knownTargetAtom, (CapabilityAtom)atom);
+        }
+        else
+        {
+            addConjunction(conjunctionPermutation, knownTargetAtom, knownStageAtom);
         }
     }
 }
 
-void CapabilitySet::addToTargetCapabilityWithTargetAndOrStageAtom(CapabilityName target, CapabilityName stage, const ArrayView<CapabilityName>& canonicalRepresentation)
+void CapabilitySet::addConjunction(CapabilityAtomSet conjunction, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom)
 {
-    if(target != CapabilityName::Invalid)
-        addToTargetCapabilityWithTargetAndStageAtom(target, stage, canonicalRepresentation);
-    else if(stage != CapabilityName::Invalid)
-        addToTargetCapabilityWithStageAtom(stage, canonicalRepresentation);
-}
-
-void CapabilitySet::addToTargetCapabilitesWithCanonicalRepresentation(const ArrayView<CapabilityName>& canonicalRepresentation)
-{
-    // only need to search i == 0/1 to find a relevant node
-    // target node should ALWAYS be first, so if we find a node, we stop searching. This is the most important node. We assume only stage+target with this logic.
-    // canonicalRepresentation of node has optionally 0-1 abstract node of each type, with a minimum of 1 abstract node total.
-    CapabilityName target = CapabilityName::Invalid;
-    CapabilityName stage = CapabilityName::Invalid;
-    for (const auto& i : canonicalRepresentation)
+    if (knownTargetAtom == CapabilityAtom::Invalid)
     {
-        const auto info = _getInfo(i);
-        if (info.abstractBase == CapabilityName::Invalid)
-            continue;
-        else if (info.abstractBase == CapabilityName::target)
-            target = i;
-        else if (info.abstractBase == CapabilityName::stage)
-            stage = i;
-
-        if (target != CapabilityName::Invalid && stage != CapabilityName::Invalid)
-            break;
+        knownTargetAtom = getTargetAtomInSet(conjunction);
+        // if no target in conjunction, add a permutation of the conjunction with every target
+        if (knownTargetAtom == CapabilityAtom::Invalid)
+        {
+            addPermutationsOfConjunctionForEachInContainer<CapabilityName::target>(conjunction, getAtomSetOfTargets(), CapabilityAtom::Invalid, getStageAtomInSet(conjunction));
+            return;
+        }
     }
+    auto& capabilitySetToTargetSet = m_targetSets[knownTargetAtom];
+    capabilitySetToTargetSet.target = knownTargetAtom;
 
-    addToTargetCapabilityWithTargetAndOrStageAtom(target, stage, canonicalRepresentation);
+    if (knownStageAtom == CapabilityAtom::Invalid)
+    {
+        knownStageAtom = getStageAtomInSet(conjunction);
+        // if no target in conjunction, add a permutation of the conjunction with every stage
+        if (knownStageAtom == CapabilityAtom::Invalid)
+        {
+            capabilitySetToTargetSet.shaderStageSets.reserve(kCapabilityStageCount);
+            addPermutationsOfConjunctionForEachInContainer<CapabilityName::stage>(conjunction, getAtomSetOfStages(), knownTargetAtom, CapabilityAtom::Invalid);
+            return;
+        }
+    }
+    auto& targetSetToStageSet = capabilitySetToTargetSet.shaderStageSets[knownStageAtom];
+    targetSetToStageSet.stage = knownStageAtom;
+    targetSetToStageSet.addNewSet(std::move(conjunction));
 }
 
 void CapabilitySet::addUnexpandedCapabilites(CapabilityName atom)
 {
     auto info = _getInfo(atom);
-    for (const auto& cr : info.canonicalRepresentation)
-        addToTargetCapabilitesWithCanonicalRepresentation(cr);
+    for (const auto cr : info.canonicalRepresentation)
+        addConjunction(*cr, CapabilityAtom::Invalid, CapabilityAtom::Invalid);
+}
+
+CapabilityAtom CapabilitySet::getUniquelyImpliedStageAtom() const
+{
+    CapabilityAtom result = CapabilityAtom::Invalid;
+    for (auto& targetKV : m_targetSets)
+    {
+        if (targetKV.second.shaderStageSets.getCount() == 1)
+        {
+            auto thisStage = targetKV.second.shaderStageSets.begin()->first;
+            if (result == CapabilityAtom::Invalid)
+                result = thisStage;
+            else if (result != thisStage)
+                return CapabilityAtom::Invalid;
+        }
+    }
+    return result;
 }
 
 CapabilitySet::CapabilitySet()
@@ -468,12 +488,6 @@ void CapabilitySet::nonDestructiveJoin(const CapabilitySet& other)
     }
 }
 
-void CapabilitySet::addCapability(List<List<CapabilityAtom>>& atomLists)
-{
-    for (const auto& cr : atomLists)
-        addToTargetCapabilitesWithCanonicalRepresentation( (*(List<CapabilityName>*)(&cr)).getArrayView());
-}
-
 CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySet& other)
 {
     CapabilitySet newSet{};
@@ -482,17 +496,11 @@ CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySe
         if (other.m_targetSets.tryGetValue(i.first))
             continue;
 
-        newSet.m_targetSets[i.first].target = i.first;
-        auto info = _getInfo(i.first);
-        if(info.canonicalRepresentation.getCount() > 0)
-            newSet.addToTargetCapabilityWithTargetAndStageAtom((CapabilityName)i.first, CapabilityName::Invalid, info.canonicalRepresentation[0]);
+        newSet.m_targetSets[i.first] = this->m_targetSets[i.first];
     }
     return newSet;
 }
 
-/// Join `this` with a compatble stage set of `CapabilityTargetSet other`.
-/// Return false when `other` is fully incompatible.
-/// incompatability is when `this->stage` is not a supported stage by `other.shaderStageSets`.
 bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
 {
     const CapabilityStageSet* otherStageSet = other.shaderStageSets.tryGetValue(this->stage);
@@ -506,11 +514,6 @@ bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
     return true;
 }
 
-/// Join a compatable target set from `this` with `CapabilityTargetSet other`.
-/// Return false when `other` is fully incompatible.
-/// incompatability is when one of 2 senarios are true:
-/// 1. `this->target` is not a supported target by `other.shaderStageSets`
-/// 2. `this` has completly disjoint shader stages from other.
 bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
 {
     const CapabilityTargetSet* otherTargetSet = other.tryGetValue(this->target);
@@ -631,9 +634,6 @@ bool CapabilitySet::hasSameTargets(const CapabilitySet& other) const
 #pragma warning(push)
 #pragma warning(disable:4702)
 #endif
-/// returns true if 'this' is a better target for 'targetCaps' than 'that'
-/// isEqual: is `this` and `that` equal
-/// isIncompatible: is `this` and `that` incompatible
 bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const
 {
     if (this->isEmpty() && (that.isEmpty() || that.isInvalid()))
@@ -882,6 +882,16 @@ int TEST_findTargetStage(
     return capSet.getCapabilityTargetSets()[target].shaderStageSets.containsKey(stage);
 }
 
+
+int TEST_targetCapSetWithSpecificAtomInStage(
+    CapabilitySet& capSet,
+    CapabilityAtom target,
+    CapabilityAtom stage,
+    CapabilityAtom atom)
+{
+    return capSet.getCapabilityTargetSets()[target].shaderStageSets[stage].atomSet->contains((UInt)atom);
+}
+
 int TEST_targetCapSetWithSpecificSetInStage(
     CapabilitySet& capSet,
     CapabilityAtom target,
@@ -943,8 +953,8 @@ void TEST_CapabilitySet_addAtom()
     testCapSet = CapabilitySet(CapabilityName::TEST_ADD_2);
 
     CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
-    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::vertex,
-        { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::vertex,
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::compute,
+        { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::compute,
         CapabilityAtom::_sm_4_0, CapabilityAtom::_sm_4_1 }));
     CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment,
         { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::fragment,
@@ -959,7 +969,54 @@ void TEST_CapabilitySet_addAtom()
     CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment,
         { CapabilityAtom::textualTarget, CapabilityAtom::glsl, CapabilityAtom::fragment,
         CapabilityAtom::_GLSL_130 }));
+
     // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_1);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
+    CHECK_CAPS((int)!TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::vertex));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_0));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_5_0));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_2);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
+    CHECK_CAPS((int)!TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_5));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_5_0));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_3);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_NV_shader_texture_footprint));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_NV_compute_shader_derivatives));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_4);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_NV_shader_texture_footprint));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_ARB_shader_image_size));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_5);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_5));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_4));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_0));
 }
 
 void TEST_CapabilitySet_join()
@@ -1034,15 +1091,15 @@ void TEST_CapabilitySet()
 /*
 /// Test Capabilities
 
-alias TEST_ADD_1 = _sm_4_1 | _GLSL_130 | spirv_1_1 | metal
-                    ;
+alias TEST_ADD_1 = _sm_4_1 | _GLSL_130 | spirv_1_1 | metal;
+alias TEST_ADD_2 = _sm_4_1 |& _sm_4_0 + compute_fragment;
+alias TEST_ADD_3 = _GLSL_130 + compute_fragment_geometry_vertex;
 
-alias TEST_ADD_2 = _sm_4_1 | _sm_4_0 + shader_stages_compute_fragment
-                    ;
-
-alias TEST_ADD_3 = _GLSL_130 + shader_stages_compute_fragment_geometry_vertex;
-
-//
+alias TEST_GEN_1 = _sm_6_5 + fragment | _sm_6_0 + vertex;
+alias TEST_GEN_2 = _sm_6_5 + fragment;
+alias TEST_GEN_3 = GL_NV_shader_texture_footprint + GL_NV_compute_shader_derivatives + fragment | _GL_NV_shader_texture_footprint + fragment;
+alias TEST_GEN_4 = GL_ARB_shader_image_size |& GL_NV_shader_texture_footprint + fragment;
+alias TEST_GEN_5 = sm_6_0 + compute_fragment| sm_6_5;
 
 alias TEST_JOIN_1A = hlsl;
 alias TEST_JOIN_1B = glsl;
@@ -1065,6 +1122,13 @@ alias TEST_JOIN_3B = _sm_4_1 + fragment
 
 alias TEST_JOIN_4A = _GLSL_140 + _GL_EXT_texture_query_lod;
 alias TEST_JOIN_4B = _GLSL_150 + _GL_EXT_texture_shadow_lod;
+
+// Will cause capability generator failiure
+alias TEST_ERROR_GEN_1 = GL_NV_shader_texture_footprint + GL_NV_compute_shader_derivatives + fragment | _GL_NV_shader_texture_footprint + _GL_NV_shader_atomic_fp16_vector + fragment;
+alias TEST_ERROR_GEN_2 = GL_NV_shader_texture_footprint | GL_NV_ray_tracing_motion_blur;
+alias TEST_ERROR_GEN_3 = GL_ARB_shader_image_size | GL_NV_shader_texture_footprint + fragment;
+alias TEST_ERROR_GEN_4 = _sm_6_5 + fragment + vertex + cpp;
+
 ///
 */
 #undef CHECK_CAPS

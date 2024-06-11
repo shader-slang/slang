@@ -1655,7 +1655,8 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     if (SLANG_SUCCEEDED(result))
     {
         disableIRValidationAtInsert();
-        simplifyFunc(autoDiffSharedContext->targetProgram, func, IRSimplificationOptions::getDefault(autoDiffSharedContext->targetProgram));
+        auto simplifyOptions = IRSimplificationOptions::getDefault(nullptr);
+        simplifyFunc(autoDiffSharedContext->targetProgram, func, simplifyOptions);
         enableIRValidationAtInsert();
     }
     return result;
@@ -1910,6 +1911,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_NonUniformResourceIndex:
     case kIROp_IsType:
+    case kIROp_StaticAssert:
     case kIROp_ImageSubscript:
     case kIROp_ImageLoad:
     case kIROp_ImageStore:

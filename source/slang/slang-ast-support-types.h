@@ -552,13 +552,11 @@ namespace Slang
         SLANG_VALUE_CLASS(QualType) 
 
         Type*	type = nullptr;
-        bool	        isLeftValue;
+        bool	        isLeftValue = false;
         bool            hasReadOnlyOnTarget = false;
         bool	        isWriteOnly = false;
 
-        QualType()
-            : isLeftValue(false)
-        {}
+        QualType() = default;
 
         QualType(Type* type);
 

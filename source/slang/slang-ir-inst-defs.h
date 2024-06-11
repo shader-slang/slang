@@ -192,6 +192,9 @@ INST(Nop, nop, 0, 0)
             INST(PrimitivesType, Primitives, 2, HOISTABLE)
         INST_RANGE(MeshOutputType, VerticesType, PrimitivesType)
 
+        /* Metal Mesh Grid Properties */
+            INST(MetalMeshGridPropertiesType, mesh_grid_properties, 0, HOISTABLE)
+
         /* HLSLStructuredBufferTypeBase */
             INST(HLSLStructuredBufferType,                  StructuredBuffer,                   0, HOISTABLE)
             INST(HLSLRWStructuredBufferType,                RWStructuredBuffer,                 0, HOISTABLE)
@@ -363,7 +366,7 @@ INST(InterfaceRequirementEntry, interface_req_entry, 2, GLOBAL)
 
 // An inst to represent the workgroup size of the calling entry point.
 // We will materialize this inst during `translateGLSLGlobalVar`.
-INST(GetWorkGroupSize, kIROp_GetWorkGroupSize, 0, HOISTABLE)
+INST(GetWorkGroupSize, GetWorkGroupSize, 0, HOISTABLE)
 
 INST(Param, param, 0, 0)
 INST(StructField, field, 2, 0)
@@ -585,8 +588,6 @@ INST(TargetSwitch, targetSwitch, 1, 0)
 // A generic asm inst has an return semantics that terminates the control flow.
 INST(GenericAsm, GenericAsm, 1, 0)
 
-INST(discard, discard, 0, 0)
-
 /* IRUnreachable */
 INST(MissingReturn, missingReturn, 0, 0)
 INST(Unreachable, unreachable, 0, 0)
@@ -594,9 +595,12 @@ INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
 INST_RANGE(TerminatorInst, Return, Unreachable)
 
+INST(discard, discard, 0, 0)
+
 INST(RequirePrelude, RequirePrelude, 1, 0)
 INST(RequireGLSLExtension, RequireGLSLExtension, 1, 0)
 INST(RequireComputeDerivative, RequireComputeDerivative, 0, 0)
+INST(StaticAssert, StaticAssert, 2, 0)
 
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point
@@ -674,7 +678,9 @@ INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
 
 INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 0)
 
-INST(GetLegalizedSPIRVGlobalParamAddr, kIROp_GetLegalizedSPIRVGlobalParamAddr, 1, 0)
+INST(GetLegalizedSPIRVGlobalParamAddr, GetLegalizedSPIRVGlobalParamAddr, 1, 0)
+
+INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, 0)
 
 INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
 
@@ -712,6 +718,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST_RANGE(TargetSpecificDecoration, TargetDecoration, RequirePreludeDecoration)
     INST(GLSLOuterArrayDecoration,          glslOuterArray,         1, 0)
     
+    INST(TargetSystemValueDecoration,       TargetSystemValue,      2, 0)
+
     INST(InterpolationModeDecoration,       interpolationMode,      1, 0)
     INST(NameHintDecoration,                nameHint,               1, 0)
 
@@ -735,6 +743,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
     INST(RequireCUDASMVersionDecoration,    requireCUDASMVersion,   1, 0)
+    INST(RequireCapabilityAtomDecoration,   requireCapabilityAtom, 1, 0)
 
     INST(HasExplicitHLSLBindingDecoration, HasExplicitHLSLBinding, 0, 0)
 
@@ -897,6 +906,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         // Marks an inst that represents the gl_Position input.
     INST(GLPositionInputDecoration, PositionInput, 0, 0)
 
+        // Marks a fragment shader input as per-vertex.
+    INST(PerVertexDecoration, PerVertex, 0, 0)
 
     /* StageAccessDecoration */
         INST(StageReadAccessDecoration, stageReadAccess, 0, 0)

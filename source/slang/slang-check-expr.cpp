@@ -2616,6 +2616,9 @@ namespace Slang
 
         auto checkedExpr = CheckInvokeExprWithCheckedOperands(expr);
 
+        // Perform additional validation for known built-in functions.
+        maybeCheckKnownBuiltinInvocation(checkedExpr);
+
         if (m_parentDifferentiableAttr)
         {
             FunctionDifferentiableLevel callerDiffLevel = FunctionDifferentiableLevel::None;
@@ -3405,6 +3408,43 @@ namespace Slang
 
         expr->typeExpr = typeExpr.exp;
         return expr;
+    }
+
+    void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
+    {
+        auto checkedInvokeExpr = as<InvokeExpr>(invokeExpr);
+        if (!checkedInvokeExpr)
+            return;
+        auto declRefFuncExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr);
+        if (!declRefFuncExpr)
+            return;
+        auto callee = declRefFuncExpr->declRef.getDecl();
+        if (!callee)
+            return;
+        auto knownBuiltinAttr = callee->findModifier<KnownBuiltinAttribute>();
+        if (!knownBuiltinAttr)
+            return;
+        if (knownBuiltinAttr->name == "GetAttributeAtVertex")
+        {
+            if (checkedInvokeExpr->arguments.getCount() != 2)
+                return;
+            auto vertexAttributeArg = checkedInvokeExpr->arguments[0];
+            auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
+            if (!vertexAttributeArgDeclRefExpr)
+            {
+                getSink()->diagnose(invokeExpr, Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
+            auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
+            if (!vertexAttributeArgDecl)
+                return;
+            if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
+                !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
+            {
+                getSink()->diagnose(vertexAttributeArgDeclRefExpr, Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
+        }
     }
 
     Expr* SemanticsVisitor::MaybeDereference(Expr* inExpr)

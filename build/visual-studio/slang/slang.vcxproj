@@ -444,7 +444,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-optional-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-reinterpret.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-result-type.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-size-of.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-tuple-types.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-witness-lookup.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-marshal-native-call.h" />
@@ -452,6 +451,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-metal-legalize.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-obfuscate-loc.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-operator-shift-overflow.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-peephole.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-propagate-func-properties.h" />
@@ -685,7 +685,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-optional-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-reinterpret.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-result-type.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-size-of.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-tuple-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-witness-lookup.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-marshal-native-call.cpp" />
@@ -693,6 +692,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-metal-legalize.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-obfuscate-loc.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-operator-shift-overflow.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-peephole.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-propagate-func-properties.cpp" />

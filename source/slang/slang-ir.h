@@ -46,6 +46,8 @@ enum class AddressSpace
     Global = 2,
     GroupShared = 3,
     Uniform = 4,
+    // specific address space for payload data in metal
+    MetalObjectData = 5,
 };
 
 typedef unsigned int IROpFlags;
@@ -1549,6 +1551,8 @@ SIMPLE_IR_TYPE(VerticesType, MeshOutputType)
 SIMPLE_IR_TYPE(IndicesType, MeshOutputType)
 SIMPLE_IR_TYPE(PrimitivesType, MeshOutputType)
 
+SIMPLE_IR_TYPE(MetalMeshGridPropertiesType, Type)
+
 SIMPLE_IR_TYPE(GLSLInputAttachmentType, Type)
 SIMPLE_IR_PARENT_TYPE(ParameterGroupType, PointerLikeType)
 SIMPLE_IR_PARENT_TYPE(UniformParameterGroupType, ParameterGroupType)
@@ -2419,6 +2423,7 @@ struct InstWorkList
         other.pool = nullptr;
         return *this;
     }
+    List<IRInst*>& getList() { return *workList; }
     IRInst* operator[](Index i) { return (*workList)[i]; }
     Index getCount() { return workList->getCount(); }
     IRInst** begin() { return workList->begin(); }
@@ -2464,7 +2469,7 @@ struct InstHashSet
         other.pool = nullptr;
         return *this;
     }
-
+    HashSet<IRInst*>& getHashSet() { return *set; }
     Index getCount() { return set->getCount(); }
     bool add(IRInst* inst) { return set->add(inst); }
     bool contains(IRInst* inst) { return set->contains(inst); }
@@ -2536,6 +2541,9 @@ bool isBuiltin(IRInst* inst);
 
     // Get the enclosuing function of an instruction.
 IRFunc* getParentFunc(IRInst* inst);
+
+    // Is child a descendent of inst
+bool hasDescendent(IRInst* inst, IRInst* child);
 
     // True if moving this inst will not change the semantics of the program
 bool isMovableInst(IRInst* inst);

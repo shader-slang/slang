@@ -18,7 +18,7 @@ jobs:
             compiler: gcc
             platform: x64
             config: debug
-            warnings-as-errors: false
+            warnings-as-errors: true
             test-category: smoke
             full-gpu-tests: false
             runs-on: ubuntu-20.04

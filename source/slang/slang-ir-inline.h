@@ -2,6 +2,7 @@
 #pragma once
 
 #include "../../slang-com-helper.h"
+#include "core/slang-basic.h"
 
 namespace Slang
 {
@@ -10,12 +11,13 @@ namespace Slang
     struct IRGlobalValueWithCode;
     class DiagnosticSink;
     class TargetProgram;
+    struct IRInst;
 
         /// Any call to a function that takes or returns a string/RefType parameter is inlined
     Result performTypeInlining(IRModule* module, DiagnosticSink* sink);
 
         /// Inline any call sites to functions marked `[unsafeForceInlineEarly]`
-    void performMandatoryEarlyInlining(IRModule* module);
+    bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedFuncs = nullptr);
 
         /// Inline any call sites to functions marked `[ForceInline]`
     void performForceInlining(IRModule* module);

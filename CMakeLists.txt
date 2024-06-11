@@ -328,7 +328,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     slang_add_target(
         source/slang-glslang
         MODULE
-        USE_EXTRA_WARNINGS
+        USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt
         INSTALL
     )
@@ -474,7 +474,8 @@ if(SLANG_ENABLE_GFX)
             imgui
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             ${CMAKE_DL_LIBS}
-            LINK_WITH_FRAMEWORK
+        LINK_WITH_FRAMEWORK
+            Foundation
             Cocoa
             QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
@@ -495,11 +496,14 @@ if(SLANG_ENABLE_GFX)
             core
             slang
             Vulkan-Headers
+            metal-cpp
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         LINK_WITH_FRAMEWORK
+            Foundation
             Cocoa
             QuartzCore
+            Metal
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:GFX_ENABLE_CUDA>
             $<$<BOOL:${SLANG_ENABLE_OPTIX}>:GFX_OPTIX>

@@ -150,7 +150,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __alignOf_intrinsic<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
         }
     }
 
@@ -192,7 +192,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __alignOf_intrinsic<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
         }
     }
 
@@ -234,7 +234,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __alignOf_intrinsic<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
         }
     }
 
@@ -259,7 +259,7 @@ struct ByteAddressBuffer
     [ForceInline]
     T LoadAligned<T>(int location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __alignOf_intrinsic<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
 };
 
@@ -510,8 +510,7 @@ float __glsl_texture_offset_level_zero_1d_shadow<TTexture, TCoord, TOffset>(TTex
     }
 }
 
-
-__generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 {
     static const int access = 0;
@@ -536,10 +535,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().CalculateLevelOfDetail(__getSampler(), location);
         case metal:
-            {
-                return __getTexture().CalculateLevelOfDetail(__getSampler(), location);
-            }
+            return __getTexture().CalculateLevelOfDetail(__getSampler(), location);
         case glsl:
             __intrinsic_asm "textureQueryLod($0, $1).x";
         case spirv:
@@ -559,10 +560,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case hlsl:
-        case metal:
-            {
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
             return __getTexture().CalculateLevelOfDetailUnclamped(__getSampler(), location);
-            }
+        case metal:
+            return __getTexture().CalculateLevelOfDetailUnclamped(__getSampler(), location);
         case glsl:
             __intrinsic_asm "textureQueryLod($0, $1).y";
         case spirv:
@@ -581,8 +584,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __requireComputeDerivative();
         __target_switch
         {
-            case cpp:
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().Sample(__getSampler(), location);
+            case cpp:
             case metal:
                 return __getTexture().Sample(__getSampler(), location);
             case glsl:
@@ -633,8 +640,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __requireComputeDerivative();
         __target_switch
         {
-            case cpp:
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().Sample(__getSampler(), location, offset);
+            case cpp:
             case metal:
                 return __getTexture().Sample(__getSampler(), location, offset);
             case glsl:
@@ -658,8 +669,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __requireComputeDerivative();
         __target_switch
         {
-            case cpp:
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().Sample(__getSampler(), location, offset, clamp);
+            case cpp:
             case metal:
                 return __getTexture().Sample(__getSampler(), location, offset, clamp);
             case glsl:
@@ -681,7 +696,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Sample";
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".Sample";
         default:
             status = 0;
             return Sample(location, offset, clamp);
@@ -696,8 +715,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __requireComputeDerivative();
         __target_switch
         {
-            case cpp:
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().SampleBias(__getSampler(), location, bias);
+            case cpp:
             case metal:
                 return __getTexture().SampleBias(__getSampler(), location, bias);
             case glsl:
@@ -720,8 +743,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __requireComputeDerivative();
         __target_switch
         {
-            case cpp:
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().SampleBias(__getSampler(), location, bias, offset);
+            case cpp:
             case metal:
                 return __getTexture().SampleBias(__getSampler(), location, bias, offset);
             case glsl:
@@ -740,6 +767,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
@@ -756,6 +784,10 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __glsl_texture(this, __makeVector(location, compareValue));
             }
         case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue);
         case metal:
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue);
         case spirv:
@@ -783,6 +815,10 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __glsl_texture_level_zero(this, __makeVector(location, compareValue));
             }
         case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
         case metal:
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
         case spirv:
@@ -799,6 +835,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
@@ -811,6 +848,10 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __glsl_texture_offset(this, __makeVector(location, compareValue), offset);
             }
         case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset);
         case metal:
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset);
         case spirv:
@@ -838,6 +879,10 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __glsl_texture_offset_level_zero(this, __makeVector(location, compareValue), offset);
             }
         case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
         case metal:
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
         case spirv:
@@ -856,8 +901,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     {
         __target_switch
         {
-            case cpp:
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
+            case cpp:
             case metal:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
 
@@ -879,8 +928,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     {
         __target_switch
         {
-            case cpp:
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset);
+            case cpp:
             case metal:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset);
             case glsl:
@@ -902,8 +955,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     {
         __target_switch
         {
-            case cpp:
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset, lodClamp);
+            case cpp:
             case metal:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset, lodClamp);
             case glsl:
@@ -925,8 +982,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     {
         __target_switch
         {
-            case cpp:
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().SampleLevel(__getSampler(), location, level);
+            case cpp:
             case metal:
                 return __getTexture().SampleLevel(__getSampler(), location, level);
             case glsl:
@@ -978,8 +1039,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     {
         __target_switch
         {
-            case cpp:
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().SampleLevel(__getSampler(), location, level, offset);
+            case cpp:
             case metal:
                 return __getTexture().SampleLevel(__getSampler(), location, level, offset);
 
@@ -1046,7 +1111,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
     }
 }
 
-__generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     [__readNone]
@@ -1058,7 +1123,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".Sample";
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
                 __intrinsic_asm ".Sample";
             case metal:
                 if (isArray == 1)
@@ -1138,7 +1207,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".Sample";
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
                 __intrinsic_asm ".Sample";
             case metal:
                 if (isArray == 1)
@@ -1182,7 +1255,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".Sample";
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
                 __intrinsic_asm ".Sample";
             case metal:
                 if (isArray == 1)
@@ -1224,7 +1301,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Sample";
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".Sample";
         default:
             status = 0;
             return Sample(s, location, offset, clamp);
@@ -1240,8 +1321,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".SampleBias";
             case hlsl:
-            __intrinsic_asm ".SampleBias";
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                __intrinsic_asm ".SampleBias";
             case metal:
                 if (isArray == 1)
                 {
@@ -1286,8 +1371,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".SampleBias";
             case hlsl:
-            __intrinsic_asm ".SampleBias";
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                __intrinsic_asm ".SampleBias";
             case metal:
                 if (isArray == 1)
                 {
@@ -1325,6 +1414,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
@@ -1341,6 +1431,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return __glsl_texture(this, s, __makeVector(location,compareValue));
             }
         case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmp";
         case metal:
             if (isArray == 1)
@@ -1389,6 +1482,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return __glsl_texture_level_zero(this, s, __makeVector(location,compareValue));
             }
         case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevelZero";
         case metal:
             if (isArray == 1)
@@ -1426,6 +1522,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case glsl:
@@ -1438,6 +1535,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return __glsl_texture_offset(this, s, __makeVector(location,compareValue), offset);
             }
         case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmp";
         case metal:
             if (isArray == 1)
@@ -1483,6 +1583,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return __glsl_texture_offset_level_zero(this, s, __makeVector(location,compareValue), offset);
             }
         case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevelZero";
         case metal:
             if (isShadow == 1)
@@ -1522,7 +1625,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".SampleGrad";
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
                 __intrinsic_asm ".SampleGrad";
             case metal:
                 if (isArray == 1)
@@ -1569,7 +1676,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".SampleGrad";
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
                 __intrinsic_asm ".SampleGrad";
             case metal:
                 if (isArray == 1)
@@ -1614,7 +1725,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".SampleGrad";
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
                 __intrinsic_asm ".SampleGrad";
             case metal:
                 if (isArray == 1)
@@ -1658,7 +1773,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".SampleLevel";
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
                 __intrinsic_asm ".SampleLevel";
             case metal:
                 if (isArray == 1)
@@ -1734,7 +1853,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".SampleLevel";
             case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
                 __intrinsic_asm ".SampleLevel";
             case metal:
                 if (isArray == 1)
@@ -2134,8 +2257,9 @@ vector<TElement,4> __texture_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 
 }
 
 ${{{{
-for (int isCombined = 0; isCombined<=1; isCombined++) {
-for (int isScalarTexture = 0; isScalarTexture <= 1; isScalarTexture++) {
+for (int isCombined = 0; isCombined < 2; isCombined++)
+for (int isScalarTexture = 0; isScalarTexture < 2; isScalarTexture++)
+{
     if (isScalarTexture == 0)
     {
         sb << "__generic<T:__BuiltinArithmeticType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>\n";
@@ -2149,24 +2273,12 @@ for (int isScalarTexture = 0; isScalarTexture <= 1; isScalarTexture++) {
 }}}}
 { // begin extension for gather
 ${{{{
-    if (isCombined)
-    {
-}}}}
-    __intrinsic_op($(kIROp_CombinedTextureSamplerGetTexture))
-    __TextureImpl<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> __getTexture();
-
-    __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
-    SamplerState __getSampler();
-
-    __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
-    SamplerComparisonState __getComparisonSampler();
-${{{{
-    }
 
     // Gather component
     const char* samplerStateParam = isCombined ? "" : " s,";
     const char* getTexture = isCombined ? "__getTexture()" : "this";
-    for (int isCmp = 0; isCmp < 2; ++isCmp) {
+    for (int isCmp = 0; isCmp < 2; ++isCmp)
+    {
         const char* cmp = isCmp ? "Cmp" : "";
         const char* cmpParam = isCmp ? ", T compareValue" : "";
         const char* compareArg = isCmp ? ", compareValue" : "";
@@ -2175,7 +2287,8 @@ ${{{{
         const char* componentNames[] = { "", "Red", "Green", "Blue", "Alpha"};
         const char* glslComponentNames[] = { ", 0", ", 1", ", 2", ", 3" };
 
-        for (auto componentId = 0;  componentId < 5; componentId++) {
+        for (auto componentId = 0;  componentId < 5; componentId++)
+        {
             auto componentName = componentNames[componentId];
             auto glslComponent = (isCmp ? "" :glslComponentNames[componentId == 0 ? 0 : componentId - 1]);
     }}}}
@@ -2224,14 +2337,13 @@ ${{{{
         }
     }
     ${{{{
-    } // for (componentId)
+        } // for (componentId)
     } // for (isCmp)
     }}}}
 } // end extension for gather
 
 ${{{{
 } // for (isScalarTexture)
-} // for (isCombined)
 }}}}
 
 // Load/Subscript for readonly, no MS textures
@@ -2564,6 +2676,26 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
         }
     }
 
+    __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
+    {
+        __glsl_extension(GL_EXT_samplerless_texture_functions)
+        [__readNone]
+        [ForceInline]
+        [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_samplerless)]
+        get
+        {
+            __target_switch
+            {
+                case cpp:
+                case hlsl:
+                    __intrinsic_asm "($0).sample[$1]";
+                case metal:
+                case glsl:
+                case spirv:
+                    return Load(location, 0);
+            }
+        }
+    }
     __subscript(vector<uint, Shape.dimensions+isArray> location, int sampleIndex) -> T
     {
         __glsl_extension(GL_EXT_samplerless_texture_functions)
@@ -3025,6 +3157,37 @@ ${{{{
 } // if (access == kStdlibResourceAccessReadWrite) // for RW MS textures.
 } // for (access).
 }}}}
+
+// Definitions to support the legacy texture .mips[][] operator.
+struct __TextureMip<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    int mip;
+    __subscript(vector<int, isArray + Shape.dimensions> pos)->T
+    {
+        [__unsafeForceInlineEarly]
+        get { return tex.Load(__makeVector(pos, mip)); }
+    }
+}
+struct __TextureMips<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    __subscript(int mip)->__TextureMip<T, Shape, isArray, isCombined, format>
+    {
+        [__unsafeForceInlineEarly]
+        get { return { tex, mip }; }
+    }
+}
+
+__generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+extension __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
+{
+    property __TextureMips<T, Shape, isArray, isCombined, format> mips
+    {
+        [__unsafeForceInlineEarly]
+        get { return { this }; }
+    }
+}
 
 // Texture type aliases.
 // T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int
@@ -3600,13 +3763,14 @@ struct StructuredBuffer
     __intrinsic_op($(kIROp_StructuredBufferLoad))
     [__readNone]
     [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
-    T Load(int location);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
     [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
-    T Load(int location, out uint status);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    __subscript(uint index) -> T
+    __generic<TIndex : __BuiltinIntegerType>
+    __subscript(TIndex index) -> T
     {
         [__readNone]
         __intrinsic_op($(kIROp_StructuredBufferLoad))
@@ -3645,7 +3809,7 @@ struct InputPatch
 };
 
 __generic<T, let N : int>
-[require(glsl_hlsl_spirv, shader_stages_domain_hull)]
+[require(glsl_hlsl_spirv, domain_hull)]
 __magic_type(HLSLOutputPatchType)
 __intrinsic_type($(kIROp_HLSLOutputPatchType))
 struct OutputPatch
@@ -3738,7 +3902,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __alignOf_intrinsic<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
         }
     }
 
@@ -3780,7 +3944,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __alignOf_intrinsic<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
         }
     }
 
@@ -3822,7 +3986,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __alignOf_intrinsic<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
         }
     }
 
@@ -3850,7 +4014,7 @@ struct $(item.name)
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     T LoadAligned<T>(int location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __alignOf_intrinsic<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
 
 ${{{{
@@ -4743,7 +4907,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store2";
         default:
-            __byteAddressBufferStore(this, address, __alignOf_intrinsic<uint2>(), value);
+            __byteAddressBufferStore(this, address, __naturalStrideOf<uint2>(), value);
         }
     }
 
@@ -4780,7 +4944,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store3";
         default:
-            __byteAddressBufferStore(this, address, __alignOf_intrinsic<uint3>(), value);
+            __byteAddressBufferStore(this, address, __naturalStrideOf<uint3>(), value);
         }
     }
 
@@ -4817,7 +4981,7 @@ ${{{{
         {
         case hlsl: __intrinsic_asm ".Store4";
         default:
-            __byteAddressBufferStore(this, address, __alignOf_intrinsic<uint4>(), value);
+            __byteAddressBufferStore(this, address, __naturalStrideOf<uint4>(), value);
         }
     }
 
@@ -4836,7 +5000,7 @@ ${{{{
     [ForceInline]
     void StoreAligned<T>(int offset, T value)
     {
-        __byteAddressBufferStore(this, offset, __alignOf_intrinsic<T>(), value);
+        __byteAddressBufferStore(this, offset, __naturalStrideOf<T>(), value);
     }
 };
 
@@ -4885,13 +5049,14 @@ struct $(item.name)
 
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoad))
-    T Load(int location);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoadStatus))
-    T Load(int location, out uint status);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    __subscript(uint index) -> T
+    __generic<TIndex : __BuiltinIntegerType>
+    __subscript(TIndex index) -> T
     {
         [__NoSideEffect]
         __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
@@ -8186,6 +8351,9 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
     }
 }
 
+__intrinsic_op($(kIROp_GetPerVertexInputArray))
+Array<T, 3> __GetPerVertexInputArray<T>(T attribute);
+
 /// Get the value of a vertex attribute at a specific vertex.
 ///
 /// The `GetAttributeAtVertex()` function can be used in a fragment shader
@@ -8203,6 +8371,8 @@ __generic<T : __BuiltinType>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
+[KnownBuiltin("GetAttributeAtVertex")]
+[__unsafeForceInlineEarly]
 T GetAttributeAtVertex(T attribute, uint vertexIndex)
 {
     __target_switch
@@ -8210,13 +8380,8 @@ T GetAttributeAtVertex(T attribute, uint vertexIndex)
     case hlsl:
         __intrinsic_asm "GetAttributeAtVertex";
     case glsl:
-        __intrinsic_asm "$0[$1]";
     case spirv:
-        return spirv_asm {
-            %_ptr_Input_T = OpTypePointer Input $$T;
-            %addr = OpAccessChain %_ptr_Input_T $attribute $vertexIndex;
-            result:$$T = OpLoad %addr;
-        };
+        return __GetPerVertexInputArray(attribute)[vertexIndex];
     }
 }
 
@@ -15717,6 +15882,8 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
         // This intrinsic doesn't take into account writing meshPayload. That
         // is dealt with separately by 'legalizeDispatchMeshPayloadForGLSL'.
         __intrinsic_asm "EmitMeshTasksEXT($0, $1, $2)";
+    case metal:
+        __intrinsic_asm "_slang_mesh_payload = *$3; _slang_mgp.set_threadgroups_per_grid(uint3($0, $1, $2)); return;";
     case spirv:
         return spirv_asm
         {

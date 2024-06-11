@@ -43,29 +43,29 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord)
 
     float frequency = 5.0f;
     vec2 pos = (uv + iTime*vec2(0.25f, 0.0f)) * frequency;
-    
+
     vec2 center = floor(pos + vec2(0.5));
-    
+
     float r0 = rand(center.x*3.0f  + center.y*7.0f);
     float r1 = rand(center.x*7.0f  + center.y*13.0f);
     float r2 = rand(center.x*13.0f + center.y*3.0f);
-    
+
     float p = mix(0.0f, 4.0f, r0);
     float f = mix(5.0f, 8.0f, r1);
-    
+
     float a = 0.5f * (1.0f + cos(iTime*f + p));
-    
+
     float rad0 = mix(0.1, 0.4, r2);
     float rad1 = mix(0.2, 0.9, r0);
-    
+
     float radius = 0.5f*mix(rad0, rad1, a);
 
     vec2 delta = pos - center;
     float distance = length(delta);
-  
+
     fragColor.xyz = vec3(r0, r1, r2);
     fragColor.w = 1.0f;
-    
+
     if(distance > radius) fragColor.xyz = vec3(0.25f);
 }
 

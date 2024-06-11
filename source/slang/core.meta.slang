@@ -253,6 +253,9 @@ void __requirePrelude(constexpr String preludeText);
 __intrinsic_op($(kIROp_RequireGLSLExtension))
 void __requireGLSLExtension(constexpr String preludeText);
 
+__intrinsic_op($(kIROp_StaticAssert))
+void static_assert(constexpr bool condition, NativeString errorMessage);
+
 /// Interface to denote types as differentiable.
 /// Allows for user-specified differential types as
 /// well as automatic generation, for when the associated type
