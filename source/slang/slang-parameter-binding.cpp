@@ -1146,10 +1146,11 @@ static void addExplicitParameterBindings_GLSL(
     // See if we can infer vulkan binding from HLSL if we have such options set, we know 
     // we can't map
     auto hlslToVulkanLayoutOptions = context->getTargetProgram()->getHLSLToVulkanLayoutOptions();
-
+    bool warnedMissingVulkanLayoutModifier = false;
     // If we have the options, but cannot infer bindings, we don't need to go further
     if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
     {
+        warnedMissingVulkanLayoutModifier = true;
         _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
     }
 
@@ -1189,7 +1190,8 @@ static void addExplicitParameterBindings_GLSL(
     // If inference is not enabled for this kind, we can issue a warning
     if (!hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
     {
-        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+        if(!warnedMissingVulkanLayoutModifier)
+            _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
     }
 
     // We use the HLSL binding directly (even though this notionally for GLSL/Vulkan)
@@ -1208,10 +1210,7 @@ static void addExplicitParameterBindings_GLSL(
         {
             descriptorTableSlot->count = 0;
         }
-        else
-        {
-            resInfo->count = 1;
-        }
+        resInfo->count = 1;
     }
     const LayoutSize count = resInfo->count;
 
