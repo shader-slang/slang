@@ -388,7 +388,7 @@ Result ShaderObjectImpl::bindAsValue(
         for (uint32_t i = 0; i < count; ++i)
         {
             auto texture = m_textures[baseIndex + i];
-            context->setTexture(texture ? texture->m_texture->m_texture.get() : nullptr, registerOffset + i);
+            context->setTexture(texture ? texture->m_textureView.get() : nullptr, registerOffset + i);
         }
     }
 
