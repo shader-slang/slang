@@ -8351,6 +8351,9 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
     }
 }
 
+__intrinsic_op($(kIROp_GetPerVertexInputArray))
+Array<T, 3> __GetPerVertexInputArray<T>(T attribute);
+
 /// Get the value of a vertex attribute at a specific vertex.
 ///
 /// The `GetAttributeAtVertex()` function can be used in a fragment shader
@@ -8368,6 +8371,8 @@ __generic<T : __BuiltinType>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
+[KnownBuiltin("GetAttributeAtVertex")]
+[__unsafeForceInlineEarly]
 T GetAttributeAtVertex(T attribute, uint vertexIndex)
 {
     __target_switch
@@ -8375,13 +8380,8 @@ T GetAttributeAtVertex(T attribute, uint vertexIndex)
     case hlsl:
         __intrinsic_asm "GetAttributeAtVertex";
     case glsl:
-        __intrinsic_asm "$0[$1]";
     case spirv:
-        return spirv_asm {
-            %_ptr_Input_T = OpTypePointer Input $$T;
-            %addr = OpAccessChain %_ptr_Input_T $attribute $vertexIndex;
-            result:$$T = OpLoad %addr;
-        };
+        return __GetPerVertexInputArray(attribute)[vertexIndex];
     }
 }
 
