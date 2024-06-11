@@ -1151,7 +1151,6 @@ static void addExplicitParameterBindings_GLSL(
     if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
     {
         _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-        return;
     }
 
     // We need an HLSL register semantic to to infer from
@@ -1191,18 +1190,31 @@ static void addExplicitParameterBindings_GLSL(
     if (!hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
     {
         _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-        return;
     }
 
     // We use the HLSL binding directly (even though this notionally for GLSL/Vulkan)
     // We'll do the shifting at later later point in _maybeApplyHLSLToVulkanShifts
+    //resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
     resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
-    
+
     semanticInfo.kind = resInfo->kind;
     semanticInfo.index = UInt(hlslInfo.index);
     semanticInfo.space = UInt(hlslInfo.space);
-
+    
+    if (resInfo->count.isFinite() && resInfo->count.getFiniteValue() == 0)
+    {
+        // hlsl objects are not going to set on a descriptor table slot
+        if (auto descriptorTableSlot = typeLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+        {
+            descriptorTableSlot->count = 0;
+        }
+        else
+        {
+            resInfo->count = 1;
+        }
+    }
     const LayoutSize count = resInfo->count;
+
 
     addExplicitParameterBinding(context, parameterInfo, as<VarDeclBase>(varDecl.getDecl()), semanticInfo, count);
 }
