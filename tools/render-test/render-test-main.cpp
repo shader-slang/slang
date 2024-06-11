@@ -1273,7 +1273,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
 		case DeviceType::DirectX12:
 			input.target = SLANG_DXBC;
-            input.profile = "sm_5_1";
+            input.profile = "sm_5_0";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
             slangPassThrough = SLANG_PASS_THROUGH_FXC;
             

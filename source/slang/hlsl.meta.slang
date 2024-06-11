@@ -3932,7 +3932,7 @@ ${{{{
     __cuda_sm_version(2.0)
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_float1)]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue)
     {
         __target_switch
@@ -4003,7 +4003,7 @@ ${{{{
     [__requiresNVAPI]
     [ForceInline]
     __cuda_sm_version(2.0)
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_float1)]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
         __target_switch
@@ -4023,7 +4023,7 @@ ${{{{
     // Int64 Add
     [ForceInline]
     __cuda_sm_version(6.0)
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda6_int64)]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda6_int64)]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue)
     {
         __target_switch
@@ -4042,7 +4042,7 @@ ${{{{
 
     // Without returning original value
     __cuda_sm_version(6.0)
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda6_int64)]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda6_int64)]
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
     {
         __target_switch
@@ -4059,7 +4059,7 @@ ${{{{
 
     // Cas uint64_t
 
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda9_int64)]
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -4077,7 +4077,7 @@ ${{{{
     // Max
 
     __cuda_sm_version(5.0)
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda5_int64)]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda5_int64)]
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -4135,7 +4135,7 @@ ${{{{
     // Min
 
     __cuda_sm_version(5.0)
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda5_int64)]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda5_int64)]
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -4193,7 +4193,7 @@ ${{{{
     // And
 
     __cuda_sm_version(5.0)
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda5_int64)]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda5_int64)]
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -4231,7 +4231,7 @@ ${{{{
     // Or
 
     __cuda_sm_version(5.0)
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda5_int64)]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda5_int64)]
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -4269,7 +4269,7 @@ ${{{{
     // Xor
 
     __cuda_sm_version(5.0)
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda5_int64)]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda5_int64)]
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -4306,7 +4306,7 @@ ${{{{
 
     // Exchange
 
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda9_int64)]
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value)
     {
         __target_switch
@@ -4411,6 +4411,7 @@ ${{{{
     }
 
     [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
     {
         __target_switch
@@ -4427,6 +4428,7 @@ ${{{{
     }
 
     [ForceInline]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
         __target_switch
@@ -19601,7 +19603,7 @@ extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite)
     [__requiresNVAPI]
     [ForceInline]
     __glsl_extension(GL_EXT_shader_atomic_float)
-    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_float1)]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda_float1)]
     void InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value, out float originalValue)
     {
         __target_switch

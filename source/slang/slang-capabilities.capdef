@@ -806,13 +806,13 @@ alias subgroup_clustered = GL_KHR_shader_subgroup_clustered | _sm_6_0 | _cuda_sm
 alias subgroup_quad = GL_KHR_shader_subgroup_quad | _sm_6_0 | _cuda_sm_7_0;
 alias subgroup_partitioned = GL_NV_shader_subgroup_partitioned + subgroup_ballot_activemask | _sm_6_5;
 
+alias atomic_glsl_hlsl_nvapi_cuda_float1 = atomic_glsl_float1 | hlsl_nvapi + _sm_4_0 | _cuda_sm_2_0;
+alias atomic_glsl_hlsl_nvapi_cuda5_int64 = atomic_glsl_int64 | hlsl_nvapi + _sm_4_0 | _cuda_sm_6_0;
+alias atomic_glsl_hlsl_nvapi_cuda6_int64 = atomic_glsl_int64 | hlsl_nvapi + _sm_4_0 | _cuda_sm_6_0;
+alias atomic_glsl_hlsl_nvapi_cuda9_int64 = atomic_glsl_int64 | hlsl_nvapi + _sm_4_0 | _cuda_sm_9_0;
+
 alias atomic_glsl_hlsl_cuda = atomic_glsl | _sm_5_0 | _cuda_sm_2_0;
-alias atomic_glsl_hlsl_cuda_float1 = atomic_glsl_float1 | atomic_hlsl_nvapi | _cuda_sm_2_0;
-alias atomic_glsl_hlsl_cuda_float2 = atomic_glsl_float2 | atomic_hlsl_nvapi | _cuda_sm_2_0;
-alias atomic_glsl_hlsl_cuda2_int64 = atomic_glsl_int64 | atomic_hlsl_nvapi | _cuda_sm_2_0;
-alias atomic_glsl_hlsl_cuda5_int64 = atomic_glsl_int64 | atomic_hlsl_nvapi | _cuda_sm_6_0;
-alias atomic_glsl_hlsl_cuda6_int64 = atomic_glsl_int64 | atomic_hlsl_nvapi | _cuda_sm_6_0;
-alias atomic_glsl_hlsl_cuda9_int64 = atomic_glsl_int64 | atomic_hlsl_nvapi | _cuda_sm_9_0;
+alias atomic_glsl_hlsl_cuda9_int64 = atomic_glsl_int64 | _sm_6_6 | _cuda_sm_9_0;
 
 alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp;
 
