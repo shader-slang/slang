@@ -694,6 +694,7 @@ DIAGNOSTIC(39025, Error, conflictingVulkanInferredBindingForParameter, "conflict
 DIAGNOSTIC(39026, Error, matrixLayoutModifierOnNonMatrixType, "matrix layout modifier cannot be used on non-matrix type '$0'.")
 
 DIAGNOSTIC(39027, Error, getAttributeAtVertexMustReferToPerVertexInput, "'GetAttributeAtVertex' must reference a vertex input directly, and the vertex input must be decorated with 'pervertex' or 'nointerpolation'.")
+
 //
 
 // 4xxxx - IL code generation.
@@ -845,6 +846,8 @@ DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatic
 
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
+DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
+DIAGNOSTIC(57003, Error, unknownTessPartitioning, "unknown tessellation partitioning '$0'.")
 
 // GLSL Compatibility
 DIAGNOSTIC(58001, Error, entryPointMustReturnVoidWhenGlobalOutputPresent, "entry point must return 'void' when global output variables are present.")
