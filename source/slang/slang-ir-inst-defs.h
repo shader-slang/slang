@@ -366,7 +366,7 @@ INST(InterfaceRequirementEntry, interface_req_entry, 2, GLOBAL)
 
 // An inst to represent the workgroup size of the calling entry point.
 // We will materialize this inst during `translateGLSLGlobalVar`.
-INST(GetWorkGroupSize, kIROp_GetWorkGroupSize, 0, HOISTABLE)
+INST(GetWorkGroupSize, GetWorkGroupSize, 0, HOISTABLE)
 
 INST(Param, param, 0, 0)
 INST(StructField, field, 2, 0)
@@ -678,7 +678,9 @@ INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
 
 INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 0)
 
-INST(GetLegalizedSPIRVGlobalParamAddr, kIROp_GetLegalizedSPIRVGlobalParamAddr, 1, 0)
+INST(GetLegalizedSPIRVGlobalParamAddr, GetLegalizedSPIRVGlobalParamAddr, 1, 0)
+
+INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, 0)
 
 INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
 
@@ -904,6 +906,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         // Marks an inst that represents the gl_Position input.
     INST(GLPositionInputDecoration, PositionInput, 0, 0)
 
+        // Marks a fragment shader input as per-vertex.
+    INST(PerVertexDecoration, PerVertex, 0, 0)
 
     /* StageAccessDecoration */
         INST(StageReadAccessDecoration, stageReadAccess, 0, 0)
