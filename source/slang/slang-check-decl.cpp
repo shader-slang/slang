@@ -10039,7 +10039,7 @@ namespace Slang
                 maybeDiagnose(
                     visitor->getSink(),
                     visitor->getOptionSet(),
-                    TypeOfErrorToDiagnose::Capability,
+                    DiagnosticCategory::Capability,
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToUseOfDecl,
                     referencedDecl,
@@ -10052,7 +10052,7 @@ namespace Slang
                 maybeDiagnose(
                     visitor->getSink(),
                     visitor->getOptionSet(),
-                    TypeOfErrorToDiagnose::Capability,
+                    DiagnosticCategory::Capability,
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToStatement,
                     nodeCaps,
@@ -10064,7 +10064,7 @@ namespace Slang
                 maybeDiagnose(
                     visitor->getSink(),
                     visitor->getOptionSet(),
-                    TypeOfErrorToDiagnose::Capability,
+                    DiagnosticCategory::Capability,
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToStatementEnclosingFunc,
                     nodeCaps,
@@ -10167,7 +10167,7 @@ namespace Slang
                 targetCap.join(bodyCap);
                 if (targetCap.isInvalid())
                 {
-                    maybeDiagnose(Base::getSink(), outerContext.getOptionSet(), TypeOfErrorToDiagnose::Capability, targetCase->body->loc, Diagnostics::conflictingCapabilityDueToStatement, bodyCap, "target_switch", oldCap);
+                    maybeDiagnose(Base::getSink(), outerContext.getOptionSet(), DiagnosticCategory::Capability, targetCase->body->loc, Diagnostics::conflictingCapabilityDueToStatement, bodyCap, "target_switch", oldCap);
                 }
                 set.unionWith(targetCap);
             }
@@ -10306,7 +10306,7 @@ namespace Slang
                 auto stageCaps = CapabilitySet(Profile(entryPointAttr->stage).getCapabilityName());
                 if (declaredCaps.isIncompatibleWith(stageCaps))
                 {
-                    maybeDiagnose(getSink(), this->getOptionSet(), TypeOfErrorToDiagnose::Capability, funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
+                    maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
                 }
                 else
                 {
@@ -10520,7 +10520,7 @@ namespace Slang
             printedDecls.add(declToPrint);
             if (auto provenance = declToPrint->capabilityRequirementProvenance.tryGetValue(atomToFind))
             {
-                maybeDiagnose(sink, optionSet, TypeOfErrorToDiagnose::Capability, provenance->referenceLoc, Diagnostics::seeUsingOf, provenance->referencedDecl);
+                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, provenance->referenceLoc, Diagnostics::seeUsingOf, provenance->referencedDecl);
                 declToPrint = provenance->referencedDecl;
                 if (printedDecls.contains(declToPrint))
                     break;
@@ -10541,7 +10541,7 @@ namespace Slang
         }
         if (declToPrint && !optionallyNeverPrintDecl)
         {
-            maybeDiagnose(sink, optionSet, TypeOfErrorToDiagnose::Capability, declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
+            maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
         }
     }
 
@@ -10570,7 +10570,7 @@ namespace Slang
             CapabilityAtom outFailedAtom{};
             if (hasTargetAtom(failedAtomsInsideAvailableSet, outFailedAtom))
             {
-                maybeDiagnose(getSink(), this->getOptionSet(), TypeOfErrorToDiagnose::Capability, decl->loc, Diagnostics::declHasDependenciesNotCompatibleOnTarget, decl, outFailedAtom);
+                maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, decl->loc, Diagnostics::declHasDependenciesNotCompatibleOnTarget, decl, outFailedAtom);
                 
                 // Anything defined on a non-failed target atom may be the culprit to why we fail having a target capability.
                 // Print out all possible culprits.
@@ -10605,7 +10605,7 @@ namespace Slang
         for (auto i : failedAtomsInsideAvailableSet)
         {
             CapabilityAtom formattedAtom = asAtom(i);
-            maybeDiagnose(getSink(), this->getOptionSet(), TypeOfErrorToDiagnose::Capability, decl->loc, diagnosticInfo, decl, formattedAtom);
+            maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, decl->loc, diagnosticInfo, decl, formattedAtom);
             // Print provenances.
             diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom);
         }

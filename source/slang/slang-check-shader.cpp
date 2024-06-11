@@ -519,7 +519,7 @@ namespace Slang
             targetCaps.join(stageCapabilitySet);
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
-                maybeDiagnose(sink, linkage->m_optionSet, TypeOfErrorToDiagnose::Capability, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
+                maybeDiagnose(sink, linkage->m_optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
                 
                 // Find out what exactly is incompatible and print out a trace of provenance to
                 // help user diagnose their code.
@@ -565,7 +565,7 @@ namespace Slang
                     maybeDiagnoseWarningOrError(
                         sink,
                         target->getOptionSet(),
-                        TypeOfErrorToDiagnose::Capability,
+                        DiagnosticCategory::Capability,
                         entryPointFuncDecl->loc,
                         Diagnostics::profileImplicitlyUpgraded,
                         Diagnostics::profileImplicitlyUpgradedRestrictive,

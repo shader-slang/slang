@@ -142,7 +142,7 @@ public:
     enum class ImpliesReturnFlags : int
     {
         NotImplied = 0,
-        Implied = 1 << 1,
+        Implied = 1 << 0,
     };
     /// Does this capability set imply all the capabilities in `other`?
     bool implies(CapabilitySet const& other) const;

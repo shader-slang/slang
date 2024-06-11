@@ -3332,23 +3332,23 @@ struct CompileTimerRAII
 };
 
 // helpers for error/warning reporting
-enum class TypeOfErrorToDiagnose
+enum class DiagnosticCategory
 {
     None = 0,
-    Capability = 1 << 1,
+    Capability = 1 << 0,
 };
 template<typename P, typename... Args>
-bool maybeDiagnose(DiagnosticSink* sink, CompilerOptionSet& optionSet, TypeOfErrorToDiagnose errorType, P const& pos, DiagnosticInfo const& info, Args const&... args)
+bool maybeDiagnose(DiagnosticSink* sink, CompilerOptionSet& optionSet, DiagnosticCategory errorType, P const& pos, DiagnosticInfo const& info, Args const&... args)
 {
-    if ((int)errorType & (int)TypeOfErrorToDiagnose::Capability && optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+    if ((int)errorType & (int)DiagnosticCategory::Capability && optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
         return false;
     return sink->diagnose(pos, info, args...);
 }
 
 template<typename P, typename... Args>
-bool maybeDiagnoseWarningOrError(DiagnosticSink* sink, CompilerOptionSet& optionSet, TypeOfErrorToDiagnose errorType, P const& pos, DiagnosticInfo const& warningInfo, DiagnosticInfo const& errorInfo, Args const&... args)
+bool maybeDiagnoseWarningOrError(DiagnosticSink* sink, CompilerOptionSet& optionSet, DiagnosticCategory errorType, P const& pos, DiagnosticInfo const& warningInfo, DiagnosticInfo const& errorInfo, Args const&... args)
 {
-    if ((int)errorType & (int)TypeOfErrorToDiagnose::Capability && optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck))
+    if ((int)errorType & (int)DiagnosticCategory::Capability && optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck))
     {
         return maybeDiagnose(sink, optionSet, errorType, pos, errorInfo, args...);
     }
