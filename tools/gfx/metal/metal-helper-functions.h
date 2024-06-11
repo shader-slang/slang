@@ -85,7 +85,7 @@ struct ComputeBindingContext : public BindingContext
     }
 };
 
-struct VertexBindingContext : public BindingContext
+struct RenderBindingContext : public BindingContext
 {
     MTL::RenderCommandEncoder* encoder;
 
@@ -99,42 +99,18 @@ struct VertexBindingContext : public BindingContext
     void setBuffer(MTL::Buffer* buffer, NS::UInteger index) override
     {
         encoder->setVertexBuffer(buffer, 0, index);
-    }
-
-    void setTexture(MTL::Texture* texture, NS::UInteger index) override
-    {
-        encoder->setVertexTexture(texture, index);
-    }
-
-    void setSampler(MTL::SamplerState* sampler, NS::UInteger index) override
-    {
-        encoder->setVertexSamplerState(sampler, index);
-    }
-};
-
-struct FragmentBindingContext : public BindingContext
-{
-    MTL::RenderCommandEncoder* encoder;
-
-    Result init(DeviceImpl* device, MTL::RenderCommandEncoder* encoder)
-    {
-        this->device = device;
-        this->encoder = encoder;
-        return SLANG_OK;
-    }
-
-    void setBuffer(MTL::Buffer* buffer, NS::UInteger index) override
-    {
         encoder->setFragmentBuffer(buffer, 0, index);
     }
 
     void setTexture(MTL::Texture* texture, NS::UInteger index) override
     {
+        encoder->setVertexTexture(texture, index);
         encoder->setFragmentTexture(texture, index);
     }
 
     void setSampler(MTL::SamplerState* sampler, NS::UInteger index) override
     {
+        encoder->setVertexSamplerState(sampler, index);
         encoder->setFragmentSamplerState(sampler, index);
     }
 };
