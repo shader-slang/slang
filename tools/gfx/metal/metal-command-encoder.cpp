@@ -360,8 +360,8 @@ Result RenderCommandEncoder::prepareDraw(MTL::RenderCommandEncoder*& encoder)
 
     encoder = m_commandBuffer->getMetalRenderCommandEncoder(m_renderPassDesc.get());
     encoder->setRenderPipelineState(pipeline->m_renderPipelineState.get());
-    // TODO only vertex stage bindings are set for now
-    VertexBindingContext bindingContext;
+
+    RenderBindingContext bindingContext;
     bindingContext.init(m_commandBuffer->m_device, encoder);
     auto program = static_cast<ShaderProgramImpl*>(m_currentPipeline->m_program.get());
     m_commandBuffer->m_rootObject.bindAsRoot(&bindingContext, program->m_rootObjectLayout);
@@ -406,7 +406,7 @@ Result RenderCommandEncoder::drawIndexed(
     SLANG_RETURN_ON_FAIL(prepareDraw(encoder));
     // TODO baseVertex is not supported by Metal
     encoder->drawIndexedPrimitives(m_primitiveType, indexCount, m_indexBufferType, m_indexBuffer, m_indexBufferOffset);
-    return SLANG_E_NOT_IMPLEMENTED;
+    return SLANG_OK;
 }
 
 Result RenderCommandEncoder::drawIndirect(
@@ -483,10 +483,12 @@ Result ComputeCommandEncoder::dispatchCompute(int x, int y, int z)
 
     MTL::ComputeCommandEncoder* encoder = m_commandBuffer->getMetalComputeCommandEncoder();
     encoder->setComputePipelineState(pipeline->m_computePipelineState.get());
+
     ComputeBindingContext bindingContext;
     bindingContext.init(m_commandBuffer->m_device, encoder);
     auto program = static_cast<ShaderProgramImpl*>(m_currentPipeline->m_program.get());
     m_commandBuffer->m_rootObject.bindAsRoot(&bindingContext, program->m_rootObjectLayout);
+
     encoder->dispatchThreadgroups(MTL::Size(x, y, z), pipeline->m_threadGroupSize);
 
     return SLANG_OK;
