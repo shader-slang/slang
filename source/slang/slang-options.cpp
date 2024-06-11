@@ -1051,6 +1051,13 @@ void OptionsParser::setProfileVersion(RawTarget* rawTarget, ProfileVersion profi
 
 void OptionsParser::addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom)
 {
+    CapabilitySet capSet(atom);
+    auto stageAtom = capSet.getUniquelyImpliedStageAtom();
+    if (stageAtom != CapabilityAtom::Invalid)
+    {
+        Stage stage = getStageFromAtom(stageAtom);
+        setStage(getCurrentEntryPoint(), stage);
+    }
     rawTarget->optionSet.addCapabilityAtom(atom);
 }
 

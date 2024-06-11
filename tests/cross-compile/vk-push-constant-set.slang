@@ -5,7 +5,7 @@
 // parameters and shifting a parameer block over to
 // `space=1`.
 
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry main -stage fragment
 
 struct S
 {
@@ -14,6 +14,9 @@ struct S
 
 [[vk::push_constant]]
 ConstantBuffer<S> x;
+
+// CHECK: OpDecorate %y Binding 0
+// CHECK: OpDecorate %y DescriptorSet 0
 
 ParameterBlock<S> y;
 

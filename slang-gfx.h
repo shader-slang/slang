@@ -1225,7 +1225,7 @@ struct DepthStencilDesc
     DepthStencilOpDesc  frontFace;
     DepthStencilOpDesc  backFace;
 
-    uint32_t stencilRef = 0;
+    uint32_t stencilRef = 0; // TODO: this should be removed
 };
 
 struct RasterizerDesc

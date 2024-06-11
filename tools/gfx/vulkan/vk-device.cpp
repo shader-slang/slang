@@ -464,6 +464,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.variablePointersFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.variablePointersFeatures;
         
+        // Compute shader derivative features.
+        extendedFeatures.computeShaderDerivativeFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.computeShaderDerivativeFeatures;
+
         // Extended dynamic states
         extendedFeatures.extendedDynamicStateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.extendedDynamicStateFeatures;
@@ -507,10 +511,6 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         // fragment shading rate features
         extendedFeatures.fragmentShadingRateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.fragmentShadingRateFeatures;
-
-        // Compute Quad Derivative features
-        extendedFeatures.computeShaderDerivativesFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &extendedFeatures.computeShaderDerivativesFeatures;
 
         if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_2)
         {
@@ -606,13 +606,6 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             "extended-dynamic-states"
         );
 
-        SIMPLE_EXTENSION_FEATURE(
-            extendedFeatures.computeShaderDerivativesFeatures,
-            computeDerivativeGroupQuads,
-            VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
-            "compute-shader-derivative"
-        );
-
         if (extendedFeatures.accelerationStructureFeatures.accelerationStructure
             && extensionNames.contains(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
             && extensionNames.contains(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME))
@@ -695,6 +688,13 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             variablePointers,
             VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME,
             "variable-pointer"
+        );
+        
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.computeShaderDerivativeFeatures,
+            computeDerivativeGroupLinear,
+            VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
+            "computeDerivativeGroupLinear"
         );
 
 #undef SIMPLE_EXTENSION_FEATURE

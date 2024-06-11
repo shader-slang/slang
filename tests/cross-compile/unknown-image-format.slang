@@ -1,8 +1,13 @@
 // unknown-image-format.slang
 
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment -default-image-format-unknown
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry main -stage fragment -default-image-format-unknown
 
 // Ensure that we can emit R/W images with an unknown format, when required.
+
+// CHECK: OpTypeImage %float 2D 2 0 0 2 Unknown
+// CHECK: OpTypeImage %float 2D 2 0 0 2 R32f
+// CHECK: OpTypeImage %float 2D 2 0 0 2 Rgba8
+// CHECK: OpTypeImage %float 2D 2 0 0 2 Rgba16f
 
 // Global Scope:
 

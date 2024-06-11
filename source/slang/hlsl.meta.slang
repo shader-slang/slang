@@ -3050,6 +3050,37 @@ ${{{{
 } // for (access).
 }}}}
 
+// Definitions to support the legacy texture .mips[][] operator.
+struct __TextureMip<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    int mip;
+    __subscript(vector<int, isArray + Shape.dimensions> pos)->T
+    {
+        [__unsafeForceInlineEarly]
+        get { return tex.Load(__makeVector(pos, mip)); }
+    }
+}
+struct __TextureMips<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    __subscript(int mip)->__TextureMip<T, Shape, isArray, isCombined, format>
+    {
+        [__unsafeForceInlineEarly]
+        get { return { tex, mip }; }
+    }
+}
+
+__generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+extension __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
+{
+    property __TextureMips<T, Shape, isArray, isCombined, format> mips
+    {
+        [__unsafeForceInlineEarly]
+        get { return { this }; }
+    }
+}
+
 // Texture type aliases.
 // T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int
 ${{{{
@@ -3624,13 +3655,14 @@ struct StructuredBuffer
     __intrinsic_op($(kIROp_StructuredBufferLoad))
     [__readNone]
     [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
-    T Load(int location);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
     [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
-    T Load(int location, out uint status);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    __subscript(uint index) -> T
+    __generic<TIndex : __BuiltinIntegerType>
+    __subscript(TIndex index) -> T
     {
         [__readNone]
         __intrinsic_op($(kIROp_StructuredBufferLoad))
@@ -4909,13 +4941,14 @@ struct $(item.name)
 
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoad))
-    T Load(int location);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoadStatus))
-    T Load(int location, out uint status);
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    __subscript(uint index) -> T
+    __generic<TIndex : __BuiltinIntegerType>
+    __subscript(TIndex index) -> T
     {
         [__NoSideEffect]
         __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
@@ -8210,6 +8243,9 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
     }
 }
 
+__intrinsic_op($(kIROp_GetPerVertexInputArray))
+Array<T, 3> __GetPerVertexInputArray<T>(T attribute);
+
 /// Get the value of a vertex attribute at a specific vertex.
 ///
 /// The `GetAttributeAtVertex()` function can be used in a fragment shader
@@ -8227,6 +8263,8 @@ __generic<T : __BuiltinType>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
+[KnownBuiltin("GetAttributeAtVertex")]
+[__unsafeForceInlineEarly]
 T GetAttributeAtVertex(T attribute, uint vertexIndex)
 {
     __target_switch
@@ -8234,13 +8272,8 @@ T GetAttributeAtVertex(T attribute, uint vertexIndex)
     case hlsl:
         __intrinsic_asm "GetAttributeAtVertex";
     case glsl:
-        __intrinsic_asm "$0[$1]";
     case spirv:
-        return spirv_asm {
-            %_ptr_Input_T = OpTypePointer Input $$T;
-            %addr = OpAccessChain %_ptr_Input_T $attribute $vertexIndex;
-            result:$$T = OpLoad %addr;
-        };
+        return __GetPerVertexInputArray(attribute)[vertexIndex];
     }
 }
 

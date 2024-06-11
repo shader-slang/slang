@@ -45,7 +45,7 @@ public:
 
     void beginCommandBuffer();
 
-    MTL::RenderCommandEncoder* getMetalRenderCommandEncoder();
+    MTL::RenderCommandEncoder* getMetalRenderCommandEncoder(MTL::RenderPassDescriptor* renderPassDesc);
     MTL::ComputeCommandEncoder* getMetalComputeCommandEncoder();
     MTL::BlitCommandEncoder* getMetalBlitCommandEncoder();
     void endMetalCommandEncoder();

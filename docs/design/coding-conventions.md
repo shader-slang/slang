@@ -31,7 +31,7 @@ As a general rule, be skeptical of "modern C++" ideas unless they are clearly be
 We are not quite in the realm of "Orthodox C++", but some of the same guidelines apply:
 
 * Don't use exceptions for non-fatal errors (and even then support a build flag to opt out of exceptions)
-* Don't the built-in C++ RTTI system (home-grown is okay)
+* Don't use the built-in C++ RTTI system (home-grown is okay)
 * Don't use the C++ variants of C headers (e.g., `<cstdio>` instead of `<stdio.h>`)
 * Don't use the STL containers
 * Don't use iostreams

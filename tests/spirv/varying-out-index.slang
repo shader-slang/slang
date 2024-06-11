@@ -12,9 +12,9 @@ struct PS_OUTPUT
     
 };
 
-// CHECK: OpDecorate %MainPS_vColor Location 0
-// CHECK: OpDecorate %MainPS_vColor2 Location 0
-// CHECK: OpDecorate %MainPS_vColor2 Index 1
+// CHECK: OpDecorate %{{.*}}MainPS_vColor Location 0
+// CHECK: OpDecorate %{{.*}}MainPS_vColor2 Location 0
+// CHECK: OpDecorate %{{.*}}MainPS_vColor2 Index 1
 
 PS_OUTPUT MainPS()
 {

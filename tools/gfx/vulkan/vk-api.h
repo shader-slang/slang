@@ -287,6 +287,10 @@ struct VulkanExtendedFeatureProperties
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTER_FEATURES_KHR
     };
 
+    VkPhysicalDeviceComputeShaderDerivativesFeaturesNV computeShaderDerivativeFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_NV
+    };
+
     // Clock features
     VkPhysicalDeviceShaderClockFeaturesKHR clockFeatures = { 
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR
@@ -310,10 +314,6 @@ struct VulkanExtendedFeatureProperties
     // Vulkan 1.2 features.
     VkPhysicalDeviceVulkan12Features vulkan12Features = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
-    };
-
-    VkPhysicalDeviceComputeShaderDerivativesFeaturesNV computeShaderDerivativesFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_NV
     };
 };
 

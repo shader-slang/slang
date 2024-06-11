@@ -1,7 +1,6 @@
 // struct-inherit-interface-requirement.slang
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 // Test that a `struct` type can use an inherited
 // member to satisfy an interface requirement.

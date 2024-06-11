@@ -20,41 +20,25 @@ enum
 class FramebufferLayoutImpl : public FramebufferLayoutBase
 {
 public:
-    RefPtr<DeviceImpl> m_device;
-    Desc m_desc;
-#if 0
-    MTL::RenderPassDescriptor* m_renderPass = nullptr;
-    Array<MTL::RenderPassColorAttachmentDescriptor*, kMaxTargets> m_targetDescs;
-    MTL::RenderPassDepthAttachmentDescriptor* m_depthAttachmentDesc = nullptr;
-    MTL::RenderPassStencilAttachmentDescriptor* m_stencilAttachmentDesc = nullptr;
-    bool m_hasDepthStencilTarget = false;
-    uint32_t m_renderTargetCount = 0;
-#endif
+    List<IFramebufferLayout::TargetLayout> m_renderTargets;
+    IFramebufferLayout::TargetLayout m_depthStencil;
 
 public:
-    ~FramebufferLayoutImpl();
-    Result init(DeviceImpl* device, const IFramebufferLayout::Desc& desc);
+    Result init(const IFramebufferLayout::Desc& desc);
 };
 
 class FramebufferImpl : public FramebufferBase
 {
 public:
     BreakableReference<DeviceImpl> m_device;
-    ShortList<ComPtr<IResourceView>> renderTargetViews;
-    ComPtr<IResourceView> depthStencilView;
+    RefPtr<FramebufferLayoutImpl> m_layout;
+    ShortList<RefPtr<TextureResourceViewImpl>> m_renderTargetViews;
+    RefPtr<TextureResourceViewImpl> m_depthStencilView;
     uint32_t m_width;
     uint32_t m_height;
-    MTL::ClearColor m_clearValues[kMaxTargets];
-    RefPtr<FramebufferLayoutImpl> m_layout;
-#if 0
-    Array<MTL::RenderPassColorAttachmentDescriptor*, kMaxTargets> m_colorTargetDescs;
-    MTL::RenderPassDepthAttachmentDescriptor* m_depthAttachmentDesc = nullptr;
-    MTL::RenderPassStencilAttachmentDescriptor* m_stencilAttachmentDesc = nullptr;
-#endif
+    uint32_t m_sampleCount;
 
 public:
-    ~FramebufferImpl();
-
     Result init(DeviceImpl* device, const IFramebuffer::Desc& desc);
 };
 

@@ -8,6 +8,8 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
+#include "slang-ir-clone.h"
+
 #include "slang-glsl-extension-tracker.h"
 #include "../../external/spirv-headers/include/spirv/unified1/spirv.h"
 
@@ -416,6 +418,10 @@ struct GLSLLegalizationContext
 
     // Currently only used for special cases of semantics which map to global variables
     Dictionary<UnownedStringSlice, SystemSemanticGlobal> systemNameToGlobalMap;
+
+    // Map from a input parameter in fragment shader to its corresponding per-vertex array
+    // to support the `GetAttributeAtVertex` intrinsic.
+    Dictionary<IRInst*, IRInst*> mapVertexInputToPerVertexArray;
 
     void requireGLSLExtension(const UnownedStringSlice& name)
     {
@@ -852,6 +858,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // float[4] on glsl
         requiredType = builder->getArrayType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 4));
     }
+    else if (semanticName == "sv_insidetessfactor")
+    {
+        name = "gl_TessLevelInner";
+
+        // float[2] on glsl
+        requiredType = builder->getArrayType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 2));
+    }
     else if (semanticName == "sv_vertexid")
     {
         // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
@@ -1071,12 +1084,30 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         &systemValueInfoStorage);
 
     IRType* type = inType;
+    IRType* peeledRequiredType = nullptr;
 
     // A system-value semantic might end up needing to override the type
     // that the user specified.
     if( systemValueInfo && systemValueInfo->requiredType )
     {
         type = systemValueInfo->requiredType;
+        peeledRequiredType = type;
+        // Unpeel `type` using declarators so that it matches `inType`.
+        for (auto dd = declarator; dd; dd = dd->next)
+        {
+            switch (dd->flavor)
+            {
+            case GlobalVaryingDeclarator::Flavor::array:
+                {
+                    if (auto arrayType = as<IRArrayTypeBase>(type))
+                    {
+                        type = arrayType->getElementType();
+                        peeledRequiredType = type;
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     // If we have a declarator, we just use the normal logic, as that seems to work correctly
@@ -1237,16 +1268,14 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
     if (systemValueInfo)
     {
-        if (auto fromType = systemValueInfo->requiredType)
+        if (systemValueInfo->requiredType)
         {
             // We may need to adapt from the declared type to/from
             // the actual type of the GLSL global.
-            auto toType = inType;
-
-            if (!isTypeEqual(fromType, toType))
+            if (!isTypeEqual(peeledRequiredType, inType))
             {
                 RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter = new ScalarizedTypeAdapterValImpl;
-                typeAdapter->actualType = systemValueInfo->requiredType;
+                typeAdapter->actualType = peeledRequiredType;
                 typeAdapter->pretendType = inType;
                 typeAdapter->val = val;
 
@@ -1525,6 +1554,8 @@ ScalarizedVal createGLSLGlobalVaryings(
     StringBuilder namehintSB;
     if (auto nameHint = leafVar->findDecoration<IRNameHintDecoration>())
     {
+        if (leafVar->getOp() == kIROp_Func)
+            namehintSB << "entryPointParam_";
         namehintSB << nameHint->getName();
     }
     OuterParamInfoLink outerParamInfo;
@@ -2418,6 +2449,91 @@ static void legalizeMeshOutputParam(
     g->removeAndDeallocate();
 }
 
+IRInst* getOrCreatePerVertexInputArray(
+    GLSLLegalizationContext* context,
+    IRInst* inputVertexAttr)
+{
+    IRInst* arrayInst = nullptr;
+    if (context->mapVertexInputToPerVertexArray.tryGetValue(inputVertexAttr, arrayInst))
+        return arrayInst;
+    IRBuilder builder(inputVertexAttr);
+    builder.setInsertBefore(inputVertexAttr);
+    auto arrayType = builder.getArrayType(inputVertexAttr->getDataType(), builder.getIntValue(builder.getIntType(), 3));
+    arrayInst = builder.createGlobalParam(arrayType);
+    context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
+    builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
+
+    // Clone decorations from original input.
+    for (auto decoration : inputVertexAttr->getDecorations())
+    {
+        switch (decoration->getOp())
+        {
+        case kIROp_InterpolationModeDecoration:
+            continue;
+        default:
+            cloneDecoration(decoration, arrayInst);
+            break;
+        }
+    }
+    return arrayInst;
+}
+
+void tryReplaceUsesOfStageInput(
+    GLSLLegalizationContext* context,
+    ScalarizedVal val,
+    IRInst* originalVal)
+{
+    switch (val.flavor)
+    {
+    case ScalarizedVal::Flavor::value:
+        {
+            traverseUses(originalVal, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                if (user->getOp() == kIROp_GetPerVertexInputArray)
+                {
+                    auto arrayInst = getOrCreatePerVertexInputArray(context, val.irValue);
+                    user->replaceUsesWith(arrayInst);
+                    user->removeAndDeallocate();
+                }
+                else
+                {
+                    IRBuilder builder(user);
+                    builder.setInsertBefore(user);
+                    builder.replaceOperand(use, val.irValue);
+                }
+            });
+        }
+        break;
+    case ScalarizedVal::Flavor::tuple:
+        {
+            auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
+            traverseUses(originalVal, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                if (auto fieldExtract = as<IRFieldExtract>(user))
+                {
+                    auto fieldKey = fieldExtract->getField();
+                    ScalarizedVal fieldVal;
+                    for (auto element : tupleVal->elements)
+                    {
+                        if (element.key == fieldKey)
+                        {
+                            fieldVal = element.val;
+                            break;
+                        }
+                    }
+                    if (fieldVal.flavor != ScalarizedVal::Flavor::none)
+                    {
+                        tryReplaceUsesOfStageInput(context, fieldVal, user);
+                    }
+                }
+            });
+        }
+        break;
+    }
+}
+
 void legalizeEntryPointParameterForGLSL(
     GLSLLegalizationContext*    context,
     CodeGenContext*             codeGenContext,
@@ -2725,6 +2841,8 @@ void legalizeEntryPointParameterForGLSL(
             context,
             codeGenContext,
             builder, paramType, paramLayout, LayoutResourceKind::VaryingInput, stage, pp);
+
+        tryReplaceUsesOfStageInput(context, globalValue, pp);
 
         // we have a simple struct which represents all materialized GlobalParams, this
         // struct will replace the no longer needed global variable which proxied as a 
