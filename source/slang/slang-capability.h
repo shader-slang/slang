@@ -139,13 +139,14 @@ public:
     /// Is this capability set incompatible with the given `other` atomic capability.
     bool isIncompatibleWith(CapabilitySet const& other) const;
 
-    /// Does this capability set imply all the capabilities in `other`?
     enum class ImpliesReturnFlags : int
     {
         NotImplied = 0,
         Implied = 1 << 1,
     };
+    /// Does this capability set imply all the capabilities in `other`?
     bool implies(CapabilitySet const& other) const;
+    /// Does this capability set imply at least 1 set in other.
     ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const;
 
     /// Does this capability set imply the atomic capability `other`?
@@ -324,6 +325,7 @@ CapabilityName findCapabilityName(UnownedStringSlice const& name);
 CapabilityAtom getLatestSpirvAtom();
 CapabilityAtom getLatestMetalAtom();
 
+/// For debug purposes ensure a casted CapabilityAtom is valid
 template<typename T>
 inline CapabilityAtom asAtom(T name)
 {

@@ -61,7 +61,7 @@ def metal : target + textualTarget;
 def spirv : target;
 
 // Capabilities that stand for target spirv version for GLSL backend.
-// These are not compilation targets. We will convert spirv->glsl_spirv 
+// These are not compilation targets. We will convert `_spirv_*`->`glsl_spirv_*` during a compile. 
 def glsl_spirv_1_0 : glsl;
 def glsl_spirv_1_1 : glsl_spirv_1_0;
 def glsl_spirv_1_2 : glsl_spirv_1_1;
@@ -712,6 +712,7 @@ alias DX_6_4 = sm_6_4;
 alias DX_6_5 = sm_6_5;
 alias DX_6_6 = sm_6_6;
 alias DX_6_7 = sm_6_7;
+
 
 alias METAL_2_3 = metallib_2_3;
 alias METAL_2_4 = metallib_2_4;

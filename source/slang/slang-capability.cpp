@@ -848,7 +848,7 @@ bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, C
     return true;
 }
 
-/// converts spirv version atom to the glsl_spirv equivlent. If not possible, Invalid is returned
+/// Converts spirv version atom to the glsl_spirv equivlent. If not possible, Invalid is returned
 inline CapabilityName maybeConvertSpirvVersionToGlslSpirvVersion(CapabilityName& atom)
 {
     if (atom >= CapabilityName::_spirv_1_0 && asAtom(atom) <= getLatestSpirvAtom())

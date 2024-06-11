@@ -117,7 +117,7 @@ void ShaderCompilerUtil::Output::reset()
     if (!hasRepro)
     {
         spSetCodeGenTarget(slangRequest, input.target);
-        if(input.profile.getLength()) // do not set profile unless explicitly requested
+        if(input.profile.getLength()) // do not set profile unless requested
             spSetTargetProfile(slangRequest, 0, spFindProfile(out.session, input.profile.getBuffer()));
         if (options.generateSPIRVDirectly)
             spSetTargetFlags(slangRequest, 0, SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY);

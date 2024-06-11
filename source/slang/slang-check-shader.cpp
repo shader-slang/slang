@@ -542,11 +542,7 @@ namespace Slang
             }
             else
             {
-
-                // if profile was implicitly upgraded:
-                // A = entry point, B = target
-                // 1. if(!B.implies(A)) => disjoint sets, missing capabilities, error
-
+                // Only attempt to error if a user adds to slangc either `-profile` or `-capability`
                 if (
                     (
                         target->getOptionSet().hasOption(CompilerOptionName::Capability)
