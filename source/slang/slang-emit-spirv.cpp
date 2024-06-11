@@ -3535,6 +3535,15 @@ struct SPIRVEmitContext
                 (IRInterpolationMode)getIntVal(decoration->getOperand(0)),
                 dstID);
             break;
+        case kIROp_PerVertexDecoration:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
+            requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvDecorationPerVertexKHR);
+            break;
         case kIROp_MemoryQualifierSetDecoration:
         {
             auto collection = as<IRMemoryQualifierSetDecoration>(decoration);
