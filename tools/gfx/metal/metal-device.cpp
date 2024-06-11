@@ -538,8 +538,12 @@ Result DeviceImpl::createTextureView(
     NS::Range sliceRange(sr.mipLevel, sr.mipLevelCount);
 
     viewImpl->m_textureView = NS::TransferPtr(textureImpl->m_texture->newTextureView(pixelFormat, textureImpl->m_textureType, levelRange, sliceRange));
-    returnComPtr(outView, viewImpl);
+    if (!viewImpl->m_textureView)
+    {
+        return SLANG_FAIL;
+    }
 
+    returnComPtr(outView, viewImpl);
     return SLANG_OK;
 }
 
