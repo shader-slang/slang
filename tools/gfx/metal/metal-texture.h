@@ -22,9 +22,8 @@ public:
 
     BreakableReference<DeviceImpl> m_device;
     NS::SharedPtr<MTL::Texture> m_texture;
-    // TODO still needed?
-    // MTL::PixelFormat m_metalFormat = MTL::PixelFormat::PixelFormatInvalid;
-    // bool m_isWeakImageReference = false;
+    MTL::TextureType m_textureType;
+    MTL::PixelFormat m_pixelFormat;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override;
 
