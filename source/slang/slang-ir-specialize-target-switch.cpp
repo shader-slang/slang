@@ -9,6 +9,16 @@ namespace Slang
 {
     void specializeTargetSwitch(TargetRequest* target, IRGlobalValueWithCode* code, DiagnosticSink* sink)
     {
+        if (auto gen = as<IRGeneric>(code))
+        {
+            auto retVal = findGenericReturnVal(gen);
+            if (auto innerCode = as<IRGlobalValueWithCode>(retVal))
+            {
+                specializeTargetSwitch(target, innerCode, sink);
+                return;
+            }
+        }
+
         bool changed = false;
         for (auto block : code->getBlocks())
         {
@@ -76,14 +86,6 @@ namespace Slang
             if (auto code = as<IRGlobalValueWithCode>(globalInst))
             {
                 specializeTargetSwitch(target, code, sink);
-                if (auto gen = as<IRGeneric>(code))
-                {
-                    auto retVal = findGenericReturnVal(gen);
-                    if (auto innerCode = as<IRGlobalValueWithCode>(retVal))
-                    {
-                        specializeTargetSwitch(target, innerCode, sink);
-                    }
-                }
             }
         }
     }
