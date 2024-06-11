@@ -406,7 +406,7 @@ Result RenderCommandEncoder::drawIndexed(
     SLANG_RETURN_ON_FAIL(prepareDraw(encoder));
     // TODO baseVertex is not supported by Metal
     encoder->drawIndexedPrimitives(m_primitiveType, indexCount, m_indexBufferType, m_indexBuffer, m_indexBufferOffset);
-    return SLANG_E_NOT_IMPLEMENTED;
+    return SLANG_OK;
 }
 
 Result RenderCommandEncoder::drawIndirect(
