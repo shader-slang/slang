@@ -15,7 +15,9 @@ TextureResourceViewImpl::~TextureResourceViewImpl()
 
 Result TextureResourceViewImpl::getNativeHandle(InteropHandle* outHandle)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    outHandle->api = InteropHandleAPI::Metal;
+    outHandle->handleValue = reinterpret_cast<uintptr_t>(m_textureView.get());
+    return SLANG_OK;
 }
 
 BufferResourceViewImpl::~BufferResourceViewImpl()
@@ -24,7 +26,9 @@ BufferResourceViewImpl::~BufferResourceViewImpl()
 
 Result BufferResourceViewImpl::getNativeHandle(InteropHandle* outHandle)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    outHandle->api = InteropHandleAPI::Metal;
+    outHandle->handleValue = reinterpret_cast<uintptr_t>(m_buffer->m_buffer.get());
+    return SLANG_OK;
 }
 
 TexelBufferResourceViewImpl::TexelBufferResourceViewImpl(DeviceImpl* device)
