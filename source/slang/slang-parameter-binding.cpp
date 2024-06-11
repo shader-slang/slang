@@ -2103,6 +2103,23 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
         return arrayTypeLayout;
     }
+    else if (auto patchType = as<HLSLPatchType>(type))
+    {
+        // Similar to the MeshOutput case, a `InputPatch` or `OutputPatch` type is just like an array.
+        //
+        auto elementTypeLayout = processEntryPointVaryingParameter(context, patchType->getElementType(), state, varLayout);
+
+        RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
+        arrayTypeLayout->elementTypeLayout = elementTypeLayout;
+        arrayTypeLayout->type = arrayType;
+
+        for (auto rr : elementTypeLayout->resourceInfos)
+        {
+            arrayTypeLayout->findOrAddResourceInfo(rr.kind)->count = rr.count;
+        }
+
+        return arrayTypeLayout;
+    }
     // Ignore a bunch of types that don't make sense here...
     else if (const auto subpassType = as<SubpassInputType>(type)) { return nullptr;  }
     else if (const auto textureType = as<TextureType>(type)) { return nullptr;  }
