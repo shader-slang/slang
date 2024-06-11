@@ -1870,7 +1870,7 @@ namespace Slang
             DeclRefType::create(m_astBuilder, structDecl),
             structDecl->ownedScope,
             LookupMask::Function,
-            LookupOptions::IgnoreInheritance);
+            (LookupOptions)((Index)LookupOptions::IgnoreInheritance | (Index)LookupOptions::NoDeref));
 
         if (!ctorLookupResult.isValid())
             return ctorList;
@@ -2013,7 +2013,7 @@ namespace Slang
             varDecl->setCheckState(DeclCheckState::DefinitionChecked);
             _validateCircularVarDefinition(varDecl);
         }
-        else if(as<DeclRefType>(varDecl->type.type))
+        else
         {
             // If a variable doesn't have an explicit initial-value
             // expression, it is still possible that it should
