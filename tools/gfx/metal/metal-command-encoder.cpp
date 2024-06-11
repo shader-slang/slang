@@ -227,7 +227,7 @@ void RenderCommandEncoder::beginPass(IRenderPassLayout* renderPass, IFramebuffer
     {
         TextureResourceViewImpl* renderTargetView = m_framebuffer->m_renderTargetViews[i];
         MTL::RenderPassColorAttachmentDescriptor* colorAttachment = m_renderPassDesc->colorAttachments()->object(i);
-        colorAttachment->setTexture(renderTargetView->m_texture->m_texture.get());
+        colorAttachment->setTexture(renderTargetView->m_textureView.get());
         colorAttachment->setLevel(renderTargetView->m_desc.subresourceRange.mipLevel);
         colorAttachment->setSlice(renderTargetView->m_desc.subresourceRange.baseArrayLayer);
     }
@@ -239,14 +239,14 @@ void RenderCommandEncoder::beginPass(IRenderPassLayout* renderPass, IFramebuffer
         if (MetalUtil::isDepthFormat(pixelFormat))
         {
             MTL::RenderPassDepthAttachmentDescriptor* depthAttachment = m_renderPassDesc->depthAttachment();
-            depthAttachment->setTexture(depthStencilView->m_texture->m_texture.get());
+            depthAttachment->setTexture(depthStencilView->m_textureView.get());
             depthAttachment->setLevel(depthStencilView->m_desc.subresourceRange.mipLevel);
             depthAttachment->setSlice(depthStencilView->m_desc.subresourceRange.baseArrayLayer);
         }
         if (MetalUtil::isStencilFormat(pixelFormat))
         {
             MTL::RenderPassStencilAttachmentDescriptor* stencilAttachment = m_renderPassDesc->stencilAttachment();
-            stencilAttachment->setTexture(depthStencilView->m_texture->m_texture.get());
+            stencilAttachment->setTexture(depthStencilView->m_textureView.get());
             stencilAttachment->setLevel(depthStencilView->m_desc.subresourceRange.mipLevel);
             stencilAttachment->setSlice(depthStencilView->m_desc.subresourceRange.baseArrayLayer);
         }

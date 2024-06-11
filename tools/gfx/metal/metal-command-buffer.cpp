@@ -77,7 +77,9 @@ void CommandBufferImpl::close()
 
 Result CommandBufferImpl::getNativeHandle(InteropHandle* outHandle)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    outHandle->api = InteropHandleAPI::Metal;
+    outHandle->handleValue = reinterpret_cast<intptr_t>(m_commandBuffer.get());
+    return SLANG_OK;
 }
 
 MTL::RenderCommandEncoder* CommandBufferImpl::getMetalRenderCommandEncoder(MTL::RenderPassDescriptor* renderPassDesc)
