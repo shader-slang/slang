@@ -3691,13 +3691,30 @@ struct ConsumeStructuredBuffer
     }
 };
 
+__intrinsic_op($(kIROp_GetElement))
+T __getElement<T, U, I>(U collection, I index);
+
 __generic<T, let N : int>
 [require(glsl_hlsl_spirv, hull)]
 __magic_type(HLSLInputPatchType)
 __intrinsic_type($(kIROp_HLSLInputPatchType))
 struct InputPatch
 {
-    __subscript(uint index) -> T;
+    __generic<TIndex : __BuiltinIntegerType>
+    __subscript(TIndex index)->T
+    {
+        [__unsafeForceInlineEarly]
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+                __intrinsic_asm ".operator[]";
+            default:
+                return __getElement<T>(this, index);
+            }
+        }
+    }
 };
 
 __generic<T, let N : int>
@@ -3706,7 +3723,21 @@ __magic_type(HLSLOutputPatchType)
 __intrinsic_type($(kIROp_HLSLOutputPatchType))
 struct OutputPatch
 {
-    __subscript(uint index) -> T;
+    __generic<TIndex : __BuiltinIntegerType>
+    __subscript(TIndex index)->T
+    {
+        [__unsafeForceInlineEarly]
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+                __intrinsic_asm ".operator[]";
+            default:
+                return __getElement<T>(this, index);
+            }
+        }
+    }
 };
 
 ${{{{
