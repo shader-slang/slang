@@ -8,6 +8,8 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
+#include "slang-ir-clone.h"
+
 #include "slang-glsl-extension-tracker.h"
 #include "../../external/spirv-headers/include/spirv/unified1/spirv.h"
 
@@ -416,6 +418,10 @@ struct GLSLLegalizationContext
 
     // Currently only used for special cases of semantics which map to global variables
     Dictionary<UnownedStringSlice, SystemSemanticGlobal> systemNameToGlobalMap;
+
+    // Map from a input parameter in fragment shader to its corresponding per-vertex array
+    // to support the `GetAttributeAtVertex` intrinsic.
+    Dictionary<IRInst*, IRInst*> mapVertexInputToPerVertexArray;
 
     void requireGLSLExtension(const UnownedStringSlice& name)
     {
@@ -2443,6 +2449,91 @@ static void legalizeMeshOutputParam(
     g->removeAndDeallocate();
 }
 
+IRInst* getOrCreatePerVertexInputArray(
+    GLSLLegalizationContext* context,
+    IRInst* inputVertexAttr)
+{
+    IRInst* arrayInst = nullptr;
+    if (context->mapVertexInputToPerVertexArray.tryGetValue(inputVertexAttr, arrayInst))
+        return arrayInst;
+    IRBuilder builder(inputVertexAttr);
+    builder.setInsertBefore(inputVertexAttr);
+    auto arrayType = builder.getArrayType(inputVertexAttr->getDataType(), builder.getIntValue(builder.getIntType(), 3));
+    arrayInst = builder.createGlobalParam(arrayType);
+    context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
+    builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
+
+    // Clone decorations from original input.
+    for (auto decoration : inputVertexAttr->getDecorations())
+    {
+        switch (decoration->getOp())
+        {
+        case kIROp_InterpolationModeDecoration:
+            continue;
+        default:
+            cloneDecoration(decoration, arrayInst);
+            break;
+        }
+    }
+    return arrayInst;
+}
+
+void tryReplaceUsesOfStageInput(
+    GLSLLegalizationContext* context,
+    ScalarizedVal val,
+    IRInst* originalVal)
+{
+    switch (val.flavor)
+    {
+    case ScalarizedVal::Flavor::value:
+        {
+            traverseUses(originalVal, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                if (user->getOp() == kIROp_GetPerVertexInputArray)
+                {
+                    auto arrayInst = getOrCreatePerVertexInputArray(context, val.irValue);
+                    user->replaceUsesWith(arrayInst);
+                    user->removeAndDeallocate();
+                }
+                else
+                {
+                    IRBuilder builder(user);
+                    builder.setInsertBefore(user);
+                    builder.replaceOperand(use, val.irValue);
+                }
+            });
+        }
+        break;
+    case ScalarizedVal::Flavor::tuple:
+        {
+            auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
+            traverseUses(originalVal, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                if (auto fieldExtract = as<IRFieldExtract>(user))
+                {
+                    auto fieldKey = fieldExtract->getField();
+                    ScalarizedVal fieldVal;
+                    for (auto element : tupleVal->elements)
+                    {
+                        if (element.key == fieldKey)
+                        {
+                            fieldVal = element.val;
+                            break;
+                        }
+                    }
+                    if (fieldVal.flavor != ScalarizedVal::Flavor::none)
+                    {
+                        tryReplaceUsesOfStageInput(context, fieldVal, user);
+                    }
+                }
+            });
+        }
+        break;
+    }
+}
+
 void legalizeEntryPointParameterForGLSL(
     GLSLLegalizationContext*    context,
     CodeGenContext*             codeGenContext,
@@ -2750,6 +2841,8 @@ void legalizeEntryPointParameterForGLSL(
             context,
             codeGenContext,
             builder, paramType, paramLayout, LayoutResourceKind::VaryingInput, stage, pp);
+
+        tryReplaceUsesOfStageInput(context, globalValue, pp);
 
         // we have a simple struct which represents all materialized GlobalParams, this
         // struct will replace the no longer needed global variable which proxied as a 
