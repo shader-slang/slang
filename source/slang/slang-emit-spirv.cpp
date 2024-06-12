@@ -2139,6 +2139,7 @@ struct SPIRVEmitContext
     {
         bool needDefaultSetBindingDecoration = false;
         bool hasExplicitSetBinding = false;
+        bool isDescirptorSetDecorated = false;
         for (auto rr : layout->getOffsetAttrs())
         {
             UInt index = rr->getOffset();
@@ -2200,32 +2201,40 @@ struct SPIRVEmitContext
                     nullptr,
                     varInst,
                     SpvLiteralInteger::from32(int32_t(index)));
-                if (space)
+                if (!isDescirptorSetDecorated)
+                {
+                    if (space)
+                    {
+                        emitOpDecorateDescriptorSet(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            varInst,
+                            SpvLiteralInteger::from32(int32_t(space)));
+                        isDescirptorSetDecorated = true;
+                    }
+                    else
+                    {
+                        needDefaultSetBindingDecoration = true;
+                    }
+                }
+                break;
+            case LayoutResourceKind::RegisterSpace:
+                if (!isDescirptorSetDecorated)
                 {
                     emitOpDecorateDescriptorSet(
                         getSection(SpvLogicalSectionID::Annotations),
                         nullptr,
                         varInst,
-                        SpvLiteralInteger::from32(int32_t(space)));
+                        SpvLiteralInteger::from32(int32_t(index)));
+                    hasExplicitSetBinding = true;
+                    isDescirptorSetDecorated = true;
                 }
-                else
-                {
-                    needDefaultSetBindingDecoration = true;
-                }
-                break;
-            case LayoutResourceKind::RegisterSpace:
-                emitOpDecorateDescriptorSet(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    nullptr,
-                    varInst,
-                    SpvLiteralInteger::from32(int32_t(index)));
-                hasExplicitSetBinding = true;
                 break;
             default:
                 break;
             }
         }
-        if (needDefaultSetBindingDecoration && !hasExplicitSetBinding)
+        if (needDefaultSetBindingDecoration && !hasExplicitSetBinding && !isDescirptorSetDecorated)
         {
             emitOpDecorateDescriptorSet(
                 getSection(SpvLogicalSectionID::Annotations),
@@ -6431,9 +6440,12 @@ SlangResult emitSPIRVFromIR(
     }
 #endif
 
+    auto shouldPreserveParams = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::PreserveParameters);
     for (auto inst : irModule->getGlobalInsts())
     {
         if (as<IRDebugSource>(inst))
+            context.ensureInst(inst);
+        if (shouldPreserveParams && as<IRGlobalParam>(inst))
             context.ensureInst(inst);
     }
 
