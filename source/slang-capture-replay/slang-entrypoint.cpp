@@ -57,6 +57,16 @@ namespace SlangCapture
         return res;
     }
 
+    SLANG_NO_THROW SlangResult EntryPointCapture::getTargetCode(
+        SlangInt    targetIndex,
+        slang::IBlob** outCode,
+        slang::IBlob** outDiagnostics)
+    {
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+        SlangResult res = m_actualEntryPoint->getTargetCode(targetIndex, outCode, outDiagnostics);
+        return res;
+    }
+
     SLANG_NO_THROW SlangResult EntryPointCapture::getResultAsFileSystem(
         SlangInt    entryPointIndex,
         SlangInt    targetIndex,

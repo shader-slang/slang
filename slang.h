@@ -4951,6 +4951,11 @@ namespace slang
             uint32_t compilerOptionEntryCount,
             CompilerOptionEntry* compilerOptionEntries,
             ISlangBlob** outDiagnostics = nullptr) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt targetIndex,
+            IBlob** outCode,
+            IBlob** outDiagnostics = nullptr) = 0;
     };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
 

@@ -60,6 +60,16 @@ namespace SlangCapture
         return res;
     }
 
+    SLANG_NO_THROW SlangResult TypeConformanceCapture::getTargetCode(
+        SlangInt    targetIndex,
+        slang::IBlob** outCode,
+        slang::IBlob** outDiagnostics)
+    {
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+        SlangResult res = m_actualTypeConformance->getTargetCode(targetIndex, outCode, outDiagnostics);
+        return res;
+    }
+
     SLANG_NO_THROW SlangResult TypeConformanceCapture::getResultAsFileSystem(
         SlangInt    entryPointIndex,
         SlangInt    targetIndex,
