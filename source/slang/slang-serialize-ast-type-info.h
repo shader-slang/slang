@@ -199,11 +199,9 @@ struct SerialTypeInfo<CapabilityTargetSet>
         auto& shaderStageSets = dst.shaderStageSets;
         shaderStageSets.clear();
         shaderStageSets.reserve(items.getCount());
-        Index iter = 0;
         for (auto& i : items)
         {
             dst.shaderStageSets[i.stage] = i;
-            iter++;
         }
     }
 };
