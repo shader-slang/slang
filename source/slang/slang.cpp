@@ -1754,7 +1754,7 @@ CapabilitySet TargetRequest::getTargetCaps()
         {
             isGLSLTarget = true;
             atoms.add(CapabilityName::glsl);
-            profileCaps.AddSpirvVersionFromOtherAsGlslSpirvVersion(profileCaps);
+            profileCaps.addSpirvVersionFromOtherAsGlslSpirvVersion(profileCaps);
         }
         break;
 
@@ -1805,7 +1805,7 @@ CapabilitySet TargetRequest::getTargetCaps()
         auto toAdd = CapabilitySet((CapabilityName)atomVal.intValue);
         
         if(isGLSLTarget)
-            targetCap.AddSpirvVersionFromOtherAsGlslSpirvVersion(toAdd);
+            targetCap.addSpirvVersionFromOtherAsGlslSpirvVersion(toAdd);
 
         if (!targetCap.isIncompatibleWith(toAdd))
             targetCap.join(toAdd);

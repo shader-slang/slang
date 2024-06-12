@@ -298,7 +298,7 @@ public:
     CapabilitySet::AtomSets::Iterator getAtomSets() const;
 
     /// Add spirv version capabilities from 'spirv CapabilityTargetSet' as glsl_spirv version capability in 'glsl CapabilityTargetSet'
-    void AddSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& other);
+    void addSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& other);
 
 private:
     /// underlying data of CapabilitySet.

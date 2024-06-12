@@ -858,7 +858,7 @@ inline CapabilityName maybeConvertSpirvVersionToGlslSpirvVersion(CapabilityName&
     return CapabilityName::Invalid;
 }
 
-void CapabilitySet::AddSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& other)
+void CapabilitySet::addSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& other)
 {
     if (auto* otherTargetSet = other.m_targetSets.tryGetValue(CapabilityAtom::spirv))
     {
