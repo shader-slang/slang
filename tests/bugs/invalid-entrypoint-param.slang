@@ -3,7 +3,7 @@
 // `TT` is not valid for defining a varying entrypoint parameter,
 // and we should diagnose an error.
 
-// CHECK: error
+// CHECK: error 39028
 
 struct TT
 {
