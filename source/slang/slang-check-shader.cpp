@@ -519,7 +519,7 @@ namespace Slang
             targetCaps.join(stageCapabilitySet);
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
-                diagnoseCapabilityErrors(sink, linkage->m_optionSet, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
+                maybeDiagnose(sink, linkage->m_optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
                 
                 // Find out what exactly is incompatible and print out a trace of provenance to
                 // help user diagnose their code.
@@ -532,12 +532,44 @@ namespace Slang
                 {
                     for (auto inferredAtom : *interredCapConjunctions.begin())
                     {
-                        CapabilityAtom inferredAtomFormatted = (CapabilityAtom)inferredAtom;
+                        CapabilityAtom inferredAtomFormatted = asAtom(inferredAtom);
                         if (!compileCaps->contains((UInt)inferredAtom))
                         {
                             diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtomFormatted);
                         }
                     }
+                }
+            }
+            else
+            {
+                // Only attempt to error if a user adds to slangc either `-profile` or `-capability`
+                if (
+                    (
+                        target->getOptionSet().hasOption(CompilerOptionName::Capability)
+                        ||
+                        target->getOptionSet().hasOption(CompilerOptionName::Profile)
+                        )
+                    && targetCaps.atLeastOneSetImpliedInOther(entryPointFuncDecl->inferredCapabilityRequirements) == CapabilitySet::ImpliesReturnFlags::NotImplied
+                    )
+                {
+                    CapabilitySet combinedSets = targetCaps;
+                    combinedSets.join(entryPointFuncDecl->inferredCapabilityRequirements);
+                    CapabilityAtomSet addedAtoms{};
+                    if (auto targetCapSet = targetCaps.getAtomSets())
+                    {
+                        if (auto combinedSet = combinedSets.getAtomSets())
+                        {
+                            CapabilityAtomSet::calcSubtract(addedAtoms, (*combinedSet), (*targetCapSet));
+                        }
+                    }
+                    maybeDiagnoseWarningOrError(
+                        sink,
+                        target->getOptionSet(),
+                        DiagnosticCategory::Capability,
+                        entryPointFuncDecl->loc,
+                        Diagnostics::profileImplicitlyUpgraded,
+                        Diagnostics::profileImplicitlyUpgradedRestrictive,
+                        addedAtoms.getElements<CapabilityAtom>());
                 }
             }
         }

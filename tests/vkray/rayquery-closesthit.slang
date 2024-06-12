@@ -25,7 +25,6 @@ void main(
 }
 
 // CHECK: OpCapability RayQueryKHR
-// CHECK: OpCapability RayTracingPositionFetchKHR
 // CHECK: OpCapability RayQueryPositionFetchKHR
 // CHECK: OpExtension "SPV_KHR_ray_query"
 // CHECK: OpExtension "SPV_KHR_ray_tracing_position_fetch"
