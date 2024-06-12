@@ -1689,6 +1689,52 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
             maybeCloseParens(innerNeedClose);
             return;
         }
+        case kIROp_GetElementPtr:
+        {
+            const auto info = getInfo(EmitOp::Prefix);
+            auto rightSidePrec = rightSide(outerPrec, info);
+            auto postfixInfo = getInfo(EmitOp::Postfix);
+            bool rightSideNeedClose = maybeEmitParens(rightSidePrec, postfixInfo);
+            emitDereferenceOperand(inst->getOperand(0), leftSide(rightSidePrec, postfixInfo));
+            bool emitBracketPostfix = true;
+            if (auto intLit = as<IRIntLit>(inst->getOperand(1)))
+            {
+                // Simplify the emitted code if we are referencing a known vector element.
+                if (auto ptrType = as<IRPtrTypeBase>(inst->getOperand(0)->getDataType()))
+                {
+                    if (as<IRVectorType>(ptrType->getValueType()))
+                    {
+                        emitBracketPostfix = false;
+                        switch (intLit->getValue())
+                        {
+                        case 0:
+                            m_writer->emit(".x");
+                            break;
+                        case 1:
+                            m_writer->emit(".y");
+                            break;
+                        case 2:
+                            m_writer->emit(".z");
+                            break;
+                        case 3:
+                            m_writer->emit(".w");
+                            break;
+                        default:
+                            emitBracketPostfix = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (emitBracketPostfix)
+            {
+                m_writer->emit("[");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit("]");
+            }
+            maybeCloseParens(rightSideNeedClose);
+            return;
+        }
         default:
             break;
         }
