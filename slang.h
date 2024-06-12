@@ -866,6 +866,7 @@ extern "C"
             MinimumSlangOptimization, // bool
             DisableNonEssentialValidations, // bool
             DisableSourceMap,       // bool
+            PreserveParameters,       // bool: preserve all resource parameters in the output code.
 
             // Target
 

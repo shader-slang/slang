@@ -3,6 +3,7 @@
 
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-peephole.h"
+#include "slang-ir-dce.h"
 
 namespace Slang
 {
@@ -15,6 +16,8 @@ namespace Slang
     {
         CFGSimplificationOptions cfgOptions;
         PeepholeOptimizationOptions peepholeOptions;
+        IRDeadCodeEliminationOptions deadCodeElimOptions;
+
         bool minimalOptimization = false;
 
         static IRSimplificationOptions getDefault(TargetProgram* targetProgram);
