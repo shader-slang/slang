@@ -926,8 +926,6 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         break;
 
     case CodeGenTarget::GLSL:
-    case CodeGenTarget::GLSL_Vulkan:
-    case CodeGenTarget::GLSL_Vulkan_OneDesc:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         if(targetProfile.getFamily() != ProfileFamily::GLSL)
@@ -1706,8 +1704,6 @@ CapabilitySet TargetRequest::getTargetCaps()
     switch(getTarget())
     {
     case CodeGenTarget::GLSL:
-    case CodeGenTarget::GLSL_Vulkan:
-    case CodeGenTarget::GLSL_Vulkan_OneDesc:
         isGLSLTarget = true;
         atoms.add(CapabilityName::glsl);
         break;
