@@ -6440,9 +6440,12 @@ SlangResult emitSPIRVFromIR(
     }
 #endif
 
+    auto shouldPreserveParams = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::PreserveParameters);
     for (auto inst : irModule->getGlobalInsts())
     {
         if (as<IRDebugSource>(inst))
+            context.ensureInst(inst);
+        if (shouldPreserveParams && as<IRGlobalParam>(inst))
             context.ensureInst(inst);
     }
 

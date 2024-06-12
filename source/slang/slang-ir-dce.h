@@ -12,6 +12,7 @@ namespace Slang
         bool keepExportsAlive = false;
         bool keepLayoutsAlive = false;
         bool useFastAnalysis = false;
+        bool keepGlobalParamsAlive = true;
     };
 
         /// Eliminate "dead" code from the given IR module.

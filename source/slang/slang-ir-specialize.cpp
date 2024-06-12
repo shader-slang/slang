@@ -49,7 +49,6 @@ struct SpecializationContext
     IRModule* module;
     DiagnosticSink* sink;
     TargetProgram* targetProgram;
-
     bool changed = false;
 
 
@@ -861,7 +860,7 @@ struct SpecializationContext
             if (iterChanged)
             {
                 this->changed = true;
-                eliminateDeadCode(module->getModuleInst(), IRDeadCodeEliminationOptions());
+                eliminateDeadCode(module->getModuleInst());
             }
 
             // Once the work list has gone dry, we should have the invariant
