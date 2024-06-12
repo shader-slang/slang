@@ -30,7 +30,7 @@ else
     SLANG_TEST_CATEGORY=smoke
 fi
 
-if [ "${PLATFORM}" != "macosx" ]; then
+if [ "${PLATFORM}" == "macosx" ]; then
     SLANG_TEST_CATEGORY=full
 fi
 
