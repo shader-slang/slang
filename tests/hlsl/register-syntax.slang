@@ -1,18 +1,19 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -stage compute -entry computeMain
-//CHECK_HLSL: u4, space2
-//CHECK_HLSL: u5, space1
-//CHECK_HLSL: u6
-//CHECK_HLSL: u7
-//CHECK_HLSL: u9
-//CHECK_HLSL: u12
 
-//CHECK_GLSL: binding = 4, set = 2
-//CHECK_GLSL: binding = 5, set = 1
-//CHECK_GLSL: binding = 6
-//CHECK_GLSL: binding = 7
-//CHECK_GLSL: binding = 10
-//CHECK_GLSL: binding = 12
+//CHECK_GLSL-DAG: binding = 4, set = 2
+//CHECK_GLSL-DAG: binding = 5, set = 1
+//CHECK_GLSL-DAG: binding = 6
+//CHECK_GLSL-DAG: binding = 7
+//CHECK_GLSL-DAG: binding = 15
+//CHECK_GLSL-DAG: binding = 12
+
+//CHECK_HLSL-DAG: u4, space2
+//CHECK_HLSL-DAG: u5, space1
+//CHECK_HLSL-DAG: u6
+//CHECK_HLSL-DAG: u7
+//CHECK_HLSL-DAG: u9
+//CHECK_HLSL-DAG: u12
 
 [[vk::binding(4,2)]]
 RWStructuredBuffer<int> b0 : register(u4, space2);
@@ -24,7 +25,7 @@ RWStructuredBuffer<int> b2 : register(u6);
 [[vk::binding(7,0)]]
 RWStructuredBuffer<int> b3 : register(u7, space0);
 
-[[vk::binding(10,0)]]
+[[vk::binding(15,0)]]
 RWStructuredBuffer<int> b4[2] : register(u9);
 
 RWStructuredBuffer<int> b5[2] : register(u12);

@@ -1048,7 +1048,7 @@ static void addExplicitParameterBindings_GLSL(
     RefPtr<VarLayout>           varLayout)
 {
     // We only want to apply GLSL-style layout modifers
-    // when compiling for a Khronos-related target.
+    // when compiling for a Khronos-related target. 
     //
     // TODO: This should have some finer granularity
     // so that we are able to distinguish between
@@ -1143,11 +1143,9 @@ static void addExplicitParameterBindings_GLSL(
         return;
     }
 
-    // See if we can infer vulkan binding from HLSL if we have such options set, we know 
-    // we can't map
     auto hlslToVulkanLayoutOptions = context->getTargetProgram()->getHLSLToVulkanLayoutOptions();
     bool warnedMissingVulkanLayoutModifier = false;
-    // If we have the options, but cannot infer bindings, we don't need to go further
+    // If we are not told how to infer bindings with a compile option, we warn
     if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
     {
         warnedMissingVulkanLayoutModifier = true;
@@ -1188,32 +1186,31 @@ static void addExplicitParameterBindings_GLSL(
     }
 
     // If inference is not enabled for this kind, we can issue a warning
-    if (!hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
+    if (hlslToVulkanLayoutOptions && !hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
     {
         if(!warnedMissingVulkanLayoutModifier)
+        {
             _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+            warnedMissingVulkanLayoutModifier = true;
+        }
     }
 
     // We use the HLSL binding directly (even though this notionally for GLSL/Vulkan)
     // We'll do the shifting at later later point in _maybeApplyHLSLToVulkanShifts
-    //resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
     resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
+
+    // If user did not set how to interpret 'hlsl style bindings', we should map 
+    // `register` 1:1 with equivlent vulkan bindings.
+    if (warnedMissingVulkanLayoutModifier)
+    {
+        resInfo->kind = LayoutResourceKind::DescriptorTableSlot;
+        resInfo->count = 1;
+    }
 
     semanticInfo.kind = resInfo->kind;
     semanticInfo.index = UInt(hlslInfo.index);
     semanticInfo.space = UInt(hlslInfo.space);
-    
-    if (resInfo->count.isFinite() && resInfo->count.getFiniteValue() == 0)
-    {
-        // hlsl objects are not going to set on a descriptor table slot
-        if (auto descriptorTableSlot = typeLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot))
-        {
-            descriptorTableSlot->count = 0;
-        }
-        resInfo->count = 1;
-    }
     const LayoutSize count = resInfo->count;
-
 
     addExplicitParameterBinding(context, parameterInfo, as<VarDeclBase>(varDecl.getDecl()), semanticInfo, count);
 }
