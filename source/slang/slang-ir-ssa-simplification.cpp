@@ -24,6 +24,9 @@ namespace Slang
         else
             result.cfgOptions = CFGSimplificationOptions::getDefault();
         result.peepholeOptions = PeepholeOptimizationOptions();
+        if (targetProgram)
+            result.deadCodeElimOptions.keepGlobalParamsAlive = targetProgram->getOptionSet().getBoolOption(CompilerOptionName::PreserveParameters);
+        result.deadCodeElimOptions.useFastAnalysis = result.minimalOptimization;
         return result;
     }
 
@@ -33,6 +36,9 @@ namespace Slang
         result.minimalOptimization = targetProgram ? targetProgram->getOptionSet().shouldPerformMinimumOptimizations() : false;
         result.cfgOptions = CFGSimplificationOptions::getFast();
         result.peepholeOptions = PeepholeOptimizationOptions();
+        if (targetProgram)
+            result.deadCodeElimOptions.keepGlobalParamsAlive = targetProgram->getOptionSet().getBoolOption(CompilerOptionName::PreserveParameters);
+        result.deadCodeElimOptions.useFastAnalysis = result.minimalOptimization;
         return result;
     }
 
@@ -45,8 +51,6 @@ namespace Slang
         const int kMaxIterations = 8;
         const int kMaxFuncIterations = 16;
         int iterationCounter = 0;
-        IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
-        dceOptions.useFastAnalysis = options.minimalOptimization;
 
         while (changed && iterationCounter < kMaxIterations)
         {
@@ -79,7 +83,7 @@ namespace Slang
                     // Note: we disregard the `changed` state from dead code elimination pass since
                     // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
                     // DCE will always remove those nearly generated consts and always returns true here.
-                    eliminateDeadCode(func, dceOptions);
+                    eliminateDeadCode(func, options.deadCodeElimOptions);
                     if (funcIterationCount == 0)
                         funcChanged |= constructSSA(func);
                     changed |= funcChanged;
@@ -88,7 +92,7 @@ namespace Slang
             }
             iterationCounter++;
         }
-        eliminateDeadCode(module, dceOptions);
+        eliminateDeadCode(module, options.deadCodeElimOptions);
     }
 
     void simplifyNonSSAIR(TargetProgram* target, IRModule* module, IRSimplificationOptions options)
@@ -96,8 +100,6 @@ namespace Slang
         bool changed = true;
         const int kMaxIterations = 8;
         int iterationCounter = 0;
-        IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
-        dceOptions.useFastAnalysis = options.minimalOptimization;
 
         while (changed && iterationCounter < kMaxIterations)
         {
@@ -111,7 +113,7 @@ namespace Slang
             // Note: we disregard the `changed` state from dead code elimination pass since
             // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
             // DCE will always remove those nearly generated consts and always returns true here.
-            eliminateDeadCode(module, dceOptions);
+            eliminateDeadCode(module, options.deadCodeElimOptions);
             iterationCounter++;
         }
     }
@@ -119,9 +121,6 @@ namespace Slang
 
     void simplifyFunc(TargetProgram* target, IRGlobalValueWithCode* func, IRSimplificationOptions options, DiagnosticSink* sink)
     {
-        IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
-        dceOptions.useFastAnalysis = options.minimalOptimization;
-
         bool changed = true;
         const int kMaxIterations = 8;
         int iterationCounter = 0;
@@ -140,7 +139,7 @@ namespace Slang
             // Note: we disregard the `changed` state from dead code elimination pass since
             // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
             // DCE will always remove those nearly generated consts and always returns true here.
-            eliminateDeadCode(func, dceOptions);
+            eliminateDeadCode(func, options.deadCodeElimOptions);
 
             changed |= constructSSA(func);
 
