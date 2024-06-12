@@ -4907,14 +4907,38 @@ namespace Slang
         // TODO: diagnose this with a warning some day, and move
         // toward deprecating it.
         //
-        AdvanceIf(parser, "class");
+        bool isEnumClass = AdvanceIf(parser, "class");
+        bool isUnscoped = false;
+
+        if (!isEnumClass)
+        {
+            if (parser->options.optionSet.getBoolOption(CompilerOptionName::UnscopedEnum))
+            {
+                isUnscoped = true;
+            }
+        }
 
         AdvanceIf(parser, TokenType::CompletionRequest);
 
         parser->FillPosition(decl);
 
-        decl->nameAndLoc = expectIdentifier(parser);
+        if (parser->tokenReader.peekTokenType() != TokenType::Identifier)
+        {
+            decl->nameAndLoc.name = generateName(parser);
+            decl->nameAndLoc.loc = decl->loc;
+            isUnscoped = true;
+        }
+        else
+        {
+            decl->nameAndLoc = expectIdentifier(parser);
+        }
 
+        // If the type needs to be unscoped, insert modifiers to make it so.
+        if (isUnscoped)
+        {
+            addModifier(decl, parser->astBuilder->create<UnscopedEnumAttribute>());
+            addModifier(decl, parser->astBuilder->create<TransparentModifier>());
+        }
 
         return parseOptGenericDecl(parser, [&](GenericDecl*)
         {

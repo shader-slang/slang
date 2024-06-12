@@ -450,6 +450,11 @@ class DifferentiableType : public BuiltinType
     SLANG_AST_CLASS(DifferentiableType)
 };
 
+class DefaultInitializableType : public BuiltinType
+{
+    SLANG_AST_CLASS(DefaultInitializableType);
+};
+
 // A vector type, e.g., `vector<T,N>`
 class VectorExpressionType : public ArithmeticExpressionType 
 {

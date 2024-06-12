@@ -315,6 +315,10 @@ namespace Slang
             SlangInt        targetIndex,
             slang::IBlob**  outCode,
             slang::IBlob**  outDiagnostics) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
             SlangInt    entryPointIndex,
@@ -608,11 +612,12 @@ namespace Slang
             Index                       argCount,
             DiagnosticSink*             sink) SLANG_OVERRIDE;
 
-    private:
+    public:
         CompositeComponentType(
             Linkage*                            linkage,
             List<RefPtr<ComponentType>> const&  childComponents);
 
+    private:
         List<RefPtr<ComponentType>> m_childComponents;
 
         // The following arrays hold the concatenated entry points, parameters,
@@ -885,6 +890,14 @@ namespace Slang
             return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt        targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetCode(targetIndex, outCode, outDiagnostics);
+        }
+
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
             SlangInt        entryPointIndex,
             SlangInt        targetIndex,
@@ -1118,6 +1131,14 @@ namespace Slang
             return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt        targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetCode(targetIndex, outCode, outDiagnostics);
+        }
+
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
             SlangInt        entryPointIndex,
             SlangInt        targetIndex,
@@ -1290,6 +1311,14 @@ namespace Slang
             slang::IBlob**  outDiagnostics) SLANG_OVERRIDE
         {
             return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt        targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetCode(targetIndex, outCode, outDiagnostics);
         }
 
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(

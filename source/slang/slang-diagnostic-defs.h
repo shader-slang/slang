@@ -695,6 +695,8 @@ DIAGNOSTIC(39026, Error, matrixLayoutModifierOnNonMatrixType, "matrix layout mod
 
 DIAGNOSTIC(39027, Error, getAttributeAtVertexMustReferToPerVertexInput, "'GetAttributeAtVertex' must reference a vertex input directly, and the vertex input must be decorated with 'pervertex' or 'nointerpolation'.")
 
+DIAGNOSTIC(39028, Error, notValidVaryingParameter, "parameter '$0' is not a valid varying parameter.")
+
 //
 
 // 4xxxx - IL code generation.

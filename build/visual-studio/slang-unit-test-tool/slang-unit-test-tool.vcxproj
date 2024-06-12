@@ -297,6 +297,7 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-find-check-entrypoint.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-find-type-by-name.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-free-list.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-get-target-code.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-io.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json-native.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json.cpp" />

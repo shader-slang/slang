@@ -423,6 +423,8 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     case kIROp_WitnessTableEntry:
         return true;
 
+    case kIROp_GlobalParam:
+        return options.keepGlobalParamsAlive;
     default:
         break;
     }

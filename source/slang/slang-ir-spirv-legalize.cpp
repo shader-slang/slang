@@ -137,9 +137,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
         builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
         if (m_sharedContext->isSpirv14OrLater())
-            builder.addDecoration(structType, kIROp_SPIRVBlockDecoration);
+            builder.addDecorationIfNotExist(structType, kIROp_SPIRVBlockDecoration);
         else
-            builder.addDecoration(structType, kIROp_SPIRVBufferBlockDecoration);
+            builder.addDecorationIfNotExist(structType, kIROp_SPIRVBufferBlockDecoration);
 
         result.structType = structType;
         result.arrayKey = arrayKey;
@@ -594,7 +594,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 {
                     innerType = wrapConstantBufferElement(inst);
                 }
-                builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
+                builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
                 
                 auto varLayoutInst = inst->findDecoration<IRLayoutDecoration>();
                 if (paramBlockType)
@@ -650,12 +650,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 innerType = glslShaderStorageBufferType->getElementType();
                 if (m_sharedContext->isSpirv14OrLater())
                 {
-                    builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
+                    builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
                     storageClass = SpvStorageClassStorageBuffer;
                 }
                 else
                 {
-                    builder.addDecoration(innerType, kIROp_SPIRVBufferBlockDecoration);
+                    builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBufferBlockDecoration);
                     storageClass = SpvStorageClassUniform;
                 }
                 needLoad = false;

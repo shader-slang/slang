@@ -11,6 +11,21 @@
 
 namespace Slang
 {
+    template<typename P, typename... Args>
+    bool diagnoseCapabilityErrors(DiagnosticSink* sink, CompilerOptionSet& optionSet, P const& pos, DiagnosticInfo const& info, Args const&... args)
+    {
+        if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+            return false;
+        return sink->diagnose(pos, info, args...);
+    }
+
+    enum class IsSubTypeOptions
+    {
+        None = 0,
+        /// Type may not be finished 'DeclCheckState::ReadyForLookup`
+        NotReadyForLookup = 1 << 0,
+    };
+
         /// Should the given `decl` be treated as a static rather than instance declaration?
     bool isEffectivelyStatic(
         Decl*           decl);
@@ -2097,9 +2112,15 @@ namespace Slang
             ///
         SubtypeWitness* isSubtype(
             Type*                   subType,
-            Type*                   superType);
+            Type*                   superType,
+            IsSubTypeOptions        isSubTypeOptions
+        );
 
-        SubtypeWitness* checkAndConstructSubtypeWitness(Type* subType, Type* superType);
+        SubtypeWitness* checkAndConstructSubtypeWitness(
+            Type* subType,
+            Type* superType,
+            IsSubTypeOptions isSubTypeOptions
+        );
 
         bool isValidGenericConstraintType(Type* type);
 
@@ -2119,7 +2140,7 @@ namespace Slang
             Type* subType,
             Type* superType)
         {
-            return isSubtype(subType, superType);
+            return isSubtype(subType, superType, IsSubTypeOptions::None);
         }
 
             /// Check whether `type` conforms to `interfaceDeclRef`,
@@ -2725,6 +2746,8 @@ namespace Slang
         Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr);
 
         Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
+
+        Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr);
 
         Expr* visitSPIRVAsmExpr(SPIRVAsmExpr*);
 
