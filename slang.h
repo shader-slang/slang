@@ -865,6 +865,7 @@ extern "C"
             MinimumSlangOptimization, // bool
             DisableNonEssentialValidations, // bool
             DisableSourceMap,       // bool
+            UnscopedEnum,           // bool
 
             // Target
 
