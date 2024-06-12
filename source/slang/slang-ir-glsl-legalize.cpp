@@ -1083,6 +1083,22 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         declarator,
         &systemValueInfoStorage);
 
+    {
+        Index index = 0;
+        IRSystemValueSemanticAttr* systemSemantic = nullptr;
+        for (; index < inVarLayout->operandCount; index++)
+        {
+            if (systemSemantic = as<IRSystemValueSemanticAttr>(inVarLayout->getOperand(index)))
+                break;
+        }
+        // Validate the system value, convert to a regular parameter if this is not a valid system value for a given target.
+        if (systemSemantic && isSPIRV(codeGenContext->getTargetFormat()) && systemSemantic->getName().caseInsensitiveEquals(UnownedStringSlice("sv_instanceid"))
+            && ((stage == Stage::Fragment) || (stage == Stage::Vertex && inVarLayout->usesResourceKind(LayoutResourceKind::VaryingOutput))))
+        {
+            inVarLayout->removeOperand(index);
+        }
+    }
+
     IRType* type = inType;
     IRType* peeledRequiredType = nullptr;
 
@@ -2323,9 +2339,7 @@ static void legalizeMeshOutputParam(
     //
 
     // First, collect the subset of outputs being used
-    const bool isSPIRV = codeGenContext->getTargetFormat() == CodeGenTarget::SPIRV
-        || codeGenContext->getTargetFormat() == CodeGenTarget::SPIRVAssembly;
-    if(!isSPIRV)
+    if(!isSPIRV(codeGenContext->getTargetFormat()))
     {
         auto isMeshOutputBuiltin = [](IRInst* g)
         {

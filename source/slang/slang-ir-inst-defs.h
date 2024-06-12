@@ -1127,7 +1127,7 @@ INST(CudaKernelLaunch, CudaKernelLaunch, 6, 0)
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
 
 /* Layout */
-    INST(VarLayout, varLayout, 1, HOISTABLE)
+    INST(VarLayout, varLayout, 1, 0)
 
     /* TypeLayout */
         INST(TypeLayoutBase, typeLayout, 0, HOISTABLE)
