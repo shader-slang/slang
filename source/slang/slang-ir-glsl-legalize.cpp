@@ -3560,20 +3560,20 @@ void legalizeEntryPointForGLSL(
 
 void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersion)
 {
-    CapabilityName atom = CapabilityName::spirv_1_0;
+    CapabilityName atom = CapabilityName::_spirv_1_0;
     switch (spirvVersion.m_major)
     {
         case 1:
         {
             switch (spirvVersion.m_minor)
             {
-                case 0: atom = CapabilityName::spirv_1_0; break;
-                case 1: atom = CapabilityName::spirv_1_1; break;
-                case 2: atom = CapabilityName::spirv_1_2; break;
-                case 3: atom = CapabilityName::spirv_1_3; break;
-                case 4: atom = CapabilityName::spirv_1_4; break;
-                case 5: atom = CapabilityName::spirv_1_5; break;
-                case 6: atom = CapabilityName::spirv_1_6; break;
+                case 0: atom = CapabilityName::_spirv_1_0; break;
+                case 1: atom = CapabilityName::_spirv_1_1; break;
+                case 2: atom = CapabilityName::_spirv_1_2; break;
+                case 3: atom = CapabilityName::_spirv_1_3; break;
+                case 4: atom = CapabilityName::_spirv_1_4; break;
+                case 5: atom = CapabilityName::_spirv_1_5; break;
+                case 6: atom = CapabilityName::_spirv_1_6; break;
                 default: SLANG_UNEXPECTED("Unknown SPIRV version");
             }
             break;

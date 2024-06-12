@@ -1687,6 +1687,61 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
             maybeCloseParens(innerNeedClose);
             return;
         }
+        case kIROp_GetElementPtr:
+        {
+            const auto info = getInfo(EmitOp::Prefix);
+            IRVectorType* vectorType = nullptr;
+            if (auto ptrType = as<IRPtrTypeBase>(inst->getOperand(0)->getDataType()))
+            {
+                vectorType = as<IRVectorType>(ptrType->getValueType());
+            }
+            if (vectorType)
+            {
+                // Can't use simplified emit logic for get vector element operations on CUDA targets.
+                if (isCUDATarget(m_codeGenContext->getTargetReq()))
+                    break;
+            }
+
+            auto rightSidePrec = rightSide(outerPrec, info);
+            auto postfixInfo = getInfo(EmitOp::Postfix);
+            bool rightSideNeedClose = maybeEmitParens(rightSidePrec, postfixInfo);
+            emitDereferenceOperand(inst->getOperand(0), leftSide(rightSidePrec, postfixInfo));
+            bool emitBracketPostfix = true;
+            if (vectorType)
+            {
+                // Simplify the emitted code if we are referencing a known vector element.
+                if (auto intLit = as<IRIntLit>(inst->getOperand(1)))
+                {
+                    emitBracketPostfix = false;
+                    switch (intLit->getValue())
+                    {
+                    case 0:
+                        m_writer->emit(".x");
+                        break;
+                    case 1:
+                        m_writer->emit(".y");
+                        break;
+                    case 2:
+                        m_writer->emit(".z");
+                        break;
+                    case 3:
+                        m_writer->emit(".w");
+                        break;
+                    default:
+                        emitBracketPostfix = true;
+                        break;
+                    }
+                }
+            }
+            if (emitBracketPostfix)
+            {
+                m_writer->emit("[");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit("]");
+            }
+            maybeCloseParens(rightSideNeedClose);
+            return;
+        }
         default:
             break;
         }
@@ -2536,10 +2591,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
                 auto rightSidePrec = rightSide(outerPrec, info);
                 auto postfixInfo = getInfo(EmitOp::Postfix);
                 bool rightSideNeedClose = maybeEmitParens(rightSidePrec, postfixInfo);
-                if (isPtrToArrayType(inst->getOperand(0)->getDataType()))
-                    emitDereferenceOperand(inst->getOperand(0), leftSide(rightSidePrec, postfixInfo));
-                else
-                    emitOperand(inst->getOperand(0), leftSide(rightSidePrec, postfixInfo));
+                emitDereferenceOperand(inst->getOperand(0), leftSide(rightSidePrec, postfixInfo));
                 m_writer->emit("[");
                 emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
                 m_writer->emit("]");

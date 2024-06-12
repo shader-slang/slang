@@ -843,6 +843,7 @@ extern "C"
             MatrixLayoutRow,    // bool
             ZeroInitialize,     // bool
             IgnoreCapabilities, // bool
+            RestrictiveCapabilityCheck, // bool
             ModuleName,         // stringValue0: module name.
             Output,
             Profile,            // intValue0: profile

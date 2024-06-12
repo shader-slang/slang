@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -profile cs_6_3 -line-directive-mode none -source-embed-style default -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -profile cs_5_1 -line-directive-mode none -source-embed-style default -emit-spirv-via-glsl
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

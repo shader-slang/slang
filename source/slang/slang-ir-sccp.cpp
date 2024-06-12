@@ -128,6 +128,8 @@ struct SCCPContext
         case kIROp_Leq:
         case kIROp_Geq:
         case kIROp_Less:
+        case kIROp_IRem:
+        case kIROp_FRem:
         case kIROp_Greater:
         case kIROp_Lsh:
         case kIROp_Rsh:
@@ -584,6 +586,15 @@ struct SCCPContext
             [](IRIntegerValue c0, IRIntegerValue c1) {  return c0 / c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 / c1; });
     }
+    LatticeVal evalRem(IRType* type, LatticeVal v0, LatticeVal v1)
+    {
+        return evalBinaryImpl(
+            type,
+            v0,
+            v1,
+            [](IRIntegerValue c0, IRIntegerValue c1) {  return c0 % c1; },
+            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return fmod(c0, c1); });
+    }
     LatticeVal evalEql(IRType* type, LatticeVal v0, LatticeVal v1)
     {
         return evalComparisonImpl(
@@ -929,6 +940,29 @@ struct SCCPContext
                 }
             }
             return evalDiv(
+                inst->getDataType(),
+                getLatticeVal(inst->getOperand(0)),
+                divisor);
+        }
+        case kIROp_FRem:
+        case kIROp_IRem:
+        {
+            // Detect divide by zero error.
+            auto divisor = getLatticeVal(inst->getOperand(1));
+            if (divisor.flavor == LatticeVal::Flavor::Constant)
+            {
+                if (isIntegralType(divisor.value->getDataType()))
+                {
+                    auto c = as<IRConstant>(divisor.value);
+                    if (c->value.intVal == 0)
+                    {
+                        if (shared->sink)
+                            shared->sink->diagnose(inst->sourceLoc, Diagnostics::divideByZero);
+                        return LatticeVal::getAny();
+                    }
+                }
+            }
+            return evalRem(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 divisor);

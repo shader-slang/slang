@@ -651,7 +651,7 @@ namespace Slang
         {
             for (auto atom : conjunctions)
             {
-                switch ((CapabilityAtom)atom)
+                switch (asAtom(atom))
                 {
                 default:
                     break;

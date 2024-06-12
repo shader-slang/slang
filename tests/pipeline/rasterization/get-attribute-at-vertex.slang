@@ -3,8 +3,8 @@
 // Basic test for `GetAttributeAtVertex` function
 
 //TEST:CROSS_COMPILE:-target dxil -entry main -stage fragment -profile sm_6_1
-//TEST:CROSS_COMPILE:-target spirv -entry main -stage fragment -profile glsl_450
-//TEST:SIMPLE(filecheck=CHECK):-emit-spirv-directly -target spirv -entry main -stage fragment -profile glsl_450
+//TEST:CROSS_COMPILE:-target spirv -entry main -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
+//TEST:SIMPLE(filecheck=CHECK):-emit-spirv-directly -target spirv -entry main -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
 
 // CHECK: OpCapability FragmentBarycentricKHR
 // CHECK: OpExtension "SPV_KHR_fragment_shader_barycentric"

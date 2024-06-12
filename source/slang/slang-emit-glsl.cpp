@@ -75,6 +75,13 @@ void GLSLSourceEmitter::_requireRayTracing()
     m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
 }
 
+void GLSLSourceEmitter::_requireRayQuery()
+{
+    m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_ray_query"));
+    m_glslExtensionTracker->requireSPIRVVersion(SemanticVersion(1, 4)); // required due to glslang bug which enables `SPV_KHR_ray_tracing` regardless of context
+    m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
+}
+
 void GLSLSourceEmitter::_requireFragmentShaderBarycentric()
 {
     m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
@@ -2584,7 +2591,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             case kIROp_RaytracingAccelerationStructureType:
             {
-                _requireRayTracing();
+                _requireRayQuery();
                 m_writer->emit("accelerationStructureEXT");
                 break;
             }

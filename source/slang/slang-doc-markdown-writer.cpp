@@ -432,7 +432,7 @@ static DocMarkdownWriter::Requirement _getRequirementFromTargetToken(const Token
         return Requirement{CodeGenTarget::SPIRV, UnownedStringSlice("")};
     }
 
-    const CapabilityAtom targetCap = (CapabilityAtom)findCapabilityName(targetName);
+    const CapabilityAtom targetCap = asAtom(findCapabilityName(targetName));
 
     if (targetCap == CapabilityAtom::Invalid)
     {
