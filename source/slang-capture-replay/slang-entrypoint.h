@@ -33,6 +33,10 @@ namespace SlangCapture
             SlangInt    targetIndex,
             slang::IBlob**     outCode,
             slang::IBlob**     outDiagnostics = nullptr) override;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt    targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics = nullptr) override;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
             SlangInt    entryPointIndex,
             SlangInt    targetIndex,

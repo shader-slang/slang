@@ -4661,6 +4661,57 @@ void ComponentType::enumerateIRModules(EnumerateIRModulesCallback callback, void
     acceptVisitor(&visitor, nullptr);
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCode(
+    Int             targetIndex,
+    slang::IBlob** outCode,
+    slang::IBlob** outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+
+    // If the user hasn't specified any entry points, then we should
+    // discover all entrypoints that are defined in linked modules, and
+    // include all of them in the compile.
+    //
+    if (getEntryPointCount() == 0)
+    {
+        List<Module*> modules;
+        this->enumerateModules([&](Module* module)
+            {
+                modules.add(module);
+            });
+        List<RefPtr<ComponentType>> components;
+        components.add(this);
+        for (auto module : modules)
+        {
+            for (auto entryPoint : module->getEntryPoints())
+            {
+                components.add(entryPoint);
+            }
+        }
+        RefPtr<CompositeComponentType> composite = new CompositeComponentType(linkage, components);
+        ComPtr<IComponentType> linkedComponentType;
+        SLANG_RETURN_ON_FAIL(composite->link(linkedComponentType.writeRef(), outDiagnostics));
+        return linkedComponentType->getTargetCode(targetIndex, outCode, outDiagnostics);
+    }
+
+    auto target = linkage->targets[targetIndex];
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    IArtifact* artifact = targetProgram->getOrCreateWholeProgramResult(&sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    if (artifact == nullptr)
+        return SLANG_FAIL;
+
+    return artifact->loadBlob(ArtifactKeep::Yes, outCode);
+}
+
 //
 // CompositeComponentType
 //

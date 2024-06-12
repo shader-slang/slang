@@ -866,6 +866,7 @@ extern "C"
             MinimumSlangOptimization, // bool
             DisableNonEssentialValidations, // bool
             DisableSourceMap,       // bool
+            UnscopedEnum,           // bool
             PreserveParameters,       // bool: preserve all resource parameters in the output code.
 
             // Target
@@ -4953,6 +4954,11 @@ namespace slang
             uint32_t compilerOptionEntryCount,
             CompilerOptionEntry* compilerOptionEntries,
             ISlangBlob** outDiagnostics = nullptr) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt targetIndex,
+            IBlob** outCode,
+            IBlob** outDiagnostics = nullptr) = 0;
     };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
 
