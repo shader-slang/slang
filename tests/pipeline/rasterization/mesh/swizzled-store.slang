@@ -2,7 +2,7 @@
 
 // This tests that writing to individual components of the output struct works
 
-//TEST:CROSS_COMPILE:-target spirv -profile glsl_450+spirv_1_4 -entry main -stage mesh
+//TEST:CROSS_COMPILE:-target spirv -profile sm_6_5 -entry main -stage mesh
 
 const static uint MAX_VERTS = 3;
 const static uint MAX_PRIMS = 1;

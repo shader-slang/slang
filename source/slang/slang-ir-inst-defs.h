@@ -660,6 +660,8 @@ INST(SampleGrad, sampleGrad, 4, 0)
 
 INST(GroupMemoryBarrierWithGroupSync, GroupMemoryBarrierWithGroupSync, 0, 0)
 
+INST(ControlBarrier, ControlBarrier, 0, 0)
+
 // GPU_FOREACH loop of the form 
 INST(GpuForeach, gpuForeach, 3, 0)
 

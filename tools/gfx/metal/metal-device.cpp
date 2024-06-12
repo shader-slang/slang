@@ -189,7 +189,53 @@ SlangResult DeviceImpl::readTextureResource(
 {
     AUTORELEASEPOOL
 
+    TextureResourceImpl* textureImpl = static_cast<TextureResourceImpl*>(texture);
+
+    if (textureImpl->getDesc()->sampleDesc.numSamples > 1)
+    {
     return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+    NS::SharedPtr<MTL::Texture> srcTexture = textureImpl->m_texture;
+
+    const ITextureResource::Desc& desc = *textureImpl->getDesc();
+    Count width = Math::Max(desc.size.width, 1);
+    Count height = Math::Max(desc.size.height, 1);
+    Count depth = Math::Max(desc.size.depth, 1);
+    FormatInfo formatInfo;
+    gfxGetFormatInfo(desc.format, &formatInfo);
+    Size bytesPerPixel = formatInfo.blockSizeInBytes / formatInfo.pixelsPerBlock;
+    Size bytesPerRow = Size(width) * bytesPerPixel;
+    Size bytesPerSlice = Size(height) * bytesPerRow;
+    Size bufferSize = Size(depth) * bytesPerSlice;
+    if (outRowPitch)
+        *outRowPitch = bytesPerRow;
+    if (outPixelSize)
+        *outPixelSize = bytesPerPixel;
+
+    // create staging buffer
+    NS::SharedPtr<MTL::Buffer> stagingBuffer = NS::TransferPtr(m_device->newBuffer(bufferSize, MTL::StorageModeShared));
+    if (!stagingBuffer)
+    {
+        return SLANG_FAIL;
+    }
+
+    MTL::CommandBuffer* commandBuffer = m_commandQueue->commandBuffer();
+    MTL::BlitCommandEncoder* encoder = commandBuffer->blitCommandEncoder();
+    encoder->copyFromTexture(
+        srcTexture.get(), 0, 0, MTL::Origin(0, 0, 0), MTL::Size(width, height, depth),
+        stagingBuffer.get(), 0, bytesPerRow, bytesPerSlice);
+    encoder->endEncoding();
+    commandBuffer->commit();
+    commandBuffer->waitUntilCompleted();
+
+    List<uint8_t> blobData;
+    blobData.setCount(bufferSize);
+    ::memcpy(blobData.getBuffer(), stagingBuffer->contents(), bufferSize);
+    auto blob = ListBlob::moveCreate(blobData);
+
+    returnComPtr(outBlob, blob);
+    return SLANG_OK;
 }
 
 SlangResult DeviceImpl::readBufferResource(
@@ -292,6 +338,11 @@ Result DeviceImpl::createTextureResource(
 
     TextureResource::Desc desc = fixupTextureDesc(descIn);
 
+    // Metal doesn't support mip-mapping for 1D textures
+    // However, we still need to use the provided mip level count when initializing the texture
+    Count initMipLevels = desc.numMipLevels;
+    desc.numMipLevels = desc.type == IResource::Type::Texture1D ? 1 : desc.numMipLevels;
+
     const MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
     if (pixelFormat == MTL::PixelFormat::PixelFormatInvalid)
     {
@@ -316,29 +367,29 @@ Result DeviceImpl::createTextureResource(
         break;
     }
 
-    NS::UInteger arrayLength = calcEffectiveArraySize(desc);
+    bool isArray = desc.arraySize > 0;
 
     switch (desc.type)
     {
     case IResource::Type::Texture1D:
-        textureDesc->setTextureType(arrayLength > 1 ? MTL::TextureType1DArray : MTL::TextureType1D);
+        textureDesc->setTextureType(isArray ? MTL::TextureType1DArray : MTL::TextureType1D);
         textureDesc->setWidth(desc.size.width);
         break;
     case IResource::Type::Texture2D:
         if (desc.sampleDesc.numSamples > 1)
         {
-            textureDesc->setTextureType(arrayLength > 1 ? MTL::TextureType2DMultisampleArray : MTL::TextureType2DMultisample);
+            textureDesc->setTextureType(isArray ? MTL::TextureType2DMultisampleArray : MTL::TextureType2DMultisample);
             textureDesc->setSampleCount(desc.sampleDesc.numSamples);
         }
         else
         {
-            textureDesc->setTextureType(arrayLength > 1 ? MTL::TextureType2DArray : MTL::TextureType2D);
+            textureDesc->setTextureType(isArray ? MTL::TextureType2DArray : MTL::TextureType2D);
         }
         textureDesc->setWidth(descIn.size.width);
         textureDesc->setHeight(descIn.size.height);
         break;
     case IResource::Type::TextureCube:
-        textureDesc->setTextureType(arrayLength > 6 ? MTL::TextureTypeCubeArray : MTL::TextureTypeCube);
+        textureDesc->setTextureType(isArray ? MTL::TextureTypeCubeArray : MTL::TextureTypeCube);
         textureDesc->setWidth(descIn.size.width);
         textureDesc->setHeight(descIn.size.height);
         break;
@@ -369,7 +420,7 @@ Result DeviceImpl::createTextureResource(
     }
 
     textureDesc->setMipmapLevelCount(desc.numMipLevels);
-    textureDesc->setArrayLength(arrayLength);
+    textureDesc->setArrayLength(isArray ? desc.arraySize : 1);
     textureDesc->setPixelFormat(pixelFormat);
     textureDesc->setUsage(textureUsage);
     textureDesc->setSampleCount(desc.sampleDesc.numSamples);
@@ -380,8 +431,52 @@ Result DeviceImpl::createTextureResource(
     {
         return SLANG_FAIL;
     }
+    textureImpl->m_textureType = textureDesc->textureType();
+    textureImpl->m_pixelFormat = textureDesc->pixelFormat();
 
     // TODO: handle initData
+    if (initData)
+    {
+        textureDesc->setStorageMode(MTL::StorageModeManaged);
+        textureDesc->setCpuCacheMode(MTL::CPUCacheModeDefaultCache);
+        NS::SharedPtr<MTL::Texture> stagingTexture = NS::TransferPtr(m_device->newTexture(textureDesc.get()));
+
+        MTL::CommandBuffer* commandBuffer = m_commandQueue->commandBuffer();
+        MTL::BlitCommandEncoder* encoder = commandBuffer->blitCommandEncoder();
+        if (!stagingTexture || !commandBuffer || !encoder)
+        {
+            return SLANG_FAIL;
+        }
+
+        Count sliceCount = isArray ? desc.arraySize : 1;
+        if (desc.type == IResource::Type::TextureCube)
+        {
+            sliceCount *= 6;
+        }
+
+        for (Index slice = 0; slice < sliceCount; ++slice)
+        {
+            MTL::Region region;
+            region.origin = MTL::Origin(0, 0, 0);
+            region.size = MTL::Size(desc.size.width, desc.size.height, desc.size.depth);
+            for (Index level = 0; level < initMipLevels; ++level)
+            {
+                if (level >= desc.numMipLevels)
+                    continue;
+                const ITextureResource::SubresourceData& subresourceData = initData[slice * initMipLevels + level];
+                stagingTexture->replaceRegion(region, level, slice, subresourceData.data, subresourceData.strideY, subresourceData.strideZ);
+                encoder->synchronizeTexture(stagingTexture.get(), slice, level);
+                region.size.width = region.size.width > 0 ? Math::Max(1ul, region.size.width >> 1) : 0;
+                region.size.height = region.size.height > 0 ? Math::Max(1ul, region.size.height >> 1) : 0;
+                region.size.depth = region.size.depth > 0 ? Math::Max(1ul, region.size.depth >> 1) : 0;
+            }
+        }
+
+        encoder->copyFromTexture(stagingTexture.get(), textureImpl->m_texture.get());
+        encoder->endEncoding();
+        commandBuffer->commit();
+        commandBuffer->waitUntilCompleted();
+    }
 
     returnComPtr(outResource, textureImpl);
     return SLANG_OK;
@@ -461,52 +556,40 @@ Result DeviceImpl::createTextureView(
 {
     AUTORELEASEPOOL
 
-    auto resourceImpl = static_cast<TextureResourceImpl*>(texture);
-    RefPtr<TextureResourceViewImpl> view = new TextureResourceViewImpl(this);
-    view->m_desc = desc;
-    view->m_device = this;
-    if (texture == nullptr)
+    auto textureImpl = static_cast<TextureResourceImpl*>(texture);
+    RefPtr<TextureResourceViewImpl> viewImpl = new TextureResourceViewImpl(this);
+    viewImpl->m_desc = desc;
+    viewImpl->m_device = this;
+    viewImpl->m_texture = textureImpl;
+    if (textureImpl == nullptr)
     {
-        view->m_texture = nullptr;
-        returnComPtr(outView, view);
+        returnComPtr(outView, viewImpl);
         return SLANG_OK;
     }
 
-    bool isArray = resourceImpl->getDesc()->arraySize > 1;
-    MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
-    NS::Range levelRange(desc.subresourceRange.baseArrayLayer, std::max(desc.subresourceRange.layerCount, 1));
-    NS::Range sliceRange(desc.subresourceRange.mipLevel, std::max(desc.subresourceRange.mipLevelCount, 1));
-    MTL::TextureType textureType;
-    switch (resourceImpl->getType())
+    const ITextureResource::Desc& textureDesc = *textureImpl->getDesc();
+    SubresourceRange sr = desc.subresourceRange;
+    sr.mipLevelCount = sr.mipLevelCount == 0 ? textureDesc.numMipLevels - sr.mipLevel : sr.mipLevelCount;
+    sr.layerCount = sr.layerCount == 0 ? textureDesc.arraySize - sr.baseArrayLayer : sr.layerCount;
+    if (sr.mipLevel == 0 && sr.mipLevelCount == textureDesc.numMipLevels &&
+        sr.baseArrayLayer == 0 && sr.layerCount == textureDesc.arraySize)
     {
-    case IResource::Type::Texture1D:
-        textureType = isArray ? MTL::TextureType1DArray : MTL::TextureType1D;
-        break;
-    case IResource::Type::Texture2D:
-        textureType = isArray ? MTL::TextureType2DArray : MTL::TextureType2D;
-        break;
-    case IResource::Type::Texture3D:
+        viewImpl->m_textureView = textureImpl->m_texture;
+        returnComPtr(outView, viewImpl);
+        return SLANG_OK;
+    }
+
+    MTL::PixelFormat pixelFormat = desc.format == Format::Unknown ? textureImpl->m_pixelFormat : MetalUtil::translatePixelFormat(desc.format);
+    NS::Range levelRange(sr.baseArrayLayer, sr.layerCount);
+    NS::Range sliceRange(sr.mipLevel, sr.mipLevelCount);
+
+    viewImpl->m_textureView = NS::TransferPtr(textureImpl->m_texture->newTextureView(pixelFormat, textureImpl->m_textureType, levelRange, sliceRange));
+    if (!viewImpl->m_textureView)
     {
-        if (isArray) SLANG_UNIMPLEMENTED_X("Metal does not support arrays of 3D textures.");
-        textureType = MTL::TextureType3D;
-        break;
+        return SLANG_FAIL;
     }
-    case IResource::Type::TextureCube:
-        textureType = isArray ? MTL::TextureTypeCube : MTL::TextureTypeCubeArray;
-        break;
-    default:
-        SLANG_UNIMPLEMENTED_X("Unsupported texture type.");
-        break;
-    }
-    ITextureResource::Desc newDesc = *texture->getDesc();
-    newDesc.numMipLevels = levelRange.length;
-    newDesc.arraySize = sliceRange.length;
 
-    view->m_type = ResourceViewImpl::ViewType::Texture;
-    view->m_texture = resourceImpl; //new TextureResourceImpl(newDesc, this);
-    view->m_texture->m_texture = NS::TransferPtr(resourceImpl->m_texture->newTextureView(pixelFormat, textureType, levelRange, sliceRange));
-    returnComPtr(outView, view);
-
+    returnComPtr(outView, viewImpl);
     return SLANG_OK;
 }
 

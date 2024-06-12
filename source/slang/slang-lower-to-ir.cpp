@@ -4444,6 +4444,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
     }
 
+    LoweredValInfo visitDefaultConstructExpr(DefaultConstructExpr* expr)
+    {
+        return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(lowerType(context, expr->type)));
+    }
+
     LoweredValInfo getDefaultVal(DeclRef<VarDeclBase> decl)
     {
         if(auto initExpr = decl.getDecl()->initExpr)
@@ -11627,11 +11632,11 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         {
             for (auto atomVal : atomSet)
             {
-                auto atom = (CapabilityName)atomVal;
-                if (atom >= CapabilityName::spirv_1_0 && atom <= latestSpirvAtom ||
-                    atom >= CapabilityName::metallib_2_3 && atom <= latestMetalAtom)
+                auto atom = asAtom(atomVal);
+                if (atom >= CapabilityAtom::_spirv_1_0 && atom <= latestSpirvAtom ||
+                    atom >= CapabilityAtom::metallib_2_3 && atom <= latestMetalAtom)
                 {
-                    builder->addRequireCapabilityAtomDecoration(irFunc, atom);
+                    builder->addRequireCapabilityAtomDecoration(irFunc, (CapabilityName)atom);
                 }
             }
         }

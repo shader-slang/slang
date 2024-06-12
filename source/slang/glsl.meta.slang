@@ -152,7 +152,7 @@ public in int gl_ViewportIndex : SV_ViewportArrayIndex;
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<float, N, N> m2)
 {
     return mul(m2, m1);
@@ -160,7 +160,7 @@ public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<f
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<half, N, N> m2)
 {
     return mul(m2, m1);
@@ -168,7 +168,7 @@ public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<hal
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix<double, N, N> m2)
 {
     return mul(m2, m1);
@@ -176,7 +176,7 @@ public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public matrix<T, R, L> operator*<T:__BuiltinFloatingPointType, let L : int, let C : int, let R : int>(matrix<T, C, L> m1, matrix<T, R, C> m2)
 {
     return mul(m2, m1);
@@ -184,7 +184,7 @@ public matrix<T, R, L> operator*<T:__BuiltinFloatingPointType, let L : int, let 
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, R> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(vector<T, C> v, matrix<T, R, C> m)
 {
     return mul(m, v);
@@ -192,7 +192,7 @@ public vector<T, R> operator*<T:__BuiltinFloatingPointType, let C : int, let R :
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, C> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(matrix<T, R, C> m, vector<T, R> v)
 {
     return mul(v, m);
@@ -306,7 +306,7 @@ ${{{{
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public T atan(T y, T x)
 {
     return atan2(y, x);
@@ -315,7 +315,7 @@ public T atan(T y, T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
 {
     return atan2(y, x);
@@ -328,7 +328,7 @@ public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public T inversesqrt(T x)
 {
     return rsqrt(x);
@@ -337,7 +337,7 @@ public T inversesqrt(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> inversesqrt(vector<T, N> x)
 {
     return rsqrt(x);
@@ -350,7 +350,7 @@ public vector<T, N> inversesqrt(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 public T roundEven(T x)
 {
     return rint(x);
@@ -359,7 +359,7 @@ public T roundEven(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 public vector<T,N> roundEven(vector<T,N> x)
 {
     return rint(x);
@@ -368,7 +368,7 @@ public vector<T,N> roundEven(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public T mod(T x, T y)
 {
     // SPIR-V doesn't have "modulus".
@@ -385,7 +385,7 @@ public T mod(T x, T y)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> mod(vector<T, N> x, T y)
 {
     __target_switch
@@ -399,7 +399,7 @@ public vector<T, N> mod(vector<T, N> x, T y)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -412,7 +412,7 @@ public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T,N> min(vector<T,N> x, T y)
 {
     __target_switch
@@ -425,7 +425,7 @@ public vector<T,N> min(vector<T,N> x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T,N> max(vector<T,N> x, T y)
 {
     __target_switch
@@ -438,7 +438,7 @@ public vector<T,N> max(vector<T,N> x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T,N> clamp(vector<T,N> x, T minBound, T maxBound)
 {
     __target_switch
@@ -452,7 +452,7 @@ public vector<T,N> clamp(vector<T,N> x, T minBound, T maxBound)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public T mix(T x, T y, T a)
 {
     return lerp(x, y, a);
@@ -461,7 +461,7 @@ public T mix(T x, T y, T a)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, T a)
 {
     __target_switch
@@ -475,7 +475,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, T a)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<T, N> a)
 {
     return lerp(x, y, a);
@@ -484,7 +484,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<T, N> a)
 __generic<T>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public T mix(T x, T y, bool a)
 {
     __target_switch
@@ -501,7 +501,7 @@ public T mix(T x, T y, bool a)
 __generic<T, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_2_0_GLSL_140)]
+[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
 {
     __target_switch
@@ -1878,7 +1878,7 @@ public ivec3 textureSize(Sampler2DMSArray<vector<T,N>,sampleCount> sampler)
 // textureQueryLod
 // -------------------
 
-__generic<T:IFloat, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, texture_querylod)]
 public vec2 textureQueryLod(__TextureImpl<
@@ -1910,10 +1910,11 @@ public vec2 textureQueryLod(__TextureImpl<
     }
 }
 
-__generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, texture_querylod)]
-public vec2 textureQueryLod(__TextureImpl<T,
+public vec2 textureQueryLod(__TextureImpl<
+        T,
         Shape,
         isArray,
         0, // isMS
@@ -2086,10 +2087,10 @@ public int textureQueryLevels(samplerCubeArrayShadow sampler)
 // textureSamples
 // -------------------
 
-__generic<T:__BuiltinArithmeticType, let N:int, let sampleCount:int>
+__generic<T, let sampleCount:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, image_samples)]
-public int textureSamples(Sampler2DMS<vector<T,N>,sampleCount> sampler)
+public int textureSamples(Sampler2DMS<T,sampleCount> sampler)
 {
     vector<int,2> dim;
     int sampleCount;
@@ -2098,10 +2099,10 @@ public int textureSamples(Sampler2DMS<vector<T,N>,sampleCount> sampler)
     return sampleCount;
 }
 
-__generic<T:__BuiltinArithmeticType, let N:int, let sampleCount:int>
+__generic<T, let sampleCount:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, image_samples)]
-public int textureSamples(Sampler2DMSArray<vector<T,N>,sampleCount> sampler)
+public int textureSamples(Sampler2DMSArray<T,sampleCount> sampler)
 {
     vector<int,3> dim;
     int sampleCount;
@@ -2118,25 +2119,25 @@ public int textureSamples(Sampler2DMSArray<vector<T,N>,sampleCount> sampler)
 // texture
 // -------------------
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> texture(Sampler1D<vector<T,N>> sampler, float p)
 {
     return __vectorReshape<4>(sampler.Sample(p));
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> texture(Sampler1D<vector<T,N>> sampler, float p, constexpr float bias)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias));
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> texture(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -2152,9 +2153,9 @@ public vector<T,4> texture(__TextureImpl<
     return __vectorReshape<4>(sampler.Sample(p));
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> texture(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -2228,14 +2229,14 @@ public float texture(sampler2DShadow sampler, vec3 p, float bias)
     }
 }
 
-[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p)
 {
     return sampler.SampleCmp(p.xyz, p.w);
 }
 
-[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p, float bias)
 {
@@ -2294,7 +2295,7 @@ public float texture(sampler2DArrayShadow sampler, vec4 p)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod_cube)]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(samplerCubeArrayShadow sampler, vec4 p, float compare)
 {
     return sampler.SampleCmp(p, compare);
@@ -2304,9 +2305,9 @@ public float texture(samplerCubeArrayShadow sampler, vec4 p, float compare)
 // textureProj
 // -------------------
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec2 p)
 {
     __requireComputeDerivative();
@@ -2321,9 +2322,9 @@ public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec2 p)
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec2 p, float bias)
 {
     __requireComputeDerivative();
@@ -2338,9 +2339,9 @@ public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec2 p, float bia
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec4 p)
 {
     __requireComputeDerivative();
@@ -2355,9 +2356,9 @@ public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec4 p)
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec4 p, float bias)
 {
     __requireComputeDerivative();
@@ -2372,9 +2373,9 @@ public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec4 p, float bia
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec3 p)
 {
     __requireComputeDerivative();
@@ -2389,9 +2390,9 @@ public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec3 p)
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec3 p, float bias)
 {
     __requireComputeDerivative();
@@ -2406,9 +2407,9 @@ public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec3 p, float bia
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec4 p)
 {
     __requireComputeDerivative();
@@ -2423,9 +2424,9 @@ public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec4 p)
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec4 p, float bias)
 {
     __requireComputeDerivative();
@@ -2440,9 +2441,9 @@ public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec4 p, float bia
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProj(Sampler3D<vector<T,N>> sampler, vec4 p)
 {
     __requireComputeDerivative();
@@ -2457,9 +2458,9 @@ public vector<T,4> textureProj(Sampler3D<vector<T,N>> sampler, vec4 p)
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProj(Sampler3D<vector<T,N>> sampler, vec4 p, float bias)
 {
     __requireComputeDerivative();
@@ -2562,17 +2563,17 @@ public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
 // textureLod
 // -------------------
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureLod(Sampler1D<vector<T,N>> sampler, float p, float lod)
 {
     return __vectorReshape<4>(sampler.SampleLevel(p, lod));
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureLod(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -2649,25 +2650,25 @@ public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
 // textureOffset
 // -------------------
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureOffset(Sampler1D<vector<T,N>> sampler, float p, constexpr int offset, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureOffset(Sampler2D<vector<T,N>> sampler, vec2 p, constexpr ivec2 offset, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureOffset(Sampler3D<vector<T,N>> sampler, vec3 p, constexpr ivec3 offset, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
@@ -2739,17 +2740,17 @@ public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureOffset(Sampler1DArray<vector<T,N>> sampler, vec2 p, constexpr int offset, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureOffset(Sampler2DArray<vector<T,N>> sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
@@ -2918,9 +2919,9 @@ public vector<T,4> texelFetchOffset(Sampler2DRect<vector<T,N>> sampler, ivec2 p,
 // textureProjOffset
 // -------------------
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec2 p, constexpr int offset)
 {
     __requireComputeDerivative();
@@ -2935,9 +2936,9 @@ public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec2 p, con
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec2 p, constexpr int offset, float bias)
 {
     __requireComputeDerivative();
@@ -2952,9 +2953,9 @@ public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec2 p, con
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec4 p, constexpr int offset)
 {
     __requireComputeDerivative();
@@ -2973,9 +2974,9 @@ public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec4 p, con
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec4 p, constexpr int offset, float bias)
 {
     __requireComputeDerivative();
@@ -2994,9 +2995,9 @@ public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec4 p, con
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec3 p, constexpr ivec2 offset)
 {
     __requireComputeDerivative();
@@ -3011,9 +3012,9 @@ public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec3 p, con
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec3 p, constexpr ivec2 offset, float bias)
 {
     __requireComputeDerivative();
@@ -3028,9 +3029,9 @@ public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec3 p, con
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec4 p, constexpr ivec2 offset)
 {
     __requireComputeDerivative();
@@ -3049,9 +3050,9 @@ public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec4 p, con
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec4 p, constexpr ivec2 offset, float bias)
 {
     __requireComputeDerivative();
@@ -3070,9 +3071,9 @@ public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec4 p, con
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjOffset(Sampler3D<vector<T,N>> sampler, vec4 p, constexpr ivec3 offset)
 {
     __requireComputeDerivative();
@@ -3087,9 +3088,9 @@ public vector<T,4> textureProjOffset(Sampler3D<vector<T,N>> sampler, vec4 p, con
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjOffset(Sampler3D<vector<T,N>> sampler, vec4 p, constexpr ivec3 offset, float bias)
 {
     __requireComputeDerivative();
@@ -3192,17 +3193,17 @@ public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 
 // textureLodOffset
 // -------------------
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0)]
 public vector<T,4> textureLodOffset(Sampler1D<vector<T,N>> sampler, float p, float lod, constexpr int offset)
 {
     return __vectorReshape<4>(sampler.SampleLevel(p, lod, offset));
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0)]
 public vector<T,4> textureLodOffset(__TextureImpl<
         vector<T,N>,
         Shape,
@@ -3282,9 +3283,9 @@ public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, c
 // textureProjLod
 // -------------------
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjLod(Sampler1D<vector<T,N>> sampler, vec2 p, float lod)
 {
     __target_switch
@@ -3298,9 +3299,9 @@ public vector<T,4> textureProjLod(Sampler1D<vector<T,N>> sampler, vec2 p, float 
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjLod(Sampler1D<vector<T,N>> sampler, vec4 p, float lod)
 {
     __target_switch
@@ -3318,9 +3319,9 @@ public vector<T,4> textureProjLod(Sampler1D<vector<T,N>> sampler, vec4 p, float 
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjLod(Sampler2D<vector<T,N>> sampler, vec3 p, float lod)
 {
     __target_switch
@@ -3334,9 +3335,9 @@ public vector<T,4> textureProjLod(Sampler2D<vector<T,N>> sampler, vec3 p, float 
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjLod(Sampler2D<vector<T,N>> sampler, vec4 p, float lod)
 {
     __target_switch
@@ -3354,9 +3355,9 @@ public vector<T,4> textureProjLod(Sampler2D<vector<T,N>> sampler, vec4 p, float 
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjLod(Sampler3D<vector<T,N>> sampler, vec4 p, float lod)
 {
     __target_switch
@@ -3414,9 +3415,9 @@ public float textureProjLod(sampler2DShadow sampler, vec4 p, float lod)
 // textureProjLodOffset
 // -------------------
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler1D<vector<T,N>> sampler, vec2 p, float lod, constexpr int offset)
 {
     __target_switch
@@ -3430,9 +3431,9 @@ public vector<T,4> textureProjLodOffset(Sampler1D<vector<T,N>> sampler, vec2 p, 
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler1D<vector<T,N>> sampler, vec4 p, float lod, constexpr int offset)
 {
     __target_switch
@@ -3450,9 +3451,9 @@ public vector<T,4> textureProjLodOffset(Sampler1D<vector<T,N>> sampler, vec4 p, 
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler2D<vector<T,N>> sampler, vec3 p, float lod, constexpr ivec2 offset)
 {
     __target_switch
@@ -3466,9 +3467,9 @@ public vector<T,4> textureProjLodOffset(Sampler2D<vector<T,N>> sampler, vec3 p, 
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler2D<vector<T,N>> sampler, vec4 p, float lod, constexpr ivec2 offset)
 {
     __target_switch
@@ -3486,9 +3487,9 @@ public vector<T,4> textureProjLodOffset(Sampler2D<vector<T,N>> sampler, vec4 p, 
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T,4> textureProjLodOffset(Sampler3D<vector<T,N>> sampler, vec4 p, float lod, constexpr ivec3 offset)
 {
     __target_switch
@@ -3547,7 +3548,7 @@ public float textureProjLodOffset(sampler2DShadow sampler, vec4 p, float lod, co
 // -------------------
 
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureGrad(Sampler1D<vector<T,N>> sampler, float p, float dPdx, float dPdy)
@@ -3555,7 +3556,7 @@ public vector<T,4> textureGrad(Sampler1D<vector<T,N>> sampler, float p, float dP
     return __vectorReshape<4>(sampler.SampleGrad(p, dPdx, dPdy));
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureGrad(__TextureImpl<
@@ -3625,7 +3626,7 @@ public float textureGrad(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
 }
 
 [ForceInline]
-[require(glsl_spirv, texture_shadowlod_cube)]
+[require(glsl_spirv, texture_shadowlod)]
 public float textureGrad(samplerCubeShadow sampler, vec4 p, vec3 dPdx, vec3 dPdy)
 {
     __target_switch
@@ -3662,7 +3663,7 @@ public float textureGrad(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 d
 // textureGradOffset
 // -------------------
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureGradOffset(Sampler1D<vector<T,N>> sampler, float p, float dPdx, float dPdy, constexpr int offset)
@@ -3670,7 +3671,7 @@ public vector<T,4> textureGradOffset(Sampler1D<vector<T,N>> sampler, float p, fl
     return __vectorReshape<4>(sampler.SampleGrad(p, dPdx, dPdy, offset));
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 [ForceInline]
 public vector<T,4> textureGradOffset(__TextureImpl<
@@ -3760,7 +3761,7 @@ public float textureGradOffset(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, 
 // textureProjGrad
 // -------------------
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler1D<vector<T,N>> sampler, vec2 p, float dPdx, float dPdy)
@@ -3776,7 +3777,7 @@ public vector<T,4> textureProjGrad(Sampler1D<vector<T,N>> sampler, vec2 p, float
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler1D<vector<T,N>> sampler, vec4 p, float dPdx, float dPdy)
@@ -3796,7 +3797,7 @@ public vector<T,4> textureProjGrad(Sampler1D<vector<T,N>> sampler, vec4 p, float
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler2D<vector<T,N>> sampler, vec3 p, vec2 dPdx, vec2 dPdy)
@@ -3812,7 +3813,7 @@ public vector<T,4> textureProjGrad(Sampler2D<vector<T,N>> sampler, vec3 p, vec2 
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler2D<vector<T,N>> sampler, vec4 p, vec2 dPdx, vec2 dPdy)
@@ -3832,7 +3833,7 @@ public vector<T,4> textureProjGrad(Sampler2D<vector<T,N>> sampler, vec4 p, vec2 
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGrad(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 dPdx, vec3 dPdy)
@@ -3892,7 +3893,7 @@ public float textureProjGrad(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dP
 // textureProjGradOffset
 // -------------------
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler1D<vector<T,N>> sampler, vec2 p, float dPdx, float dPdy, constexpr int offset)
@@ -3908,7 +3909,7 @@ public vector<T,4> textureProjGradOffset(Sampler1D<vector<T,N>> sampler, vec2 p,
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler1D<vector<T,N>> sampler, vec4 p, float dPdx, float dPdy, constexpr int offset)
@@ -3928,7 +3929,7 @@ public vector<T,4> textureProjGradOffset(Sampler1D<vector<T,N>> sampler, vec4 p,
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler2D<vector<T,N>> sampler, vec3 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
@@ -3944,7 +3945,7 @@ public vector<T,4> textureProjGradOffset(Sampler2D<vector<T,N>> sampler, vec3 p,
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler2D<vector<T,N>> sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
@@ -3964,7 +3965,7 @@ public vector<T,4> textureProjGradOffset(Sampler2D<vector<T,N>> sampler, vec4 p,
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N:int>
+__generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T,4> textureProjGradOffset(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 dPdx, vec3 dPdy, constexpr ivec3 offset)
@@ -4170,163 +4171,163 @@ public vec4 textureGatherOffsets(__TextureImpl<
 // error when we try to translate the GLSL to SPIR-V.
 // So we cannot use them.
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1D(sampler1D sampler, float coord)
 {
     return texture(sampler, coord);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1D(sampler1D sampler, float coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec2 coord)
 {
     return textureProj(sampler, coord);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec2 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec4 coord)
 {
     return textureProj(sampler, coord);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DLod(sampler1D sampler, float coord, float lod)
 {
     return textureLod(sampler, coord, lod);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProjLod(sampler1D sampler, vec2 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProjLod(sampler1D sampler, vec4 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2D(sampler2D sampler, vec2 coord)
 {
     return texture(sampler, coord);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2D(sampler2D sampler, vec2 coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec3 coord)
 {
     return textureProj(sampler, coord);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec3 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec4 coord)
 {
     return textureProj(sampler, coord);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DLod(sampler2D sampler, vec2 coord, float lod)
 {
     return textureLod(sampler, coord, lod);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProjLod(sampler2D sampler, vec3 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProjLod(sampler2D sampler, vec4 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3D(sampler3D sampler, vec3 coord)
 {
     return texture(sampler, coord);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3D(sampler3D sampler, vec3 coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3DProj(sampler3D sampler, vec4 coord)
 {
     return textureProj(sampler, coord);
 }
 
-[require(glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3DProj(sampler3D sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3DLod(sampler3D sampler, vec3 coord, float lod)
 {
     return textureLod(sampler, coord, lod);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3DProjLod(sampler3D sampler, vec4 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 textureCube(samplerCube sampler, vec3 coord)
 {
     return texture(sampler, coord);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 textureCube(samplerCube sampler, vec3 coord, float bias)
 {
     return texture(sampler, coord, bias);
 }
 
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 textureCubeLod(samplerCube sampler, vec3 coord, float lod)
 {
     return textureLod(sampler, coord, lod);
@@ -9389,7 +9390,7 @@ public vec4 noise4(vector<float, N> x)
 // TODO: if called after a return, error.
 
 [ForceInline]
-[require(glsl_hlsl_spirv, glsl_barrier)]
+[require(glsl_hlsl_spirv, memorybarrier)]
 public void barrier()
 {
     __target_switch

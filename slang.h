@@ -588,8 +588,8 @@ extern "C"
         SLANG_TARGET_UNKNOWN,
         SLANG_TARGET_NONE,
         SLANG_GLSL,
-        SLANG_GLSL_VULKAN,              //< deprecated: just use `SLANG_GLSL`
-        SLANG_GLSL_VULKAN_ONE_DESC,     //< deprecated
+        SLANG_GLSL_VULKAN_DEPRECATED,              //< deprecated and removed: just use `SLANG_GLSL`.
+        SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED,     //< deprecated and removed.
         SLANG_HLSL,
         SLANG_SPIRV,
         SLANG_SPIRV_ASM,
@@ -841,7 +841,9 @@ extern "C"
             Language,
             MatrixLayoutColumn, // bool
             MatrixLayoutRow,    // bool
+            ZeroInitialize,     // bool
             IgnoreCapabilities, // bool
+            RestrictiveCapabilityCheck, // bool
             ModuleName,         // stringValue0: module name.
             Output,
             Profile,            // intValue0: profile
@@ -865,6 +867,8 @@ extern "C"
             MinimumSlangOptimization, // bool
             DisableNonEssentialValidations, // bool
             DisableSourceMap,       // bool
+            UnscopedEnum,           // bool
+            PreserveParameters,       // bool: preserve all resource parameters in the output code.
 
             // Target
 
@@ -4951,6 +4955,11 @@ namespace slang
             uint32_t compilerOptionEntryCount,
             CompilerOptionEntry* compilerOptionEntries,
             ISlangBlob** outDiagnostics = nullptr) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt targetIndex,
+            IBlob** outCode,
+            IBlob** outDiagnostics = nullptr) = 0;
     };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
 

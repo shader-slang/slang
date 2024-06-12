@@ -694,6 +694,9 @@ DIAGNOSTIC(39025, Error, conflictingVulkanInferredBindingForParameter, "conflict
 DIAGNOSTIC(39026, Error, matrixLayoutModifierOnNonMatrixType, "matrix layout modifier cannot be used on non-matrix type '$0'.")
 
 DIAGNOSTIC(39027, Error, getAttributeAtVertexMustReferToPerVertexInput, "'GetAttributeAtVertex' must reference a vertex input directly, and the vertex input must be decorated with 'pervertex' or 'nointerpolation'.")
+
+DIAGNOSTIC(39028, Error, notValidVaryingParameter, "parameter '$0' is not a valid varying parameter.")
+
 //
 
 // 4xxxx - IL code generation.
@@ -730,6 +733,8 @@ DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to 
 
 DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'void' function")
 DIAGNOSTIC(41011, Error, profileIncompatibleWithTargetSwitch, "__target_switch has no compatable target with current profile '$0'")
+DIAGNOSTIC(41012, Warning, profileImplicitlyUpgraded, "user set `profile` had an implicit upgrade applied to it, atoms added: '$0'")
+DIAGNOSTIC(41012, Error, profileImplicitlyUpgradedRestrictive, "user set `profile` had an implicit upgrade applied to it, atoms added: '$0'")
 DIAGNOSTIC(41015, Error, usingUninitializedValue, "use of uninitialized value '$0'")
 DIAGNOSTIC(41016, Warning, returningWithUninitializedOut, "returning without initializing out parameter '$0'")
 DIAGNOSTIC(41017, Warning, returningWithPartiallyUninitializedOut, "returning without fully initializing out parameter '$0'")
@@ -843,6 +848,8 @@ DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatic
 
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
+DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
+DIAGNOSTIC(57003, Error, unknownTessPartitioning, "unknown tessellation partitioning '$0'.")
 
 // GLSL Compatibility
 DIAGNOSTIC(58001, Error, entryPointMustReturnVoidWhenGlobalOutputPresent, "entry point must return 'void' when global output variables are present.")

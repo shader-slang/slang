@@ -2733,7 +2733,7 @@ namespace Slang
         // Get a reference to the builtin 'IDifferentiable' interface
         auto differentiableInterface = getASTBuilder()->getDifferentiableInterfaceType();
 
-        auto conformanceWitness = as<Witness>(isSubtype(primalType, differentiableInterface));
+        auto conformanceWitness = as<Witness>(isSubtype(primalType, differentiableInterface, IsSubTypeOptions::None));
         // Check if the provided type inherits from IDifferentiable.
         // If not, return the original type.
         if (conformanceWitness)
@@ -3116,6 +3116,12 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsExprVisitor::visitDefaultConstructExpr(DefaultConstructExpr* expr)
+    {
+        return expr;
+    }
+
+
     static bool _isSizeOfType(Type* type)
     {
         if (!type)
@@ -3337,7 +3343,7 @@ namespace Slang
             valueType = typeType->getType();
 
         // If value is a subtype of `type`, then this expr is always true.
-        if(isSubtype(valueType, expr->typeExpr.type))
+        if(isSubtype(valueType, expr->typeExpr.type, IsSubTypeOptions::None))
         {
             // Instead of returning a BoolLiteralExpr, we use a field to indicate this scenario,
             // so that the language server can still see the original syntax tree.

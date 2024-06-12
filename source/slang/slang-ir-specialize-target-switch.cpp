@@ -9,6 +9,16 @@ namespace Slang
 {
     void specializeTargetSwitch(TargetRequest* target, IRGlobalValueWithCode* code, DiagnosticSink* sink)
     {
+        if (auto gen = as<IRGeneric>(code))
+        {
+            auto retVal = findGenericReturnVal(gen);
+            if (auto innerCode = as<IRGlobalValueWithCode>(retVal))
+            {
+                specializeTargetSwitch(target, innerCode, sink);
+                return;
+            }
+        }
+
         bool changed = false;
         for (auto block : code->getBlocks())
         {
@@ -18,6 +28,7 @@ namespace Slang
                 bool isEqual;
                 CapabilitySet bestCapSet = CapabilitySet::makeInvalid();
                 IRBlock* targetBlock = nullptr;
+                CapabilitySet::ImpliesReturnFlags impliesReturnType = CapabilitySet::ImpliesReturnFlags::NotImplied;
                 for (UInt i = 0; i < targetSwitch->getCaseCount(); i++)
                 {
                     auto cap = (CapabilityName)getIntVal(targetSwitch->getCaseValue(i));
@@ -31,9 +42,8 @@ namespace Slang
                     bool isBetterForTarget = capSet.isBetterForTarget(bestCapSet, target->getTargetCaps(), isEqual);
                     if (isBetterForTarget)
                     {
-                        CapabilitySet joinedCapSet = capSet;
-                        joinedCapSet.join(target->getTargetCaps());
-                        bool targetImpliesCapSet = target->getTargetCaps().implies(joinedCapSet, true);
+                        impliesReturnType = target->getTargetCaps().atLeastOneSetImpliedInOther(capSet);
+                        bool targetImpliesCapSet = ((int)impliesReturnType & (int)CapabilitySet::ImpliesReturnFlags::Implied || capSet.isEmpty());
                         if (targetImpliesCapSet)
                         {
                             // Now check if bestCapSet contains targetCaps. If it does not then this is an invalid target
@@ -76,14 +86,6 @@ namespace Slang
             if (auto code = as<IRGlobalValueWithCode>(globalInst))
             {
                 specializeTargetSwitch(target, code, sink);
-                if (auto gen = as<IRGeneric>(code))
-                {
-                    auto retVal = findGenericReturnVal(gen);
-                    if (auto innerCode = as<IRGlobalValueWithCode>(retVal))
-                    {
-                        specializeTargetSwitch(target, innerCode, sink);
-                    }
-                }
             }
         }
     }
