@@ -328,6 +328,8 @@ IR_SIMPLE_DECORATION(VulkanHitObjectAttributesDecoration)
 
 IR_SIMPLE_DECORATION(PerVertexDecoration)
 
+IR_SIMPLE_DECORATION(SPIRVBlockDecoration)
+
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLVersionDecoration };
@@ -4340,6 +4342,13 @@ public:
     IRDecoration* addDecoration(IRInst* value, IROp op)
     {
         return addDecoration(value, op, (IRInst* const*) nullptr, 0);
+    }
+
+    IRDecoration* addDecorationIfNotExist(IRInst* value, IROp op)
+    {
+        if (auto decor = value->findDecorationImpl(op))
+            return decor;
+        return addDecoration(value, op);
     }
 
     IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* operand)

@@ -585,6 +585,7 @@ Result linkAndOptimizeIR(
     IRDeadCodeEliminationOptions deadCodeEliminationOptions = IRDeadCodeEliminationOptions();
     fastIRSimplificationOptions.minimalOptimization = defaultIRSimplificationOptions.minimalOptimization;
     deadCodeEliminationOptions.useFastAnalysis = fastIRSimplificationOptions.minimalOptimization;
+    deadCodeEliminationOptions.keepGlobalParamsAlive = targetProgram->getOptionSet().getBoolOption(CompilerOptionName::PreserveParameters);
 
     simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
 

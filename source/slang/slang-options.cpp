@@ -347,6 +347,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::SourceEmbedLanguage, "-source-embed-language", "-source-embed-language <language>",
         "The language to be used for source embedding. Defaults to C/C++. Currently only C/C++ are supported"},
         { OptionKind::DisableShortCircuit, "-disable-short-circuit", nullptr, "Disable short-circuiting for \"&&\" and \"||\" operations" },
+        { OptionKind::PreserveParameters, "-preserve-params", nullptr, "Preserve all resource parameters in the output code, even if they are not used by the shader."}
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
@@ -1704,6 +1705,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::NoHLSLBinding:
             case OptionKind::NoHLSLPackConstantBufferElements:
             case OptionKind::LoopInversion:
+            case OptionKind::PreserveParameters:
                 linkage->m_optionSet.set(optionKind, true); break;
                 break;
             case OptionKind::MatrixLayoutRow:

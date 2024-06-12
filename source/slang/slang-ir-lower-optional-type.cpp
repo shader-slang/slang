@@ -15,6 +15,10 @@ namespace Slang
         InstWorkList workList;
         InstHashSet workListSet;
 
+        IRGeneric* genericOptionalStructType = nullptr;
+        IRStructKey* valueKey = nullptr;
+        IRStructKey* hasValueKey = nullptr;
+
         OptionalTypeLoweringContext(IRModule* inModule)
             :module(inModule), workList(inModule), workListSet(inModule)
         {}
@@ -24,8 +28,6 @@ namespace Slang
             IRType* optionalType = nullptr;
             IRType* valueType = nullptr;
             IRType* loweredType = nullptr;
-            IRStructField* valueField = nullptr;
-            IRStructField* hasValueField = nullptr;
         };
         Dictionary<IRInst*, RefPtr<LoweredOptionalTypeInfo>> mapLoweredTypeToOptionalTypeInfo;
         Dictionary<IRInst*, RefPtr<LoweredOptionalTypeInfo>> loweredOptionalTypes;
@@ -36,6 +38,34 @@ namespace Slang
                 return info->loweredType;
             else
                 return type;
+        }
+
+        IRInst* getOrCreateGenericOptionalStruct()
+        {
+            if (genericOptionalStructType)
+                return genericOptionalStructType;
+            IRBuilder builder(module);
+            builder.setInsertInto(module->getModuleInst());
+
+            valueKey = builder.createStructKey();
+            builder.addNameHintDecoration(valueKey, UnownedStringSlice("value"));
+            hasValueKey = builder.createStructKey();
+            builder.addNameHintDecoration(hasValueKey, UnownedStringSlice("hasValue"));
+
+            genericOptionalStructType = builder.emitGeneric();
+            builder.addNameHintDecoration(genericOptionalStructType, UnownedStringSlice("_slang_Optional"));
+
+            builder.setInsertInto(genericOptionalStructType);
+            auto block = builder.emitBlock();
+            auto typeParam = builder.emitParam(builder.getTypeKind());
+            auto structType = builder.createStructType();
+            builder.addNameHintDecoration(structType, UnownedStringSlice("_slang_Optional"));
+            builder.createStructField(structType, valueKey, (IRType*)typeParam);
+            builder.createStructField(structType, hasValueKey, builder.getBoolType());
+            builder.setInsertInto(block);
+            builder.emitReturn(structType);
+            genericOptionalStructType->setFullType(builder.getTypeKind());
+            return genericOptionalStructType;
         }
 
         bool typeHasNullValue(IRInst* type)
@@ -78,19 +108,10 @@ namespace Slang
             }
             else
             {
-                auto structType = builder->createStructType();
-                info->loweredType = structType;
-                builder->addNameHintDecoration(structType, UnownedStringSlice("OptionalType"));
-
-                info->valueType = valueType;
-                auto valueKey = builder->createStructKey();
-                builder->addNameHintDecoration(valueKey, UnownedStringSlice("value"));
-                info->valueField = builder->createStructField(structType, valueKey, (IRType*)valueType);
-
-                auto boolType = builder->getBoolType();
-                auto hasValueKey = builder->createStructKey();
-                builder->addNameHintDecoration(hasValueKey, UnownedStringSlice("hasValue"));
-                info->hasValueField = builder->createStructField(structType, hasValueKey, (IRType*)boolType);
+                auto genericType = getOrCreateGenericOptionalStruct();
+                IRInst* args[] = { valueType };
+                auto specializedType = builder->emitSpecializeInst(builder->getTypeKind(), genericType, 1, args);
+                info->loweredType = (IRType*)specializedType;
             }
             mapLoweredTypeToOptionalTypeInfo[info->loweredType] = info;
             loweredOptionalTypes[type] = info;
@@ -100,12 +121,6 @@ namespace Slang
         void addToWorkList(
             IRInst* inst)
         {
-            for (auto ii = inst->getParent(); ii; ii = ii->getParent())
-            {
-                if (as<IRGeneric>(ii))
-                    return;
-            }
-
             if (workListSet.contains(inst))
                 return;
 
@@ -169,7 +184,7 @@ namespace Slang
                 result = builder->emitFieldExtract(
                     builder->getBoolType(),
                     optionalInst,
-                    loweredOptionalTypeInfo->hasValueField->getKey());
+                    hasValueKey);
             }
             else
             {
@@ -201,11 +216,10 @@ namespace Slang
             if (loweredOptionalTypeInfo->loweredType != loweredOptionalTypeInfo->valueType)
             {
                 SLANG_ASSERT(loweredOptionalTypeInfo);
-                SLANG_ASSERT(loweredOptionalTypeInfo->valueField);
                 auto getElement = builder->emitFieldExtract(
                     loweredOptionalTypeInfo->valueType,
                     base,
-                    loweredOptionalTypeInfo->valueField->getKey());
+                    valueKey);
                 inst->replaceUsesWith(getElement);
             }
             else
@@ -257,7 +271,6 @@ namespace Slang
             while (workList.getCount() != 0)
             {
                 IRInst* inst = workList.getLast();
-
                 workList.removeLast();
                 workListSet.remove(inst);
 
