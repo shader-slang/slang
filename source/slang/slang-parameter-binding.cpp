@@ -1199,12 +1199,20 @@ static void addExplicitParameterBindings_GLSL(
     // We'll do the shifting at later later point in _maybeApplyHLSLToVulkanShifts
     resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
 
-    // If user did not set how to interpret 'hlsl style bindings', we should map 
-    // `register` 1:1 with equivlent vulkan bindings.
     if (warnedMissingVulkanLayoutModifier)
     {
-        resInfo->kind = LayoutResourceKind::DescriptorTableSlot;
-        resInfo->count = 1;
+        // If we warn due to invalid bindings and user did not set how to interpret 'hlsl style bindings', we should map 
+        // `register` 1:1 with equivlent vulkan bindings.
+        if(!hlslToVulkanLayoutOptions
+            || hlslToVulkanLayoutOptions->getKindShiftEnabledFlags() == HLSLToVulkanLayoutOptions::KindFlag::None)
+        {
+            resInfo->kind = LayoutResourceKind::DescriptorTableSlot;
+            resInfo->count = 1;
+        }
+        else
+        {
+            return;
+        }
     }
 
     semanticInfo.kind = resInfo->kind;

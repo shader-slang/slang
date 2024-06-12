@@ -75,6 +75,7 @@ public:
     {
         enum Enum : KindFlags
         {
+            None            = 0,
             UnorderedAccess = KindFlags(1) << Index(Kind::UnorderedAccess),
             Sampler         = KindFlags(1) << Index(Kind::Sampler), 
             ShaderResource  = KindFlags(1) << Index(Kind::ShaderResource),
