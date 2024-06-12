@@ -2185,9 +2185,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     state,
                     fieldVarLayout);
 
-                SLANG_ASSERT(fieldTypeLayout);
-                if(!fieldTypeLayout)
+                if (!fieldTypeLayout)
+                {
+                    getSink(context)->diagnose(field, Diagnostics::notValidVaryingParameter, field);
                     continue;
+                }
                 fieldVarLayout->typeLayout = fieldTypeLayout;
 
                 // The field needs to have offset information stored
@@ -4169,6 +4171,9 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
     if( !m_layout )
     {
         m_layout = generateParameterBindings(this, sink);
+        if (sink->getErrorCount() != 0)
+            return nullptr;
+
         if( m_layout )
         {
             m_irModuleForLayout = createIRModuleForLayout(sink);
