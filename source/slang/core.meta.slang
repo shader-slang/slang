@@ -74,6 +74,13 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
+__magic_type(DefaultInitializableType)
+interface IDefaultInitializableType
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::DefaultInitializableConstructor))
+    __init();
+}
+
 interface IComparable
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::Equals))
@@ -187,7 +194,9 @@ interface IFloat : IArithmetic, IDifferentiable
 /// A type that can be used as an operand for builtins
 [sealed]
 [builtin]
-interface __BuiltinType {}
+interface __BuiltinType 
+{
+}
 
 /// A type that can be used for arithmetic operations
 [sealed]
@@ -381,20 +390,6 @@ interface IArray<T>
     int getCount();
     __subscript(int index) -> T
     {
-        get;
-    }
-}
-
-__generic<T, let N:int>
-__magic_type(ArrayExpressionType)
-struct Array : IArray<T>
-{
-    [ForceInline]
-    int getCount() { return N; }
-
-    __subscript(int index) -> T
-    {
-        __intrinsic_op($(kIROp_GetElement))
         get;
     }
 }
@@ -1035,6 +1030,20 @@ extension int16_t : IRangedValue
 {
     static const int16_t maxValue = 32767;
     static const int16_t minValue = -32768;
+}
+
+__generic<T, let N:int>
+__magic_type(ArrayExpressionType)
+struct Array : IArray<T>
+{
+    [ForceInline]
+    int getCount() { return N; }
+
+    __subscript(int index) -> T
+    {
+        __intrinsic_op($(kIROp_GetElement))
+        get;
+    }
 }
 
     /// An `N` component vector with elements of type `T`.

@@ -4444,6 +4444,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
     }
 
+    LoweredValInfo visitDefaultConstructExpr(DefaultConstructExpr* expr)
+    {
+        return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(lowerType(context, expr->type)));
+    }
+
     LoweredValInfo getDefaultVal(DeclRef<VarDeclBase> decl)
     {
         if(auto initExpr = decl.getDecl()->initExpr)

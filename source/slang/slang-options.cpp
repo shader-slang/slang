@@ -289,6 +289,10 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Language,     "-lang", "-lang <language>", "Set the language for the following input files."},
         { OptionKind::MatrixLayoutColumn, "-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major."},
         { OptionKind::MatrixLayoutRow,"-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major."},
+        { OptionKind::ZeroInitialize, "-zero-initialize", nullptr, 
+        "Initialize all variables to zero."
+        "Structs will set all struct-fields without an init expression to 0."
+        "All variables will call their default constructor if not explicitly initialized as usual."},
         { OptionKind::IgnoreCapabilities,"-ignore-capabilities", nullptr, "Do not warn or error if capabilities are violated"},
         { OptionKind::MinimumSlangOptimization, "-minimum-slang-optimization", nullptr, "Perform minimum code optimization in Slang to favor compilation time."},
         { OptionKind::DisableNonEssentialValidations, "-disable-non-essential-validations", nullptr, "Disable non-essential IR validations such as use of uninitialized variables."},
@@ -1693,6 +1697,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::VulkanUseEntryPointName:
             case OptionKind::VulkanUseGLLayout:
             case OptionKind::VulkanEmitReflection:
+            case OptionKind::ZeroInitialize:
             case OptionKind::IgnoreCapabilities:
             case OptionKind::MinimumSlangOptimization:
             case OptionKind::DisableNonEssentialValidations:

@@ -80,7 +80,7 @@ namespace Slang
         Type*                   interfaceType)
     {
         // The most basic test here should be: does the type declare conformance to the trait.
-        if(isSubtype(type, interfaceType))
+        if(isSubtype(type, interfaceType, IsSubTypeOptions::None))
             return type;
 
         // Just because `type` doesn't conform to the given `interfaceDeclRef`, that
@@ -120,7 +120,7 @@ namespace Slang
                     continue;
 
                 // We only want to consider types that implement the target interface.
-                if(!isSubtype(candidateType, interfaceType))
+                if(!isSubtype(candidateType, interfaceType, IsSubTypeOptions::None))
                     continue;
 
                 // We only want to consider types where we can implicitly convert from `type`
@@ -484,7 +484,7 @@ namespace Slang
             }
 
             // Search for a witness that shows the constraint is satisfied.
-            auto subTypeWitness = isSubtype(sub, sup);
+            auto subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
             if(subTypeWitness)
             {
                 // We found a witness, so it will become an (implicit) argument.
