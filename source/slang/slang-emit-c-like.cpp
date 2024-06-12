@@ -58,8 +58,6 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
             return SourceLanguage::Unknown;
         }
         case CodeGenTarget::GLSL:
-        case CodeGenTarget::GLSL_Vulkan:
-        case CodeGenTarget::GLSL_Vulkan_OneDesc:
         {
             return SourceLanguage::GLSL;
         }
