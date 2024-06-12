@@ -563,11 +563,6 @@ namespace Slang
             {
                 return PassThroughMode::Dxc;
             }
-            case CodeGenTarget::GLSL_Vulkan:
-            case CodeGenTarget::GLSL_Vulkan_OneDesc:
-            {
-                return PassThroughMode::Glslang;
-            }
             case CodeGenTarget::MetalLib:
             case CodeGenTarget::MetalLibAssembly:
             {

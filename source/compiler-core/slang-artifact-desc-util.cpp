@@ -256,8 +256,6 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     {
         case SLANG_TARGET_UNKNOWN:                return Desc::make(Kind::Unknown, Payload::None, Style::Unknown, 0);
         case SLANG_TARGET_NONE:                   return Desc::make(Kind::None, Payload::None, Style::Unknown, 0);
-        case SLANG_GLSL_VULKAN:
-        case SLANG_GLSL_VULKAN_ONE_DESC:
         case SLANG_GLSL:
         {
             // For the moment we Desc::make all just map to GLSL, but we could use flags
