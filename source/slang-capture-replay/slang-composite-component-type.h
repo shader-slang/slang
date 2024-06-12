@@ -59,6 +59,10 @@ namespace SlangCapture
             uint32_t compilerOptionEntryCount,
             slang::CompilerOptionEntry* compilerOptionEntries,
             ISlangBlob** outDiagnostics = nullptr) override;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt    targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics = nullptr) override;
 
         slang::IComponentType* getActualCompositeComponentType() const { return m_actualCompositeComponentType; }
     private:
