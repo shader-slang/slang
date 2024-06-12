@@ -759,7 +759,7 @@ namespace Slang
                             auto valueType = tryGetPointedToType(&builder, ptrType);
                             if (!valueType)
                                 continue;
-                            if (auto vectorType = as<IRVectorType>(valueType))
+                            if (as<IRVectorType>(valueType))
                                 argsToFixup.add(call->getArgs() + i);
                         }
                     }
