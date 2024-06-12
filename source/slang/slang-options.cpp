@@ -289,6 +289,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Language,     "-lang", "-lang <language>", "Set the language for the following input files."},
         { OptionKind::MatrixLayoutColumn, "-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major."},
         { OptionKind::MatrixLayoutRow,"-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major."},
+        { OptionKind::RestrictiveCapabilityCheck,"-restrictive-capability-check", nullptr, "Many capability warnings will become an error."},
         { OptionKind::ZeroInitialize, "-zero-initialize", nullptr, 
         "Initialize all variables to zero."
         "Structs will set all struct-fields without an init expression to 0."
@@ -1699,6 +1700,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::VulkanEmitReflection:
             case OptionKind::ZeroInitialize:
             case OptionKind::IgnoreCapabilities:
+            case OptionKind::RestrictiveCapabilityCheck:
             case OptionKind::MinimumSlangOptimization:
             case OptionKind::DisableNonEssentialValidations:
             case OptionKind::DisableSourceMap:

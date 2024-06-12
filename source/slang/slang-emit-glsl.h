@@ -126,6 +126,8 @@ protected:
 
     void _requireRayTracing();
 
+    void _requireRayQuery();
+
     void _requireFragmentShaderBarycentric();
 
     void _emitSpecialFloatImpl(IRType* type, const char* valueExpr);

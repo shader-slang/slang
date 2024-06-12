@@ -1724,7 +1724,7 @@ CapabilitySet TargetRequest::getTargetCaps()
                 {
                     for (auto atom : profileCapAtomSet)
                     {
-                        if (isTargetVersionAtom((CapabilityName)atom))
+                        if (isTargetVersionAtom(asAtom(atom)))
                         {
                             atoms.add((CapabilityName)atom);
                             hasTargetVersionAtom = true;
@@ -1742,7 +1742,7 @@ CapabilitySet TargetRequest::getTargetCaps()
             {
                 for (auto atom : profileCapAtomSet)
                 {
-                    if (isSpirvExtensionAtom((CapabilityName)atom))
+                    if (isSpirvExtensionAtom(asAtom(atom)))
                     {
                         atoms.add((CapabilityName)atom);
                         hasTargetVersionAtom = true;
@@ -1754,6 +1754,7 @@ CapabilitySet TargetRequest::getTargetCaps()
         {
             isGLSLTarget = true;
             atoms.add(CapabilityName::glsl);
+            profileCaps.addSpirvVersionFromOtherAsGlslSpirvVersion(profileCaps);
         }
         break;
 
@@ -1796,30 +1797,24 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     CapabilitySet targetCap = CapabilitySet(atoms);
 
-    CapabilityName latestSpirvAtom = getLatestSpirvAtom();
-
+    if (profileCaps.atLeastOneSetImpliedInOther(targetCap) == CapabilitySet::ImpliesReturnFlags::Implied)
+        targetCap.join(profileCaps);
+    
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
-        auto atom = (CapabilityName)atomVal.intValue;
-        if (isGLSLTarget)
-        {
-            // If we are emitting GLSL code, we need to
-            // translate all spirv_*_* capabilities to
-            // glsl_spirv_*_* instead.
-            //
-            if (atom >= CapabilityName::spirv_1_0 && atom <= latestSpirvAtom)
-            {
-                atom = (CapabilityName)((Int)CapabilityName::glsl_spirv_1_0 + ((Int)atom - (Int)CapabilityName::spirv_1_0));
-            }
-        }
-        if (!targetCap.isIncompatibleWith(atom))
-        {
-            // Only add atoms that are compatible with the current target.
-            atoms.add(atom);
-        }
+        auto toAdd = CapabilitySet((CapabilityName)atomVal.intValue);
+        
+        if(isGLSLTarget)
+            targetCap.addSpirvVersionFromOtherAsGlslSpirvVersion(toAdd);
+
+        if (!targetCap.isIncompatibleWith(toAdd))
+            targetCap.join(toAdd);
     }
 
-    cookedCapabilities = CapabilitySet(atoms);
+    cookedCapabilities = targetCap;
+    
+    SLANG_ASSERT(!cookedCapabilities.isInvalid());
+        
     return cookedCapabilities;
 }
 

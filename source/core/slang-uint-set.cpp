@@ -106,7 +106,7 @@ void UIntSet::subtractWith(const UIntSet& set)
 
 /* static */void UIntSet::calcUnion(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
-    outRs.m_buffer.setCount(Math::Max(set1.m_buffer.getCount(), set2.m_buffer.getCount()));
+    outRs.resizeBackingBufferDirectly(Math::Max(set1.m_buffer.getCount(), set2.m_buffer.getCount()));
     outRs.clear();
     for (Index i = 0; i < set1.m_buffer.getCount(); i++)
         outRs.m_buffer[i] |= set1.m_buffer[i];
@@ -117,7 +117,7 @@ void UIntSet::subtractWith(const UIntSet& set)
 /* static */void UIntSet::calcIntersection(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
     const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
-    outRs.m_buffer.setCount(minCount);
+    outRs.resizeBackingBufferDirectly(minCount);
 
     for (Index i = 0; i < minCount; i++)
         outRs.m_buffer[i] = set1.m_buffer[i] & set2.m_buffer[i];
@@ -125,7 +125,7 @@ void UIntSet::subtractWith(const UIntSet& set)
 
 /* static */void UIntSet::calcSubtract(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
-    outRs.m_buffer.setCount(set1.m_buffer.getCount());
+    outRs.resizeBackingBufferDirectly(set1.m_buffer.getCount());
 
     const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
     for (Index i = 0; i < minCount; i++)
