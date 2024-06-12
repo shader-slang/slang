@@ -563,11 +563,6 @@ namespace Slang
             {
                 return PassThroughMode::Dxc;
             }
-            case CodeGenTarget::GLSL_Vulkan:
-            case CodeGenTarget::GLSL_Vulkan_OneDesc:
-            {
-                return PassThroughMode::Glslang;
-            }
             case CodeGenTarget::MetalLib:
             case CodeGenTarget::MetalLibAssembly:
             {
@@ -656,7 +651,7 @@ namespace Slang
         {
             for (auto atom : conjunctions)
             {
-                switch ((CapabilityAtom)atom)
+                switch (asAtom(atom))
                 {
                 default:
                     break;

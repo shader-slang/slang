@@ -2030,8 +2030,6 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
     switch (targetProgram->getTargetReq()->getTarget())
     {
         case CodeGenTarget::GLSL:
-        case CodeGenTarget::GLSL_Vulkan:
-        case CodeGenTarget::GLSL_Vulkan_OneDesc:
             // If we aren't emitting directly we are going to output GLSL to feed to GLSLANG
         case CodeGenTarget::SPIRV:
         case CodeGenTarget::SPIRVAssembly:

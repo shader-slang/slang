@@ -588,8 +588,8 @@ extern "C"
         SLANG_TARGET_UNKNOWN,
         SLANG_TARGET_NONE,
         SLANG_GLSL,
-        SLANG_GLSL_VULKAN,              //< deprecated: just use `SLANG_GLSL`
-        SLANG_GLSL_VULKAN_ONE_DESC,     //< deprecated
+        SLANG_GLSL_VULKAN_DEPRECATED,              //< deprecated and removed: just use `SLANG_GLSL`.
+        SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED,     //< deprecated and removed.
         SLANG_HLSL,
         SLANG_SPIRV,
         SLANG_SPIRV_ASM,
@@ -843,6 +843,7 @@ extern "C"
             MatrixLayoutRow,    // bool
             ZeroInitialize,     // bool
             IgnoreCapabilities, // bool
+            RestrictiveCapabilityCheck, // bool
             ModuleName,         // stringValue0: module name.
             Output,
             Profile,            // intValue0: profile

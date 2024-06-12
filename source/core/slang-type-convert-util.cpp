@@ -9,8 +9,6 @@ namespace Slang
     switch (target)
     {
         case SLANG_GLSL:
-        case SLANG_GLSL_VULKAN:
-        case SLANG_GLSL_VULKAN_ONE_DESC:
         {
             return SLANG_SOURCE_LANGUAGE_GLSL;
         }
