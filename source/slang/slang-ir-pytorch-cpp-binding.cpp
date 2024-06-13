@@ -632,7 +632,6 @@ void generateReflectionFunc(IRBuilder* builder, IRFunc* kernelFunc, IRFunc* host
 
     builder->addExternCppDecoration(reflectionFunc, reflFuncExportName.getUnownedSlice());
     builder->addTorchEntryPointDecoration(reflectionFunc, reflFuncExportName.getUnownedSlice());
-    builder->addHLSLExportDecoration(reflectionFunc);
     builder->addKeepAliveDecoration(reflectionFunc);
 }
 
@@ -817,7 +816,6 @@ void generateReflectionForType(IRType* type, DiagnosticSink* sink)
  
     builder.addTorchEntryPointDecoration(reflFunc, reflFuncExportName.getUnownedSlice());
     builder.addExternCppDecoration(reflFunc, reflFuncExportName.getUnownedSlice());
-    builder.addHLSLExportDecoration(reflFunc);
     builder.addKeepAliveDecoration(reflFunc);
 }
 
@@ -899,7 +897,6 @@ IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
         // Mark for host-side emit logic.
         builder.addCudaHostDecoration(hostFunc);
         // Keep alive. This method will be accessed externally.
-        builder.addHLSLExportDecoration(hostFunc);
         builder.addKeepAliveDecoration(hostFunc);
     }
 
@@ -1163,6 +1160,27 @@ void handleAutoBindNames(IRModule* module)
     }
 }
 
+void removeTorchAndCUDAEntryPoints(IRModule* module)
+{
+    // Go through global insts, find cuda & torch related entry points and remove the keep-alive decoration.
+    IRBuilder builder(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(globalInst))
+        {
+            if (func->findDecoration<IRAutoPyBindCudaDecoration>() ||
+                func->findDecoration<IRTorchEntryPointDecoration>() ||
+                func->findDecoration<IRCudaKernelDecoration>())
+            {
+                if (auto keepAlive = func->findDecoration<IRKeepAliveDecoration>())
+                    keepAlive->removeAndDeallocate();
+                if (auto hlslExport = func->findDecoration<IRHLSLExportDecoration>())
+                    hlslExport->removeAndDeallocate();
+            }
+        }
+    }
+}
+
 void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
@@ -1237,7 +1255,6 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
                     builder.addExternCppDecoration(wrapperFunc, nameBuilder.getUnownedSlice());
                 }
 
-                builder.addHLSLExportDecoration(wrapperFunc);
                 builder.addKeepAliveDecoration(wrapperFunc);
 
                 builder.addCudaKernelForwardDerivativeDecoration(func, wrapperFunc);
@@ -1296,7 +1313,6 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
                     builder.addExternCppDecoration(wrapperFunc, nameBuilder.getUnownedSlice());
                 }
 
-                builder.addHLSLExportDecoration(wrapperFunc);
                 builder.addKeepAliveDecoration(wrapperFunc);
 
                 builder.addCudaKernelBackwardDerivativeDecoration(func, wrapperFunc);
