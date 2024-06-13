@@ -143,12 +143,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
     if (!layout)
         return;
-    auto func = getParentFunc(param);
-    auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
-    Stage stage = Stage::Unknown;
-    if (entryPointDecor)
-        stage = entryPointDecor->getProfile().getStage();
-    
+
     for (auto rr : layout->getOffsetAttrs())
     {
         switch (rr->getResourceKind())
