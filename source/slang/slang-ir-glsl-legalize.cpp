@@ -1286,29 +1286,34 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         &systemValueInfoStorage);
 
     {
-        uint32_t index = 0;
-        IRSystemValueSemanticAttr* systemSemantic = nullptr;
-        for (; index < inVarLayout->operandCount; index++)
-        {
-            if (auto systemValueSemanticAttr = as<IRSystemValueSemanticAttr>(inVarLayout->getOperand(index)))
-            {    
-                systemSemantic = systemValueSemanticAttr;
-                break;
-            }
-        }
+
+        auto systemSemantic = inVarLayout->findAttr<IRSystemValueSemanticAttr>();
         // Validate the system value, convert to a regular parameter if this is not a valid system value for a given target.
         if (systemSemantic && isSPIRV(codeGenContext->getTargetFormat()) && systemSemantic->getName().caseInsensitiveEquals(UnownedStringSlice("sv_instanceid"))
             && ((stage == Stage::Fragment) || (stage == Stage::Vertex && inVarLayout->usesResourceKind(LayoutResourceKind::VaryingOutput))))
         {
-            IRCloneEnv cloneEnv;
-            IRBuilder cloneBuilder(builder->getModule());
-            cloneBuilder.setInsertBefore(inVarLayout);
+            ShortList<IRInst*> newOperands;
+            auto opCount = inVarLayout->getOperandCount();
+            newOperands.setCount(opCount);
+            Index validCount = 0;
+            for (UInt i = 0; i < opCount; ++i)
+            {
+                auto op = inVarLayout->getOperand(i);
+                if (op == systemSemantic)
+                    continue;
+                newOperands[validCount] = op;
+                validCount++;
+            }
 
-            HashSet<Index> setOfOperandsToRemove;
-            setOfOperandsToRemove.add(index);
-            auto clonedVarLayout = cloneInstExcludingSomeOperands(&cloneEnv, &cloneBuilder, inVarLayout, setOfOperandsToRemove);
-            cloneInstDecorationsAndChildren(&cloneEnv, builder->getModule(), inVarLayout, clonedVarLayout);
-            inVarLayout->replaceUsesWith(clonedVarLayout);
+            auto newVarLayout = builder->emitIntrinsicInst(
+                inVarLayout->getFullType(),
+                inVarLayout->getOp(),
+                validCount,
+                newOperands.getArrayView().getBuffer());
+
+            newVarLayout->sourceLoc = inVarLayout->sourceLoc;
+            
+            inVarLayout->replaceUsesWith(newVarLayout);
         }
     }
 
