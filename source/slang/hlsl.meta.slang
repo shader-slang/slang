@@ -1784,20 +1784,24 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 {
                     switch (Shape.flavor)
                     {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "$c$0.sample($1, ($2).x, uint(($2).y))$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), level($3))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), level($3))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), level($3))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w), level($3))$z";
                     }
                 }
                 else
                 {
                     switch (Shape.flavor)
                     {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "$c$0.sample($1, $2)$z";
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, $2, level($3))";
+                        __intrinsic_asm "$c$0.sample($1, $2, level($3))$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1866,9 +1870,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), level($3), $4)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), level($3), $4)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), level($3), $4)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w), level($3), $4)$z";
                     }
                 }
                 else
@@ -1878,7 +1882,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, $2, level($3), $4)";
+                        __intrinsic_asm "$c$0.sample($1, $2, level($3), $4)$z";
                     }
                 }
                 __intrinsic_asm "<invalid intrinsic>";
@@ -3883,7 +3887,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint Load(int location)
     {
         __target_switch
@@ -3899,7 +3903,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint2 Load2(int location)
     {
         __target_switch
@@ -3912,7 +3916,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint2 Load2(int location, int alignment)
     {
         __target_switch
@@ -3925,7 +3929,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint2 Load2Aligned(int location)
     {
         __target_switch
@@ -3941,7 +3945,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint3 Load3(int location)
     {
         __target_switch
@@ -3954,7 +3958,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint3 Load3(int location, int alignment)
     {
         __target_switch
@@ -3967,7 +3971,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint3 Load3Aligned(int location)
     {
         __target_switch
@@ -3983,7 +3987,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint4 Load4(int location)
     {
         __target_switch
@@ -3996,7 +4000,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint4 Load4(int location, int alignment)
     {
         __target_switch
@@ -4009,7 +4013,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint4 Load4Aligned(int location)
     {
         __target_switch
@@ -4025,7 +4029,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     T Load<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
@@ -4033,7 +4037,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     T Load<T>(int location, int alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
@@ -4041,7 +4045,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     T LoadAligned<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
@@ -4894,7 +4898,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store(uint address, uint value)
     {
         __target_switch
@@ -4907,7 +4911,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store2(uint address, uint2 value)
     {
         __target_switch
@@ -4920,7 +4924,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store2(uint address, uint2 value, uint alignment)
     {
         __target_switch
@@ -4932,7 +4936,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store2Aligned(uint address, uint2 value)
     {
         __target_switch
@@ -4944,7 +4948,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store3(uint address, uint3 value)
     {
         __target_switch
@@ -4957,7 +4961,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store3(uint address, uint3 value, uint alignment)
     {
         __target_switch
@@ -4994,7 +4998,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store4(uint address, uint4 value, uint alignment)
     {
         __target_switch
@@ -5006,7 +5010,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store4Aligned(uint address, uint4 value)
     {
         __target_switch
@@ -5685,7 +5689,7 @@ double asdouble(uint lowbits, uint highbits)
 // Reinterpret bits as a float (HLSL SM 4.0)
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 float asfloat(int x)
 {
     __target_switch
@@ -5694,6 +5698,7 @@ float asfloat(int x)
     case cuda: __intrinsic_asm "$P_asfloat($0)";
     case glsl: __intrinsic_asm "intBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$float result $x
     };
@@ -5701,7 +5706,7 @@ float asfloat(int x)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 float asfloat(uint x)
 {
     __target_switch
@@ -5710,6 +5715,7 @@ float asfloat(uint x)
     case cuda: __intrinsic_asm "$P_asfloat($0)";
     case glsl: __intrinsic_asm "uintBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$float result $x
     };
@@ -5718,13 +5724,14 @@ float asfloat(uint x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<float, N> asfloat(vector< int, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "intBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<float, N> result $x
     };
@@ -5735,13 +5742,14 @@ vector<float, N> asfloat(vector< int, N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<float,N> asfloat(vector<uint,N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "uintBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<float,N> result $x
     };
@@ -5779,21 +5787,18 @@ matrix<float,N,M> asfloat(matrix<uint,N,M> x)
 // No op
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 float asfloat(float x)
 { return x; }
 
 __generic<let N : int>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 vector<float,N> asfloat(vector<float,N> x)
 { return x; }
 
 __generic<let N : int, let M : int>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 matrix<float,N,M> asfloat(matrix<float,N,M> x)
 { return x; }
 
@@ -5890,7 +5895,7 @@ vector<T,N> asinh(vector<T,N> x)
 // Reinterpret bits as an int (HLSL SM 4.0)
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 int asint(float x)
 {
     __target_switch
@@ -5899,6 +5904,7 @@ int asint(float x)
     case cuda: __intrinsic_asm "$P_asint($0)";
     case glsl: __intrinsic_asm "floatBitsToInt";
     case hlsl: __intrinsic_asm "asint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$int result $x
     };
@@ -5906,7 +5912,7 @@ int asint(float x)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 int asint(uint x)
 {
     __target_switch
@@ -5915,6 +5921,7 @@ int asint(uint x)
     case cuda: __intrinsic_asm "$P_asint($0)";
     case glsl: __intrinsic_asm "int($0)";
     case hlsl: __intrinsic_asm "asint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$int result $x
     };
@@ -5923,13 +5930,14 @@ int asint(uint x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<int, N> asint(vector<float, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "floatBitsToInt";
     case hlsl: __intrinsic_asm "asint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<int, N> result $x
     };
@@ -5940,13 +5948,14 @@ vector<int, N> asint(vector<float, N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<int, N> asint(vector<uint, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "ivec$N0($0)";
     case hlsl: __intrinsic_asm "asint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<int, N> result $x
     };
@@ -5984,21 +5993,18 @@ matrix<int, N, M> asint(matrix<uint, N, M> x)
 // No op
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 int asint(int x)
 { return x; }
 
 __generic<let N : int>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 vector<int,N> asint(vector<int,N> x)
 { return x; }
 
 __generic<let N : int, let M : int>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 matrix<int,N,M> asint(matrix<int,N,M> x)
 { return x; }
 
@@ -6030,7 +6036,7 @@ void asuint(double value, out uint lowbits, out uint highbits)
 // Reinterpret bits as a uint (HLSL SM 4.0)
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 uint asuint(float x)
 {
     __target_switch
@@ -6039,6 +6045,7 @@ uint asuint(float x)
     case cuda: __intrinsic_asm "$P_asuint($0)";
     case glsl: __intrinsic_asm "floatBitsToUint";
     case hlsl: __intrinsic_asm "asuint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$uint result $x
     };
@@ -6046,7 +6053,7 @@ uint asuint(float x)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 uint asuint(int x)
 {
     __target_switch
@@ -6055,6 +6062,7 @@ uint asuint(int x)
     case cuda: __intrinsic_asm "$P_asuint($0)";
     case glsl: __intrinsic_asm "uint($0)";
     case hlsl: __intrinsic_asm "asuint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$uint result $x
     };
@@ -6063,13 +6071,14 @@ uint asuint(int x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<uint,N> asuint(vector<float,N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "floatBitsToUint";
     case hlsl: __intrinsic_asm "asuint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<uint,N> result $x
     };
@@ -6080,13 +6089,14 @@ vector<uint,N> asuint(vector<float,N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<uint, N> asuint(vector<int, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "uvec$N0($0)";
     case hlsl: __intrinsic_asm "asuint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<uint, N> result $x
     };
@@ -6246,13 +6256,14 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<uint16_t,R,C> v
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 int16_t asint16(float16_t value) 
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "__half_as_short";
     case hlsl: __intrinsic_asm "asint16";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$int16_t result $value
     };
@@ -6262,12 +6273,13 @@ int16_t asint16(float16_t value)
 
 [__unsafeForceInlineEarly]
 [__readNone] 
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value) 
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "asint16";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     default: return asuint16(value);
     }
 }
@@ -6286,13 +6298,14 @@ matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> valu
 
 [__readNone]
 [__unsafeForceInlineEarly] 
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 float16_t asfloat16(int16_t value) 
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "__short_as_half";
     case hlsl: __intrinsic_asm "asfloat16";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$float16_t result $value
     };
@@ -6302,12 +6315,13 @@ float16_t asfloat16(int16_t value)
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value) 
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat16";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<float16_t,N> result $value
     };
@@ -7687,7 +7701,7 @@ vector<T,N> exp10(vector<T,N> x)
 __glsl_version(420)
 __cuda_sm_version(6.0)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 float f16tof32(uint value)
 {
     __target_switch
@@ -7696,6 +7710,7 @@ float f16tof32(uint value)
     case hlsl: __intrinsic_asm "f16tof32($0)";
     case cuda: __intrinsic_asm "__half2float(__ushort_as_half($0))";
     case cpp: __intrinsic_asm "f16tof32($0)";
+    case metal: __intrinsic_asm "as_type<half>((ushort)($0))";
     case spirv:
     {
         return spirv_asm {
@@ -7709,7 +7724,7 @@ float f16tof32(uint value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<float, N> f16tof32(vector<uint, N> value)
 {
     __target_switch
@@ -7734,7 +7749,7 @@ vector<float, N> f16tof32(vector<uint, N> value)
 __glsl_version(420)
 __cuda_sm_version(6.0)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 uint f32tof16(float value)
 {
     __target_switch
@@ -7743,6 +7758,7 @@ uint f32tof16(float value)
     case hlsl: __intrinsic_asm "f32tof16($0)";
     case cuda: __intrinsic_asm "__half_as_ushort(__float2half($0))";
     case cpp: __intrinsic_asm "f32tof16($0)";
+    case metal: __intrinsic_asm "as_type<ushort>((half)($0))";
     case spirv:
     {
         return spirv_asm {
@@ -7756,7 +7772,7 @@ uint f32tof16(float value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<uint, N> f32tof16(vector<float, N> value)
 {
     __target_switch
@@ -7782,7 +7798,7 @@ vector<uint, N> f32tof16(vector<float, N> value)
 
 __glsl_version(420)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 float f16tof32(float16_t value)
 {
     __target_switch
@@ -7791,6 +7807,7 @@ float f16tof32(float16_t value)
     case hlsl: __intrinsic_asm "f16tof32($0)";
     case cuda: __intrinsic_asm "__half2float($0)";
     case cpp: __intrinsic_asm "f16tof32($0)";
+    case metal: __intrinsic_asm "float($0)";
     case spirv:
     {
         return spirv_asm {
@@ -7802,13 +7819,14 @@ float f16tof32(float16_t value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<float, N> f16tof32(vector<float16_t, N> value)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "__half2float";
     case hlsl: __intrinsic_asm "f16tof32";
+    case metal: __intrinsic_asm "$TR($0)";
     case spirv: return spirv_asm {
         OpFConvert $$vector<float, N> result $value
     };
@@ -7820,13 +7838,14 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
 // Convert to float16_t
 __glsl_version(420)
 [__readNone]
-[require(cuda_glsl_spirv, shader5_sm_5_0)]
+[require(cuda_glsl_metal_spirv, shader5_sm_5_0)]
 float16_t f32tof16_(float value)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "__float2half";
     case glsl: __intrinsic_asm "packHalf2x16(vec2($0,0.0))";
+    case metal: __intrinsic_asm "half($0)";
     case spirv: return spirv_asm {
         OpFConvert $$float16_t result $value
     };
@@ -7835,12 +7854,13 @@ float16_t f32tof16_(float value)
 
 __generic<let N : int>
 [__readNone]
-[require(cuda_glsl_spirv, shader5_sm_5_0)]
+[require(cuda_glsl_metal_spirv, shader5_sm_5_0)]
 vector<float16_t, N> f32tof16_(vector<float, N> value)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "__float2half";
+    case metal: __intrinsic_asm "$TR($0)";
     case spirv: return spirv_asm {
         OpFConvert $$vector<float16_t, N> result $value
     };
@@ -7854,13 +7874,14 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
 // Flip surface normal to face forward, if needed
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "faceforward";
     case hlsl: __intrinsic_asm "faceforward";
+    case metal: __intrinsic_asm "faceforward";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T,N> result glsl450 FaceForward $n $i $ng
     };
@@ -7871,7 +7892,7 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 
 // Find first set bit starting at high bit and working down
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 int firstbithigh(int value)
 {
     __target_switch
@@ -7880,6 +7901,7 @@ int firstbithigh(int value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
+    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindSMsb $value
     };
@@ -7888,13 +7910,14 @@ int firstbithigh(int value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<int, N> firstbithigh(vector<int, N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
+    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<int, N> result glsl450 FindSMsb $value
     };
@@ -7904,7 +7927,7 @@ vector<int, N> firstbithigh(vector<int, N> value)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 uint firstbithigh(uint value)
 {
     __target_switch
@@ -7913,6 +7936,7 @@ uint firstbithigh(uint value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
+    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindUMsb $value
     };
@@ -7921,13 +7945,14 @@ uint firstbithigh(uint value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<uint,N> firstbithigh(vector<uint,N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
+    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<uint,N> result glsl450 FindUMsb $value
     };
@@ -7938,7 +7963,7 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
 
 // Find first set bit starting at low bit and working up
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 int firstbitlow(int value)
 {
     __target_switch
@@ -7947,6 +7972,7 @@ int firstbitlow(int value)
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
+    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindILsb $value
     };
@@ -7955,13 +7981,14 @@ int firstbitlow(int value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<int,N> firstbitlow(vector<int,N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
+    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<int,N> result glsl450 FindILsb $value
     };
@@ -7971,7 +7998,7 @@ vector<int,N> firstbitlow(vector<int,N> value)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 uint firstbitlow(uint value)
 {
     __target_switch
@@ -7980,6 +8007,7 @@ uint firstbitlow(uint value)
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
+    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindILsb $value
     };
@@ -7988,13 +8016,14 @@ uint firstbitlow(uint value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<uint,N> firstbitlow(vector<uint,N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
+    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<uint,N> result glsl450 FindILsb $value
     };

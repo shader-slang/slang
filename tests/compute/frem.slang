@@ -3,7 +3,6 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE:-vk -shaderobj -emit-spirv-directly -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 // Test uses of floating-point `%` operator.
 
