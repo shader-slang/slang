@@ -12,8 +12,8 @@ namespace SlangCapture
     {
         SLANG_CAPTURE_ASSERT(m_actualGlobalSession != nullptr);
 
-        m_thisHandle = reinterpret_cast<SlangCapture::AddressFormat>(this);
-        m_captureManager = std::make_unique<CaptureManager>(m_thisHandle);
+        m_globalSessionHandle = reinterpret_cast<SlangCapture::AddressFormat>(m_actualGlobalSession.get());
+        m_captureManager = std::make_unique<CaptureManager>(m_globalSessionHandle);
 
         // We will use the address of the global session as the filename for the capture manager
         // to make it unique for each global session.
@@ -41,7 +41,17 @@ namespace SlangCapture
         slangCaptureLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
 
         slang::ISession* actualSession = nullptr;
+
+        ParameterEncoder* encoder = m_captureManager->beginMethodCapture(ApiCallId::IGlobalSession_createSession, m_globalSessionHandle);
+        encoder->encodeStruct(desc);
+        encoder->encodeAddress(nullptr);
+        encoder = m_captureManager->endMethodCapture();
+
         SlangResult res = m_actualGlobalSession->createSession(desc, &actualSession);
+
+        encoder->encodeAddress(actualSession);
+        m_captureManager->endMethodCaptureAppendOutput();
+
 
         if (actualSession != nullptr)
         {
