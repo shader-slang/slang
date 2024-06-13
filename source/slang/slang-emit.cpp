@@ -557,6 +557,17 @@ Result linkAndOptimizeIR(
 
     switch (target)
     {
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::PyTorchCppBinding:
+    break;
+
+    default:
+        removeTorchAndCUDAEntryPoints(irModule);
+        break;
+    }
+
+    switch (target)
+    {
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::HostCPPSource:
     {
@@ -605,10 +616,19 @@ Result linkAndOptimizeIR(
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         fuseCallsToSaturatedCooperation(irModule);
 
-    // Generate any requested derivative wrappers
-    if (requiredLoweringPassSet.derivativePyBindWrapper)
-        generateDerivativeWrappers(irModule, sink);
-
+    switch (target)
+    {   
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::PyTorchCppBinding:
+    {
+        // Generate any requested derivative wrappers
+        if (requiredLoweringPassSet.derivativePyBindWrapper)
+            generateDerivativeWrappers(irModule, sink);
+        break;
+    }
+    default:
+        break;
+    }
     // Next, we need to ensure that the code we emit for
     // the target doesn't contain any operations that would
     // be illegal on the target platform. For example,
