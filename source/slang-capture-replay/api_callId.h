@@ -17,21 +17,27 @@ namespace SlangCapture
 
     constexpr uint16_t getMemberFunctionId(uint32_t callId)
     {
-        return static_cast<uint16_t>(call_id & 0x0000ffff);
+        return static_cast<uint16_t>(callId & 0x0000ffff);
     }
 
     enum ApiClassId : uint16_t
     {
-        Class_IGlobalSession = 1,
-        Class_ISession = 2,
-        Class_IModule   = 3,
-        Class_IEntryPoint  = 4,
-        Class_ICompositeComponentType    = 5,
-        Class_ITypeConformance    = 6,
+        GlobalFunction                   = 1,
+        Class_IGlobalSession             = 2,
+        Class_ISession                   = 3,
+        Class_IModule                    = 4,
+        Class_IEntryPoint                = 5,
+        Class_ICompositeComponentType    = 6,
+        Class_ITypeConformance           = 7,
     };
+
+    typedef uint64_t AddressFormat;
+
+    constexpr uint64_t g_globalFunctionHandle = 0;
 
     enum ApiCallId : uint32_t
     {
+        ICreateGlobalSession                                 = makeApiCallId(GlobalFunction, 0x0000),
         IGlobalSession_createSession                         = makeApiCallId(Class_IGlobalSession, 0x0001),
         IGlobalSession_findProfile                           = makeApiCallId(Class_IGlobalSession, 0x0002),
         IGlobalSession_setDownstreamCompilerPath             = makeApiCallId(Class_IGlobalSession, 0x0003),

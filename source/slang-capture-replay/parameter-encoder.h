@@ -13,28 +13,36 @@ namespace SlangCapture
     {
     public:
         ParameterEncoder(OutputStream* stream) : m_stream(stream) {};
-        void EncodeInt8(int8_t value) { EncodeValue(value); }
-        void EncodeUint8(uint8_t value) { EncodeValue(value); }
-        void EncodeInt16(int16_t value) { EncodeValue(value); }
-        void EncodeUint16(uint16_t value) { EncodeValue(value); }
-        void EncodeInt32(int32_t value) { EncodeValue(value); }
-        void EncodeUint32(uint32_t value) { EncodeValue(value); }
-        void EncodeInt64(int64_t value) { EncodeValue(value); }
-        void EncodeUint64(uint64_t value) { EncodeValue(value); }
-        void EncodeFloat(float value) { EncodeValue(value); }
-        void EncodeDouble(double value) { EncodeValue(value); }
-        void EncodeBool(bool value) { EncodeValue(value); }
+        void encodeInt8(int8_t value) { encodeValue(value); }
+        void encodeUint8(uint8_t value) { encodeValue(value); }
+        void encodeInt16(int16_t value) { encodeValue(value); }
+        void encodeUint16(uint16_t value) { encodeValue(value); }
+        void encodeInt32(int32_t value) { encodeValue(value); }
+        void encodeUint32(uint32_t value) { encodeValue(value); }
+        void encodeInt64(int64_t value) { encodeValue(value); }
+        void encodeUint64(uint64_t value) { encodeValue(value); }
+        void encodeFloat(float value) { encodeValue(value); }
+        void encodeDouble(double value) { encodeValue(value); }
+        void encodeBool(bool value) { encodeValue(value); }
 
         template<typename T>
-        void EncodeEnumValue(T value) { EncodeValue(static_cast<uint32_t>(value)); }
+        void encodeEnumValue(T value) { encodeValue(static_cast<uint32_t>(value)); }
 
-        void EncodeString(const char* value);
-        void EncodePointer(const void* value);
+        void encodeString(const char* value);
+        void encodePointer(const void* value, bool omitData = false, size_t size = 0);
+        void encodeAddress(const void* value) { encodeValue(reinterpret_cast<uint64_t>(value)); }
+
+        void encodeStruct(slang::SessionDesc const& desc);
+        void encodeStruct(slang::PreprocessorMacroDesc const& desc);
+        void encodeStruct(slang::CompilerOptionEntry const& entry);
+        void encodeStruct(slang::CompilerOptionValue const& value);
+        void encodeStruct(slang::TargetDesc const& targetDesc);
+
     private:
         template <typename T>
-        void EncodeValue(T value)
+        void encodeValue(T value)
         {
-            m_stream->Write(&value, sizeof(T));
+            m_stream->write(&value, sizeof(T));
         }
         OutputStream* m_stream;
     };
