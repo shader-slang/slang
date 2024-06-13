@@ -5,9 +5,12 @@
 #include "slang-ir-util.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-specialize-address-space.h"
+#include "slang-ir-legalize-varying-params.h"
 
 namespace Slang
 {
+    const UnownedStringSlice groupThreadIDString = UnownedStringSlice("sv_groupthreadid");
+
     struct EntryPointInfo
     {
         IRFunc* entryPointFunc;
@@ -229,6 +232,11 @@ namespace Slang
         bool isSpecial;
     };
 
+    IRType* getGroupThreadIdType(IRBuilder& builder)
+    {
+        return builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3));
+    }
+
     MetalSystemValueInfo getSystemValueInfo(IRBuilder& builder, String semanticName, UInt attrIndex)
     {
         SLANG_UNUSED(attrIndex);
@@ -297,7 +305,7 @@ namespace Slang
         else if (semanticName == "sv_groupthreadid")
         {
             result.metalSystemValueName = toSlice("thread_position_in_threadgroup");
-            result.requiredType = builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3));
+            result.requiredType = getGroupThreadIdType(builder);
         }
         else if (semanticName == "sv_gsinstanceid")
         {
@@ -629,10 +637,8 @@ namespace Slang
             UInt attrIndex;
         };
         List<SystemValLegalizationWorkItem> systemValWorkItems;
-        List<SystemValLegalizationWorkItem> workList;
 
         IRBuilder builder(entryPoint.entryPointFunc);
-        List<IRParam*> params;
 
         for (auto param : entryPoint.entryPointFunc->getParams())
         {
@@ -655,8 +661,12 @@ namespace Slang
             auto sysAttrIndex = sysValAttr->getIndex();
             systemValWorkItems.add({ param, semanticName, sysAttrIndex });
         }
-        for (auto workItem : systemValWorkItems)
+
+        IRParam* groupThreadId = nullptr;
+        for (auto index = 0; index < systemValWorkItems.getCount(); index++)
         {
+            auto workItem = systemValWorkItems[index];
+
             auto param = workItem.param;
             auto semanticName = workItem.attrName;
             auto sysAttrIndex = workItem.attrIndex;
@@ -671,10 +681,66 @@ namespace Slang
                     param->replaceUsesWith(val);
                     param->removeAndDeallocate();
                 }
-                else
+                else if (semanticName == "sv_groupindex")
                 {
-                    // Process special cases after trivial cases.
-                    workList.add(workItem);
+                    // Ensure we have a cached "sv_groupthreadid"
+                    if (!groupThreadId)
+                    {
+                        for (auto i : systemValWorkItems)
+                        {
+                            if (i.attrName == groupThreadIDString)
+                            {
+                                groupThreadId = param;
+                            }
+                        }
+                        if (!groupThreadId)
+                        {
+                            // Add the missing groupthreadid needed to compute sv_groupindex
+                            IRBuilder groupThreadIdBuilder(builder);
+                            groupThreadIdBuilder.setInsertInto(entryPoint.entryPointFunc->getFirstBlock());
+                            groupThreadId = groupThreadIdBuilder.emitParamAtHead(getGroupThreadIdType(groupThreadIdBuilder));
+                            groupThreadIdBuilder.addNameHintDecoration(groupThreadId, groupThreadIDString);
+                            
+                            // Since "sv_groupindex" will be translated out to a global var and no longer be considered a system value
+                            // we can reuse its layout and semantic info
+                            Index foundRequiredDecorations = 0;
+                            IRLayoutDecoration* layoutDecoration = nullptr;
+                            UInt semanticIndex = 0;
+                            for (auto decoration : param->getDecorations())
+                            {
+                                if (auto layoutDecorationTmp = as<IRLayoutDecoration>(decoration))
+                                {
+                                    layoutDecoration = layoutDecorationTmp;
+                                    foundRequiredDecorations++;
+                                }
+                                else if (auto semanticDecoration = as<IRSemanticDecoration>(decoration))
+                                {
+                                    semanticIndex = semanticDecoration->getSemanticIndex();
+                                    groupThreadIdBuilder.addSemanticDecoration(groupThreadId, groupThreadIDString, (int)semanticIndex);
+                                    foundRequiredDecorations++;
+                                }
+                                if (foundRequiredDecorations >= 2)
+                                    break;
+                            }
+                            SLANG_ASSERT(layoutDecoration);
+                            layoutDecoration->removeFromParent();
+                            layoutDecoration->insertAtStart(groupThreadId);
+                            systemValWorkItems.add({ groupThreadId, groupThreadIDString, semanticIndex });
+                        }
+                    }
+
+                    IRBuilder svBuilder(builder.getModule());
+                    auto uintType = builder.getUIntType();
+                    auto newGroupIndex = svBuilder.createGlobalVar(uintType);
+                    svBuilder.addNameHintDecoration(newGroupIndex, UnownedStringSlice("sv_groupindex"));
+
+                    svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
+                    auto computeExtent = emitCalcGroupExtents(svBuilder, entryPoint.entryPointFunc, builder.getVectorType(uintType, builder.getIntValue(builder.getIntType(), 3)));
+                    auto groupIndexCalc = emitCalcGroupThreadIndex(svBuilder, groupThreadId, computeExtent);
+                    svBuilder.emitStore(newGroupIndex, groupIndexCalc);
+
+                    param->replaceUsesWith(newGroupIndex);
+                    param->removeAndDeallocate();
                 }
             }
             if (info.isUnsupported)
