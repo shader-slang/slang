@@ -1385,21 +1385,27 @@ static void addLinkageDecoration(
         {
             builder->addCudaKernelDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addHLSLExportDecoration(inst);
+
+            // Temp decorations to get this function through the linker.
             builder->addKeepAliveDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
         }
         else if (as<TorchEntryPointAttribute>(modifier))
         {
             builder->addTorchEntryPointDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addCudaHostDecoration(inst);
-            builder->addHLSLExportDecoration(inst);
-            builder->addKeepAliveDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+
+            // Temp decorations to get this function through the linker.
+            builder->addKeepAliveDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
         }
         else if (as<AutoPyBindCudaAttribute>(modifier))
         {
             builder->addAutoPyBindCudaDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addAutoPyBindExportInfoDecoration(inst);
+
+            // Temp decorations to get this function through the linker.
             builder->addKeepAliveDecoration(inst);
             builder->addHLSLExportDecoration(inst);
         }
