@@ -1,5 +1,3 @@
-
-#include <vector>
 #include "slang-global-session.h"
 #include "slang-session.h"
 #include "slang-filesystem.h"
@@ -8,10 +6,21 @@
 
 namespace SlangCapture
 {
+    // constructor is called in slang_createGlobalSession
     GlobalSessionCapture::GlobalSessionCapture(slang::IGlobalSession* session):
         m_actualGlobalSession(session)
     {
         SLANG_CAPTURE_ASSERT(m_actualGlobalSession != nullptr);
+
+        m_thisHandle = reinterpret_cast<SlangCapture::AddressFormat>(this);
+        m_captureManager = std::make_unique<CaptureManager>(m_thisHandle);
+
+        // We will use the address of the global session as the filename for the capture manager
+        // to make it unique for each global session.
+        // capture slang::createGlobalSession
+        ParameterEncoder* encoder = m_captureManager->beginMethodCapture(ApiCallId::ICreateGlobalSession, g_globalFunctionHandle);
+        encoder->encodeAddress(m_actualGlobalSession);
+        m_captureManager->endMethodCapture();
     }
 
     GlobalSessionCapture::~GlobalSessionCapture()
