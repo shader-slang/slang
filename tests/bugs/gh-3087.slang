@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=HLSL): -allow-glsl -entry main -target hlsl
-//TEST:SIMPLE(filecheck=GLSL): -allow-glsl -entry main -target glsl
-//TEST:SIMPLE(filecheck=SPIRV): -allow-glsl -entry main -target spirv
+//TEST:SIMPLE(filecheck=HLSL): -entry main -target hlsl
+//TEST:SIMPLE(filecheck=GLSL): -entry main -target glsl
+//TEST:SIMPLE(filecheck=SPIRV): -entry main -target spirv
 
 // HLSL-DAG: main
 // HLSL-DAG: SV_InstanceID
@@ -10,6 +10,10 @@
 
 // SPIRV: OpEntryPoint
 // SPIRV-NOT: BuiltIn InstanceIndex
+// We require 1 `Flat` for the fragment input `uint`
+// SPIRV: Flat
+// SPIRV-NOT: Flat
+
 
 struct PSInput
 {

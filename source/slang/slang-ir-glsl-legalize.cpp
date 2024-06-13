@@ -1300,7 +1300,15 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         if (systemSemantic && isSPIRV(codeGenContext->getTargetFormat()) && systemSemantic->getName().caseInsensitiveEquals(UnownedStringSlice("sv_instanceid"))
             && ((stage == Stage::Fragment) || (stage == Stage::Vertex && inVarLayout->usesResourceKind(LayoutResourceKind::VaryingOutput))))
         {
-            inVarLayout->removeOperand(index);
+            IRCloneEnv cloneEnv;
+            IRBuilder cloneBuilder(builder->getModule());
+            cloneBuilder.setInsertBefore(inVarLayout);
+
+            HashSet<Index> setOfOperandsToRemove;
+            setOfOperandsToRemove.add(index);
+            auto clonedVarLayout = cloneInstExcludingSomeOperands(&cloneEnv, &cloneBuilder, inVarLayout, setOfOperandsToRemove);
+            cloneInstDecorationsAndChildren(&cloneEnv, builder->getModule(), inVarLayout, clonedVarLayout);
+            inVarLayout->replaceUsesWith(clonedVarLayout);
         }
     }
 
