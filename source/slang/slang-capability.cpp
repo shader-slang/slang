@@ -192,6 +192,8 @@ CapabilityAtom getStageAtomInSet(const CapabilityAtomSet& atomSet)
 template<CapabilityName keyholeAtomToPermuteWith>
 void CapabilitySet::addPermutationsOfConjunctionForEachInContainer(CapabilityAtomSet& setToPermutate, const CapabilityAtomSet& elementsToPermutateWith, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom)
 {
+    SLANG_UNUSED(knownTargetAtom);
+    SLANG_UNUSED(knownStageAtom);
     for(auto i : elementsToPermutateWith)
     {
         CapabilityName atom = (CapabilityName)i;
@@ -201,12 +203,10 @@ void CapabilitySet::addPermutationsOfConjunctionForEachInContainer(CapabilityAto
 
         if constexpr (keyholeAtomToPermuteWith == CapabilityName::target)
         {
-            SLANG_UNUSED(knownTargetAtom);
             addConjunction(conjunctionPermutation, asAtom(atom), knownStageAtom);
         }
         else if constexpr (keyholeAtomToPermuteWith == CapabilityName::stage)
         {
-            SLANG_UNUSED(knownStageAtom);
             addConjunction(conjunctionPermutation, knownTargetAtom, asAtom(atom));
         }
         else
