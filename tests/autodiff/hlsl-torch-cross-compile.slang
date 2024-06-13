@@ -23,10 +23,11 @@ void torchMain(TensorView<float> v)
 }
 
 // Shouldn't see torchMain (or its transformations) anywhere in the HLSL output
-
-// HLSL: {{.*}}func1{{.*}}
-// HLSL-NOT: {{.*}}torchMain{{.*}}
-// HLSL: {{.*}}computeMain{{.*}}
+// HLSL-NOT:torchMain
+// HLSL:func1
+// HLSL-NOT:torchMain
+// HLSL:computeMain
+// HLSL-NOT:torchMain
 
 [Differentiable]
 float func2(float a)
