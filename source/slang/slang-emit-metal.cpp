@@ -180,10 +180,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::VaryingInput:
-            if (stage == Stage::Vertex)
-            {
-                m_writer->emit(" [[stage_in]]");
-            }
+            m_writer->emit(" [[stage_in]]");
             break;
         case LayoutResourceKind::MetalPayload:
             m_writer->emit(" [[payload]]");
