@@ -813,10 +813,24 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
         if (maybeEmitSystemSemantic(inst))
             return;
 
-        bool hasSemantic = false;
         auto varLayout = findVarLayout(inst);
+        bool hasSemantic = false;
+
         if (varLayout)
         {
+            for (auto attr : varLayout->getAllAttrs())
+            {
+                if (auto offsetAttr = as<IRVarOffsetAttr>(attr))
+                {
+                    if (offsetAttr->getResourceKind() == LayoutResourceKind::MetalAttribute)
+                    {
+                        m_writer->emit(" [[attribute(");
+                        m_writer->emit(offsetAttr->getOffset());
+                        m_writer->emit(")]]");
+                        return;
+                    }
+                }
+            }
             for (auto attr : varLayout->getAllAttrs())
             {
                if (auto semanticAttr = as<IRSemanticAttr>(attr))
@@ -832,25 +846,7 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
         {
             if (auto semanticDecor = inst->findDecoration<IRSemanticDecoration>())
             {
-                hasSemantic = _emitUserSemantic(semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
-            }
-        }
-        // Emit `attribute` decoration when there is no user semantic.
-        if (hasSemantic)
-            return;
-        if (varLayout)
-        {
-            for (auto attr : varLayout->getAllAttrs())
-            {
-                if (auto offsetAttr = as<IRVarOffsetAttr>(attr))
-                {
-                    if (offsetAttr->getResourceKind() == LayoutResourceKind::MetalAttribute)
-                    {
-                        m_writer->emit(" [[attribute(");
-                        m_writer->emit(offsetAttr->getOffset());
-                        m_writer->emit(")]]");
-                    }
-                }
+                _emitUserSemantic(semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
             }
         }
     }
