@@ -1057,6 +1057,12 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 
             case ShaderParameterKind::TextureSampler:
             case ShaderParameterKind::MutableTextureSampler:
+            {
+                ObjectLayoutInfo info;
+                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*)));
+                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*)));
+                return info;
+            }
             case ShaderParameterKind::InputRenderTarget:
                 // TODO: how to handle these?
             default:
@@ -1447,11 +1453,11 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getTextureBufferRules()
 
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingInputRules()
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingOutputRules()
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
