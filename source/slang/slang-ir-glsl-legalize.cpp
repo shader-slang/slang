@@ -1286,12 +1286,15 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         &systemValueInfoStorage);
 
     {
-        Index index = 0;
+        uint32_t index = 0;
         IRSystemValueSemanticAttr* systemSemantic = nullptr;
         for (; index < inVarLayout->operandCount; index++)
         {
-            if (systemSemantic = as<IRSystemValueSemanticAttr>(inVarLayout->getOperand(index)))
+            if (auto systemValueSemanticAttr = as<IRSystemValueSemanticAttr>(inVarLayout->getOperand(index)))
+            {    
+                systemSemantic = systemValueSemanticAttr;
                 break;
+            }
         }
         // Validate the system value, convert to a regular parameter if this is not a valid system value for a given target.
         if (systemSemantic && isSPIRV(codeGenContext->getTargetFormat()) && systemSemantic->getName().caseInsensitiveEquals(UnownedStringSlice("sv_instanceid"))
