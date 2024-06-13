@@ -1,5 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -allow-glsl -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage vertex -entry main -allow-glsl -emit-spirv-directly
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage vertex -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=METAL): -target metal -stage vertex -entry main -allow-glsl
 #version 310 es
 layout(location = 0) in highp vec4 a_position;
 
@@ -13,8 +14,10 @@ void main()
 {
     gl_Position = m1 * m2 * a_position;
    
-    // CHECK: OpEntryPoint
-    // CHECK: OpMatrixTimesMatrix
-    // CHECK: OpMatrixTimesVector
+    // SPIRV: OpEntryPoint
+    // SPIRV: OpMatrixTimesMatrix
+    // SPIRV: OpMatrixTimesVector
+
+    // METAL: {{.*}}m1{{.*}}*{{.*}}m2{{.*}}*{{.*}}a_position{{.*}}
 }
 
