@@ -1285,6 +1285,36 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         declarator,
         &systemValueInfoStorage);
 
+    {
+
+        auto systemSemantic = inVarLayout->findAttr<IRSystemValueSemanticAttr>();
+        // Validate the system value, convert to a regular parameter if this is not a valid system value for a given target.
+        if (systemSemantic && isSPIRV(codeGenContext->getTargetFormat()) && systemSemantic->getName().caseInsensitiveEquals(UnownedStringSlice("sv_instanceid"))
+            && ((stage == Stage::Fragment) || (stage == Stage::Vertex && inVarLayout->usesResourceKind(LayoutResourceKind::VaryingOutput))))
+        {
+            ShortList<IRInst*> newOperands;
+            auto opCount = inVarLayout->getOperandCount();
+            newOperands.reserveOverflowBuffer(opCount);
+            for (UInt i = 0; i < opCount; ++i)
+            {
+                auto op = inVarLayout->getOperand(i);
+                if (op == systemSemantic)
+                    continue;
+                newOperands.add(op);
+            }
+
+            auto newVarLayout = builder->emitIntrinsicInst(
+                inVarLayout->getFullType(),
+                inVarLayout->getOp(),
+                newOperands.getCount(),
+                newOperands.getArrayView().getBuffer());
+
+            newVarLayout->sourceLoc = inVarLayout->sourceLoc;
+            
+            inVarLayout->replaceUsesWith(newVarLayout);
+        }
+    }
+
     IRType* type = inType;
     IRType* peeledRequiredType = nullptr;
 
@@ -2570,9 +2600,7 @@ static void legalizeMeshOutputParam(
     //
 
     // First, collect the subset of outputs being used
-    const bool isSPIRV = codeGenContext->getTargetFormat() == CodeGenTarget::SPIRV
-        || codeGenContext->getTargetFormat() == CodeGenTarget::SPIRVAssembly;
-    if(!isSPIRV)
+    if(!isSPIRV(codeGenContext->getTargetFormat()))
     {
         auto isMeshOutputBuiltin = [](IRInst* g)
         {
