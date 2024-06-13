@@ -1168,10 +1168,9 @@ struct ByteAddressBufferLegalizationContext
                         uint64Val, m_builder.getIntValue(m_builder.getUInt64Type(), 32)));
                 auto loOffset = offset;
                 auto hiOffset = emitOffsetAddIfNeeded(offset, 4);
-                IRInst* storeLoArgs[] = { buffer, loOffset, loVal };
-                IRInst* storeHiArgs[] = { buffer, hiOffset, hiVal };
-                m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeLoArgs);
-                m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeHiArgs);
+                IRInst* alignment = m_builder.getIntValue(m_builder.getUIntType(), 0);
+                m_builder.emitByteAddressBufferStore(buffer, loOffset, alignment, loVal);
+                m_builder.emitByteAddressBufferStore(buffer, hiOffset, alignment, hiVal);
                 return SLANG_OK;
             }
             else if (sizeAlignment.size < 4)
@@ -1202,14 +1201,12 @@ struct ByteAddressBufferLegalizationContext
                 mask = m_builder.emitBitNot(m_builder.getUIntType(), mask);
                 auto maskedData = m_builder.emitBitAnd(m_builder.getUIntType(), existingVal, mask);
                 auto newData = m_builder.emitBitOr(m_builder.getUIntType(), maskedData, shiftedData);
-                IRInst* storeArgs[] = { buffer, alignedOffset, newData };
-                m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeArgs);
+                m_builder.emitByteAddressBufferStore(buffer, alignedOffset, newData);
                 return SLANG_OK;
             }
         }
         {
-            IRInst* storeArgs[] = { buffer, offset, value };
-            m_builder.emitIntrinsicInst(m_builder.getVoidType(), kIROp_ByteAddressBufferStore, 3, storeArgs);
+            m_builder.emitByteAddressBufferStore(buffer, offset, value);
             return SLANG_OK;
         }
     }

@@ -3213,6 +3213,18 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* value)
+    {
+        IRInst* args[] = { byteAddressBuffer, offset, getIntValue(getUIntType(), 0), value};
+        return emitIntrinsicInst(getVoidType(), kIROp_ByteAddressBufferStore, 4, args);
+    }
+
+    IRInst* IRBuilder::emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* alignment, IRInst* value)
+    {
+        IRInst* args[] = { byteAddressBuffer, offset, alignment, value };
+        return emitIntrinsicInst(getVoidType(), kIROp_ByteAddressBufferStore, 4, args);
+    }
+
     IRInst* IRBuilder::emitReinterpret(IRInst* type, IRInst* value)
     {
         return emitIntrinsicInst((IRType*)type, kIROp_Reinterpret, 1, &value);

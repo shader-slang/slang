@@ -3926,6 +3926,9 @@ public:
     IRInst* emitOutImplicitCast(IRInst* type, IRInst* value);
     IRInst* emitInOutImplicitCast(IRInst* type, IRInst* value);
 
+    IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* value);
+    IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* alignment, IRInst* value);
+
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
