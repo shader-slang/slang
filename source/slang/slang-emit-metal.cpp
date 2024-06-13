@@ -831,8 +831,7 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
                if (auto semanticAttr = as<IRSemanticAttr>(attr))
                 {
                     auto semanticName = String(semanticAttr->getName()).toUpper();
-                    _emitUserSemantic(semanticAttr->getName(), semanticAttr->getIndex());
-                    hasSemantic = true;
+                    hasSemantic = _emitUserSemantic(semanticAttr->getName(), semanticAttr->getIndex());
                 }
             }
 
