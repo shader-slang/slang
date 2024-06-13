@@ -1294,21 +1294,19 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         {
             ShortList<IRInst*> newOperands;
             auto opCount = inVarLayout->getOperandCount();
-            newOperands.setCount(opCount);
-            Index validCount = 0;
+            newOperands.reserveOverflowBuffer(opCount);
             for (UInt i = 0; i < opCount; ++i)
             {
                 auto op = inVarLayout->getOperand(i);
                 if (op == systemSemantic)
                     continue;
-                newOperands[validCount] = op;
-                validCount++;
+                newOperands.add(op);
             }
 
             auto newVarLayout = builder->emitIntrinsicInst(
                 inVarLayout->getFullType(),
                 inVarLayout->getOp(),
-                validCount,
+                newOperands.getCount(),
                 newOperands.getArrayView().getBuffer());
 
             newVarLayout->sourceLoc = inVarLayout->sourceLoc;

@@ -100,47 +100,6 @@ IRInst* cloneInstAndOperands(
     return newInst;
 }
 
-IRInst* cloneInstExcludingSomeOperands(
-    IRCloneEnv* env,
-    IRBuilder* builder,
-    IRInst* oldInst,
-    HashSet<Index> operandsToIgnore)
-{
-    SLANG_ASSERT(env);
-    SLANG_ASSERT(builder);
-    SLANG_ASSERT(oldInst);
-    SLANG_ASSERT(!as<IRConstant>(oldInst));
-
-    auto oldType = oldInst->getFullType();
-    auto newType = (IRType*)findCloneForOperand(env, oldType);
-
-    UInt operandCount = oldInst->getOperandCount();
-
-    ShortList<IRInst*> newOperands;
-    newOperands.setCount(operandCount);
-    Index validCount = 0;
-    for (UInt ii = 0; ii < operandCount; ++ii)
-    {
-        if (operandsToIgnore.contains(ii))
-            continue;
-        auto oldOperand = oldInst->getOperand(ii);
-        auto newOperand = findCloneForOperand(env, oldOperand);
-
-        newOperands[validCount] = newOperand;
-        validCount++;
-    }
-
-    auto newInst = builder->emitIntrinsicInst(
-        newType,
-        oldInst->getOp(),
-        validCount,
-        newOperands.getArrayView().getBuffer());
-
-    newInst->sourceLoc = oldInst->sourceLoc;
-
-    return newInst;
-}
-
 // The complexity of the second phase of cloning (the
 // one that deals with decorations and children) comes
 // from the fact that it needs to sequence the two phases

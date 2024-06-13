@@ -84,12 +84,6 @@ IRInst* cloneInstAndOperands(
     IRBuilder*      builder,
     IRInst*         oldInst);
 
-IRInst* cloneInstExcludingSomeOperands(
-    IRCloneEnv* env,
-    IRBuilder* builder,
-    IRInst* oldInst,
-    HashSet<Index> operandsToIgnore);
-
 // The second phase of cloning an instruction is to clone
 // its decorations and children. This step only needs to
 // be performed on those instructions that *have* decorations
