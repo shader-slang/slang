@@ -37,7 +37,7 @@ namespace SlangCapture
         virtual void write(const void* data, size_t len) override;
         virtual void flush() override;
         const void* getData() { return m_memoryStream.getContents().getBuffer(); }
-        uint32_t getSizeInBytes() { return m_memoryStream.getContents().getCount(); }
+        size_t getSizeInBytes() { return m_memoryStream.getContents().getCount(); }
 
     private:
         Slang::OwnedMemoryStream    m_memoryStream;

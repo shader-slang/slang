@@ -7,7 +7,7 @@ namespace SlangCapture
         encodeUint64(desc.structureSize);
         encodeInt64(desc.targetCount);
 
-        for (uint32_t i = 0; i < desc.targetCount; i++)
+        for (SlangInt i = 0; i < desc.targetCount; i++)
         {
             encodeStruct(desc.targets[i]);
         }
@@ -15,13 +15,13 @@ namespace SlangCapture
         encodeUint32(desc.flags);
         encodeUint32(desc.defaultMatrixLayoutMode);
         encodeInt64(desc.searchPathCount);
-        for (uint32_t i = 0; i < desc.searchPathCount; i++)
+        for (SlangInt i = 0; i < desc.searchPathCount; i++)
         {
             encodeString(desc.searchPaths[i]);
         }
 
         encodeInt64(desc.preprocessorMacroCount);
-        for (uint32_t i = 0; i < desc.preprocessorMacroCount; i++)
+        for (SlangInt i = 0; i < desc.preprocessorMacroCount; i++)
         {
             encodeStruct(desc.preprocessorMacros[i]);
         }
@@ -50,21 +50,23 @@ namespace SlangCapture
 
     void ParameterEncoder::encodeStruct(slang::CompilerOptionValue const& value)
     {
-
+        (void)value;
     }
 
     void ParameterEncoder::encodeStruct(slang::TargetDesc const& targetDesc)
     {
-
+        (void)targetDesc;
     }
 
     void ParameterEncoder::encodePointer(const void* value, bool omitData, size_t size)
     {
-
+        (void)value;
+        (void)omitData;
+        (void)size;
     }
     // first 4-bytes is the length of the string
     void ParameterEncoder::encodeString(const char* value)
     {
-
+        (void)value;
     }
 }

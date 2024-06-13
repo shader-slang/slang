@@ -16,9 +16,9 @@ namespace SlangCapture
 
         struct FunctionHeader
         {
-            ApiCallId        callId {0};
+            ApiCallId        callId {InvalidCallId};
             uint64_t         handleId {0};
-            uint32_t         dataSizeInBytes {0};
+            uint64_t         dataSizeInBytes {0};
             uint64_t         threadId {0};
         };
 
