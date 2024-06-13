@@ -1,5 +1,3 @@
-#include <sstream>
-#include <thread>
 #include "slang-global-session.h"
 #include "slang-session.h"
 #include "slang-filesystem.h"
