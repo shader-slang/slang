@@ -403,7 +403,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("[(");
             emitOperand(offset, getInfo(EmitOp::General));
             m_writer->emit(")>>2] = as_type<uint32_t>(");
-            emitOperand(inst->getOperand(3), getInfo(EmitOp::General));
+            emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }
