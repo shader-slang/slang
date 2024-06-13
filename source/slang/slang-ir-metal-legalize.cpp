@@ -725,6 +725,65 @@ namespace Slang
         legalizeDispatchMeshPayloadForMetal(entryPoint);
     }
 
+    void legalizeFuncBody(IRFunc* func)
+    {
+        IRBuilder builder(func);
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getModifiableChildren())
+            {
+                if (auto call = as<IRCall>(inst))
+                {
+                    ShortList<IRUse*> argsToFixup;
+                    // Metal doesn't support taking the address of a vector element.
+                    // If such an address is used as an argument to a call, we need to replace it with a temporary.
+                    // for example, if we see:
+                    // ```
+                    //     void foo(inout float x) { x = 1; }
+                    //     float4 v;
+                    //     foo(v.x);
+                    // ```
+                    // We need to transform it into:
+                    // ```
+                    //     float4 v;
+                    //     float temp = v.x;
+                    //     foo(temp);
+                    //     v.x = temp;
+                    // ```
+                    //
+                    for (UInt i = 0; i < call->getArgCount(); i++)
+                    {
+                        if (auto addr = as<IRGetElementPtr>(call->getArg(i)))
+                        {
+                            auto ptrType = addr->getBase()->getDataType();
+                            auto valueType = tryGetPointedToType(&builder, ptrType);
+                            if (!valueType)
+                                continue;
+                            if (as<IRVectorType>(valueType))
+                                argsToFixup.add(call->getArgs() + i);
+                        }
+                    }
+                    if (argsToFixup.getCount() == 0)
+                        continue;
+
+                    // Define temp vars for all args that need fixing up.
+                    for (auto arg : argsToFixup)
+                    {
+                        auto addr = as<IRGetElementPtr>(arg->get());
+                        auto ptrType = addr->getDataType();
+                        auto valueType = tryGetPointedToType(&builder, ptrType);
+                        builder.setInsertBefore(call);
+                        auto temp = builder.emitVar(valueType);
+                        auto initialValue = builder.emitLoad(valueType, addr);
+                        builder.emitStore(temp, initialValue);
+                        builder.setInsertAfter(call);
+                        builder.emitStore(addr, builder.emitLoad(valueType, temp));
+                        arg->set(temp);
+                    }
+                }
+            }
+        }
+    }
 
     void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
     {
@@ -740,6 +799,7 @@ namespace Slang
                     info.entryPointFunc = func;
                     entryPoints.add(info);
                 }
+                legalizeFuncBody(func);
             }
         }
 

@@ -139,8 +139,15 @@ public:
     /// Is this capability set incompatible with the given `other` atomic capability.
     bool isIncompatibleWith(CapabilitySet const& other) const;
 
+    enum class ImpliesReturnFlags : int
+    {
+        NotImplied = 0,
+        Implied = 1 << 0,
+    };
     /// Does this capability set imply all the capabilities in `other`?
-    bool implies(CapabilitySet const& other, const bool onlyRequireSingleImply = false) const;
+    bool implies(CapabilitySet const& other) const;
+    /// Does this capability set imply at least 1 set in other.
+    ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const;
 
     /// Does this capability set imply the atomic capability `other`?
     bool implies(CapabilityAtom other) const;
@@ -289,6 +296,10 @@ public:
     /// Get access to the raw atomic capabilities that define this set.
     /// Get all bottom level UIntSets for each CapabilityTargetSet.
     CapabilitySet::AtomSets::Iterator getAtomSets() const;
+
+    /// Add spirv version capabilities from 'spirv CapabilityTargetSet' as glsl_spirv version capability in 'glsl CapabilityTargetSet'
+    void addSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& other);
+
 private:
     /// underlying data of CapabilitySet.
     CapabilityTargetSets m_targetSets{};
@@ -296,6 +307,13 @@ private:
     void addCapability(CapabilityName name);
 
     bool hasSameTargets(const CapabilitySet& other) const;
+
+    enum class ImpliesFlags
+    {
+        None = 0,
+        OnlyRequireASingleValidImply = 1 << 0,
+    };
+    ImpliesReturnFlags _implies(CapabilitySet const& other, ImpliesFlags flags) const;
 };
 
     /// Returns true if atom is derived from base
@@ -304,8 +322,16 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base);
     /// Find a capability atom with the given `name`, or return CapabilityAtom::Invalid.
 CapabilityName findCapabilityName(UnownedStringSlice const& name);
 
-CapabilityName getLatestSpirvAtom();
-CapabilityName getLatestMetalAtom();
+CapabilityAtom getLatestSpirvAtom();
+CapabilityAtom getLatestMetalAtom();
+
+/// For debug purposes ensure a casted CapabilityAtom is valid
+template<typename T>
+inline CapabilityAtom asAtom(T name)
+{
+    SLANG_ASSERT((UInt)name < (UInt)CapabilityAtom::Count);
+    return CapabilityAtom(name);
+}
 
     /// Gets the capability names.
 void getCapabilityNames(List<UnownedStringSlice>& ioNames);
@@ -316,8 +342,8 @@ bool isDirectChildOfAbstractAtom(CapabilityAtom name);
 
 
     /// Return true if `name` represents an atom for a target version, e.g. spirv_1_5.
-bool isTargetVersionAtom(CapabilityName name);
-bool isSpirvExtensionAtom(CapabilityName name);
+bool isTargetVersionAtom(CapabilityAtom name);
+bool isSpirvExtensionAtom(CapabilityAtom name);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);
