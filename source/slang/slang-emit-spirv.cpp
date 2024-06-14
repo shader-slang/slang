@@ -3590,8 +3590,8 @@ struct SPIRVEmitContext
         case kIROp_VulkanRayPayloadDecoration:
         case kIROp_VulkanRayPayloadInDecoration:
             // needed since GLSL will not set optypes accordingly, but will keep the decoration 
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_query"));
-            requireSPIRVCapability(SpvCapabilityRayQueryKHR);
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
+            requireSPIRVCapability(SpvCapabilityRayTracingKHR);
             isRayTracingObject = true;
             break;
         case kIROp_InterpolationModeDecoration:

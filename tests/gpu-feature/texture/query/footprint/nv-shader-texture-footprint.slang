@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -emit-spirv-via-glsl -entry fragmentMain -stage fragment -DENABLE_CLAMP
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry fragmentMain -stage fragment -DENABLE_CLAMP
 //DISABLED_TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry fragmentMain -stage fragment -DENABLE_CLAMP -emit-spirv-directly
 
 //DISABLED_TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry fragmentMain -stage fragment
@@ -84,14 +85,12 @@ void fragmentMain(
             float                       v : VARYING,
 
     uniform Texture2D                   texture_2D,
-// SPIRV: OpTypeImage
-// SPIRV-SAME: 2D
+// SPIRV-DAG: OpTypeImage {{.*}} 2D
 
 // HLSL-DAG: Texture2D{{.*}}register(t0)
 
     uniform Texture3D                   texture_3D,
-// SPIRV: OpTypeImage
-// SPIRV-SAME: 3D
+// SPIRV-DAG: OpTypeImage {{.*}} 3D
 
 // HLSL-DAG: Texture3D{{.*}}register(t1)
 
