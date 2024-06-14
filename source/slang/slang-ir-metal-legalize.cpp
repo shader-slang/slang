@@ -296,7 +296,8 @@ namespace Slang
         }
         else if (semanticName == "sv_groupid")
         {
-            result.isSpecial = true;
+            result.metalSystemValueName = toSlice("threadgroup_position_in_grid");
+            result.requiredType = builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3));
         }
         else if (semanticName == "sv_groupindex")
         {
