@@ -2591,7 +2591,10 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             case kIROp_RaytracingAccelerationStructureType:
             {
-                _requireRayQuery();
+                if (!isRaytracingStage(m_entryPointStage))
+                    _requireRayQuery();
+                else
+                    _requireRayTracing();
                 m_writer->emit("accelerationStructureEXT");
                 break;
             }

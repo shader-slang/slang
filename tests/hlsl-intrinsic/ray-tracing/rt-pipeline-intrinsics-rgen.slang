@@ -1,11 +1,22 @@
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage raygeneration -profile glsl_460+GL_EXT_ray_tracing -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage raygeneration -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage raygeneration
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage raygeneration -profile sm_6_5 -DNOMOTION
 
+// SPIRV-NOT: OpCapability RayQueryKHR
+// SPIRV-DAG: OpCapability RayTracingKHR
+// SPIRV-DAG: OpCapability RayTracingMotionBlurNV
+// SPIRV-DAG: SPV_KHR_ray_tracing
+// SPIRV-DAG: SPV_NV_ray_tracing_motion_blur
+
 // SPIRV: OpEntryPoint
 
-// SPIRV: OpLoad %v3uint %gl_LaunchIDEXT
-// SPIRV: OpLoad %v3uint %gl_LaunchSizeEXT
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchIdNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchSizeNV
+// SPIRV-DAG: OpDecorate %{{.*}} Binding 0
+// SPIRV-DAG: OpDecorate %{{.*}} DescriptorSet 0
+// SPIRV-DAG: OpDecorate %{{.*}} Binding 1
+// SPIRV-DAG: OpDecorate %{{.*}} DescriptorSet 0
 
 // SPIRV: OpTraceRayKHR
 // SPIRV: OpTraceRayMotionNV
