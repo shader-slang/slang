@@ -5,6 +5,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-specialize-address-space.h"
+#include "slang-parameter-binding.h"
 #include "slang-ir-legalize-varying-params.h"
 
 namespace Slang
@@ -237,13 +238,15 @@ namespace Slang
         return builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3));
     }
 
-    MetalSystemValueInfo getSystemValueInfo(IRBuilder& builder, String semanticName, UInt attrIndex)
+    MetalSystemValueInfo getSystemValueInfo(IRBuilder& builder, String inSemanticName)
     {
-        SLANG_UNUSED(attrIndex);
+        inSemanticName = inSemanticName.toLower();
+
+        UnownedStringSlice semanticName;
+        UnownedStringSlice semanticIndex;
+        splitNameAndIndex(inSemanticName.getUnownedSlice(), semanticName, semanticIndex);
 
         MetalSystemValueInfo result = {};
-
-        semanticName = semanticName.toLower();
 
         if (semanticName == "sv_position")
         {
@@ -374,9 +377,10 @@ namespace Slang
             result.requiredType = builder.getBasicType(BaseType::UInt);
             result.altRequiredType = builder.getBasicType(BaseType::UInt16);
         }
-        else if (semanticName == "sv_target")
+        else if (semanticName.startsWith("sv_target"))
         {
-            result.metalSystemValueName = (StringBuilder() << "color(" << String(attrIndex) << ")").produceString();
+            
+            result.metalSystemValueName = (StringBuilder() << "color(" << semanticIndex << ")").produceString();
         }
         else
         {
@@ -404,7 +408,7 @@ namespace Slang
             {
                 if (semanticDecor->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
                 {
-                    auto sysValInfo = getSystemValueInfo(builder, semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
+                    auto sysValInfo = getSystemValueInfo(builder, semanticDecor->getSemanticName());
                     if (sysValInfo.isUnsupported || sysValInfo.isSpecial)
                     {
                         reportUnsupportedSystemAttribute(sink, field, semanticDecor->getSemanticName());
@@ -670,9 +674,8 @@ namespace Slang
 
             auto param = workItem.param;
             auto semanticName = workItem.attrName;
-            auto sysAttrIndex = workItem.attrIndex;
 
-            auto info = getSystemValueInfo(builder, semanticName, sysAttrIndex);
+            auto info = getSystemValueInfo(builder, semanticName);
             if (info.isSpecial)
             {
                 if (semanticName == "sv_innercoverage")
