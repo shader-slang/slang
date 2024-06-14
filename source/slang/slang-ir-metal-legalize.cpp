@@ -730,16 +730,12 @@ namespace Slang
                     }
 
                     IRBuilder svBuilder(builder.getModule());
-                    auto uintType = builder.getUIntType();
-                    auto newGroupIndex = svBuilder.createGlobalVar(uintType);
-                    svBuilder.addNameHintDecoration(newGroupIndex, UnownedStringSlice("sv_groupindex"));
-
                     svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
-                    auto computeExtent = emitCalcGroupExtents(svBuilder, entryPoint.entryPointFunc, builder.getVectorType(uintType, builder.getIntValue(builder.getIntType(), 3)));
+                    auto computeExtent = emitCalcGroupExtents(svBuilder, entryPoint.entryPointFunc, builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3)));
                     auto groupIndexCalc = emitCalcGroupThreadIndex(svBuilder, groupThreadId, computeExtent);
-                    svBuilder.emitStore(newGroupIndex, groupIndexCalc);
+                    svBuilder.addNameHintDecoration(groupIndexCalc, UnownedStringSlice("sv_groupindex"));
 
-                    param->replaceUsesWith(newGroupIndex);
+                    param->replaceUsesWith(groupIndexCalc);
                     param->removeAndDeallocate();
                 }
             }
