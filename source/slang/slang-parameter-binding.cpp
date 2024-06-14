@@ -480,9 +480,7 @@ static bool isDigit(char c)
     return (c >= '0') && (c <= '9');
 }
 
-/// Given a string that specifies a name and index (e.g., `COLOR0`),
-/// split it into slices for the name part and the index part.
-static void splitNameAndIndex(
+void splitNameAndIndex(
     UnownedStringSlice const&       text,
     UnownedStringSlice& outName,
     UnownedStringSlice& outDigits)

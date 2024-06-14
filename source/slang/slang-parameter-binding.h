@@ -29,6 +29,14 @@ void generateParameterBindings(
     TargetRequest*  targetReq,
     DiagnosticSink* sink);
 
+/// Given a string that specifies a name and index (e.g., `COLOR0`),
+/// split it into slices for the name part and the index part.
+/// 
+void splitNameAndIndex(
+    UnownedStringSlice const& text,
+    UnownedStringSlice& outName,
+    UnownedStringSlice& outDigits);
+
 }
 
 #endif 
