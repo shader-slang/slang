@@ -1852,14 +1852,16 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
         case SourceLanguage::HLSL:
         case SourceLanguage::C:
         case SourceLanguage::CPP:
-            m_writer->emit("static ");
+            m_writer->emit("static const ");
             break;
-
+        case SourceLanguage::Metal:
+            m_writer->emit("constant ");
+            break;
         default:
+            m_writer->emit("const ");
             break;
         }
 
-        m_writer->emit("const ");
     }
 
     emitType(type, getName(inst));
