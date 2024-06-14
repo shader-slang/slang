@@ -393,7 +393,7 @@ DIAGNOSTIC(36109, Error, invalidTargetSwitchCase, "'$0' cannot be used as a targ
 DIAGNOSTIC(36110, Error, stageIsInCompatibleWithCapabilityDefinition, "'$0' is defined for stage '$1', which is incompatible with the declared capability set '$2'.")
 
 // Attributes
-DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
+DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
 DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects $1 arguments ($2 provided)")
 DIAGNOSTIC(31002, Error, attributeNotApplicable, "attribute '$0' is not valid here")
 
