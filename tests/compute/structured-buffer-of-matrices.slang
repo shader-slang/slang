@@ -15,7 +15,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -matrix-layout-row-major -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+
 
 // Note: we are using a buffer of floating-point matrices, but fill it with integer
 // data, to allow this test to work on the Vulkan targets, which do not currently
