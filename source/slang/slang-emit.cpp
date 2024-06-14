@@ -241,6 +241,7 @@ struct RequiredLoweringPassSet
     bool glslGlobalVar;
     bool glslSSBO;
     bool byteAddressBuffer;
+    bool genericResourceArray;
 };
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -343,6 +344,9 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
     case kIROp_HLSLRWByteAddressBufferType:
     case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
+        break;
+    case kIROp_GenericResourceArrayType:
+        result.genericResourceArray = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -919,6 +923,12 @@ Result linkAndOptimizeIR(
     if (isKhronosTarget(targetRequest))
     {
         specializeArrayParameters(codeGenContext, irModule);
+    }
+
+    // Create new aliased parameters for all usages of `GenericResourceArray`.
+    if (requiredLoweringPassSet.genericResourceArray)
+    {
+        specializeResourceArrayParameters(codeGenContext, irModule);
     }
 
 #if 0

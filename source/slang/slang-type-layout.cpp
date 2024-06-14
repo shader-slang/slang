@@ -4340,6 +4340,12 @@ static TypeLayoutResult _createTypeLayout(
 
         return result;
     }
+    else if (auto resourceArrayType = as<GenericResourceArrayType>(type))
+    {
+        // Pick an arbitrary element type for layout, that maps to DescriptorTableSlot.
+        auto elemTypePlaceholder = context.astBuilder->getStructuredBufferType(context.astBuilder->getIntType());
+        return createArrayLikeTypeLayout(context, resourceArrayType, elemTypePlaceholder, nullptr);
+    }
     else if (auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->getDeclRef();

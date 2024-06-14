@@ -58,6 +58,14 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         if(as<IRUniformParameterGroupType>(type))
             return true;
 
+        // ResourceArrays are opaque placeholders for descriptor
+        // binding variables. The later specialization pass requires
+        // all uses to directly reference the source variable, so
+        // we'll need to specialize them to uncover indirections.
+        //
+        if(type->getOp() == kIROp_GenericResourceArrayType)
+            return true;
+
         // For GL/Vulkan targets, we also need to specialize
         // any parameters that use structured or byte-addressed
         // buffers or images with format qualifiers.
@@ -1217,6 +1225,101 @@ bool specializeResourceUsage(
             IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
     }
     return result;
+}
+
+struct ResourceArraySpecializationPass
+{
+    CodeGenContext* codeGenContext;
+    IRModule* module;
+
+    Dictionary<IRType*, IRGlobalParam*> specializedParams;
+
+    bool processModule()
+    {
+        List<IRInst*> toRemove;
+
+        for (auto inst : module->getGlobalInsts())
+        {
+            auto param = as<IRGlobalParam>(inst);
+
+            if (param && processGlobalParam(param))
+            {
+                toRemove.add(param);
+            }
+        }
+
+        // Remove unused parameters later to avoid invalidating iterator.
+        for (auto inst : toRemove)
+        {
+            inst->removeAndDeallocate();
+        }
+        return toRemove.getCount() > 0;
+    }
+
+    bool processGlobalParam(IRGlobalParam* param)
+    {
+        if (param->getFullType()->getOp() != kIROp_GenericResourceArrayType)
+            return false;
+
+        IRBuilder builder(module);
+
+        traverseUses(param, [&](IRUse* use) {
+            auto user = use->getUser();
+            builder.setInsertBefore(user);
+
+            // Replace intrinsic with an array access to the specialized parameter.
+            if (user->getOp() == kIROp_GetResourceArrayElement)
+            {
+                IRType* resourceType = user->getFullType();
+                IRGlobalParam* specializedParam = getSpecializedParam(builder, param, resourceType);
+
+                auto newAccess = builder.emitElementExtract(resourceType, specializedParam, user->getOperand(1));
+                user->replaceUsesWith(newAccess);
+                user->removeAndDeallocate();
+            }
+            else
+            {
+                codeGenContext->getSink()->diagnose(user, Diagnostics::ambiguousReference, param);
+
+                user->replaceUsesWith(builder.emitUndefined(param->getFullType()));
+                user->removeAndDeallocate();
+            }
+        });
+        return true;
+    }
+    IRGlobalParam* getSpecializedParam(IRBuilder& builder, IRGlobalParam* param, IRType* resourceType)
+    {
+        IRGlobalParam* specializedParam;
+        if (!specializedParams.tryGetValue(resourceType, specializedParam))
+        {
+            specializedParam = builder.createGlobalParam(builder.getUnsizedArrayType(resourceType));
+
+            // Copy name and layout
+            for (auto decoration : param->getDecorations())
+            {
+                if (auto nameDecoration = as<IRNameHintDecoration>(decoration))
+                {
+                    builder.addNameHintDecoration(specializedParam, nameDecoration->getName());
+                }
+                else if (auto layoutDecoration = as<IRLayoutDecoration>(decoration))
+                {
+                    builder.addLayoutDecoration(specializedParam, layoutDecoration->getLayout());
+                }
+            }
+            specializedParams[resourceType] = specializedParam;
+        }
+        return specializedParam;
+    }
+};
+
+bool specializeResourceArrayParameters(
+    CodeGenContext* codeGenContext,
+    IRModule*       module)
+{
+    ResourceArraySpecializationPass pass;
+    pass.codeGenContext = codeGenContext;
+    pass.module = module;
+    return pass.processModule();
 }
 
 bool isIllegalGLSLParameterType(IRType* type)

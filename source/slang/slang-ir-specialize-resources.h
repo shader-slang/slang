@@ -30,6 +30,11 @@ namespace Slang
         CodeGenContext* codeGenContext,
         IRModule*       irModule);
 
+    // Specialize all usages of `GenericResourceArray` global parameters.
+    bool specializeResourceArrayParameters(
+        CodeGenContext* codeGenContext,
+        IRModule*       module);
+
     bool isIllegalGLSLParameterType(IRType* type);
     bool isIllegalSPIRVParameterType(IRType* type, bool isArray);
 
