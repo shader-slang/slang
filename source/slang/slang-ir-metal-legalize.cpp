@@ -690,7 +690,7 @@ namespace Slang
                         {
                             if (i.attrName == groupThreadIDString)
                             {
-                                groupThreadId = param;
+                                groupThreadId = i.param;
                             }
                         }
                         if (!groupThreadId)
