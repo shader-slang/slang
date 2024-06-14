@@ -4,6 +4,7 @@
 #include "slang-lookup.h"
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
+#include "slang-ir-util.h"
 
 #include "../compiler-core/slang-artifact-desc-util.h"
 
@@ -1639,6 +1640,20 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
                 context->layoutContext,
                 type,
                 kEntryPointParameterDirection_Output);
+        }
+        else if (isSPIRV(context->getTargetRequest()->getTarget())
+             && (
+                    (state.directionMask & kEntryPointParameterDirection_Input && state.stage == Stage::Fragment)
+                    || (state.directionMask & kEntryPointParameterDirection_Output && state.stage == Stage::Vertex)
+                )
+            && sn == "sv_instanceid"
+            )
+        {
+            // This fragment-shader-input/vertex-shader-output is effectively not a system semantic for SPIR-V,
+            typeLayout = getSimpleVaryingParameterTypeLayout(
+                context->layoutContext,
+                type,
+                state.directionMask);
         }
         else
         {

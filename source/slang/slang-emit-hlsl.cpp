@@ -714,7 +714,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 m_writer->emit("(");
                 emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
                 m_writer->emit(", ");
-                emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+                emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
                 m_writer->emit(")");
 
                 maybeCloseParens(needClose);
