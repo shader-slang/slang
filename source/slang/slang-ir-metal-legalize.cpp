@@ -380,7 +380,9 @@ namespace Slang
         else if (semanticName.startsWith("sv_target"))
         {
             
-            result.metalSystemValueName = (StringBuilder() << "color(" << semanticIndex << ")").produceString();
+            result.metalSystemValueName = (StringBuilder() << "color("
+                << (semanticIndex.getLength() != 0 ? semanticIndex : toSlice("0"))
+                << ")").produceString();
         }
         else
         {
