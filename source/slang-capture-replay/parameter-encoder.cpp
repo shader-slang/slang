@@ -1,4 +1,5 @@
 #include "parameter-encoder.h"
+#include "api_callId.h"
 
 namespace SlangCapture
 {
@@ -13,7 +14,7 @@ namespace SlangCapture
         }
 
         encodeUint32(desc.flags);
-        encodeUint32(desc.defaultMatrixLayoutMode);
+        encodeEnumValue(desc.defaultMatrixLayoutMode);
         encodeInt64(desc.searchPathCount);
         for (SlangInt i = 0; i < desc.searchPathCount; i++)
         {
@@ -44,29 +45,82 @@ namespace SlangCapture
 
     void ParameterEncoder::encodeStruct(slang::CompilerOptionEntry const& entry)
     {
-        encodeInt32((int32_t)(entry.name));
+        encodeEnumValue(entry.name);
         encodeStruct(entry.value);
     }
 
     void ParameterEncoder::encodeStruct(slang::CompilerOptionValue const& value)
     {
-        (void)value;
+        encodeEnumValue(value.kind);
+        encodeInt32(value.intValue0);
+        encodeString(value.stringValue0);
+        encodeString(value.stringValue1);
     }
 
     void ParameterEncoder::encodeStruct(slang::TargetDesc const& targetDesc)
     {
-        (void)targetDesc;
+        encodeUint64(targetDesc.structureSize);
+        encodeEnumValue(targetDesc.format);
+        encodeEnumValue(targetDesc.profile);
+        encodeEnumValue(targetDesc.flags);
+        encodeEnumValue(targetDesc.floatingPointMode);
+        encodeEnumValue(targetDesc.lineDirectiveMode);
+        encodeBool(targetDesc.forceGLSLScalarBufferLayout);
+        encodeUint32(targetDesc.compilerOptionEntryCount);
+        for (uint32_t i = 0; i < targetDesc.compilerOptionEntryCount; i++)
+        {
+            encodeStruct(targetDesc.compilerOptionEntries[i]);
+        }
     }
 
     void ParameterEncoder::encodePointer(const void* value, bool omitData, size_t size)
     {
-        (void)value;
-        (void)omitData;
-        (void)size;
+        encodeAddress(value);
+        if (omitData)
+        {
+            return;
+        }
+
+        encodeUint64(size);
+        if (size)
+        {
+            m_stream->write(value, size);
+        }
     }
+
+    void ParameterEncoder::encodePointer(ISlangBlob* blob)
+    {
+        encodeAddress(static_cast<const void*>(blob));
+
+        if (blob)
+        {
+            size_t size = blob->getBufferSize();
+            const void* buffer = blob->getBufferPointer();
+            encodePointer(buffer, false, size);
+        }
+    }
+
     // first 4-bytes is the length of the string
     void ParameterEncoder::encodeString(const char* value)
     {
-        (void)value;
+        if (value == nullptr)
+        {
+            encodeUint32(0);
+        }
+        else
+        {
+            uint32_t size = strlen(value);
+            encodeUint32(size);
+            m_stream->write(value, size);
+        }
+    }
+
+    void ParameterEncoder::encodeStringArray(const char* const* strArray, size_t count)
+    {
+        encodeUint64(count);
+        for (size_t i = 0; i < count; i++)
+        {
+            encodeString(strArray[i]);
+        }
     }
 }
