@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE: -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE: -vk -compute -shaderobj -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 // Test that writing to swizzles of matrix swizzles works correctly
 
