@@ -2385,10 +2385,10 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                 // lod is not supported for 1D texture
                 if (isArray == 1)
                     // Tv read(uint coord, uint array, uint lod = 0) const
-                    __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y))";
+                    __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y, uint(($1).z))";
                 else
                     // Tv read(uint coord, uint lod = 0) const
-                    __intrinsic_asm "$0.read(uint(($1).x))";
+                    __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y)";
                 break;
             case $(SLANG_TEXTURE_2D):
                 if (isShadow == 1)
@@ -2420,7 +2420,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                 {
                     if (isArray == 1)
                         // T read(uint2 coord, uint face, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "<invalid intrinsics>";
                     else
                         // T read(uint2 coord, uint face, uint lod = 0) const
                         __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
@@ -2429,7 +2429,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                 {
                     if (isArray == 1)
                         // Tv read(uint2 coord, uint face, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "<invalid intrinsics>";
                     else
                         // Tv read(uint2 coord, uint face, uint lod = 0) const
                         __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
@@ -2791,39 +2791,39 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                         __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y))";
                     else
                         // Tv read(uint coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(uint(($1).x))";
+                        __intrinsic_asm "$0.read(uint($1))";
                     break;
                 case $(SLANG_TEXTURE_2D):
                     if (isShadow == 1)
                     {
                         if (isArray == 1)
                             // T read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
                         else
                             // T read(uint2 coord, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy))";
                     }
                     else
                     {
                         if (isArray == 1)
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
                         else
                             // Tv read(uint2 coord, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy))";
                     }
                     break;
                 case $(SLANG_TEXTURE_3D):
                     if (isShadow == 0 && isArray == 0)
                         // Tv read(uint3 coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,3>(($1).xyz), uint(($1).w))";
+                        __intrinsic_asm "$0.read(vec<uint,3>(($1).xyz))";
                     break;
                 case $(SLANG_TEXTURE_CUBE):
                     if (isShadow == 1)
                     {
                         if (isArray == 1)
                             // T read(uint2 coord, uint face, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6, uint(($1).w))";
+                            __intrinsic_asm "<invalid intrinsics>";
                         else
                             // T read(uint2 coord, uint face, uint lod = 0) const
                             __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
@@ -2832,7 +2832,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     {
                         if (isArray == 1)
                             // Tv read(uint2 coord, uint face, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6, uint(($1).w))";
+                            __intrinsic_asm "<invalid intrinsics>";
                         else
                             // Tv read(uint2 coord, uint face, uint lod = 0) const
                             __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
@@ -2960,10 +2960,10 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                         // lod is not supported for 1D texture
                         if (isArray == 1)
                             // void write(Tv color, uint coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.write($2, uint(($1).x))";
+                            __intrinsic_asm "$0.write($2, uint(($1).x), uint(($1).y))";
                         else
                             // void write(Tv color, uint coord, uint lod = 0) const
-                            __intrinsic_asm "$0.write($2, uint(($1).x))";
+                            __intrinsic_asm "$0.write($2, uint($1))";
                         break;
                     case $(SLANG_TEXTURE_2D):
                         if (isShadow == 1)
@@ -2995,19 +2995,19 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                         {
                             if (isArray == 1)
                                 // void write(Tv color, uint2 coord, uint face, uint array, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6)";
+                                __intrinsic_asm "<invalid intrinsics>";
                             else
                                 // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z))";
+                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                         }
                         else
                         {
                             if (isArray == 1)
                                 // void write(Tv color, uint2 coord, uint face, uint array, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6)";
+                                __intrinsic_asm "<invalid intrinsics>";
                             else
                                 // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z))";
+                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                         }
                         break;
                     }

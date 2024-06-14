@@ -50,6 +50,7 @@
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-vector-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
@@ -1156,11 +1157,16 @@ Result linkAndOptimizeIR(
     // Legalize `ImageSubscript` and constant buffer loads for GLSL.
     switch (target)
     {
+    case CodeGenTarget::Metal:
+        {
+            legalizeImageSubscript(targetRequest, irModule, sink);
+            break;
+        } 
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         {
-            legalizeImageSubscriptForGLSL(irModule);
+            legalizeImageSubscript(targetRequest, irModule, sink);
             legalizeConstantBufferLoadForGLSL(irModule);
             legalizeDispatchMeshPayloadForGLSL(irModule);
         }
