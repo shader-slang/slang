@@ -29,7 +29,9 @@ namespace SlangCapture
         void encodeEnumValue(T value) { encodeValue(static_cast<uint32_t>(value)); }
 
         void encodeString(const char* value);
+        void encodeStringArray(const char* const* strArray, size_t count);
         void encodePointer(const void* value, bool omitData = false, size_t size = 0);
+        void encodePointer(ISlangBlob* blob);
         void encodeAddress(const void* value) { encodeValue(reinterpret_cast<uint64_t>(value)); }
 
         void encodeStruct(slang::SessionDesc const& desc);
