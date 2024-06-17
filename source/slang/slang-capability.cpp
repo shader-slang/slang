@@ -124,7 +124,7 @@ CapabilityName findCapabilityName(UnownedStringSlice const& name)
     return result;
 }
 
-inline CapabilityAtom getLatestSpirvAtom()
+CapabilityAtom getLatestSpirvAtom()
 {
     static CapabilityAtom result = CapabilityAtom::Invalid;
     if (result == CapabilityAtom::Invalid)

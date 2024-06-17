@@ -77,7 +77,7 @@ namespace SlangCapture
             // session at the same time. So even if there is one session used by multiple threads, those threads will execute the compile jobs
             // sequentially.
             std::unique_ptr<CaptureManager>      m_captureManager;
-            uint64_t                             m_thisHandle = 0;
+            uint64_t                             m_globalSessionHandle = 0;
     };
 } // namespace Slang
 

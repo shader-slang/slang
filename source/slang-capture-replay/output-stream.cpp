@@ -26,7 +26,7 @@ namespace SlangCapture
 
     void FileOutputStream::write(const void* data, size_t len)
     {
-        SLANG_CAPTURE_ASSERT(m_fileStream.write(data, len));
+        SLANG_CAPTURE_CHECK(m_fileStream.write(data, len));
     }
 
     MemoryStream::MemoryStream()
@@ -35,12 +35,12 @@ namespace SlangCapture
 
     void FileOutputStream::flush()
     {
-        SLANG_CAPTURE_ASSERT(m_fileStream.flush());
+        SLANG_CAPTURE_CHECK(m_fileStream.flush());
     }
 
     void MemoryStream::write(const void* data, size_t len)
     {
-        SLANG_CAPTURE_ASSERT(m_memoryStream.write(data, len));
+        SLANG_CAPTURE_CHECK(m_memoryStream.write(data, len));
     }
 
     void MemoryStream::flush()
