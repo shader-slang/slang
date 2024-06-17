@@ -7,6 +7,7 @@
 #include "../core/slang-smart-pointer.h"
 #include "../core/slang-dictionary.h"
 #include "../slang/slang-compiler.h"
+#include "capture-manager.h"
 
 namespace SlangCapture
 {
@@ -19,7 +20,7 @@ namespace SlangCapture
         SLANG_REF_OBJECT_IUNKNOWN_ALL
         ISlangUnknown* getInterface(const Guid& guid);
 
-        explicit EntryPointCapture(slang::IEntryPoint* entryPoint);
+        explicit EntryPointCapture(slang::IEntryPoint* entryPoint, CaptureManager* captureManager);
         ~EntryPointCapture();
 
         // Interfaces for `IComponentType`
@@ -68,7 +69,9 @@ namespace SlangCapture
 
         slang::IEntryPoint* getActualEntryPoint() const { return m_actualEntryPoint; }
     private:
-        Slang::ComPtr<slang::IEntryPoint> m_actualEntryPoint;
+        Slang::ComPtr<slang::IEntryPoint>   m_actualEntryPoint;
+        uint64_t                            m_entryPointHandle = 0;
+        CaptureManager*                     m_captureManager = nullptr;
     };
 }
 #endif // SLANG_ENTRY_POINT_H
