@@ -109,7 +109,7 @@ namespace SlangCapture
         }
         else
         {
-            uint32_t size = strlen(value);
+            uint32_t size = (uint32_t)strlen(value);
             encodeUint32(size);
             m_stream->write(value, size);
         }
