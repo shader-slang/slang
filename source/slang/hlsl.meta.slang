@@ -2386,7 +2386,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                 if (isArray == 1)
                     // Tv read(uint coord, uint array, uint lod = 0) const
                     //__intrinsic_asm "$0.read(uint(($1).x), uint(($1).y, uint(($1).z))";
-                    __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y)";
+                    __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y))";
                 else
                     // Tv read(uint coord, uint lod = 0) const
                     //__intrinsic_asm "$0.read(uint(($1).x), uint(($1).y)";
