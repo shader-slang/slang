@@ -62,7 +62,7 @@ namespace SlangCapture
             // the Linkage will set to user provided file system or slang default file system.
             // We need to reset it to our capture file system
             Slang::Linkage* linkage = static_cast<Linkage*>(actualSession);
-            FileSystemCapture* fileSystemCapture = new FileSystemCapture(linkage->getFileSystemExt());
+            FileSystemCapture* fileSystemCapture = new FileSystemCapture(linkage->getFileSystemExt(), m_captureManager.get());
 
             Slang::ComPtr<FileSystemCapture> resultFileSystemCapture(fileSystemCapture);
             linkage->setFileSystem(resultFileSystemCapture.detach());
