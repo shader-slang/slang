@@ -2418,6 +2418,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                     __intrinsic_asm "$0.read(vec<uint,3>(($1).xyz), uint(($1).w))";
                 break;
             case $(SLANG_TEXTURE_CUBE):
+                static_assert(isArray == 0, "Unsupported 'Load' of 'texture cube array' for 'metal' target");
                 if (isShadow == 1)
                 {
                     if (isArray == 1)
@@ -2821,6 +2822,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                         __intrinsic_asm "$0.read(vec<uint,3>(($1).xyz))";
                     break;
                 case $(SLANG_TEXTURE_CUBE):
+                    static_assert(isArray == 0, "Unsupported 'Load' of 'texture cube array' for 'metal' target");
                     if (isShadow == 1)
                     {
                         if (isArray == 1)
@@ -2993,6 +2995,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                             __intrinsic_asm "$0.write($2, vec<uint,3>(($1).xyz))";
                         break;
                     case $(SLANG_TEXTURE_CUBE):
+                        static_assert(isArray == 0, "Unsupported 'Store' of 'texture cube array' for 'metal' target");
                         if (isShadow == 1)
                         {
                             if (isArray == 1)
