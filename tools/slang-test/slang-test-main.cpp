@@ -972,6 +972,11 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         {
             return 0;
         }
+        case SLANG_WGSL_SPIRV:
+        case SLANG_WGSL_SPIRV_ASM:
+        {
+            return PassThroughFlag::Tint;
+        }
         case SLANG_DXBC:
         case SLANG_DXBC_ASM:
         {

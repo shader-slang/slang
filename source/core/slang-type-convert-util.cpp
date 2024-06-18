@@ -18,6 +18,7 @@ namespace Slang
         case SLANG_CPP_PYTORCH_BINDING:return SLANG_SOURCE_LANGUAGE_CPP;
         case SLANG_HOST_CPP_SOURCE:    return SLANG_SOURCE_LANGUAGE_CPP;
         case SLANG_CUDA_SOURCE:        return SLANG_SOURCE_LANGUAGE_CUDA;
+        case SLANG_WGSL:               return SLANG_SOURCE_LANGUAGE_WGSL;
         default: break;
     }
     return SLANG_SOURCE_LANGUAGE_UNKNOWN;

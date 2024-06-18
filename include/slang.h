@@ -610,6 +610,8 @@ extern "C"
         SLANG_METAL_LIB_ASM,            ///< Metal library assembly
         SLANG_HOST_SHARED_LIBRARY,      ///< A shared library/Dll for host code (for hosting CPU/OS)
         SLANG_WGSL,                     ///< WebGPU shading language
+        SLANG_WGSL_SPIRV_ASM,           ///< SPIR-V assembly via WebGPU shading language
+        SLANG_WGSL_SPIRV,               ///< SPIR-V via WebGPU shading language
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -643,7 +645,7 @@ extern "C"
         SLANG_PASS_THROUGH_LLVM,                    ///< LLVM 'compiler' - includes LLVM and Clang
         SLANG_PASS_THROUGH_SPIRV_OPT,               ///< SPIRV-opt
         SLANG_PASS_THROUGH_METAL,                   ///< Metal compiler
-        SLANG_PASS_THROUGH_WGSL,                    ///< WGSL compiler
+        SLANG_PASS_THROUGH_TINT,                    ///< Tint WGSL compiler
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
