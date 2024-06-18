@@ -3894,7 +3894,23 @@ namespace Slang
     {
         auto targetVectorType = as<IRVectorType>(type);
         auto sourceVectorType = as<IRVectorType>(value->getDataType());
-        if (!targetVectorType)
+        if (targetVectorType && !sourceVectorType)
+        {
+            auto elementType = targetVectorType->getElementType();
+            int elemCount = 1;
+            if(auto intLit = as<IRIntLit>(targetVectorType->getElementCount()))
+            {
+                elemCount = intLit->getValue();
+            }
+            IRInst* zeroVal = emitDefaultConstruct(elementType);
+            List<IRInst*> defaultVals;
+            defaultVals.reserve(elemCount);
+            defaultVals.add(value);
+            for(auto i = 1; i < elemCount; i++)
+                defaultVals.add(zeroVal);
+            return emitMakeVector(targetVectorType, defaultVals);
+        }
+        else if (!targetVectorType)
         {
             if (!sourceVectorType)
                 return emitCast(targetVectorType, value);
