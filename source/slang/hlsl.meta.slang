@@ -2421,25 +2421,17 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                 static_assert(isArray == 0, "Unsupported 'Load' of 'texture cube array' for 'metal' target");
                 if (isShadow == 1)
                 {
-                    if (isArray == 1)
-                        // T read(uint2 coord, uint face, uint array, uint lod = 0) const
-                        __intrinsic_asm "<invalid intrinsics>";
-                    else
-                        // T read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                    // T read(uint2 coord, uint face, uint lod = 0) const
+                    __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                 }
                 else
                 {
-                    if (isArray == 1)
-                        // Tv read(uint2 coord, uint face, uint array, uint lod = 0) const
-                        __intrinsic_asm "<invalid intrinsics>";
-                    else
-                        // Tv read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                    // Tv read(uint2 coord, uint face, uint lod = 0) const
+                    __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                 }
                 break;
             }
-            // TODO: This needs to be handled by the capability system
+            static_assert(false, "Unsupported 'Load' of 'texture' for 'metal' target");
             __intrinsic_asm "<invalid intrinsics>";
         case glsl:
             __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e)$z";
@@ -2825,25 +2817,17 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     static_assert(isArray == 0, "Unsupported 'Load' of 'texture cube array' for 'metal' target");
                     if (isShadow == 1)
                     {
-                        if (isArray == 1)
-                            // T read(uint2 coord, uint face, uint array, uint lod = 0) const
-                            __intrinsic_asm "<invalid intrinsics>";
-                        else
-                            // T read(uint2 coord, uint face, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        // T read(uint2 coord, uint face, uint lod = 0) const
+                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                     }
                     else
                     {
-                        if (isArray == 1)
-                            // Tv read(uint2 coord, uint face, uint array, uint lod = 0) const
-                            __intrinsic_asm "<invalid intrinsics>";
-                        else
-                            // Tv read(uint2 coord, uint face, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        // Tv read(uint2 coord, uint face, uint lod = 0) const
+                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                     }
                     break;
                 }
-                // TODO: This needs to be handled by the capability system
+                static_assert(false, "Unsupported 'Load' of 'texture' for 'metal' target");
                 __intrinsic_asm "<invalid intrinsics>";
         }
     }
@@ -2998,21 +2982,13 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                         static_assert(isArray == 0, "Unsupported 'Store' of 'texture cube array' for 'metal' target");
                         if (isShadow == 1)
                         {
-                            if (isArray == 1)
-                                // void write(Tv color, uint2 coord, uint face, uint array, uint lod = 0) const
-                                __intrinsic_asm "<invalid intrinsics>";
-                            else
-                                // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
+                            __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                         }
                         else
                         {
-                            if (isArray == 1)
-                                // void write(Tv color, uint2 coord, uint face, uint array, uint lod = 0) const
-                                __intrinsic_asm "<invalid intrinsics>";
-                            else
-                                // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
+                            __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                         }
                         break;
                     }
