@@ -2385,12 +2385,10 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                 // lod is not supported for 1D texture
                 if (isArray == 1)
                     // Tv read(uint coord, uint array, uint lod = 0) const
-                    __intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y, uint(($1).z))$z";
-                    //__intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y))$z";
+                    __intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y))$z";
                 else
                     // Tv read(uint coord, uint lod = 0) const
-                    __intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y)$z";
-                    //__intrinsic_asm "$c$0.read(uint(($1).x))$z";
+                    __intrinsic_asm "$c$0.read(uint(($1).x))$z";
                 break;
             case $(SLANG_TEXTURE_2D):
                 if (isShadow == 1)
