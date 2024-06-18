@@ -406,7 +406,7 @@ INST(GetElementPtr, getElementPtr, 2, 0)
 INST(GetOffsetPtr, getOffsetPtr, 2, 0) 
 INST(GetAddr, getAddr, 1, 0)
 
-INST(GetResourceArrayElement, getResourceArrayElement, 2, HOISTABLE)
+INST(GetGenericResourceArrayElement, getGenericResourceArrayElement, 2, HOISTABLE)
 
 // Get an unowned NativeString from a String.
 INST(getNativeStr, getNativeStr, 1, 0)

@@ -925,12 +925,6 @@ Result linkAndOptimizeIR(
         specializeArrayParameters(codeGenContext, irModule);
     }
 
-    // Create new aliased parameters for all usages of `GenericResourceArray`.
-    if (requiredLoweringPassSet.genericResourceArray)
-    {
-        specializeResourceArrayParameters(codeGenContext, irModule);
-    }
-
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER RESOURCE SPECIALIZATION");
 #endif
@@ -1142,6 +1136,10 @@ Result linkAndOptimizeIR(
     // Legalize non struct parameters that are expected to be structs for HLSL. 
     if(isD3DTarget(targetRequest))
         legalizeNonStructParameterToStructForHLSL(irModule);
+
+    // Create new aliased parameters for all usages of `GenericResourceArray`.
+    if(requiredLoweringPassSet.genericResourceArray && isKhronosTarget(targetRequest))
+        legalizeGenericResourceArraysForGLSL(codeGenContext, irModule);
 
     // Legalize `ImageSubscript` and constant buffer loads for GLSL.
     switch (target)

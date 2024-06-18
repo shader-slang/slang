@@ -3729,4 +3729,59 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
     });
 }
 
+void legalizeGenericResourceArraysForGLSL(CodeGenContext* context, IRModule* module)
+{
+    List<IRInst*> toRemove;
+    Dictionary<IRType*, IRGlobalParam*> aliasedParams;
+    IRBuilder builder(module);
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto param = as<IRGlobalParam>(inst);
+
+        if (!param || param->getFullType()->getOp() != kIROp_GenericResourceArrayType)
+            continue;
+
+        traverseUsers(param, [&](IRInst* user) {
+            builder.setInsertBefore(user);
+
+            // Replace intrinsic with an array access to the appropriate parameter alias.
+            if (user->getOp() == kIROp_GetGenericResourceArrayElement)
+            {
+                IRType* resourceType = user->getFullType();
+                IRGlobalParam* resourceParam;
+
+                if (!aliasedParams.tryGetValue(resourceType, resourceParam))
+                {
+                    resourceParam = builder.createGlobalParam(builder.getUnsizedArrayType(resourceType));
+
+                    for (auto decoration : param->getDecorations())
+                        cloneDecoration(decoration, resourceParam);
+
+                    aliasedParams[resourceType] = resourceParam;
+                }
+
+                auto newAccess = builder.emitElementExtract(resourceType, resourceParam, user->getOperand(1));
+                user->replaceUsesWith(newAccess);
+                user->removeAndDeallocate();
+            }
+            else
+            {
+                context->getSink()->diagnose(user, Diagnostics::ambiguousReference, param);
+
+                user->replaceUsesWith(builder.emitUndefined(param->getFullType()));
+                user->removeAndDeallocate();
+            }
+        });
+        
+        toRemove.add(param);
+    }
+
+    // Remove unused parameters later to avoid invalidating iterator.
+    for (auto inst : toRemove)
+    {
+        inst->removeAndDeallocate();
+    }
+}
+
 } // namespace Slang

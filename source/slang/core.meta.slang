@@ -1541,7 +1541,7 @@ __magic_type(GenericResourceArrayType)
 __intrinsic_type($(kIROp_GenericResourceArrayType))
 struct __ResourceArray<let kind : __IndexableResourceKind> 
 {
-    __intrinsic_op($(kIROp_GetResourceArrayElement))
+    __intrinsic_op($(kIROp_GetGenericResourceArrayElement))
     T get<T : __IIndexableResource<kind>>(int index);
 }
 enum __IndexableResourceKind
