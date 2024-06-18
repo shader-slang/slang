@@ -178,8 +178,11 @@ namespace Slang
                 continue;
             for (auto block : func->getBlocks())
             {
-                for (IRInst* inst : block->getChildren())
+                auto inst = block->getFirstInst();
+                IRInst* next;
+                for ( ; inst; inst = next)
                 {
+                    next = inst->getNextInst();
                     switch (inst->getOp())
                     {
                     case kIROp_Store:

@@ -1164,6 +1164,9 @@ Result linkAndOptimizeIR(
         {
             legalizeImageSubscript(targetRequest, irModule, sink);
         } 
+        break;
+    default:
+        break;
     }
 
     // Legalize constant buffer loads.
