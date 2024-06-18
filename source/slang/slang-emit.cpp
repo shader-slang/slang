@@ -1154,19 +1154,25 @@ Result linkAndOptimizeIR(
     if(isD3DTarget(targetRequest))
         legalizeNonStructParameterToStructForHLSL(irModule);
 
-    // Legalize `ImageSubscript` and constant buffer loads for GLSL.
+    // Legalize `ImageSubscript` loads.
     switch (target)
     {
     case CodeGenTarget::Metal:
-        {
-            legalizeImageSubscript(targetRequest, irModule, sink);
-            break;
-        } 
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         {
             legalizeImageSubscript(targetRequest, irModule, sink);
+        } 
+    }
+
+    // Legalize constant buffer loads.
+    switch (target)
+    {
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        {
             legalizeConstantBufferLoadForGLSL(irModule);
             legalizeDispatchMeshPayloadForGLSL(irModule);
         }

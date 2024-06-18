@@ -10,16 +10,20 @@
 
 namespace Slang
 {
-    void legalizeImageSubscriptStore(TargetRequest* target, IRBuilder& builder, IRInst* storeInst, DiagnosticSink* sink)
+    void legalizeStore(TargetRequest* target, IRBuilder& builder, IRInst* storeInst, DiagnosticSink* sink)
     {
         builder.setInsertBefore(storeInst);
-        auto getElementPtr = as<IRGetElementPtr>(storeInst->getOperand(0));
         IRImageSubscript* imageSubscript = nullptr;
-        if (getElementPtr)
+        auto getElementPtr = as<IRGetElementPtr>(storeInst->getOperand(0));
+        if(getElementPtr)
+        {
             imageSubscript = as<IRImageSubscript>(getElementPtr->getBase());
+        }
         else
+        {
             imageSubscript = as<IRImageSubscript>(storeInst->getOperand(0));
-        assert(imageSubscript);
+        }
+        SLANG_ASSERT(imageSubscript);
         IRTextureType* textureType = as<IRTextureType>(imageSubscript->getImage()->getFullType());
         auto imageElementType = cast<IRPtrTypeBase>(imageSubscript->getDataType())->getValueType();
         auto vectorBaseType = getIRVectorBaseType(imageElementType);
@@ -174,18 +178,15 @@ namespace Slang
                 continue;
             for (auto block : func->getBlocks())
             {
-                auto inst = block->getFirstInst();
-                IRInst* next;
-                for ( ; inst; inst = next)
+                for (IRInst* inst : block->getChildren())
                 {
-                    next = inst->getNextInst();
                     switch (inst->getOp())
                     {
                     case kIROp_Store:
                     case kIROp_SwizzledStore:
                         if (getRootAddr(inst->getOperand(0))->getOp() == kIROp_ImageSubscript)
                         {
-                            legalizeImageSubscriptStore(target, builder, inst, sink);
+                            legalizeStore(target, builder, inst, sink);
                         }
                     }
                 }   
