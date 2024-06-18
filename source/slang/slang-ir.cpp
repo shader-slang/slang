@@ -3897,10 +3897,10 @@ namespace Slang
         if (targetVectorType && !sourceVectorType)
         {
             auto elementType = targetVectorType->getElementType();
-            IRIntegerValue elemCount = 1;
+            Index elemCount = 1;
             if(auto intLit = as<IRIntLit>(targetVectorType->getElementCount()))
             {
-                elemCount = intLit->getValue();
+                elemCount = (Index)intLit->getValue();
             }
             IRInst* zeroVal = emitDefaultConstruct(elementType);
             List<IRInst*> defaultVals;
