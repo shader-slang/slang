@@ -12,6 +12,8 @@ namespace Slang
 {
     void legalizeStore(TargetRequest* target, IRBuilder& builder, IRInst* storeInst, DiagnosticSink* sink)
     {
+        SLANG_ASSERT(storeInst);
+        
         builder.setInsertBefore(storeInst);
         IRImageSubscript* imageSubscript = nullptr;
         auto getElementPtr = as<IRGetElementPtr>(storeInst->getOperand(0));
@@ -24,7 +26,9 @@ namespace Slang
             imageSubscript = as<IRImageSubscript>(storeInst->getOperand(0));
         }
         SLANG_ASSERT(imageSubscript);
+        SLANG_ASSERT(imageSubscript->getImage());
         IRTextureType* textureType = as<IRTextureType>(imageSubscript->getImage()->getFullType());
+        SLANG_ASSERT(textureType);
         auto imageElementType = cast<IRPtrTypeBase>(imageSubscript->getDataType())->getValueType();
         auto vectorBaseType = getIRVectorBaseType(imageElementType);
         IRType* vector4Type = builder.getVectorType(vectorBaseType, 4);
@@ -56,7 +60,6 @@ namespace Slang
         {
             legalizedCoord = builder.emitCast(coordType, legalizedCoord);
         }
-
 
         const Index kCoordParamIndex = 1;
         const Index kValueParamIndex = 2;
