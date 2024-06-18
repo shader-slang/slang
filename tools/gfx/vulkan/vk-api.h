@@ -19,8 +19,6 @@ namespace gfx {
     x(vkCreateDebugReportCallbackEXT) \
     x(vkDestroyDebugReportCallbackEXT) \
     x(vkDebugReportMessageEXT) \
-    x(vkCreateDebugUtilsMessengerEXT) \
-    x(vkDestroyDebugUtilsMessengerEXT) \
     /* */
 
 #define VK_API_INSTANCE_PROCS(x) \
