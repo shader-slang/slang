@@ -93,6 +93,7 @@ option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
 option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
 option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang wrapper target" ON)
+option(SLANG_ENABLE_SLANG_TINT "Enable glslang dependency and slang-tint wrapper target" ON)
 option(SLANG_ENABLE_TESTS "Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 
@@ -323,7 +324,7 @@ if(SLANG_ENABLE_SLANGC)
 endif()
 
 #
-# Our wrappers for glslang and llvm
+# Our wrappers for glslang, tint and llvm
 #
 if(SLANG_ENABLE_SLANG_GLSLANG)
     slang_add_target(
@@ -338,6 +339,18 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     add_supported_cxx_linker_flags(slang-glslang PRIVATE "-Wl,--exclude-libs,ALL")
 endif()
 
+if(SLANG_ENABLE_SLANG_TINT)
+    slang_add_target(
+        source/slang-tint
+        MODULE
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE tint_api
+        INSTALL
+    )
+    # Our only interface is through what we define in source/slang-tint, in the
+    # interests of hygiene, hide anything else we link in.
+    add_supported_cxx_linker_flags(slang-tint PRIVATE "-Wl,--exclude-libs,ALL")
+endif()
 
 if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
     #
@@ -602,6 +615,10 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENA
     if(TARGET slang-glslang)
         # Only add a dependency here if slang-glslang exists
         add_dependencies(slang-test slang-glslang)
+    endif()
+    if(TARGET slang-tint)
+        # Only add a dependency here if slang-tint exists
+        add_dependencies(slang-test slang-tint)
     endif()
     if(TARGET slang-llvm)
         # Only add a dependency here if slang-llvm exists

@@ -57,6 +57,18 @@ endif()
 add_library(imgui INTERFACE)
 target_include_directories(imgui INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui")
 
+# Dawn, which also includes Tint
+set(DAWN_USE_GLFW OFF)
+set(DAWN_BUILD_SAMPLES OFF)
+set(DAWN_ENABLE_DESKTOP_GL OFF)
+set(DAWN_ENABLE_OPENGLES OFF)
+set(TINT_BUILD_TESTS OFF)
+set(TINT_BUILD_CMD_TOOLS OFF)
+set(DAWN_SPIRV_TOOLS_DIR "${CMAKE_CURRENT_LIST_DIR}/spirv-tools")
+set(DAWN_SPIRV_HEADERS_DIR "${CMAKE_CURRENT_LIST_DIR}/spirv-headers")
+set(DAWN_ABSEIL_DIR "${CMAKE_CURRENT_LIST_DIR}/abseil-cpp")
+add_subdirectory(dawn EXCLUDE_FROM_ALL)
+
 # Tidy things up:
 
 # Restore log level if we set it

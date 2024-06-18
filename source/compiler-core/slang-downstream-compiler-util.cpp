@@ -24,6 +24,7 @@
 #include "slang-glslang-compiler.h"
 #include "slang-llvm-compiler.h"
 #include "slang-metal-compiler.h"
+#include "slang-tint-compiler.h"
 
 namespace Slang
 {
@@ -332,6 +333,7 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     outFuncs[int(SLANG_PASS_THROUGH_LLVM)] = &LLVMDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_SPIRV_DIS)] = &SpirvDisDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_METAL)] = &MetalDownstreamCompilerUtil::locateCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_TINT)] = &TintDownstreamCompilerUtil::locateCompilers;
 }
 
 static String _getParentPath(const String& path)
