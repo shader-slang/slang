@@ -154,6 +154,21 @@ static bool _hasAnySetBits(const T& val, size_t offset)
     return false;
 }
 
+
+VkDebugUtilsMessengerEXT debugUtilsMessenger = VK_NULL_HANDLE;
+
+
+// Callback function
+VkBool32 __stdcall debugUtilsMessengerCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData)
+{
+    return VK_FALSE;
+}
+
+
 Result DeviceImpl::initVulkanInstanceAndDevice(
     const InteropHandle* handles, bool useValidationLayer)
 {
@@ -198,6 +213,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
         if (ENABLE_VALIDATION_LAYER || isGfxDebugLayerEnabled())
             instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+
+        // Raytracing validation performs logging via debug utils extension callbacks
+        //if (m_desc.enableRaytracingValidation)
+        //    instanceExtensions.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
         VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
 #if SLANG_APPLE_FAMILY
@@ -288,7 +307,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
     if (!instance)
         return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
-    if (useValidationLayer && m_api.vkCreateDebugReportCallbackEXT)
+    if ((m_desc.enableRaytracingValidation || useValidationLayer) && m_api.vkCreateDebugReportCallbackEXT)
     {
         VkDebugReportFlagsEXT debugFlags =
             VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
@@ -512,6 +531,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.fragmentShadingRateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.fragmentShadingRateFeatures;
 
+        // raytracing validation features
+        extendedFeatures.rayTracingValidationFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.rayTracingValidationFeatures;
+
         if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_2)
         {
             extendedFeatures.vulkan12Features.pNext = deviceFeatures2.pNext;
@@ -696,6 +719,24 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
             "computeDerivativeGroupLinear"
         );
+
+        // Only enable raytracing validation if both requested and supported
+        if(m_desc.enableRaytracingValidation)
+        {
+            if (extendedFeatures.rayTracingValidationFeatures.rayTracingValidation)
+            {
+                SIMPLE_EXTENSION_FEATURE(
+                    extendedFeatures.rayTracingValidationFeatures,
+                    rayTracingValidation,
+                    VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME,
+                    "ray-tracing-validation"
+                );
+            }
+            else
+            {
+                //what to do if requested but not supported?
+            }
+        }
 
 #undef SIMPLE_EXTENSION_FEATURE
 
@@ -934,6 +975,20 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
     {
         installPipelineDumpLayer(m_api);
     }
+
+    // If ray tracing validation was requested and supported, it'll be enabled, so hook up the debug
+    // debug handle to catch the messages
+    if (m_desc.enableRaytracingValidation && extendedFeatures.rayTracingValidationFeatures.rayTracingValidation && m_api.vkCreateDebugUtilsMessengerEXT)
+    {
+        VkDebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCI{};
+        debugUtilsMessengerCI.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        debugUtilsMessengerCI.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        debugUtilsMessengerCI.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+        debugUtilsMessengerCI.pfnUserCallback = debugUtilsMessengerCallback;
+        VkResult result = m_api.vkCreateDebugUtilsMessengerEXT(instance, &debugUtilsMessengerCI, nullptr, &debugUtilsMessenger);
+        assert(result == VK_SUCCESS);
+    }
+
     return SLANG_OK;
 }
 

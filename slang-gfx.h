@@ -2266,6 +2266,8 @@ public:
         ShaderCacheDesc shaderCache = {};
         // Configurations for Slang compiler.
         SlangDesc slang = {};
+        /// Whether to enable ray tracing validation (currently only Vulkan - D3D requires app layer to use NVAPI)
+        bool enableRaytracingValidation = false;
 
         GfxCount extendedDescCount = 0;
         void** extendedDescs = nullptr;
