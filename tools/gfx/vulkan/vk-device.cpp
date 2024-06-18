@@ -214,10 +214,6 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         if (ENABLE_VALIDATION_LAYER || isGfxDebugLayerEnabled())
             instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 
-        // Raytracing validation performs logging via debug utils extension callbacks
-        //if (m_desc.enableRaytracingValidation)
-        //    instanceExtensions.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-
         VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
 #if SLANG_APPLE_FAMILY
         instanceCreateInfo.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
@@ -307,6 +303,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
     if (!instance)
         return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
+
     if ((m_desc.enableRaytracingValidation || useValidationLayer) && m_api.vkCreateDebugReportCallbackEXT)
     {
         VkDebugReportFlagsEXT debugFlags =
@@ -721,21 +718,14 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         );
 
         // Only enable raytracing validation if both requested and supported
-        if(m_desc.enableRaytracingValidation)
+        if(m_desc.enableRaytracingValidation && extendedFeatures.rayTracingValidationFeatures.rayTracingValidation)
         {
-            if (extendedFeatures.rayTracingValidationFeatures.rayTracingValidation)
-            {
-                SIMPLE_EXTENSION_FEATURE(
-                    extendedFeatures.rayTracingValidationFeatures,
-                    rayTracingValidation,
-                    VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME,
-                    "ray-tracing-validation"
-                );
-            }
-            else
-            {
-                //what to do if requested but not supported?
-            }
+            SIMPLE_EXTENSION_FEATURE(
+                extendedFeatures.rayTracingValidationFeatures,
+                rayTracingValidation,
+                VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME,
+                "ray-tracing-validation"
+            );
         }
 
 #undef SIMPLE_EXTENSION_FEATURE
@@ -974,19 +964,6 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
     if (shouldDumpPipeline())
     {
         installPipelineDumpLayer(m_api);
-    }
-
-    // If ray tracing validation was requested and supported, it'll be enabled, so hook up the debug
-    // debug handle to catch the messages
-    if (m_desc.enableRaytracingValidation && extendedFeatures.rayTracingValidationFeatures.rayTracingValidation && m_api.vkCreateDebugUtilsMessengerEXT)
-    {
-        VkDebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCI{};
-        debugUtilsMessengerCI.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        debugUtilsMessengerCI.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        debugUtilsMessengerCI.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
-        debugUtilsMessengerCI.pfnUserCallback = debugUtilsMessengerCallback;
-        VkResult result = m_api.vkCreateDebugUtilsMessengerEXT(instance, &debugUtilsMessengerCI, nullptr, &debugUtilsMessenger);
-        assert(result == VK_SUCCESS);
     }
 
     return SLANG_OK;
