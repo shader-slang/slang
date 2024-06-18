@@ -154,21 +154,6 @@ static bool _hasAnySetBits(const T& val, size_t offset)
     return false;
 }
 
-
-VkDebugUtilsMessengerEXT debugUtilsMessenger = VK_NULL_HANDLE;
-
-
-// Callback function
-VkBool32 __stdcall debugUtilsMessengerCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-    VkDebugUtilsMessageTypeFlagsEXT messageType,
-    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-    void* pUserData)
-{
-    return VK_FALSE;
-}
-
-
 Result DeviceImpl::initVulkanInstanceAndDevice(
     const InteropHandle* handles, bool useValidationLayer)
 {
