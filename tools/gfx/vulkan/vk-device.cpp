@@ -161,6 +161,22 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
     m_queueAllocCount = 0;
 
+    bool enableRayTracingValidation = false;
+
+    // Read properties from extended device descriptions
+    for (GfxIndex i = 0; i < m_desc.extendedDescCount; i++)
+    {
+        StructType stype;
+        memcpy(&stype, m_desc.extendedDescs[i], sizeof(stype));
+        switch (stype)
+        {
+        case StructType::RayTracingValidationDesc:
+            enableRayTracingValidation = static_cast<RayTracingValidationDesc*>(m_desc.extendedDescs[i])->enableRaytracingValidation;
+            break;
+        }
+    }
+
+
     VkInstance instance = VK_NULL_HANDLE;
     if (handles[0].handleValue == 0)
     {
@@ -289,7 +305,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
 
-    if ((m_desc.enableRaytracingValidation || useValidationLayer) && m_api.vkCreateDebugReportCallbackEXT)
+    if ((enableRayTracingValidation || useValidationLayer) && m_api.vkCreateDebugReportCallbackEXT)
     {
         VkDebugReportFlagsEXT debugFlags =
             VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
@@ -703,7 +719,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         );
 
         // Only enable raytracing validation if both requested and supported
-        if(m_desc.enableRaytracingValidation && extendedFeatures.rayTracingValidationFeatures.rayTracingValidation)
+        if(enableRayTracingValidation && extendedFeatures.rayTracingValidationFeatures.rayTracingValidation)
         {
             SIMPLE_EXTENSION_FEATURE(
                 extendedFeatures.rayTracingValidationFeatures,
