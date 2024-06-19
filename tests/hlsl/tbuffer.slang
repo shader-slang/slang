@@ -1,7 +1,9 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
+
+// Metal backend requires a new legalization pass to support emitting `TextureBufferType`
+//DISABLE_TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
+//DISABLE_TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // SPIRV backend has no support for emitting `TextureBufferType`
 //DISABLE_TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage compute -entry computeMain
