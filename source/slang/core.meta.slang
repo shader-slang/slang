@@ -1210,6 +1210,31 @@ extension matrix<int16_t,R,C,L>
     __init(int value) { this = matrix<T,R,C,L>(T(value)); }
 }
 
+
+__generic<T>
+extension vector<T, 4>
+{
+    __generic<let L : int>
+    __implicit_conversion($(kConversionCost_MatrixToVector))
+    [__unsafeForceInlineEarly]
+    __init(matrix<T, 2, 2, L> value)
+    {
+        this.xy = value[0];
+        this.zw = value[1];
+    }
+}
+__generic<T, let L : int>
+extension matrix<T, 2, 2, L>
+{
+    __implicit_conversion($(kConversionCost_VectorToMatrix))
+    [__unsafeForceInlineEarly]
+    __init(vector<T, 4> value)
+    {
+        this[0] = value.xy;
+        this[1] = value.zw;
+    }
+}
+
 ${{{{
 static const struct {
     char const* name;
