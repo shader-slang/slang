@@ -33,13 +33,13 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-lower-error-handling.h"
 #include "slang-ir-obfuscate-loc.h"
-#include "slang-ir-use-uninitialized-out-param.h"
+#include "slang-ir-use-uninitialized-values.h"
 #include "slang-ir-peephole.h"
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 
-// Natural layout 
+// Natural layout
 #include "slang-ast-natural-layout.h"
 
 namespace Slang
@@ -162,7 +162,7 @@ struct LoweredValInfo
     Flavor flavor;
 
         // NOTE! This relies on the union, allowing the comparison of any of the pointer type in the union.
-        // Assumes equality is the same as val pointer/or ext pointer being equal. 
+        // Assumes equality is the same as val pointer/or ext pointer being equal.
     bool operator==(const ThisType& rhs) const { return flavor == rhs.flavor && aliasPtr == rhs.aliasPtr; }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
@@ -476,7 +476,7 @@ struct IRGenEnv
 
 struct SharedIRGenContext
 {
-    
+
     // The "global" environment for mapping declarations to their IR values.
     IRGenEnv globalEnv;
 
@@ -1440,14 +1440,14 @@ static void addLinkageDecoration(
     const String mangledName = getMangledName(context->astBuilder, decl);
 
     // Obfuscate the mangled names if necessary.
-    // 
-    // Care is needed around stdlib as it is only compiled once and *without* obfuscation, 
+    //
+    // Care is needed around stdlib as it is only compiled once and *without* obfuscation,
     // so any linkage name to stdlib *shouldn't* have obfuscation applied to it.
-    if (context->shared->m_obfuscateCode && 
+    if (context->shared->m_obfuscateCode &&
         !isFromStdLib(decl))
     {
         const auto obfuscatedName = getHashedName(mangledName.getUnownedSlice());
-    
+
         addLinkageDecoration(context, inst, decl, obfuscatedName.getUnownedSlice());
     }
     else
@@ -3171,7 +3171,7 @@ void _lowerFuncDeclBaseTypeInfo(
     }
 
     auto& irResultType = outInfo.resultType;
-    
+
     if (parameterLists.params.getCount() && parameterLists.params.getLast().isReturnDestination)
     {
         irResultType = context->irBuilder->getVoidType();
@@ -3200,7 +3200,7 @@ void _lowerFuncDeclBaseTypeInfo(
             irResultType = builder->getPtrType(irResultType);
         }
     }
-  
+
     if (!getErrorCodeType(context->astBuilder, declRef)->equals(context->astBuilder->getBottomType()))
     {
         auto errorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
@@ -3718,7 +3718,7 @@ struct ExprLoweringContext
                 irArgs,
                 tryEnv);
             applyOutArgumentFixups(context, argFixups);
-            
+
             if (funcTypeInfo.returnViaLastRefParam)
                 return result;
             return callResult;
@@ -3789,7 +3789,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             // A reference to a property is a special case, because
             // we must translate the reference to the property
-            // into a reference to one of its accessors.   
+            // into a reference to one of its accessors.
             return lowerStorageReference(context, lowerTypeOfExpr, propertyDeclRef, LoweredValInfo(), 0, nullptr);
         }
         LoweredValInfo info = emitDeclRef(
@@ -3800,8 +3800,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     }
 
     // Emit IR to denote the forward-mode derivative
-    // of the inner func-expr. This will be resolved 
-    // to a concrete function during the derivative 
+    // of the inner func-expr. This will be resolved
+    // to a concrete function during the derivative
     // pass.
     LoweredValInfo visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
     {
@@ -3839,7 +3839,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // TODO(Sai): We might be missing the case where a single materialize could create
                 // multiple calls (multiple index operations?). Not quite sure what the right way
                 // to handle that case might be.
-                // 
+                //
                 if (as<IRCall>(materializedVal.val))
                 {
                     if (expr->flavor == TreatAsDifferentiableExpr::Flavor::NoDiff)
@@ -3851,11 +3851,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 }
 
                 innerInst = getSimpleVal(context, materializedVal);
-                
-                // We'll special case handle 'loads' here in order to allow TreatAsDifferentiable to be 
+
+                // We'll special case handle 'loads' here in order to allow TreatAsDifferentiable to be
                 // used on array index operations. (This is to avoid a discrepancy between using no_diff
                 // on local variable indexing vs. resource indexing.)
-                // 
+                //
                 if (as<IRLoad>(innerInst))
                     innerInst = getBuilder()->emitDetachDerivative(innerInst->getDataType(), innerInst);
             }
@@ -3878,13 +3878,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
 
         SLANG_ASSERT(innerInst);
-        
+
         return LoweredValInfo::simple(innerInst);
     }
 
     // Emit IR to denote the forward-mode derivative
-    // of the inner func-expr. This will be resolved 
-    // to a concrete function during the derivative 
+    // of the inner func-expr. This will be resolved
+    // to a concrete function during the derivative
     // pass.
     LoweredValInfo visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
     {
@@ -3951,9 +3951,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(inst);
         }
 
-        const auto value = 
-            as<SizeOfExpr>(sizeOfLikeExpr) ? 
-                size.size : 
+        const auto value =
+            as<SizeOfExpr>(sizeOfLikeExpr) ?
+                size.size :
                 size.alignment;
 
         return LoweredValInfo::simple(getBuilder()->getIntValue(builder->getUIntType(), value));
@@ -4776,7 +4776,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         else if (auto transitiveSubtypeWitness = as<TransitiveSubtypeWitness>(subTypeWitness))
         {
             // Try to resolve the inheritance situation which may show-up with 2+ levels of inheritance.
-            // We will recursivly follow through the subType->midType & midType->superType witnesses until 
+            // We will recursivly follow through the subType->midType & midType->superType witnesses until
             // we resolve DeclaredSubtypeWitness's
             LoweredValInfo subToMid;
             if (auto witness = as<SubtypeWitness>(transitiveSubtypeWitness->getSubToMid()))
@@ -5389,7 +5389,7 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
 
 // ExprLoweringVisitor that fuses the destination assignment.
 //
-struct DestinationDrivenRValueExprLoweringVisitor 
+struct DestinationDrivenRValueExprLoweringVisitor
     : ExprVisitor<DestinationDrivenRValueExprLoweringVisitor>
 {
     ExprLoweringContext<DestinationDrivenRValueExprLoweringVisitor> sharedLoweringContext;
@@ -5946,22 +5946,22 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // may create additional blocks due to short circuiting, so
             // the block we are current inserting into is not necessarily
             // the same as `testLabel`.
-            // 
+            //
             auto invCondition = builder->emitNot(irCondition->getDataType(), irCondition);
 
             // Now we want to `break` if the loop condition is false,
             // otherwise we will jump back to the head of the loop.
-            // 
+            //
             // We need to make sure not to reuse the break block of the loop as
             // the break/merge block of the ifelse test.
             // Therefore, we introduce a separate merge block for the loop test.
-            // 
+            //
             // Emit the following structure:
-            // 
+            //
             // [merge(mergeBlock)]
             // if (cond) goto loopHead;
             // else goto mergeBlock;
-            // 
+            //
             // mergeBlock:
             //   goto breakLabel;
             auto mergeBlock = builder->createBlock();
@@ -6281,7 +6281,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
         else if (const auto defaultStmt = as<DefaultStmt>(stmt))
         {
-            // A 'default:' is a kind of case. 
+            // A 'default:' is a kind of case.
             return true;
         }
 
@@ -6487,7 +6487,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // First emit code to compute the condition:
         auto conditionVal = getSimpleVal(context, lowerRValueExpr(context, stmt->condition));
 
-        // Check for any cases or default. 
+        // Check for any cases or default.
         if (!hasSwitchCases(stmt->body))
         {
             // If we don't have any case/default then nothing inside switch can be executed (other than condition)
@@ -6776,7 +6776,7 @@ LoweredValInfo tryGetAddress(
                 auto elementPtr = context->irBuilder->emitElementAddress(newBase.val, originalSwizzleInfo->elementIndices[0]);
                 return LoweredValInfo::ptr(elementPtr);
             }
-            
+
             RefPtr<SwizzledLValueInfo> newSwizzleInfo = new SwizzledLValueInfo();
             context->shared->extValues.add(newSwizzleInfo);
 
@@ -7347,7 +7347,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     getBuilder()->addSimpleDecoration<IRDerivativeGroupLinearDecoration>(d);
             }
         }
-        
+
         if(!verifyComputeDerivativeGroupModifier)
             return LoweredValInfo();
         for(auto d : entryPoints)
@@ -7355,7 +7355,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             verifyComputeDerivativeGroupModifiers(
                 getSink(),
                 decl->loc,
-                d->findDecoration<IRDerivativeGroupQuadDecoration>(), 
+                d->findDecoration<IRDerivativeGroupQuadDecoration>(),
                 d->findDecoration<IRDerivativeGroupLinearDecoration>(),
                 d->findDecoration<IRNumThreadsDecoration>());
         }
@@ -7631,7 +7631,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: This approach doesn't really make sense for generic `extension` conformances.
         auto mangledName = getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
 
-        
+
         // A witness table may need to be generic, if the outer
         // declaration (either a type declaration or an `extension`)
         // is generic.
@@ -7659,7 +7659,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto irSubType = lowerType(subContext, subType);
         irWitnessTable->setConcreteType(irSubType);
 
-        // TODO(JS): 
+        // TODO(JS):
         // Should the mangled name take part in obfuscation if enabled?
 
         addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
@@ -7849,7 +7849,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return paramVal;
     }
 
-    LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl) 
+    LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl)
     {
         // It's constant, so shoul dhave this modifier
         SLANG_ASSERT(decl->hasModifier<ConstModifier>());
@@ -7927,7 +7927,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
 
         addLinkageDecoration(context, irConstant, decl);
-        
+
         addNameHint(context, irConstant, decl);
         addVarDecorations(context, irConstant, decl);
 
@@ -7994,7 +7994,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         IRType* varType = lowerType(subContext, decl->getType());
 
-        // TODO(JS): Do we create something derived from IRGlobalVar? Or do we use 
+        // TODO(JS): Do we create something derived from IRGlobalVar? Or do we use
         // a decoration to identify an *actual* global?
 
         IRGlobalValueWithCode* irGlobal = subBuilder->createGlobalVar(varType);
@@ -8188,7 +8188,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         return Slang::getInterfaceRequirementKey(context, requirementDecl);
     }
-    
+
     LoweredValInfo visitAssocTypeDecl(AssocTypeDecl* decl)
     {
         SLANG_ASSERT(decl->parentDecl != nullptr);
@@ -8201,7 +8201,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         auto assocType = context->irBuilder->getAssociatedType(
             constraintInterfaces.getArrayView().arrayView);
-        context->setValue(decl, assocType); 
+        context->setValue(decl, assocType);
         return LoweredValInfo::simple(assocType);
     }
 
@@ -8284,7 +8284,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Setup subContext for proper lowering `ThisType`, associated types and
         // the interface decl's self reference.
-        
+
         auto thisType = DeclRefType::create(
             context->astBuilder,
             createDefaultSpecializedDeclRef(subContext, nullptr, decl->getThisTypeDecl()));
@@ -8507,8 +8507,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             SLANG_UNREACHABLE("associatedtype should have been handled by visitAssocTypeDecl.");
         }
 
-        // TODO(JS): 
-        // Not clear what to do around HLSLExportModifier. 
+        // TODO(JS):
+        // Not clear what to do around HLSLExportModifier.
         // The HLSL spec says it only applies to functions, so we ignore for now.
 
         // We are going to create nested IR building state
@@ -8546,12 +8546,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getSink()->diagnose(decl->loc, Diagnostics::unimplemented, "lower unknown AggType to IR");
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
-        
+
         maybeAddDebugLocationDecoration(context, irAggType);
 
         auto finalFinishedVal = finishOuterGenerics(subBuilder, irAggType, outerGeneric);
 
-        // We add the decl now such that if there are Ptr or other references 
+        // We add the decl now such that if there are Ptr or other references
         // to this type they can still complete
         context->setValue(decl, LoweredValInfo::simple(finalFinishedVal));
 
@@ -8655,7 +8655,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (as<NonCopyableTypeAttribute>(modifier))
                 subBuilder->addNonCopyableTypeDecoration(irAggType);
         }
-     
+
 
         return LoweredValInfo::simple(finalFinishedVal);
     }
@@ -8734,7 +8734,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             // If the witness can be lowered, and the differentiable type entry exists,
             // add an entry to the context.
-            // 
+            //
             if (irWitness)
             {
                 getBuilder()->addDifferentiableTypeEntry(irDict, irType, irWitness);
@@ -9098,7 +9098,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     typeGeneric->setFullType(typeBuilder.getGenericKind());
                     typeBuilder.setInsertInto(typeGeneric);
                     typeBuilder.emitBlock();
-                    
+
                     for (auto child : parentGeneric->getFirstBlock()->getChildren())
                     {
                         if (valuesToClone.contains(child))
@@ -9373,7 +9373,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         String definition;
-        
+
         // If we have a member function, then we want the default intrinsic
         // definition to reflect this fact so that we can emit it correctly
         // (the assumption is that a catch-all definition of a member function
@@ -9917,7 +9917,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     subContext,
                     declRefExpr->declRef,
                     funcType);
-                
+
                 SLANG_RELEASE_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
 
                 IRInst* derivativeFunc = loweredVal.val;
@@ -10178,7 +10178,7 @@ LoweredValInfo lowerDecl(
     }
 }
 
-// We will probably want to put the 
+// We will probably want to put the
 
 LoweredValInfo* _findLoweredValInfo(
     IRGenContext* context,
@@ -10256,7 +10256,7 @@ bool canDeclLowerToAGeneric(Decl* decl)
             return !isFunctionVarDecl(varDecl);
         }
     }
-    
+
     return false;
 }
 
@@ -10593,7 +10593,7 @@ static void lowerFrontEndEntryPointToIR(
                     else if (as<HLSLPointModifier>(modifier))
                         op = kIROp_PointInputPrimitiveTypeDecoration;
                     else if (as<HLSLLineModifier>(modifier))
-                        op = kIROp_LineInputPrimitiveTypeDecoration; 
+                        op = kIROp_LineInputPrimitiveTypeDecoration;
                     else if (as<HLSLLineAdjModifier>(modifier))
                         op = kIROp_LineAdjInputPrimitiveTypeDecoration;
                     else if (as<HLSLTriangleAdjModifier>(modifier))
@@ -10841,7 +10841,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     //
     constructSSA(module);
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-    
+
     bool minimumOptimizations = linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
     if (!minimumOptimizations)
     {
@@ -10925,9 +10925,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // call graph) based on constraints imposed by different instructions.
         propagateConstExpr(module, compileRequest->getSink());
 
-        // Check for using uninitialized out parameters.
-        checkForUsingUninitializedOutParams(module, compileRequest->getSink());
-        
+        // Check for using uninitialized values
+        checkForUsingUninitializedValues(module, compileRequest->getSink());
+
         // TODO: give error messages if any `undefined` or
         // instructions remain.
 
@@ -10968,16 +10968,16 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
         stripOptions.shouldStripNameHints = linkage->m_optionSet.shouldObfuscateCode();
 
-        // If we are generating an obfuscated source map, we don't want to strip locs, 
+        // If we are generating an obfuscated source map, we don't want to strip locs,
         // we want to generate *new* locs that can be mapped (via source map)
         // back to *actual* source.
-        // 
-        // We don't do the obfuscation remapping here, because DCE and other passes may 
-        // change what locs are actually needed, we need to be sure 
+        //
+        // We don't do the obfuscation remapping here, because DCE and other passes may
+        // change what locs are actually needed, we need to be sure
         // that if we have obfuscation enabled we don't forget to obfuscate.
         stripOptions.stripSourceLocs = false;
         stripFrontEndOnlyInstructions(module, stripOptions);
-    
+
         // Stripping out decorations could leave some dead code behind
         // in the module, and in some cases that extra code is also
         // undesirable (e.g., the string literals referenced by name-hint
@@ -11373,12 +11373,12 @@ IRTypeLayout* lowerTypeLayout(
     }
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
     {
-        // TODO(JS): 
+        // TODO(JS):
         // For now we don't lower the value/target type because this could lead to inifinte recursion
         // in the way this is currently implemented.
 
         //auto irValueTypeLayout = lowerTypeLayout(context, ptrTypeLayout->valueTypeLayout);
-        IRPointerTypeLayout::Builder builder(context->irBuilder); 
+        IRPointerTypeLayout::Builder builder(context->irBuilder);
         return _lowerTypeLayoutCommon(context, &builder, ptrTypeLayout);
     }
     else if( auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout) )

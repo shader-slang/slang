@@ -598,7 +598,7 @@ DIAGNOSTIC(39999, Error, unableToFindSymbolInModule, "unable to find the mangled
 
 DIAGNOSTIC(39999, Error, overloadedParameterToHigherOrderFunction, "passing overloaded functions to higher order functions is not supported")
 
-// 38xxx 
+// 38xxx
 
 DIAGNOSTIC(38000, Error, entryPointFunctionNotFound, "no function found matching entry point name '$0'")
 DIAGNOSTIC(38001, Error, ambiguousEntryPoint, "more than one function matches entry point name '$0'")
@@ -738,6 +738,8 @@ DIAGNOSTIC(41012, Error, profileImplicitlyUpgradedRestrictive, "user set `profil
 DIAGNOSTIC(41015, Error, usingUninitializedValue, "use of uninitialized value '$0'")
 DIAGNOSTIC(41016, Warning, returningWithUninitializedOut, "returning without initializing out parameter '$0'")
 DIAGNOSTIC(41017, Warning, returningWithPartiallyUninitializedOut, "returning without fully initializing out parameter '$0'")
+DIAGNOSTIC(41018, Warning, returningWithUninitializedValue, "returning without initializing variable '$0'")
+DIAGNOSTIC(41019, Warning, returningWithPartiallyUninitializedValue, "returning without fully initializing variable '$0'")
 
 DIAGNOSTIC(41011, Error, typeDoesNotFitAnyValueSize, "type '$0' does not fit in the size required by its conforming interface.")
 DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")

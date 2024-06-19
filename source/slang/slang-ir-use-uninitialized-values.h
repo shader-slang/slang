@@ -6,7 +6,7 @@ namespace Slang
     class DiagnosticSink;
     struct IRModule;
 
-    void checkForUsingUninitializedOutParams(
+    void checkForUsingUninitializedValues(
         IRModule*       module,
         DiagnosticSink* sink);
 }
