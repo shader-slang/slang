@@ -7,6 +7,8 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  schedule:   
+    - cron: '30 06 * * *'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -40,6 +42,11 @@ jobs:
 
         MSBuild.exe slang.sln -v:m -m -property:Configuration=${{matrix.configuration}} -property:Platform=${{matrix.platform}} -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
 
+    - name: setup-python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.12"
+        
     - uses: robinraju/release-downloader@v1.9
       id: download
       with:
@@ -70,8 +77,22 @@ jobs:
         extract: false
 
     - name: run falcor-compiler-perf-test
+      if: ${{ github.event_name == 'pull_request' }} || ${{ github.event_name == 'push' }}
       run: |
         $filename = '${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
         Expand-Archive $filename -DestinationPath .\falcor-perf-test
         $env:PATH += ";.\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}";
         .\falcor-perf-test\bin\Release\falcor_perftest.exe
+
+    - name: setup falcor nightly run
+      env:
+        slang_verif_svc: ${{ secrets.slang_verif_svc_cred }}
+        github_sha: ${{ github.sha }}
+
+      # commenting this condition out so it will run on pull request
+      # once we're ready to commit I'll remove the comment
+      #if: ${{ github.event_name == 'schedule' }}
+      run: |
+        python -m pip install --upgrade pip
+        pip install gspread oauth2client
+        python .\extras\falcor-perf-extract-results.py ${{ github.workspace }}\falcor-perf-test\bin\Release\falcor_perftest.exe ${{ github.workspace }}\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}
