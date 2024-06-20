@@ -536,11 +536,14 @@ namespace Slang
             case CodeGenTarget::GLSL:
             case CodeGenTarget::HLSL:
             case CodeGenTarget::CUDASource:
+            case CodeGenTarget::CUDAHeader:
             case CodeGenTarget::CPPSource:
+            case CodeGenTarget::CPPHeader:
             case CodeGenTarget::HostCPPSource:
             case CodeGenTarget::PyTorchCppBinding:
             case CodeGenTarget::CSource:
             case CodeGenTarget::Metal:
+            case CodeGenTarget::MetalHeader:
             {
                 return PassThroughMode::None;
             }
@@ -966,6 +969,7 @@ namespace Slang
         {
             case CodeGenTarget::PTX:
             case CodeGenTarget::CUDASource:
+            case CodeGenTarget::CUDAHeader:
             {
                 return new CUDAExtensionTracker;
             }
@@ -1670,11 +1674,14 @@ namespace Slang
         case CodeGenTarget::GLSL:
         case CodeGenTarget::HLSL:
         case CodeGenTarget::CUDASource:
+        case CodeGenTarget::CUDAHeader:
         case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CPPHeader:
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::PyTorchCppBinding:
         case CodeGenTarget::CSource:
         case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalHeader:
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
                 

@@ -461,6 +461,8 @@ public:
     protected:
 
 
+
+    virtual bool shouldEmitOnlyHeader() { return false; }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual bool doesTargetSupportPtrTypes() { return false; }
     virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }

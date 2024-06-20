@@ -17,6 +17,7 @@
 #include "slang-ir-check-recursive-type.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-defunctionalization.h"
+#include "slang-ir-header-export.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
@@ -517,6 +518,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::HostCPPSource:
             break;
         case CodeGenTarget::CUDASource:
+        case CodeGenTarget::CUDAHeader:
             collectOptiXEntryPointUniformParams(irModule);
             #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "OPTIX ENTRY POINT UNIFORMS COLLECTED");
@@ -525,6 +527,7 @@ Result linkAndOptimizeIR(
             break;
 
         case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CPPHeader:
             passOptions.alwaysCreateCollectedParam = true;
             [[fallthrough]];
         default:
@@ -550,6 +553,10 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
         break;
+    case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::CUDAHeader:
+        generateTransitiveExternCpp(irModule, sink);
+        break;
     }
 
     if (requiredLoweringPassSet.optionalType)
@@ -574,6 +581,14 @@ Result linkAndOptimizeIR(
         lowerComInterfaces(irModule, artifactDesc.style, sink);
         generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
         generateDllExportFuncs(irModule, sink);
+        break;
+    }
+    case CodeGenTarget::CPPHeader:
+    {
+        lowerComInterfaces(irModule, artifactDesc.style, sink);
+        generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
+        generateDllExportFuncs(irModule, sink);
+        generateTransitiveExternCpp(irModule, sink);
         break;
     }
     default: break;
@@ -719,6 +734,7 @@ Result linkAndOptimizeIR(
         handleAutoBindNames(irModule);
         break;
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
         removeTorchKernels(irModule);
         handleAutoBindNames(irModule);
@@ -819,6 +835,7 @@ Result linkAndOptimizeIR(
         [[fallthrough]];
     case CodeGenTarget::HLSL:
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         if (requiredLoweringPassSet.combinedTextureSamplers)
@@ -1029,6 +1046,7 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions.translateToStructuredBufferOps = true;
             break;
         case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalHeader:
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
             byteAddressBufferOptions.scalarizeVectorLoadStore = true;
@@ -1078,6 +1096,7 @@ Result linkAndOptimizeIR(
     switch(target)
     {
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
         {
             synthesizeActiveMask(
@@ -1128,18 +1147,21 @@ Result linkAndOptimizeIR(
     }
     break;
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     {
         legalizeIRForMetal(irModule, sink);
     }
     break;
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
         {
             legalizeEntryPointVaryingParamsForCPU(irModule, codeGenContext->getSink());
         }
         break;
 
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             legalizeEntryPointVaryingParamsForCUDA(irModule, codeGenContext->getSink());
         }
@@ -1179,11 +1201,14 @@ Result linkAndOptimizeIR(
         moveGlobalVarInitializationToEntryPoints(irModule);
         break;
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         moveGlobalVarInitializationToEntryPoints(irModule);
         introduceExplicitGlobalContext(irModule, target);
-        if(target == CodeGenTarget::CPPSource)
+        if(target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
         {
             convertEntryPointPtrParamsToRawPtrs(irModule);
         }
