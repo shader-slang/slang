@@ -216,6 +216,10 @@ class GenericResourceArrayType : public BuiltinType
     SLANG_AST_CLASS(GenericResourceArrayType)
 };
 
+class DynamicResourceEntryType : public BuiltinType
+{
+    SLANG_AST_CLASS(DynamicResourceEntryType)
+};
 
 // HLSL buffer-type resources
 

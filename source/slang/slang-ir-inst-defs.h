@@ -137,6 +137,7 @@ INST(Nop, nop, 0, 0)
 
     // Unbounded resource descriptor array that allows for generic indexing.
     INST(GenericResourceArrayType, GenericResourceArray, 0, HOISTABLE)
+    INST(DynamicResourceEntryType, DynamicResourceEntry, 0, HOISTABLE)
 
     INST(DefaultBufferLayoutType, DefaultLayout, 0, HOISTABLE)
     INST(Std140BufferLayoutType, Std140Layout, 0, HOISTABLE)

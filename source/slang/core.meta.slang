@@ -1544,6 +1544,11 @@ struct __ResourceArray<let kind : __IndexableResourceKind>
     __intrinsic_op($(kIROp_GetGenericResourceArrayElement))
     T get<T : __IIndexableResource<kind>>(int index);
 }
+__magic_type(DynamicResourceEntryType)
+__intrinsic_type($(kIROp_DynamicResourceEntryType))
+struct __DynamicResource
+{
+}
 enum __IndexableResourceKind
 {
     Resource = 0,
