@@ -30,4 +30,8 @@ namespace SlangCapture
         }                                   \
     } while(0)
 
+#define SLANG_CAPTURE_CHECK(VALUE)          \
+    do {                                    \
+        SLANG_CAPTURE_ASSERT((VALUE) == SLANG_OK);      \
+    } while(0)
 #endif // CAPTURE_UTILITY_H

@@ -102,7 +102,7 @@ public out int gl_FragStencilRef : SV_StencilRef;
 
 public in uvec3 gl_GlobalInvocationID : SV_DispatchThreadID;
 public in uvec3 gl_WorkGroupID : SV_GroupID;
-public in uvec3 gl_LocalInvocationIndex : SV_GroupIndex;
+public in uint gl_LocalInvocationIndex : SV_GroupIndex;
 public in uvec3 gl_LocalInvocationID : SV_GroupThreadID;
 
 public property uint3 gl_NumWorkGroups {
