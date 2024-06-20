@@ -1210,6 +1210,9 @@ extension matrix<int16_t,R,C,L>
     __init(int value) { this = matrix<T,R,C,L>(T(value)); }
 }
 
+__intrinsic_op(makeVector)
+__generic<T, let N:int>
+vector<T,N*2> __makeVector(vector<T,N> vec1, vector<T,N> vec2);
 
 __generic<T>
 extension vector<T, 4>
@@ -1219,8 +1222,7 @@ extension vector<T, 4>
     [__unsafeForceInlineEarly]
     __init(matrix<T, 2, 2, L> value)
     {
-        this.xy = value[0];
-        this.zw = value[1];
+        this = __makeVector(value[0], value[1]);
     }
 }
 __generic<T, let L : int>
