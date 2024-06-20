@@ -14,6 +14,22 @@ ProfileFamily getProfileFamily(ProfileVersion version)
     }
 }
 
+bool isRaytracingStage(Stage inStage)
+{
+    switch (inStage)
+    {
+    case Stage::RayGeneration:
+    case Stage::Miss:
+    case Stage::Intersection:
+    case Stage::ClosestHit:
+    case Stage::Callable:
+    case Stage::AnyHit:
+        return true;
+    default:
+        return false;
+    }
+}
+
 const char* getStageName(Stage stage)
 {
     switch(stage)

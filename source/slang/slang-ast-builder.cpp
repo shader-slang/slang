@@ -419,6 +419,16 @@ bool ASTBuilder::isDifferentiableInterfaceAvailable()
     return (m_sharedASTBuilder->tryFindMagicDecl("DifferentiableType") != nullptr);
 }
 
+DeclRef<InterfaceDecl> ASTBuilder::getDefaultInitializableTypeInterfaceDecl()
+{
+    DeclRef<InterfaceDecl> declRef = DeclRef<InterfaceDecl>(getBuiltinDeclRef("DefaultInitializableType", nullptr));
+    return declRef;
+}
+Type* ASTBuilder::getDefaultInitializableType()
+{
+    return DeclRefType::create(m_sharedASTBuilder->m_astBuilder, getDefaultInitializableTypeInterfaceDecl());
+}
+
 MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
     HLSLMeshShaderOutputModifier* modifier,
     Type* elementType,

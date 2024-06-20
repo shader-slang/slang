@@ -100,16 +100,16 @@ bool isDirectChildOfAbstractAtom(CapabilityAtom name)
     return _getInfo(name).abstractBase != CapabilityName::Invalid;
 }
 
-bool isTargetVersionAtom(CapabilityName name)
+bool isTargetVersionAtom(CapabilityAtom name)
 {
-    if (name >= CapabilityName::spirv_1_0 && name <= getLatestSpirvAtom())
+    if (name >= CapabilityAtom::_spirv_1_0 && name <= getLatestSpirvAtom())
         return true;
-    if (name >= CapabilityName::metallib_2_3 && name <= getLatestMetalAtom())
+    if (name >= CapabilityAtom::metallib_2_3 && name <= getLatestMetalAtom())
         return true;
     return false;
 }
 
-bool isSpirvExtensionAtom(CapabilityName name)
+bool isSpirvExtensionAtom(CapabilityAtom name)
 {
     return UnownedStringSlice(_getInfo(name).name).startsWith("SPV_");
 }
@@ -124,26 +124,26 @@ CapabilityName findCapabilityName(UnownedStringSlice const& name)
     return result;
 }
 
-CapabilityName getLatestSpirvAtom()
+CapabilityAtom getLatestSpirvAtom()
 {
-    static CapabilityName result = CapabilityName::Invalid;
-    if (result == CapabilityName::Invalid)
+    static CapabilityAtom result = CapabilityAtom::Invalid;
+    if (result == CapabilityAtom::Invalid)
     {
-        CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
+        CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::_spirv_latest);
         auto latestSpirvCapSetElements = latestSpirvCapSet.getAtomSets()->getElements<CapabilityAtom>();
-        result = (CapabilityName)latestSpirvCapSetElements[latestSpirvCapSetElements.getCount() - 2]; //-1 gets shader stage
+        result = asAtom(latestSpirvCapSetElements[latestSpirvCapSetElements.getCount() - 2]); //-1 gets shader stage
     }
     return result;
 }
 
-CapabilityName getLatestMetalAtom()
+CapabilityAtom getLatestMetalAtom()
 {
-    static CapabilityName result = CapabilityName::Invalid;
-    if (result == CapabilityName::Invalid)
+    static CapabilityAtom result = CapabilityAtom::Invalid;
+    if (result == CapabilityAtom::Invalid)
     {
         CapabilitySet latestMetalCapSet = CapabilitySet(CapabilityName::metallib_latest);
         auto latestMetalCapSetElements = latestMetalCapSet.getAtomSets()->getElements<CapabilityAtom>();
-        result = (CapabilityName)latestMetalCapSetElements[latestMetalCapSetElements.getCount() - 2]; //-1 gets shader stage
+        result = asAtom(latestMetalCapSetElements[latestMetalCapSetElements.getCount() - 2]); //-1 gets shader stage
     }
     return result;
 }
@@ -175,7 +175,7 @@ CapabilityAtom getTargetAtomInSet(const CapabilityAtomSet& atomSet)
     auto iter = out.begin();
     if (iter == out.end())
         return CapabilityAtom::Invalid;
-    return (CapabilityAtom)*iter;
+    return asAtom(*iter);
 }
 
 CapabilityAtom getStageAtomInSet(const CapabilityAtomSet& atomSet)
@@ -186,12 +186,14 @@ CapabilityAtom getStageAtomInSet(const CapabilityAtomSet& atomSet)
     auto iter = out.begin();
     if (iter == out.end())
         return CapabilityAtom::Invalid;
-    return (CapabilityAtom)*iter;
+    return asAtom(*iter);
 }
 
 template<CapabilityName keyholeAtomToPermuteWith>
 void CapabilitySet::addPermutationsOfConjunctionForEachInContainer(CapabilityAtomSet& setToPermutate, const CapabilityAtomSet& elementsToPermutateWith, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom)
 {
+    SLANG_UNUSED(knownTargetAtom);
+    SLANG_UNUSED(knownStageAtom);
     for(auto i : elementsToPermutateWith)
     {
         CapabilityName atom = (CapabilityName)i;
@@ -201,11 +203,11 @@ void CapabilitySet::addPermutationsOfConjunctionForEachInContainer(CapabilityAto
 
         if constexpr (keyholeAtomToPermuteWith == CapabilityName::target)
         {
-            addConjunction(conjunctionPermutation, (CapabilityAtom)atom, knownStageAtom);
+            addConjunction(conjunctionPermutation, asAtom(atom), knownStageAtom);
         }
         else if constexpr (keyholeAtomToPermuteWith == CapabilityName::stage)
         {
-            addConjunction(conjunctionPermutation, knownTargetAtom, (CapabilityAtom)atom);
+            addConjunction(conjunctionPermutation, knownTargetAtom, asAtom(atom));
         }
         else
         {
@@ -394,17 +396,25 @@ bool CapabilitySet::implies(CapabilityAtom atom) const
     return this->implies(tmpSet);
 }
 
-bool CapabilitySet::implies(CapabilitySet const& other, const bool onlyRequireSingleImply) const
+CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(CapabilitySet const& otherSet, ImpliesFlags flags) const
 {
     // x implies (c | d) only if (x implies c) and (x implies d).
 
-    for (const auto& otherTarget : other.m_targetSets)
+    bool onlyRequireSingleImply = ((int)flags & (int)ImpliesFlags::OnlyRequireASingleValidImply);
+    int flagsCollected = (int)CapabilitySet::ImpliesReturnFlags::NotImplied;
+
+    if (otherSet.isEmpty())
+        return CapabilitySet::ImpliesReturnFlags::Implied;
+
+    for (const auto& otherTarget : otherSet.m_targetSets)
     {
         auto thisTarget = this->m_targetSets.tryGetValue(otherTarget.first);
         if (!thisTarget)
         {
+            if (onlyRequireSingleImply)
+                continue;
             // 'this' lacks a target 'other' has.
-            return false;
+            return CapabilitySet::ImpliesReturnFlags::NotImplied;
         }
 
         for (const auto& otherStage : otherTarget.second.shaderStageSets)
@@ -412,31 +422,44 @@ bool CapabilitySet::implies(CapabilitySet const& other, const bool onlyRequireSi
             auto thisStage = thisTarget->shaderStageSets.tryGetValue(otherStage.first);
             if (!thisStage)
             {
+                if (onlyRequireSingleImply)
+                    continue;
                 // 'this' lacks a stage 'other' has.
-                return false;
+                return CapabilitySet::ImpliesReturnFlags::NotImplied;
             }
 
             // all stage sets that are in 'other' must be contained by 'this'
-            if(thisStage->atomSet)
+            if (thisStage->atomSet)
             {
                 auto& thisStageSet = thisStage->atomSet.value();
-                if(otherStage.second.atomSet)
-                {   
-                    if (!onlyRequireSingleImply)
+                if (otherStage.second.atomSet)
+                {
+                    auto contained = thisStageSet.contains(otherStage.second.atomSet.value());
+                    if (!onlyRequireSingleImply && !contained)
                     {
-                        if (!thisStageSet.contains(otherStage.second.atomSet.value()))
-                            return false;
+                        return CapabilitySet::ImpliesReturnFlags::NotImplied;
                     }
-                    else
+                    else if (onlyRequireSingleImply && contained)
                     {
-                        if (thisStageSet.contains(otherStage.second.atomSet.value()))
-                            return true;
+                        return CapabilitySet::ImpliesReturnFlags::Implied;
                     }
                 }
             }
         }
     }
-    return !onlyRequireSingleImply;
+    if (!onlyRequireSingleImply)
+        flagsCollected |= (int)CapabilitySet::ImpliesReturnFlags::Implied;
+
+    return (CapabilitySet::ImpliesReturnFlags)flagsCollected;
+}
+
+bool CapabilitySet::implies(CapabilitySet const& other) const
+{
+    return (int)_implies(other, ImpliesFlags::None) & (int)CapabilitySet::ImpliesReturnFlags::Implied;
+}
+CapabilitySet::ImpliesReturnFlags CapabilitySet::atLeastOneSetImpliedInOther(CapabilitySet const& other) const
+{
+    return _implies(other, ImpliesFlags::OnlyRequireASingleValidImply);
 }
 
 void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
@@ -827,6 +850,53 @@ bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, C
     return true;
 }
 
+/// Converts spirv version atom to the glsl_spirv equivlent. If not possible, Invalid is returned
+inline CapabilityName maybeConvertSpirvVersionToGlslSpirvVersion(CapabilityName& atom)
+{
+    if (atom >= CapabilityName::_spirv_1_0 && asAtom(atom) <= getLatestSpirvAtom())
+    {
+        return (CapabilityName)((Int)CapabilityName::glsl_spirv_1_0 + ((Int)atom - (Int)CapabilityName::_spirv_1_0));
+    }
+    return CapabilityName::Invalid;
+}
+
+void CapabilitySet::addSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& other)
+{
+    if (auto* otherTargetSet = other.m_targetSets.tryGetValue(CapabilityAtom::spirv))
+    {
+        auto* thisTargetSet = m_targetSets.tryGetValue(CapabilityAtom::glsl);
+        if (!thisTargetSet)
+            return;
+
+        for (auto& otherStageSet : otherTargetSet->shaderStageSets)
+        {
+            if (!otherStageSet.second.atomSet)
+                continue;
+
+            auto* thisStageSet = thisTargetSet->shaderStageSets.tryGetValue(otherStageSet.first);
+            if (!thisStageSet || !thisStageSet->atomSet)
+                continue;
+
+            CapabilityAtomSet::Iterator otherAtom = otherStageSet.second.atomSet->begin();
+            while (otherAtom != otherStageSet.second.atomSet->end())
+            {
+                otherAtom++;
+                auto otherAtomName = (CapabilityName)*otherAtom;
+                if (otherAtomName > (CapabilityName)getLatestSpirvAtom())
+                {
+                    otherAtom = otherStageSet.second.atomSet->end();
+                    continue;
+                }
+                auto maybeConvertedSpirvVersionAtom = maybeConvertSpirvVersionToGlslSpirvVersion(otherAtomName);
+                if (maybeConvertedSpirvVersionAtom == CapabilityName::Invalid)
+                    continue;
+
+                thisStageSet->atomSet->add((UInt)maybeConvertedSpirvVersionAtom);
+            }
+        }
+    }
+}
+
 void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
 {
     bool isFirstSet = true;
@@ -863,6 +933,20 @@ void printDiagnosticArg(StringBuilder& sb, CapabilityName name)
 {
     sb << _getInfo(name).name;
 }
+
+void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)
+{
+    sb << "{";
+    auto count = list.getCount();
+    for(Index i = 0; i < count; i++)
+    {
+        printDiagnosticArg(sb, list[i]);
+        if (i + 1 != count)
+            sb << ", ";
+    }
+    sb << "}";
+}
+
 
 #ifdef UNIT_TEST_CAPABILITIES
 

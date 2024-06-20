@@ -4,6 +4,7 @@
 #include "slang-lookup.h"
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
+#include "slang-ir-util.h"
 
 #include "../compiler-core/slang-artifact-desc-util.h"
 
@@ -479,9 +480,7 @@ static bool isDigit(char c)
     return (c >= '0') && (c <= '9');
 }
 
-/// Given a string that specifies a name and index (e.g., `COLOR0`),
-/// split it into slices for the name part and the index part.
-static void splitNameAndIndex(
+void splitNameAndIndex(
     UnownedStringSlice const&       text,
     UnownedStringSlice& outName,
     UnownedStringSlice& outDigits)
@@ -1048,7 +1047,7 @@ static void addExplicitParameterBindings_GLSL(
     RefPtr<VarLayout>           varLayout)
 {
     // We only want to apply GLSL-style layout modifers
-    // when compiling for a Khronos-related target.
+    // when compiling for a Khronos-related target. 
     //
     // TODO: This should have some finer granularity
     // so that we are able to distinguish between
@@ -1143,15 +1142,13 @@ static void addExplicitParameterBindings_GLSL(
         return;
     }
 
-    // See if we can infer vulkan binding from HLSL if we have such options set, we know 
-    // we can't map
     auto hlslToVulkanLayoutOptions = context->getTargetProgram()->getHLSLToVulkanLayoutOptions();
-
-    // If we have the options, but cannot infer bindings, we don't need to go further
+    bool warnedMissingVulkanLayoutModifier = false;
+    // If we are not told how to infer bindings with a compile option, we warn
     if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
     {
+        warnedMissingVulkanLayoutModifier = true;
         _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-        return;
     }
 
     // We need an HLSL register semantic to to infer from
@@ -1188,20 +1185,38 @@ static void addExplicitParameterBindings_GLSL(
     }
 
     // If inference is not enabled for this kind, we can issue a warning
-    if (!hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
+    if (hlslToVulkanLayoutOptions && !hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
     {
-        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-        return;
+        if(!warnedMissingVulkanLayoutModifier)
+        {
+            _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+            warnedMissingVulkanLayoutModifier = true;
+        }
     }
 
     // We use the HLSL binding directly (even though this notionally for GLSL/Vulkan)
     // We'll do the shifting at later later point in _maybeApplyHLSLToVulkanShifts
     resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
-    
+
+    if (warnedMissingVulkanLayoutModifier)
+    {
+        // If we warn due to invalid bindings and user did not set how to interpret 'hlsl style bindings', we should map 
+        // `register` 1:1 with equivlent vulkan bindings.
+        if(!hlslToVulkanLayoutOptions
+            || hlslToVulkanLayoutOptions->getKindShiftEnabledFlags() == HLSLToVulkanLayoutOptions::KindFlag::None)
+        {
+            resInfo->kind = LayoutResourceKind::DescriptorTableSlot;
+            resInfo->count = 1;
+        }
+        else
+        {
+            return;
+        }
+    }
+
     semanticInfo.kind = resInfo->kind;
     semanticInfo.index = UInt(hlslInfo.index);
     semanticInfo.space = UInt(hlslInfo.space);
-
     const LayoutSize count = resInfo->count;
 
     addExplicitParameterBinding(context, parameterInfo, as<VarDeclBase>(varDecl.getDecl()), semanticInfo, count);
@@ -1623,6 +1638,20 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
                 context->layoutContext,
                 type,
                 kEntryPointParameterDirection_Output);
+        }
+        else if (isSPIRV(context->getTargetRequest()->getTarget())
+             && (
+                    (state.directionMask & kEntryPointParameterDirection_Input && state.stage == Stage::Fragment)
+                    || (state.directionMask & kEntryPointParameterDirection_Output && state.stage == Stage::Vertex)
+                )
+            && sn == "sv_instanceid"
+            )
+        {
+            // This fragment-shader-input/vertex-shader-output is effectively not a system semantic for SPIR-V,
+            typeLayout = getSimpleVaryingParameterTypeLayout(
+                context->layoutContext,
+                type,
+                state.directionMask);
         }
         else
         {
@@ -2092,6 +2121,23 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
         return arrayTypeLayout;
     }
+    else if (auto patchType = as<HLSLPatchType>(type))
+    {
+        // Similar to the MeshOutput case, a `InputPatch` or `OutputPatch` type is just like an array.
+        //
+        auto elementTypeLayout = processEntryPointVaryingParameter(context, patchType->getElementType(), state, varLayout);
+
+        RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
+        arrayTypeLayout->elementTypeLayout = elementTypeLayout;
+        arrayTypeLayout->type = arrayType;
+
+        for (auto rr : elementTypeLayout->resourceInfos)
+        {
+            arrayTypeLayout->findOrAddResourceInfo(rr.kind)->count = rr.count;
+        }
+
+        return arrayTypeLayout;
+    }
     // Ignore a bunch of types that don't make sense here...
     else if (const auto subpassType = as<SubpassInputType>(type)) { return nullptr;  }
     else if (const auto textureType = as<TextureType>(type)) { return nullptr;  }
@@ -2152,9 +2198,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     state,
                     fieldVarLayout);
 
-                SLANG_ASSERT(fieldTypeLayout);
-                if(!fieldTypeLayout)
+                if (!fieldTypeLayout)
+                {
+                    getSink(context)->diagnose(field, Diagnostics::notValidVaryingParameter, field);
                     continue;
+                }
                 fieldVarLayout->typeLayout = fieldTypeLayout;
 
                 // The field needs to have offset information stored
@@ -4137,6 +4185,9 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
     if( !m_layout )
     {
         m_layout = generateParameterBindings(this, sink);
+        if (sink->getErrorCount() != 0)
+            return nullptr;
+
         if( m_layout )
         {
             m_irModuleForLayout = createIRModuleForLayout(sink);

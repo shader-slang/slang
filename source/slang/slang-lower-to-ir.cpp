@@ -1385,21 +1385,27 @@ static void addLinkageDecoration(
         {
             builder->addCudaKernelDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addHLSLExportDecoration(inst);
+
+            // Temp decorations to get this function through the linker.
             builder->addKeepAliveDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
         }
         else if (as<TorchEntryPointAttribute>(modifier))
         {
             builder->addTorchEntryPointDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addCudaHostDecoration(inst);
-            builder->addHLSLExportDecoration(inst);
-            builder->addKeepAliveDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+
+            // Temp decorations to get this function through the linker.
+            builder->addKeepAliveDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
         }
         else if (as<AutoPyBindCudaAttribute>(modifier))
         {
             builder->addAutoPyBindCudaDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addAutoPyBindExportInfoDecoration(inst);
+
+            // Temp decorations to get this function through the linker.
             builder->addKeepAliveDecoration(inst);
             builder->addHLSLExportDecoration(inst);
         }
@@ -4442,6 +4448,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             }
         }
         return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
+    }
+
+    LoweredValInfo visitDefaultConstructExpr(DefaultConstructExpr* expr)
+    {
+        return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(lowerType(context, expr->type)));
     }
 
     LoweredValInfo getDefaultVal(DeclRef<VarDeclBase> decl)
@@ -11627,11 +11638,11 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         {
             for (auto atomVal : atomSet)
             {
-                auto atom = (CapabilityName)atomVal;
-                if (atom >= CapabilityName::spirv_1_0 && atom <= latestSpirvAtom ||
-                    atom >= CapabilityName::metallib_2_3 && atom <= latestMetalAtom)
+                auto atom = asAtom(atomVal);
+                if (atom >= CapabilityAtom::_spirv_1_0 && atom <= latestSpirvAtom ||
+                    atom >= CapabilityAtom::metallib_2_3 && atom <= latestMetalAtom)
                 {
-                    builder->addRequireCapabilityAtomDecoration(irFunc, atom);
+                    builder->addRequireCapabilityAtomDecoration(irFunc, (CapabilityName)atom);
                 }
             }
         }

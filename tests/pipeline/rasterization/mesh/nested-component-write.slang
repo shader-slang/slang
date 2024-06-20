@@ -3,7 +3,7 @@
 // This tests that writing to individual components nested structs works for
 // mesh shader outputs.
 
-//TEST:CROSS_COMPILE:-target spirv -profile glsl_450+spirv_1_4 -entry main -stage mesh
+//TEST:CROSS_COMPILE:-target spirv -profile glsl_450+GL_EXT_mesh_shader -entry main -stage mesh
 
 struct Foo
 {

@@ -1870,7 +1870,7 @@ namespace Slang
             DeclRefType::create(m_astBuilder, structDecl),
             structDecl->ownedScope,
             LookupMask::Function,
-            LookupOptions::IgnoreInheritance);
+            (LookupOptions)((Index)LookupOptions::IgnoreInheritance | (Index)LookupOptions::NoDeref));
 
         if (!ctorLookupResult.isValid())
             return ctorList;
@@ -1948,8 +1948,46 @@ namespace Slang
         checkVisibility(classDecl);
     }
 
+    static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+    {
+        if (!varDecl->type || !varDecl->type.type)
+            return nullptr;
+
+        ConstructorDecl* defaultCtor = nullptr;
+        auto declRefType = as<DeclRefType>(varDecl->type.type);
+        if (declRefType)
+        {
+            if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
+            {
+                defaultCtor = _getDefaultCtor(structDecl);
+            }
+        }
+
+        if (defaultCtor)
+        {
+            auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
+            auto member = visitor->getASTBuilder()->getMemberDeclRef(declRefType->getDeclRef(), defaultCtor);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
+            return invoke;
+        }
+        else
+        {
+            auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();
+            defaultCall->type = QualType(varDecl->type);
+            return defaultCall;
+        }
+    }
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
+        // if zero initialize is true, set everything to a default
+        if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) 
+            && !varDecl->initExpr
+            && as<VarDecl>(varDecl)
+            )
+        {
+            varDecl->initExpr = constructDefaultInitExprForVar(this, varDecl);
+        }
+        
         if (auto initExpr = varDecl->initExpr)
         {
             // Disable the short-circuiting for static const variable init expression
@@ -4120,8 +4158,9 @@ namespace Slang
             }
         }
 
+        bool isDefaultInitializableType = requiredMemberDeclRef.getParent() == getASTBuilder()->getDefaultInitializableTypeInterfaceDecl();
         bool isInWrapperType = isWrapperTypeDecl(context->parentDecl);
-        if (!isInWrapperType)
+        if (!isInWrapperType && !isDefaultInitializableType)
         {
             return false;
         }
@@ -4136,6 +4175,10 @@ namespace Slang
         auto ctorName = getName("$init");
         ctorDecl->nameAndLoc.name = ctorName;
         ctorDecl->nameAndLoc.loc = ctorDecl->loc;
+
+        auto seqStmt = m_astBuilder->create<SeqStmt>();
+        ctorDecl->body = seqStmt;
+        ctorDecl->returnType.type = DeclRefType::create(m_astBuilder, makeDeclRef(context->parentDecl));
         
         List<Expr*> synArgs;
         addRequiredParamsToSynthesizedDecl(requiredMemberDeclRef, ctorDecl, synArgs);
@@ -4143,52 +4186,55 @@ namespace Slang
         ThisExpr* synThis = nullptr;
         addModifiersToSynthesizedDecl(context, requiredMemberDeclRef, ctorDecl, synThis);
 
-        auto seqStmt = m_astBuilder->create<SeqStmt>();
-        ctorDecl->body = seqStmt;
-        ctorDecl->returnType.type = DeclRefType::create(m_astBuilder, makeDeclRef(context->parentDecl));
-        SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(ctorDecl));
-        bodyVisitor.maybeRegisterDifferentiableType(m_astBuilder, context->conformingType);
-
-        for (auto member : context->parentDecl->members)
+        if (isInWrapperType)
         {
-            if (auto varDecl = as<VarDeclBase>(member))
-            {
-                auto varExpr = m_astBuilder->create<VarExpr>();
-                varExpr->scope = ctorDecl->ownedScope;
-                varExpr->name = varDecl->getName();
-                auto checkedVarExpr = CheckTerm(varExpr);
-                if (!checkedVarExpr)
-                    return false;
-                if (as<ErrorType>(checkedVarExpr->type.type))
-                    return false;
-                auto assign = m_astBuilder->create<AssignExpr>();
-                assign->left = checkedVarExpr;
-                auto temp = m_astBuilder->create<InvokeExpr>();
-                auto lookupResult = lookUpMember(
-                    m_astBuilder,
-                    this,
-                    ctorName,
-                    varDecl->type.type,
-                    ctorDecl->ownedScope,
-                    LookupMask::Function,
-                    LookupOptions::IgnoreBaseInterfaces);
-                temp->functionExpr = createLookupResultExpr(ctorName, lookupResult, nullptr, context->parentDecl->loc, nullptr);
-                temp->arguments.addRange(synArgs);
-                auto resolvedVar = ResolveInvoke(temp);
-                if (!resolvedVar)
-                    return false;
-                assign->right = resolvedVar;
-                assign->type = m_astBuilder->getVoidType();
-                bodyVisitor.maybeRegisterDifferentiableType(m_astBuilder, varDecl->type.type);
+            SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(ctorDecl));
+            bodyVisitor.maybeRegisterDifferentiableType(m_astBuilder, context->conformingType);
 
-                auto stmt = m_astBuilder->create<ExpressionStmt>();
-                stmt->expression = assign;
-                seqStmt->stmts.add(stmt);
-                break;
+            for (auto member : context->parentDecl->members)
+            {
+                if (auto varDecl = as<VarDeclBase>(member))
+                {
+                    auto varExpr = m_astBuilder->create<VarExpr>();
+                    varExpr->scope = ctorDecl->ownedScope;
+                    varExpr->name = varDecl->getName();
+                    auto checkedVarExpr = CheckTerm(varExpr);
+                    if (!checkedVarExpr)
+                        return false;
+                    if (as<ErrorType>(checkedVarExpr->type.type))
+                        return false;
+                    auto assign = m_astBuilder->create<AssignExpr>();
+                    assign->left = checkedVarExpr;
+                    auto temp = m_astBuilder->create<InvokeExpr>();
+                    auto lookupResult = lookUpMember(
+                        m_astBuilder,
+                        this,
+                        ctorName,
+                        varDecl->type.type,
+                        ctorDecl->ownedScope,
+                        LookupMask::Function,
+                        LookupOptions::IgnoreBaseInterfaces);
+                    temp->functionExpr = createLookupResultExpr(ctorName, lookupResult, nullptr, context->parentDecl->loc, nullptr);
+                    temp->arguments.addRange(synArgs);
+                    auto resolvedVar = ResolveInvoke(temp);
+                    if (!resolvedVar)
+                        return false;
+                    assign->right = resolvedVar;
+                    assign->type = m_astBuilder->getVoidType();
+                    bodyVisitor.maybeRegisterDifferentiableType(m_astBuilder, varDecl->type.type);
+
+                    auto stmt = m_astBuilder->create<ExpressionStmt>();
+                    stmt->expression = assign;
+                    seqStmt->stmts.add(stmt);
+                    break;
+                }
             }
         }
-
-        _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
+        if (isDefaultInitializableType)
+            context->parentDecl->addMember(ctorDecl);
+        else
+            _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
+        
         return true;
     }
 
@@ -6057,6 +6103,21 @@ namespace Slang
                 continue;
             }
 
+            if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize) && !isFromStdLib(decl))
+            {
+                // Force add IDefaultInitializableType to any struct missing (transitively) `IDefaultInitializableType`.
+                auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
+                if(!isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType, IsSubTypeOptions::NotReadyForLookup))
+                {
+                    InheritanceDecl* conformanceDecl = m_astBuilder->create<InheritanceDecl>();
+                    conformanceDecl->parentDecl = decl;
+                    conformanceDecl->loc = decl->loc;
+                    conformanceDecl->base.type = defaultInitializableType;
+                    conformanceDecl->nameAndLoc.name = getName("$inheritance");
+                    decl->members.add(conformanceDecl);
+                }
+            }
+
             // TODO: At this point we have the `baseDeclRef`
             // and could use it to perform further validity checks,
             // and/or to build up a more refined representation of
@@ -7491,6 +7552,14 @@ namespace Slang
         // expression. This would be a senario we need to
         // put the `ExpressionStmt` inside a `SeqStmt`.
         auto stmt = as<BlockStmt>(decl->body);
+        if (!stmt)
+        {
+            auto tmpExpr = decl->body;
+            auto blockStmt = m_astBuilder->create<BlockStmt>();
+            blockStmt->body = tmpExpr;
+            decl->body = blockStmt;
+            stmt = blockStmt;
+        }
         if (!as<SeqStmt>(stmt->body))
         {
             auto tmpExpr = stmt->body;
@@ -7541,6 +7610,21 @@ namespace Slang
             inheritanceDefaultCtorList.add(DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, true));
         }
         DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, false);
+
+        // ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if init expressions 
+        // of members are to be synthisised, they are.
+        bool isDefaultInitializableType = isSubtype(DeclRefType::create(m_astBuilder, structDecl), m_astBuilder->getDefaultInitializableType(), IsSubTypeOptions::None);
+        for (auto m : structDecl->members)
+        {
+            auto varDeclBase = as<VarDeclBase>(m);
+            if (!varDeclBase)
+                continue;
+            ensureDecl(m->getDefaultDeclRef(), DeclCheckState::DefaultConstructorReadyForUse);
+            if (!isDefaultInitializableType
+                || varDeclBase->initExpr)
+                continue;
+            varDeclBase->initExpr = constructDefaultInitExprForVar(this, varDeclBase);
+        }
 
         Index insertOffset = 0;
         Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
@@ -7596,8 +7680,11 @@ namespace Slang
             for (auto& m : structDecl->members)
             {
                 auto varDeclBase = as<VarDeclBase>(m);
+
+                // Static variables are initialized at start of runtime, not inside a constructor
                 if (!varDeclBase
-                    || !varDeclBase->initExpr)
+                    || !varDeclBase->initExpr
+                    || varDeclBase->hasModifier<HLSLStaticModifier>())
                     continue;
 
                 MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
@@ -10036,9 +10123,10 @@ namespace Slang
             // then the decl is using things that require conflicting set of capabilities, and we should diagnose an error.
             if (referencedDecl && decl)
             {
-                diagnoseCapabilityErrors(
+                maybeDiagnose(
                     visitor->getSink(),
                     visitor->getOptionSet(),
+                    DiagnosticCategory::Capability,
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToUseOfDecl,
                     referencedDecl,
@@ -10048,9 +10136,10 @@ namespace Slang
             }
             else if (decl)
             {
-                diagnoseCapabilityErrors(
+                maybeDiagnose(
                     visitor->getSink(),
                     visitor->getOptionSet(),
+                    DiagnosticCategory::Capability,
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToStatement,
                     nodeCaps,
@@ -10059,9 +10148,10 @@ namespace Slang
             }
             else
             {
-                diagnoseCapabilityErrors(
+                maybeDiagnose(
                     visitor->getSink(),
                     visitor->getOptionSet(),
+                    DiagnosticCategory::Capability,
                     referenceLoc,
                     Diagnostics::conflictingCapabilityDueToStatementEnclosingFunc,
                     nodeCaps,
@@ -10164,7 +10254,7 @@ namespace Slang
                 targetCap.join(bodyCap);
                 if (targetCap.isInvalid())
                 {
-                    diagnoseCapabilityErrors(Base::getSink(), outerContext.getOptionSet(), targetCase->body->loc, Diagnostics::conflictingCapabilityDueToStatement, bodyCap, "target_switch", oldCap);
+                    maybeDiagnose(Base::getSink(), outerContext.getOptionSet(), DiagnosticCategory::Capability, targetCase->body->loc, Diagnostics::conflictingCapabilityDueToStatement, bodyCap, "target_switch", oldCap);
                 }
                 set.unionWith(targetCap);
             }
@@ -10303,7 +10393,7 @@ namespace Slang
                 auto stageCaps = CapabilitySet(Profile(entryPointAttr->stage).getCapabilityName());
                 if (declaredCaps.isIncompatibleWith(stageCaps))
                 {
-                    diagnoseCapabilityErrors(getSink(), this->getOptionSet(), funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
+                    maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
                 }
                 else
                 {
@@ -10517,7 +10607,7 @@ namespace Slang
             printedDecls.add(declToPrint);
             if (auto provenance = declToPrint->capabilityRequirementProvenance.tryGetValue(atomToFind))
             {
-                diagnoseCapabilityErrors(sink, optionSet, provenance->referenceLoc, Diagnostics::seeUsingOf, provenance->referencedDecl);
+                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, provenance->referenceLoc, Diagnostics::seeUsingOf, provenance->referencedDecl);
                 declToPrint = provenance->referencedDecl;
                 if (printedDecls.contains(declToPrint))
                     break;
@@ -10538,7 +10628,7 @@ namespace Slang
         }
         if (declToPrint && !optionallyNeverPrintDecl)
         {
-            diagnoseCapabilityErrors(sink, optionSet, declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
+            maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
         }
     }
 
@@ -10567,7 +10657,7 @@ namespace Slang
             CapabilityAtom outFailedAtom{};
             if (hasTargetAtom(failedAtomsInsideAvailableSet, outFailedAtom))
             {
-                diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, Diagnostics::declHasDependenciesNotCompatibleOnTarget, decl, outFailedAtom);
+                maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, decl->loc, Diagnostics::declHasDependenciesNotCompatibleOnTarget, decl, outFailedAtom);
                 
                 // Anything defined on a non-failed target atom may be the culprit to why we fail having a target capability.
                 // Print out all possible culprits.
@@ -10578,7 +10668,7 @@ namespace Slang
                 
                 for (auto atom : targetsNotUsedSet)
                 {
-                    CapabilityAtom formattedAtom = (CapabilityAtom)atom;
+                    CapabilityAtom formattedAtom = asAtom(atom);
                     diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, true);
                 }
                 return;
@@ -10601,8 +10691,8 @@ namespace Slang
         // can come from multiple referenced items in a function body.
         for (auto i : failedAtomsInsideAvailableSet)
         {
-            CapabilityAtom formattedAtom = (CapabilityAtom)i;
-            diagnoseCapabilityErrors(getSink(), this->getOptionSet(), decl->loc, diagnosticInfo, decl, formattedAtom);
+            CapabilityAtom formattedAtom = asAtom(i);
+            maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, decl->loc, diagnosticInfo, decl, formattedAtom);
             // Print provenances.
             diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom);
         }

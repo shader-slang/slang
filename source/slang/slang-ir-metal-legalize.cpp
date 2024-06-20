@@ -5,9 +5,13 @@
 #include "slang-ir-util.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-specialize-address-space.h"
+#include "slang-parameter-binding.h"
+#include "slang-ir-legalize-varying-params.h"
 
 namespace Slang
 {
+    const UnownedStringSlice groupThreadIDString = UnownedStringSlice("sv_groupthreadid");
+
     struct EntryPointInfo
     {
         IRFunc* entryPointFunc;
@@ -229,13 +233,20 @@ namespace Slang
         bool isSpecial;
     };
 
-    MetalSystemValueInfo getSystemValueInfo(IRBuilder& builder, String semanticName, UInt attrIndex)
+    IRType* getGroupThreadIdType(IRBuilder& builder)
     {
-        SLANG_UNUSED(attrIndex);
+        return builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3));
+    }
+
+    MetalSystemValueInfo getSystemValueInfo(IRBuilder& builder, String inSemanticName)
+    {
+        inSemanticName = inSemanticName.toLower();
+
+        UnownedStringSlice semanticName;
+        UnownedStringSlice semanticIndex;
+        splitNameAndIndex(inSemanticName.getUnownedSlice(), semanticName, semanticIndex);
 
         MetalSystemValueInfo result = {};
-
-        semanticName = semanticName.toLower();
 
         if (semanticName == "sv_position")
         {
@@ -288,7 +299,8 @@ namespace Slang
         }
         else if (semanticName == "sv_groupid")
         {
-            result.isSpecial = true;
+            result.metalSystemValueName = toSlice("threadgroup_position_in_grid");
+            result.requiredType = builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3));
         }
         else if (semanticName == "sv_groupindex")
         {
@@ -297,7 +309,7 @@ namespace Slang
         else if (semanticName == "sv_groupthreadid")
         {
             result.metalSystemValueName = toSlice("thread_position_in_threadgroup");
-            result.requiredType = builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3));
+            result.requiredType = getGroupThreadIdType(builder);
         }
         else if (semanticName == "sv_gsinstanceid")
         {
@@ -365,9 +377,12 @@ namespace Slang
             result.requiredType = builder.getBasicType(BaseType::UInt);
             result.altRequiredType = builder.getBasicType(BaseType::UInt16);
         }
-        else if (semanticName == "sv_target")
+        else if (semanticName.startsWith("sv_target"))
         {
-            result.metalSystemValueName = (StringBuilder() << "color(" << String(attrIndex) << ")").produceString();
+            
+            result.metalSystemValueName = (StringBuilder() << "color("
+                << (semanticIndex.getLength() != 0 ? semanticIndex : toSlice("0"))
+                << ")").produceString();
         }
         else
         {
@@ -395,7 +410,7 @@ namespace Slang
             {
                 if (semanticDecor->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
                 {
-                    auto sysValInfo = getSystemValueInfo(builder, semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
+                    auto sysValInfo = getSystemValueInfo(builder, semanticDecor->getSemanticName());
                     if (sysValInfo.isUnsupported || sysValInfo.isSpecial)
                     {
                         reportUnsupportedSystemAttribute(sink, field, semanticDecor->getSemanticName());
@@ -629,10 +644,8 @@ namespace Slang
             UInt attrIndex;
         };
         List<SystemValLegalizationWorkItem> systemValWorkItems;
-        List<SystemValLegalizationWorkItem> workList;
 
         IRBuilder builder(entryPoint.entryPointFunc);
-        List<IRParam*> params;
 
         for (auto param : entryPoint.entryPointFunc->getParams())
         {
@@ -655,13 +668,16 @@ namespace Slang
             auto sysAttrIndex = sysValAttr->getIndex();
             systemValWorkItems.add({ param, semanticName, sysAttrIndex });
         }
-        for (auto workItem : systemValWorkItems)
+
+        IRParam* groupThreadId = nullptr;
+        for (auto index = 0; index < systemValWorkItems.getCount(); index++)
         {
+            auto workItem = systemValWorkItems[index];
+
             auto param = workItem.param;
             auto semanticName = workItem.attrName;
-            auto sysAttrIndex = workItem.attrIndex;
 
-            auto info = getSystemValueInfo(builder, semanticName, sysAttrIndex);
+            auto info = getSystemValueInfo(builder, semanticName);
             if (info.isSpecial)
             {
                 if (semanticName == "sv_innercoverage")
@@ -671,10 +687,62 @@ namespace Slang
                     param->replaceUsesWith(val);
                     param->removeAndDeallocate();
                 }
-                else
+                else if (semanticName == "sv_groupindex")
                 {
-                    // Process special cases after trivial cases.
-                    workList.add(workItem);
+                    // Ensure we have a cached "sv_groupthreadid"
+                    if (!groupThreadId)
+                    {
+                        for (auto i : systemValWorkItems)
+                        {
+                            if (i.attrName == groupThreadIDString)
+                            {
+                                groupThreadId = i.param;
+                            }
+                        }
+                        if (!groupThreadId)
+                        {
+                            // Add the missing groupthreadid needed to compute sv_groupindex
+                            IRBuilder groupThreadIdBuilder(builder);
+                            groupThreadIdBuilder.setInsertInto(entryPoint.entryPointFunc->getFirstBlock());
+                            groupThreadId = groupThreadIdBuilder.emitParamAtHead(getGroupThreadIdType(groupThreadIdBuilder));
+                            groupThreadIdBuilder.addNameHintDecoration(groupThreadId, groupThreadIDString);
+                            
+                            // Since "sv_groupindex" will be translated out to a global var and no longer be considered a system value
+                            // we can reuse its layout and semantic info
+                            Index foundRequiredDecorations = 0;
+                            IRLayoutDecoration* layoutDecoration = nullptr;
+                            UInt semanticIndex = 0;
+                            for (auto decoration : param->getDecorations())
+                            {
+                                if (auto layoutDecorationTmp = as<IRLayoutDecoration>(decoration))
+                                {
+                                    layoutDecoration = layoutDecorationTmp;
+                                    foundRequiredDecorations++;
+                                }
+                                else if (auto semanticDecoration = as<IRSemanticDecoration>(decoration))
+                                {
+                                    semanticIndex = semanticDecoration->getSemanticIndex();
+                                    groupThreadIdBuilder.addSemanticDecoration(groupThreadId, groupThreadIDString, (int)semanticIndex);
+                                    foundRequiredDecorations++;
+                                }
+                                if (foundRequiredDecorations >= 2)
+                                    break;
+                            }
+                            SLANG_ASSERT(layoutDecoration);
+                            layoutDecoration->removeFromParent();
+                            layoutDecoration->insertAtStart(groupThreadId);
+                            systemValWorkItems.add({ groupThreadId, groupThreadIDString, semanticIndex });
+                        }
+                    }
+
+                    IRBuilder svBuilder(builder.getModule());
+                    svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
+                    auto computeExtent = emitCalcGroupExtents(svBuilder, entryPoint.entryPointFunc, builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3)));
+                    auto groupIndexCalc = emitCalcGroupThreadIndex(svBuilder, groupThreadId, computeExtent);
+                    svBuilder.addNameHintDecoration(groupIndexCalc, UnownedStringSlice("sv_groupindex"));
+
+                    param->replaceUsesWith(groupIndexCalc);
+                    param->removeAndDeallocate();
                 }
             }
             if (info.isUnsupported)
@@ -725,6 +793,65 @@ namespace Slang
         legalizeDispatchMeshPayloadForMetal(entryPoint);
     }
 
+    void legalizeFuncBody(IRFunc* func)
+    {
+        IRBuilder builder(func);
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getModifiableChildren())
+            {
+                if (auto call = as<IRCall>(inst))
+                {
+                    ShortList<IRUse*> argsToFixup;
+                    // Metal doesn't support taking the address of a vector element.
+                    // If such an address is used as an argument to a call, we need to replace it with a temporary.
+                    // for example, if we see:
+                    // ```
+                    //     void foo(inout float x) { x = 1; }
+                    //     float4 v;
+                    //     foo(v.x);
+                    // ```
+                    // We need to transform it into:
+                    // ```
+                    //     float4 v;
+                    //     float temp = v.x;
+                    //     foo(temp);
+                    //     v.x = temp;
+                    // ```
+                    //
+                    for (UInt i = 0; i < call->getArgCount(); i++)
+                    {
+                        if (auto addr = as<IRGetElementPtr>(call->getArg(i)))
+                        {
+                            auto ptrType = addr->getBase()->getDataType();
+                            auto valueType = tryGetPointedToType(&builder, ptrType);
+                            if (!valueType)
+                                continue;
+                            if (as<IRVectorType>(valueType))
+                                argsToFixup.add(call->getArgs() + i);
+                        }
+                    }
+                    if (argsToFixup.getCount() == 0)
+                        continue;
+
+                    // Define temp vars for all args that need fixing up.
+                    for (auto arg : argsToFixup)
+                    {
+                        auto addr = as<IRGetElementPtr>(arg->get());
+                        auto ptrType = addr->getDataType();
+                        auto valueType = tryGetPointedToType(&builder, ptrType);
+                        builder.setInsertBefore(call);
+                        auto temp = builder.emitVar(valueType);
+                        auto initialValue = builder.emitLoad(valueType, addr);
+                        builder.emitStore(temp, initialValue);
+                        builder.setInsertAfter(call);
+                        builder.emitStore(addr, builder.emitLoad(valueType, temp));
+                        arg->set(temp);
+                    }
+                }
+            }
+        }
+    }
 
     void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
     {
@@ -740,6 +867,7 @@ namespace Slang
                     info.entryPointFunc = func;
                     entryPoints.add(info);
                 }
+                legalizeFuncBody(func);
             }
         }
 

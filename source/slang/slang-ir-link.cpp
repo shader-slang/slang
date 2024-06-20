@@ -1833,12 +1833,16 @@ LinkedIR linkIR(
         }
     }
 
+    bool shouldCopyGlobalParams = linkage->m_optionSet.getBoolOption(CompilerOptionName::PreserveParameters);
+
     for (IRModule* irModule : irModules)
     {
         for (auto inst : irModule->getGlobalInsts())
         {
-            // Is it (HLSL) `export` clone
-            if (_isHLSLExported(inst))
+            // We need to copy over exported symbols,
+            // and any global parameters if preserve-params option is set.
+            if (_isHLSLExported(inst) ||
+                shouldCopyGlobalParams && as<IRGlobalParam>(inst))
             {
                 auto cloned = cloneValue(context, inst);
                 if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))

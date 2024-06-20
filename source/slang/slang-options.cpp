@@ -289,6 +289,11 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Language,     "-lang", "-lang <language>", "Set the language for the following input files."},
         { OptionKind::MatrixLayoutColumn, "-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major."},
         { OptionKind::MatrixLayoutRow,"-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major."},
+        { OptionKind::RestrictiveCapabilityCheck,"-restrictive-capability-check", nullptr, "Many capability warnings will become an error."},
+        { OptionKind::ZeroInitialize, "-zero-initialize", nullptr, 
+        "Initialize all variables to zero."
+        "Structs will set all struct-fields without an init expression to 0."
+        "All variables will call their default constructor if not explicitly initialized as usual."},
         { OptionKind::IgnoreCapabilities,"-ignore-capabilities", nullptr, "Do not warn or error if capabilities are violated"},
         { OptionKind::MinimumSlangOptimization, "-minimum-slang-optimization", nullptr, "Perform minimum code optimization in Slang to favor compilation time."},
         { OptionKind::DisableNonEssentialValidations, "-disable-non-essential-validations", nullptr, "Disable non-essential IR validations such as use of uninitialized variables."},
@@ -347,6 +352,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::SourceEmbedLanguage, "-source-embed-language", "-source-embed-language <language>",
         "The language to be used for source embedding. Defaults to C/C++. Currently only C/C++ are supported"},
         { OptionKind::DisableShortCircuit, "-disable-short-circuit", nullptr, "Disable short-circuiting for \"&&\" and \"||\" operations" },
+        { OptionKind::UnscopedEnum, "-unscoped-enum", nullptr, "Treat enums types as unscoped by default."},
+        { OptionKind::PreserveParameters, "-preserve-params", nullptr, "Preserve all resource parameters in the output code, even if they are not used by the shader."}
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
@@ -1691,7 +1698,9 @@ SlangResult OptionsParser::_parse(
             case OptionKind::VulkanUseEntryPointName:
             case OptionKind::VulkanUseGLLayout:
             case OptionKind::VulkanEmitReflection:
+            case OptionKind::ZeroInitialize:
             case OptionKind::IgnoreCapabilities:
+            case OptionKind::RestrictiveCapabilityCheck:
             case OptionKind::MinimumSlangOptimization:
             case OptionKind::DisableNonEssentialValidations:
             case OptionKind::DisableSourceMap:
@@ -1704,7 +1713,9 @@ SlangResult OptionsParser::_parse(
             case OptionKind::NoHLSLBinding:
             case OptionKind::NoHLSLPackConstantBufferElements:
             case OptionKind::LoopInversion:
-                linkage->m_optionSet.set(optionKind, true); break;
+            case OptionKind::UnscopedEnum:
+            case OptionKind::PreserveParameters:
+                linkage->m_optionSet.set(optionKind, true);
                 break;
             case OptionKind::MatrixLayoutRow:
             case OptionKind::MatrixLayoutColumn:

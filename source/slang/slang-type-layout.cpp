@@ -1057,6 +1057,12 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 
             case ShaderParameterKind::TextureSampler:
             case ShaderParameterKind::MutableTextureSampler:
+            {
+                ObjectLayoutInfo info;
+                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*)));
+                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*)));
+                return info;
+            }
             case ShaderParameterKind::InputRenderTarget:
                 // TODO: how to handle these?
             default:
@@ -1447,11 +1453,11 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getTextureBufferRules()
 
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingInputRules()
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingOutputRules()
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
@@ -2035,8 +2041,6 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
     switch (targetProgram->getTargetReq()->getTarget())
     {
         case CodeGenTarget::GLSL:
-        case CodeGenTarget::GLSL_Vulkan:
-        case CodeGenTarget::GLSL_Vulkan_OneDesc:
             // If we aren't emitting directly we are going to output GLSL to feed to GLSLANG
         case CodeGenTarget::SPIRV:
         case CodeGenTarget::SPIRVAssembly:

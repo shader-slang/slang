@@ -11,8 +11,8 @@
 
 // CHECK:     struct vertexInput{{.*}}
 // CHECK-NEXT:{
-// CHECK-NEXT:    float4 position{{.*}} {{\[\[}}attribute(0){{\]\]}} {{\[\[}}user(POSITION){{\]\]}};
-// CHECK-NEXT:    float4 color{{.*}} {{\[\[}}attribute(1){{\]\]}} {{\[\[}}user(COLOR){{\]\]}};
+// CHECK-NEXT:    float4 position{{.*}} {{\[\[}}attribute(0){{\]\]}};
+// CHECK-NEXT:    float4 color{{.*}} {{\[\[}}attribute(1){{\]\]}};
 // CHECK-NEXT:};
 
 // CHECK: {{\[\[}}vertex{{\]\]}} VOut{{.*}} main_vertex(vertexInput{{.*}}{{\[\[}}stage_in{{\]\]}}, uint vid{{.*}}{{\[\[}}vertex_id{{\]\]}}, uint instanceID{{.*}} {{\[\[}}instance_id{{\]\]}})

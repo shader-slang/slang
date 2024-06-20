@@ -76,9 +76,10 @@ Result PipelineStateImpl::createMetalRenderPipelineState()
         }
     }
 
-    // Offset vertex buffer indices in vertex layout.
-    // They need to be in a range not used by other buffer bindings.
-    m_vertexBufferOffset = 10; // TODO get from layout
+    // Create a vertex descriptor with the vertex buffer binding indices being offset.
+    // They need to be in a range not used by any buffers in the root object layout.
+    // The +1 is to account for a potential constant buffer at index 0.
+    m_vertexBufferOffset = programImpl->m_rootObjectLayout->getBufferCount() + 1;
     auto inputLayoutImpl = static_cast<InputLayoutImpl*>(desc.graphics.inputLayout);
     NS::SharedPtr<MTL::VertexDescriptor> vertexDescriptor = inputLayoutImpl->createVertexDescriptor(m_vertexBufferOffset);
     pd->setVertexDescriptor(vertexDescriptor.get());
@@ -212,7 +213,18 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
 
 SLANG_NO_THROW Result SLANG_MCALL PipelineStateImpl::getNativeHandle(InteropHandle* outHandle)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    switch (desc.type)
+    {
+    case PipelineType::Compute:
+        outHandle->api = InteropHandleAPI::Metal;
+        outHandle->handleValue = reinterpret_cast<intptr_t>(m_computePipelineState.get());
+        return SLANG_OK;
+    case PipelineType::Graphics:
+        outHandle->api = InteropHandleAPI::Metal;
+        outHandle->handleValue = reinterpret_cast<intptr_t>(m_renderPipelineState.get());
+        return SLANG_OK;
+    }
+    return SLANG_FAIL;
 }
 
 RayTracingPipelineStateImpl::RayTracingPipelineStateImpl(DeviceImpl* device)

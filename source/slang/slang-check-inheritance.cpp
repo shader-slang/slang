@@ -417,7 +417,7 @@ namespace Slang
                     break;
                 auto rightBaseType = rightBase->origin.type;
 
-                if (visitor.isSubtype(leftBaseType, rightBaseType))
+                if (visitor.isSubtype(leftBaseType, rightBaseType, IsSubTypeOptions::None))
                 {
                     // If a type earlier in the list of bases is a subtype of
                     // one later in the list, then the ordering is consistent
@@ -427,7 +427,7 @@ namespace Slang
                     //
                     // TODO: decide whether to diagnose this case.
                 }
-                else if (visitor.isSubtype(rightBaseType, leftBaseType))
+                else if (visitor.isSubtype(rightBaseType, leftBaseType, IsSubTypeOptions::None))
                 {
                     // If a type later in the list is a subtype of a type earlier
                     // in the list, then the declared list of bases is inconsistent

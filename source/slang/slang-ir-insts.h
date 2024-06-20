@@ -328,6 +328,8 @@ IR_SIMPLE_DECORATION(VulkanHitObjectAttributesDecoration)
 
 IR_SIMPLE_DECORATION(PerVertexDecoration)
 
+IR_SIMPLE_DECORATION(SPIRVBlockDecoration)
+
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLVersionDecoration };
@@ -3190,7 +3192,10 @@ struct IRSPIRVAsmInst : IRInst
 
     IRSPIRVAsmOperand* getOpcodeOperand()
     {
-        const auto opcodeOperand = cast<IRSPIRVAsmOperand>(getOperand(0));
+        auto operand = getOperand(0);
+        if (auto globalRef = as<IRGlobalValueRef>(operand))
+            operand = globalRef->getValue();
+        const auto opcodeOperand = cast<IRSPIRVAsmOperand>(operand);
         // This must be either:
         // - An enum, such as 'OpNop'
         // - The __truncate pseudo-instruction
@@ -3921,6 +3926,9 @@ public:
     IRInst* emitOutImplicitCast(IRInst* type, IRInst* value);
     IRInst* emitInOutImplicitCast(IRInst* type, IRInst* value);
 
+    IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* value);
+    IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* alignment, IRInst* value);
+
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
@@ -4337,6 +4345,13 @@ public:
     IRDecoration* addDecoration(IRInst* value, IROp op)
     {
         return addDecoration(value, op, (IRInst* const*) nullptr, 0);
+    }
+
+    IRDecoration* addDecorationIfNotExist(IRInst* value, IROp op)
+    {
+        if (auto decor = value->findDecorationImpl(op))
+            return decor;
+        return addDecoration(value, op);
     }
 
     IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* operand)

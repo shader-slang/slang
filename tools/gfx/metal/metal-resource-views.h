@@ -41,6 +41,7 @@ public:
     {}
     ~TextureResourceViewImpl();
     RefPtr<TextureResourceImpl> m_texture;
+    NS::SharedPtr<MTL::Texture> m_textureView;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };

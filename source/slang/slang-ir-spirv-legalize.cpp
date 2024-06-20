@@ -137,9 +137,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
         builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
         if (m_sharedContext->isSpirv14OrLater())
-            builder.addDecoration(structType, kIROp_SPIRVBlockDecoration);
+            builder.addDecorationIfNotExist(structType, kIROp_SPIRVBlockDecoration);
         else
-            builder.addDecoration(structType, kIROp_SPIRVBufferBlockDecoration);
+            builder.addDecorationIfNotExist(structType, kIROp_SPIRVBufferBlockDecoration);
 
         result.structType = structType;
         result.arrayKey = arrayKey;
@@ -594,7 +594,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 {
                     innerType = wrapConstantBufferElement(inst);
                 }
-                builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
+                builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
                 
                 auto varLayoutInst = inst->findDecoration<IRLayoutDecoration>();
                 if (paramBlockType)
@@ -650,12 +650,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 innerType = glslShaderStorageBufferType->getElementType();
                 if (m_sharedContext->isSpirv14OrLater())
                 {
-                    builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
+                    builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
                     storageClass = SpvStorageClassStorageBuffer;
                 }
                 else
                 {
-                    builder.addDecoration(innerType, kIROp_SPIRVBufferBlockDecoration);
+                    builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBufferBlockDecoration);
                     storageClass = SpvStorageClassUniform;
                 }
                 needLoad = false;
@@ -1690,143 +1690,194 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     }
 
-    // Opcodes that can exist in global scope, as long as the operands are.
-    bool isLegalGlobalInst(IRInst* inst)
+    struct GlobalInstInliningContext
     {
-        switch (inst->getOp())
-        {
-        case kIROp_MakeStruct:
-        case kIROp_MakeArray:
-        case kIROp_MakeArrayFromElement:
-        case kIROp_MakeVector:
-        case kIROp_MakeMatrix:
-        case kIROp_MakeMatrixFromScalar:
-        case kIROp_MakeVectorFromScalar:
-            return true;
-        default:
-            return false;
-        }
-    }
+        Dictionary<IRInst*, bool> m_mapGlobalInstToShouldInline;
 
-    // Opcodes that can be inlined into function bodies.
-    bool isInlinableGlobalInst(IRInst* inst)
-    {
-        switch (inst->getOp())
-        {
-        case kIROp_Add:
-        case kIROp_Sub:
-        case kIROp_Mul:
-        case kIROp_FRem:
-        case kIROp_IRem:
-        case kIROp_Lsh:
-        case kIROp_Rsh:
-        case kIROp_And:
-        case kIROp_Or:
-        case kIROp_Not:
-        case kIROp_Neg:
-        case kIROp_Div:
-        case kIROp_FieldExtract:
-        case kIROp_FieldAddress:
-        case kIROp_GetElement:
-        case kIROp_GetElementPtr:
-        case kIROp_GetOffsetPtr:
-        case kIROp_UpdateElement:
-        case kIROp_MakeTuple:
-        case kIROp_GetTupleElement:
-        case kIROp_MakeStruct:
-        case kIROp_MakeArray:
-        case kIROp_MakeArrayFromElement:
-        case kIROp_MakeVector:
-        case kIROp_MakeMatrix:
-        case kIROp_MakeMatrixFromScalar:
-        case kIROp_MakeVectorFromScalar:
-        case kIROp_swizzle:
-        case kIROp_swizzleSet:
-        case kIROp_MatrixReshape:
-        case kIROp_MakeString:
-        case kIROp_MakeResultError:
-        case kIROp_MakeResultValue:
-        case kIROp_GetResultError:
-        case kIROp_GetResultValue:
-        case kIROp_CastFloatToInt:
-        case kIROp_CastIntToFloat:
-        case kIROp_CastIntToPtr:
-        case kIROp_PtrCast:
-        case kIROp_CastPtrToBool:
-        case kIROp_CastPtrToInt:
-        case kIROp_BitAnd:
-        case kIROp_BitNot:
-        case kIROp_BitOr:
-        case kIROp_BitXor:
-        case kIROp_BitCast:
-        case kIROp_IntCast:
-        case kIROp_FloatCast:
-        case kIROp_Greater:
-        case kIROp_Less:
-        case kIROp_Geq:
-        case kIROp_Leq:
-        case kIROp_Neq:
-        case kIROp_Eql:
-        case kIROp_Call:
-        case kIROp_SPIRVAsm:
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    bool shouldInlineInst(IRInst* inst)
-    {
-        if (!isInlinableGlobalInst(inst))
-            return false;
-        if (isLegalGlobalInst(inst))
-        {
-            for (UInt i = 0; i < inst->getOperandCount(); i++)
-                if (shouldInlineInst(inst->getOperand(i)))
-                    return true;
-            return false;
-        }
-        return true;
-    }
-
-    /// Inline `inst` in the local function body so they can be emitted as a local inst.
-    ///
-    IRInst* maybeInlineGlobalValue(IRBuilder& builder, IRInst* inst, IRCloneEnv& cloneEnv)
-    {
-        if (!shouldInlineInst(inst))
+        // Opcodes that can exist in global scope, as long as the operands are.
+        bool isLegalGlobalInst(IRInst* inst)
         {
             switch (inst->getOp())
             {
-            case kIROp_Func:
-            case kIROp_Specialize:
-            case kIROp_Generic:
-            case kIROp_LookupWitness:
-                return inst;
+            case kIROp_MakeStruct:
+            case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
+            case kIROp_MakeVector:
+            case kIROp_MakeMatrix:
+            case kIROp_MakeMatrixFromScalar:
+            case kIROp_MakeVectorFromScalar:
+                return true;
+            default:
+                if (as<IRConstant>(inst))
+                    return true;
+                if (as<IRSPIRVAsmOperand>(inst))
+                    return true;
+                return false;
             }
-            if (as<IRType>(inst))
-                return inst;
+        }
 
-            // If we encounter a global value that shouldn't be inlined, e.g. a const literal,
-            // we should insert a GlobalValueRef() inst to wrap around it, so all the dependent uses
-            // can be pinned to the function body.
-            auto result = builder.emitGlobalValueRef(inst);
-            cloneEnv.mapOldValToNew[inst] = result;
+        // Opcodes that can be inlined into function bodies.
+        bool isInlinableGlobalInst(IRInst* inst)
+        {
+            switch (inst->getOp())
+            {
+            case kIROp_Add:
+            case kIROp_Sub:
+            case kIROp_Mul:
+            case kIROp_FRem:
+            case kIROp_IRem:
+            case kIROp_Lsh:
+            case kIROp_Rsh:
+            case kIROp_And:
+            case kIROp_Or:
+            case kIROp_Not:
+            case kIROp_Neg:
+            case kIROp_Div:
+            case kIROp_FieldExtract:
+            case kIROp_FieldAddress:
+            case kIROp_GetElement:
+            case kIROp_GetElementPtr:
+            case kIROp_GetOffsetPtr:
+            case kIROp_UpdateElement:
+            case kIROp_MakeTuple:
+            case kIROp_GetTupleElement:
+            case kIROp_MakeStruct:
+            case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
+            case kIROp_MakeVector:
+            case kIROp_MakeMatrix:
+            case kIROp_MakeMatrixFromScalar:
+            case kIROp_MakeVectorFromScalar:
+            case kIROp_swizzle:
+            case kIROp_swizzleSet:
+            case kIROp_MatrixReshape:
+            case kIROp_MakeString:
+            case kIROp_MakeResultError:
+            case kIROp_MakeResultValue:
+            case kIROp_GetResultError:
+            case kIROp_GetResultValue:
+            case kIROp_CastFloatToInt:
+            case kIROp_CastIntToFloat:
+            case kIROp_CastIntToPtr:
+            case kIROp_PtrCast:
+            case kIROp_CastPtrToBool:
+            case kIROp_CastPtrToInt:
+            case kIROp_BitAnd:
+            case kIROp_BitNot:
+            case kIROp_BitOr:
+            case kIROp_BitXor:
+            case kIROp_BitCast:
+            case kIROp_IntCast:
+            case kIROp_FloatCast:
+            case kIROp_Greater:
+            case kIROp_Less:
+            case kIROp_Geq:
+            case kIROp_Leq:
+            case kIROp_Neq:
+            case kIROp_Eql:
+            case kIROp_Call:
+            case kIROp_SPIRVAsm:
+                return true;
+            default:
+                if (as<IRSPIRVAsmInst>(inst))
+                    return true;
+                if (as<IRSPIRVAsmOperand>(inst))
+                    return true;
+                return false;
+            }
+        }
+
+        bool shouldInlineInstImpl(IRInst* inst)
+        {
+            if (!isInlinableGlobalInst(inst))
+                return false;
+            if (isLegalGlobalInst(inst))
+            {
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    if (shouldInlineInst(inst->getOperand(i)))
+                        return true;
+                return false;
+            }
+            return true;
+        }
+
+        bool shouldInlineInst(IRInst* inst)
+        {
+            bool result = false;
+            if (m_mapGlobalInstToShouldInline.tryGetValue(inst, result))
+                return result;
+            result = shouldInlineInstImpl(inst);
+            m_mapGlobalInstToShouldInline[inst] = result;
             return result;
         }
 
-        // If the global value is inlinable, we make all its operands avaialble locally, and then copy it
-        // to the local scope.
-        ShortList<IRInst*> args;
-        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        IRInst* inlineInst(IRBuilder& builder, IRCloneEnv& cloneEnv, IRInst* inst)
         {
-            auto operand = inst->getOperand(i);
-            auto inlinedOperand = maybeInlineGlobalValue(builder, operand, cloneEnv);
-            args.add(inlinedOperand);
+            IRInst* result;
+            if (cloneEnv.mapOldValToNew.tryGetValue(inst, result))
+                return result;
+
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                auto operand = inst->getOperand(i);
+                IRBuilder operandBuilder(builder);
+                setInsertBeforeOutsideASM(operandBuilder, builder.getInsertLoc().getInst());
+                maybeInlineGlobalValue(operandBuilder, inst, operand, cloneEnv);
+            }
+            result = cloneInstAndOperands(&cloneEnv, &builder, inst);
+            cloneEnv.mapOldValToNew[inst] = result;
+            IRBuilder subBuilder(builder);
+            subBuilder.setInsertInto(result);
+            for (auto child : inst->getDecorations())
+            {
+                cloneInst(&cloneEnv, &subBuilder, child);
+            }
+            for (auto child : inst->getChildren())
+            {
+                inlineInst(subBuilder, cloneEnv, child);
+            }
+            return result;
         }
-        auto result = cloneInst(&cloneEnv, &builder, inst);
-        cloneEnv.mapOldValToNew[inst] = result;
-        return result;
-    }
+
+        /// Inline `inst` in the local function body so they can be emitted as a local inst.
+        ///
+        IRInst* maybeInlineGlobalValue(IRBuilder& builder, IRInst* user, IRInst* inst, IRCloneEnv& cloneEnv)
+        {
+            if (!shouldInlineInst(inst))
+            {
+                switch (inst->getOp())
+                {
+                case kIROp_Func:
+                case kIROp_Specialize:
+                case kIROp_Generic:
+                case kIROp_LookupWitness:
+                    return inst;
+                }
+                if (as<IRType>(inst))
+                    return inst;
+
+                // If we encounter a global value that shouldn't be inlined, e.g. a const literal,
+                // we should insert a GlobalValueRef() inst to wrap around it, so all the dependent uses
+                // can be pinned to the function body.
+                auto result = inst;
+                bool shouldWrapGlobalRef = true;
+                if (!isLegalGlobalInst(user) && !getIROpInfo(user->getOp()).isHoistable())
+                    shouldWrapGlobalRef = false;
+                else if (as<IRSPIRVAsmOperand>(user) && as<IRSPIRVAsmOperandInst>(user))
+                    shouldWrapGlobalRef = false;
+                else if (as<IRSPIRVAsmInst>(user))
+                    shouldWrapGlobalRef = false;
+                if (shouldWrapGlobalRef)
+                    result = builder.emitGlobalValueRef(inst);
+                cloneEnv.mapOldValToNew[inst] = result;
+                return result;
+            }
+
+            // If the global value is inlinable, we make all its operands avaialble locally, and then copy it
+            // to the local scope.
+            return inlineInst(builder, cloneEnv, inst);
+        }
+    };
 
     void processBranch(IRInst* branch)
     {
@@ -2079,7 +2130,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    void setInsertBeforeOutsideASM(IRBuilder& builder, IRInst* beforeInst)
+    static void setInsertBeforeOutsideASM(IRBuilder& builder, IRInst* beforeInst)
     {
         auto parent = beforeInst->getParent();
         while (parent)
@@ -2105,25 +2156,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto spirvAtom = ((CapabilityName)atom);
                 switch (spirvAtom)
                 {
-                case CapabilityName::spirv_1_0:
+                case CapabilityName::_spirv_1_0:
                     m_sharedContext->requireSpirvVersion(0x10000);
                     break;
-                case CapabilityName::spirv_1_1:
+                case CapabilityName::_spirv_1_1:
                     m_sharedContext->requireSpirvVersion(0x10100);
                     break;
-                case CapabilityName::spirv_1_2:
+                case CapabilityName::_spirv_1_2:
                     m_sharedContext->requireSpirvVersion(0x10200);
                     break;
-                case CapabilityName::spirv_1_3:
+                case CapabilityName::_spirv_1_3:
                     m_sharedContext->requireSpirvVersion(0x10300);
                     break;
-                case CapabilityName::spirv_1_4:
+                case CapabilityName::_spirv_1_4:
                     m_sharedContext->requireSpirvVersion(0x10400);
                     break;
-                case CapabilityName::spirv_1_5:
+                case CapabilityName::_spirv_1_5:
                     m_sharedContext->requireSpirvVersion(0x10500);
                     break;
-                case CapabilityName::spirv_1_6:
+                case CapabilityName::_spirv_1_6:
                     m_sharedContext->requireSpirvVersion(0x10600);
                     break;
                 case CapabilityName::SPV_EXT_demote_to_helper_invocation:
@@ -2234,6 +2285,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Inline global values that can't represented by SPIRV constant inst
         // to their use sites.
         List<IRUse*> globalInstUsesToInline;
+        GlobalInstInliningContext globalInstInliningContext;
 
         for (auto globalInst : m_module->getGlobalInsts())
         {
@@ -2248,7 +2300,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 sortBlocksInFunc(func);
             }
             
-            if (isInlinableGlobalInst(globalInst))
+            if (globalInstInliningContext.isInlinableGlobalInst(globalInst))
             {
                 for (auto use = globalInst->firstUse; use; use = use->nextUse)
                 {
@@ -2264,7 +2316,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(user);
             setInsertBeforeOutsideASM(builder, user);
             IRCloneEnv cloneEnv;
-            auto val = maybeInlineGlobalValue(builder, use->get(), cloneEnv);
+            auto val = globalInstInliningContext.maybeInlineGlobalValue(builder, use->getUser(), use->get(), cloneEnv);
             if (val != use->get())
                 builder.replaceOperand(use, val);
         }

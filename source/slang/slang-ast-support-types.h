@@ -67,7 +67,7 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, DeclRefBase* declRefBase);
     void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType);
     void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& set);
-
+    void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& set);
 
     struct QualifiedDeclPath
     {
@@ -466,6 +466,7 @@ namespace Slang
             /// functions, so it belongs in the last phase of checking.
             ///
         DefinitionChecked,
+        DefaultConstructorReadyForUse = DefinitionChecked,
 
             /// The capabilities required by the decl is infered and validated.
             ///
@@ -1601,6 +1602,8 @@ namespace Slang
     /// The kind of a builtin interface requirement that can be automatically synthesized.
     enum class BuiltinRequirementKind
     {
+        DefaultInitializableConstructor, ///< The `IDefaultInitializable.__init()` method
+
         DifferentialType, ///< The `IDifferentiable.Differential` associated type requirement 
         DZeroFunc, ///< The `IDifferentiable.dzero` function requirement 
         DAddFunc, ///< The `IDifferentiable.dadd` function requirement 

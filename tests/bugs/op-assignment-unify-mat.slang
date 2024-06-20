@@ -1,4 +1,4 @@
-// We can't test on VK, as currently we don't support integer matrix types
+// We can't test on VK or metal, as currently we don't support integer matrix types
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -vk
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -cpu

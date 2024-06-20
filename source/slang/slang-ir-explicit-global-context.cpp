@@ -464,11 +464,15 @@ struct IntroduceExplicitGlobalContextPass
         for( IRUse* use = globalVar->firstUse; use; use = nextUse )
         {
             nextUse = use->nextUse;
+            auto user = use->getUser();
+
+            // Ensure the use site checked actually requires a replacement
+            if (as<IRDecoration>(user))
+                continue;
 
             // At each use site, we need to look up the context
             // pointer that is appropriate for that use.
             //
-            auto user = use->getUser();
             auto contextParam = findOrCreateContextPtrForInst(user);
             builder.setInsertBefore(user);
 

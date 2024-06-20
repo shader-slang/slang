@@ -32,10 +32,10 @@ static inline Index bitscanForward(uint64_t in)
 #else
     uint32_t out;
     // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
-    if (_BitScanForward((unsigned long*)&out, *(((uint32_t*)&in) + 1)))
+    if (_BitScanForward((unsigned long*)&out, *(((uint32_t*)&in))))
         return Index(out);
-    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)));
-    return Index(out);
+    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)+1));
+    return Index(out)+32;
 #endif// #ifdef _WIN64
 
 #else 
