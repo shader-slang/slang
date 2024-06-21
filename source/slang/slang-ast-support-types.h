@@ -167,10 +167,6 @@ namespace Slang
         kConversionCost_ScalarToMatrix = 10,
         kConversionCost_ScalarIntegerToFloatMatrix = kConversionCost_IntegerToFloatConversion + kConversionCost_ScalarToMatrix,
 
-        // Additional conversion cost to add when casting matrix to vector and vise versa, 1/2 loads, 1/2 stores
-        kConversionCost_MatrixToVector = 3,
-        kConversionCost_VectorToMatrix = 3,
-
         // Additional cost when casting an LValue.
         kConversionCost_LValueCast = 800,
 

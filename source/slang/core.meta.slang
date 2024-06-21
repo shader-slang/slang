@@ -1218,7 +1218,6 @@ __generic<T>
 extension vector<T, 4>
 {
     __generic<let L : int>
-    __implicit_conversion($(kConversionCost_MatrixToVector))
     [__unsafeForceInlineEarly]
     __init(matrix<T, 2, 2, L> value)
     {
@@ -1228,7 +1227,6 @@ extension vector<T, 4>
 __generic<T, let L : int>
 extension matrix<T, 2, 2, L>
 {
-    __implicit_conversion($(kConversionCost_VectorToMatrix))
     [__unsafeForceInlineEarly]
     __init(vector<T, 4> value)
     {
