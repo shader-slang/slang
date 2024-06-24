@@ -27,5 +27,5 @@ void legalizeConstantBufferLoadForGLSL(IRModule* module);
 
 void legalizeDispatchMeshPayloadForGLSL(IRModule* module);
 
-void legalizeGenericResourceArraysForGLSL(CodeGenContext* context, IRModule* module);
+void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module);
 }

@@ -3729,58 +3729,96 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
     });
 }
 
-void legalizeGenericResourceArraysForGLSL(CodeGenContext* context, IRModule* module)
+void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
 {
-    List<IRInst*> toRemove;
+    List<IRGlobalParam*> toRemove;
     Dictionary<IRType*, IRGlobalParam*> aliasedParams;
     IRBuilder builder(module);
+
+    auto getAliasedParam = [&](IRGlobalParam* baseParam, IRType* type)
+    {
+        IRGlobalParam* param;
+
+        if (!aliasedParams.tryGetValue(type, param))
+        {
+            param = builder.createGlobalParam(type);
+
+            for (auto decoration : baseParam->getDecorations())
+                cloneDecoration(decoration, param);
+
+            aliasedParams[type] = param;
+        }
+        return param;
+    };
 
     for (auto inst : module->getGlobalInsts())
     {
         auto param = as<IRGlobalParam>(inst);
 
-        if (!param || param->getFullType()->getOp() != kIROp_GenericResourceArrayType)
+        if (!param)
             continue;
 
-        traverseUsers(param, [&](IRInst* user) {
-            builder.setInsertBefore(user);
+        // We are only interested in parameters involving `DynamicResource`, or arrays of it.
+        auto arrayType = as<IRArrayTypeBase>(param->getDataType());
+        auto type = arrayType ? arrayType->getElementType() : param->getDataType();
 
-            // Replace intrinsic with an array access to the appropriate parameter alias.
-            if (user->getOp() == kIROp_GetGenericResourceArrayElement)
+        if (!as<IRDynamicResourceType>(type))
+            continue;
+
+        // Try to rewrite all uses leading to `CastDynamicResource`.
+        // Later, we will diagnose an error if the parameter still has uses.
+        traverseUsers(param, [&](IRInst* user)
+        {
+            if (user->getOp() == kIROp_CastDynamicResource && !arrayType)
             {
-                IRType* resourceType = user->getFullType();
-                IRGlobalParam* resourceParam;
+                builder.setInsertBefore(user);
 
-                if (!aliasedParams.tryGetValue(resourceType, resourceParam))
-                {
-                    resourceParam = builder.createGlobalParam(builder.getUnsizedArrayType(resourceType));
-
-                    for (auto decoration : param->getDecorations())
-                        cloneDecoration(decoration, resourceParam);
-
-                    aliasedParams[resourceType] = resourceParam;
-                }
-
-                auto newAccess = builder.emitElementExtract(resourceType, resourceParam, user->getOperand(1));
-                user->replaceUsesWith(newAccess);
+                user->replaceUsesWith(getAliasedParam(param, user->getDataType()));
                 user->removeAndDeallocate();
             }
-            else
+            else if (user->getOp() == kIROp_GetElement && arrayType)
             {
-                context->getSink()->diagnose(user, Diagnostics::ambiguousReference, param);
+                traverseUsers(user, [&](IRInst* elementUser)
+                {
+                    if (elementUser->getOp() == kIROp_CastDynamicResource)
+                    {
+                        builder.setInsertBefore(elementUser);
 
-                user->replaceUsesWith(builder.emitUndefined(param->getFullType()));
-                user->removeAndDeallocate();
+                        auto paramType = builder.getArrayTypeBase(
+                            arrayType->getOp(),
+                            elementUser->getDataType(),
+                            arrayType->getElementCount());
+
+                        auto newAccess = builder.emitElementExtract(
+                            paramType->getElementType(),
+                            getAliasedParam(param, paramType),
+                            user->getOperand(1));
+
+                        elementUser->replaceUsesWith(newAccess);
+                        elementUser->removeAndDeallocate();
+                    }
+                });
+
+                if (!user->hasUses())
+                {
+                    user->removeAndDeallocate();
+                }
             }
         });
-        
         toRemove.add(param);
     }
 
     // Remove unused parameters later to avoid invalidating iterator.
-    for (auto inst : toRemove)
+    for (auto param : toRemove)
     {
-        inst->removeAndDeallocate();
+        if (!param->hasUses())
+        {
+            param->removeAndDeallocate();
+        }
+        else
+        {
+            context->getSink()->diagnose(param->firstUse->getUser(), Diagnostics::ambiguousReference, param);
+        }
     }
 }
 

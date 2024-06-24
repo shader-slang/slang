@@ -211,14 +211,9 @@ class PointerLikeType : public BuiltinGenericType
     SLANG_AST_CLASS(PointerLikeType)
 };
 
-class GenericResourceArrayType : public BuiltinType
+class DynamicResourceType : public BuiltinType
 {
-    SLANG_AST_CLASS(GenericResourceArrayType)
-};
-
-class DynamicResourceEntryType : public BuiltinType
-{
-    SLANG_AST_CLASS(DynamicResourceEntryType)
+    SLANG_AST_CLASS(DynamicResourceType)
 };
 
 // HLSL buffer-type resources

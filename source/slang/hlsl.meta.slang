@@ -19889,3 +19889,50 @@ struct ConstBufferPointer
         }
     }
 }
+
+//
+// HLSL-like dynamic resources
+// https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html
+//
+// For Khronos targets, `__DynamicResource` can be used to declare "untyped" global bindings as
+// usual (e.g. unsized arrays for descriptor indexing), which will then be materialized into 
+// new aliased bindings for each distinct cast type.
+//
+
+__magic_type(DynamicResourceType)
+__intrinsic_type($(kIROp_DynamicResourceType))
+struct __DynamicResource<let kind = __DynamicResourceKind.General>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    T as<T : __IDynamicResourceCastable<kind>>();
+}
+interface __IDynamicResourceCastable<let kind = __DynamicResourceKind.General>
+{
+}
+
+enum __DynamicResourceKind
+{
+    General = 0, // CBV_SRV_UAV
+    Sampler = 1
+}
+
+__generic<T, Shape : __ITextureShape, let isArray : int, let isMS : int, let sampleCount : int, let access : int, let isShadow : int, let isCombined : int, let format : int>
+extension __TextureImpl<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format> : __IDynamicResourceCastable<__DynamicResourceKind.General>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+}
+
+extension SamplerState : __IDynamicResourceCastable<__DynamicResourceKind.Sampler>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+}
+extension SamplerComparisonState : __IDynamicResourceCastable<__DynamicResourceKind.Sampler>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+}

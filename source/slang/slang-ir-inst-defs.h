@@ -135,10 +135,6 @@ INST(Nop, nop, 0, 0)
         INST(SamplerComparisonStateType, SamplerComparisonState, 0, HOISTABLE)
     INST_RANGE(SamplerStateTypeBase, SamplerStateType, SamplerComparisonStateType)
 
-    // Unbounded resource descriptor array that allows for generic indexing.
-    INST(GenericResourceArrayType, GenericResourceArray, 0, HOISTABLE)
-    INST(DynamicResourceEntryType, DynamicResourceEntry, 0, HOISTABLE)
-
     INST(DefaultBufferLayoutType, DefaultLayout, 0, HOISTABLE)
     INST(Std140BufferLayoutType, Std140Layout, 0, HOISTABLE)
     INST(Std430BufferLayoutType, Std430Layout, 0, HOISTABLE)
@@ -226,6 +222,9 @@ INST(Nop, nop, 0, 0)
 
 INST(RayQueryType, RayQuery, 1, HOISTABLE)
 INST(HitObjectType, HitObject, 0, HOISTABLE)
+
+// Opaque type that can be dynamically cast to other resource types.
+INST(DynamicResourceType, DynamicResource, 0, HOISTABLE)
 
 // A user-defined structure declaration at the IR level.
 // Unlike in the AST where there is a distinction between
@@ -407,7 +406,7 @@ INST(GetElementPtr, getElementPtr, 2, 0)
 INST(GetOffsetPtr, getOffsetPtr, 2, 0) 
 INST(GetAddr, getAddr, 1, 0)
 
-INST(GetGenericResourceArrayElement, getGenericResourceArrayElement, 2, HOISTABLE)
+INST(CastDynamicResource, castDynamicResource, 1, 0)
 
 // Get an unowned NativeString from a String.
 INST(getNativeStr, getNativeStr, 1, 0)

@@ -4340,12 +4340,7 @@ static TypeLayoutResult _createTypeLayout(
 
         return result;
     }
-    else if (auto resourceArrayType = as<GenericResourceArrayType>(type))
-    {
-        auto elemType = context.astBuilder->getSpecializedBuiltinType(nullptr, "DynamicResourceEntryType");
-        return createArrayLikeTypeLayout(context, resourceArrayType, elemType, nullptr);
-    }
-    else if (auto resourceEntryType = as<DynamicResourceEntryType>(type))
+    else if (auto dynamicResourceType = as<DynamicResourceType>(type))
     {
         return createSimpleTypeLayout(
             SimpleLayoutInfo(LayoutResourceKind::DescriptorTableSlot, 1),

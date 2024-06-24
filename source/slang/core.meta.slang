@@ -1537,31 +1537,6 @@ struct SamplerComparisonState
 {
 }
 
-__magic_type(GenericResourceArrayType)
-__intrinsic_type($(kIROp_GenericResourceArrayType))
-struct __ResourceArray<let kind : __IndexableResourceKind> 
-{
-    __intrinsic_op($(kIROp_GetGenericResourceArrayElement))
-    T get<T : __IIndexableResource<kind>>(int index);
-}
-__magic_type(DynamicResourceEntryType)
-__intrinsic_type($(kIROp_DynamicResourceEntryType))
-struct __DynamicResource
-{
-}
-enum __IndexableResourceKind
-{
-    Resource = 0,
-    Sampler = 1
-}
-interface __IIndexableResource<let kind : __IndexableResourceKind> { }
-
-__generic<T, Shape : __ITextureShape, let isArray : int, let isMS : int, let sampleCount : int, let access : int, let isShadow : int, let isCombined : int, let format : int>
-extension __TextureImpl<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format> : __IIndexableResource<__IndexableResourceKind.Resource> { }
-
-extension SamplerState : __IIndexableResource<__IndexableResourceKind.Sampler> { }
-extension SamplerComparisonState : __IIndexableResource<__IndexableResourceKind.Sampler> { }
-
 //@ hidden:
 
 ${{{{

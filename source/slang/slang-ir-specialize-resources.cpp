@@ -58,14 +58,6 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         if(as<IRUniformParameterGroupType>(type))
             return true;
 
-        // ResourceArrays are opaque placeholders for descriptor
-        // binding variables. The later specialization pass requires
-        // all uses to directly reference the source variable, so
-        // we'll need to specialize them to uncover indirections.
-        //
-        if(type->getOp() == kIROp_GenericResourceArrayType)
-            return true;
-
         // For GL/Vulkan targets, we also need to specialize
         // any parameters that use structured or byte-addressed
         // buffers or images with format qualifiers.
@@ -1253,6 +1245,8 @@ bool isIllegalGLSLParameterType(IRType* type)
     if (as<IRMeshOutputType>(type))
         return true;
     if (as<IRHLSLStreamOutputType>(type))
+        return true;
+    if (as<IRDynamicResourceType>(type))
         return true;
     return false;
 }
