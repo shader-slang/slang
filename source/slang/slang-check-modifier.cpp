@@ -476,7 +476,24 @@ namespace Slang
         }
         else if (auto inputAttachmentIndexLayoutAttribute = as<GLSLInputAttachmentIndexLayoutAttribute>(attr))
         {
-            if (!as<SubpassInputType>(attrTarget))
+            VarDecl* varDecl = as<VarDecl>(attrTarget);
+            bool isSubpassType = false;
+            // Attributes do not have type information.
+            // Here we must check the type expression to validate attribute usage.
+            if (varDecl->type.exp)
+            {
+                if (DeclRefExpr* declRefType = as<DeclRefExpr>(CheckTerm(varDecl->type.exp)))
+                {
+                    auto genericDecl = as<GenericDecl>(declRefType->declRef.getDecl());
+                    if (genericDecl 
+                        && as<TypeAliasDecl>(genericDecl->inner) 
+                        && as<SubpassInputType>(as<TypeAliasDecl>(genericDecl->inner)->type))
+                    {
+                        isSubpassType = true;
+                    }
+                }
+            }
+            if (!isSubpassType)
             {
                 getSink()->diagnose(attr, Diagnostics::InputAttachmentIndexOnlyAllowedOnSubpass, attr);
                 return false;
