@@ -476,6 +476,12 @@ namespace Slang
         }
         else if (auto inputAttachmentIndexLayoutAttribute = as<GLSLInputAttachmentIndexLayoutAttribute>(attr))
         {
+            if (!as<SubpassInputType>(attrTarget))
+            {
+                getSink()->diagnose(attr, Diagnostics::InputAttachmentIndexOnlyAllowedOnSubpass, attr);
+                return false;
+            }
+
             if (attr->args.getCount() != 1)
                 return false;
     
@@ -1343,6 +1349,14 @@ namespace Slang
                 }
                 return m;
             }
+        }
+
+        if (as<GLSLInputAttachmentIndexLayoutAttribute>(m))
+        {
+            if (as<SubpassInputType>(syntaxNode))
+                return m;
+            getSink()->diagnose(m, Diagnostics::InputAttachmentIndexOnlyAllowedOnSubpass, m);
+            return nullptr;
         }
 
         MemoryQualifierSetModifier::Flags::MemoryQualifiersBit memoryQualifierBit = MemoryQualifierSetModifier::Flags::kNone;
