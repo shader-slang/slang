@@ -4099,7 +4099,7 @@ static TypeLayoutResult _createTypeLayout(
             type,
             rules);
     }
-    else if (auto subpassInputType = as<SubpassInputType>(type))
+    else if (as<SubpassInputType>(type))
     {
         // SubpassInputType fills 2 slots, 'shader resource' and 'input_attachment_index'
         auto objLayout1 = rules->GetObjectLayout(ShaderParameterKind::Texture, context.objectLayoutOptions);
