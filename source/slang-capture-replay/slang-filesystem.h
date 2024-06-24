@@ -4,6 +4,7 @@
 #include "../core/slang-com-object.h"
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
+#include "capture-manager.h"
 
 namespace SlangCapture
 {
@@ -16,7 +17,7 @@ namespace SlangCapture
     class FileSystemCapture : public RefObject, public ISlangFileSystemExt
     {
     public:
-        explicit FileSystemCapture(ISlangFileSystemExt* fileSystem);
+        explicit FileSystemCapture(ISlangFileSystemExt* fileSystem, CaptureManager* captureManager);
         ~FileSystemCapture();
 
         // ISlangUnknown
@@ -61,7 +62,8 @@ namespace SlangCapture
 
         virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() override;
     private:
-        Slang::ComPtr<ISlangFileSystemExt> m_actualFileSystem;
+        Slang::ComPtr<ISlangFileSystemExt>  m_actualFileSystem;
+        CaptureManager*                     m_captureManager = nullptr;
 };
 
 }
