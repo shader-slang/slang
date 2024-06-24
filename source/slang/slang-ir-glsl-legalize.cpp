@@ -3732,24 +3732,6 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
 void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
 {
     List<IRGlobalParam*> toRemove;
-    Dictionary<IRType*, IRGlobalParam*> aliasedParams;
-    IRBuilder builder(module);
-
-    auto getAliasedParam = [&](IRGlobalParam* baseParam, IRType* type)
-    {
-        IRGlobalParam* param;
-
-        if (!aliasedParams.tryGetValue(type, param))
-        {
-            param = builder.createGlobalParam(type);
-
-            for (auto decoration : baseParam->getDecorations())
-                cloneDecoration(decoration, param);
-
-            aliasedParams[type] = param;
-        }
-        return param;
-    };
 
     for (auto inst : module->getGlobalInsts())
     {
@@ -3765,6 +3747,25 @@ void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
         if (!as<IRDynamicResourceType>(type))
             continue;
 
+        Dictionary<IRType*, IRGlobalParam*> aliasedParams;
+        IRBuilder builder(module);
+
+        auto getAliasedParam = [&](IRType* type)
+        {
+            IRGlobalParam* newParam;
+
+            if (!aliasedParams.tryGetValue(type, newParam))
+            {
+                newParam = builder.createGlobalParam(type);
+
+                for (auto decoration : param->getDecorations())
+                    cloneDecoration(decoration, newParam);
+
+                aliasedParams[type] = newParam;
+            }
+            return newParam;
+        };
+
         // Try to rewrite all uses leading to `CastDynamicResource`.
         // Later, we will diagnose an error if the parameter still has uses.
         traverseUsers(param, [&](IRInst* user)
@@ -3773,7 +3774,7 @@ void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
             {
                 builder.setInsertBefore(user);
 
-                user->replaceUsesWith(getAliasedParam(param, user->getDataType()));
+                user->replaceUsesWith(getAliasedParam(user->getDataType()));
                 user->removeAndDeallocate();
             }
             else if (user->getOp() == kIROp_GetElement && arrayType)
@@ -3791,7 +3792,7 @@ void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
 
                         auto newAccess = builder.emitElementExtract(
                             paramType->getElementType(),
-                            getAliasedParam(param, paramType),
+                            getAliasedParam(paramType),
                             user->getOperand(1));
 
                         elementUser->replaceUsesWith(newAccess);

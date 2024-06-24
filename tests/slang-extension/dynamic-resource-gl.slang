@@ -18,9 +18,14 @@ __DynamicResource<__DynamicResourceKind.General> g_TextureHeap[];
 __DynamicResource<__DynamicResourceKind.Sampler> g_SamplerHeap[];
 
 // CHECK-DAG: layout(binding = 0, set = 2)
-// CHECK-DAG: texture2D g_SingleDynamicResource_0;
+// CHECK-DAG: texture2D g_SingleDynamicResourceA_0;
 [vk::binding(0, 2)]
-__DynamicResource g_SingleDynamicResource;
+__DynamicResource g_SingleDynamicResourceA;
+
+// CHECK-DAG: layout(binding = 1, set = 2)
+// CHECK-DAG: texture2D g_SingleDynamicResourceB_0;
+[vk::binding(1, 2)]
+__DynamicResource g_SingleDynamicResourceB;
 
 
 // CHECK: IndirectAccess_0
@@ -44,7 +49,8 @@ void computeMain(int2 tid: SV_DispatchThreadID)
 
     value += IndirectAccess(g_TextureHeap[1], tid);
 
-    value += g_SingleDynamicResource.as<Texture2D>()[tid];
+    value += g_SingleDynamicResourceA.as<Texture2D>()[tid];
+    value += g_SingleDynamicResourceB.as<Texture2D>()[tid];
 
     outputBuffer.Store(tid.x + tid.y * 64, value);
 }

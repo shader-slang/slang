@@ -36,8 +36,15 @@ standard output = {
             }
         },
         {
-            "name": "g_SingleDynamicResource",
+            "name": "g_SingleDynamicResourceA",
             "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 0},
+            "type": {
+                "kind": "DynamicResource"
+            }
+        },
+        {
+            "name": "g_SingleDynamicResourceB",
+            "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 1},
             "type": {
                 "kind": "DynamicResource"
             }
@@ -76,8 +83,12 @@ standard output = {
                     "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 2}
                 },
                 {
-                    "name": "g_SingleDynamicResource",
+                    "name": "g_SingleDynamicResourceA",
                     "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 0}
+                },
+                {
+                    "name": "g_SingleDynamicResourceB",
+                    "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 1}
                 }
             ]
         }
