@@ -996,6 +996,16 @@ static void addExplicitParameterBindings_HLSL(
 
     // If the declaration has explicit binding modifiers, then
     // here is where we want to extract and apply them...
+    if (auto inputAttachmentIndexLayoutAttribute = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
+    {
+        LayoutSemanticInfo semanticInfo;
+        semanticInfo.index = inputAttachmentIndexLayoutAttribute->location;
+        semanticInfo.space = 0;
+        semanticInfo.kind = LayoutResourceKind::InputAttachmentIndex;
+
+        if (auto varDeclBase = varDecl.as<VarDeclBase>())
+            addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, 1);
+    }
 
     // Look for HLSL `register` or `packoffset` semantics.
     for (auto semantic : varDecl.getDecl()->getModifiersOfType<HLSLLayoutSemantic>())
@@ -1065,81 +1075,87 @@ static void addExplicitParameterBindings_GLSL(
     // the index/offset/etc.
     //
 
-    TypeLayout::ResourceInfo* resInfo = nullptr;
+    const int kMaxResCount = 2;
+    const int kSubpassResInfo = 1;
+    const int kResInfo = 0;
+
     TypeLayout::ResourceInfo* foundResInfo = nullptr;
-
-    LayoutSemanticInfo semanticInfo;
-    semanticInfo.index = 0;
-    semanticInfo.space = 0;
-
-    LayoutSemanticInfo subpassSemanticInfo;
-    bool foundBinding = false;
-    bool foundSubpass = false;
-
-    if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
+    struct ResAndSemanticInfo
     {
-        for (auto dec : varDecl.getDecl()->modifiers)
+        TypeLayout::ResourceInfo* resInfo = nullptr;
+        LayoutSemanticInfo semanticInfo;
+        ResAndSemanticInfo()
         {
-            // Try to find `binding` and `set`
-            if (auto glslBindingAttr = as<GLSLBindingAttribute>(dec))
-            {
-                resInfo = foundResInfo;
-                semanticInfo.index = glslBindingAttr->binding;
-                semanticInfo.space = glslBindingAttr->set;
-                foundBinding = true;
-                if (foundSubpass) 
-                    break;
-            }
-            // Try to find `input_attachment_index`
-            else if (auto glslAttachmentIndexAttr = as<GLSLInputAttachmentIndexLayoutModifier>(dec))
-            {
-                // Subpass fills semantic info of a descriptor & subpass
-                subpassSemanticInfo.index = stringToInt(glslAttachmentIndexAttr->valToken.getContent());
-                subpassSemanticInfo.space = 0;
-                subpassSemanticInfo.kind = LayoutResourceKind::InputAttachmentIndex;
-                foundSubpass = true;
-                if (foundBinding) 
-                    break;
-            }
+            semanticInfo.index = 0;
+            semanticInfo.space = 0;
+        }
+    };
+    ResAndSemanticInfo info[kMaxResCount] = {};
+    
+    if ((foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::InputAttachmentIndex)) != nullptr)
+    {
+        // Try to find `input_attachment_index`
+        if (auto glslAttachmentIndexAttr = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
+        {
+            info[kSubpassResInfo].resInfo = foundResInfo;
+            // Subpass fills semantic info of a descriptor and subpass
+            info[kSubpassResInfo].semanticInfo.index = (UInt)glslAttachmentIndexAttr->location;
+            info[kSubpassResInfo].semanticInfo.space = 0;
         }
     }
-    else if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace)) != nullptr )
+
+    if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr)
+    {
+        // Try to find `binding` and `set`
+        if (auto glslBindingAttr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+        {
+            info[kResInfo].resInfo = foundResInfo;
+            info[kResInfo].semanticInfo.index = glslBindingAttr->binding;
+            info[kResInfo].semanticInfo.space = glslBindingAttr->set;
+        }
+    }
+    else if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace)) != nullptr)
     {
         // Try to find `set`
         if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
         {
-            resInfo = foundResInfo;
+            info[kResInfo].resInfo = foundResInfo;
             if (attr->binding != 0)
             {
                 getSink(context)->diagnose(attr, Diagnostics::wholeSpaceParameterRequiresZeroBinding, varDecl.getName(), attr->binding);
             }
-            semanticInfo.index = attr->set;
-            semanticInfo.space = 0;
+            info[kResInfo].semanticInfo.index = attr->set;
+            info[kResInfo].semanticInfo.space = 0;
         }
     }
-    else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant)) != nullptr )
+    else if( (info[kResInfo].resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant)) != nullptr)
     {
         DeclRef<Decl> varDecl2(varDecl);
 
         // Try to find `constant_id` binding
-        if(!findLayoutArg<GLSLConstantIDLayoutModifier>(varDecl2, &semanticInfo.index))
+        if(!findLayoutArg<GLSLConstantIDLayoutModifier>(varDecl2, &info[kResInfo].semanticInfo.index))
             return;
     }
 
-    // if we found resInfo, we add the explicit binding
-    if (resInfo)
+    if(auto varDeclBase = as<VarDeclBase>(varDecl))
     {
-        auto kind = resInfo->kind;
-        auto count = resInfo->count;
-        semanticInfo.kind = kind;
-
-        if (auto varDeclBase = varDecl.as<VarDeclBase>())
+        bool setABinding = false;
+        for (int i = 0; i < kMaxResCount; i++)
         {
+            auto* resInfoItem = info[i].resInfo;
+            auto& semanticInfo = info[i].semanticInfo;
+            if (!resInfoItem)
+                continue;
+        
+            auto kind = resInfoItem->kind;
+            auto count = resInfoItem->count;
+            semanticInfo.kind = kind;
+            
             addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, count);
-            if (foundSubpass)
-                addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), subpassSemanticInfo, count);
+            setABinding = true;
         }
-        return;
+        if(setABinding)
+            return;
     }
 
     auto hlslToVulkanLayoutOptions = context->getTargetProgram()->getHLSLToVulkanLayoutOptions();
@@ -1196,7 +1212,7 @@ static void addExplicitParameterBindings_GLSL(
 
     // We use the HLSL binding directly (even though this notionally for GLSL/Vulkan)
     // We'll do the shifting at later later point in _maybeApplyHLSLToVulkanShifts
-    resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
+    info[kResInfo].resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
 
     if (warnedMissingVulkanLayoutModifier)
     {
@@ -1205,8 +1221,8 @@ static void addExplicitParameterBindings_GLSL(
         if(!hlslToVulkanLayoutOptions
             || hlslToVulkanLayoutOptions->getKindShiftEnabledFlags() == HLSLToVulkanLayoutOptions::KindFlag::None)
         {
-            resInfo->kind = LayoutResourceKind::DescriptorTableSlot;
-            resInfo->count = 1;
+            info[kResInfo].resInfo->kind = LayoutResourceKind::DescriptorTableSlot;
+            info[kResInfo].resInfo->count = 1;
         }
         else
         {
@@ -1214,12 +1230,12 @@ static void addExplicitParameterBindings_GLSL(
         }
     }
 
-    semanticInfo.kind = resInfo->kind;
-    semanticInfo.index = UInt(hlslInfo.index);
-    semanticInfo.space = UInt(hlslInfo.space);
-    const LayoutSize count = resInfo->count;
+    info[kResInfo].semanticInfo.kind = info[kResInfo].resInfo->kind;
+    info[kResInfo].semanticInfo.index = UInt(hlslInfo.index);
+    info[kResInfo].semanticInfo.space = UInt(hlslInfo.space);
+    const LayoutSize count = info[kResInfo].resInfo->count;
 
-    addExplicitParameterBinding(context, parameterInfo, as<VarDeclBase>(varDecl.getDecl()), semanticInfo, count);
+    addExplicitParameterBinding(context, parameterInfo, as<VarDeclBase>(varDecl.getDecl()), info[kResInfo].semanticInfo, count);
 }
 
 // Given a single parameter, collect whatever information we have on

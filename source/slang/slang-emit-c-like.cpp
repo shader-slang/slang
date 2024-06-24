@@ -3159,9 +3159,14 @@ void CLikeSourceEmitter::emitSemantics(IRInst* inst, bool allowOffsetLayout)
     emitSemanticsImpl(inst, allowOffsetLayout);
 }
 
+void CLikeSourceEmitter::emitDecorationLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
+{
+    emitLayoutSemanticsImpl(inst, uniformSemanticSpelling, EmitLayoutSemanticOption::kPreType);
+}
+
 void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
 {
-    emitLayoutSemanticsImpl(inst, uniformSemanticSpelling);
+    emitLayoutSemanticsImpl(inst, uniformSemanticSpelling, EmitLayoutSemanticOption::kPostType);
 }
 
 void CLikeSourceEmitter::emitRegion(Region* inRegion)
@@ -4154,6 +4159,8 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
     SLANG_ASSERT(layout);
 
     emitVarModifiers(layout, varDecl, varType);
+    
+    emitDecorationLayoutSemantics(varDecl);
 
     emitRateQualifiersAndAddressSpace(varDecl);
     emitType(varType, getName(varDecl));

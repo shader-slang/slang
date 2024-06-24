@@ -17105,19 +17105,20 @@ struct __SubpassImpl<T, let isMS:int>
 {
 }
 
-__generic<T, let isMS:int=0>
+__generic<T = float4, let isMS:int=0>
 typealias SubpassInput = __SubpassImpl<T, isMS>;
 
 __generic<T>
 extension __SubpassImpl<T, 0>
 {
     [ForceInline]
-    [require(hlsl_spirv, subpass)]
+    [require(glsl_hlsl_spirv, subpass)]
     T SubpassLoad()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm "$0.SubpassLoad()";
+        case glsl: __intrinsic_asm "subpassLoad($0)";
         case spirv:
         {
             let zeroVec = int2(0);
@@ -17131,19 +17132,20 @@ extension __SubpassImpl<T, 0>
     }
 }
 
-__generic<T, let isMS:int=1>
+__generic<T = float4, let isMS:int=1>
 typealias SubpassInputMS = __SubpassImpl<T, isMS>;
 
 __generic<T>
 extension __SubpassImpl<T, 1>
 {
     [ForceInline]
-    [require(hlsl_spirv, subpass)]
+    [require(glsl_hlsl_spirv, subpass)]
     T SubpassLoad(int sample)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm "$0.SubpassLoad($1)";
+        case glsl: __intrinsic_asm "subpassLoad($0, $1)";
         case spirv:
         {
             let zeroVec = int2(0);

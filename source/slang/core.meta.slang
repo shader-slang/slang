@@ -2450,6 +2450,9 @@ attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [vk_spirv_instruction(op : int, set : String = "")]     : SPIRVInstructionOpAttribute;
 
+__attributeTarget(VarDeclBase)
+attribute_syntax [vk_input_attachment_index(location : int)] : GLSLInputAttachmentIndexLayoutAttribute;
+
 __attributeTarget(FuncDecl)
 attribute_syntax [spv_target_env_1_3] : SPIRVTargetEnv13Attribute;
 

@@ -29,7 +29,7 @@ public:
 protected:
     RefPtr<HLSLExtensionTracker> m_extensionTracker;
 
-    virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling) SLANG_OVERRIDE;
+    virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling, EmitLayoutSemanticOption layoutSemanticOption) SLANG_OVERRIDE;
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
     
@@ -69,8 +69,8 @@ protected:
     void _emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling = "register");
 
         // Emit all the `register` semantics that are appropriate for a particular variable layout
-    void _emitHLSLRegisterSemantics(EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling = "register");
-    void _emitHLSLRegisterSemantics(IRVarLayout* varLayout, IRInst* inst, char const* uniformSemanticSpelling = "register");
+    void _emitHLSLRegisterSemantics(EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling = "register", EmitLayoutSemanticOption layoutSemanticOption = EmitLayoutSemanticOption::kPostType);
+    void _emitHLSLRegisterSemantics(IRVarLayout* varLayout, IRInst* inst, char const* uniformSemanticSpelling = "register", EmitLayoutSemanticOption layoutSemanticOption = EmitLayoutSemanticOption::kPostType);
 
     void _emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain);
     void _emitHLSLParameterGroupFieldLayoutSemantics(IRVarLayout* fieldLayout, EmitVarChain* inChain);

@@ -437,11 +437,6 @@ struct IRGLSLLocationDecoration : IRDecoration
     IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
 };
 
-struct IRGLSLInputAttachmentIndexDecoration : IRDecoration
-{
-    IR_LEAF_ISA(GLSLInputAttachmentIndexDecoration)
-    IRIntLit* getIndex() { return cast<IRIntLit>(getOperand(0)); }
-};
 
 struct IRGLSLOffsetDecoration : IRDecoration
 {
