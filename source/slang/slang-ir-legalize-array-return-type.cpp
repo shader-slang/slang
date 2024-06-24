@@ -18,7 +18,7 @@ void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
     {
         paramTypes.add(funcType->getParamType(i));
     }
-    auto outParamType = builder.getOutType(funcType->getResultType());
+    auto outParamType = builder.getPtrType(kIROp_OutType, arrayType, AddressSpace::ThreadLocal);
     paramTypes.add(outParamType);
 
     auto newFuncType = builder.getFuncType(paramTypes, builder.getVoidType());
