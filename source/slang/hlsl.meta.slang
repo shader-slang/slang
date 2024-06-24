@@ -14950,7 +14950,7 @@ matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask)
 }
 
 [ForceInline]
-[require(hlsl)]
+[require(hlsl, sm_6_0)]
 bool IsHelperLane()
 {
     __target_switch
