@@ -927,7 +927,7 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getAnyValueRules() override;
     virtual LayoutRulesImpl* getConstantBufferRules(CompilerOptionSet& compilerOptions) override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
-    virtual LayoutRulesImpl* getTextureBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
@@ -948,7 +948,7 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getAnyValueRules() override;
     virtual LayoutRulesImpl* getConstantBufferRules(CompilerOptionSet& compilerOptions) override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
-    virtual LayoutRulesImpl* getTextureBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
@@ -969,7 +969,7 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getAnyValueRules() override;
     virtual LayoutRulesImpl* getConstantBufferRules(CompilerOptionSet& compilerOptions) override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
-    virtual LayoutRulesImpl* getTextureBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
@@ -989,7 +989,7 @@ struct CUDALayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getAnyValueRules() override;
     virtual LayoutRulesImpl* getConstantBufferRules(CompilerOptionSet& compilerOptions) override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
-    virtual LayoutRulesImpl* getTextureBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
@@ -1009,7 +1009,7 @@ struct MetalLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getAnyValueRules() override;
     virtual LayoutRulesImpl* getConstantBufferRules(CompilerOptionSet& compilerOptions) override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
-    virtual LayoutRulesImpl* getTextureBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
@@ -1265,6 +1265,10 @@ LayoutRulesImpl kHLSLStructuredBufferLayoutRulesImpl_ = {
     &kHLSLLayoutRulesFamilyImpl, &kHLSLStructuredBufferLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kHLSLTextureBufferLayoutRulesImpl_ = {
+    &kHLSLLayoutRulesFamilyImpl, &kHLSLConstantBufferLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
+};
+
 LayoutRulesImpl kHLSLVaryingInputLayoutRulesImpl_ = {
     &kHLSLLayoutRulesFamilyImpl, &kHLSLVaryingInputLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
 };
@@ -1316,9 +1320,12 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
     return &kGLSLShaderRecordLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules()
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet& compilerOptions)
 {
-    return nullptr;
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kScalarLayoutRulesImpl_;
+    return &kStd430LayoutRulesImpl_;
+
 }
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getVaryingInputRules()
@@ -1399,9 +1406,9 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOpt
     return &kHLSLStructuredBufferLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getTextureBufferRules()
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kHLSLTextureBufferLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getVaryingInputRules()
@@ -1456,9 +1463,9 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getPushConstantBufferRules()
     return &kCPULayoutRulesImpl_;
 }
 
-LayoutRulesImpl* CPULayoutRulesFamilyImpl::getTextureBufferRules()
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingInputRules()
@@ -1522,9 +1529,9 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getPushConstantBufferRules()
     return &kCUDALayoutRulesImpl_;
 }
 
-LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getTextureBufferRules()
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingInputRules()
@@ -1712,9 +1719,9 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOp
     return &kMetalStructuredBufferLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getTextureBufferRules()
+LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kMetalConstantBufferLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getVaryingInputRules()
@@ -2638,11 +2645,16 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     if( wantConstantBuffer )
     {
         // If there is any ordinary data, then we'll need to
-        // allocate a constant buffer regiser/binding into
-        // the overall layout, to account for it.
+        // allocate a constant buffer or tbuffer (if we have a tbuffer parameter group type)
+        // register/binding the overall layout, to account for this.
         //
-        auto cbUsage = parameterGroupRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context.objectLayoutOptions);
-        for (auto layoutInfo : cbUsage.layoutInfos)
+        ShaderParameterKind parameterKind = ShaderParameterKind::ConstantBuffer;
+        if (as<TextureBufferType>(parameterGroupType))
+        {
+            parameterKind = ShaderParameterKind::TextureUniformBuffer;
+        }
+        auto bufferUsage = parameterGroupRules->GetObjectLayout(parameterKind, context.objectLayoutOptions);
+        for (auto layoutInfo : bufferUsage.layoutInfos)
             containerTypeLayout->addResourceUsage(layoutInfo.kind, layoutInfo.size);
     }
 
@@ -3058,7 +3070,7 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
     }
     else if( as<TextureBufferType>(parameterGroupType) )
     {
-        return rules->getLayoutRulesFamily()->getTextureBufferRules();
+        return rules->getLayoutRulesFamily()->getTextureBufferRules(compilerOptions);
     }
     else if( as<GLSLInputParameterGroupType>(parameterGroupType) )
     {

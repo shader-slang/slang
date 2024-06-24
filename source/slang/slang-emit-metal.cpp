@@ -690,6 +690,13 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitHLSLTextureType(texType);
         return;
     }
+    else if (as<IRTextureBufferType>(type))
+    {
+        m_writer->emit("texture_buffer<");
+        emitVal(type->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(">");
+        return;
+    }
     else if (auto imageType = as<IRGLSLImageType>(type))
     {
         _emitHLSLTextureType(imageType);

@@ -1,8 +1,10 @@
 #ifndef CAPTURE_MANAGER_H
 #define CAPTURE_MANAGER_H
 
+#include <filesystem>
 #include "parameter-encoder.h"
 #include "api_callId.h"
+
 namespace SlangCapture
 {
     class CaptureManager
@@ -17,6 +19,9 @@ namespace SlangCapture
         // endMethodCaptureAppendOutput is an optional call that can be used to append output to
         // the end of the capture. It has to start with a FunctionTailer
         void endMethodCaptureAppendOutput();
+
+        std::filesystem::path const& getCaptureFileDirectory() const { return m_captureFileDirectory; }
+
     private:
         void clearWithHeader(const ApiCallId& callId, uint64_t handleId);
         void clearWithTailer();
@@ -38,6 +43,7 @@ namespace SlangCapture
 
         MemoryStream m_memoryStream;
         std::unique_ptr<FileOutputStream> m_fileStream;
+        std::filesystem::path             m_captureFileDirectory = std::filesystem::current_path();
         ParameterEncoder m_encoder;
     };
 } // namespace SlangCapture
