@@ -7,6 +7,7 @@
 #include "../core/slang-smart-pointer.h"
 #include "../core/slang-dictionary.h"
 #include "../slang/slang-compiler.h"
+#include "capture-manager.h"
 
 namespace SlangCapture
 {
@@ -19,7 +20,7 @@ namespace SlangCapture
         SLANG_REF_OBJECT_IUNKNOWN_ALL
         ISlangUnknown* getInterface(const Guid& guid);
 
-        explicit TypeConformanceCapture(slang::ITypeConformance* typeConformance);
+        explicit TypeConformanceCapture(slang::ITypeConformance* typeConformance, CaptureManager* captureManager);
         ~TypeConformanceCapture();
 
         // Interfaces for `IComponentType`
@@ -69,6 +70,8 @@ namespace SlangCapture
         slang::ITypeConformance* getActualTypeConformance() const { return m_actualTypeConformance; }
     private:
         Slang::ComPtr<slang::ITypeConformance> m_actualTypeConformance;
+        uint64_t                               m_typeConformanceHandle = 0;
+        CaptureManager*                        m_captureManager = nullptr;
     };
 }
 #endif // SLANG_TYPE_CONFORMANCE_H

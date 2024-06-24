@@ -7,6 +7,7 @@
 #include "../core/slang-smart-pointer.h"
 #include "../core/slang-dictionary.h"
 #include "../slang/slang-compiler.h"
+#include "capture-manager.h"
 
 namespace SlangCapture
 {
@@ -17,7 +18,7 @@ namespace SlangCapture
         SLANG_REF_OBJECT_IUNKNOWN_ALL
         ISlangUnknown* getInterface(const Guid& guid);
 
-        explicit CompositeComponentTypeCapture(slang::IComponentType* componentType);
+        explicit CompositeComponentTypeCapture(slang::IComponentType* componentType, CaptureManager* captureManager);
         ~CompositeComponentTypeCapture();
 
         // Interfaces for `IComponentType`
@@ -67,6 +68,9 @@ namespace SlangCapture
         slang::IComponentType* getActualCompositeComponentType() const { return m_actualCompositeComponentType; }
     private:
         Slang::ComPtr<slang::IComponentType> m_actualCompositeComponentType;
+        uint64_t                             m_compositeComponentHandle = 0;
+        CaptureManager*                      m_captureManager = nullptr;
+
     };
 }
 #endif // SLANG_COMPOSITE_COMPONENT_TYPE_H
