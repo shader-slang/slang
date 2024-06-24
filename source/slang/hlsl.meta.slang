@@ -14949,6 +14949,16 @@ matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask)
     }
 }
 
+[ForceInline]
+[require(hlsl)]
+bool IsHelperLane()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "IsHelperLane()";
+    }
+}
+
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
 typedef Texture2D texture2D;
 
