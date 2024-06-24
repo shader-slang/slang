@@ -1210,6 +1210,31 @@ extension matrix<int16_t,R,C,L>
     __init(int value) { this = matrix<T,R,C,L>(T(value)); }
 }
 
+__intrinsic_op(makeVector)
+__generic<T, let N:int>
+vector<T,N*2> __makeVector(vector<T,N> vec1, vector<T,N> vec2);
+
+__generic<T>
+extension vector<T, 4>
+{
+    __generic<let L : int>
+    [__unsafeForceInlineEarly]
+    __init(matrix<T, 2, 2, L> value)
+    {
+        this = __makeVector(value[0], value[1]);
+    }
+}
+__generic<T, let L : int>
+extension matrix<T, 2, 2, L>
+{
+    [__unsafeForceInlineEarly]
+    __init(vector<T, 4> value)
+    {
+        this[0] = value.xy;
+        this[1] = value.zw;
+    }
+}
+
 ${{{{
 static const struct {
     char const* name;
