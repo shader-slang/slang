@@ -73,6 +73,12 @@ namespace SlangCapture
         }
     }
 
+    void ParameterEncoder::encodeStruct(slang::SpecializationArg const& specializationArg)
+    {
+        encodeEnumValue(specializationArg.kind);
+        encodeAddress(specializationArg.type);
+    }
+
     void ParameterEncoder::encodePointer(const void* value, bool omitData, size_t size)
     {
         encodeAddress(value);
@@ -112,15 +118,6 @@ namespace SlangCapture
             uint32_t size = (uint32_t)strlen(value);
             encodeUint32(size);
             m_stream->write(value, size);
-        }
-    }
-
-    void ParameterEncoder::encodeStringArray(const char* const* strArray, size_t count)
-    {
-        encodeUint64(count);
-        for (size_t i = 0; i < count; i++)
-        {
-            encodeString(strArray[i]);
         }
     }
 }

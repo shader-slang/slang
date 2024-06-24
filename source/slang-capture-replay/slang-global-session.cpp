@@ -46,7 +46,6 @@ namespace SlangCapture
         {
             encoder = m_captureManager->beginMethodCapture(ApiCallId::IGlobalSession_createSession, m_globalSessionHandle);
             encoder->encodeStruct(desc);
-            encoder->encodeAddress(nullptr);
             encoder = m_captureManager->endMethodCapture();
         }
 
@@ -63,12 +62,12 @@ namespace SlangCapture
             // the Linkage will set to user provided file system or slang default file system.
             // We need to reset it to our capture file system
             Slang::Linkage* linkage = static_cast<Linkage*>(actualSession);
-            FileSystemCapture* fileSystemCapture = new FileSystemCapture(linkage->getFileSystemExt());
+            FileSystemCapture* fileSystemCapture = new FileSystemCapture(linkage->getFileSystemExt(), m_captureManager.get());
 
             Slang::ComPtr<FileSystemCapture> resultFileSystemCapture(fileSystemCapture);
             linkage->setFileSystem(resultFileSystemCapture.detach());
 
-            SessionCapture* sessionCapture = new SessionCapture(actualSession);
+            SessionCapture* sessionCapture = new SessionCapture(actualSession, m_captureManager.get());
             Slang::ComPtr<SessionCapture> result(sessionCapture);
             *outSession = result.detach();
         }
@@ -129,7 +128,6 @@ namespace SlangCapture
         {
             encoder = m_captureManager->beginMethodCapture(ApiCallId::IGlobalSession_getDownstreamCompilerPrelude, m_globalSessionHandle);
             encoder->encodeEnumValue(inPassThrough);
-            encoder->encodeAddress(nullptr);
             encoder = m_captureManager->endMethodCapture();
         }
 
@@ -204,7 +202,6 @@ namespace SlangCapture
         {
             encoder = m_captureManager->beginMethodCapture(ApiCallId::IGlobalSession_getLanguagePrelude, m_globalSessionHandle);
             encoder->encodeEnumValue(inSourceLanguage);
-            encoder->encodeAddress(nullptr);
             encoder = m_captureManager->endMethodCapture();
         }
 
@@ -223,7 +220,6 @@ namespace SlangCapture
         ParameterEncoder* encoder {};
         {
             encoder = m_captureManager->beginMethodCapture(ApiCallId::IGlobalSession_createCompileRequest, m_globalSessionHandle);
-            encoder->encodeAddress(nullptr);
             encoder = m_captureManager->endMethodCapture();
         }
 
@@ -267,13 +263,14 @@ namespace SlangCapture
         ParameterEncoder* encoder {};
         {
             encoder = m_captureManager->beginMethodCapture(ApiCallId::IGlobalSession_getSharedLibraryLoader, m_globalSessionHandle);
-            encoder->encodeAddress(nullptr);
+            encoder = m_captureManager->endMethodCapture();
         }
 
         ISlangSharedLibraryLoader* loader = m_actualGlobalSession->getSharedLibraryLoader();
 
         {
             encoder->encodeAddress(loader);
+            m_captureManager->endMethodCaptureAppendOutput();
         }
         return loader;
     }
@@ -302,6 +299,7 @@ namespace SlangCapture
         {
             encoder = m_captureManager->beginMethodCapture(ApiCallId::IGlobalSession_compileStdLib, m_globalSessionHandle);
             encoder->encodeEnumValue(flags);
+            m_captureManager->endMethodCapture();
         }
 
         SlangResult res = m_actualGlobalSession->compileStdLib(flags);
@@ -331,11 +329,15 @@ namespace SlangCapture
         {
             encoder = m_captureManager->beginMethodCapture(ApiCallId::IGlobalSession_saveStdLib, m_globalSessionHandle);
             encoder->encodeEnumValue(archiveType);
-            encoder->encodeAddress(outBlob);
-            m_captureManager->endMethodCapture();
+            encoder = m_captureManager->endMethodCapture();
         }
 
         SlangResult res = m_actualGlobalSession->saveStdLib(archiveType, outBlob);
+
+        {
+            encoder->encodeAddress(*outBlob);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
         return res;
     }
 
@@ -410,6 +412,7 @@ namespace SlangCapture
         {
             encoder->encodeStruct(*outSessionDesc);
             encoder->encodeAddress(*outAllocation);
+            m_captureManager->endMethodCaptureAppendOutput();
         }
         return res;
     }
