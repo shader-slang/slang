@@ -999,7 +999,7 @@ static void addExplicitParameterBindings_HLSL(
     if (auto inputAttachmentIndexLayoutAttribute = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
     {
         LayoutSemanticInfo semanticInfo;
-        semanticInfo.index = inputAttachmentIndexLayoutAttribute->location;
+        semanticInfo.index = (UInt)inputAttachmentIndexLayoutAttribute->location;
         semanticInfo.space = 0;
         semanticInfo.kind = LayoutResourceKind::InputAttachmentIndex;
 
