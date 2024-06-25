@@ -227,6 +227,7 @@ namespace Slang
                             if (addrSpace != AddressSpace::Generic)
                             {
                                 mapVarValueToAddrSpace[inst->getOperand(0)] = addrSpace;
+                                mapInstToAddrSpace[inst] = addrSpace;
                                 changed = true;
                             }
                         }
@@ -425,19 +426,18 @@ namespace Slang
     {
         AddressSpaceContext context(module);
         
-        // To specialize address space of a function we must specialize the call sites
-        // then the 'functionToSpecialize'
+        // To specialize address space of a function we must specialize all call site
+        // parent functions
         HashSet<IRFunc*> funcsThatNeedProcessing;
         for (auto& func : functionsToSpecialize)
         {
             for (auto use = func->firstUse; use; use = use->nextUse)
             {
-                if (auto callInst = as<IRCall>(use->getUser()))
-                {
-                    funcsThatNeedProcessing.add(getParentFunc(callInst));
-                }
+                auto callInst = as<IRCall>(use->getUser());
+                if (!callInst)
+                    continue;
+                funcsThatNeedProcessing.add(getParentFunc(callInst));
             }
-            funcsThatNeedProcessing.add(func);
         }
 
         context.workList.reserve(funcsThatNeedProcessing.getCount());
