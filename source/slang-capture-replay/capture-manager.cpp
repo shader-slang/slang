@@ -2,6 +2,7 @@
 #include <string>
 #include <sstream>
 #include <thread>
+#include "capture_utility.h"
 #include "capture-manager.h"
 
 namespace SlangCapture
@@ -11,7 +12,21 @@ namespace SlangCapture
     {
         std::stringstream ss;
         ss << "gs-"<< globalSessionHandle <<"-t-"<<std::this_thread::get_id() << ".cap";
-        m_fileStream = std::make_unique<FileOutputStream>(ss.str());
+
+        m_captureFileDirectory = m_captureFileDirectory / "slang-capture";
+
+        if (!std::filesystem::exists(m_captureFileDirectory))
+        {
+            std::error_code ec;
+            if (!std::filesystem::create_directory(m_captureFileDirectory, ec))
+            {
+                slangCaptureLog(LogLevel::Error, "Fail to create directory: %s, error (%d): %s\n",
+                    m_captureFileDirectory.string().c_str(), ec.value(), ec.message().c_str());
+            }
+        }
+
+        std::filesystem::path captureFilePath = m_captureFileDirectory / ss.str();
+        m_fileStream = std::make_unique<FileOutputStream>(captureFilePath.string());
     }
 
     void CaptureManager::clearWithHeader(const ApiCallId& callId, uint64_t handleId)

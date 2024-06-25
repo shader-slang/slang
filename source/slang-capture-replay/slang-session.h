@@ -8,6 +8,7 @@
 #include "../core/slang-dictionary.h"
 #include "../slang/slang-compiler.h"
 #include "slang-module.h"
+#include "capture-manager.h"
 
 namespace SlangCapture
 {
@@ -18,7 +19,7 @@ namespace SlangCapture
         SLANG_REF_OBJECT_IUNKNOWN_ALL
         ISlangUnknown* getInterface(const Guid& guid);
 
-        explicit SessionCapture(slang::ISession* session);
+        explicit SessionCapture(slang::ISession* session, CaptureManager* captureManager);
         ~SessionCapture();
 
         SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL getGlobalSession() override;
@@ -105,8 +106,10 @@ namespace SlangCapture
         ModuleCapture* getModuleCapture(slang::IModule* module);
 
         Slang::ComPtr<slang::ISession> m_actualSession;
+        uint64_t                       m_sessionHandle = 0;
 
         Dictionary<slang::IModule*, ModuleCapture> m_mapModuleToCapture;
+        CaptureManager*                m_captureManager = nullptr;
     };
 }
 
