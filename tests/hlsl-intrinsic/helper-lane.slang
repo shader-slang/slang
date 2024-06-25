@@ -1,10 +1,9 @@
-//TEST:SIMPLE: -profile ps_6_0
-//TEST:SIMPLE: -profile ps_6_6
+//TEST:SIMPLE(filecheck=CHECK): -entry main -target hlsl -stage fragment
+//TEST:SIMPLE(filecheck=GLSL): -entry main -target glsl -stage fragment
+//TEST:SIMPLE(filecheck=METAL): -entry main -target metal -stage fragment
+//TEST:SIMPLE(filecheck=SPIRV): -entry main -target spirv -stage fragment
 
 float4 main() : SV_Target
 {
-    // IsHelperLane() has different implementations
-    // under 6.0 <= SM < 6.6, see the following:
-    // https://microsoft.github.io/DirectX-Specs/d3d/HLSL_ShaderModel6_6.html#is-helper-lane
-    return IsHelperLane() ? (float4) 0.0f : (float4) 1.0f;
+    return float4(IsHelperLane());
 }

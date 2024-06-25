@@ -14950,12 +14950,17 @@ matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask)
 }
 
 [ForceInline]
-[require(hlsl, sm_6_0)]
+[require(glsl_hlsl_metal_spirv, helper_lane)]
 bool IsHelperLane()
 {
-    __target_switch
-    {
+    __target_switch {
     case hlsl: __intrinsic_asm "IsHelperLane()";
+    case glsl: __intrinsic_asm "gl_HelperInvocation";
+    case metal: __intrinsic_asm "simd_is_helper_thread()";
+    case spirv:
+        return spirv_asm {
+            result:$$bool = OpIsHelperInvocationEXT
+        };
     }
 }
 

@@ -817,6 +817,12 @@ alias atomic_glsl_hlsl_nvapi_cuda9_int64 = atomic_glsl_int64 | hlsl_nvapi + _sm_
 alias atomic_glsl_hlsl_cuda = atomic_glsl | _sm_5_0 | _cuda_sm_2_0;
 alias atomic_glsl_hlsl_cuda9_int64 = atomic_glsl_int64 | _sm_6_6 | _cuda_sm_9_0;
 
+alias helper_lane = _sm_6_0 + fragment
+                   | _GLSL_140 + GL_EXT_demote_to_helper_invocation + fragment
+                   | spirv_1_0 + SPV_EXT_demote_to_helper_invocation + fragment
+                   | metal + fragment
+                   ;
+
 alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp;
 
 alias raytracing_allstages = raytracing_stages + raytracing;
