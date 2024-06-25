@@ -6,7 +6,7 @@
 namespace Slang
 {
 
-void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
+void makeFuncReturnViaOutParam(TargetRequest* targetRequest, IRBuilder& builder, IRFunc* func)
 {
     auto funcType = as<IRFuncType>(func->getFullType());
     if (!funcType)
@@ -18,7 +18,12 @@ void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
     {
         paramTypes.add(funcType->getParamType(i));
     }
-    auto outParamType = builder.getPtrType(kIROp_OutType, arrayType, AddressSpace::ThreadLocal);
+    
+    IRType* outParamType = nullptr;
+    if(isMetalTarget(targetRequest))
+        outParamType = builder.getPtrType(kIROp_OutType, arrayType, AddressSpace::ThreadLocal);
+    else
+        outParamType = builder.getOutType(arrayType);
     paramTypes.add(outParamType);
 
     auto newFuncType = builder.getFuncType(paramTypes, builder.getVoidType());
@@ -78,7 +83,7 @@ void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
 
 }
 
-void legalizeArrayReturnType(IRModule* module)
+void legalizeArrayReturnType(TargetRequest* targetRequest, IRModule* module)
 {
     IRBuilder builder(module);
 
@@ -88,7 +93,7 @@ void legalizeArrayReturnType(IRModule* module)
         {
             if (func->getResultType()->getOp() == kIROp_ArrayType)
             {
-                makeFuncReturnViaOutParam(builder, func);
+                makeFuncReturnViaOutParam(targetRequest, builder, func);
             }
         }
     }
