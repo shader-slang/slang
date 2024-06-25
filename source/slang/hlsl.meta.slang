@@ -14949,6 +14949,7 @@ matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask)
     }
 }
 
+__glsl_extension(GL_EXT_demote_to_helper_invocation)
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, helper_lane)]
 bool IsHelperLane()
@@ -14959,6 +14960,8 @@ bool IsHelperLane()
     case metal: __intrinsic_asm "simd_is_helper_thread()";
     case spirv:
         return spirv_asm {
+            OpExtension "SPV_EXT_demote_to_helper_invocation";
+            OpCapability DemoteToHelperInvocationEXT;
             result:$$bool = OpIsHelperInvocationEXT
         };
     }
