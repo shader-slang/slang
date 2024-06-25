@@ -1096,6 +1096,11 @@ Result linkAndOptimizeIR(
         break;
     }
 
+
+    // Rewrite functions that return arrays to return them via `out` parameter,
+    // since our target languages doesn't allow returning arrays.
+    legalizeArrayReturnType(irModule);
+
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
     //
@@ -1251,10 +1256,6 @@ Result linkAndOptimizeIR(
             lowerBufferElementTypeToStorageType(targetProgram, irModule);
         }
     }
-
-    // Rewrite functions that return arrays to return them via `out` parameter,
-    // since our target languages doesn't allow returning arrays.
-    legalizeArrayReturnType(targetRequest, irModule);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {

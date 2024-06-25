@@ -1,10 +1,11 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-static groupshared uint g_values[2] = { 0, 1 };
+static groupshared uint g_values[2] = { 1, 0 };
 static uint g_altValues[2] = { 2, 3 };
 
 static groupshared uint g_valuesReturned[2];
@@ -25,6 +26,7 @@ uint[2] maybeGroupSharedReturn(uint id)
 [numthreads(2, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    AllMemoryBarrierWithGroupSync();
     uint tid = dispatchThreadID.x;
     if (tid == 0)
     {
@@ -36,7 +38,15 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 
     AllMemoryBarrierWithGroupSync();
-    outputBuffer[tid] = g_valuesReturned[tid];
-    // BUF: 0
+    if (tid == 0)
+    {
+        outputBuffer[tid] = g_valuesReturned[tid];
+    }
+    else
+    {
+        outputBuffer[tid] = g_altValuesReturned[tid];
+    }
+
+    // BUF: 1
     // BUF: 3
 }
