@@ -9223,7 +9223,7 @@ void InterlockedMax(__ref  int dest,  int value, out  int original_value)
     case glsl: __intrinsic_asm "($2 = $atomicMax($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicMax($0, $1))";
     case metal:
-        __metalInterlocked_max(__getMetalAtomicRef(dest), value);
+        __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9244,7 +9244,7 @@ void InterlockedMax(__ref uint dest, uint value, out uint original_value)
     case glsl: __intrinsic_asm "($2 = $atomicMax($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicMax((int*)$0, $1))";
     case metal:
-        __metalInterlocked_max(__getMetalAtomicRef(dest), value);
+        __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9341,7 +9341,7 @@ void InterlockedMin(__ref  int dest,  int value, out  int original_value)
     case glsl: __intrinsic_asm "($2 = $atomicMin($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicMin($0, $1))";
     case metal:
-        __metalInterlocked_min(__getMetalAtomicRef(dest), value);
+        __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9362,7 +9362,7 @@ void InterlockedMin(__ref uint dest, uint value, out uint original_value)
     case glsl: __intrinsic_asm "($2 = $atomicMin($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicMin((int*)$0, $1))";
     case metal:
-        __metalInterlocked_min(__getMetalAtomicRef(dest), value);
+        __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9459,7 +9459,7 @@ void InterlockedOr(__ref  int dest,  int value, out  int original_value)
     case glsl: __intrinsic_asm "($2 = atomicOr($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicOr($0, $1))";
     case metal:
-        __metalInterlocked_or(__getMetalAtomicRef(dest), value);
+        __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9480,7 +9480,7 @@ void InterlockedOr(__ref uint dest, uint value, out uint original_value)
     case glsl: __intrinsic_asm "($2 = atomicOr($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicOr((int*)$0, $1))";
     case metal:
-        __metalInterlocked_or(__getMetalAtomicRef(dest), value);
+        __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
