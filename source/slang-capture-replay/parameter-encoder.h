@@ -29,7 +29,6 @@ namespace SlangCapture
         void encodeEnumValue(T value) { encodeValue(static_cast<uint32_t>(value)); }
 
         void encodeString(const char* value);
-        void encodeStringArray(const char* const* strArray, size_t count);
         void encodePointer(const void* value, bool omitData = false, size_t size = 0);
         void encodePointer(ISlangBlob* blob);
         void encodeAddress(const void* value) { encodeValue(reinterpret_cast<uint64_t>(value)); }
@@ -39,6 +38,43 @@ namespace SlangCapture
         void encodeStruct(slang::CompilerOptionEntry const& entry);
         void encodeStruct(slang::CompilerOptionValue const& value);
         void encodeStruct(slang::TargetDesc const& targetDesc);
+        void encodeStruct(slang::SpecializationArg const& specializationArg);
+
+        template <typename T>
+        void encodeValueArray(const T* array, size_t count)
+        {
+            for (size_t i = 0; i < count; ++i)
+            {
+                encodeValue(array[i]);
+            }
+        }
+
+        void encodeStringArray(const char* const* array, size_t count)
+        {
+            for (size_t i = 0; i < count; ++i)
+            {
+                encodeString(array[i]);
+            }
+        }
+
+        template <typename T>
+        void encodeStructArray(T const* array, size_t count)
+        {
+            for (size_t i = 0; i < count; ++i)
+            {
+                encodeStruct(array[i]);
+            }
+        }
+
+        template <typename T>
+        void encodeAddressArray(T* const* array, size_t count)
+        {
+            for (size_t i = 0; i < count; ++i)
+            {
+                encodeAddress(array[i]);
+            }
+        }
+
 
     private:
         template <typename T>
