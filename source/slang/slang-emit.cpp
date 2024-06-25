@@ -58,6 +58,7 @@
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-specialize.h"
+#include "slang-ir-specialize-address-space.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
 #include "slang-ir-specialize-resources.h"
@@ -1096,11 +1097,6 @@ Result linkAndOptimizeIR(
         break;
     }
 
-
-    // Rewrite functions that return arrays to return them via `out` parameter,
-    // since our target languages doesn't allow returning arrays.
-    legalizeArrayReturnType(irModule);
-
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
     //
@@ -1256,6 +1252,13 @@ Result linkAndOptimizeIR(
             lowerBufferElementTypeToStorageType(targetProgram, irModule);
         }
     }
+
+    // Rewrite functions that return arrays to return them via `out` parameter,
+    // since our target languages doesn't allow returning arrays.
+    legalizeArrayReturnType(irModule);
+    
+    if(isMetalTarget(targetRequest))
+        specializeAddressSpace(irModule);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {
