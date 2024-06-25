@@ -6,13 +6,24 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
+
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=uintBuffer
 RWStructuredBuffer<uint> uintBuffer;
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=intBuffer
 RWStructuredBuffer<int> intBuffer;
 
-groupshared uint shareMemUI[4];
-groupshared int shareMemI[4];
+groupshared uint shareMemUI[4]
+#if !defined(METAL)
+    // Issue#4468
+    = { 0, 0, 0, 0 }
+#endif
+;
+groupshared int shareMemI[4]
+#if !defined(METAL)
+    // Issue#4468
+    = { 0, 0, 0, 0 }
+#endif
+;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
