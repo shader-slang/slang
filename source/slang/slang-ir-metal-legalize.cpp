@@ -873,6 +873,8 @@ namespace Slang
 
         for (auto entryPoint : entryPoints)
             legalizeEntryPointForMetal(entryPoint, sink);
+
+        specializeAddressSpace(module);
     }
 
 }

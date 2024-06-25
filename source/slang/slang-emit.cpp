@@ -1255,10 +1255,7 @@ Result linkAndOptimizeIR(
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
-    legalizeArrayReturnType(irModule);
-    
-    if(isMetalTarget(targetRequest))
-        specializeAddressSpace(irModule);
+    legalizeArrayReturnType(targetRequest, irModule);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {

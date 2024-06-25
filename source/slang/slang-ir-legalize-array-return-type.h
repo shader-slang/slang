@@ -9,5 +9,5 @@ namespace Slang
 
     // Turn array-typed return values into `out` parameters for backends that does not
     // support arrays in return values.
-    void legalizeArrayReturnType(IRModule* module);
+    void legalizeArrayReturnType(TargetRequest* targetRequest, IRModule* module);
 }
