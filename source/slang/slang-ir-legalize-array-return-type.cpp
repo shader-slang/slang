@@ -21,7 +21,7 @@ void makeFuncReturnViaOutParam(TargetRequest* targetRequest, IRBuilder& builder,
     }
 
     IRType* outParamType = nullptr;
-    if(isMetalTarget)
+    if(isMetalTarget(targetRequest))
         outParamType = builder.getPtrType(kIROp_OutType, funcType->getResultType(), AddressSpace::ThreadLocal);
     else
         outParamType = builder.getOutType(funcType->getResultType());
