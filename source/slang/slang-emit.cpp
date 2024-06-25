@@ -58,7 +58,6 @@
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-specialize.h"
-#include "slang-ir-specialize-address-space.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
 #include "slang-ir-specialize-resources.h"

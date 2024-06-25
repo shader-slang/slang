@@ -1,5 +1,6 @@
 // slang-ir-specialize-address-space.h
 #pragma once
+#include "slang-ir-insts.h"
 
 namespace Slang
 {
@@ -11,4 +12,8 @@ namespace Slang
     /// 
     void specializeAddressSpace(
         IRModule*       module);
+
+    void specializeAddressSpace(
+        IRModule* module,
+        List<IRFunc*> functionsToSpecialize);
 }

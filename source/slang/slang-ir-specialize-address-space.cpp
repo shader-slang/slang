@@ -7,6 +7,12 @@
 
 namespace Slang
 {
+    enum class SpecializeAddressSpaceOptions : int
+    {
+        None = 0,
+        AddEntryPoints = 1 << 0
+    };
+
     struct AddressSpaceContext
     {
         IRModule* module;
@@ -362,6 +368,7 @@ namespace Slang
             }
         }
 
+        template<int options>
         void processModule()
         {
             for (auto globalInst : module->getGlobalInsts())
@@ -371,10 +378,14 @@ namespace Slang
                 {
                     mapInstToAddrSpace[globalInst] = addrSpace;
                 }
-                if (auto func = as<IRFunc>(globalInst))
+
+                if constexpr (options & (int)SpecializeAddressSpaceOptions::AddEntryPoints)
                 {
-                    if (func->findDecoration<IREntryPointDecoration>())
-                        workList.add(func);
+                    if (auto func = as<IRFunc>(globalInst))
+                    {
+                        if (func->findDecoration<IREntryPointDecoration>())
+                            workList.add(func);
+                    }
                 }
             }
 
@@ -408,6 +419,31 @@ namespace Slang
     void specializeAddressSpace(IRModule* module)
     {
         AddressSpaceContext context(module);
-        context.processModule();
+        context.processModule<(int)SpecializeAddressSpaceOptions::AddEntryPoints>();
+    }
+    void specializeAddressSpace(IRModule* module, List<IRFunc*> functionsToSpecialize)
+    {
+        AddressSpaceContext context(module);
+        
+        // To specialize address space of a function we must specialize the call sites
+        // then the 'functionToSpecialize'
+        HashSet<IRFunc*> funcsThatNeedProcessing;
+        for (auto& func : functionsToSpecialize)
+        {
+            for (auto use = func->firstUse; use; use = use->nextUse)
+            {
+                if (auto callInst = as<IRCall>(use->getUser()))
+                {
+                    funcsThatNeedProcessing.add(getParentFunc(callInst));
+                }
+            }
+            funcsThatNeedProcessing.add(func);
+        }
+
+        context.workList.reserve(funcsThatNeedProcessing.getCount());
+        for(auto i : funcsThatNeedProcessing)
+            context.workList.add(i);
+        
+        context.processModule<(int)SpecializeAddressSpaceOptions::None>();
     }
 }
