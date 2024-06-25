@@ -1,4 +1,5 @@
-//TEST:COMPARE_HLSL:-slang -dx12 -use-dxil -profile ps_6_0
+//TEST:SIMPLE: -profile ps_6_0
+//TEST:SIMPLE: -profile ps_6_6
 
 float4 main() : SV_Target
 {
