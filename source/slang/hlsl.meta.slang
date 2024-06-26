@@ -5695,6 +5695,36 @@ double asdouble(uint lowbits, uint highbits)
     }
 }
 
+__glsl_extension(GL_ARB_gpu_shader5)
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+double2 asdouble2(uint2 lowbits, uint2 highbits)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "asdouble2";
+    case glsl:
+        __intrinsic_asm "dvec2(packDouble2x32(uvec2($0.x, $1.x)), packDouble2x32(uvec2($0.y, $1.y))";
+    case cpp:
+        __intrinsic_asm "Vector<double, 2>(U32_asdouble($0.x, $1.x), U32_asdouble($0.y, $1.y))";
+    case cuda:
+        __intrinsic_asm "make_double2(U32_asdouble($0.x, $1.x), U32_asdouble($0.y, $1.y))";
+    case spirv:
+        return spirv_asm {
+            %l0:$$uint = OpCompositeExtract $lowbits 0;
+            %h0:$$uint = OpCompositeExtract $highbits 0;
+            %v0:$$uint2 = OpCompositeConstruct %l0 %h0;
+            %l1:$$uint = OpCompositeExtract $lowbits 1;
+            %h1:$$uint = OpCompositeExtract $highbits 1;
+            %v1:$$uint2 = OpCompositeConstruct %l1 %h1;
+            %d0:$$double = OpExtInst glsl450 59 %v0;
+            %d1:$$double = OpExtInst glsl450 59 %v1;
+            result:$$double2 = OpCompositeConstruct %d0 %d1
+        };
+    }
+}
+
 // Reinterpret bits as a float (HLSL SM 4.0)
 
 [__readNone]
