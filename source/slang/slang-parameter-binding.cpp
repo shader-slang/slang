@@ -1092,7 +1092,7 @@ static void addExplicitParameterBindings_GLSL(
     };
     ResAndSemanticInfo info[kMaxResCount] = {};
     
-    if ((foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::InputAttachmentIndex)) != nullptr)
+    if (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::InputAttachmentIndex))
     {
         // Try to find `input_attachment_index`
         if (auto glslAttachmentIndexAttr = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
