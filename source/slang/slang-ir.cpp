@@ -4841,17 +4841,18 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitImageLoad(IRType* type, IRInst* image, IRInst* coord)
+    /// @param params An ordered list of imageLoad parameters { image, coord, [optional] seperateArrayCoord, [optional] seperateSampleCoord }
+    IRInst* IRBuilder::emitImageLoad(IRType* type, ShortList<IRInst*> params)
     {
-        auto inst = createInst<IRImageLoad>(this, kIROp_ImageLoad, type, image, coord);
+        auto inst = createInst<IRImageLoad>(this, kIROp_ImageLoad, type, params.getCount(), params.getArrayView().getBuffer());
         addInst(inst);
         return inst;
     }
 
-    IRInst* IRBuilder::emitImageStore(IRType* type, IRInst* image, IRInst* coord, IRInst* value)
+    /// @param params An ordered list of imageStore parameters { image, coord, value, [optional] seperateArrayCoord, [optional] seperateSampleCoord }
+    IRInst* IRBuilder::emitImageStore(IRType* type, ShortList<IRInst*> params)
     {
-        IRInst* args[] = {image, coord, value};
-        auto inst = createInst<IRImageStore>(this, kIROp_ImageStore, type, 3, args);
+        auto inst = createInst<IRImageStore>(this, kIROp_ImageStore, type, params.getCount(), params.getArrayView().getBuffer());
         addInst(inst);
         return inst;
     }
