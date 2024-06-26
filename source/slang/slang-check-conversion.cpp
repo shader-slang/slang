@@ -512,8 +512,14 @@ namespace Slang
         UInt argCount = fromInitializerListExpr->args.getCount();
         UInt argIndex = 0;
 
-        // TODO: we should handle the special case of `{0}` as an initializer
-        // for arbitrary `struct` types here.
+        if (argCount == 0 && outToExpr && toType)
+        {
+            // C++ style default-initialization
+            auto* defaultCall = getASTBuilder()->create<DefaultConstructExpr>();
+            defaultCall->type = QualType(toType);
+            *outToExpr = constructDefaultInitExprForVarType(this, toType);
+            return true;
+        }
 
         // If this initializer list has a more specific type than just
         // InitializerListType (i.e. it's already undergone a coercion) we

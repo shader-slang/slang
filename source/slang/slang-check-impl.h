@@ -2870,4 +2870,47 @@ namespace Slang
 
     RefPtr<EntryPoint> findAndValidateEntryPoint(
         FrontEndEntryPointRequest* entryPointReq);
+
+
+    static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
+    {
+        for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+        {
+            if (!ctor->body || ctor->members.getCount() != 0)
+                continue;
+            return ctor;
+        }
+        return nullptr;
+    }
+
+    static Expr* constructDefaultInitExprForVarType(SemanticsVisitor* visitor, Type* varType)
+    {
+        if (!varType)
+            return nullptr;
+
+        ConstructorDecl* defaultCtor = nullptr;
+        auto declRefType = as<DeclRefType>(varType);
+        if (declRefType)
+        {
+            if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
+            {
+                defaultCtor = _getDefaultCtor(structDecl);
+            }
+        }
+
+        if (defaultCtor)
+        {
+            auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
+            auto member = visitor->getASTBuilder()->getMemberDeclRef(declRefType->getDeclRef(), defaultCtor);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
+            invoke->type = varType;
+            return invoke;
+        }
+        else
+        {
+            auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();
+            defaultCall->type = QualType(varType);
+            return defaultCall;
+        }
+    }
 }
