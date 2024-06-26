@@ -354,6 +354,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-array-return-type.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-image-subscript.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-mesh-outputs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1077,6 +1080,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-array-return-type.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-image-subscript.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-mesh-outputs.cpp">

@@ -451,6 +451,47 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
             return true;
         }
+        case kIROp_ImageLoad:
+        {
+            auto imageOp = as<IRImageLoad>(inst);
+            emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
+            m_writer->emit(".read(");
+            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
+            if(imageOp->hasAuxCoord1())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
+            }
+            if(imageOp->hasAuxCoord2())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord2(), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+            return true;
+        }
+        case kIROp_ImageStore:
+        {
+            
+            auto imageOp = as<IRImageStore>(inst);
+            emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
+            m_writer->emit(".write(");
+            emitOperand(imageOp->getValue(), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
+            if(imageOp->hasAuxCoord1())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
+            }
+            if(imageOp->hasAuxCoord2())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord2(), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+            return true;
+        }
         default: break;
     }
     // Not handled

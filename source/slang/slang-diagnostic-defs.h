@@ -774,6 +774,8 @@ DIAGNOSTIC(41400, Error, staticAssertionFailure, "static assertion failed, $0")
 DIAGNOSTIC(41401, Error, staticAssertionFailureWithoutMessage, "static assertion failed.")
 DIAGNOSTIC(41402, Error, staticAssertionConditionNotConstant, "condition for static assertion cannot be evaluated at the compile-time.")
 
+DIAGNOSTIC(41402, Error, multiSampledTextureDoesNotAllowWrites, "cannot write to a multisampled texture with target '$0'.")
+
 //
 // 5xxxx - Target code generation.
 //
