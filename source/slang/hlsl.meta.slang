@@ -4628,7 +4628,7 @@ ${{{{
 
     // Added operations:
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedAdd(
         UINT dest,
         UINT value,
@@ -4639,6 +4639,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicAdd($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedAdd";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAdd(buf[dest / 4], value, original_value);
@@ -4646,7 +4647,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedAdd(
         UINT dest,
         UINT value)
@@ -4656,6 +4657,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicAdd($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicAdd($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedAdd";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAdd(buf[dest / 4], value);
@@ -4663,7 +4665,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedAnd(
         UINT dest,
         UINT value,
@@ -4674,6 +4676,7 @@ ${{{{
         case glsl: __intrinsic_asm "$3 = atomicAnd($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "(*$3 = atomicAnd($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedAnd";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAnd(buf[dest / 4], value, original_value);
@@ -4681,7 +4684,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedAnd(
         UINT dest,
         UINT value)
@@ -4691,6 +4694,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicAnd($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicAnd($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedAnd";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAnd(buf[dest / 4], value);
@@ -4698,7 +4702,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedCompareExchange(
         UINT dest,
         UINT compare_value,
@@ -4710,6 +4714,7 @@ ${{{{
         case glsl: __intrinsic_asm "($4 = atomicCompSwap($0._data[$1/4], $2, $3))";
         case cuda: __intrinsic_asm "(*$4 = atomicCAS($0._getPtrAt<uint32_t>($1), $2, $3))";
         case hlsl: __intrinsic_asm ".InterlockedCompareExchange";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedCompareExchange(buf[dest / 4], compare_value, value, original_value);
@@ -4735,7 +4740,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedExchange(
         UINT dest,
         UINT value,
@@ -4746,6 +4751,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicExchange($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicExch($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedExchange";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedExchange(buf[dest / 4], value, original_value);
@@ -4753,7 +4759,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedMax(
         UINT dest,
         UINT value,
@@ -4764,6 +4770,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicMax($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicMax($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedMax";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMax(buf[dest / 4], value, original_value);
@@ -4771,7 +4778,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedMax(
         UINT dest,
         UINT value)
@@ -4781,6 +4788,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicMax($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicMax($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedMax";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMax(buf[dest / 4], value);
@@ -4788,7 +4796,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedMin(
         UINT dest,
         UINT value,
@@ -4799,6 +4807,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicMin($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicMin($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedMin";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMin(buf[dest / 4], value, original_value);
@@ -4806,7 +4815,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedMin(
         UINT dest,
         UINT value)
@@ -4816,6 +4825,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicMin($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicMin($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedMin";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMin(buf[dest / 4], value);
@@ -4823,7 +4833,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedOr(
         UINT dest,
         UINT value,
@@ -4834,6 +4844,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicOr($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicOr($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedOr";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedOr(buf[dest / 4], value, original_value);
@@ -4841,7 +4852,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedOr(
         UINT dest,
         UINT value)
@@ -4851,6 +4862,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicOr($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicOr($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedOr";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedOr(buf[dest / 4], value);
@@ -4858,7 +4870,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedXor(
         UINT dest,
         UINT value,
@@ -4869,6 +4881,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicXor($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicXor($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedXor";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedXor(buf[dest / 4], value, original_value);
@@ -4876,7 +4889,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedXor(
         UINT dest,
         UINT value)
@@ -4886,6 +4899,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicXor($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicXor($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedXor";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedXor(buf[dest / 4], value);
@@ -8591,9 +8605,62 @@ void GroupMemoryBarrierWithGroupSync()
 
 // Atomics
 
+__generic<T>
+__intrinsic_op($(kIROp_MetalAtomicCast))
+[require(metal)]
+T* __getMetalAtomicRef(__ref T x);
+
+${{{{
+for (const char* fetchAndModify : {"add", "and", "max", "min", "or", "sub", "xor"})
+{
+}}}}
+    __generic<AtomicType, T>
+    [ForceInline]
+    [require(metal)]
+    void __metalInterlocked_$(fetchAndModify)(AtomicType dest, T value)
+    {
+        __intrinsic_asm "atomic_fetch_$(fetchAndModify)_explicit($0, $1, memory_order_relaxed)";
+    }
+
+    __generic<AtomicType, T>
+    [ForceInline]
+    [require(metal)]
+    void __metalInterlocked_$(fetchAndModify)(AtomicType dest, T value, out T original_value)
+    {
+        __intrinsic_asm "((*($2)) = (($[0])(atomic_fetch_$(fetchAndModify)_explicit($0, $1, memory_order_relaxed))))", T;
+    }
+${{{{
+} // fetchAndModify
+}}}}
+
+__generic<AtomicType, T>
 [ForceInline]
+[require(metal)]
+void __metalInterlocked_exchange(AtomicType dest, T value, out T original_value)
+{
+    __intrinsic_asm "((*($2)) = (($[0])(atomic_exchange_explicit($0, $1, memory_order_relaxed))))", T;
+}
+
+__generic<AtomicType, T>
+[ForceInline]
+[require(metal)]
+void __metalInterlocked_compare_exchange(AtomicType dest, __ref T compare_value, T value)
+{
+    __intrinsic_asm "atomic_compare_exchange_weak_explicit($0, $1, $2, memory_order_relaxed, memory_order_relaxed)";
+}
+
+__generic<AtomicType, T>
+[ForceInline]
+[require(metal)]
+void __metalInterlocked_compare_exchange(AtomicType dest, T compare_value, T value, out T original_value)
+{
+    __metalInterlocked_compare_exchange(dest, compare_value, value);
+    original_value = compare_value;
+}
+
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref  int dest,  int value)
 {
     __target_switch
@@ -8601,6 +8668,9 @@ void InterlockedAdd(__ref  int dest,  int value)
     case hlsl: __intrinsic_asm "InterlockedAdd";
     case cuda: __intrinsic_asm "atomicAdd($0, $1)";
     case glsl: __intrinsic_asm "$atomicAdd($A, $1)";
+    case metal:
+        __metalInterlocked_add(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8611,7 +8681,7 @@ void InterlockedAdd(__ref  int dest,  int value)
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref uint dest, uint value)
 {
     __target_switch
@@ -8619,6 +8689,9 @@ void InterlockedAdd(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedAdd";
     case cuda: __intrinsic_asm "atomicAdd((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicAdd($A, $1)";
+    case metal:
+        __metalInterlocked_add(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8635,14 +8708,17 @@ void InterlockedAdd(__ref uint dest, int value)
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
+void InterlockedAdd(__ref int dest, int value, out int original_value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAdd";
     case cuda: __intrinsic_asm "(*$2 = atomicAdd($0, $1))";
     case glsl: __intrinsic_asm "($2 = $atomicAdd($A, $1))";
+    case metal:
+        __metalInterlocked_add(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8654,7 +8730,7 @@ void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -8662,6 +8738,9 @@ void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedAdd";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicAdd((int*)$0, $1))";
     case glsl: __intrinsic_asm "($2 = $atomicAdd($A, $1))";
+    case metal:
+        __metalInterlocked_add(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8753,14 +8832,17 @@ void InterlockedAdd(__ref uint64_t dest, uint64_t value, out uint64_t original_v
 
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAnd(__ref  int dest,  int value)
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
+void InterlockedAnd(__ref int dest, int value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAnd";
     case cuda: __intrinsic_asm "atomicAnd($0, $1)";
     case glsl: __intrinsic_asm "$atomicAnd($A, $1)";
+    case metal:
+        __metalInterlocked_and(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8770,7 +8852,7 @@ void InterlockedAnd(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref uint dest, uint value)
 {
     __target_switch
@@ -8778,6 +8860,9 @@ void InterlockedAnd(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedAnd";
     case cuda: __intrinsic_asm "atomicAnd((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicAnd($A, $1)";
+    case metal:
+        __metalInterlocked_and(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8787,14 +8872,17 @@ void InterlockedAnd(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAnd(__ref  int dest,  int value, out  int original_value)
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
+void InterlockedAnd(__ref int dest, int value, out int original_value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAnd";
     case cuda: __intrinsic_asm "(*$2 = atomicAnd($0, $1))";
     case glsl: __intrinsic_asm "($2 = $atomicAnd($A, $1))";
+    case metal:
+        __metalInterlocked_and(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8805,7 +8893,7 @@ void InterlockedAnd(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -8813,6 +8901,9 @@ void InterlockedAnd(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedAnd";
     case glsl: __intrinsic_asm "($2 = atomicAnd($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicAnd((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_and(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8841,7 +8932,7 @@ void InterlockedAnd(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value, out  int original_value)
 {
     __target_switch
@@ -8849,6 +8940,9 @@ void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value,
     case hlsl: __intrinsic_asm "InterlockedCompareExchange";
     case glsl: __intrinsic_asm "($3 = $atomicCompSwap($A, $1, $2))";
     case cuda: __intrinsic_asm "(*$3 = atomicCAS($0, $1, $2))";
+    case metal:
+        __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8859,7 +8953,7 @@ void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value,
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value, out uint original_value)
 {
     __target_switch
@@ -8867,6 +8961,9 @@ void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value,
     case hlsl: __intrinsic_asm "InterlockedCompareExchange";
     case glsl: __intrinsic_asm "($3 = $atomicCompSwap($A, $1, $2))";
     case cuda: __intrinsic_asm "(*$3 = (uint)atomicCAS((int*)$0, $1, $2))";
+    case metal:
+        __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8882,6 +8979,9 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedCompareExchangeFloatBitwise";
+    case metal:
+        __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value);
+        return;
     }
 }
 
@@ -8891,44 +8991,36 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedCompareExchangeFloatBitwise";
+    case metal:
+        __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
+        return;
     }
 }
 
-[ForceInline]
-void InterlockedCompareExchange(__ref  int64_t dest,  int64_t compare_value,  int64_t value)
+${{{{
+for (const char* T : {"int64_t", "uint64_t"})
 {
-    __target_switch
+}}}}
+    [ForceInline]
+    void InterlockedCompareExchange(__ref $(T) dest, $(T) compare_value, $(T) value)
     {
-    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+        }
     }
-}
 
-[ForceInline]
-void InterlockedCompareExchange(__ref  int64_t dest,  int64_t compare_value,  int64_t value, out  int64_t original_value)
-{
-    __target_switch
+    [ForceInline]
+    void InterlockedCompareExchange(__ref $(T) dest, $(T) compare_value, $(T) value, out $(T) original_value)
     {
-    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+        }
     }
-}
-
-[ForceInline]
-void InterlockedCompareExchange(__ref  uint64_t dest,  uint64_t compare_value,  uint64_t value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
-    }
-}
-
-[ForceInline]
-void InterlockedCompareExchange(__ref  uint64_t dest,  uint64_t compare_value,  uint64_t value, out  uint64_t original_value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
-    }
-}
+${{{{
+} // T
+}}}}
 
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
@@ -8992,7 +9084,7 @@ void InterlockedCompareStore(__ref uint64_t dest, uint64_t compare_value, uint64
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
 {
     __target_switch
@@ -9000,6 +9092,9 @@ void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
     case hlsl: __intrinsic_asm "InterlockedExchange";
     case glsl: __intrinsic_asm "($2 = $atomicExchange($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicExch($0, $1))";
+    case metal:
+        __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9010,7 +9105,7 @@ void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedExchange(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -9018,6 +9113,9 @@ void InterlockedExchange(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedExchange";
     case glsl: __intrinsic_asm "($2 = $atomicExchange($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicExch((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9042,6 +9140,9 @@ void InterlockedExchange(__ref  float dest,  float value, out  float original_va
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedExchange";
+    case metal:
+        __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
+        return;
     }
 }
 
@@ -9082,7 +9183,7 @@ void InterlockedExchange(__ref  uint64_t dest,  uint64_t value, out  uint64_t or
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref  int dest,  int value)
 {
     __target_switch
@@ -9090,6 +9191,9 @@ void InterlockedMax(__ref  int dest,  int value)
     case hlsl: __intrinsic_asm "InterlockedMax";
     case glsl: __intrinsic_asm "$atomicMax($A, $1)";
     case cuda: __intrinsic_asm "atomicMax($0, $1)";
+    case metal:
+        __metalInterlocked_max(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9099,7 +9203,7 @@ void InterlockedMax(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref uint dest, uint value)
 {
     __target_switch
@@ -9107,6 +9211,9 @@ void InterlockedMax(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedMax";
     case glsl: __intrinsic_asm "$atomicMax($A, $1)";
     case cuda: __intrinsic_asm "atomicMax((int*)$0, $1)";
+    case metal:
+        __metalInterlocked_max(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9116,7 +9223,7 @@ void InterlockedMax(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref  int dest,  int value, out  int original_value)
 {
     __target_switch
@@ -9124,6 +9231,9 @@ void InterlockedMax(__ref  int dest,  int value, out  int original_value)
     case hlsl: __intrinsic_asm "InterlockedMax";
     case glsl: __intrinsic_asm "($2 = $atomicMax($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicMax($0, $1))";
+    case metal:
+        __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9134,7 +9244,7 @@ void InterlockedMax(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -9142,6 +9252,9 @@ void InterlockedMax(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedMax";
     case glsl: __intrinsic_asm "($2 = $atomicMax($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicMax((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9188,7 +9301,7 @@ void InterlockedMax(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref  int dest,  int value)
 {
     __target_switch
@@ -9196,6 +9309,9 @@ void InterlockedMin(__ref  int dest,  int value)
     case hlsl: __intrinsic_asm "InterlockedMin";
     case glsl: __intrinsic_asm "$atomicMin($A, $1)";
     case cuda: __intrinsic_asm "atomicMin($0, $1)";
+    case metal:
+        __metalInterlocked_min(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9205,7 +9321,7 @@ void InterlockedMin(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref uint dest, uint value)
 {
     __target_switch
@@ -9213,6 +9329,9 @@ void InterlockedMin(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedMin";
     case glsl: __intrinsic_asm "$atomicMin($A, $1)";
     case cuda: __intrinsic_asm "atomicMin((int*)$0, $1)";
+    case metal:
+        __metalInterlocked_min(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9222,7 +9341,7 @@ void InterlockedMin(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref  int dest,  int value, out  int original_value)
 {
     __target_switch
@@ -9230,6 +9349,9 @@ void InterlockedMin(__ref  int dest,  int value, out  int original_value)
     case hlsl: __intrinsic_asm "InterlockedMin";
     case glsl: __intrinsic_asm "($2 = $atomicMin($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicMin($0, $1))";
+    case metal:
+        __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9240,7 +9362,7 @@ void InterlockedMin(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -9248,6 +9370,9 @@ void InterlockedMin(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedMin";
     case glsl: __intrinsic_asm "($2 = $atomicMin($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicMin((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9294,7 +9419,7 @@ void InterlockedMin(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref  int dest,  int value)
 {
     __target_switch
@@ -9302,6 +9427,9 @@ void InterlockedOr(__ref  int dest,  int value)
     case hlsl: __intrinsic_asm "InterlockedOr";
     case cuda: __intrinsic_asm "atomicOr((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicOr($A, $1)";
+    case metal:
+        __metalInterlocked_or(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9311,7 +9439,7 @@ void InterlockedOr(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref uint dest, uint value)
 {
     __target_switch
@@ -9319,6 +9447,9 @@ void InterlockedOr(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedOr";
     case cuda: __intrinsic_asm "atomicOr((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicOr($A, $1)";
+    case metal:
+        __metalInterlocked_or(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9328,7 +9459,7 @@ void InterlockedOr(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref  int dest,  int value, out  int original_value)
 {
      __target_switch
@@ -9336,6 +9467,9 @@ void InterlockedOr(__ref  int dest,  int value, out  int original_value)
     case hlsl: __intrinsic_asm "InterlockedOr";
     case glsl: __intrinsic_asm "($2 = atomicOr($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicOr($0, $1))";
+    case metal:
+        __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9346,7 +9480,7 @@ void InterlockedOr(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref uint dest, uint value, out uint original_value)
 {
      __target_switch
@@ -9354,6 +9488,9 @@ void InterlockedOr(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedOr";
     case glsl: __intrinsic_asm "($2 = atomicOr($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicOr((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9382,7 +9519,7 @@ void InterlockedOr(__ref  uint64_t dest,  uint64_t value, out  uint64_t original
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref  int dest,  int value)
 {
     __target_switch
@@ -9390,6 +9527,9 @@ void InterlockedXor(__ref  int dest,  int value)
     case hlsl: __intrinsic_asm "InterlockedXor";
     case cuda: __intrinsic_asm "atomicXor((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicXor($A, $1)";
+    case metal:
+        __metalInterlocked_xor(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9399,7 +9539,7 @@ void InterlockedXor(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref uint dest, uint value)
 {
     __target_switch
@@ -9407,6 +9547,9 @@ void InterlockedXor(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedXor";
     case cuda: __intrinsic_asm "atomicXor((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicXor($A, $1)";
+    case metal:
+        __metalInterlocked_xor(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9416,7 +9559,7 @@ void InterlockedXor(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref  int dest,  int value, out  int original_value)
 {
      __target_switch
@@ -9424,6 +9567,9 @@ void InterlockedXor(__ref  int dest,  int value, out  int original_value)
     case hlsl: __intrinsic_asm "InterlockedXor";
     case glsl: __intrinsic_asm "($2 = atomicXor($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicXor($0, $1))";
+    case metal:
+        __metalInterlocked_xor(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9434,7 +9580,7 @@ void InterlockedXor(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref uint dest, uint value, out uint original_value)
 {
      __target_switch
@@ -9442,6 +9588,9 @@ void InterlockedXor(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedXor";
     case glsl: __intrinsic_asm "($2 = atomicXor($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicXor((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_xor(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
