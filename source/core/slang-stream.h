@@ -138,7 +138,10 @@ public:
     void setContent(const void* contents, size_t contentsSize)
     {
         m_ownedContents.setCount(contentsSize);
-        ::memcpy(m_ownedContents.getBuffer(), contents, contentsSize);
+        if (contents != nullptr)
+        {
+            ::memcpy(m_ownedContents.getBuffer(), contents, contentsSize);
+        }
         _setContents(m_ownedContents.getBuffer(), m_ownedContents.getCount());
     }
 

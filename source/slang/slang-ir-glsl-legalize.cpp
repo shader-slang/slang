@@ -15,148 +15,6 @@
 
 namespace Slang
 {
-int getIRVectorElementSize(IRType* type)
-{
-    if (type->getOp() != kIROp_VectorType)
-        return 1;
-    return (int)(as<IRIntLit>(as<IRVectorType>(type)->getElementCount())->value.intVal);
-}
-IRType* getIRVectorBaseType(IRType* type)
-{
-    if (type->getOp() != kIROp_VectorType)
-        return type;
-    return as<IRVectorType>(type)->getElementType();
-}
-
-void legalizeImageSubscriptStoreForGLSL(IRBuilder& builder, IRInst* storeInst)
-{
-    builder.setInsertBefore(storeInst);
-    auto getElementPtr = as<IRGetElementPtr>(storeInst->getOperand(0));
-    IRImageSubscript* imageSubscript = nullptr;
-    if (getElementPtr)
-        imageSubscript = as<IRImageSubscript>(getElementPtr->getBase());
-    else
-        imageSubscript = as<IRImageSubscript>(storeInst->getOperand(0));
-    assert(imageSubscript);
-    auto imageElementType = cast<IRPtrTypeBase>(imageSubscript->getDataType())->getValueType();
-    auto coordType = imageSubscript->getCoord()->getDataType();
-    auto coordVectorSize = getIRVectorElementSize(coordType);
-    if (coordVectorSize != 1)
-    {
-        coordType = builder.getVectorType(
-            builder.getIntType(), builder.getIntValue(builder.getIntType(), coordVectorSize));
-    }
-    else
-    {
-        coordType = builder.getIntType();
-    }
-    auto legalizedCoord = imageSubscript->getCoord();
-    if (coordType != imageSubscript->getCoord()->getDataType())
-    {
-        legalizedCoord = builder.emitCast(coordType, legalizedCoord);
-    }
-    switch (storeInst->getOp())
-    {
-    case kIROp_Store:
-        {
-            IRInst* newValue = nullptr;
-            if (getElementPtr)
-            {
-                auto vectorBaseType = getIRVectorBaseType(imageElementType);
-                IRType* vector4Type = builder.getVectorType(vectorBaseType, 4);
-                auto originalValue = builder.emitImageLoad(vector4Type, imageSubscript->getImage(), legalizedCoord);
-                auto index = getElementPtr->getIndex();
-                newValue = builder.emitSwizzleSet(vector4Type, originalValue, storeInst->getOperand(1), 1, &index);
-            }
-            else
-            {
-                newValue = storeInst->getOperand(1);
-                if (getIRVectorElementSize(imageElementType) != 4)
-                {
-                    auto vectorBaseType = getIRVectorBaseType(imageElementType);
-                    newValue = builder.emitVectorReshape(
-                        builder.getVectorType(
-                            vectorBaseType, builder.getIntValue(builder.getIntType(), 4)),
-                        newValue);
-                }
-            }
-            auto imageStore = builder.emitImageStore(
-                builder.getVoidType(),
-                imageSubscript->getImage(),
-                legalizedCoord,
-                newValue);
-            storeInst->replaceUsesWith(imageStore);
-            storeInst->removeAndDeallocate();
-            if (!imageSubscript->hasUses())
-            {
-                imageSubscript->removeAndDeallocate();
-            }
-        }
-        break;
-    case kIROp_SwizzledStore:
-        {
-            auto swizzledStore = cast<IRSwizzledStore>(storeInst);
-            // Here we assume the imageElementType is already lowered into float4/uint4 types from any
-            // user-defined type.
-            assert(imageElementType->getOp() == kIROp_VectorType);
-            auto vectorBaseType = getIRVectorBaseType(imageElementType);
-            IRType* vector4Type = builder.getVectorType(vectorBaseType, 4);
-            auto originalValue = builder.emitImageLoad(vector4Type, imageSubscript->getImage(), legalizedCoord);
-            Array<IRInst*, 4> indices;
-            for (UInt i = 0; i < swizzledStore->getElementCount(); i++)
-            {
-                indices.add(swizzledStore->getElementIndex(i));
-            }
-            auto newValue = builder.emitSwizzleSet(
-                vector4Type,
-                originalValue,
-                swizzledStore->getSource(),
-                swizzledStore->getElementCount(),
-                indices.getBuffer());
-            auto imageStore = builder.emitImageStore(
-                builder.getVoidType(), imageSubscript->getImage(), legalizedCoord, newValue);
-            storeInst->replaceUsesWith(imageStore);
-            storeInst->removeAndDeallocate();
-            if (!imageSubscript->hasUses())
-            {
-                imageSubscript->removeAndDeallocate();
-            }
-        }
-        break;
-    default:
-        break;
-    }
-}
-
-void legalizeImageSubscriptForGLSL(IRModule* module)
-{
-    IRBuilder builder(module);
-    for (auto globalInst : module->getModuleInst()->getChildren())
-    {
-        auto func = as<IRFunc>(globalInst);
-        if (!func)
-            continue;
-        for (auto block : func->getBlocks())
-        {
-            auto inst = block->getFirstInst();
-            IRInst* next;
-            for ( ; inst; inst = next)
-            {
-                next = inst->getNextInst();
-                switch (inst->getOp())
-                {
-                case kIROp_Store:
-                case kIROp_SwizzledStore:
-                    if (getRootAddr(inst->getOperand(0))->getOp() == kIROp_ImageSubscript)
-                    {
-                        legalizeImageSubscriptStoreForGLSL(builder, inst);
-                    }
-                }
-            }   
-        }
-    }
-}
-
     //
 // Legalization of entry points for GLSL:
 //
@@ -1284,6 +1142,36 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         inType,
         declarator,
         &systemValueInfoStorage);
+
+    {
+
+        auto systemSemantic = inVarLayout->findAttr<IRSystemValueSemanticAttr>();
+        // Validate the system value, convert to a regular parameter if this is not a valid system value for a given target.
+        if (systemSemantic && isSPIRV(codeGenContext->getTargetFormat()) && systemSemantic->getName().caseInsensitiveEquals(UnownedStringSlice("sv_instanceid"))
+            && ((stage == Stage::Fragment) || (stage == Stage::Vertex && inVarLayout->usesResourceKind(LayoutResourceKind::VaryingOutput))))
+        {
+            ShortList<IRInst*> newOperands;
+            auto opCount = inVarLayout->getOperandCount();
+            newOperands.reserveOverflowBuffer(opCount);
+            for (UInt i = 0; i < opCount; ++i)
+            {
+                auto op = inVarLayout->getOperand(i);
+                if (op == systemSemantic)
+                    continue;
+                newOperands.add(op);
+            }
+
+            auto newVarLayout = builder->emitIntrinsicInst(
+                inVarLayout->getFullType(),
+                inVarLayout->getOp(),
+                newOperands.getCount(),
+                newOperands.getArrayView().getBuffer());
+
+            newVarLayout->sourceLoc = inVarLayout->sourceLoc;
+            
+            inVarLayout->replaceUsesWith(newVarLayout);
+        }
+    }
 
     IRType* type = inType;
     IRType* peeledRequiredType = nullptr;
@@ -2570,9 +2458,7 @@ static void legalizeMeshOutputParam(
     //
 
     // First, collect the subset of outputs being used
-    const bool isSPIRV = codeGenContext->getTargetFormat() == CodeGenTarget::SPIRV
-        || codeGenContext->getTargetFormat() == CodeGenTarget::SPIRVAssembly;
-    if(!isSPIRV)
+    if(!isSPIRV(codeGenContext->getTargetFormat()))
     {
         auto isMeshOutputBuiltin = [](IRInst* g)
         {

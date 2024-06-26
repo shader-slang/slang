@@ -338,6 +338,16 @@ void verifyComputeDerivativeGroupModifiers(
     bool linearAttr,
     IRNumThreadsDecoration* numThreadsDecor);
 
+
+inline bool isSPIRV(CodeGenTarget codeGenTarget)
+{
+    return codeGenTarget == CodeGenTarget::SPIRV
+            || codeGenTarget == CodeGenTarget::SPIRVAssembly;
+}
+
+int getIRVectorElementSize(IRType* type);
+IRType* getIRVectorBaseType(IRType* type);
+
 }
 
 #endif

@@ -56,6 +56,8 @@ namespace Slang
         
     };
 
+    bool isRaytracingStage(Stage inStage);
+
     const char* getStageName(Stage stage);
 
     void printDiagnosticArg(StringBuilder& sb, Stage val);

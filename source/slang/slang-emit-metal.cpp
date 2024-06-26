@@ -143,24 +143,36 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
     if (!layout)
         return;
+
     for (auto rr : layout->getOffsetAttrs())
     {
         switch (rr->getResourceKind())
         {
         case LayoutResourceKind::MetalTexture:
-            m_writer->emit(" [[texture(");
-            m_writer->emit(rr->getOffset());
-            m_writer->emit(")]]");
+            if (as<IRTextureTypeBase>(param->getDataType()) || as<IRTextureBufferType>(param->getDataType()))
+            {
+                m_writer->emit(" [[texture(");
+                m_writer->emit(rr->getOffset());
+                m_writer->emit(")]]");
+            }
             break;
         case LayoutResourceKind::MetalBuffer:
-            m_writer->emit(" [[buffer(");
-            m_writer->emit(rr->getOffset());
-            m_writer->emit(")]]");
+            if (as<IRPtrTypeBase>(param->getDataType()) || as<IRHLSLStructuredBufferTypeBase>(param->getDataType()) ||
+                as<IRByteAddressBufferTypeBase>(param->getDataType()) ||
+                as<IRUniformParameterGroupType>(param->getDataType()))
+            {
+                m_writer->emit(" [[buffer(");
+                m_writer->emit(rr->getOffset());
+                m_writer->emit(")]]");
+            }
             break;
         case LayoutResourceKind::SamplerState:
-            m_writer->emit(" [[sampler(");
-            m_writer->emit(rr->getOffset());
-            m_writer->emit(")]]");
+            if (as<IRSamplerStateTypeBase>(param->getDataType()))
+            {
+                m_writer->emit(" [[sampler(");
+                m_writer->emit(rr->getOffset());
+                m_writer->emit(")]]");
+            }
             break;
         case LayoutResourceKind::VaryingInput:
             m_writer->emit(" [[stage_in]]");
@@ -241,6 +253,24 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_discard:
         m_writer->emit("discard_fragment();\n");
         return true;
+    case kIROp_MetalAtomicCast:
+    {
+        auto oldValName = getName(inst);
+        auto op0 = inst->getOperand(0);
+
+        m_writer->emit("atomic_");
+        emitType(op0->getDataType());
+        m_writer->emit(" ");
+        m_writer->emit(oldValName);
+        m_writer->emit(" = ");
+
+        m_writer->emit("((atomic_");
+        emitType(op0->getDataType());
+        m_writer->emit(")(");
+        emitOperand(op0, getInfo(EmitOp::General));
+        m_writer->emit("));\n");
+        return true;
+    }
     }
     return false;
 }
@@ -314,6 +344,15 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             }
             break;
         }
+        case kIROp_FRem:
+        {
+            m_writer->emit("fmod(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
         case kIROp_Select:
         {
             m_writer->emit("select(");
@@ -374,7 +413,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("[(");
             emitOperand(offset, getInfo(EmitOp::General));
             m_writer->emit(")>>2] = as_type<uint32_t>(");
-            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }
@@ -410,6 +449,47 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
             m_writer->emit("] = ");
             emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            return true;
+        }
+        case kIROp_ImageLoad:
+        {
+            auto imageOp = as<IRImageLoad>(inst);
+            emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
+            m_writer->emit(".read(");
+            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
+            if(imageOp->hasAuxCoord1())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
+            }
+            if(imageOp->hasAuxCoord2())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord2(), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+            return true;
+        }
+        case kIROp_ImageStore:
+        {
+            
+            auto imageOp = as<IRImageStore>(inst);
+            emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
+            m_writer->emit(".write(");
+            emitOperand(imageOp->getValue(), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
+            if(imageOp->hasAuxCoord1())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
+            }
+            if(imageOp->hasAuxCoord2())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord2(), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
             return true;
         }
         default: break;
@@ -587,9 +667,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("matrix<");
             emitType(matType->getElementType());
             m_writer->emit(",");
-            emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
-            m_writer->emit(",");
             emitVal(matType->getRowCount(), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
             m_writer->emit("> ");           
             return;
         }
@@ -667,6 +747,13 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     if (auto texType = as<IRTextureType>(type))
     {
         _emitHLSLTextureType(texType);
+        return;
+    }
+    else if (as<IRTextureBufferType>(type))
+    {
+        m_writer->emit("texture_buffer<");
+        emitVal(type->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(">");
         return;
     }
     else if (auto imageType = as<IRGLSLImageType>(type))
@@ -760,7 +847,7 @@ bool MetalSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
     return false;
 }
 
-void MetalSourceEmitter::_emitUserSemantic(UnownedStringSlice semanticName, IRIntegerValue semanticIndex)
+bool MetalSourceEmitter::_emitUserSemantic(UnownedStringSlice semanticName, IRIntegerValue semanticIndex)
 {
     if (!semanticName.startsWithCaseInsensitive(toSlice("SV_")))
     {
@@ -772,7 +859,9 @@ void MetalSourceEmitter::_emitUserSemantic(UnownedStringSlice semanticName, IRIn
             m_writer->emit(semanticIndex);
         }
         m_writer->emit(")]]");
+        return true;
     }
+    return false;
 }
 
 void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
@@ -785,8 +874,10 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
         if (maybeEmitSystemSemantic(inst))
             return;
 
-        bool hasSemanticFromLayout = false;
-        if (auto varLayout = findVarLayout(inst))
+        auto varLayout = findVarLayout(inst);
+        bool hasSemantic = false;
+
+        if (varLayout)
         {
             for (auto attr : varLayout->getAllAttrs())
             {
@@ -797,18 +888,21 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
                         m_writer->emit(" [[attribute(");
                         m_writer->emit(offsetAttr->getOffset());
                         m_writer->emit(")]]");
+                        return;
                     }
                 }
-                else if (auto semanticAttr = as<IRSemanticAttr>(attr))
+            }
+            for (auto attr : varLayout->getAllAttrs())
+            {
+               if (auto semanticAttr = as<IRSemanticAttr>(attr))
                 {
                     auto semanticName = String(semanticAttr->getName()).toUpper();
-                    _emitUserSemantic(semanticAttr->getName(), semanticAttr->getIndex());
-                    hasSemanticFromLayout = true;
+                    hasSemantic = _emitUserSemantic(semanticAttr->getName(), semanticAttr->getIndex());
                 }
             }
 
         }
-        if (!hasSemanticFromLayout)
+        if (!hasSemantic)
         {
             if (auto semanticDecor = inst->findDecoration<IRSemanticDecoration>())
             {

@@ -1,7 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12 -use-dxil -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 // nested-parameter-block-2.slang
 
 struct CB

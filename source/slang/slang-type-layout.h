@@ -1043,16 +1043,19 @@ struct LayoutRulesImpl
 
     UniformLayoutInfo BeginStructLayout()
     {
+        SLANG_ASSERT(simpleRules);
         return simpleRules->BeginStructLayout();
     }
 
     LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo)
     {
+        SLANG_ASSERT(simpleRules);
         return simpleRules->AddStructField(ioStructInfo, fieldInfo);
     }
 
     void EndStructLayout(UniformLayoutInfo* ioStructInfo)
     {
+        SLANG_ASSERT(simpleRules);
         return simpleRules->EndStructLayout(ioStructInfo);
     }
 
@@ -1080,7 +1083,7 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getAnyValueRules()             = 0;
     virtual LayoutRulesImpl* getConstantBufferRules(CompilerOptionSet& compilerOptions) = 0;
     virtual LayoutRulesImpl* getPushConstantBufferRules()   = 0;
-    virtual LayoutRulesImpl* getTextureBufferRules()        = 0;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) = 0;
     virtual LayoutRulesImpl* getVaryingInputRules()         = 0;
     virtual LayoutRulesImpl* getVaryingOutputRules()        = 0;
     virtual LayoutRulesImpl* getSpecializationConstantRules()= 0;

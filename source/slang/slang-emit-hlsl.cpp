@@ -191,8 +191,10 @@ void HLSLSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(IRVarLayout*
 
 void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
+    LayoutResourceKind layoutResourceKind = LayoutResourceKind::ConstantBuffer;
     if (as<IRTextureBufferType>(type))
     {
+        layoutResourceKind = LayoutResourceKind::ShaderResource;
         m_writer->emit("tbuffer ");
     }
     else
@@ -218,7 +220,7 @@ void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
         typeLayout = parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
     }
 
-    _emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain, varDecl);
+    _emitHLSLRegisterSemantic(layoutResourceKind, &containerChain, varDecl);
 
     auto elementType = type->getElementType();
     if (shouldForceUnpackConstantBufferElements(type) || hasExplicitConstantBufferOffset(type))
@@ -714,7 +716,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 m_writer->emit("(");
                 emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
                 m_writer->emit(", ");
-                emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+                emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
                 m_writer->emit(")");
 
                 maybeCloseParens(needClose);

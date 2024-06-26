@@ -102,7 +102,7 @@ public out int gl_FragStencilRef : SV_StencilRef;
 
 public in uvec3 gl_GlobalInvocationID : SV_DispatchThreadID;
 public in uvec3 gl_WorkGroupID : SV_GroupID;
-public in uvec3 gl_LocalInvocationIndex : SV_GroupIndex;
+public in uint gl_LocalInvocationIndex : SV_GroupIndex;
 public in uvec3 gl_LocalInvocationID : SV_GroupThreadID;
 
 public property uint3 gl_NumWorkGroups {
@@ -1636,8 +1636,6 @@ public typealias sampler2DMS = Sampler2DMS<float4>;
 public typealias isampler2DMS = Sampler2DMS<int4>;
 public typealias usampler2DMS = Sampler2DMS<uint4>;
 
-__generic<T=float4, let sampleCount:int=0, let format:int=0>
-public typealias Sampler2DMSArray = Sampler2DArrayMS<T, sampleCount, format>;
 public typealias sampler2DMSArray = Sampler2DMSArray<float4>;
 public typealias isampler2DMSArray = Sampler2DMSArray<int4>;
 public typealias usampler2DMSArray = Sampler2DMSArray<uint4>;

@@ -3213,6 +3213,18 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* value)
+    {
+        IRInst* args[] = { byteAddressBuffer, offset, getIntValue(getUIntType(), 0), value};
+        return emitIntrinsicInst(getVoidType(), kIROp_ByteAddressBufferStore, 4, args);
+    }
+
+    IRInst* IRBuilder::emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* alignment, IRInst* value)
+    {
+        IRInst* args[] = { byteAddressBuffer, offset, alignment, value };
+        return emitIntrinsicInst(getVoidType(), kIROp_ByteAddressBufferStore, 4, args);
+    }
+
     IRInst* IRBuilder::emitReinterpret(IRInst* type, IRInst* value)
     {
         return emitIntrinsicInst((IRType*)type, kIROp_Reinterpret, 1, &value);
@@ -3882,7 +3894,23 @@ namespace Slang
     {
         auto targetVectorType = as<IRVectorType>(type);
         auto sourceVectorType = as<IRVectorType>(value->getDataType());
-        if (!targetVectorType)
+        if (targetVectorType && !sourceVectorType)
+        {
+            auto elementType = targetVectorType->getElementType();
+            Index elemCount = 1;
+            if(auto intLit = as<IRIntLit>(targetVectorType->getElementCount()))
+            {
+                elemCount = (Index)intLit->getValue();
+            }
+            IRInst* zeroVal = emitDefaultConstruct(elementType);
+            List<IRInst*> defaultVals;
+            defaultVals.reserve(elemCount);
+            defaultVals.add(value);
+            for(auto i = 1; i < elemCount; i++)
+                defaultVals.add(zeroVal);
+            return emitMakeVector(targetVectorType, defaultVals);
+        }
+        else if (!targetVectorType)
         {
             if (!sourceVectorType)
                 return emitCast(targetVectorType, value);
@@ -4813,17 +4841,18 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitImageLoad(IRType* type, IRInst* image, IRInst* coord)
+    /// @param params An ordered list of imageLoad parameters { image, coord, [optional] seperateArrayCoord, [optional] seperateSampleCoord }
+    IRInst* IRBuilder::emitImageLoad(IRType* type, ShortList<IRInst*> params)
     {
-        auto inst = createInst<IRImageLoad>(this, kIROp_ImageLoad, type, image, coord);
+        auto inst = createInst<IRImageLoad>(this, kIROp_ImageLoad, type, params.getCount(), params.getArrayView().getBuffer());
         addInst(inst);
         return inst;
     }
 
-    IRInst* IRBuilder::emitImageStore(IRType* type, IRInst* image, IRInst* coord, IRInst* value)
+    /// @param params An ordered list of imageStore parameters { image, coord, value, [optional] seperateArrayCoord, [optional] seperateSampleCoord }
+    IRInst* IRBuilder::emitImageStore(IRType* type, ShortList<IRInst*> params)
     {
-        IRInst* args[] = {image, coord, value};
-        auto inst = createInst<IRImageStore>(this, kIROp_ImageStore, type, 3, args);
+        auto inst = createInst<IRImageStore>(this, kIROp_ImageStore, type, params.getCount(), params.getArrayView().getBuffer());
         addInst(inst);
         return inst;
     }

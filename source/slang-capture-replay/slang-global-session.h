@@ -5,6 +5,7 @@
 #include "../../slang.h"
 #include "../../slang-com-helper.h"
 #include "../core/slang-smart-pointer.h"
+#include "capture-manager.h"
 
 namespace SlangCapture
 {
@@ -58,6 +59,8 @@ namespace SlangCapture
 
             SLANG_NO_THROW SlangResult SLANG_MCALL getSessionDescDigest(slang::SessionDesc* sessionDesc, ISlangBlob** outBlob) override;
 
+            CaptureManager* getCaptureManager() { return m_captureManager.get(); }
+
         private:
             SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(GlobalSessionCapture* session)
             {
@@ -65,6 +68,16 @@ namespace SlangCapture
             }
 
             Slang::ComPtr<slang::IGlobalSession> m_actualGlobalSession;
+
+            // we will create one capture file per IGlobalSession.
+            // We don't try to reproduce the user application's threading model, because it requires lots of effort and it's not necessary.
+            // Instead, we record all the compilation jobs associated with the session in the same capture file, so that during replay,
+            // those jobs will be executed sequentially. This might violate the user application's threading model, because those jobs might
+            // be executed in different threads. But it's not a big problem, because slang doesn't allow multiple threads to access the same
+            // session at the same time. So even if there is one session used by multiple threads, those threads will execute the compile jobs
+            // sequentially.
+            std::unique_ptr<CaptureManager>      m_captureManager;
+            uint64_t                             m_globalSessionHandle = 0;
     };
 } // namespace Slang
 

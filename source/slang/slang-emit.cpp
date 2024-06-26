@@ -50,6 +50,7 @@
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-vector-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
@@ -561,6 +562,17 @@ Result linkAndOptimizeIR(
 
     switch (target)
     {
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::PyTorchCppBinding:
+    break;
+
+    default:
+        removeTorchAndCUDAEntryPoints(irModule);
+        break;
+    }
+
+    switch (target)
+    {
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::HostCPPSource:
     {
@@ -609,10 +621,19 @@ Result linkAndOptimizeIR(
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         fuseCallsToSaturatedCooperation(irModule);
 
-    // Generate any requested derivative wrappers
-    if (requiredLoweringPassSet.derivativePyBindWrapper)
-        generateDerivativeWrappers(irModule, sink);
-
+    switch (target)
+    {   
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::PyTorchCppBinding:
+    {
+        // Generate any requested derivative wrappers
+        if (requiredLoweringPassSet.derivativePyBindWrapper)
+            generateDerivativeWrappers(irModule, sink);
+        break;
+    }
+    default:
+        break;
+    }
     // Next, we need to ensure that the code we emit for
     // the target doesn't contain any operations that would
     // be illegal on the target platform. For example,
@@ -1141,14 +1162,28 @@ Result linkAndOptimizeIR(
     if(requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
         legalizeDynamicResourcesForGLSL(codeGenContext, irModule);
 
-    // Legalize `ImageSubscript` and constant buffer loads for GLSL.
+    // Legalize `ImageSubscript` loads.
+    switch (target)
+    {
+    case CodeGenTarget::Metal:
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        {
+            legalizeImageSubscript(targetRequest, irModule, sink);
+        } 
+        break;
+    default:
+        break;
+    }
+
+    // Legalize constant buffer loads.
     switch (target)
     {
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         {
-            legalizeImageSubscriptForGLSL(irModule);
             legalizeConstantBufferLoadForGLSL(irModule);
             legalizeDispatchMeshPayloadForGLSL(irModule);
         }

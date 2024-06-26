@@ -1135,11 +1135,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "$0.sample($1, ($2).x, uint(($2).y))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).x, uint(($2).y))$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w))$z";
                     }
                 }
                 else
@@ -1150,7 +1150,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm ".sample";
+                        __intrinsic_asm "$c$0.sample($1, $2)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1219,7 +1219,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), $3)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), $3)$z";
                     }
                 }
                 else
@@ -1228,7 +1228,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     {
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm ".sample";
+                        __intrinsic_asm "$c$0.sample($1, $2, $3)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1267,7 +1267,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), min_lod_clamp($4), $3)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), min_lod_clamp($4), $3)$z";
                     }
                 }
                 else
@@ -1276,7 +1276,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     {
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "$0.sample($1, $2, min_lod_clamp($4), $3)";
+                        __intrinsic_asm "$c$0.sample($1, $2, min_lod_clamp($4), $3)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1333,9 +1333,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), bias($3))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), bias($3))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), bias($3))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w), bias($3))$z";
                     }
                 }
                 else
@@ -1345,7 +1345,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, $2, bias($3))";
+                        __intrinsic_asm "$c$0.sample($1, $2, bias($3))$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1383,7 +1383,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), bias($3), $4)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), bias($3), $4)$z";
                     }
                 }
                 else
@@ -1392,7 +1392,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     {
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "$0.sample($1, $2, bias($3), $4)";
+                        __intrinsic_asm "$c$0.sample($1, $2, bias($3), $4)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1637,9 +1637,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), gradientcube($3, $4))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w), gradientcube($3, $4))$z";
                     }
                 }
                 else
@@ -1647,11 +1647,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient2d($3, $4))";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient2d($3, $4))$z";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient3d($3, $4))";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient3d($3, $4))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, $2, gradientcube($3, $4))";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradientcube($3, $4))$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1688,7 +1688,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4), $5)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4), $5)$z";
                     }
                 }
                 else
@@ -1696,9 +1696,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient2d($3, $4), $5)";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient2d($3, $4), $5)$z";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient3d($3, $4), $5)";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient3d($3, $4), $5)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1737,7 +1737,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4), min_lod_clamp($6), $5)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4), min_lod_clamp($6), $5)$z";
                     }
                 }
                 else
@@ -1745,9 +1745,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient2d($3, $4), min_lod_clamp($6), $5)";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient2d($3, $4), min_lod_clamp($6), $5)$z";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient3d($3, $4), min_lod_clamp($6), $5)";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient3d($3, $4), min_lod_clamp($6), $5)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1784,20 +1784,24 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 {
                     switch (Shape.flavor)
                     {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "$c$0.sample($1, ($2).x, uint(($2).y))$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), level($3))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), level($3))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), level($3))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w), level($3))$z";
                     }
                 }
                 else
                 {
                     switch (Shape.flavor)
                     {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "$c$0.sample($1, $2)$z";
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, $2, level($3))";
+                        __intrinsic_asm "$c$0.sample($1, $2, level($3))$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1866,9 +1870,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), level($3), $4)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), level($3), $4)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), level($3), $4)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w), level($3), $4)$z";
                     }
                 }
                 else
@@ -1878,7 +1882,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, $2, level($3), $4)";
+                        __intrinsic_asm "$c$0.sample($1, $2, level($3), $4)$z";
                     }
                 }
                 __intrinsic_asm "<invalid intrinsic>";
@@ -2381,58 +2385,59 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                 // lod is not supported for 1D texture
                 if (isArray == 1)
                     // Tv read(uint coord, uint array, uint lod = 0) const
-                    __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y))";
+                    __intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y))$z";
                 else
                     // Tv read(uint coord, uint lod = 0) const
-                    __intrinsic_asm "$0.read(uint(($1).x))";
+                    __intrinsic_asm "$c$0.read(uint(($1).x))$z";
                 break;
             case $(SLANG_TEXTURE_2D):
                 if (isShadow == 1)
                 {
                     if (isArray == 1)
                         // T read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // T read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 else
                 {
                     if (isArray == 1)
                         // Tv read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // Tv read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 break;
             case $(SLANG_TEXTURE_3D):
                 if (isShadow == 0 && isArray == 0)
                     // Tv read(uint3 coord, uint lod = 0) const
-                    __intrinsic_asm "$0.read(vec<uint,3>(($1).xyz), uint(($1).w))";
+                    __intrinsic_asm "$c$0.read(vec<uint,3>(($1).xyz), uint(($1).w))$z";
                 break;
             case $(SLANG_TEXTURE_CUBE):
+                static_assert(isArray == 0, "Unsupported 'Load' of 'texture cube array' for 'metal' target");
                 if (isShadow == 1)
                 {
                     if (isArray == 1)
                         // T read(uint2 coord, uint face, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "<invalid intrinsics>";
                     else
                         // T read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 else
                 {
                     if (isArray == 1)
                         // Tv read(uint2 coord, uint face, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "<invalid intrinsics>";
                     else
                         // Tv read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 break;
             }
-            // TODO: This needs to be handled by the capability system
+            static_assert(false, "Unsupported 'Load' of 'texture' for 'metal' target");
             __intrinsic_asm "<invalid intrinsics>";
         case glsl:
             __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e)$z";
@@ -2579,20 +2584,20 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(($1).xy, ($1).z, uint($2))";
+                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // T read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$0.read($1, uint($2))";
+                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(($1).xy, ($1).z, uint($2))";
+                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // Tv read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$0.read($1, uint($2))";
+                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
                     }
                     break;
                 }
@@ -2784,37 +2789,38 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     // lod is not supported for 1D texture
                     if (isArray == 1)
                         // Tv read(uint coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y))";
+                        __intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y))$z";
                     else
                         // Tv read(uint coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(uint(($1).x))";
+                        __intrinsic_asm "$c$0.read(uint($1))$z";
                     break;
                 case $(SLANG_TEXTURE_2D):
                     if (isShadow == 1)
                     {
                         if (isArray == 1)
                             // T read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                         else
                             // T read(uint2 coord, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy))$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                         else
                             // Tv read(uint2 coord, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy))$z";
                     }
                     break;
                 case $(SLANG_TEXTURE_3D):
                     if (isShadow == 0 && isArray == 0)
                         // Tv read(uint3 coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,3>(($1).xyz), uint(($1).w))";
+                        __intrinsic_asm "$c$0.read(vec<uint,3>(($1).xyz))$z";
                     break;
                 case $(SLANG_TEXTURE_CUBE):
+                    static_assert(isArray == 0, "Unsupported 'Load' of 'texture cube array' for 'metal' target");
                     if (isShadow == 1)
                     {
                         if (isArray == 1)
@@ -2822,7 +2828,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                             __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6, uint(($1).w))";
                         else
                             // T read(uint2 coord, uint face, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     }
                     else
                     {
@@ -2831,11 +2837,11 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                             __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6, uint(($1).w))";
                         else
                             // Tv read(uint2 coord, uint face, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     }
                     break;
                 }
-                // TODO: This needs to be handled by the capability system
+                static_assert(false, "Unsupported 'Load' of 'texture' for 'metal' target");
                 __intrinsic_asm "<invalid intrinsics>";
         }
     }
@@ -2956,10 +2962,10 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                         // lod is not supported for 1D texture
                         if (isArray == 1)
                             // void write(Tv color, uint coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.write($2, uint(($1).x))";
+                            __intrinsic_asm "$0.write($2, uint(($1).x), uint(($1).y))";
                         else
                             // void write(Tv color, uint coord, uint lod = 0) const
-                            __intrinsic_asm "$0.write($2, uint(($1).x))";
+                            __intrinsic_asm "$0.write($2, uint($1))";
                         break;
                     case $(SLANG_TEXTURE_2D):
                         if (isShadow == 1)
@@ -2987,23 +2993,16 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                             __intrinsic_asm "$0.write($2, vec<uint,3>(($1).xyz))";
                         break;
                     case $(SLANG_TEXTURE_CUBE):
+                        static_assert(isArray == 0, "Unsupported 'Store' of 'texture cube array' for 'metal' target");
                         if (isShadow == 1)
                         {
-                            if (isArray == 1)
-                                // void write(Tv color, uint2 coord, uint face, uint array, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6)";
-                            else
-                                // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z))";
+                            // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
+                            __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                         }
                         else
                         {
-                            if (isArray == 1)
-                                // void write(Tv color, uint2 coord, uint face, uint array, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6)";
-                            else
-                                // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z))";
+                            // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
+                            __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                         }
                         break;
                     }
@@ -3040,20 +3039,20 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
                         if (isArray == 1)
                             // The document seems to have a typo. `lod` must mean `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), $2)";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), $2)$z";
                         else
                             // T read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), $2)";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), $2)$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // The document seems to have a typo. `lod` must mean `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), $2)";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), $2)$z";
                         else
                             // Tv read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), $2)";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), $2)$z";
                     }
                     break;
                 }
@@ -3232,7 +3231,7 @@ ${{{{
         auto requireString = requireStringBuilder.toString();
 }}}}
 $(requireString)
-typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(arrayPostFix[isArray])$(msPostFix[isMS])<T=float4, let sampleCount:int=0, let format:int=0> = __TextureImpl<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
+typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T=float4, let sampleCount:int=0, let format:int=0> = __TextureImpl<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
 ${{{{
 }
 }}}}
@@ -3883,7 +3882,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint Load(int location)
     {
         __target_switch
@@ -3899,7 +3898,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint2 Load2(int location)
     {
         __target_switch
@@ -3912,7 +3911,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint2 Load2(int location, int alignment)
     {
         __target_switch
@@ -3925,7 +3924,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint2 Load2Aligned(int location)
     {
         __target_switch
@@ -3941,7 +3940,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint3 Load3(int location)
     {
         __target_switch
@@ -3954,7 +3953,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint3 Load3(int location, int alignment)
     {
         __target_switch
@@ -3967,7 +3966,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint3 Load3Aligned(int location)
     {
         __target_switch
@@ -3983,7 +3982,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint4 Load4(int location)
     {
         __target_switch
@@ -3996,7 +3995,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint4 Load4(int location, int alignment)
     {
         __target_switch
@@ -4009,7 +4008,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     uint4 Load4Aligned(int location)
     {
         __target_switch
@@ -4025,7 +4024,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     T Load<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
@@ -4033,7 +4032,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     T Load<T>(int location, int alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
@@ -4041,7 +4040,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     T LoadAligned<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
@@ -4629,7 +4628,7 @@ ${{{{
 
     // Added operations:
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedAdd(
         UINT dest,
         UINT value,
@@ -4640,6 +4639,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicAdd($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedAdd";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAdd(buf[dest / 4], value, original_value);
@@ -4647,7 +4647,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedAdd(
         UINT dest,
         UINT value)
@@ -4657,6 +4657,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicAdd($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicAdd($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedAdd";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAdd(buf[dest / 4], value);
@@ -4664,7 +4665,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedAnd(
         UINT dest,
         UINT value,
@@ -4675,6 +4676,7 @@ ${{{{
         case glsl: __intrinsic_asm "$3 = atomicAnd($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "(*$3 = atomicAnd($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedAnd";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAnd(buf[dest / 4], value, original_value);
@@ -4682,7 +4684,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedAnd(
         UINT dest,
         UINT value)
@@ -4692,6 +4694,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicAnd($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicAnd($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedAnd";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAnd(buf[dest / 4], value);
@@ -4699,7 +4702,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedCompareExchange(
         UINT dest,
         UINT compare_value,
@@ -4711,6 +4714,7 @@ ${{{{
         case glsl: __intrinsic_asm "($4 = atomicCompSwap($0._data[$1/4], $2, $3))";
         case cuda: __intrinsic_asm "(*$4 = atomicCAS($0._getPtrAt<uint32_t>($1), $2, $3))";
         case hlsl: __intrinsic_asm ".InterlockedCompareExchange";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedCompareExchange(buf[dest / 4], compare_value, value, original_value);
@@ -4736,7 +4740,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedExchange(
         UINT dest,
         UINT value,
@@ -4747,6 +4751,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicExchange($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicExch($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedExchange";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedExchange(buf[dest / 4], value, original_value);
@@ -4754,7 +4759,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedMax(
         UINT dest,
         UINT value,
@@ -4765,6 +4770,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicMax($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicMax($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedMax";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMax(buf[dest / 4], value, original_value);
@@ -4772,7 +4778,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedMax(
         UINT dest,
         UINT value)
@@ -4782,6 +4788,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicMax($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicMax($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedMax";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMax(buf[dest / 4], value);
@@ -4789,7 +4796,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedMin(
         UINT dest,
         UINT value,
@@ -4800,6 +4807,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicMin($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicMin($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedMin";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMin(buf[dest / 4], value, original_value);
@@ -4807,7 +4815,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedMin(
         UINT dest,
         UINT value)
@@ -4817,6 +4825,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicMin($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicMin($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedMin";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMin(buf[dest / 4], value);
@@ -4824,7 +4833,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedOr(
         UINT dest,
         UINT value,
@@ -4835,6 +4844,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicOr($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicOr($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedOr";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedOr(buf[dest / 4], value, original_value);
@@ -4842,7 +4852,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedOr(
         UINT dest,
         UINT value)
@@ -4852,6 +4862,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicOr($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicOr($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedOr";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedOr(buf[dest / 4], value);
@@ -4859,7 +4870,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedXor(
         UINT dest,
         UINT value,
@@ -4870,6 +4881,7 @@ ${{{{
         case glsl: __intrinsic_asm "($3 = atomicXor($0._data[$1/4], $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicXor($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedXor";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedXor(buf[dest / 4], value, original_value);
@@ -4877,7 +4889,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedXor(
         UINT dest,
         UINT value)
@@ -4887,6 +4899,7 @@ ${{{{
         case glsl: __intrinsic_asm "atomicXor($0._data[$1/4], $2)";
         case cuda: __intrinsic_asm "atomicXor($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedXor";
+        case metal:
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedXor(buf[dest / 4], value);
@@ -4894,7 +4907,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store(uint address, uint value)
     {
         __target_switch
@@ -4907,7 +4920,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store2(uint address, uint2 value)
     {
         __target_switch
@@ -4920,7 +4933,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store2(uint address, uint2 value, uint alignment)
     {
         __target_switch
@@ -4932,7 +4945,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store2Aligned(uint address, uint2 value)
     {
         __target_switch
@@ -4944,7 +4957,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store3(uint address, uint3 value)
     {
         __target_switch
@@ -4957,7 +4970,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store3(uint address, uint3 value, uint alignment)
     {
         __target_switch
@@ -4994,7 +5007,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store4(uint address, uint4 value, uint alignment)
     {
         __target_switch
@@ -5006,7 +5019,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store4Aligned(uint address, uint4 value)
     {
         __target_switch
@@ -5685,7 +5698,7 @@ double asdouble(uint lowbits, uint highbits)
 // Reinterpret bits as a float (HLSL SM 4.0)
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 float asfloat(int x)
 {
     __target_switch
@@ -5694,6 +5707,7 @@ float asfloat(int x)
     case cuda: __intrinsic_asm "$P_asfloat($0)";
     case glsl: __intrinsic_asm "intBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$float result $x
     };
@@ -5701,7 +5715,7 @@ float asfloat(int x)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 float asfloat(uint x)
 {
     __target_switch
@@ -5710,6 +5724,7 @@ float asfloat(uint x)
     case cuda: __intrinsic_asm "$P_asfloat($0)";
     case glsl: __intrinsic_asm "uintBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$float result $x
     };
@@ -5718,13 +5733,14 @@ float asfloat(uint x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<float, N> asfloat(vector< int, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "intBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<float, N> result $x
     };
@@ -5735,13 +5751,14 @@ vector<float, N> asfloat(vector< int, N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<float,N> asfloat(vector<uint,N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "uintBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<float,N> result $x
     };
@@ -5779,21 +5796,18 @@ matrix<float,N,M> asfloat(matrix<uint,N,M> x)
 // No op
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 float asfloat(float x)
 { return x; }
 
 __generic<let N : int>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 vector<float,N> asfloat(vector<float,N> x)
 { return x; }
 
 __generic<let N : int, let M : int>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 matrix<float,N,M> asfloat(matrix<float,N,M> x)
 { return x; }
 
@@ -5890,7 +5904,7 @@ vector<T,N> asinh(vector<T,N> x)
 // Reinterpret bits as an int (HLSL SM 4.0)
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 int asint(float x)
 {
     __target_switch
@@ -5899,6 +5913,7 @@ int asint(float x)
     case cuda: __intrinsic_asm "$P_asint($0)";
     case glsl: __intrinsic_asm "floatBitsToInt";
     case hlsl: __intrinsic_asm "asint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$int result $x
     };
@@ -5906,7 +5921,7 @@ int asint(float x)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 int asint(uint x)
 {
     __target_switch
@@ -5915,6 +5930,7 @@ int asint(uint x)
     case cuda: __intrinsic_asm "$P_asint($0)";
     case glsl: __intrinsic_asm "int($0)";
     case hlsl: __intrinsic_asm "asint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$int result $x
     };
@@ -5923,13 +5939,14 @@ int asint(uint x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<int, N> asint(vector<float, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "floatBitsToInt";
     case hlsl: __intrinsic_asm "asint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<int, N> result $x
     };
@@ -5940,13 +5957,14 @@ vector<int, N> asint(vector<float, N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<int, N> asint(vector<uint, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "ivec$N0($0)";
     case hlsl: __intrinsic_asm "asint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<int, N> result $x
     };
@@ -5984,21 +6002,18 @@ matrix<int, N, M> asint(matrix<uint, N, M> x)
 // No op
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 int asint(int x)
 { return x; }
 
 __generic<let N : int>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 vector<int,N> asint(vector<int,N> x)
 { return x; }
 
 __generic<let N : int, let M : int>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 matrix<int,N,M> asint(matrix<int,N,M> x)
 { return x; }
 
@@ -6030,7 +6045,7 @@ void asuint(double value, out uint lowbits, out uint highbits)
 // Reinterpret bits as a uint (HLSL SM 4.0)
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 uint asuint(float x)
 {
     __target_switch
@@ -6039,6 +6054,7 @@ uint asuint(float x)
     case cuda: __intrinsic_asm "$P_asuint($0)";
     case glsl: __intrinsic_asm "floatBitsToUint";
     case hlsl: __intrinsic_asm "asuint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$uint result $x
     };
@@ -6046,7 +6062,7 @@ uint asuint(float x)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 uint asuint(int x)
 {
     __target_switch
@@ -6055,6 +6071,7 @@ uint asuint(int x)
     case cuda: __intrinsic_asm "$P_asuint($0)";
     case glsl: __intrinsic_asm "uint($0)";
     case hlsl: __intrinsic_asm "asuint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$uint result $x
     };
@@ -6063,13 +6080,14 @@ uint asuint(int x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<uint,N> asuint(vector<float,N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "floatBitsToUint";
     case hlsl: __intrinsic_asm "asuint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<uint,N> result $x
     };
@@ -6080,13 +6098,14 @@ vector<uint,N> asuint(vector<float,N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<uint, N> asuint(vector<int, N> x)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "uvec$N0($0)";
     case hlsl: __intrinsic_asm "asuint";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<uint, N> result $x
     };
@@ -6246,13 +6265,14 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<uint16_t,R,C> v
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 int16_t asint16(float16_t value) 
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "__half_as_short";
     case hlsl: __intrinsic_asm "asint16";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$int16_t result $value
     };
@@ -6262,12 +6282,13 @@ int16_t asint16(float16_t value)
 
 [__unsafeForceInlineEarly]
 [__readNone] 
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value) 
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "asint16";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     default: return asuint16(value);
     }
 }
@@ -6286,13 +6307,14 @@ matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> valu
 
 [__readNone]
 [__unsafeForceInlineEarly] 
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 float16_t asfloat16(int16_t value) 
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "__short_as_half";
     case hlsl: __intrinsic_asm "asfloat16";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$float16_t result $value
     };
@@ -6302,12 +6324,13 @@ float16_t asfloat16(int16_t value)
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
+[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value) 
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat16";
+    case metal: __intrinsic_asm "as_type<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$vector<float16_t,N> result $value
     };
@@ -7687,7 +7710,7 @@ vector<T,N> exp10(vector<T,N> x)
 __glsl_version(420)
 __cuda_sm_version(6.0)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 float f16tof32(uint value)
 {
     __target_switch
@@ -7696,6 +7719,7 @@ float f16tof32(uint value)
     case hlsl: __intrinsic_asm "f16tof32($0)";
     case cuda: __intrinsic_asm "__half2float(__ushort_as_half($0))";
     case cpp: __intrinsic_asm "f16tof32($0)";
+    case metal: __intrinsic_asm "as_type<half>((ushort)($0))";
     case spirv:
     {
         return spirv_asm {
@@ -7709,7 +7733,7 @@ float f16tof32(uint value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<float, N> f16tof32(vector<uint, N> value)
 {
     __target_switch
@@ -7734,7 +7758,7 @@ vector<float, N> f16tof32(vector<uint, N> value)
 __glsl_version(420)
 __cuda_sm_version(6.0)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 uint f32tof16(float value)
 {
     __target_switch
@@ -7743,6 +7767,7 @@ uint f32tof16(float value)
     case hlsl: __intrinsic_asm "f32tof16($0)";
     case cuda: __intrinsic_asm "__half_as_ushort(__float2half($0))";
     case cpp: __intrinsic_asm "f32tof16($0)";
+    case metal: __intrinsic_asm "as_type<ushort>((half)($0))";
     case spirv:
     {
         return spirv_asm {
@@ -7756,7 +7781,7 @@ uint f32tof16(float value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<uint, N> f32tof16(vector<float, N> value)
 {
     __target_switch
@@ -7782,7 +7807,7 @@ vector<uint, N> f32tof16(vector<float, N> value)
 
 __glsl_version(420)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 float f16tof32(float16_t value)
 {
     __target_switch
@@ -7791,6 +7816,7 @@ float f16tof32(float16_t value)
     case hlsl: __intrinsic_asm "f16tof32($0)";
     case cuda: __intrinsic_asm "__half2float($0)";
     case cpp: __intrinsic_asm "f16tof32($0)";
+    case metal: __intrinsic_asm "float($0)";
     case spirv:
     {
         return spirv_asm {
@@ -7802,13 +7828,14 @@ float f16tof32(float16_t value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<float, N> f16tof32(vector<float16_t, N> value)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "__half2float";
     case hlsl: __intrinsic_asm "f16tof32";
+    case metal: __intrinsic_asm "$TR($0)";
     case spirv: return spirv_asm {
         OpFConvert $$vector<float, N> result $value
     };
@@ -7820,13 +7847,14 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
 // Convert to float16_t
 __glsl_version(420)
 [__readNone]
-[require(cuda_glsl_spirv, shader5_sm_5_0)]
+[require(cuda_glsl_metal_spirv, shader5_sm_5_0)]
 float16_t f32tof16_(float value)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "__float2half";
     case glsl: __intrinsic_asm "packHalf2x16(vec2($0,0.0))";
+    case metal: __intrinsic_asm "half($0)";
     case spirv: return spirv_asm {
         OpFConvert $$float16_t result $value
     };
@@ -7835,12 +7863,13 @@ float16_t f32tof16_(float value)
 
 __generic<let N : int>
 [__readNone]
-[require(cuda_glsl_spirv, shader5_sm_5_0)]
+[require(cuda_glsl_metal_spirv, shader5_sm_5_0)]
 vector<float16_t, N> f32tof16_(vector<float, N> value)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "__float2half";
+    case metal: __intrinsic_asm "$TR($0)";
     case spirv: return spirv_asm {
         OpFConvert $$vector<float16_t, N> result $value
     };
@@ -7854,13 +7883,14 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
 // Flip surface normal to face forward, if needed
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "faceforward";
     case hlsl: __intrinsic_asm "faceforward";
+    case metal: __intrinsic_asm "faceforward";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T,N> result glsl450 FaceForward $n $i $ng
     };
@@ -7871,7 +7901,7 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 
 // Find first set bit starting at high bit and working down
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 int firstbithigh(int value)
 {
     __target_switch
@@ -7880,6 +7910,7 @@ int firstbithigh(int value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
+    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindSMsb $value
     };
@@ -7888,13 +7919,14 @@ int firstbithigh(int value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<int, N> firstbithigh(vector<int, N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
+    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<int, N> result glsl450 FindSMsb $value
     };
@@ -7904,7 +7936,7 @@ vector<int, N> firstbithigh(vector<int, N> value)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 uint firstbithigh(uint value)
 {
     __target_switch
@@ -7913,6 +7945,7 @@ uint firstbithigh(uint value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
+    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindUMsb $value
     };
@@ -7921,13 +7954,14 @@ uint firstbithigh(uint value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<uint,N> firstbithigh(vector<uint,N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
+    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<uint,N> result glsl450 FindUMsb $value
     };
@@ -7938,7 +7972,7 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
 
 // Find first set bit starting at low bit and working up
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 int firstbitlow(int value)
 {
     __target_switch
@@ -7947,6 +7981,7 @@ int firstbitlow(int value)
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
+    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindILsb $value
     };
@@ -7955,13 +7990,14 @@ int firstbitlow(int value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<int,N> firstbitlow(vector<int,N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
+    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<int,N> result glsl450 FindILsb $value
     };
@@ -7971,7 +8007,7 @@ vector<int,N> firstbitlow(vector<int,N> value)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 uint firstbitlow(uint value)
 {
     __target_switch
@@ -7980,6 +8016,7 @@ uint firstbitlow(uint value)
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
+    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindILsb $value
     };
@@ -7988,13 +8025,14 @@ uint firstbitlow(uint value)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<uint,N> firstbitlow(vector<uint,N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
+    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<uint,N> result glsl450 FindILsb $value
     };
@@ -8567,9 +8605,62 @@ void GroupMemoryBarrierWithGroupSync()
 
 // Atomics
 
+__generic<T>
+__intrinsic_op($(kIROp_MetalAtomicCast))
+[require(metal)]
+T* __getMetalAtomicRef(__ref T x);
+
+${{{{
+for (const char* fetchAndModify : {"add", "and", "max", "min", "or", "sub", "xor"})
+{
+}}}}
+    __generic<AtomicType, T>
+    [ForceInline]
+    [require(metal)]
+    void __metalInterlocked_$(fetchAndModify)(AtomicType dest, T value)
+    {
+        __intrinsic_asm "atomic_fetch_$(fetchAndModify)_explicit($0, $1, memory_order_relaxed)";
+    }
+
+    __generic<AtomicType, T>
+    [ForceInline]
+    [require(metal)]
+    void __metalInterlocked_$(fetchAndModify)(AtomicType dest, T value, out T original_value)
+    {
+        __intrinsic_asm "((*($2)) = (($[0])(atomic_fetch_$(fetchAndModify)_explicit($0, $1, memory_order_relaxed))))", T;
+    }
+${{{{
+} // fetchAndModify
+}}}}
+
+__generic<AtomicType, T>
 [ForceInline]
+[require(metal)]
+void __metalInterlocked_exchange(AtomicType dest, T value, out T original_value)
+{
+    __intrinsic_asm "((*($2)) = (($[0])(atomic_exchange_explicit($0, $1, memory_order_relaxed))))", T;
+}
+
+__generic<AtomicType, T>
+[ForceInline]
+[require(metal)]
+void __metalInterlocked_compare_exchange(AtomicType dest, __ref T compare_value, T value)
+{
+    __intrinsic_asm "atomic_compare_exchange_weak_explicit($0, $1, $2, memory_order_relaxed, memory_order_relaxed)";
+}
+
+__generic<AtomicType, T>
+[ForceInline]
+[require(metal)]
+void __metalInterlocked_compare_exchange(AtomicType dest, T compare_value, T value, out T original_value)
+{
+    __metalInterlocked_compare_exchange(dest, compare_value, value);
+    original_value = compare_value;
+}
+
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref  int dest,  int value)
 {
     __target_switch
@@ -8577,6 +8668,9 @@ void InterlockedAdd(__ref  int dest,  int value)
     case hlsl: __intrinsic_asm "InterlockedAdd";
     case cuda: __intrinsic_asm "atomicAdd($0, $1)";
     case glsl: __intrinsic_asm "$atomicAdd($A, $1)";
+    case metal:
+        __metalInterlocked_add(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8587,7 +8681,7 @@ void InterlockedAdd(__ref  int dest,  int value)
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref uint dest, uint value)
 {
     __target_switch
@@ -8595,6 +8689,9 @@ void InterlockedAdd(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedAdd";
     case cuda: __intrinsic_asm "atomicAdd((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicAdd($A, $1)";
+    case metal:
+        __metalInterlocked_add(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8611,14 +8708,17 @@ void InterlockedAdd(__ref uint dest, int value)
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
+void InterlockedAdd(__ref int dest, int value, out int original_value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAdd";
     case cuda: __intrinsic_asm "(*$2 = atomicAdd($0, $1))";
     case glsl: __intrinsic_asm "($2 = $atomicAdd($A, $1))";
+    case metal:
+        __metalInterlocked_add(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8630,7 +8730,7 @@ void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -8638,6 +8738,9 @@ void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedAdd";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicAdd((int*)$0, $1))";
     case glsl: __intrinsic_asm "($2 = $atomicAdd($A, $1))";
+    case metal:
+        __metalInterlocked_add(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8729,14 +8832,17 @@ void InterlockedAdd(__ref uint64_t dest, uint64_t value, out uint64_t original_v
 
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAnd(__ref  int dest,  int value)
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
+void InterlockedAnd(__ref int dest, int value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAnd";
     case cuda: __intrinsic_asm "atomicAnd($0, $1)";
     case glsl: __intrinsic_asm "$atomicAnd($A, $1)";
+    case metal:
+        __metalInterlocked_and(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8746,7 +8852,7 @@ void InterlockedAnd(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref uint dest, uint value)
 {
     __target_switch
@@ -8754,6 +8860,9 @@ void InterlockedAnd(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedAnd";
     case cuda: __intrinsic_asm "atomicAnd((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicAnd($A, $1)";
+    case metal:
+        __metalInterlocked_and(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8763,14 +8872,17 @@ void InterlockedAnd(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAnd(__ref  int dest,  int value, out  int original_value)
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
+void InterlockedAnd(__ref int dest, int value, out int original_value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedAnd";
     case cuda: __intrinsic_asm "(*$2 = atomicAnd($0, $1))";
     case glsl: __intrinsic_asm "($2 = $atomicAnd($A, $1))";
+    case metal:
+        __metalInterlocked_and(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8781,7 +8893,7 @@ void InterlockedAnd(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAnd(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -8789,6 +8901,9 @@ void InterlockedAnd(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedAnd";
     case glsl: __intrinsic_asm "($2 = atomicAnd($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicAnd((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_and(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8817,7 +8932,7 @@ void InterlockedAnd(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value, out  int original_value)
 {
     __target_switch
@@ -8825,6 +8940,9 @@ void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value,
     case hlsl: __intrinsic_asm "InterlockedCompareExchange";
     case glsl: __intrinsic_asm "($3 = $atomicCompSwap($A, $1, $2))";
     case cuda: __intrinsic_asm "(*$3 = atomicCAS($0, $1, $2))";
+    case metal:
+        __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8835,7 +8953,7 @@ void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value,
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value, out uint original_value)
 {
     __target_switch
@@ -8843,6 +8961,9 @@ void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value,
     case hlsl: __intrinsic_asm "InterlockedCompareExchange";
     case glsl: __intrinsic_asm "($3 = $atomicCompSwap($A, $1, $2))";
     case cuda: __intrinsic_asm "(*$3 = (uint)atomicCAS((int*)$0, $1, $2))";
+    case metal:
+        __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8858,6 +8979,9 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedCompareExchangeFloatBitwise";
+    case metal:
+        __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value);
+        return;
     }
 }
 
@@ -8867,44 +8991,36 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedCompareExchangeFloatBitwise";
+    case metal:
+        __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
+        return;
     }
 }
 
-[ForceInline]
-void InterlockedCompareExchange(__ref  int64_t dest,  int64_t compare_value,  int64_t value)
+${{{{
+for (const char* T : {"int64_t", "uint64_t"})
 {
-    __target_switch
+}}}}
+    [ForceInline]
+    void InterlockedCompareExchange(__ref $(T) dest, $(T) compare_value, $(T) value)
     {
-    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+        }
     }
-}
 
-[ForceInline]
-void InterlockedCompareExchange(__ref  int64_t dest,  int64_t compare_value,  int64_t value, out  int64_t original_value)
-{
-    __target_switch
+    [ForceInline]
+    void InterlockedCompareExchange(__ref $(T) dest, $(T) compare_value, $(T) value, out $(T) original_value)
     {
-    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+        }
     }
-}
-
-[ForceInline]
-void InterlockedCompareExchange(__ref  uint64_t dest,  uint64_t compare_value,  uint64_t value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
-    }
-}
-
-[ForceInline]
-void InterlockedCompareExchange(__ref  uint64_t dest,  uint64_t compare_value,  uint64_t value, out  uint64_t original_value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
-    }
-}
+${{{{
+} // T
+}}}}
 
 __glsl_version(430)
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
@@ -8968,7 +9084,7 @@ void InterlockedCompareStore(__ref uint64_t dest, uint64_t compare_value, uint64
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
 {
     __target_switch
@@ -8976,6 +9092,9 @@ void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
     case hlsl: __intrinsic_asm "InterlockedExchange";
     case glsl: __intrinsic_asm "($2 = $atomicExchange($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicExch($0, $1))";
+    case metal:
+        __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -8986,7 +9105,7 @@ void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedExchange(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -8994,6 +9113,9 @@ void InterlockedExchange(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedExchange";
     case glsl: __intrinsic_asm "($2 = $atomicExchange($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicExch((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9018,6 +9140,9 @@ void InterlockedExchange(__ref  float dest,  float value, out  float original_va
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedExchange";
+    case metal:
+        __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
+        return;
     }
 }
 
@@ -9058,7 +9183,7 @@ void InterlockedExchange(__ref  uint64_t dest,  uint64_t value, out  uint64_t or
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref  int dest,  int value)
 {
     __target_switch
@@ -9066,6 +9191,9 @@ void InterlockedMax(__ref  int dest,  int value)
     case hlsl: __intrinsic_asm "InterlockedMax";
     case glsl: __intrinsic_asm "$atomicMax($A, $1)";
     case cuda: __intrinsic_asm "atomicMax($0, $1)";
+    case metal:
+        __metalInterlocked_max(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9075,7 +9203,7 @@ void InterlockedMax(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref uint dest, uint value)
 {
     __target_switch
@@ -9083,6 +9211,9 @@ void InterlockedMax(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedMax";
     case glsl: __intrinsic_asm "$atomicMax($A, $1)";
     case cuda: __intrinsic_asm "atomicMax((int*)$0, $1)";
+    case metal:
+        __metalInterlocked_max(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9092,7 +9223,7 @@ void InterlockedMax(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref  int dest,  int value, out  int original_value)
 {
     __target_switch
@@ -9100,6 +9231,9 @@ void InterlockedMax(__ref  int dest,  int value, out  int original_value)
     case hlsl: __intrinsic_asm "InterlockedMax";
     case glsl: __intrinsic_asm "($2 = $atomicMax($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicMax($0, $1))";
+    case metal:
+        __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9110,7 +9244,7 @@ void InterlockedMax(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMax(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -9118,6 +9252,9 @@ void InterlockedMax(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedMax";
     case glsl: __intrinsic_asm "($2 = $atomicMax($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicMax((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9164,7 +9301,7 @@ void InterlockedMax(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref  int dest,  int value)
 {
     __target_switch
@@ -9172,6 +9309,9 @@ void InterlockedMin(__ref  int dest,  int value)
     case hlsl: __intrinsic_asm "InterlockedMin";
     case glsl: __intrinsic_asm "$atomicMin($A, $1)";
     case cuda: __intrinsic_asm "atomicMin($0, $1)";
+    case metal:
+        __metalInterlocked_min(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9181,7 +9321,7 @@ void InterlockedMin(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref uint dest, uint value)
 {
     __target_switch
@@ -9189,6 +9329,9 @@ void InterlockedMin(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedMin";
     case glsl: __intrinsic_asm "$atomicMin($A, $1)";
     case cuda: __intrinsic_asm "atomicMin((int*)$0, $1)";
+    case metal:
+        __metalInterlocked_min(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9198,7 +9341,7 @@ void InterlockedMin(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref  int dest,  int value, out  int original_value)
 {
     __target_switch
@@ -9206,6 +9349,9 @@ void InterlockedMin(__ref  int dest,  int value, out  int original_value)
     case hlsl: __intrinsic_asm "InterlockedMin";
     case glsl: __intrinsic_asm "($2 = $atomicMin($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicMin($0, $1))";
+    case metal:
+        __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9216,7 +9362,7 @@ void InterlockedMin(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedMin(__ref uint dest, uint value, out uint original_value)
 {
     __target_switch
@@ -9224,6 +9370,9 @@ void InterlockedMin(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedMin";
     case glsl: __intrinsic_asm "($2 = $atomicMin($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicMin((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9270,7 +9419,7 @@ void InterlockedMin(__ref  uint64_t dest,  uint64_t value, out  uint64_t origina
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref  int dest,  int value)
 {
     __target_switch
@@ -9278,6 +9427,9 @@ void InterlockedOr(__ref  int dest,  int value)
     case hlsl: __intrinsic_asm "InterlockedOr";
     case cuda: __intrinsic_asm "atomicOr((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicOr($A, $1)";
+    case metal:
+        __metalInterlocked_or(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9287,7 +9439,7 @@ void InterlockedOr(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref uint dest, uint value)
 {
     __target_switch
@@ -9295,6 +9447,9 @@ void InterlockedOr(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedOr";
     case cuda: __intrinsic_asm "atomicOr((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicOr($A, $1)";
+    case metal:
+        __metalInterlocked_or(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9304,7 +9459,7 @@ void InterlockedOr(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref  int dest,  int value, out  int original_value)
 {
      __target_switch
@@ -9312,6 +9467,9 @@ void InterlockedOr(__ref  int dest,  int value, out  int original_value)
     case hlsl: __intrinsic_asm "InterlockedOr";
     case glsl: __intrinsic_asm "($2 = atomicOr($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicOr($0, $1))";
+    case metal:
+        __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9322,7 +9480,7 @@ void InterlockedOr(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedOr(__ref uint dest, uint value, out uint original_value)
 {
      __target_switch
@@ -9330,6 +9488,9 @@ void InterlockedOr(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedOr";
     case glsl: __intrinsic_asm "($2 = atomicOr($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicOr((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9358,7 +9519,7 @@ void InterlockedOr(__ref  uint64_t dest,  uint64_t value, out  uint64_t original
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref  int dest,  int value)
 {
     __target_switch
@@ -9366,6 +9527,9 @@ void InterlockedXor(__ref  int dest,  int value)
     case hlsl: __intrinsic_asm "InterlockedXor";
     case cuda: __intrinsic_asm "atomicXor((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicXor($A, $1)";
+    case metal:
+        __metalInterlocked_xor(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9375,7 +9539,7 @@ void InterlockedXor(__ref  int dest,  int value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref uint dest, uint value)
 {
     __target_switch
@@ -9383,6 +9547,9 @@ void InterlockedXor(__ref uint dest, uint value)
     case hlsl: __intrinsic_asm "InterlockedXor";
     case cuda: __intrinsic_asm "atomicXor((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicXor($A, $1)";
+    case metal:
+        __metalInterlocked_xor(__getMetalAtomicRef(dest), value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9392,7 +9559,7 @@ void InterlockedXor(__ref uint dest, uint value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref  int dest,  int value, out  int original_value)
 {
      __target_switch
@@ -9400,6 +9567,9 @@ void InterlockedXor(__ref  int dest,  int value, out  int original_value)
     case hlsl: __intrinsic_asm "InterlockedXor";
     case glsl: __intrinsic_asm "($2 = atomicXor($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicXor($0, $1))";
+    case metal:
+        __metalInterlocked_xor(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -9410,7 +9580,7 @@ void InterlockedXor(__ref  int dest,  int value, out  int original_value)
 }
 
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedXor(__ref uint dest, uint value, out uint original_value)
 {
      __target_switch
@@ -9418,6 +9588,9 @@ void InterlockedXor(__ref uint dest, uint value, out uint original_value)
     case hlsl: __intrinsic_asm "InterlockedXor";
     case glsl: __intrinsic_asm "($2 = atomicXor($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicXor((int*)$0, $1))";
+    case metal:
+        __metalInterlocked_xor(__getMetalAtomicRef(dest), value, original_value);
+        return;
     case spirv:
         spirv_asm
         {
@@ -10848,6 +11021,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
+[OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
@@ -14919,6 +15093,24 @@ matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask)
     }
 }
 
+__glsl_extension(GL_EXT_demote_to_helper_invocation)
+[ForceInline]
+[require(glsl_hlsl_metal_spirv, helper_lane)]
+bool IsHelperLane()
+{
+    __target_switch {
+    case hlsl: __intrinsic_asm "IsHelperLane()";
+    case glsl: __intrinsic_asm "gl_HelperInvocation";
+    case metal: __intrinsic_asm "simd_is_helper_thread()";
+    case spirv:
+        return spirv_asm {
+            OpExtension "SPV_EXT_demote_to_helper_invocation";
+            OpCapability DemoteToHelperInvocationEXT;
+            result:$$bool = OpIsHelperInvocationEXT
+        };
+    }
+}
+
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
 typedef Texture2D texture2D;
 
@@ -14981,7 +15173,7 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load";
-        case metal: __intrinsic_asm "$0.read(uint($1))";
+        case metal: __intrinsic_asm "$c$0.read(uint($1))$z";
         case glsl: __intrinsic_asm "$(glslLoadFuncName)($0, $1)$z";
         case spirv: return spirv_asm {
                 %sampled:__sampledType(T) = $(spvLoadInstName) $this $location;
@@ -19180,8 +19372,7 @@ ${
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19208,8 +19399,7 @@ ${
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Bias $bias;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel Bias $bias;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19238,8 +19428,7 @@ ${
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel MinLod $lodClamp;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel MinLod $lodClamp;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19269,8 +19458,7 @@ ${
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Bias|MinLod $bias $lodClamp;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel Bias|MinLod $bias $lodClamp;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19298,8 +19486,7 @@ ${
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Lod $lod;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel Lod $lod;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19332,8 +19519,7 @@ ${{{
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Grad $dx $dy;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel Grad $dx $dy;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19364,8 +19550,7 @@ ${{{
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Grad|MinLod $dx $dy $lodClamp;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel Grad|MinLod $dx $dy $lodClamp;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
