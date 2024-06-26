@@ -3232,6 +3232,13 @@ struct IRSPIRVAsm : IRInst
     }
 };
 
+struct IRMetalSetVertex : IRInst
+{
+    IR_LEAF_ISA(MetalSetVertex)
+    IRInst* getIndex() { return getOperand(0); }
+    IRInst* getVertex() { return getOperand(1); }
+}; 
+
 struct IRGenericAsm : IRTerminatorInst
 {
     IR_LEAF_ISA(GenericAsm)
@@ -3618,6 +3625,12 @@ public:
     IRMetalMeshGridPropertiesType* getMetalMeshGridPropertiesType()
     {
         return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
+    }
+
+    IRMetalMeshType* getMetalMeshType(IRType* vertexType, IRType* primitiveType, IRInst* maxVertices, IRInst* maxPrimitives, IRStringLit* topology)
+    {
+        IRInst* operands[] = {vertexType, primitiveType, maxVertices, maxPrimitives, topology};
+        return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, operands);
     }
 
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
@@ -4254,6 +4267,8 @@ public:
     IRBindGlobalGenericParam* emitBindGlobalGenericParam(
         IRInst* param,
         IRInst* val);
+
+    IRInst* emitMetalSetVertex(IRInst* baseIndex, IRInst* vertex);
 
     IRDecoration* addBindExistentialSlotsDecoration(
         IRInst*         value,

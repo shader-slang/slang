@@ -1551,6 +1551,17 @@ SIMPLE_IR_TYPE(VerticesType, MeshOutputType)
 SIMPLE_IR_TYPE(IndicesType, MeshOutputType)
 SIMPLE_IR_TYPE(PrimitivesType, MeshOutputType)
 
+// Metal mesh shading output is defined by a generic type
+struct IRMetalMeshType : IRType
+{
+    IRType* getVertexType() { return (IRType*)getOperand(0); }
+    IRType* getPrimitiveType() { return (IRType*)getOperand(1); }
+    IRInst* getMaxNumVertices() { return (IRInst*)getOperand(2); }
+    IRInst* getMaxNumPrimitives() { return (IRInst*)getOperand(3); }
+    // Technically, it is a built-in enum, but it is equivalent to the unquoted HLSL topology
+    IRStringLit* getTopology() { return (IRStringLit*)getOperand(4); }
+};
+
 SIMPLE_IR_TYPE(MetalMeshGridPropertiesType, Type)
 
 SIMPLE_IR_TYPE(GLSLInputAttachmentType, Type)

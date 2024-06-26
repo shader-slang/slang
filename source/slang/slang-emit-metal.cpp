@@ -451,6 +451,16 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
             return true;
         }
+        case kIROp_MetalSetVertex:
+        {
+            auto setVertex = as<IRMetalSetVertex>(inst);
+            m_writer->emit("_slang_mesh.set_vertex(");
+            emitOperand(setVertex->getIndex(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(setVertex->getVertex(), getInfo(EmitOp::General));
+            m_writer->emit(");");
+            return true;
+        }
         default: break;
     }
     // Not handled
@@ -697,6 +707,23 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_MetalMeshGridPropertiesType:
         {
             m_writer->emit("mesh_grid_properties ");
+            return;
+        }
+        case kIROp_MetalMeshType:
+        {
+            auto meshType = cast<IRMetalMeshType>(type);
+            m_writer->emit("metal::mesh<");
+            emitType(meshType->getVertexType());
+            m_writer->emit(", ");
+            emitType(meshType->getPrimitiveType());
+            m_writer->emit(", ");
+            emitSimpleValue(meshType->getMaxNumVertices());
+            m_writer->emit(", ");
+            emitSimpleValue(meshType->getMaxNumPrimitives());
+            m_writer->emit(", metal::topology::");
+            // TODO: this is pretty hacky, there has to be a better way to do this, but I dont see why this wouldn't work
+            m_writer->emitRawTextSpan(meshType->getTopology()->getStringSlice().begin(), meshType->getTopology()->getStringSlice().end());
+            m_writer->emit(">");
             return;
         }
         default:

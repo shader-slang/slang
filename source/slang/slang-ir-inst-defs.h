@@ -192,8 +192,14 @@ INST(Nop, nop, 0, 0)
             INST(PrimitivesType, Primitives, 2, HOISTABLE)
         INST_RANGE(MeshOutputType, VerticesType, PrimitivesType)
 
+        /* Metal Mesh Type*/
+            INST(MetalMeshType, metal::mesh, 5, HOISTABLE)
+
         /* Metal Mesh Grid Properties */
             INST(MetalMeshGridPropertiesType, mesh_grid_properties, 0, HOISTABLE)
+    
+        /* Metal Mesh set_vertex inst */
+            INST(MetalSetVertex, set_vertex, 2, HOISTABLE)
 
         /* HLSLStructuredBufferTypeBase */
             INST(HLSLStructuredBufferType,                  StructuredBuffer,                   0, HOISTABLE)

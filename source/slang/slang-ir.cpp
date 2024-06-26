@@ -5151,6 +5151,13 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitMetalSetVertex(IRInst* baseIndex, IRInst* vertex)
+    {
+        auto inst = createInst<IRMetalSetVertex>(this, kIROp_MetalSetVertex, getVoidType(), baseIndex, vertex);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode)
     {
         return addDecoration(
