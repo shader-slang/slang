@@ -1157,6 +1157,11 @@ struct IRStringLit : IRConstant
     IR_LEAF_ISA(StringLit);
 };
 
+struct IRBlobLit : IRConstant
+{
+    IR_LEAF_ISA(BlobLit);
+};
+
 struct IRPtrLit : IRConstant
 {
     IR_LEAF_ISA(PtrLit);

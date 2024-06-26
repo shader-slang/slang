@@ -3431,6 +3431,7 @@ public:
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
+    IRBlobLit* getBlobValue(ISlangBlob* blob);
     IRPtrLit* _getPtrValue(void* ptr);
     IRPtrLit* getNullPtrValue(IRType* type);
     IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
@@ -3946,6 +3947,9 @@ public:
 
     IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* value);
     IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* alignment, IRInst* value);
+
+    IRInst* emitEmbeddedDXIL(ISlangBlob* blob);
+    IRInst* emitEmbeddedSPIRV(ISlangBlob* blob);
 
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
