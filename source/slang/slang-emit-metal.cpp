@@ -253,6 +253,24 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_discard:
         m_writer->emit("discard_fragment();\n");
         return true;
+    case kIROp_MetalAtomicCast:
+    {
+        auto oldValName = getName(inst);
+        auto op0 = inst->getOperand(0);
+
+        m_writer->emit("atomic_");
+        emitType(op0->getDataType());
+        m_writer->emit(" ");
+        m_writer->emit(oldValName);
+        m_writer->emit(" = ");
+
+        m_writer->emit("((atomic_");
+        emitType(op0->getDataType());
+        m_writer->emit(")(");
+        emitOperand(op0, getInfo(EmitOp::General));
+        m_writer->emit("));\n");
+        return true;
+    }
     }
     return false;
 }

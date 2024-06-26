@@ -2889,6 +2889,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_AtomicCounterIncrement:
     case kIROp_AtomicCounterDecrement:
     case kIROp_StructuredBufferGetDimensions:
+    case kIROp_MetalAtomicCast:
         emitInstStmt(inst);
         break;
 
