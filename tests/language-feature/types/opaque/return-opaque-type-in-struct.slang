@@ -4,7 +4,8 @@
 // aggregate type that includes an opaque type
 
 //TEST(compute):COMPARE_COMPUTE:
-//TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+// GFX backend fails
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 struct Things
 {
