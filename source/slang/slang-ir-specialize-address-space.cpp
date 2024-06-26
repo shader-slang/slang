@@ -60,9 +60,18 @@ namespace Slang
             case kIROp_RWStructuredBufferGetElementPtr:
                 return AddressSpace::Global;
             case kIROp_Var:
-                if (as<IRBlock>(inst->getParent()))
+            {
+                auto addressSpace = getAddressSpaceFromVarType(as<IRVar>(inst)->getFullType());
+                if (!as<IRBlock>(inst->getParent()))
+                    return addressSpace;
+
+                // Default address space for local variables are `ThreadLocal`
+                // `Generic`/`Global` implies missing address space, use default address space.
+                if (addressSpace == AddressSpace::Generic
+                    || addressSpace == AddressSpace::Global)
                     return AddressSpace::ThreadLocal;
-                break;
+                return addressSpace;
+            }
             default:
                 break;
             }
@@ -196,8 +205,7 @@ namespace Slang
                         {
                         case kIROp_Var:
                         {
-                            // All local variables should be in the thread-local address space.
-                            mapInstToAddrSpace[inst] = AddressSpace::ThreadLocal;
+                            mapInstToAddrSpace[inst] = getLeafInstAddressSpace(inst);
                             changed = true;
                             break;
                         }
