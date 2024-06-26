@@ -5,15 +5,6 @@ standard output = {
 {
     "parameters": [
         {
-            "name": "outputBuffer",
-            "binding": {"kind": "descriptorTableSlot", "index": 0},
-            "type": {
-                "kind": "resource",
-                "baseShape": "byteAddressBuffer",
-                "access": "readWrite"
-            }
-        },
-        {
             "name": "g_TextureHeap",
             "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 0},
             "type": {
@@ -48,6 +39,13 @@ standard output = {
             "type": {
                 "kind": "DynamicResource"
             }
+        },
+        {
+            "name": "g_SingleDynamicResourceC",
+            "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 2},
+            "type": {
+                "kind": "DynamicResource"
+            }
         }
     ],
     "entryPoints": [
@@ -71,10 +69,6 @@ standard output = {
             "threadGroupSize": [16, 1, 1],
             "bindings": [
                 {
-                    "name": "outputBuffer",
-                    "binding": {"kind": "descriptorTableSlot", "index": 0}
-                },
-                {
                     "name": "g_TextureHeap",
                     "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 0}
                 },
@@ -89,6 +83,10 @@ standard output = {
                 {
                     "name": "g_SingleDynamicResourceB",
                     "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 1}
+                },
+                {
+                    "name": "g_SingleDynamicResourceC",
+                    "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 2}
                 }
             ]
         }

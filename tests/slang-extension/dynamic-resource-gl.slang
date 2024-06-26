@@ -1,8 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target glsl
 //TEST:REFLECTION: -stage compute -entry computeMain -target glsl
 
-RWByteAddressBuffer outputBuffer;
-
 // CHECK-DAG: layout(binding = 0, set = 1)
 // CHECK-DAG: texture2D g_TextureHeap_1[]
 
@@ -27,6 +25,9 @@ __DynamicResource g_SingleDynamicResourceA;
 [vk::binding(1, 2)]
 __DynamicResource g_SingleDynamicResourceB;
 
+// CHECK-DAG: layout(std430, binding = 2, set = 2) buffer
+[vk::binding(2, 2)]
+__DynamicResource g_SingleDynamicResourceC;
 
 // CHECK: IndirectAccess_0
 // CHECK: g_TextureHeap_0[_S1]
@@ -45,6 +46,7 @@ void computeMain(int2 tid: SV_DispatchThreadID)
 {
     Texture2D texture = g_TextureHeap[3];
     SamplerState sampler = g_SamplerHeap[2].as<SamplerState>();
+
     float4 value = texture.SampleLevel(sampler, tid / 64.0, 0.0);
 
     value += IndirectAccess(g_TextureHeap[1], tid);
@@ -52,5 +54,6 @@ void computeMain(int2 tid: SV_DispatchThreadID)
     value += g_SingleDynamicResourceA.as<Texture2D>()[tid];
     value += g_SingleDynamicResourceB.as<Texture2D>()[tid];
 
-    outputBuffer.Store(tid.x + tid.y * 64, value);
+    RWStructuredBuffer<float4> outputBuffer = g_SingleDynamicResourceC;
+    outputBuffer[tid.x + tid.y * 64] = value;
 }

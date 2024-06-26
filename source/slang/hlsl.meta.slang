@@ -20109,15 +20109,33 @@ extension __TextureImpl<T, Shape, isArray, isMS, sampleCount, access, isShadow, 
     __init(__DynamicResource res);
 }
 
-extension SamplerState : __IDynamicResourceCastable<__DynamicResourceKind.Sampler>
+${{{{
+const char* kDynamicResourceCastableTypes[] = {
+    "StructuredBuffer<T, L>", "RWStructuredBuffer<T, L>",
+    "AppendStructuredBuffer<T, L>", "ConsumeStructuredBuffer<T, L>", "RasterizerOrderedStructuredBuffer<T, L>",
+    "ByteAddressBuffer", "RWByteAddressBuffer", "RasterizerOrderedByteAddressBuffer",
+
+    "SamplerState", "SamplerComparisonState",
+
+    "ConstantBuffer<T>", "TextureBuffer<T>",
+};
+
+for (auto typeName: kDynamicResourceCastableTypes) {
+    auto kind = strstr(typeName, "Sampler") ? "Sampler" : "General";
+
+    if (strstr(typeName, "StructuredBuffer<T, L>"))
+        sb << "__generic<T, L : IBufferDataLayout = DefaultDataLayout>\n";
+    else if (strstr(typeName, "<T>"))
+        sb << "__generic<T>\n";
+}}}}
+
+extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(kind)>
 {
     __intrinsic_op($(kIROp_CastDynamicResource))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
     __init(__DynamicResource res);
 }
-extension SamplerComparisonState : __IDynamicResourceCastable<__DynamicResourceKind.Sampler>
-{
-    __intrinsic_op($(kIROp_CastDynamicResource))
-    __implicit_conversion($(kConversionCost_GenericParamUpcast))
-    __init(__DynamicResource res);
+
+${{{{
 }
+}}}}
