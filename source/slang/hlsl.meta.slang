@@ -2296,11 +2296,17 @@ ${{{{
         {
             auto componentName = componentNames[componentId];
             auto glslComponent = (isCmp ? "" :glslComponentNames[componentId == 0 ? 0 : componentId - 1]);
-    }}}}
+    
+            for (bool isStatus : { false, true })
+            {
+                const char* statusDecl = isStatus ? ", out uint status" : "";
+                const char* statusInit = isStatus ? " status = 0;\n" : "";
+}}}}
     [ForceInline]
     [require(glsl_hlsl_metal_spirv, texture_gather)]
-    vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam))
+    vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam) $(statusDecl))
     {
+        $(statusInit)
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
@@ -2313,8 +2319,9 @@ ${{{{
     }
     [ForceInline]
     [require(glsl_hlsl_metal_spirv, texture_gather)]
-    vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam), constexpr vector<int, Shape.planeDimensions> offset)
+    vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam), constexpr vector<int, Shape.planeDimensions> offset $(statusDecl))
     {
+        $(statusInit)
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
@@ -2331,8 +2338,10 @@ ${{{{
         constexpr vector<int, Shape.planeDimensions> offset1,
         constexpr vector<int, Shape.planeDimensions> offset2,
         constexpr vector<int, Shape.planeDimensions> offset3,
-        constexpr vector<int, Shape.planeDimensions> offset4)
+        constexpr vector<int, Shape.planeDimensions> offset4
+        $(statusDecl))
     {
+        $(statusInit)
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
@@ -2341,10 +2350,11 @@ ${{{{
             return __texture_gather$(cmp)_offsets<T>(this,$(samplerStateParam) location $(compareArg), offset1,offset2,offset3,offset4 $(glslComponent));
         }
     }
-    ${{{{
+${{{{
+            } // for (isStatus)
         } // for (componentId)
     } // for (isCmp)
-    }}}}
+}}}}
 } // end extension for gather
 
 ${{{{
