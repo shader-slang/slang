@@ -1135,11 +1135,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "$0.sample($1, ($2).x, uint(($2).y))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).x, uint(($2).y))$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w))$z";
                     }
                 }
                 else
@@ -1150,7 +1150,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm ".sample";
+                        __intrinsic_asm "$c$0.sample($1, $2)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1219,7 +1219,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), $3)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), $3)$z";
                     }
                 }
                 else
@@ -1228,7 +1228,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     {
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm ".sample";
+                        __intrinsic_asm "$c$0.sample($1, $2, $3)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1267,7 +1267,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), min_lod_clamp($4), $3)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), min_lod_clamp($4), $3)$z";
                     }
                 }
                 else
@@ -1276,7 +1276,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     {
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "$0.sample($1, $2, min_lod_clamp($4), $3)";
+                        __intrinsic_asm "$c$0.sample($1, $2, min_lod_clamp($4), $3)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1333,9 +1333,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), bias($3))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), bias($3))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), bias($3))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w), bias($3))$z";
                     }
                 }
                 else
@@ -1345,7 +1345,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, $2, bias($3))";
+                        __intrinsic_asm "$c$0.sample($1, $2, bias($3))$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1383,7 +1383,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), bias($3), $4)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), bias($3), $4)$z";
                     }
                 }
                 else
@@ -1392,7 +1392,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     {
                     case $(SLANG_TEXTURE_2D):
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "$0.sample($1, $2, bias($3), $4)";
+                        __intrinsic_asm "$c$0.sample($1, $2, bias($3), $4)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1637,9 +1637,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, ($2).xyz, uint(($2).w), gradientcube($3, $4))";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w), gradientcube($3, $4))$z";
                     }
                 }
                 else
@@ -1647,11 +1647,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient2d($3, $4))";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient2d($3, $4))$z";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient3d($3, $4))";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient3d($3, $4))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "$0.sample($1, $2, gradientcube($3, $4))";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradientcube($3, $4))$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1688,7 +1688,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4), $5)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4), $5)$z";
                     }
                 }
                 else
@@ -1696,9 +1696,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient2d($3, $4), $5)";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient2d($3, $4), $5)$z";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient3d($3, $4), $5)";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient3d($3, $4), $5)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -1737,7 +1737,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4), min_lod_clamp($6), $5)";
+                        __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), gradient2d($3, $4), min_lod_clamp($6), $5)$z";
                     }
                 }
                 else
@@ -1745,9 +1745,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient2d($3, $4), min_lod_clamp($6), $5)";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient2d($3, $4), min_lod_clamp($6), $5)$z";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "$0.sample($1, $2, gradient3d($3, $4), min_lod_clamp($6), $5)";
+                        __intrinsic_asm "$c$0.sample($1, $2, gradient3d($3, $4), min_lod_clamp($6), $5)$z";
                     }
                 }
                 // TODO: This needs to be handled by the capability system
@@ -2385,35 +2385,35 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                 // lod is not supported for 1D texture
                 if (isArray == 1)
                     // Tv read(uint coord, uint array, uint lod = 0) const
-                    __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y))";
+                    __intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y))$z";
                 else
                     // Tv read(uint coord, uint lod = 0) const
-                    __intrinsic_asm "$0.read(uint(($1).x))";
+                    __intrinsic_asm "$c$0.read(uint(($1).x))$z";
                 break;
             case $(SLANG_TEXTURE_2D):
                 if (isShadow == 1)
                 {
                     if (isArray == 1)
                         // T read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // T read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 else
                 {
                     if (isArray == 1)
                         // Tv read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // Tv read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 break;
             case $(SLANG_TEXTURE_3D):
                 if (isShadow == 0 && isArray == 0)
                     // Tv read(uint3 coord, uint lod = 0) const
-                    __intrinsic_asm "$0.read(vec<uint,3>(($1).xyz), uint(($1).w))";
+                    __intrinsic_asm "$c$0.read(vec<uint,3>(($1).xyz), uint(($1).w))$z";
                 break;
             case $(SLANG_TEXTURE_CUBE):
                 if (isShadow == 1)
@@ -2423,7 +2423,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                         __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                     else
                         // T read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 else
                 {
@@ -2432,7 +2432,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                         __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
                     else
                         // Tv read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 break;
             }
@@ -2583,20 +2583,20 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(($1).xy, ($1).z, uint($2))";
+                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // T read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$0.read($1, uint($2))";
+                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(($1).xy, ($1).z, uint($2))";
+                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // Tv read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$0.read($1, uint($2))";
+                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
                     }
                     break;
                 }
@@ -2788,35 +2788,35 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     // lod is not supported for 1D texture
                     if (isArray == 1)
                         // Tv read(uint coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$0.read(uint(($1).x), uint(($1).y))";
+                        __intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y))$z";
                     else
                         // Tv read(uint coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(uint(($1).x))";
+                        __intrinsic_asm "$c$0.read(uint($1))$z";
                     break;
                 case $(SLANG_TEXTURE_2D):
                     if (isShadow == 1)
                     {
                         if (isArray == 1)
                             // T read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                         else
                             // T read(uint2 coord, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy))$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                         else
                             // Tv read(uint2 coord, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy))$z";
                     }
                     break;
                 case $(SLANG_TEXTURE_3D):
                     if (isShadow == 0 && isArray == 0)
                         // Tv read(uint3 coord, uint lod = 0) const
-                        __intrinsic_asm "$0.read(vec<uint,3>(($1).xyz), uint(($1).w))";
+                        __intrinsic_asm "$c$0.read(vec<uint,3>(($1).xyz))$z";
                     break;
                 case $(SLANG_TEXTURE_CUBE):
                     if (isShadow == 1)
@@ -2826,7 +2826,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                             __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6, uint(($1).w))";
                         else
                             // T read(uint2 coord, uint face, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     }
                     else
                     {
@@ -2835,7 +2835,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                             __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z)%6, uint(($1).z)/6, uint(($1).w))";
                         else
                             // Tv read(uint2 coord, uint face, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     }
                     break;
                 }
@@ -3044,20 +3044,20 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
                         if (isArray == 1)
                             // The document seems to have a typo. `lod` must mean `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), $2)";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), $2)$z";
                         else
                             // T read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), $2)";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), $2)$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // The document seems to have a typo. `lod` must mean `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), uint(($1).z), $2)";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), $2)$z";
                         else
                             // Tv read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$0.read(vec<uint,2>(($1).xy), $2)";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), $2)$z";
                     }
                     break;
                 }
@@ -10877,6 +10877,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
+[OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
@@ -14948,6 +14949,24 @@ matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask)
     }
 }
 
+__glsl_extension(GL_EXT_demote_to_helper_invocation)
+[ForceInline]
+[require(glsl_hlsl_metal_spirv, helper_lane)]
+bool IsHelperLane()
+{
+    __target_switch {
+    case hlsl: __intrinsic_asm "IsHelperLane()";
+    case glsl: __intrinsic_asm "gl_HelperInvocation";
+    case metal: __intrinsic_asm "simd_is_helper_thread()";
+    case spirv:
+        return spirv_asm {
+            OpExtension "SPV_EXT_demote_to_helper_invocation";
+            OpCapability DemoteToHelperInvocationEXT;
+            result:$$bool = OpIsHelperInvocationEXT
+        };
+    }
+}
+
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
 typedef Texture2D texture2D;
 
@@ -15010,7 +15029,7 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load";
-        case metal: __intrinsic_asm "$0.read(uint($1))";
+        case metal: __intrinsic_asm "$c$0.read(uint($1))$z";
         case glsl: __intrinsic_asm "$(glslLoadFuncName)($0, $1)$z";
         case spirv: return spirv_asm {
                 %sampled:__sampledType(T) = $(spvLoadInstName) $this $location;

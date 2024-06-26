@@ -7,10 +7,13 @@
 namespace SlangCapture
 {
 
-    SessionCapture::SessionCapture(slang::ISession* session)
-        : m_actualSession(session)
+    SessionCapture::SessionCapture(slang::ISession* session, CaptureManager* captureManager)
+        : m_actualSession(session),
+          m_captureManager(captureManager)
     {
         SLANG_CAPTURE_ASSERT(m_actualSession);
+        SLANG_CAPTURE_ASSERT(m_captureManager);
+        m_sessionHandle = reinterpret_cast<uint64_t>(m_actualSession.get());
         slangCaptureLog(LogLevel::Verbose, "%s: %p\n", "SessionCapture create:", session);
     }
 
@@ -29,6 +32,7 @@ namespace SlangCapture
 
     SLANG_NO_THROW slang::IGlobalSession* SessionCapture::getGlobalSession()
     {
+        // No need to capture this function.
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         slang::IGlobalSession* pGlobalSession = m_actualSession->getGlobalSession();
         return pGlobalSession;
@@ -39,7 +43,22 @@ namespace SlangCapture
         slang::IBlob**     outDiagnostics)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_loadModule, m_sessionHandle);
+            encoder->encodeString(moduleName);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         slang::IModule* pModule = m_actualSession->loadModule(moduleName, outDiagnostics);
+
+        {
+            encoder->encodeAddress(*outDiagnostics);
+            encoder->encodeAddress(pModule);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         ModuleCapture* pModuleCapture = getModuleCapture(pModule);
         return static_cast<slang::IModule*>(pModuleCapture);
     }
@@ -51,7 +70,24 @@ namespace SlangCapture
         slang::IBlob** outDiagnostics)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_loadModuleFromIRBlob, m_sessionHandle);
+            encoder->encodeString(moduleName);
+            encoder->encodeString(path);
+            encoder->encodePointer(source);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         slang::IModule* pModule = m_actualSession->loadModuleFromIRBlob(moduleName, path, source, outDiagnostics);
+
+        {
+            encoder->encodeAddress(*outDiagnostics);
+            encoder->encodeAddress(pModule);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         ModuleCapture* pModuleCapture = getModuleCapture(pModule);
         return static_cast<slang::IModule*>(pModuleCapture);
     }
@@ -63,7 +99,24 @@ namespace SlangCapture
         slang::IBlob** outDiagnostics)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_loadModuleFromSource, m_sessionHandle);
+            encoder->encodeString(moduleName);
+            encoder->encodeString(path);
+            encoder->encodePointer(source);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         slang::IModule* pModule = m_actualSession->loadModuleFromSource(moduleName, path, source, outDiagnostics);
+
+        {
+            encoder->encodeAddress(*outDiagnostics);
+            encoder->encodeAddress(pModule);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         ModuleCapture* pModuleCapture = getModuleCapture(pModule);
         return static_cast<slang::IModule*>(pModuleCapture);
     }
@@ -75,7 +128,25 @@ namespace SlangCapture
         slang::IBlob** outDiagnostics)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_loadModuleFromSourceString, m_sessionHandle);
+            encoder->encodeString(moduleName);
+            encoder->encodeString(path);
+            encoder->encodeString(string);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         slang::IModule* pModule = m_actualSession->loadModuleFromSourceString(moduleName, path, string, outDiagnostics);
+
+        {
+            // TODO: Not sure if we need to capture the diagnostics blob.
+            encoder->encodeAddress(*outDiagnostics);
+            encoder->encodeAddress(pModule);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         ModuleCapture* pModuleCapture = getModuleCapture(pModule);
         return static_cast<slang::IModule*>(pModuleCapture);
     }
@@ -96,12 +167,26 @@ namespace SlangCapture
             SLANG_CAPTURE_ASSERT(!"Failed to get actual component types");
         }
 
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_createCompositeComponentType, m_sessionHandle);
+            encoder->encodeAddressArray(componentTypeList.getBuffer(), componentTypeCount);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         SlangResult result = m_actualSession->createCompositeComponentType(
                 componentTypeList.getBuffer(), componentTypeCount, outCompositeComponentType, outDiagnostics);
 
+        {
+            encoder->encodeAddress(*outCompositeComponentType);
+            encoder->encodeAddress(*outDiagnostics);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         if (SLANG_OK == result)
         {
-            CompositeComponentTypeCapture* compositeComponentTypeCapture = new CompositeComponentTypeCapture(*outCompositeComponentType);
+            CompositeComponentTypeCapture* compositeComponentTypeCapture =
+                new CompositeComponentTypeCapture(*outCompositeComponentType, m_captureManager);
             Slang::ComPtr<CompositeComponentTypeCapture> resultCapture(compositeComponentTypeCapture);
             *outCompositeComponentType = resultCapture.detach();
         }
@@ -116,7 +201,23 @@ namespace SlangCapture
         ISlangBlob**                    outDiagnostics)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_specializeType, m_sessionHandle);
+            encoder->encodeAddress(type);
+            encoder->encodeStructArray(specializationArgs, specializationArgCount);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         slang::TypeReflection* pTypeReflection = m_actualSession->specializeType(type, specializationArgs, specializationArgCount, outDiagnostics);
+
+        {
+            encoder->encodeAddress(*outDiagnostics);
+            encoder->encodeAddress(pTypeReflection);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         return pTypeReflection;
     }
 
@@ -127,7 +228,24 @@ namespace SlangCapture
         ISlangBlob**    outDiagnostics)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_getTypeLayout, m_sessionHandle);
+            encoder->encodeAddress(type);
+            encoder->encodeInt64(targetIndex);
+            encoder->encodeEnumValue(rules);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         slang::TypeLayoutReflection* pTypeLayoutReflection = m_actualSession->getTypeLayout(type, targetIndex, rules, outDiagnostics);
+
+        {
+            encoder->encodeAddress(*outDiagnostics);
+            encoder->encodeAddress(pTypeLayoutReflection);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         return pTypeLayoutReflection;
     }
 
@@ -137,14 +255,43 @@ namespace SlangCapture
         ISlangBlob** outDiagnostics)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_getContainerType, m_sessionHandle);
+            encoder->encodeAddress(elementType);
+            encoder->encodeEnumValue(containerType);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         slang::TypeReflection* pTypeReflection = m_actualSession->getContainerType(elementType, containerType, outDiagnostics);
+
+        {
+            encoder->encodeAddress(*outDiagnostics);
+            encoder->encodeAddress(pTypeReflection);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         return pTypeReflection;
     }
 
     SLANG_NO_THROW slang::TypeReflection* SessionCapture::getDynamicType()
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_getDynamicType, m_sessionHandle);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         slang::TypeReflection* pTypeReflection = m_actualSession->getDynamicType();
+
+        {
+            encoder->encodeAddress(pTypeReflection);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         return pTypeReflection;
     }
 
@@ -153,7 +300,21 @@ namespace SlangCapture
         ISlangBlob** outNameBlob)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_getTypeRTTIMangledName, m_sessionHandle);
+            encoder->encodeAddress(type);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         SlangResult result = m_actualSession->getTypeRTTIMangledName(type, outNameBlob);
+
+        {
+            encoder->encodeAddress(outNameBlob);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         return result;
     }
 
@@ -163,7 +324,22 @@ namespace SlangCapture
         ISlangBlob** outNameBlob)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_getTypeConformanceWitnessMangledName, m_sessionHandle);
+            encoder->encodeAddress(type);
+            encoder->encodeAddress(interfaceType);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         SlangResult result = m_actualSession->getTypeConformanceWitnessMangledName(type, interfaceType, outNameBlob);
+
+        {
+            encoder->encodeAddress(outNameBlob);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         return result;
     }
 
@@ -173,7 +349,18 @@ namespace SlangCapture
         uint32_t*              outId)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_getTypeConformanceWitnessSequentialID, m_sessionHandle);
+            encoder->encodeAddress(type);
+            encoder->encodeAddress(interfaceType);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         SlangResult result = m_actualSession->getTypeConformanceWitnessSequentialID(type, interfaceType, outId);
+
+        // No need to capture outId, it's not slang allocation
         return result;
     }
 
@@ -186,11 +373,26 @@ namespace SlangCapture
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
 
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_createTypeConformanceComponentType, m_sessionHandle);
+            encoder->encodeAddress(type);
+            encoder->encodeAddress(interfaceType);
+            encoder->encodeInt64(conformanceIdOverride);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         SlangResult result = m_actualSession->createTypeConformanceComponentType(type, interfaceType, outConformance, conformanceIdOverride, outDiagnostics);
+
+        {
+            encoder->encodeAddress(*outConformance);
+            encoder->encodeAddress(*outDiagnostics);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
 
         if (SLANG_OK != result)
         {
-            TypeConformanceCapture* conformanceCapture = new TypeConformanceCapture(*outConformance);
+            TypeConformanceCapture* conformanceCapture = new TypeConformanceCapture(*outConformance, m_captureManager);
             Slang::ComPtr<TypeConformanceCapture> resultCapture(conformanceCapture);
             *outConformance = resultCapture.detach();
         }
@@ -202,12 +404,26 @@ namespace SlangCapture
         SlangCompileRequest**   outCompileRequest)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_createCompileRequest, m_sessionHandle);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         SlangResult result = m_actualSession->createCompileRequest(outCompileRequest);
+
+        {
+            encoder->encodeAddress(*outCompileRequest);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
+
         return result;
     }
 
     SLANG_NO_THROW SlangInt SessionCapture::getLoadedModuleCount()
     {
+        // No need to capture this function, it's just a query.
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         SlangInt count = m_actualSession->getLoadedModuleCount();
         return count;
@@ -216,7 +432,20 @@ namespace SlangCapture
     SLANG_NO_THROW slang::IModule* SessionCapture::getLoadedModule(SlangInt index)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+        ParameterEncoder* encoder {};
+        {
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::ISession_getLoadedModule, m_sessionHandle);
+            encoder->encodeInt64(index);
+            encoder = m_captureManager->endMethodCapture();
+        }
+
         slang::IModule* pModule = m_actualSession->getLoadedModule(index);
+
+        {
+            encoder->encodeAddress(pModule);
+            m_captureManager->endMethodCaptureAppendOutput();
+        }
 
         if (pModule)
         {
@@ -233,6 +462,7 @@ namespace SlangCapture
 
     SLANG_NO_THROW bool SessionCapture::isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob)
     {
+        // No need to capture this function, it's a query function and doesn't impact slang internal state.
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         bool result = m_actualSession->isBinaryModuleUpToDate(modulePath, binaryModuleBlob);
         return result;
@@ -244,7 +474,7 @@ namespace SlangCapture
         moduleCapture = m_mapModuleToCapture.tryGetValue(module);
         if (!moduleCapture)
         {
-            moduleCapture = new ModuleCapture(module);
+            moduleCapture = new ModuleCapture(module, m_captureManager);
             Slang::ComPtr<ModuleCapture> result(moduleCapture);
             m_mapModuleToCapture.add(module, *result.detach());
         }
