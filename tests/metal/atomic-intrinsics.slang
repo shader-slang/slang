@@ -12,18 +12,8 @@ RWStructuredBuffer<uint> uintBuffer;
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=intBuffer
 RWStructuredBuffer<int> intBuffer;
 
-groupshared uint shareMemUI[4]
-#if !defined(METAL)
-    // Issue#4468
-    = { 0, 0, 0, 0 }
-#endif
-;
-groupshared int shareMemI[4]
-#if !defined(METAL)
-    // Issue#4468
-    = { 0, 0, 0, 0 }
-#endif
-;
+groupshared uint shareMemUI[4];
+groupshared int shareMemI[4];
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -31,6 +21,16 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint groupIndex : SV_GroupIndex)
 {
+    if (groupIndex == 0)
+    {
+        for (int i = 0; i < 4; ++i)
+        {
+            shareMemUI[i] = 0U;
+            shareMemI[i] = 0;
+        }
+    }
+    AllMemoryBarrierWithGroupSync();
+    
     int idx = groupIndex;
     float val = 0.0f;
 
