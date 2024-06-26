@@ -15098,6 +15098,24 @@ matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask)
     }
 }
 
+__glsl_extension(GL_EXT_demote_to_helper_invocation)
+[ForceInline]
+[require(glsl_hlsl_metal_spirv, helper_lane)]
+bool IsHelperLane()
+{
+    __target_switch {
+    case hlsl: __intrinsic_asm "IsHelperLane()";
+    case glsl: __intrinsic_asm "gl_HelperInvocation";
+    case metal: __intrinsic_asm "simd_is_helper_thread()";
+    case spirv:
+        return spirv_asm {
+            OpExtension "SPV_EXT_demote_to_helper_invocation";
+            OpCapability DemoteToHelperInvocationEXT;
+            result:$$bool = OpIsHelperInvocationEXT
+        };
+    }
+}
+
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
 typedef Texture2D texture2D;
 
