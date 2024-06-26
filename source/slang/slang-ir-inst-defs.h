@@ -685,6 +685,7 @@ INST(GetLegalizedSPIRVGlobalParamAddr, GetLegalizedSPIRVGlobalParamAddr, 1, 0)
 INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, 0)
 
 INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
+INST(MetalAtomicCast, MetalAtomicCast, 1, 0)
 
 INST(MakeArrayList, makeArrayList, 0, 0)
 INST(MakeTensorView, makeTensorView, 0, 0)

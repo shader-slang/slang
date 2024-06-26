@@ -2435,6 +2435,8 @@ struct IRImageSubscript : IRInst
     IR_LEAF_ISA(ImageSubscript);
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
+    bool hasSampleCoord() { return getOperandCount() > 2 && getOperand(2) != nullptr;  }
+    IRInst* getSampleCoord() { return getOperand(2); }
 };
 
 struct IRImageLoad : IRInst
@@ -2442,6 +2444,16 @@ struct IRImageLoad : IRInst
     IR_LEAF_ISA(ImageLoad);
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
+
+    /// If GLSL/SPIR-V, Sample coord
+    /// If Metal, Array or Sample coord
+    bool hasAuxCoord1() { return getOperandCount() > 2 && getOperand(2) != nullptr; }
+    IRInst* getAuxCoord1() { return getOperand(2); }
+
+    /// If Metal, Sample coord
+    bool hasAuxCoord2() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
+    IRInst* getAuxCoord2() { return getOperand(3); }
+
 };
 
 struct IRImageStore : IRInst
@@ -2450,6 +2462,15 @@ struct IRImageStore : IRInst
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
     IRInst* getValue() { return getOperand(2); }
+
+    /// If GLSL/SPIR-V, Sample coord
+    /// If Metal, Array or Sample coord
+    bool hasAuxCoord1() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
+    IRInst* getAuxCoord1() { return getOperand(3); }
+
+    /// If Metal, Sample coord
+    bool hasAuxCoord2() { return getOperandCount() > 4 && getOperand(4) != nullptr; }
+    IRInst* getAuxCoord2() { return getOperand(4); }
 };
 // Terminators
 
@@ -4043,14 +4064,11 @@ public:
 
     IRInst* emitImageLoad(
         IRType* type,
-        IRInst* image,
-        IRInst* coord);
+        ShortList<IRInst*> params);
 
     IRInst* emitImageStore(
         IRType* type,
-        IRInst* image,
-        IRInst* coord,
-        IRInst* value);
+        ShortList<IRInst*> params);
 
     IRInst* emitIsType(IRInst* value, IRInst* witness, IRInst* typeOperand, IRInst* targetWitness);
 

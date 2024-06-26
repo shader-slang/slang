@@ -2026,21 +2026,33 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         case kIROp_ImageLoad:
         {
+            auto imageOp = as<IRImageLoad>(inst);
             m_writer->emit("imageLoad(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
             m_writer->emit(",");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
+            if (imageOp->hasAuxCoord1())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
+            }
             m_writer->emit(")");
             return true;
         }
         case kIROp_ImageStore:
         {
+            auto imageOp = as<IRImageStore>(inst);
             m_writer->emit("imageStore(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
             m_writer->emit(",");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
+            if (imageOp->hasAuxCoord1())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
+            }
             m_writer->emit(",");
-            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            emitOperand(imageOp->getValue(), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }

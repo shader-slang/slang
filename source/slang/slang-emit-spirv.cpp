@@ -2999,12 +2999,26 @@ struct SPIRVEmitContext
 
     SpvInst* emitImageLoad(SpvInstParent* parent, IRImageLoad* load)
     {
-        return emitInst(parent, load, SpvOpImageRead, load->getDataType(), kResultID, load->getImage(), load->getCoord());
+        if (load->hasAuxCoord1())
+        {
+            return emitInst(parent, load, SpvOpImageRead, load->getDataType(), kResultID, load->getImage(), load->getCoord(), SpvImageOperandsSampleMask, load->getAuxCoord1());
+        }
+        else
+        {
+            return emitInst(parent, load, SpvOpImageRead, load->getDataType(), kResultID, load->getImage(), load->getCoord());
+        }
     }
 
     SpvInst* emitImageStore(SpvInstParent* parent, IRImageStore* store)
     {
-        return emitInst(parent, store, SpvOpImageWrite, store->getImage(), store->getCoord(), store->getValue());
+        if (store->hasAuxCoord1())
+        {
+            return emitInst(parent, store, SpvOpImageWrite, store->getImage(), store->getCoord(), store->getValue(), SpvImageOperandsSampleMask, store->getAuxCoord1());
+        }
+        else
+        {
+            return emitInst(parent, store, SpvOpImageWrite, store->getImage(), store->getCoord(), store->getValue());
+        }
     }
 
     SpvInst* emitImageSubscript(SpvInstParent* parent, IRImageSubscript* subscript)
