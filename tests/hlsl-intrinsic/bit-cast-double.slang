@@ -1,9 +1,11 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -shaderobj -render-feature double
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -compute -dx11 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -compute -dx12 -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -shaderobj -render-feature double
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -shaderobj -mtl
+
+//CHK: 1
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
