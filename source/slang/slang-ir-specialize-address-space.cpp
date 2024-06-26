@@ -24,24 +24,8 @@ namespace Slang
         {
         }
 
-        AddressSpace getLeafInstAddressSpace(IRInst* inst)
+        AddressSpace getAddressSpaceFromVarType(IRInst* type)
         {
-            if (as<IRGroupSharedRate>(inst->getRate()))
-                return AddressSpace::GroupShared;
-            switch (inst->getOp())
-            {
-            case kIROp_RWStructuredBufferGetElementPtr:
-                return AddressSpace::Global;
-            case kIROp_Var:
-                if (as<IRBlock>(inst->getParent()))
-                    return AddressSpace::ThreadLocal;
-                break;
-            default:
-                break;
-            }
-            auto type = unwrapAttributedType(inst->getDataType());
-            if (!type)
-                return AddressSpace::Generic;
             if (as<IRUniformParameterGroupType>(type))
             {
                 return AddressSpace::Uniform;
@@ -65,6 +49,27 @@ namespace Slang
                 return AddressSpace::Global;
             }
             return AddressSpace::Generic;
+        }
+
+        AddressSpace getLeafInstAddressSpace(IRInst* inst)
+        {
+            if (as<IRGroupSharedRate>(inst->getRate()))
+                return AddressSpace::GroupShared;
+            switch (inst->getOp())
+            {
+            case kIROp_RWStructuredBufferGetElementPtr:
+                return AddressSpace::Global;
+            case kIROp_Var:
+                if (as<IRBlock>(inst->getParent()))
+                    return AddressSpace::ThreadLocal;
+                break;
+            default:
+                break;
+            }
+            auto type = unwrapAttributedType(inst->getDataType());
+            if (!type)
+                return AddressSpace::Generic;
+            return getAddressSpaceFromVarType(type);
         }
 
         AddressSpace getAddrSpace(IRInst* inst)
@@ -160,13 +165,7 @@ namespace Slang
         AddressSpace getFuncResultAddrSpace(IRFunc* callee)
         {
             auto funcType = as<IRFuncType>(callee->getDataType());
-            auto ptrResultType = as<IRPtrTypeBase>(funcType->getResultType());
-            if (!ptrResultType)
-                return AddressSpace::Generic;
-            AddressSpace resultAddrSpace = AddressSpace::Generic;
-            if (ptrResultType->hasAddressSpace())
-                resultAddrSpace = (AddressSpace)ptrResultType->getAddressSpace();
-            return resultAddrSpace;
+            return getAddressSpaceFromVarType(funcType->getResultType());
         }
 
         // Return true if the address space of the function return type is changed.
@@ -323,11 +322,11 @@ namespace Slang
                                 if (addrSpace != AddressSpace::Generic)
                                 {
                                     auto funcType = as<IRFuncType>(func->getDataType());
-                                    auto ptrResultType = as<IRPtrTypeBase>(funcType->getResultType());
-                                    SLANG_ASSERT(ptrResultType);
                                     AddressSpace resultAddrSpace = getFuncResultAddrSpace(func);
                                     if (resultAddrSpace != addrSpace)
                                     {
+                                        auto ptrResultType = as<IRPtrTypeBase>(funcType->getResultType());
+                                        SLANG_ASSERT(ptrResultType);
                                         IRBuilder builder(func);
                                         auto newResultType = builder.getPtrType(ptrResultType->getOp(), ptrResultType->getValueType(), addrSpace);
                                         fixUpFuncType(func, newResultType);
