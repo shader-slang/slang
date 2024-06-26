@@ -7,12 +7,6 @@
 
 namespace Slang
 {
-    enum class SpecializeAddressSpaceOptions : int
-    {
-        None = 0,
-        AddEntryPoints = 1 << 0
-    };
-
     struct AddressSpaceContext
     {
         IRModule* module;
@@ -24,8 +18,24 @@ namespace Slang
         {
         }
 
-        AddressSpace getAddressSpaceFromVarType(IRInst* type)
+        AddressSpace getLeafInstAddressSpace(IRInst* inst)
         {
+            if (as<IRGroupSharedRate>(inst->getRate()))
+                return AddressSpace::GroupShared;
+            switch (inst->getOp())
+            {
+            case kIROp_RWStructuredBufferGetElementPtr:
+                return AddressSpace::Global;
+            case kIROp_Var:
+                if (as<IRBlock>(inst->getParent()))
+                    return AddressSpace::ThreadLocal;
+                break;
+            default:
+                break;
+            }
+            auto type = unwrapAttributedType(inst->getDataType());
+            if (!type)
+                return AddressSpace::Generic;
             if (as<IRUniformParameterGroupType>(type))
             {
                 return AddressSpace::Uniform;
@@ -49,36 +59,6 @@ namespace Slang
                 return AddressSpace::Global;
             }
             return AddressSpace::Generic;
-        }
-
-        AddressSpace getLeafInstAddressSpace(IRInst* inst)
-        {
-            if (as<IRGroupSharedRate>(inst->getRate()))
-                return AddressSpace::GroupShared;
-            switch (inst->getOp())
-            {
-            case kIROp_RWStructuredBufferGetElementPtr:
-                return AddressSpace::Global;
-            case kIROp_Var:
-            {
-                auto addressSpace = getAddressSpaceFromVarType(as<IRVar>(inst)->getFullType());
-                if (!as<IRBlock>(inst->getParent()))
-                    return addressSpace;
-
-                // Default address space for local variables are `ThreadLocal`
-                // `Generic`/`Global` implies missing address space, use default address space.
-                if (addressSpace == AddressSpace::Generic
-                    || addressSpace == AddressSpace::Global)
-                    return AddressSpace::ThreadLocal;
-                return addressSpace;
-            }
-            default:
-                break;
-            }
-            auto type = unwrapAttributedType(inst->getDataType());
-            if (!type)
-                return AddressSpace::Generic;
-            return getAddressSpaceFromVarType(type);
         }
 
         AddressSpace getAddrSpace(IRInst* inst)
@@ -174,7 +154,13 @@ namespace Slang
         AddressSpace getFuncResultAddrSpace(IRFunc* callee)
         {
             auto funcType = as<IRFuncType>(callee->getDataType());
-            return getAddressSpaceFromVarType(funcType->getResultType());
+            auto ptrResultType = as<IRPtrTypeBase>(funcType->getResultType());
+            if (!ptrResultType)
+                return AddressSpace::Generic;
+            AddressSpace resultAddrSpace = AddressSpace::Generic;
+            if (ptrResultType->hasAddressSpace())
+                resultAddrSpace = (AddressSpace)ptrResultType->getAddressSpace();
+            return resultAddrSpace;
         }
 
         // Return true if the address space of the function return type is changed.
@@ -205,7 +191,8 @@ namespace Slang
                         {
                         case kIROp_Var:
                         {
-                            mapInstToAddrSpace[inst] = getLeafInstAddressSpace(inst);
+                            // All local variables should be in the thread-local address space.
+                            mapInstToAddrSpace[inst] = AddressSpace::ThreadLocal;
                             changed = true;
                             break;
                         }
@@ -234,7 +221,6 @@ namespace Slang
                             if (addrSpace != AddressSpace::Generic)
                             {
                                 mapVarValueToAddrSpace[inst->getOperand(0)] = addrSpace;
-                                mapInstToAddrSpace[inst] = addrSpace;
                                 changed = true;
                             }
                         }
@@ -330,11 +316,11 @@ namespace Slang
                                 if (addrSpace != AddressSpace::Generic)
                                 {
                                     auto funcType = as<IRFuncType>(func->getDataType());
+                                    auto ptrResultType = as<IRPtrTypeBase>(funcType->getResultType());
+                                    SLANG_ASSERT(ptrResultType);
                                     AddressSpace resultAddrSpace = getFuncResultAddrSpace(func);
                                     if (resultAddrSpace != addrSpace)
                                     {
-                                        auto ptrResultType = as<IRPtrTypeBase>(funcType->getResultType());
-                                        SLANG_ASSERT(ptrResultType);
                                         IRBuilder builder(func);
                                         auto newResultType = builder.getPtrType(ptrResultType->getOp(), ptrResultType->getValueType(), addrSpace);
                                         fixUpFuncType(func, newResultType);
@@ -376,7 +362,6 @@ namespace Slang
             }
         }
 
-        template<int options>
         void processModule()
         {
             for (auto globalInst : module->getGlobalInsts())
@@ -386,14 +371,10 @@ namespace Slang
                 {
                     mapInstToAddrSpace[globalInst] = addrSpace;
                 }
-
-                if constexpr (options & (int)SpecializeAddressSpaceOptions::AddEntryPoints)
+                if (auto func = as<IRFunc>(globalInst))
                 {
-                    if (auto func = as<IRFunc>(globalInst))
-                    {
-                        if (func->findDecoration<IREntryPointDecoration>())
-                            workList.add(func);
-                    }
+                    if (func->findDecoration<IREntryPointDecoration>())
+                        workList.add(func);
                 }
             }
 
@@ -427,30 +408,6 @@ namespace Slang
     void specializeAddressSpace(IRModule* module)
     {
         AddressSpaceContext context(module);
-        context.processModule<(int)SpecializeAddressSpaceOptions::AddEntryPoints>();
-    }
-    void specializeAddressSpace(IRModule* module, List<IRFunc*> functionsToSpecialize)
-    {
-        AddressSpaceContext context(module);
-        
-        // To specialize address space of a function we must specialize all call site
-        // parent functions
-        HashSet<IRFunc*> funcsThatNeedProcessing;
-        for (auto& func : functionsToSpecialize)
-        {
-            for (auto use = func->firstUse; use; use = use->nextUse)
-            {
-                auto callInst = as<IRCall>(use->getUser());
-                if (!callInst)
-                    continue;
-                funcsThatNeedProcessing.add(getParentFunc(callInst));
-            }
-        }
-
-        context.workList.reserve(funcsThatNeedProcessing.getCount());
-        for(auto i : funcsThatNeedProcessing)
-            context.workList.add(i);
-        
-        context.processModule<(int)SpecializeAddressSpaceOptions::None>();
+        context.processModule();
     }
 }

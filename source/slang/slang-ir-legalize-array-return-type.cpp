@@ -2,7 +2,6 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-clone.h"
-#include "slang-ir-specialize-address-space.h"
 
 namespace Slang
 {
@@ -79,9 +78,8 @@ void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
 
 }
 
-void legalizeArrayReturnType(TargetRequest* targetRequest, IRModule* module)
+void legalizeArrayReturnType(IRModule* module)
 {
-    List<IRFunc*> functionsToProcess;
     IRBuilder builder(module);
 
     for (auto inst : module->getGlobalInsts())
@@ -91,11 +89,8 @@ void legalizeArrayReturnType(TargetRequest* targetRequest, IRModule* module)
             if (func->getResultType()->getOp() == kIROp_ArrayType)
             {
                 makeFuncReturnViaOutParam(builder, func);
-                functionsToProcess.add(func);
             }
         }
     }
-    if(isMetalTarget(targetRequest))
-        specializeAddressSpace(module, functionsToProcess);
 }
 }
