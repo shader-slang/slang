@@ -230,7 +230,7 @@ void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
         typeLayout = parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
     }
 
-    _emitHLSLRegisterSemantic(layoutResourceKind, &containerChain, varDecl);
+    _emitHLSLRegisterSemantic(layoutResourceKind, &containerChain, varDecl, "register");
 
     auto elementType = type->getElementType();
     if (shouldForceUnpackConstantBufferElements(type) || hasExplicitConstantBufferOffset(type))

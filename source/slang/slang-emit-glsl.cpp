@@ -1343,7 +1343,7 @@ void GLSLSourceEmitter::_emitGLSLPerVertexVaryingFragmentInput(IRGlobalParam* pa
 
     emitSemantics(param, false);
 
-    emitLayoutSemantics(param);
+    emitLayoutSemantics(param, "register");
 
     m_writer->emit(";\n\n");
 }

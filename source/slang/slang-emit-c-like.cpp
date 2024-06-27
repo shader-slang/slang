@@ -3964,7 +3964,7 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
     emitType(varType, getName(varDecl));
 
     emitSemantics(varDecl);
-    emitLayoutSemantics(varDecl);
+    emitLayoutSemantics(varDecl, "register");
     emitPostDeclarationAttributesForType(varType);
 
     // TODO: ideally this logic should scan ahead to see if it can find a `store`
@@ -4097,7 +4097,7 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
     // global variables.
     //
     emitSemantics(varDecl);
-    emitLayoutSemantics(varDecl);
+    emitLayoutSemantics(varDecl, "register");
 
     if (varDecl->getFirstBlock())
     {
@@ -4161,14 +4161,14 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
 
     emitVarModifiers(layout, varDecl, varType);
     
-    emitDecorationLayoutSemantics(varDecl);
+    emitDecorationLayoutSemantics(varDecl, "register");
 
     emitRateQualifiersAndAddressSpace(varDecl);
     emitType(varType, getName(varDecl));
 
     emitSemantics(varDecl);
 
-    emitLayoutSemantics(varDecl);
+    emitLayoutSemantics(varDecl, "register");
 
     // A shader parameter cannot have an initializer,
     // so we do need to consider emitting one here.
