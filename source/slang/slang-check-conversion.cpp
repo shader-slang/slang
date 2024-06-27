@@ -216,8 +216,10 @@ namespace Slang
                 return true;
 
             // C++ style default-initialization
-            *outToExpr = constructDefaultInitExprForVarType(this, toType);
-            (*outToExpr)->loc = fromInitializerListExpr->loc;
+            auto defaultExpr = getASTBuilder()->create<DefaultConstructExpr>();
+            defaultExpr->type = QualType(toType);
+            defaultExpr->loc = fromInitializerListExpr->loc;
+            *outToExpr = defaultExpr;
             return true;
         }
 
