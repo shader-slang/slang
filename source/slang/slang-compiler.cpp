@@ -2480,7 +2480,7 @@ namespace Slang
         SlangInt32 index)
     {
         SourceFile* sourceFile = getFileDependencies()[index];
-        return sourceFile->getPathInfo().hasFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : "unknown";
+        return sourceFile->getPathInfo().hasFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : nullptr;
     }
 
     void validateEntryPoint(
