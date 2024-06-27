@@ -210,17 +210,6 @@ namespace Slang
         auto toType = inToType;
         UInt argCount = fromInitializerListExpr->args.getCount();
 
-        if (argCount == 0 && toType)
-        {
-            if(!outToExpr)
-                return true;
-
-            // C++ style default-initialization
-            *outToExpr = constructDefaultInitExprForVarType(this, toType);
-            (*outToExpr)->loc = fromInitializerListExpr->loc;
-            return true;
-        }
-
         // In the case where we need to build a result expression,
         // we will collect the new arguments here
         List<Expr*> coercedArgs;
@@ -522,6 +511,9 @@ namespace Slang
     {
         UInt argCount = fromInitializerListExpr->args.getCount();
         UInt argIndex = 0;
+
+        // TODO: we should handle the special case of `{0}` as an initializer
+        // for arbitrary `struct` types here.
 
         // If this initializer list has a more specific type than just
         // InitializerListType (i.e. it's already undergone a coercion) we

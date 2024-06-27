@@ -4185,7 +4185,8 @@ namespace Slang
             arg = CheckTerm(arg);
         }
 
-        expr->type = m_astBuilder->getInitializerListType();
+        if(!expr->type)
+            expr->type = m_astBuilder->getInitializerListType();
 
         return expr;
     }
