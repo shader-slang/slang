@@ -1847,6 +1847,18 @@ namespace Slang
         return ctor;
     }
 
+    static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
+    {
+        for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+        {
+            if (!ctor->body || ctor->members.getCount() != 0)
+                continue;
+            return ctor;
+        }
+        return nullptr;
+    }
+
+
     static List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut)
     {
         List<ConstructorDecl*> ctorList;
@@ -1936,6 +1948,35 @@ namespace Slang
         checkVisibility(classDecl);
     }
 
+    static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+    {
+        if (!varDecl->type || !varDecl->type.type)
+            return nullptr;
+
+        ConstructorDecl* defaultCtor = nullptr;
+        auto declRefType = as<DeclRefType>(varDecl->type.type);
+        if (declRefType)
+        {
+            if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
+            {
+                defaultCtor = _getDefaultCtor(structDecl);
+            }
+        }
+
+        if (defaultCtor)
+        {
+            auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
+            auto member = visitor->getASTBuilder()->getMemberDeclRef(declRefType->getDeclRef(), defaultCtor);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
+            return invoke;
+        }
+        else
+        {
+            auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();
+            defaultCall->type = QualType(varDecl->type);
+            return defaultCall;
+        }
+    }
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
         // if zero initialize is true, set everything to a default
@@ -1944,7 +1985,7 @@ namespace Slang
             && as<VarDecl>(varDecl)
             )
         {
-            varDecl->initExpr = constructDefaultInitExprForVarType(this, varDecl->getType());
+            varDecl->initExpr = constructDefaultInitExprForVar(this, varDecl);
         }
         
         if (auto initExpr = varDecl->initExpr)
@@ -7582,7 +7623,7 @@ namespace Slang
             if (!isDefaultInitializableType
                 || varDeclBase->initExpr)
                 continue;
-            varDeclBase->initExpr = constructDefaultInitExprForVarType(this, varDeclBase->getType());
+            varDeclBase->initExpr = constructDefaultInitExprForVar(this, varDeclBase);
         }
 
         Index insertOffset = 0;
