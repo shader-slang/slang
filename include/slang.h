@@ -872,6 +872,8 @@ extern "C"
             DisableSourceMap,       // bool
             UnscopedEnum,           // bool
             PreserveParameters,       // bool: preserve all resource parameters in the output code.
+            EmbedDXIL,              // bool
+            EmbedSPIRV,             // bool
 
             // Target
 
@@ -4150,7 +4152,6 @@ namespace slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetFlags(
             int                     targetIndex,
             SlangTargetFlags        flags) = 0;
-
 
             /*!
             @brief Set the floating point mode (e.g., precise or fast) to use a target.

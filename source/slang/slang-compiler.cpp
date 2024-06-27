@@ -1991,7 +1991,11 @@ namespace Slang
             {                
                 if (auto artifact = targetProgram->getExistingWholeProgramResult())
                 {
-                    artifacts.add(ComPtr<IArtifact>(artifact));
+                    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL) &&
+                        !targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedSPIRV))
+                    {
+                        artifacts.add(ComPtr<IArtifact>(artifact));
+                    }
                 }
             }
             else
@@ -2251,7 +2255,7 @@ namespace Slang
     void EndToEndCompileRequest::generateOutput()
     {
         generateOutput(getSpecializedGlobalAndEntryPointsComponentType());
-        
+
         // If we are in command-line mode, we might be expected to actually
         // write output to one or more files here.
 
