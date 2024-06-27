@@ -348,6 +348,12 @@ namespace Slang {
             }
         }
 
+	// TODO:
+	// Serialization of target component IR is causing the embedded precompiled binary
+	// feature to fail. The resulting data modules contain both TU IR and TC IR, with only
+	// one module header. Yong suggested to ignore the TC IR for now, though also that
+	// OV was using the feature, so disabling this might cause problems.
+#if 0
         if (data.targetComponents.getCount() && (options.optionFlags & SerialOptionFlag::IRModule))
         {
             // TODO: in the case where we have specialization, we might need
@@ -365,6 +371,7 @@ namespace Slang {
                 SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, options.compressionType, container));
             }
         }
+#endif
     }
 
     if (data.entryPoints.getCount())

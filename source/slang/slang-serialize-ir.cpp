@@ -195,6 +195,14 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
                 switch (srcInst->getOp())
                 {
                     // Special handling for the ir const derived types
+                    case kIROp_BlobLit:
+                    {
+			// Blobs are serialized into string table like strings
+                        auto stringLit = static_cast<IRBlobLit*>(srcInst);
+                        dstInst.m_payloadType = PayloadType::String_1;
+                        dstInst.m_payload.m_stringIndices[0] = getStringIndex(stringLit->getStringSlice());
+                        break;
+                    }
                     case kIROp_StringLit:
                     {
                         auto stringLit = static_cast<IRStringLit*>(srcInst);
@@ -790,6 +798,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
                         op, operandCount, prefixSize));
                     break;
                 }
+                case kIROp_BlobLit:
                 case kIROp_StringLit:
                 {
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);

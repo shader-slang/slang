@@ -1990,7 +1990,12 @@ namespace Slang
             {                
                 if (auto artifact = targetProgram->getExistingWholeProgramResult())
                 {
-                    artifacts.add(ComPtr<IArtifact>(artifact));
+		    // TODO: Is it a hack to flag targets as 'embedded' and then omit them from
+		    // artifacts like this?
+                    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedOutputInIR))
+                    {
+                        artifacts.add(ComPtr<IArtifact>(artifact));
+                    }
                 }
             }
             else
@@ -2250,6 +2255,48 @@ namespace Slang
     void EndToEndCompileRequest::generateOutput()
     {
         generateOutput(getSpecializedGlobalAndEntryPointsComponentType());
+
+        // Augment module IR with precompiled libraries
+        if (m_containerFormat == ContainerFormat::SlangModule)
+        {
+            auto linkage = getLinkage();
+            auto program = getSpecializedGlobalAndEntryPointsComponentType();
+
+            for (auto targetReq : linkage->targets)
+            {
+                auto targetProgram = program->getTargetProgram(targetReq);
+
+                if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedOutputInIR))
+                {
+                    // TODO:
+                    // This may not make sense, since the translation unit level IR is augmented
+                    // with the binary results of compiling the whole program.
+                    // In a previous iteration of the embed precompiled DXIL feature, the
+                    // target program IR was augmented with the DXIL blob, but there is an issue
+                    // with serialization of TP IR, and Yong suggested that DXIL blob is attached
+                    // to the TU IR instead. It is probably not implemented correctly here.
+                    for (TranslationUnitRequest* translationUnit : m_frontEndReq->translationUnits)
+                    {
+                        if (const auto artifact = targetProgram->getExistingWholeProgramResult())
+                        {
+                            ISlangBlob* blob;
+                            artifact->loadBlob(ArtifactKeep::Yes, &blob);
+                            auto module = translationUnit->getModule()->getIRModule();
+                            auto builder = IRBuilder(module);
+                            builder.setInsertInto(module);
+                            if (targetReq->getTarget() == CodeGenTarget::DXIL)
+                            {
+                                builder.emitEmbeddedDXIL(blob);
+                            }
+                            if (targetReq->getTarget() == CodeGenTarget::SPIRV)
+                            {
+                                builder.emitEmbeddedSPIRV(blob);
+                            }
+                        }
+                    }
+                }
+            }
+        }
         
         // If we are in command-line mode, we might be expected to actually
         // write output to one or more files here.

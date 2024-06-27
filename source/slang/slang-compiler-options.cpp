@@ -202,6 +202,7 @@ namespace Slang
         else
             set(CompilerOptionName::EmitSpirvViaGLSL, true);
         set(CompilerOptionName::ParameterBlocksUseRegisterSpaces, (flags & SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES) != 0);
+        set(CompilerOptionName::EmbedOutputInIR, (flags & SLANG_TARGET_FLAG_EMBED_OUTPUT_IN_IR) != 0);
     }
 
     void CompilerOptionSet::addTargetFlags(SlangTargetFlags flags)
@@ -217,6 +218,9 @@ namespace Slang
 
         if ((flags & SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES) != 0)
             set(CompilerOptionName::ParameterBlocksUseRegisterSpaces, true);
+
+        if ((flags & SLANG_TARGET_FLAG_EMBED_OUTPUT_IN_IR) != 0)
+            set(CompilerOptionName::EmbedOutputInIR, true);
     }
     MatrixLayoutMode CompilerOptionSet::getMatrixLayoutMode()
     {
