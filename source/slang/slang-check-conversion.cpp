@@ -210,6 +210,17 @@ namespace Slang
         auto toType = inToType;
         UInt argCount = fromInitializerListExpr->args.getCount();
 
+        if (argCount == 0 && toType)
+        {
+            if(!outToExpr)
+                return true;
+
+            // C++ style default-initialization
+            *outToExpr = constructDefaultInitExprForVarType(this, toType);
+            (*outToExpr)->loc = fromInitializerListExpr->loc;
+            return true;
+        }
+
         // In the case where we need to build a result expression,
         // we will collect the new arguments here
         List<Expr*> coercedArgs;
@@ -511,15 +522,6 @@ namespace Slang
     {
         UInt argCount = fromInitializerListExpr->args.getCount();
         UInt argIndex = 0;
-
-        if (argCount == 0 && outToExpr && toType)
-        {
-            // C++ style default-initialization
-            auto* defaultCall = getASTBuilder()->create<DefaultConstructExpr>();
-            defaultCall->type = QualType(toType);
-            *outToExpr = constructDefaultInitExprForVarType(this, toType);
-            return true;
-        }
 
         // If this initializer list has a more specific type than just
         // InitializerListType (i.e. it's already undergone a coercion) we
