@@ -105,6 +105,7 @@ jobs:
             # cache in the setup phase
             cmake --preset default --fresh \
               -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+              -DSLANG_ENABLE_EXAMPLES=OFF \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}
             cmake --workflow --preset "${{matrix.config}}"
           fi
