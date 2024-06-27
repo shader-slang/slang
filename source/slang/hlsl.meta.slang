@@ -5695,6 +5695,20 @@ double asdouble(uint lowbits, uint highbits)
     }
 }
 
+__glsl_extension(GL_ARB_gpu_shader5)
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+double2 asdouble(uint2 lowbits, uint2 highbits)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "asdouble($0, $1)";
+    default:
+        return double2(asdouble(lowbits.x, highbits.x), asdouble(lowbits.y, highbits.y));
+    }
+}
+
 // Reinterpret bits as a float (HLSL SM 4.0)
 
 [__readNone]
