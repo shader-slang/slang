@@ -7569,6 +7569,12 @@ namespace Slang
             inheritanceDefaultCtorList.add(DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, true));
         }
         DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, false);
+        for (auto i : structDeclInfo.ctorList)
+        {
+            auto* newMod = getASTBuilder()->create<ForceInlineAttribute>();
+            newMod->next = i->modifiers.first;
+            i->modifiers.first = newMod;
+        }
 
         // ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if init expressions 
         // of members are to be synthisised, they are.
