@@ -7571,7 +7571,7 @@ namespace Slang
         DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, false);
         for (auto i : structDeclInfo.ctorList)
         {
-            auto* newMod = getASTBuilder()->create<ForceInlineAttribute>();
+            auto* newMod = getASTBuilder()->create<DifferentiableAttribute>();
             newMod->next = i->modifiers.first;
             i->modifiers.first = newMod;
         }
