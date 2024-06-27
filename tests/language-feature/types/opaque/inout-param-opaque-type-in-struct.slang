@@ -5,7 +5,7 @@
 
 //TEST(compute):COMPARE_COMPUTE:
 // GFX backend fails
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 struct Things
 {
