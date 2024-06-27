@@ -689,7 +689,6 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
     slang_add_target(
         examples/example-base
         STATIC
-        EXCLUDE_FROM_ALL
         LINK_WITH_PRIVATE
             core
             slang
@@ -713,7 +712,6 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
         slang_add_target(
             ${dir}
             EXECUTABLE
-            EXCLUDE_FROM_ALL
             USE_FEWER_WARNINGS
             LINK_WITH_PRIVATE
                 core
