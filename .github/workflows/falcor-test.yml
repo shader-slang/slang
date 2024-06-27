@@ -45,7 +45,7 @@ jobs:
         cd ..\
     - name: build
       run: |
-        .\premake.bat vs2019 --arch=${{matrix.platform}} --deps=true --no-progress=true --enable-cuda=true
+        .\premake.bat vs2019 --arch=${{matrix.platform}} --deps=true --no-progress=true --enable-cuda=true --enable-examples=false
         
         .\make-slang-tag-version.bat
         
