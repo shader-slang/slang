@@ -6917,6 +6917,7 @@ vector<T,N> cospi(vector<T,N> x)
 
 // Population count
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 uint countbits(uint value)
 {
@@ -6938,6 +6939,7 @@ uint countbits(uint value)
 
 __generic <let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<uint, N> countbits(vector<uint, N> value)
 {
