@@ -4,7 +4,7 @@ on:
     tags:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
-name: Linux Release
+name: centos7-gcc9 Release
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,16 +15,14 @@ jobs:
           submodules: 'true'
           fetch-depth: '0'
 
-      - name: build docker image
-        run: docker build -t ubuntu-18.04-gcc-9 ./.github/workflows/dockerfiles/ubuntu-18.04-x64
-
       # build the binary in docker image
       - name: Run the build process with Docker
         uses: addnab/docker-run-action@v3
         with:
-            image: ubuntu-18.04-gcc-9
-            options: -v ${{ github.workspace }}:/home/app
+            image: slangdeveloper/centos7-gcc9
+            options: -v ${{ github.workspace }}:/home/app -v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt
             run: |
+              source /opt/rh/devtoolset-9/enable
               cd /home/app
               git config --global --add safe.directory /home/app
               export CC=gcc
@@ -45,19 +43,19 @@ jobs:
             export SLANG_TAG=${TAG_NAME#v}
             echo "tag:$TAG_NAME"
             echo "slang-tag:$SLANG_TAG"
-            export SLANG_BINARY_ARCHIVE=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}-glibc-2.27.zip
-            export SLANG_BINARY_ARCHIVE_TAR=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}-glibc-2.27.tar.gz
+            export SLANG_BINARY_ARCHIVE=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}-glibc-2.17.zip
+            export SLANG_BINARY_ARCHIVE_TAR=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}-glibc-2.17.tar.gz
             echo "creating zip"
             zip -r ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc bin/*/*/slangd bin/*/*/libslang.so bin/*/*/libslang-glslang.so bin/*/*/libgfx.so bin/*/*/libslang-llvm.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
             echo "creating tar"
             tar -czf ${SLANG_BINARY_ARCHIVE_TAR} bin/*/*/slangc bin/*/*/slangd bin/*/*/libslang.so bin/*/*/libslang-glslang.so bin/*/*/libgfx.so bin/*/*/libslang-llvm.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
             echo "SLANG_BINARY_ARCHIVE=${SLANG_BINARY_ARCHIVE}" >> $GITHUB_OUTPUT
             echo "SLANG_BINARY_ARCHIVE_TAR=${SLANG_BINARY_ARCHIVE_TAR}" >> $GITHUB_OUTPUT
-      - name: UploadBinary
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE }}
-            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE_TAR }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: UploadBinary
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     files: |
+      #       ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE }}
+      #       ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE_TAR }}
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
