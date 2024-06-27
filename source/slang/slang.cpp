@@ -5686,6 +5686,16 @@ void EndToEndCompileRequest::setTargetMatrixLayoutMode(int targetIndex, SlangMat
     getTargetOptionSet(targetIndex).setMatrixLayoutMode(MatrixLayoutMode(mode));
 }
 
+void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
+}
+
+void EndToEndCompileRequest::setTargetEmbedOutputInIR(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedOutputInIR, value);
+}
+
 void EndToEndCompileRequest::setTargetLineDirectiveMode(
     SlangInt targetIndex,
     SlangLineDirectiveMode mode)
