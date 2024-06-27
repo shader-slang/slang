@@ -1075,9 +1075,12 @@ static void addExplicitParameterBindings_GLSL(
     // the index/offset/etc.
     //
 
-    const int kMaxResCount = 2;
-    const int kSubpassResInfo = 1;
-    const int kResInfo = 0;
+    enum 
+    {
+        kResInfo = 0,
+        kSubpassResInfo,
+        kMaxResCount,
+    };
 
     TypeLayout::ResourceInfo* foundResInfo = nullptr;
     struct ResAndSemanticInfo
@@ -1141,26 +1144,27 @@ static void addExplicitParameterBindings_GLSL(
             return;
     }
 
-    if(auto varDeclBase = as<VarDeclBase>(varDecl))
+
+    auto varDeclBase = as<VarDeclBase>(varDecl);
+    bool hasABinding = false;
+    for (int i = 0; i < kMaxResCount; i++)
     {
-        bool setABinding = false;
-        for (int i = 0; i < kMaxResCount; i++)
-        {
-            auto* resInfoItem = info[i].resInfo;
-            auto& semanticInfo = info[i].semanticInfo;
-            if (!resInfoItem)
-                continue;
-        
-            auto kind = resInfoItem->kind;
-            auto count = resInfoItem->count;
-            semanticInfo.kind = kind;
-            
-            addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, count);
-            setABinding = true;
-        }
-        if(setABinding)
-            return;
+        auto* resInfoItem = info[i].resInfo;
+        auto& semanticInfo = info[i].semanticInfo;
+        if (!resInfoItem)
+            continue;
+
+        auto kind = resInfoItem->kind;
+        auto count = resInfoItem->count;
+        semanticInfo.kind = kind;
+        hasABinding = true;
+        if(!varDeclBase)
+            break;
+
+        addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, count);
     }
+    if(hasABinding)
+        return;
 
     auto hlslToVulkanLayoutOptions = context->getTargetProgram()->getHLSLToVulkanLayoutOptions();
     bool warnedMissingVulkanLayoutModifier = false;
