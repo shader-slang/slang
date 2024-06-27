@@ -56,7 +56,7 @@ const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 
 enum class StructType
 {
-    D3D12DeviceExtendedDesc, D3D12ExperimentalFeaturesDesc, SlangSessionExtendedDesc
+    D3D12DeviceExtendedDesc, D3D12ExperimentalFeaturesDesc, SlangSessionExtendedDesc, RayTracingValidationDesc
 };
 
 // TODO: Rename to Stage
@@ -2736,6 +2736,13 @@ struct SlangSessionExtendedDesc
     StructType structType = StructType::SlangSessionExtendedDesc;
     uint32_t compilerOptionEntryCount = 0;
     slang::CompilerOptionEntry* compilerOptionEntries = nullptr;
+};
+
+/// Whether to enable ray tracing validation (currently only Vulkan - D3D requires app layer to use NVAPI)
+struct RayTracingValidationDesc
+{
+    StructType structType = StructType::RayTracingValidationDesc;
+    bool enableRaytracingValidation = false;
 };
 
 }
