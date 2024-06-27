@@ -1092,8 +1092,9 @@ static void addExplicitParameterBindings_GLSL(
     };
     ResAndSemanticInfo info[kMaxResCount] = {};
     
-    if (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::InputAttachmentIndex))
+    if (auto foundInputAttachmentIndex = typeLayout->FindResourceInfo(LayoutResourceKind::InputAttachmentIndex))
     {
+        foundResInfo = foundInputAttachmentIndex;
         // Try to find `input_attachment_index`
         if (auto glslAttachmentIndexAttr = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
         {
@@ -1104,8 +1105,9 @@ static void addExplicitParameterBindings_GLSL(
         }
     }
 
-    if(foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+    if(auto foundDescriptorTableSlot = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
     {
+        foundResInfo = foundDescriptorTableSlot;
         // Try to find `binding` and `set`
         if (auto glslBindingAttr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
         {
@@ -1114,8 +1116,9 @@ static void addExplicitParameterBindings_GLSL(
             info[kResInfo].semanticInfo.space = glslBindingAttr->set;
         }
     }
-    else if(foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
+    else if(auto foundSubElementRegisterSpace = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
     {
+        foundResInfo = foundSubElementRegisterSpace;
         // Try to find `set`
         if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
         {
@@ -1128,8 +1131,9 @@ static void addExplicitParameterBindings_GLSL(
             info[kResInfo].semanticInfo.space = 0;
         }
     }
-    else if(info[kResInfo].resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant))
+    else if(auto foundSpecializationConstant = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant))
     {
+        info[kResInfo].resInfo = foundSpecializationConstant;
         DeclRef<Decl> varDecl2(varDecl);
 
         // Try to find `constant_id` binding
