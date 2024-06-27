@@ -220,6 +220,7 @@ namespace Slang
                             if (addrSpace != AddressSpace::Generic)
                             {
                                 mapVarValueToAddrSpace[inst->getOperand(0)] = addrSpace;
+                                mapInstToAddrSpace[inst] = addrSpace;
                                 changed = true;
                             }
                         }

@@ -189,6 +189,22 @@ namespace SlangCapture
         return res;
     }
 
+    SLANG_NO_THROW SlangInt32 ModuleCapture::getDependencyFileCount()
+    {
+        // No need to capture this call as it is just a query.
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+        SlangInt32 res = m_actualModule->getDependencyFileCount();
+        return res;
+    }
+
+    SLANG_NO_THROW char const* ModuleCapture::getDependencyFilePath(SlangInt32 index)
+    {
+        // No need to capture this call as it is just a query.
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+        const char* res = m_actualModule->getDependencyFilePath(index);
+        return res;
+    }
+
     SLANG_NO_THROW slang::ISession* ModuleCapture::getSession()
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
