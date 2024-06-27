@@ -20120,12 +20120,12 @@ const char* kDynamicResourceCastableTypes[] = {
     "ConstantBuffer<T>", "TextureBuffer<T>",
 };
 
-for (auto typeName: kDynamicResourceCastableTypes) {
+for (auto typeName : kDynamicResourceCastableTypes) {
     auto kind = strstr(typeName, "Sampler") ? "Sampler" : "General";
 
     if (strstr(typeName, "StructuredBuffer<T, L>"))
         sb << "__generic<T, L : IBufferDataLayout = DefaultDataLayout>\n";
-    else if (strstr(typeName, "<T>"))
+    else if (strstr(typeName, "Buffer<T>"))
         sb << "__generic<T>\n";
 }}}}
 
