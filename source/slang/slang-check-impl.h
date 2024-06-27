@@ -2872,7 +2872,7 @@ namespace Slang
         FrontEndEntryPointRequest* entryPointReq);
 
 
-    static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
+    [[maybe_unused]] static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
     {
         for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
         {
@@ -2883,7 +2883,7 @@ namespace Slang
         return nullptr;
     }
 
-    static Expr* constructDefaultInitExprForVarType(SemanticsVisitor* visitor, Type* varType)
+    [[maybe_unused]] static Expr* constructDefaultInitExprForVarType(SemanticsVisitor* visitor, Type* varType)
     {
         if (!varType)
             return nullptr;
