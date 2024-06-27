@@ -84,6 +84,7 @@ namespace SlangCapture
         encodeAddress(value);
         if (omitData)
         {
+            encodeUint64(0llu);
             return;
         }
 
