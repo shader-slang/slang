@@ -22,5 +22,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         && (r1 == 1)
         && (r2.x == 0 && r2.y == 1)
         && (r3.x == 0 && r3.y == 1 && r3.z == 2)
-        && (r4.x == 0 && r4.y == 1 && r4.z == 2 && r4.w == 3);
+        && (r4.x == 0 && r4.y == 1 && r4.z == 2 && r4.w == 3)
+        ;
 }

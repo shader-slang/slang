@@ -6936,9 +6936,10 @@ uint countbits(uint value)
     }
 }
 
+__generic <let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
-uint2 countbits(uint2 value)
+vector<uint, N> countbits(vector<uint, N> value)
 {
     __target_switch
     {
@@ -6948,42 +6949,10 @@ uint2 countbits(uint2 value)
         __intrinsic_asm "bitCount";
     case metal:
         __intrinsic_asm "popcount";
+    case spirv:
+        return spirv_asm {OpBitCount $$vector<uint, N> result $value};
     default:
-        return uint2(countbits(value.x), countbits(value.y));
-    }
-}
-
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
-uint3 countbits(uint3 value)
-{
-    __target_switch
-    {
-    case hlsl:
-        __intrinsic_asm "countbits";
-    case glsl:
-        __intrinsic_asm "bitCount";
-    case metal:
-        __intrinsic_asm "popcount";
-    default:
-        return uint3(countbits(value.x), countbits(value.y), countbits(value.z));
-    }
-}
-
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
-uint4 countbits(uint4 value)
-{
-    __target_switch
-    {
-    case hlsl:
-        __intrinsic_asm "countbits";
-    case glsl:
-        __intrinsic_asm "bitCount";
-    case metal:
-        __intrinsic_asm "popcount";
-    default:
-        return uint4(countbits(value.x), countbits(value.y), countbits(value.z), countbits(value.w));
+        VECTOR_MAP_UNARY(uint, N, countbits, value);
     }
 }
 
