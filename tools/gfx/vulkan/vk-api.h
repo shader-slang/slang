@@ -315,6 +315,12 @@ struct VulkanExtendedFeatureProperties
     VkPhysicalDeviceVulkan12Features vulkan12Features = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
     };
+
+    // Ray tracing validation features
+    VkPhysicalDeviceRayTracingValidationFeaturesNV rayTracingValidationFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV
+    };
+
 };
 
 struct VulkanApi

@@ -36,6 +36,9 @@ namespace SlangCapture
         virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() override;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL findAndCheckEntryPoint(
             char const* name, SlangStage stage, slang::IEntryPoint** outEntryPoint, ISlangBlob** outDiagnostics) override;
+        virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDependencyFileCount() override;
+        virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
+            SlangInt32 index) override;
 
         // Interfaces for `IComponentType`
         virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override;
