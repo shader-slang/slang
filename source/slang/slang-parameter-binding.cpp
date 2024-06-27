@@ -1104,7 +1104,7 @@ static void addExplicitParameterBindings_GLSL(
         }
     }
 
-    if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr)
+    if(foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
     {
         // Try to find `binding` and `set`
         if (auto glslBindingAttr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
@@ -1114,7 +1114,7 @@ static void addExplicitParameterBindings_GLSL(
             info[kResInfo].semanticInfo.space = glslBindingAttr->set;
         }
     }
-    else if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace)) != nullptr)
+    else if(foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
     {
         // Try to find `set`
         if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
@@ -1128,7 +1128,7 @@ static void addExplicitParameterBindings_GLSL(
             info[kResInfo].semanticInfo.space = 0;
         }
     }
-    else if( (info[kResInfo].resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant)) != nullptr)
+    else if(info[kResInfo].resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant))
     {
         DeclRef<Decl> varDecl2(varDecl);
 
