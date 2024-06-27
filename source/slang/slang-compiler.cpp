@@ -2471,6 +2471,18 @@ namespace Slang
         return nullptr;
     }
 
+    SLANG_NO_THROW SlangInt32 SLANG_MCALL Module::getDependencyFileCount()
+    {
+        return (SlangInt32)getFileDependencies().getCount();
+    }
+
+    SLANG_NO_THROW char const* SLANG_MCALL Module::getDependencyFilePath(
+        SlangInt32 index)
+    {
+        SourceFile* sourceFile = getFileDependencies()[index];
+        return sourceFile->getPathInfo().hasFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : "unknown";
+    }
+
     void validateEntryPoint(
         EntryPoint* entryPoint,
         DiagnosticSink* sink);
