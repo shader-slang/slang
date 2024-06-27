@@ -1453,6 +1453,15 @@ namespace Slang
         /// Get the unique identity of the module.
         virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() override;
 
+        /// Get the number of dependency files that this module depends on.
+        /// This includes both the explicit source files, as well as any
+        /// additional files that were transitively referenced (e.g., via
+        /// a `#include` directive).
+        virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDependencyFileCount() override;
+
+        /// Get the path to a file this module depends on.
+        virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
+            SlangInt32 index) override;
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
