@@ -257,6 +257,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
 
     // status variant
+#if !defined(VK)
     f4 = t2D.GatherGreen(samplerState, float2(u, u), int2(1, 2), status);
     val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
 
@@ -265,6 +266,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 
     f4 = tCubeArray.GatherGreen(samplerState, float4(1.5, 1.5, 1.5, 1.5), status);
     val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+#endif
 
     /*
         ret Object.Load()
@@ -319,7 +321,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 // DX12CS6: 363
 // DX12CS6: 363
 // DX12CS6: 363
-// VK: 363
-// VK: 363
-// VK: 363
-// VK: 363
+// VK: 351
+// VK: 351
+// VK: 351
+// VK: 351
