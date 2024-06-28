@@ -10183,22 +10183,22 @@ namespace Slang
 
     CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt);
 
-    template<typename ProcessFunc, typename RefParentDiagnosticFunc>
+    template<typename ProcessFunc, typename ParentDiagnosticFunc>
     struct CapabilityDeclReferenceVisitor
-        : public SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc, RefParentDiagnosticFunc>>
+        : public SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc>>
     {
-        typedef SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc, RefParentDiagnosticFunc>> Base;
+        typedef SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc>> Base;
 
-        const ProcessFunc& handleReferenceFunc;
-        const RefParentDiagnosticFunc& handleReferenceParentDiagnosticFunc;
+        const ProcessFunc handleProcessFunc;
+        const ParentDiagnosticFunc handleParentDiagnosticFunc;
         RequireCapabilityAttribute* maybeRequireCapability;
         SemanticsContext& outerContext;
-        CapabilityDeclReferenceVisitor(const ProcessFunc& processFunc, const RefParentDiagnosticFunc& refParentDiagnosticFunc, RequireCapabilityAttribute* maybeRequireCapability, SemanticsContext& outer)
-            : handleReferenceFunc(processFunc)
-            , handleReferenceParentDiagnosticFunc(refParentDiagnosticFunc)
+        CapabilityDeclReferenceVisitor(const ProcessFunc& processFunc, const ParentDiagnosticFunc& parentDiagnosticFunc, RequireCapabilityAttribute* maybeRequireCapability, SemanticsContext& outer)
+            : handleProcessFunc(processFunc)
+            , handleParentDiagnosticFunc(parentDiagnosticFunc)
             , maybeRequireCapability(maybeRequireCapability)
             , outerContext(outer)
-            , SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc, RefParentDiagnosticFunc>>(outer)
+            , SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc>>(outer)
         {
         }
         virtual void processReferencedDecl(Decl* decl) override
@@ -10206,16 +10206,16 @@ namespace Slang
             SourceLoc loc = SourceLoc();
             if (Base::sourceLocStack.getCount())
                 loc = Base::sourceLocStack.getLast();
-            handleReferenceFunc(decl, decl->inferredCapabilityRequirements, loc);
+            handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
         }
         virtual void processDeclModifiers(Decl* decl) override
         {
             if (decl)
-                handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+                handleProcessFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
         }
         void visitDiscardStmt(DiscardStmt* stmt)
         {
-            handleReferenceFunc(stmt, CapabilitySet(CapabilityName::fragment), stmt->loc);
+            handleProcessFunc(stmt, CapabilitySet(CapabilityName::fragment), stmt->loc);
         }
         void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
         {
@@ -10264,7 +10264,7 @@ namespace Slang
                         {
                             maybeDiagnose(Base::getSink(), outerContext.getOptionSet(), DiagnosticCategory::Capability, stmt->targetCases[targetCaseIndex]->loc,
                                 Diagnostics::conflictingCapabilityDueToStatement, targetCap, maybeRequireCapability, maybeRequireCapability->capabilitySet);
-                            handleReferenceParentDiagnosticFunc(DiagnosticCategory::Capability);
+                            handleParentDiagnosticFunc(DiagnosticCategory::Capability);
                         }
                     }
                 }
@@ -10275,23 +10275,23 @@ namespace Slang
                 if (targetCap.isInvalid())
                 {
                     maybeDiagnose(Base::getSink(), outerContext.getOptionSet(), DiagnosticCategory::Capability, targetCase->body->loc, Diagnostics::conflictingCapabilityDueToStatement, bodyCap, "target_switch", oldCap);
-                    handleReferenceParentDiagnosticFunc(DiagnosticCategory::Capability);
+                    handleParentDiagnosticFunc(DiagnosticCategory::Capability);
                 }
                 set.unionWith(targetCap);
             }
-            handleReferenceFunc(stmt, set, stmt->loc);
+            handleProcessFunc(stmt, set, stmt->loc);
         }
 
         void visitRequireCapabilityDecl(RequireCapabilityDecl* decl)
         {
-            handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+            handleProcessFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
         }
     };
 
-    template<typename ProcessFunc, typename RefParentDiagnosticFunc>
-    void visitReferencedDecls(SemanticsContext& context, NodeBase* node, SourceLoc initialLoc, RequireCapabilityAttribute* maybeRequireCapability, const ProcessFunc& func, RefParentDiagnosticFunc refParentDiagnosticFunc)
+    template<typename ProcessFunc, typename ParentDiagnosticFunc>
+    void visitReferencedDecls(SemanticsContext& context, NodeBase* node, SourceLoc initialLoc, RequireCapabilityAttribute* maybeRequireCapability, const ProcessFunc& processFunc, const ParentDiagnosticFunc& parentDiagnosticFunc)
     {
-        CapabilityDeclReferenceVisitor<ProcessFunc, RefParentDiagnosticFunc> visitor(func, refParentDiagnosticFunc, maybeRequireCapability, context);
+        CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc> visitor(processFunc, parentDiagnosticFunc, maybeRequireCapability, context);
         visitor.sourceLocStack.add(initialLoc);
 
         if (auto val = as<Val>(node))
@@ -10384,8 +10384,8 @@ namespace Slang
         decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
     }
 
-    template<typename ProcessFunc, typename RefParentDiagnosticFunc>
-    static inline void _dispatchCapabilitiesVisitorOfFunctionDecl(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, ProcessFunc propegateFuncForReferences, RefParentDiagnosticFunc refParentDiagnosticFunc)
+    template<typename ProcessFunc, typename ParentDiagnosticFunc>
+    static inline void _dispatchCapabilitiesVisitorOfFunctionDecl(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, const ProcessFunc& processFunc, const ParentDiagnosticFunc& parentDiagnosticFunc)
     {
         visitor->setParentFuncOfVisitor(funcDecl);
 
@@ -10395,7 +10395,7 @@ namespace Slang
             _propagateRequirement(visitor, funcDecl->inferredCapabilityRequirements, funcDecl, member, member->inferredCapabilityRequirements, member->loc);
         }
 
-        visitReferencedDecls(*visitor, funcDecl->body, funcDecl->loc, funcDecl->findModifier<RequireCapabilityAttribute>(), propegateFuncForReferences, refParentDiagnosticFunc);
+        visitReferencedDecls(*visitor, funcDecl->body, funcDecl->loc, funcDecl->findModifier<RequireCapabilityAttribute>(), processFunc, parentDiagnosticFunc);
 
         if (!isEffectivelyStatic(funcDecl))
         {
