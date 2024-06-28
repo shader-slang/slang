@@ -2301,9 +2301,11 @@ ${{{{
             {
                 const char* statusDecl = isStatus ? ", out uint status" : "";
                 const char* statusInit = isStatus ? " status = 0;\n" : "";
+                const char* statusCapWithMetal = isStatus ? "hlsl" : "glsl_hlsl_metal_spirv";
+                const char* statusCapWithoutMetal = isStatus ? "hlsl" : "glsl_hlsl_spirv";
 }}}}
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_gather)]
+    [require($(statusCapWithMetal), texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam) $(statusDecl))
     {
         $(statusInit)
@@ -2318,7 +2320,7 @@ ${{{{
         }
     }
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_gather)]
+    [require($(statusCapWithMetal), texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam), constexpr vector<int, Shape.planeDimensions> offset $(statusDecl))
     {
         $(statusInit)
@@ -2333,7 +2335,7 @@ ${{{{
         }
     }
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_gather)]
+    [require($(statusCapWithoutMetal), texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam),
         constexpr vector<int, Shape.planeDimensions> offset1,
         constexpr vector<int, Shape.planeDimensions> offset2,
