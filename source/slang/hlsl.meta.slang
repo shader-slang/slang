@@ -3226,11 +3226,7 @@ ${{{{
         if (shape == kStdlibShapeIndex3D && isArray == 1)
             continue;
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
-
-        StringBuilder requireStringBuilder;
-        auto requireString = requireStringBuilder.toString();
 }}}}
-$(requireString)
 typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T=float4, let sampleCount:int=0, let format:int=0> = __TextureImpl<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
 ${{{{
 }
@@ -13975,7 +13971,7 @@ vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
 {
     __target_switch
@@ -14047,7 +14043,7 @@ vector<T, N> WaveActive$(opName)(vector<T, N> expr)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 matrix<T, N, M> WaveActive$(opName)(matrix<T, N, M> expr)
 {
     __target_switch
@@ -14141,7 +14137,7 @@ vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
 {
     __target_switch
@@ -14458,7 +14454,7 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
 {
     __target_switch
@@ -14534,7 +14530,7 @@ vector<T,N> WavePrefixSum(vector<T,N> expr)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
 {
     __target_switch
@@ -14590,7 +14586,7 @@ vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 }
 
 __generic<T : __BuiltinType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_ballot)]
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 {
     __target_switch
@@ -14654,7 +14650,7 @@ vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
 }
 
 __generic<T : __BuiltinType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_ballot)]
+[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
 matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
 {
     __target_switch
@@ -14715,7 +14711,7 @@ vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
 }
 
 __generic<T : __BuiltinType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_shuffle)]
+[require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
 matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
 {
     __target_switch
@@ -14881,7 +14877,7 @@ uint4 WaveMatch(vector<T,N> value)
 }
 
 __generic<T : __BuiltinType, let N : int, let M : int>
-[require(cuda_glsl_hlsl, subgroup_partitioned)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 uint4 WaveMatch(matrix<T,N,M> value)
 {
     __target_switch
@@ -16094,7 +16090,7 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 // This function cannot be inlined due to a legalization pass happening mid-way through processing
 // and later more processing happening to the function which requires eventual inlining.
 [KnownBuiltin("DispatchMesh")]
-[require(glsl_hlsl_spirv, meshshading)]
+[require(glsl_hlsl_metal_spirv, meshshading)]
 [noRefInline]
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
 {
@@ -18382,7 +18378,7 @@ struct HitObject
 
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
     {
         __target_switch
