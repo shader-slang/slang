@@ -1402,15 +1402,7 @@ __generic<let N:int>
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public vector<uint,N> bitCount(vector<uint,N> value)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitCount";
-    case spirv: return spirv_asm {
-        result:$$vector<uint,N> = OpBitCount $value
-    };
-    default:
-        VECTOR_MAP_UNARY(uint, N, countbits, value);
-    }
+    return countbits(value);
 }
 
 [__readNone] 

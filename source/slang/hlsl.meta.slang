@@ -5695,6 +5695,20 @@ double asdouble(uint lowbits, uint highbits)
     }
 }
 
+__glsl_extension(GL_ARB_gpu_shader5)
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+double2 asdouble(uint2 lowbits, uint2 highbits)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "asdouble($0, $1)";
+    default:
+        return double2(asdouble(lowbits.x, highbits.x), asdouble(lowbits.y, highbits.y));
+    }
+}
+
 // Reinterpret bits as a float (HLSL SM 4.0)
 
 [__readNone]
@@ -6903,6 +6917,7 @@ vector<T,N> cospi(vector<T,N> x)
 
 // Population count
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 uint countbits(uint value)
 {
@@ -6919,6 +6934,27 @@ uint countbits(uint value)
         __intrinsic_asm "$P_countbits($0)";
     case spirv:
         return spirv_asm {OpBitCount $$uint result $value};
+    }
+}
+
+__generic <let N : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
+vector<uint, N> countbits(vector<uint, N> value)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "countbits";
+    case glsl:
+        __intrinsic_asm "bitCount";
+    case metal:
+        __intrinsic_asm "popcount";
+    case spirv:
+        return spirv_asm {OpBitCount $$vector<uint, N> result $value};
+    default:
+        VECTOR_MAP_UNARY(uint, N, countbits, value);
     }
 }
 
