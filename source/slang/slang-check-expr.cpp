@@ -4176,7 +4176,7 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
     {
-        // If we are assigned a type, expr has already been legalaized
+        // If we are assigned a type, expr has already been legalized
         if(expr->type)
             return expr;
         
