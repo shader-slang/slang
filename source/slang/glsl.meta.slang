@@ -126,7 +126,7 @@ public property uint3 gl_NumWorkGroups {
 public property uint3 gl_WorkGroupSize
 {
     [__unsafeForceInlineEarly]
-    [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+    [require(compute)]
     get
     {
         return WorkgroupSize();
