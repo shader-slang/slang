@@ -704,10 +704,7 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
     )
     set_target_properties(all-examples PROPERTIES FOLDER examples)
     function(example dir)
-        set(debug_dir ${dir})
-        if (MSVC)
-            set(debug_dir ${CMAKE_BINARY_DIR}/${dir})
-        endif()
+        set(debug_dir ${CMAKE_BINARY_DIR}/${dir})
 
         slang_add_target(
             ${dir}
@@ -729,31 +726,32 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
             ${ARGN}
         )
 
-        if (MSVC)
-            get_filename_component(example_target ${dir} NAME)
-            file(GLOB asset_files
-                "${CMAKE_SOURCE_DIR}/${dir}/*.slang"
-                "${CMAKE_SOURCE_DIR}/${dir}/*.jpg"
-                "${CMAKE_SOURCE_DIR}/${dir}/*.obj"
-                "${CMAKE_SOURCE_DIR}/${dir}/*.mtl"
+        get_filename_component(example_target ${dir} NAME)
+        file(GLOB asset_files
+            "${CMAKE_SOURCE_DIR}/${dir}/*.slang"
+            "${CMAKE_SOURCE_DIR}/${dir}/*.jpg"
+            "${CMAKE_SOURCE_DIR}/${dir}/*.obj"
+            "${CMAKE_SOURCE_DIR}/${dir}/*.mtl"
+            "${CMAKE_SOURCE_DIR}/${dir}/*.h"
+        )
+
+        list(LENGTH asset_files asset_files_length)
+            if (asset_files_length GREATER 0)
+            set(copy_assets_target "${example_target}-copy-assets")
+
+            add_custom_target(
+                ${copy_assets_target}
+                COMMAND ${CMAKE_COMMAND} -E make_directory ${debug_dir}
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${asset_files} ${debug_dir}
+                COMMENT "Copy example assets to ${debug_dir}"
             )
 
-            list(LENGTH asset_files asset_files_length)
-                if (asset_files_length GREATER 0)
-                set(copy_assets_target "${example_target}-copy-assets")
+            set_target_properties(${copy_assets_target} PROPERTIES FOLDER "examples/copy_assets")
 
-                add_custom_target(
-                    ${copy_assets_target}
-                    COMMAND ${CMAKE_COMMAND} -E make_directory ${debug_dir}
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${asset_files} ${debug_dir}
-                    COMMENT "Copy example assets to ${debug_dir}"
-                )
+            add_dependencies(${example_target} ${copy_assets_target})
 
-                set_target_properties(${copy_assets_target} PROPERTIES FOLDER "examples/copy_assets")
-
-                add_dependencies(${example_target} ${copy_assets_target})
-
-                # Copy DirectX shader binaries so signing doesn't fail when running from Visual Studio
+            # Copy DirectX shader binaries so signing doesn't fail when running from Visual Studio
+            if (MSVC)
                 if (SLANG_ENABLE_PREBUILT_BINARIES)
                     add_dependencies(${example_target} copy-prebuilt-binaries)
                 endif()
