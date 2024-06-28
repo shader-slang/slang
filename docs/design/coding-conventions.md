@@ -200,15 +200,16 @@ case JUST_A:  doA();        break;
 case JUST_B:         doB(); break;
 ```
 
-Don't put space between a control-flow keyword and a following `(`.
+Put space between a control-flow keyword and a following `(`.
+This is a default setting of Visual Studio 2019 and 2022.
 Examples of how to format the major C++ control-flow constructs follow:
 
 ```c++
 void example()
 {
-    for(int ii = 0; ii < N; ++ii)
+    for (int ii = 0; ii < N; ++ii)
     {
-        if(ii == 0)
+        if (ii == 0)
         {
         }
         else
@@ -217,7 +218,7 @@ void example()
     }
 
     int x = 0;
-    while(x < 100)
+    while (x < 100)
     {
         x++;
     }
@@ -225,7 +226,7 @@ void example()
     int mode = 0;
     do
     {
-        switch(mode)
+        switch (mode)
         {
         case 0:
             x /= 2;
@@ -240,7 +241,7 @@ void example()
             mode--;
             break;
         }
-    } while(x > 0);
+    } while (x > 0);
 }
 ```
 

@@ -51,11 +51,11 @@ jobs:
             tar -czf ${SLANG_BINARY_ARCHIVE_TAR} bin/*/*/slangc bin/*/*/slangd bin/*/*/libslang.so bin/*/*/libslang-glslang.so bin/*/*/libgfx.so bin/*/*/libslang-llvm.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
             echo "SLANG_BINARY_ARCHIVE=${SLANG_BINARY_ARCHIVE}" >> $GITHUB_OUTPUT
             echo "SLANG_BINARY_ARCHIVE_TAR=${SLANG_BINARY_ARCHIVE_TAR}" >> $GITHUB_OUTPUT
-      # - name: UploadBinary
-      #   uses: softprops/action-gh-release@v1
-      #   with:
-      #     files: |
-      #       ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE }}
-      #       ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE_TAR }}
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: UploadBinary
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE }}
+            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE_TAR }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
