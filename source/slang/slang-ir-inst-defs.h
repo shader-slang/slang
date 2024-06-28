@@ -893,7 +893,6 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(GlobalOutputDecoration, output, 0, 0)
     INST(GlobalInputDecoration, output, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
-    INST(GLSLInputAttachmentIndexDecoration, glslInputAttachmentIndex, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 

@@ -751,6 +751,11 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifierWithBindingKinds(LayoutResourceK
             m_writer->emit("layout(shaderRecordEXT)\n");
             break;
 
+        case LayoutResourceKind::InputAttachmentIndex:
+            m_writer->emit("layout(input_attachment_index = ");
+            m_writer->emit(index);
+            m_writer->emit(")\n");
+            break;
     }
     return true;
 }
@@ -1338,7 +1343,7 @@ void GLSLSourceEmitter::_emitGLSLPerVertexVaryingFragmentInput(IRGlobalParam* pa
 
     emitSemantics(param, false);
 
-    emitLayoutSemantics(param);
+    emitLayoutSemantics(param, "register");
 
     m_writer->emit(";\n\n");
 }
@@ -2825,16 +2830,6 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         break;
     }
 
-    // non raytracing decorations
-    for (auto decoration : varDecl->getDecorations())
-    {        
-        if (auto glslInputAttachment = as<IRGLSLInputAttachmentIndexDecoration>(decoration))
-        {
-            m_writer->emit(toSlice("layout(input_attachment_index = "));
-            m_writer->emit(glslInputAttachment->getIndex()->getValue());
-            m_writer->emit(toSlice(")\n"));
-        }
-    }
 }
 
 void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)

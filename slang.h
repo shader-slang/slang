@@ -5028,6 +5028,16 @@ namespace slang
             SlangStage stage,
             IEntryPoint** outEntryPoint,
             ISlangBlob** outDiagnostics) = 0;
+
+        /// Get the number of dependency files that this module depends on.
+        /// This includes both the explicit source files, as well as any
+        /// additional files that were transitively referenced (e.g., via
+        /// a `#include` directive).
+        virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDependencyFileCount() = 0;
+
+        /// Get the path to a file this module depends on.
+        virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
+            SlangInt32 index) = 0;
     };
     
     #define SLANG_UUID_IModule IModule::getTypeGuid()
