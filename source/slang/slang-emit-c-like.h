@@ -20,6 +20,13 @@ namespace Slang
 class CLikeSourceEmitter: public SourceEmitterBase
 {
 public:
+
+    enum class EmitLayoutSemanticOption
+    {
+        kPreType,
+        kPostType
+    };
+
     struct Desc
     {
         CodeGenContext* codeGenContext = nullptr;
@@ -344,7 +351,8 @@ public:
     void emitSemantics(IRInst* inst, bool allowOffsets = false);
     void emitSemanticsUsingVarLayout(IRVarLayout* varLayout);
 
-    void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
+    void emitDecorationLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling);
+    void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling);
 
         /// Emit high-level language statements from a structured region.
     void emitRegion(Region* inRegion);
@@ -463,7 +471,7 @@ public:
 
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual bool doesTargetSupportPtrTypes() { return false; }
-    virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
+    virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling, EmitLayoutSemanticOption layoutSemanticOption) { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); SLANG_UNUSED(layoutSemanticOption); }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) = 0;
 
