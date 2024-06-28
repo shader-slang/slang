@@ -17,14 +17,14 @@
             },
             {
                 "name" : "slang-glslang",
-                "baseUrl" : "https://github.com/shader-slang/slang-glslang/releases/download/v13.0.0.x-j/slang-glslang-13.0.0.x-j-",
+                "baseUrl" : "https://github.com/shader-slang/slang-glslang/releases/download/v13.0.0.x-k/slang-glslang-13.0.0.x-k-",
                 "optional" : true,
                 "packages" : 
                 {
                     "windows-x86_64" : { "type" : "url", "path" : "windows-x64-release.zip" },
                     "windows-x86" : { "type": "url", "path" : "windows-win32-release.zip" },
                     "linux-x86_64" : { "type": "url", "path" : "linux-x64-release.zip" },
-                    "linux-x86_64-glibc-2.27" : { "type": "url", "path" : "linux-x64-release-glibc-2.27.zip" },
+                    "linux-x86_64-glibc-2.27" : { "type": "url", "path" : "linux-x64-release-glibc-2.17.zip" },
                     "linux-x86" : { "type": "url", "path" : "linux-x86-release.zip" },
                     "macosx-x86_64" : { "type": "url", "path" : "macosx-x86_64-release.zip" },
                     "windows-aarch64" : { "type" : "url", "path" : "windows-aarch64-release.zip" }
