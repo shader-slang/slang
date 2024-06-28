@@ -93,6 +93,13 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitV
         break;
 
         case LayoutResourceKind::InputAttachmentIndex:
+        {
+            m_writer->emit("[[vk::input_attachment_index("); 
+            m_writer->emit(index);
+            m_writer->emit(")]]");
+        }
+        break;
+
         case LayoutResourceKind::RegisterSpace:
         case LayoutResourceKind::GenericResource:
         case LayoutResourceKind::ExistentialTypeParam:
@@ -141,7 +148,7 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitV
     }
 }
 
-void HLSLSourceEmitter::_emitHLSLRegisterSemantics(EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling)
+void HLSLSourceEmitter::_emitHLSLRegisterSemantics(EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling, EmitLayoutSemanticOption layoutSemanticOption)
 {
     if (!chain) return;
 
@@ -158,17 +165,20 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantics(EmitVarChain* chain, IRInst* 
 
     for (auto rr : layout->getOffsetAttrs())
     {
+        if (layoutSemanticOption == EmitLayoutSemanticOption::kPreType
+            && rr->getResourceKind() != LayoutResourceKind::InputAttachmentIndex)
+            continue;
         _emitHLSLRegisterSemantic(rr->getResourceKind(), chain, inst, uniformSemanticSpelling);
     }
 }
 
-void HLSLSourceEmitter::_emitHLSLRegisterSemantics(IRVarLayout* varLayout, IRInst* inst, char const* uniformSemanticSpelling)
+void HLSLSourceEmitter::_emitHLSLRegisterSemantics(IRVarLayout* varLayout, IRInst* inst, char const* uniformSemanticSpelling, EmitLayoutSemanticOption layoutSemanticOption)
 {
     if (!varLayout)
         return;
 
     EmitVarChain chain(varLayout);
-    _emitHLSLRegisterSemantics(&chain, inst, uniformSemanticSpelling);
+    _emitHLSLRegisterSemantics(&chain, inst, uniformSemanticSpelling, layoutSemanticOption);
 }
 
 void HLSLSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain)
@@ -220,7 +230,7 @@ void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
         typeLayout = parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
     }
 
-    _emitHLSLRegisterSemantic(layoutResourceKind, &containerChain, varDecl);
+    _emitHLSLRegisterSemantic(layoutResourceKind, &containerChain, varDecl, "register");
 
     auto elementType = type->getElementType();
     if (shouldForceUnpackConstantBufferElements(type) || hasExplicitConstantBufferOffset(type))
@@ -320,12 +330,12 @@ void HLSLSourceEmitter::_emitHLSLSubpassInputType(IRSubpassInputType* subpassTyp
     m_writer->emit(">");
 }
 
-void HLSLSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
+void HLSLSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling, EmitLayoutSemanticOption layoutSemanticOption)
 {
     auto layout = getVarLayout(inst); 
     if (layout)
     {
-        _emitHLSLRegisterSemantics(layout, inst, uniformSemanticSpelling);
+        _emitHLSLRegisterSemantics(layout, inst, uniformSemanticSpelling, layoutSemanticOption);
     }
 }
 
@@ -1281,13 +1291,6 @@ void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 {
     for(auto decoration : varDecl->getDecorations())
     {
-        if(auto glslInputAttachmentIndex = as<IRGLSLInputAttachmentIndexDecoration>(decoration))
-        {
-            m_writer->emit("[[vk::input_attachment_index(");
-            m_writer->emit(glslInputAttachmentIndex->getIndex()->getValue());
-            m_writer->emit(")]]\n");
-            continue;
-        }
         if (auto collection = as<IRMemoryQualifierSetDecoration>(decoration))
         {
             auto flags = collection->getMemoryQualifierBit();
