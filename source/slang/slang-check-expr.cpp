@@ -4176,6 +4176,10 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
     {
+        // If we are assigned a type, expr has already been legalized
+        if(expr->type)
+            return expr;
+        
         // When faced with an initializer list, we first just check the sub-expressions blindly.
         // Actually making them conform to a desired type will wait for when we know the desired
         // type based on context.
