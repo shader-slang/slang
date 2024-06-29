@@ -1433,7 +1433,7 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         ;
 }
 
-[require(cpp_cuda_glsl_hlsl_spirv,compute,fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv, compute_fragment)]
 __extern_cpp void TEST_main()
 {
     // GLSL: void main(
