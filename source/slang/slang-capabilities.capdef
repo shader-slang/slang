@@ -447,7 +447,7 @@ alias sm_4_0_version = _sm_4_0
              ;
 alias sm_4_0 = sm_4_0_version
              | SPV_GOOGLE_user_type + spvMinLod
-             | GL_ARB_sparse_texture_clamp + GL_EXT_samplerless_texture_functions + GL_EXT_texture_query_lod + GL_EXT_texture_shadow_lod + GL_EXT_debug_printf
+             | GL_ARB_sparse_texture_clamp + GL_EXT_samplerless_texture_functions + GL_EXT_texture_query_lod + GL_EXT_texture_shadow_lod + GL_EXT_debug_printf + GL_ARB_shader_image_size
              ;
 
 alias sm_4_1_version = _sm_4_1
@@ -458,6 +458,7 @@ alias sm_4_1_version = _sm_4_1
              | cpp
              ;
 alias sm_4_1 = sm_4_1_version
+             | GL_ARB_texture_gather + GL_ARB_texture_query_levels + GL_ARB_shader_texture_image_samples
              // previous
              | sm_4_0
              ;
