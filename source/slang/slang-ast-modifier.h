@@ -242,11 +242,6 @@ class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier
     SLANG_AST_CLASS(GLSLLocationLayoutModifier)
 };
 
-class GLSLInputAttachmentIndexLayoutModifier : public GLSLParsedLayoutModifier
-{
-    SLANG_AST_CLASS(GLSLInputAttachmentIndexLayoutModifier)
-};
-
 class GLSLBufferDataLayoutModifier : public GLSLParsedLayoutModifier
 {
     SLANG_AST_CLASS(GLSLBufferDataLayoutModifier)
@@ -773,6 +768,14 @@ class GLSLSimpleIntegerLayoutAttribute : public Attribute
     SLANG_AST_CLASS(GLSLSimpleIntegerLayoutAttribute)
  
     int32_t value = 0;
+};
+
+/// [[vk_input_attachment_index]]
+class GLSLInputAttachmentIndexLayoutAttribute : public Attribute
+{
+    SLANG_AST_CLASS(GLSLInputAttachmentIndexLayoutAttribute)
+
+    IntegerLiteralValue location;
 };
 
 // [[vk_location]]

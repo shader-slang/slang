@@ -126,7 +126,7 @@ public property uint3 gl_NumWorkGroups {
 public property uint3 gl_WorkGroupSize
 {
     [__unsafeForceInlineEarly]
-    [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+    [require(compute)]
     get
     {
         return WorkgroupSize();
@@ -9556,20 +9556,7 @@ ${{{{
     [require(glsl_hlsl_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,0> subpass)
     {
-        __target_switch
-        {
-        case hlsl: return subpass.SubpassLoad();
-        case glsl: __intrinsic_asm "subpassLoad($0)";
-        case spirv:
-        {
-            let zeroVec = ivec2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $subpass $zeroVec
-            };
-        }
-        }
+        return subpass.SubpassLoad();
     }
     __generic<T>
     [__NoSideEffect]
@@ -9577,20 +9564,7 @@ ${{{{
     [require(glsl_hlsl_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,1> subpass, int sample)
     {
-        __target_switch
-        {
-        case hlsl: return subpass.SubpassLoad(sample);
-        case glsl: __intrinsic_asm "subpassLoad($0, $1)";
-        case spirv:
-        {
-            let zeroVec = ivec2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $subpass $zeroVec Sample $sample
-            };
-        }
-        }
+        return subpass.SubpassLoad(sample);
     }
 
 /// Section 8.19. Shader Invocation Group Functions

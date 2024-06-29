@@ -2212,16 +2212,6 @@ void addVarDecorations(
             builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
                 builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
         }
-        else if (auto glslInputAttachmentMod = as<GLSLInputAttachmentIndexLayoutModifier>(mod))
-        {
-            auto subpassType = as<IRSubpassInputType>(inst->getDataType());
-
-            if (!subpassType)
-                context->getSink()->diagnose(inst, Diagnostics::InputAttachmentIndexOnlyAllowedOnSubpass);
-
-            builder->addDecoration(inst, kIROp_GLSLInputAttachmentIndexDecoration,
-                builder->getIntValue(builder->getIntType(), stringToInt(glslInputAttachmentMod->valToken.getContent())));
-        }
         else if (auto glslOffsetMod = as<GLSLOffsetLayoutAttribute>(mod))
         {
             builder->addDecoration(inst, kIROp_GLSLOffsetDecoration,
