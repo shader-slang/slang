@@ -140,6 +140,9 @@ TensorView make_tensor_view(torch::Tensor val, const char* name, torch::ScalarTy
     for (int i = 0; i < val.dim(); ++i)
     {
         res.strides[i] = val.stride(i) * elementSize;
+        if (res.strides[i] == 0)
+            throw std::runtime_error(std::string(name).append(": tensors with broadcasted dimensions are not supported (use tensor.contiguous() to make tensor whole)").c_str());
+
         res.sizes[i] = val.size(i);
         if (res.sizes[i] > 0)
             isEmpty = false;
