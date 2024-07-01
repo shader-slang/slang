@@ -253,6 +253,24 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_discard:
         m_writer->emit("discard_fragment();\n");
         return true;
+    case kIROp_MetalAtomicCast:
+    {
+        auto oldValName = getName(inst);
+        auto op0 = inst->getOperand(0);
+
+        m_writer->emit("atomic_");
+        emitType(op0->getDataType());
+        m_writer->emit(" ");
+        m_writer->emit(oldValName);
+        m_writer->emit(" = ");
+
+        m_writer->emit("((atomic_");
+        emitType(op0->getDataType());
+        m_writer->emit(")(");
+        emitOperand(op0, getInfo(EmitOp::General));
+        m_writer->emit("));\n");
+        return true;
+    }
     }
     return false;
 }
@@ -431,6 +449,47 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
             m_writer->emit("] = ");
             emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            return true;
+        }
+        case kIROp_ImageLoad:
+        {
+            auto imageOp = as<IRImageLoad>(inst);
+            emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
+            m_writer->emit(".read(");
+            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
+            if(imageOp->hasAuxCoord1())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
+            }
+            if(imageOp->hasAuxCoord2())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord2(), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+            return true;
+        }
+        case kIROp_ImageStore:
+        {
+            
+            auto imageOp = as<IRImageStore>(inst);
+            emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
+            m_writer->emit(".write(");
+            emitOperand(imageOp->getValue(), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
+            if(imageOp->hasAuxCoord1())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
+            }
+            if(imageOp->hasAuxCoord2())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord2(), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
             return true;
         }
         default: break;
@@ -688,6 +747,13 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     if (auto texType = as<IRTextureType>(type))
     {
         _emitHLSLTextureType(texType);
+        return;
+    }
+    else if (as<IRTextureBufferType>(type))
+    {
+        m_writer->emit("texture_buffer<");
+        emitVal(type->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(">");
         return;
     }
     else if (auto imageType = as<IRGLSLImageType>(type))

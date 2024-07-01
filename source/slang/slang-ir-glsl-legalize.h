@@ -21,8 +21,6 @@ void legalizeEntryPointsForGLSL(
     CodeGenContext*         context,
     GLSLExtensionTracker*   glslExtensionTracker);
 
-void legalizeImageSubscriptForGLSL(IRModule* module);
-
 void legalizeConstantBufferLoadForGLSL(IRModule* module);
 
 void legalizeDispatchMeshPayloadForGLSL(IRModule* module);

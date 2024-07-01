@@ -3,6 +3,7 @@
 #include "slang-gfx.h"
 #include "tools/platform/window.h"
 #include "source/core/slang-basic.h"
+#include "source/core/slang-io.h"
 
 #ifdef _WIN32
 void _Win32OutputDebugString(const char* str);
@@ -27,7 +28,7 @@ protected:
     Slang::ComPtr<gfx::ICommandQueue> gQueue;
 
     Slang::Result initializeBase(
-        const char* titile,
+        const char* title,
         int width,
         int height,
         gfx::DeviceType deviceType = gfx::DeviceType::Default);
@@ -41,6 +42,29 @@ protected:
 public:
     platform::Window* getWindow() { return gWindow.Ptr(); }
     virtual void finalize() { gQueue->waitOnHost(); }
+};
+
+struct ExampleResources {
+    Slang::String baseDir;
+
+    ExampleResources(const Slang::String &dir) : baseDir(dir) {}
+    
+    Slang::String resolveResource(const char* fileName) const {
+        static const Slang::List<Slang::String> directories {
+            "examples",
+            "../examples",
+            "../../examples",
+        };
+    
+        for (const Slang::String& dir : directories) {      
+            Slang::StringBuilder pathSb;
+            pathSb << dir  << "/" << baseDir << "/" << fileName;
+            if (Slang::File::exists(pathSb.getBuffer()))
+                return pathSb.toString();
+        }
+
+        return fileName;
+    }
 };
 
 int64_t getCurrentTime();

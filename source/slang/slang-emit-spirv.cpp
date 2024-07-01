@@ -2230,6 +2230,16 @@ struct SPIRVEmitContext
                     isDescirptorSetDecorated = true;
                 }
                 break;
+            case LayoutResourceKind::InputAttachmentIndex:
+                {
+                    emitOpDecorateInputAttachmentIndex(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        nullptr,
+                        varInst,
+                        SpvLiteralInteger::from32((int32_t)index)
+                    );
+                }
+                break;
             default:
                 break;
             }
@@ -2989,12 +2999,26 @@ struct SPIRVEmitContext
 
     SpvInst* emitImageLoad(SpvInstParent* parent, IRImageLoad* load)
     {
-        return emitInst(parent, load, SpvOpImageRead, load->getDataType(), kResultID, load->getImage(), load->getCoord());
+        if (load->hasAuxCoord1())
+        {
+            return emitInst(parent, load, SpvOpImageRead, load->getDataType(), kResultID, load->getImage(), load->getCoord(), SpvImageOperandsSampleMask, load->getAuxCoord1());
+        }
+        else
+        {
+            return emitInst(parent, load, SpvOpImageRead, load->getDataType(), kResultID, load->getImage(), load->getCoord());
+        }
     }
 
     SpvInst* emitImageStore(SpvInstParent* parent, IRImageStore* store)
     {
-        return emitInst(parent, store, SpvOpImageWrite, store->getImage(), store->getCoord(), store->getValue());
+        if (store->hasAuxCoord1())
+        {
+            return emitInst(parent, store, SpvOpImageWrite, store->getImage(), store->getCoord(), store->getValue(), SpvImageOperandsSampleMask, store->getAuxCoord1());
+        }
+        else
+        {
+            return emitInst(parent, store, SpvOpImageWrite, store->getImage(), store->getCoord(), store->getValue());
+        }
     }
 
     SpvInst* emitImageSubscript(SpvInstParent* parent, IRImageSubscript* subscript)
@@ -3559,17 +3583,6 @@ struct SPIRVEmitContext
                     dstID,
                     SpvExecutionModeOutputPrimitivesEXT,
                     SpvLiteralInteger::from32(int32_t(c->getMaxSize()->getValue()))
-                );
-            }
-            break;
-        case kIROp_GLSLInputAttachmentIndexDecoration:
-            {
-                const auto c = cast<IRGLSLInputAttachmentIndexDecoration>(decoration);
-                emitOpDecorateInputAttachmentIndex(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    decoration,
-                    dstID,
-                    SpvLiteralInteger::from32(int32_t(c->getIndex()->getValue()))
                 );
             }
             break;

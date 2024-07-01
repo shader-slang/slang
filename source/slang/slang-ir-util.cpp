@@ -1783,4 +1783,17 @@ void verifyComputeDerivativeGroupModifiers(
     }
 }
 
+int getIRVectorElementSize(IRType* type)
+{
+    if (type->getOp() != kIROp_VectorType)
+        return 1;
+    return (int)(as<IRIntLit>(as<IRVectorType>(type)->getElementCount())->value.intVal);
+}
+IRType* getIRVectorBaseType(IRType* type)
+{
+    if (type->getOp() != kIROp_VectorType)
+        return type;
+    return as<IRVectorType>(type)->getElementType();
+}
+
 }

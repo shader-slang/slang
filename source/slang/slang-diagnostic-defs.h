@@ -453,7 +453,6 @@ DIAGNOSTIC(31203, Error, cannotExportIncompleteType, "cannot export incomplete t
 DIAGNOSTIC(31204, Error, incompleteTypeCannotBeUsedInBuffer, "incomplete type '$0' cannot be used in a buffer")
 DIAGNOSTIC(31205, Error, incompleteTypeCannotBeUsedInUniformParameter, "incomplete type '$0' cannot be used in a uniform parameter")
 DIAGNOSTIC(31206, Error, memoryQualifierNotAllowedOnANonImageTypeParameter, "modifier $0 is not allowed on a non image type parameter.")
-DIAGNOSTIC(31207, Error, InputAttachmentIndexOnlyAllowedOnSubpass, "input_attachment_index is only allowed on subpass images.")
 DIAGNOSTIC(31208, Error, requireInputDecoratedVarForParameter, "$0 expects for argument $1 a type which is a shader input (`in`) variable.")
 DIAGNOSTIC(31210, Error, derivativeGroupQuadMustBeMultiple2ForXYThreads, "compute derivative group quad requires thread dispatch count of X and Y to each be at a multiple of 2")
 DIAGNOSTIC(31211, Error, derivativeGroupLinearMustBeMultiple4ForTotalThreadCount, "compute derivative group linear requires total thread dispatch count to be at a multiple of 4")
@@ -773,6 +772,8 @@ DIAGNOSTIC(41300, Error, byteAddressBufferUnaligned, "invalid alignment `$0` spe
 DIAGNOSTIC(41400, Error, staticAssertionFailure, "static assertion failed, $0")
 DIAGNOSTIC(41401, Error, staticAssertionFailureWithoutMessage, "static assertion failed.")
 DIAGNOSTIC(41402, Error, staticAssertionConditionNotConstant, "condition for static assertion cannot be evaluated at the compile-time.")
+
+DIAGNOSTIC(41402, Error, multiSampledTextureDoesNotAllowWrites, "cannot write to a multisampled texture with target '$0'.")
 
 //
 // 5xxxx - Target code generation.
