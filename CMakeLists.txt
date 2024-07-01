@@ -316,6 +316,7 @@ if(SLANG_ENABLE_SLANGC)
         source/slangc
         EXECUTABLE
         USE_FEWER_WARNINGS
+        DEBUG_DIR ${slang_SOURCE_DIR}
         LINK_WITH_PRIVATE core slang Threads::Threads
         INSTALL
     )
