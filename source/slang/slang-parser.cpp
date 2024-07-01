@@ -5349,9 +5349,9 @@ namespace Slang
         {
             statement = ParseExpressionStatement();
         }
-        else if (LookAheadToken(TokenType::Identifier))
+        else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
         {
-            if (LookAheadToken(TokenType::Colon, 1))
+            if (LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Colon, 1))
             {
                 // An identifier followed by an ":" is a label.
                 return parseLabelStatement();
