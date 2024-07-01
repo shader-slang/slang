@@ -2068,7 +2068,9 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
             m_writer->emit("._data[");
+            m_writer->emit("uint(");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
             m_writer->emit("]");
 
             maybeCloseParens(needClose);
