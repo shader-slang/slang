@@ -42,6 +42,8 @@
 using namespace gfx;
 using namespace Slang;
 
+static const ExampleResources resourceBase("triangle");
+
 // For the purposes of a small example, we will define the vertex data for a
 // single triangle directly in the source file. It should be easy to extend
 // this example to load data from an external source, if desired.
@@ -112,7 +114,8 @@ gfx::Result loadShaderProgram(
     // already been loaded previously, that would be used directly.
     //
     ComPtr<slang::IBlob> diagnosticsBlob;
-    slang::IModule* module = slangSession->loadModule("shaders", diagnosticsBlob.writeRef());
+    Slang::String path = resourceBase.resolveResource("shaders.slang");
+    slang::IModule* module = slangSession->loadModule(path.getBuffer(), diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     if(!module)
         return SLANG_FAIL;
