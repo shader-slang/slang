@@ -3202,6 +3202,7 @@ struct __TextureMip<T, Shape : __ITextureShape, let isArray : int, let isCombine
         get { return tex.Load(__makeVector(pos, mip)); }
     }
 }
+
 struct __TextureMips<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
     __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
@@ -3216,6 +3217,38 @@ __generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, l
 extension __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
 {
     property __TextureMips<T, Shape, isArray, isCombined, format> mips
+    {
+        [__unsafeForceInlineEarly]
+        get { return { this }; }
+    }
+}
+
+// Definitions to support the .sample[][] operator.
+struct __TextureSample<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    int sample;
+    __subscript(vector<int, isArray + Shape.dimensions> pos)->T
+    {
+        [__unsafeForceInlineEarly]
+        get { return tex[pos, sample]; }
+    }
+}
+
+struct __TextureSampleMS<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    __subscript(int sample)->__TextureSample<T, Shape, isArray, isCombined, format>
+    {
+        [__unsafeForceInlineEarly]
+        get { return { tex, sample }; }
+    }
+}
+
+__generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+extension __TextureImpl<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
+{
+    property __TextureSampleMS<T, Shape, isArray, isCombined, format> sample
     {
         [__unsafeForceInlineEarly]
         get { return { this }; }
