@@ -1213,6 +1213,57 @@ namespace Slang
         }
     }
 
+    void SemanticsVisitor::checkDerivativeMemberAttributeReferences(
+            VarDeclBase* varDecl, DerivativeMemberAttribute* derivativeMemberAttr)
+    {
+        if (derivativeMemberAttr->memberDeclRef)
+        {
+            // Already checked! This usually happens if this attribute is synthesized by the compiler.
+            return;
+        }
+        
+        SLANG_ASSERT(derivativeMemberAttr->args.getCount() == 1);
+        auto checkedExpr = dispatchExpr(derivativeMemberAttr->args[0], allowStaticReferenceToNonStaticMember());
+        
+        auto memberType = varDecl->type.type; // All types must be fully checked by now.
+        auto diffType = getDifferentialType(m_astBuilder, memberType, varDecl->loc);
+        auto thisType = calcThisType(makeDeclRef(varDecl->parentDecl));
+        if (!thisType) return; // Diagnostic should have been emitted previously.
+        
+        auto diffThisType = getDifferentialType(m_astBuilder, thisType, derivativeMemberAttr->loc);
+        if (!diffThisType) return; // Diagnostic should have been emitted previously.
+
+        if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
+        {
+            derivativeMemberAttr->memberDeclRef = declRefExpr;
+            if (!diffType->equals(declRefExpr->type))
+            {
+                getSink()->diagnose(derivativeMemberAttr, Diagnostics::typeMismatch, diffType, declRefExpr->type);
+            }
+            if (!varDecl->parentDecl)
+            {
+                getSink()->diagnose(derivativeMemberAttr, Diagnostics::attributeNotApplicable, diffType, declRefExpr->type);
+            }
+            if (auto memberExpr = as<StaticMemberExpr>(declRefExpr))
+            {
+                auto baseExprType = memberExpr->baseExpression->type.type;
+                if (auto typeType = as<TypeType>(baseExprType))
+                {
+                    if (diffThisType->equals(typeType->getType()))
+                    {
+                        return;
+                    }
+                }
+
+            }
+        }
+        getSink()->diagnose(
+            derivativeMemberAttr,
+            Diagnostics::
+            derivativeMemberAttributeMustNameAMemberInExpectedDifferentialType,
+            diffThisType);
+    }
+
     Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc)
     {
         auto result = tryGetDifferentialType(builder, type);

@@ -17,7 +17,7 @@ struct A : IDifferentiable
     
     [DerivativeMember(B.z)]
     float x;
-    float y;
+    no_diff float y;
 
     [__unsafeForceInlineEarly]
     static Differential dzero()

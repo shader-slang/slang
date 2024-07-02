@@ -12,6 +12,7 @@ __generic<T : IDifferentiable, let N : int>
 struct dvector : IDifferentiable
 {
     typedef dvector<T.Differential, N> Differential;
+    [DerivativeMember(Differential.values)]
     T values[N];
 };
 
