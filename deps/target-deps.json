@@ -17,7 +17,7 @@
             },
             {
                 "name" : "slang-glslang",
-                "baseUrl" : "https://github.com/shader-slang/slang-glslang/releases/download/v13.0.0.x-k/slang-glslang-13.0.0.x-k-",
+                "baseUrl" : "https://github.com/shader-slang/slang-glslang/releases/download/v13.0.0.x-l/slang-glslang-13.0.0.x-l-",
                 "optional" : true,
                 "packages" : 
                 {
