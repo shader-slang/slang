@@ -1,0 +1,1092 @@
+func:
+  named hint: (nil)load instruction is:
+[nameHint("outputData")]
+let  %outputData	: Float	= add(%outputData1, %uninitializedVariable)
+
+inst is:
+[nameHint("uninitializedVariable")]
+let  %uninitializedVariable	: Float	= undefined
+
+tests/diagnostics/uninitialized-variables.slang(52): error 41015: use of uninitialized value 'uninitializedVariable'
+    outputData += uninitializedVariable;
+               ^~
+func:
+  named hint: (nil)load instruction is:
+[nameHint("outputData")]
+let  %outputData	: Float	= add(%outputData1, %1)
+
+inst is:
+[nameHint("undefData")]
+let  %undefData	: %Data	= undefined
+
+tests/diagnostics/uninitialized-variables.slang(53): error 41015: use of uninitialized value 'undefData'
+    outputData += undefData.value;
+               ^~
+func:
+  named hint: (nil)load instruction is:
+[nameHint("outputData")]
+let  %outputData	: Float	= add(%outputData1, %1)
+
+inst is:
+[nameHint("nestedData")]
+let  %nestedData	: %NestedData	= undefined
+
+tests/diagnostics/uninitialized-variables.slang(54): error 41015: use of uninitialized value 'nestedData'
+    outputData += nestedData.data.value;
+               ^~
+func:
+  named hint: (nil)load instruction is:
+[nameHint("x")]
+let  %x	: Int	= add(%x1, %k)
+
+inst is:
+[nameHint("x")]
+let  %x	: Int	= undefined
+
+tests/diagnostics/uninitialized-variables.slang(4): error 41015: use of uninitialized value 'x'
+    x += k;
+      ^~
+func:
+  named hint: (nil)load instruction is:
+return_val(%x)
+
+inst is:
+[nameHint("x")]
+let  %x	: %T	= undefined
+
+tests/diagnostics/uninitialized-variables.slang(12): warning 41018: returning without initializing 'x'
+    return x;
+    ^~~~~~
+func:
+  named hint: (nil)load instruction is:
+return_val(%result)
+
+inst is:
+[nameHint("result")]
+let  %result	: %DiffStructx5FDifferential	= undefined
+
+(0): warning 41018: returning without initializing 'result'
+func:
+  named hint: (nil)load instruction is:
+return_val(%result)
+
+inst is:
+[nameHint("result")]
+let  %result	: %DiffStructx5FDifferential	= undefined
+
+(0): warning 41018: returning without initializing 'result'
+func:
+  named hint: (nil)load instruction is:
+return_val(%result)
+
+inst is:
+[nameHint("result")]
+let  %result	: %DiffStructx5FDifferential	= undefined
+
+(0): warning 41018: returning without initializing 'result'
+func:
+  named hint: (nil)load instruction is:
+return_val(%result)
+
+inst is:
+[nameHint("result")]
+let  %result	: %DiffStructx5FDifferential	= undefined
+
+(0): warning 41018: returning without initializing 'result'
+func:
+  named hint: (nil)load instruction is:
+return_val(%result)
+
+inst is:
+[nameHint("result")]
+let  %result	: %DiffStructx5FDifferential	= undefined
+
+(0): warning 41018: returning without initializing 'result'
+func:
+  named hint: (nil)load instruction is:
+return_val(%result)
+
+inst is:
+[nameHint("result")]
+let  %result	: %DiffStructx5FDifferential	= undefined
+
+(0): warning 41018: returning without initializing 'result'
+### LOWER-TO-IR:
+undefined
+let  %1	: Void	= no_diff
+let  %2	: witness_table_t(%IDifferentiable)	= lookupWitness(%3, %4)
+let  %3	: witness_table_t(%IFloat)	= lookupWitness(%5, %6)
+let  %7	: CapabilitySet	= capabilityDisjunction(%8, %9, %10, %11, %12, %13, %14, %15, %16, %17, %18, %19, %20, %21, %22, %23, %24, %25, %26, %27, %28, %29, %30, %31, %32, %33, %34, %35, %36, %37, %38, %39, %40, %41, %42, %43, %44, %45, %46, %47, %48, %49, %50, %51, %52, %53, %54, %55, %56, %57, %58, %59, %60, %61, %62, %63, %64, %65, %66, %67, %68, %69, %70, %71, %72, %73, %74, %75, %76, %77, %78, %79, %80, %81, %82, %83, %84, %85, %86, %87, %88, %89, %90, %91, %92, %93, %94, %95, %96, %97, %98, %99, %100, %101, %102, %103, %104, %105)
+let  %105	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 74 : Int)
+let  %104	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 73 : Int)
+let  %103	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 72 : Int)
+let  %102	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 71 : Int)
+let  %101	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 70 : Int)
+let  %100	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 69 : Int)
+let  %99	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 68 : Int)
+let  %98	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 67 : Int)
+let  %97	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 66 : Int)
+let  %96	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 65 : Int)
+let  %95	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 64 : Int)
+let  %94	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 63 : Int)
+let  %93	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 62 : Int)
+let  %92	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 61 : Int)
+let  %91	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 74 : Int)
+let  %90	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 73 : Int)
+let  %89	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 72 : Int)
+let  %88	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 71 : Int)
+let  %87	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 70 : Int)
+let  %86	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 69 : Int)
+let  %85	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 68 : Int)
+let  %84	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 67 : Int)
+let  %83	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 66 : Int)
+let  %82	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 65 : Int)
+let  %81	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 64 : Int)
+let  %80	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 63 : Int)
+let  %79	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 62 : Int)
+let  %78	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 61 : Int)
+let  %77	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 74 : Int)
+let  %76	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 73 : Int)
+let  %75	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 72 : Int)
+let  %74	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 71 : Int)
+let  %73	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 70 : Int)
+let  %72	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 69 : Int)
+let  %71	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 68 : Int)
+let  %70	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 67 : Int)
+let  %69	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 66 : Int)
+let  %68	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 65 : Int)
+let  %67	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 64 : Int)
+let  %66	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 63 : Int)
+let  %65	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 62 : Int)
+let  %64	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 61 : Int)
+let  %63	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 74 : Int)
+let  %62	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 73 : Int)
+let  %61	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 72 : Int)
+let  %60	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 71 : Int)
+let  %59	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 70 : Int)
+let  %58	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 69 : Int)
+let  %57	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 68 : Int)
+let  %56	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 67 : Int)
+let  %55	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 66 : Int)
+let  %54	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 65 : Int)
+let  %53	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 64 : Int)
+let  %52	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 63 : Int)
+let  %51	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 62 : Int)
+let  %50	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 61 : Int)
+let  %49	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 74 : Int)
+let  %48	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 73 : Int)
+let  %47	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 72 : Int)
+let  %46	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 71 : Int)
+let  %45	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 70 : Int)
+let  %44	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 69 : Int)
+let  %43	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 68 : Int)
+let  %42	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 67 : Int)
+let  %41	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 66 : Int)
+let  %40	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 65 : Int)
+let  %39	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 64 : Int)
+let  %38	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 63 : Int)
+let  %37	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 62 : Int)
+let  %36	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 61 : Int)
+let  %35	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 74 : Int)
+let  %34	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 73 : Int)
+let  %33	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 72 : Int)
+let  %32	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 71 : Int)
+let  %31	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 70 : Int)
+let  %30	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 69 : Int)
+let  %29	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 68 : Int)
+let  %28	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 67 : Int)
+let  %27	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 66 : Int)
+let  %26	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 65 : Int)
+let  %25	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 64 : Int)
+let  %24	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 63 : Int)
+let  %23	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 62 : Int)
+let  %22	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 61 : Int)
+let  %21	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 74 : Int)
+let  %20	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 73 : Int)
+let  %19	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 72 : Int)
+let  %18	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 71 : Int)
+let  %17	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 70 : Int)
+let  %16	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 69 : Int)
+let  %15	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 68 : Int)
+let  %14	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 67 : Int)
+let  %13	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 66 : Int)
+let  %12	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 65 : Int)
+let  %11	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 64 : Int)
+let  %10	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 63 : Int)
+let  %9	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 62 : Int)
+let  %8	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 61 : Int)
+[export("_STR26uninitialized_2Dxvariables4Data")]
+[nameHint("Data")]
+struct %Data	: Type
+{
+	field(%value, Float)
+}
+
+[export("_SVR26uninitialized_2Dxvariables4Data5value")]
+[nameHint("value")]
+let  %value	: _	= key
+[import("_ST4core17IBufferDataLayout")]
+[nameHint("IBufferDataLayout")]
+let  %IBufferDataLayout	: Type	= interface
+[import("_SW4core17DefaultDataLayout4core17IBufferDataLayout")]
+witness_table %106	: witness_table_t(%IBufferDataLayout)(DefaultLayout);
+
+[nameHint("inputBuffer")]
+[export("_SVR26uninitialized_2Dxvariables11inputBuffer")]
+let  %inputBuffer	: RWStructuredBuffer(%Data, DefaultLayout, %106)	= global_param
+[export("_STR26uninitialized_2Dxvariables10NestedData")]
+[nameHint("NestedData")]
+struct %NestedData	: Type
+{
+	field(%data, %Data)
+}
+
+[export("_SVR26uninitialized_2Dxvariables10NestedData4data")]
+[nameHint("data")]
+let  %data	: _	= key
+let  %107	: _	= interface_req_entry(%108, witness_table_t(%x5Fx5FBuiltinType))
+let  %109	: _	= interface_req_entry(%110, witness_table_t(%IArithmetic))
+[BuiltinDecoration]
+[import("_ST4core23__BuiltinArithmeticType")]
+[nameHint("__BuiltinArithmeticType")]
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%107, %109)
+[import("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinType")]
+let  %108	: _	= key
+[BuiltinDecoration]
+[import("_ST4core13__BuiltinType")]
+[nameHint("__BuiltinType")]
+let  %x5Fx5FBuiltinType	: Type	= interface
+[import("_S4core23__BuiltinArithmeticTypeI4core11IArithmetic")]
+let  %110	: _	= key
+let  %111	: _	= interface_req_entry(%112, witness_table_t(%IComparable))
+let  %113	: _	= interface_req_entry(%114, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %115	: _	= interface_req_entry(%116, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %117	: _	= interface_req_entry(%118, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %119	: _	= interface_req_entry(%120, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %121	: _	= interface_req_entry(%122, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %123	: _	= interface_req_entry(%124, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %125	: _	= interface_req_entry(%126, Func(this_type(%IArithmetic), Int))
+let  %127	: _	= interface_req_entry(%128, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[import("_ST4core11IArithmetic")]
+[nameHint("IArithmetic")]
+let  %IArithmetic	: Type	= interface(%111, %113, %115, %117, %119, %121, %123, %125, %127)
+[import("_S4core11IArithmeticI4core11IComparable")]
+let  %112	: _	= key
+let  %129	: _	= interface_req_entry(%130, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+let  %131	: _	= interface_req_entry(%132, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+let  %133	: _	= interface_req_entry(%134, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[import("_ST4core11IComparable")]
+[nameHint("IComparable")]
+let  %IComparable	: Type	= interface(%129, %131, %133)
+[import("_S4core11IComparable6equalsp1p4core11IComparable4Thisb")]
+let  %130	: _	= key
+[import("_S4core11IComparable8lessThanp1p4core11IComparable4Thisb")]
+let  %132	: _	= key
+[import("_S4core11IComparable16lessThanOrEqualsp1p4core11IComparable4Thisb")]
+let  %134	: _	= key
+[import("_S4core11IArithmetic3addp1p4core11IArithmetic4This4core11IArithmetic4This")]
+let  %114	: _	= key
+[import("_S4core11IArithmetic3subp1p4core11IArithmetic4This4core11IArithmetic4This")]
+let  %116	: _	= key
+[import("_S4core11IArithmetic3mulp1p4core11IArithmetic4This4core11IArithmetic4This")]
+let  %118	: _	= key
+[import("_S4core11IArithmetic3divp1p4core11IArithmetic4This4core11IArithmetic4This")]
+let  %120	: _	= key
+[import("_S4core11IArithmetic3modp1p4core11IArithmetic4This4core11IArithmetic4This")]
+let  %122	: _	= key
+[import("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %124	: _	= key
+[import("_S4core11IArithmeticR8_24xinitp1pi")]
+let  %126	: _	= key
+[import("_S4core11IArithmeticR8_24xinitp1p4core11IArithmetic4This")]
+let  %128	: _	= key
+let  %5	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)	= thisTypeWitness
+let  %135	: _	= interface_req_entry(%136, witness_table_t(%x5Fx5FBuiltinRealType))
+let  %137	: _	= interface_req_entry(%6, witness_table_t(%IFloat))
+let  %138	: _	= interface_req_entry(%139, Func(this_type(%x5Fx5FBuiltinFloatingPointType)))
+let  %140	: _	= interface_req_entry(%141, Func(DiffPairUserCode(this_type(%x5Fx5FBuiltinFloatingPointType), %2)))
+let  %142	: _	= interface_req_entry(%143, Func(Void, associated_type(%IDifferentiable)))
+[treatAsDifferentiableDecoration]
+[BuiltinDecoration]
+[import("_ST4core26__BuiltinFloatingPointType")]
+[nameHint("__BuiltinFloatingPointType")]
+let  %x5Fx5FBuiltinFloatingPointType	: Type	= interface(%135, %137, %138, %140, %142)
+[import("_S4core26__BuiltinFloatingPointTypeI4core17__BuiltinRealType")]
+let  %136	: _	= key
+let  %144	: _	= interface_req_entry(%145, witness_table_t(%x5Fx5FBuiltinSignedArithmeticType))
+[BuiltinDecoration]
+[import("_ST4core17__BuiltinRealType")]
+[nameHint("__BuiltinRealType")]
+let  %x5Fx5FBuiltinRealType	: Type	= interface(%144)
+[import("_S4core17__BuiltinRealTypeI4core29__BuiltinSignedArithmeticType")]
+let  %145	: _	= key
+let  %146	: _	= interface_req_entry(%147, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+[BuiltinDecoration]
+[import("_ST4core29__BuiltinSignedArithmeticType")]
+[nameHint("__BuiltinSignedArithmeticType")]
+let  %x5Fx5FBuiltinSignedArithmeticType	: Type	= interface(%146)
+[import("_S4core29__BuiltinSignedArithmeticTypeI4core23__BuiltinArithmeticType")]
+let  %147	: _	= key
+[import("_S4core26__BuiltinFloatingPointTypeI4core6IFloat")]
+let  %6	: _	= key
+let  %148	: _	= interface_req_entry(%149, witness_table_t(%IArithmetic))
+let  %150	: _	= interface_req_entry(%4, witness_table_t(%IDifferentiable))
+let  %151	: _	= interface_req_entry(%152, Func(this_type(%IFloat), Float))
+let  %153	: _	= interface_req_entry(%154, Func(Float, this_type(%IFloat)))
+let  %155	: _	= interface_req_entry(%156, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %157	: _	= interface_req_entry(%158, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %159	: _	= interface_req_entry(%160, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %161	: _	= interface_req_entry(%162, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %163	: _	= interface_req_entry(%164, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %165	: _	= interface_req_entry(%166, Func(this_type(%IFloat), this_type(%IFloat)))
+let  %167	: _	= interface_req_entry(%168, Func(this_type(%IFloat), this_type(%IFloat)))
+let  %169	: _	= interface_req_entry(%170, %171)
+[import("_ST4core6IFloat")]
+[nameHint("IFloat")]
+let  %IFloat	: Type	= interface(%148, %150, %151, %153, %155, %157, %159, %161, %163, %165, %167, %169)
+[import("_S4core6IFloatI4core11IArithmetic")]
+let  %149	: _	= key
+[import("_S4core6IFloatI4core15IDifferentiable")]
+let  %4	: _	= key
+let  %172	: _	= interface_req_entry(%173, associated_type(%IDifferentiable))
+let  %174	: _	= interface_req_entry(%175, witness_table_t(%IDifferentiable))
+let  %176	: _	= interface_req_entry(%177, Func(associated_type(%IDifferentiable)))
+let  %178	: _	= interface_req_entry(%179, Func(associated_type(%IDifferentiable), associated_type(%IDifferentiable), associated_type(%IDifferentiable)))
+let  %180	: _	= interface_req_entry(%181, %182)
+[import("_ST4core15IDifferentiable")]
+[nameHint("IDifferentiable")]
+let  %IDifferentiable	: Type	= interface(%172, %174, %176, %178, %180)
+[import("_ST4core15IDifferentiable12Differential")]
+let  %173	: _	= key
+[import("_S4core15IDifferentiable12DifferentialI4core15IDifferentiable")]
+let  %175	: _	= key
+[StaticRequirementDecoration]
+[import("_S4core15IDifferentiable5dzerop0p4core15IDifferentiable12Differential")]
+let  %177	: _	= key
+[StaticRequirementDecoration]
+[import("_S4core15IDifferentiable4daddp2p4core15IDifferentiable12Differential4core15IDifferentiable12Differential4core15IDifferentiable12Differential")]
+let  %179	: _	= key
+[import("_S4core15IDifferentiable4dmulg2TC4core15IDifferentiable1T4core17__BuiltinRealTypep2p4core15IDifferentiable1T4core15IDifferentiable12Differential4core15IDifferentiable12Differential")]
+let  %181	: _	= key
+generic %182	: Generic
+{
+block %183(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
+		[nameHint("IDifferentiable.T")]
+		param %IDifferentiablex5FT	: type_t,
+		param %184	: witness_table_t(%x5Fx5FBuiltinRealType)):
+	return_val(Func(associated_type(%IDifferentiable), %IDifferentiablex5FT, associated_type(%IDifferentiable)))
+}
+[import("_S4core6IFloatR8_24xinitp1pf")]
+let  %152	: _	= key
+[import("_S4core6IFloat7toFloatp0pf")]
+let  %154	: _	= key
+[import("_S4core6IFloat3addp1p4core6IFloat4This4core6IFloat4This")]
+let  %156	: _	= key
+[import("_S4core6IFloat3subp1p4core6IFloat4This4core6IFloat4This")]
+let  %158	: _	= key
+[import("_S4core6IFloat3mulp1p4core6IFloat4This4core6IFloat4This")]
+let  %160	: _	= key
+[import("_S4core6IFloat3divp1p4core6IFloat4This4core6IFloat4This")]
+let  %162	: _	= key
+[import("_S4core6IFloat3modp1p4core6IFloat4This4core6IFloat4This")]
+let  %164	: _	= key
+[import("_S4core6IFloat3negp0p4core6IFloat4This")]
+let  %166	: _	= key
+[import("_S4core6IFloatR8_24xinitp1p4core6IFloat4This")]
+let  %168	: _	= key
+[import("_S4core6IFloat5scaleg2TC4core6IFloat1T4core26__BuiltinFloatingPointTypep1p4core6IFloat1T4core6IFloat4This")]
+let  %170	: _	= key
+generic %171	: Generic
+{
+block %185(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinFloatingPointType)]
+		[nameHint("IFloat.T")]
+		param %IFloatx5FT	: type_t,
+		param %186	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)):
+	return_val(Func(this_type(%IFloat), this_type(%IFloat), %IFloatx5FT))
+}
+[backwardDiffReference(%143)]
+[fwdDerivative(%141)]
+[StaticRequirementDecoration]
+[import("_S4core26__BuiltinFloatingPointType5getPip0p4core26__BuiltinFloatingPointType4This")]
+let  %139	: _	= key
+[StaticRequirementDecoration]
+[import("_SFwdReq_4core26__BuiltinFloatingPointType5getPip0p4core26__BuiltinFloatingPointType4This")]
+let  %141	: _	= key
+[StaticRequirementDecoration]
+[import("_SBwdReq_4core26__BuiltinFloatingPointType5getPip0p4core26__BuiltinFloatingPointType4This")]
+let  %143	: _	= key
+[export("_SWf4core13__BuiltinType")]
+witness_table %187	: witness_table_t(%x5Fx5FBuiltinType)(Float);
+
+[intrinsicOp(255 : Int)]
+[import("_S4core5float6equalsp1pfb")]
+[nameHint("float.equals")]
+func %floatx5Fequals	: Func(Bool, Float, Float);
+
+[intrinsicOp(258 : Int)]
+[import("_S4core5float8lessThanp1pfb")]
+[nameHint("float.lessThan")]
+func %floatx5FlessThan	: Func(Bool, Float, Float);
+
+[intrinsicOp(260 : Int)]
+[import("_S4core5float16lessThanOrEqualsp1pfb")]
+[nameHint("float.lessThanOrEquals")]
+func %floatx5FlessThanOrEquals	: Func(Bool, Float, Float);
+
+[export("_SWf4core11IComparable")]
+witness_table %188	: witness_table_t(%IComparable)(Float)
+{
+	witness_table_entry(%130,%floatx5Fequals)
+
+	witness_table_entry(%132,%floatx5FlessThan)
+
+	witness_table_entry(%134,%floatx5FlessThanOrEquals)
+
+}
+
+[intrinsicOp(247 : Int)]
+[import("_S4core5float3addp1pff")]
+[nameHint("float.add")]
+func %floatx5Fadd	: Func(Float, Float, Float);
+
+[intrinsicOp(248 : Int)]
+[import("_S4core5float3subp1pff")]
+[nameHint("float.sub")]
+func %floatx5Fsub	: Func(Float, Float, Float);
+
+[intrinsicOp(249 : Int)]
+[import("_S4core5float3mulp1pff")]
+[nameHint("float.mul")]
+func %floatx5Fmul	: Func(Float, Float, Float);
+
+[intrinsicOp(250 : Int)]
+[import("_S4core5float3divp1pff")]
+[nameHint("float.div")]
+func %floatx5Fdiv	: Func(Float, Float, Float);
+
+[intrinsicOp(252 : Int)]
+[import("_S4core5float3modp1pff")]
+[nameHint("float.mod")]
+func %floatx5Fmod	: Func(Float, Float, Float);
+
+[intrinsicOp(266 : Int)]
+[import("_S4core5float3negp0pf")]
+[nameHint("float.neg")]
+func %floatx5Fneg	: Func(Float, Float);
+
+[intrinsicOp(468 : Int)]
+[import("_S4core5floatR8_24xinitp1pi")]
+[nameHint("float.$init")]
+func %floatx5Fx24init	: Func(Float, Int);
+
+[intrinsicOp(0 : Int)]
+[treatAsDifferentiableDecoration]
+[import("_S4core5floatR8_24xinitp1pf")]
+[nameHint("float.$init")]
+func %floatx5Fx24init1	: Func(Float, Float);
+
+[export("_SWf4core11IArithmetic")]
+witness_table %189	: witness_table_t(%IArithmetic)(Float)
+{
+	witness_table_entry(%112,%188)
+
+	witness_table_entry(%114,%floatx5Fadd)
+
+	witness_table_entry(%116,%floatx5Fsub)
+
+	witness_table_entry(%118,%floatx5Fmul)
+
+	witness_table_entry(%120,%floatx5Fdiv)
+
+	witness_table_entry(%122,%floatx5Fmod)
+
+	witness_table_entry(%124,%floatx5Fneg)
+
+	witness_table_entry(%126,%floatx5Fx24init)
+
+	witness_table_entry(%128,%floatx5Fx24init1)
+
+}
+
+[export("_SWf4core23__BuiltinArithmeticType")]
+witness_table %190	: witness_table_t(%x5Fx5FBuiltinArithmeticType)(Float)
+{
+	witness_table_entry(%108,%187)
+
+	witness_table_entry(%110,%189)
+
+}
+
+[export("_SWf4core29__BuiltinSignedArithmeticType")]
+witness_table %191	: witness_table_t(%x5Fx5FBuiltinSignedArithmeticType)(Float)
+{
+	witness_table_entry(%147,%190)
+
+}
+
+[export("_SWf4core17__BuiltinRealType")]
+witness_table %192	: witness_table_t(%x5Fx5FBuiltinRealType)(Float)
+{
+	witness_table_entry(%145,%191)
+
+}
+
+[export("_SWf4core11IComparable")]
+witness_table %193	: witness_table_t(%IComparable)(Float)
+{
+	witness_table_entry(%130,%floatx5Fequals)
+
+	witness_table_entry(%132,%floatx5FlessThan)
+
+	witness_table_entry(%134,%floatx5FlessThanOrEquals)
+
+}
+
+[export("_SWf4core11IArithmetic")]
+witness_table %194	: witness_table_t(%IArithmetic)(Float)
+{
+	witness_table_entry(%112,%193)
+
+	witness_table_entry(%114,%floatx5Fadd)
+
+	witness_table_entry(%116,%floatx5Fsub)
+
+	witness_table_entry(%118,%floatx5Fmul)
+
+	witness_table_entry(%120,%floatx5Fdiv)
+
+	witness_table_entry(%122,%floatx5Fmod)
+
+	witness_table_entry(%124,%floatx5Fneg)
+
+	witness_table_entry(%126,%floatx5Fx24init)
+
+	witness_table_entry(%128,%floatx5Fx24init1)
+
+}
+
+[DifferentiableTypeDictionaryDecoration]
+[backwardDifferentiable]
+[unsafeForceInlineEarly]
+[import("_S4core5float5dzerop0pf")]
+[nameHint("float.dzero")]
+func %floatx5Fdzero	: Func(Float)
+{
+block %195:
+	return_val(0 : Float)
+}
+[DifferentiableTypeDictionaryDecoration]
+[backwardDifferentiable]
+[unsafeForceInlineEarly]
+[import("_S4core5float4daddp2pfff")]
+[nameHint("float.dadd")]
+func %floatx5Fdadd	: Func(Float, Float, Float)
+{
+block %196(
+		[nameHint("a")]
+		param %a	: Float,
+		[nameHint("b")]
+		param %b	: Float):
+	let  %197	: Float	= add(%a, %b)
+	return_val(%197)
+}
+generic %198	: Generic
+{
+block %199(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
+		[nameHint("float.U")]
+		param %floatx5FU	: type_t,
+		param %200	: witness_table_t(%x5Fx5FBuiltinRealType)):
+	return_val(Func(Float, Attributed(%floatx5FU, %1), Float))
+}
+[import("_S4core5float4dmulg2TC4core5float1U4core17__BuiltinRealTypep2p4core5float1Uff")]
+generic %201	: %198
+{
+block %202(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
+		[nameHint("float.U")]
+		param %floatx5FU1	: type_t,
+		param %203	: witness_table_t(%x5Fx5FBuiltinRealType)):
+	[DifferentiableTypeDictionaryDecoration]
+	[backwardDifferentiable]
+	[unsafeForceInlineEarly]
+	[nameHint("float.dmul")]
+		func %floatx5Fdmul	: Func(Float, Attributed(%floatx5FU1, %1), Float)
+	{
+block %204(
+			[nameHint("a")]
+			param %a1	: Attributed(%floatx5FU1, %1),
+			[nameHint("b")]
+			param %b1	: Float):
+		let  %205	: Float	= floatCast(%a1)
+		let  %206	: Float	= mul(%205, %b1)
+		return_val(%206)
+}
+	return_val(%floatx5Fdmul)
+}
+[export("_SWf4core15IDifferentiable")]
+witness_table %207	: witness_table_t(%IDifferentiable)(Float)
+{
+	witness_table_entry(%175,%207)
+
+	witness_table_entry(%173,Float)
+
+	witness_table_entry(%177,%floatx5Fdzero)
+
+	witness_table_entry(%179,%floatx5Fdadd)
+
+	witness_table_entry(%181,%201)
+
+}
+
+[intrinsicOp(467 : Int)]
+[import("_S4core5float7toFloatp0pf")]
+[nameHint("float.toFloat")]
+func %floatx5FtoFloat	: Func(Float, Float);
+
+generic %208	: Generic
+{
+block %209(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinFloatingPointType)]
+		[nameHint("float.T")]
+		param %floatx5FT	: type_t,
+		param %210	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)):
+	return_val(Func(Float, Float, %floatx5FT))
+}
+[import("_S4core5float5scaleg2TC4core5float1T4core26__BuiltinFloatingPointTypep1p4core5float1Tf")]
+generic %211	: %208
+{
+block %212(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinFloatingPointType)]
+		[nameHint("float.T")]
+		param %floatx5FT1	: type_t,
+		param %213	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)):
+	[intrinsicOp(249 : Int)]
+	[nameHint("float.scale")]
+		func %floatx5Fscale	: Func(Float, Float, %floatx5FT1);
+
+	return_val(%floatx5Fscale)
+}
+[export("_SWf4core6IFloat")]
+witness_table %214	: witness_table_t(%IFloat)(Float)
+{
+	witness_table_entry(%149,%194)
+
+	witness_table_entry(%4,%207)
+
+	witness_table_entry(%152,%floatx5Fx24init1)
+
+	witness_table_entry(%154,%floatx5FtoFloat)
+
+	witness_table_entry(%156,%floatx5Fadd)
+
+	witness_table_entry(%158,%floatx5Fsub)
+
+	witness_table_entry(%160,%floatx5Fmul)
+
+	witness_table_entry(%162,%floatx5Fdiv)
+
+	witness_table_entry(%164,%floatx5Fmod)
+
+	witness_table_entry(%166,%floatx5Fneg)
+
+	witness_table_entry(%168,%floatx5Fx24init1)
+
+	witness_table_entry(%170,%211)
+
+}
+
+[DifferentiableTypeDictionaryDecoration]
+[backwardDifferentiable]
+[export("_SR26uninitialized_2Dxvariables1fp1pff")]
+[nameHint("f")]
+func %f	: Func(Float, Float)
+{
+block %215(
+		[nameHint("x")]
+		param %x	: Float):
+	return_val(%x)
+}
+[nameHint("outputBuffer")]
+[export("_SVR26uninitialized_2Dxvariables12outputBuffer")]
+let  %outputBuffer	: RWStructuredBuffer(%Data, DefaultLayout, %106)	= global_param
+[entryPoint(6 : Int, "computeMain", "uninitialized-variables")]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_SR26uninitialized_2Dxvariables11computeMainp1pv3uV")]
+[nameHint("computeMain")]
+func %computeMain	: Func(Void, Vec(UInt, 3 : Int))
+{
+block %216(
+		[nameHint("dispatchThreadID")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %dispatchThreadID	: Vec(UInt, 3 : Int)):
+	[nameHint("tid")]
+	let  %tid	: UInt	= swizzle(%dispatchThreadID, 0 : Int)
+	let  %217	: Ptr(%Data)	= rwstructuredBufferGetElementPtr(%inputBuffer, %tid)
+	[nameHint("inputData")]
+	let  %inputData	: %Data	= load(%217)
+	[nameHint("outputData")]
+	let  %outputData	: Float	= get_field(%inputData, %value)
+	[nameHint("uninitializedVariable")]
+	let  %uninitializedVariable	: Float	= undefined
+	[nameHint("outputData")]
+	let  %outputData1	: Float	= add(%outputData, %uninitializedVariable)
+	[nameHint("undefData")]
+	let  %undefData	: %Data	= undefined
+	let  %218	: Float	= get_field(%undefData, %value)
+	[nameHint("outputData")]
+	let  %outputData2	: Float	= add(%outputData1, %218)
+	[nameHint("nestedData")]
+	let  %nestedData	: %NestedData	= undefined
+	let  %219	: %Data	= get_field(%nestedData, %data)
+	let  %220	: Float	= get_field(%219, %value)
+	[nameHint("outputData")]
+	let  %outputData3	: Float	= add(%outputData2, %220)
+	[nameHint("dp")]
+	let  %dp	: Ptr(DiffPairUserCode(Float, %207))	= var
+	let  %221	: DiffPairUserCode(Float, %207)	= MakeDiffPairUserCode(1 : Float, 0 : Float)
+	store(%dp, %221)
+	let  %222	: Func(Void, InOut(DiffPairUserCode(Float, %207)), Float)	= BackwardDifferentiate(%f)
+	call %222(%dp, 1 : Float)
+	let  %223	: DiffPairUserCode(Float, %207)	= load(%dp)
+	let  %224	: Float	= GetDifferentialUserCode(%223)
+	[nameHint("outputData")]
+	let  %outputData4	: Float	= add(%outputData3, %224)
+	let  %225	: Ptr(%Data)	= rwstructuredBufferGetElementPtr(%outputBuffer, %tid)
+	let  %226	: Ptr(Float)	= get_field_addr(%225, %value)
+	store(%226, %outputData4)
+	return_val(void_constant)
+}
+[export("_SWi4core13__BuiltinType")]
+witness_table %227	: witness_table_t(%x5Fx5FBuiltinType)(Int);
+
+[intrinsicOp(255 : Int)]
+[import("_S4core3int6equalsp1pib")]
+[nameHint("int.equals")]
+func %intx5Fequals	: Func(Bool, Int, Int);
+
+[intrinsicOp(258 : Int)]
+[import("_S4core3int8lessThanp1pib")]
+[nameHint("int.lessThan")]
+func %intx5FlessThan	: Func(Bool, Int, Int);
+
+[intrinsicOp(260 : Int)]
+[import("_S4core3int16lessThanOrEqualsp1pib")]
+[nameHint("int.lessThanOrEquals")]
+func %intx5FlessThanOrEquals	: Func(Bool, Int, Int);
+
+[export("_SWi4core11IComparable")]
+witness_table %228	: witness_table_t(%IComparable)(Int)
+{
+	witness_table_entry(%130,%intx5Fequals)
+
+	witness_table_entry(%132,%intx5FlessThan)
+
+	witness_table_entry(%134,%intx5FlessThanOrEquals)
+
+}
+
+[intrinsicOp(247 : Int)]
+[import("_S4core3int3addp1pii")]
+[nameHint("int.add")]
+func %intx5Fadd	: Func(Int, Int, Int);
+
+[intrinsicOp(248 : Int)]
+[import("_S4core3int3subp1pii")]
+[nameHint("int.sub")]
+func %intx5Fsub	: Func(Int, Int, Int);
+
+[intrinsicOp(249 : Int)]
+[import("_S4core3int3mulp1pii")]
+[nameHint("int.mul")]
+func %intx5Fmul	: Func(Int, Int, Int);
+
+[intrinsicOp(250 : Int)]
+[import("_S4core3int3divp1pii")]
+[nameHint("int.div")]
+func %intx5Fdiv	: Func(Int, Int, Int);
+
+[intrinsicOp(252 : Int)]
+[import("_S4core3int3modp1pii")]
+[nameHint("int.mod")]
+func %intx5Fmod	: Func(Int, Int, Int);
+
+[intrinsicOp(266 : Int)]
+[import("_S4core3int3negp0pi")]
+[nameHint("int.neg")]
+func %intx5Fneg	: Func(Int, Int);
+
+[intrinsicOp(0 : Int)]
+[import("_S4core3intR8_24xinitp1pi")]
+[nameHint("int.$init")]
+func %intx5Fx24init	: Func(Int, Int);
+
+[export("_SWi4core11IArithmetic")]
+witness_table %229	: witness_table_t(%IArithmetic)(Int)
+{
+	witness_table_entry(%112,%228)
+
+	witness_table_entry(%114,%intx5Fadd)
+
+	witness_table_entry(%116,%intx5Fsub)
+
+	witness_table_entry(%118,%intx5Fmul)
+
+	witness_table_entry(%120,%intx5Fdiv)
+
+	witness_table_entry(%122,%intx5Fmod)
+
+	witness_table_entry(%124,%intx5Fneg)
+
+	witness_table_entry(%126,%intx5Fx24init)
+
+	witness_table_entry(%128,%intx5Fx24init)
+
+}
+
+[export("_SWi4core23__BuiltinArithmeticType")]
+witness_table %230	: witness_table_t(%x5Fx5FBuiltinArithmeticType)(Int)
+{
+	witness_table_entry(%108,%227)
+
+	witness_table_entry(%110,%229)
+
+}
+
+[export("_SR26uninitialized_2Dxvariables19use_undefined_valuep1pii")]
+[nameHint("use_undefined_value")]
+func %usex5Fundefinedx5Fvalue	: Func(Int, Int)
+{
+block %231(
+		[nameHint("k")]
+		param %k	: Int):
+	[nameHint("x")]
+	let  %x1	: Int	= undefined
+	[nameHint("x")]
+	let  %x2	: Int	= add(%x1, %k)
+	return_val(%x2)
+}
+generic %232	: Generic
+{
+block %233(
+		[nameHint("T")]
+		param %T	: type_t):
+	return_val(Func(%T))
+}
+[export("_SR26uninitialized_2Dxvariables24generic_undefined_returng1Tp0pR26uninitialized_2Dxvariables1T")]
+generic %234	: %232
+{
+block %235(
+		[nameHint("T")]
+		param %T1	: type_t):
+	[nameHint("generic_undefined_return")]
+		func %genericx5Fundefinedx5Freturn	: Func(%T1)
+	{
+block %236:
+		[nameHint("x")]
+		let  %x3	: %T1	= undefined
+		return_val(%x3)
+}
+	return_val(%genericx5Fundefinedx5Freturn)
+}
+[export("_STR26uninitialized_2Dxvariables10DiffStruct")]
+[nameHint("DiffStruct")]
+struct %DiffStruct	: Type
+{
+	field(%tex, TextureType(Vec(Float, 4 : Int), TextureShape1DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %237))
+}
+
+[export("_STR26uninitialized_2Dxvariables10DiffStruct12Differential")]
+[nameHint("DiffStruct.Differential")]
+struct %DiffStructx5FDifferential	: Type;
+
+[DifferentiableTypeDictionaryDecoration]
+[backwardDifferentiable]
+[export("_SR26uninitialized_2Dxvariables10DiffStruct12DifferentialR18_24x_u_usyn_udzerop0pR26uninitialized_2Dxvariables10DiffStruct12Differential")]
+[nameHint("DiffStruct.Differential.$__syn_dzero")]
+func %DiffStructx5FDifferentialx5Fx24x5Fx5Fsynx5Fdzero	: Func(%DiffStructx5FDifferential)
+{
+block %238:
+	[nameHint("result")]
+	let  %result	: %DiffStructx5FDifferential	= undefined
+	return_val(%result)
+}
+[DifferentiableTypeDictionaryDecoration]
+[backwardDifferentiable]
+[export("_SR26uninitialized_2Dxvariables10DiffStruct12DifferentialR17_24x_u_usyn_udaddp2pR26uninitialized_2Dxvariables10DiffStruct12DifferentialR26uninitialized_2Dxvariables10DiffStruct12DifferentialR26uninitialized_2Dxvariables10DiffStruct12Differential")]
+[nameHint("DiffStruct.Differential.$__syn_dadd")]
+func %DiffStructx5FDifferentialx5Fx24x5Fx5Fsynx5Fdadd	: Func(%DiffStructx5FDifferential, %DiffStructx5FDifferential, %DiffStructx5FDifferential)
+{
+block %239(
+		[nameHint("SLANG_anonymous_0")]
+		param %SLANGx5Fanonymousx5F0_	: %DiffStructx5FDifferential,
+		[nameHint("SLANG_anonymous_1")]
+		param %SLANGx5Fanonymousx5F1_	: %DiffStructx5FDifferential):
+	[nameHint("result")]
+	let  %result1	: %DiffStructx5FDifferential	= undefined
+	return_val(%result1)
+}
+generic %240	: Generic
+{
+block %241(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
+		[nameHint("DiffStruct.Differential.T")]
+		param %DiffStructx5FDifferentialx5FT	: type_t,
+		param %242	: witness_table_t(%x5Fx5FBuiltinRealType)):
+	return_val(Func(%DiffStructx5FDifferential, Attributed(%DiffStructx5FDifferentialx5FT, %1), %DiffStructx5FDifferential))
+}
+[export("_SR26uninitialized_2Dxvariables10DiffStruct12DifferentialR17_24x_u_usyn_udmulg2TCR26uninitialized_2Dxvariables10DiffStruct12Differential1T4core17__BuiltinRealTypep2pR26uninitialized_2Dxvariables10DiffStruct12Differential1TR26uninitialized_2Dxvariables10DiffStruct12DifferentialR26uninitialized_2Dxvariables10DiffStruct12Differential")]
+generic %243	: %240
+{
+block %244(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
+		[nameHint("DiffStruct.Differential.T")]
+		param %DiffStructx5FDifferentialx5FT1	: type_t,
+		param %245	: witness_table_t(%x5Fx5FBuiltinRealType)):
+	[DifferentiableTypeDictionaryDecoration]
+	[backwardDifferentiable]
+	[nameHint("DiffStruct.Differential.$__syn_dmul")]
+		func %DiffStructx5FDifferentialx5Fx24x5Fx5Fsynx5Fdmul	: Func(%DiffStructx5FDifferential, Attributed(%DiffStructx5FDifferentialx5FT1, %1), %DiffStructx5FDifferential)
+	{
+block %246(
+			[nameHint("SLANG_anonymous_2")]
+			param %SLANGx5Fanonymousx5F2_	: Attributed(%DiffStructx5FDifferentialx5FT1, %1),
+			[nameHint("SLANG_anonymous_3")]
+			param %SLANGx5Fanonymousx5F3_	: %DiffStructx5FDifferential):
+		[nameHint("result")]
+		let  %result2	: %DiffStructx5FDifferential	= undefined
+		return_val(%result2)
+}
+	return_val(%DiffStructx5FDifferentialx5Fx24x5Fx5Fsynx5Fdmul)
+}
+[export("_SWR26uninitialized_2Dxvariables10DiffStruct12Differential4core15IDifferentiable")]
+witness_table %247	: witness_table_t(%IDifferentiable)(%DiffStructx5FDifferential)
+{
+	witness_table_entry(%175,%247)
+
+	witness_table_entry(%173,%DiffStructx5FDifferential)
+
+	witness_table_entry(%177,%DiffStructx5FDifferentialx5Fx24x5Fx5Fsynx5Fdzero)
+
+	witness_table_entry(%179,%DiffStructx5FDifferentialx5Fx24x5Fx5Fsynx5Fdadd)
+
+	witness_table_entry(%181,%243)
+
+}
+
+[DifferentiableTypeDictionaryDecoration]
+[backwardDifferentiable]
+[export("_SR26uninitialized_2Dxvariables10DiffStructR18_24x_u_usyn_udzerop0pR26uninitialized_2Dxvariables10DiffStruct12Differential")]
+[nameHint("DiffStruct.$__syn_dzero")]
+func %DiffStructx5Fx24x5Fx5Fsynx5Fdzero	: Func(%DiffStructx5FDifferential)
+{
+block %248:
+	[nameHint("result")]
+	let  %result3	: %DiffStructx5FDifferential	= undefined
+	return_val(%result3)
+}
+[DifferentiableTypeDictionaryDecoration]
+[backwardDifferentiable]
+[export("_SR26uninitialized_2Dxvariables10DiffStructR17_24x_u_usyn_udaddp2pR26uninitialized_2Dxvariables10DiffStruct12DifferentialR26uninitialized_2Dxvariables10DiffStruct12DifferentialR26uninitialized_2Dxvariables10DiffStruct12Differential")]
+[nameHint("DiffStruct.$__syn_dadd")]
+func %DiffStructx5Fx24x5Fx5Fsynx5Fdadd	: Func(%DiffStructx5FDifferential, %DiffStructx5FDifferential, %DiffStructx5FDifferential)
+{
+block %249(
+		[nameHint("SLANG_anonymous_0")]
+		param %SLANGx5Fanonymousx5F0_1	: %DiffStructx5FDifferential,
+		[nameHint("SLANG_anonymous_1")]
+		param %SLANGx5Fanonymousx5F1_1	: %DiffStructx5FDifferential):
+	[nameHint("result")]
+	let  %result4	: %DiffStructx5FDifferential	= undefined
+	return_val(%result4)
+}
+generic %250	: Generic
+{
+block %251(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
+		[nameHint("DiffStruct.T")]
+		param %DiffStructx5FT	: type_t,
+		param %252	: witness_table_t(%x5Fx5FBuiltinRealType)):
+	return_val(Func(%DiffStructx5FDifferential, Attributed(%DiffStructx5FT, %1), %DiffStructx5FDifferential))
+}
+[export("_SR26uninitialized_2Dxvariables10DiffStructR17_24x_u_usyn_udmulg2TCR26uninitialized_2Dxvariables10DiffStruct1T4core17__BuiltinRealTypep2pR26uninitialized_2Dxvariables10DiffStruct1TR26uninitialized_2Dxvariables10DiffStruct12DifferentialR26uninitialized_2Dxvariables10DiffStruct12Differential")]
+generic %253	: %250
+{
+block %254(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
+		[nameHint("DiffStruct.T")]
+		param %DiffStructx5FT1	: type_t,
+		param %255	: witness_table_t(%x5Fx5FBuiltinRealType)):
+	[DifferentiableTypeDictionaryDecoration]
+	[backwardDifferentiable]
+	[nameHint("DiffStruct.$__syn_dmul")]
+		func %DiffStructx5Fx24x5Fx5Fsynx5Fdmul	: Func(%DiffStructx5FDifferential, Attributed(%DiffStructx5FT1, %1), %DiffStructx5FDifferential)
+	{
+block %256(
+			[nameHint("SLANG_anonymous_2")]
+			param %SLANGx5Fanonymousx5F2_1	: Attributed(%DiffStructx5FT1, %1),
+			[nameHint("SLANG_anonymous_3")]
+			param %SLANGx5Fanonymousx5F3_1	: %DiffStructx5FDifferential):
+		[nameHint("result")]
+		let  %result5	: %DiffStructx5FDifferential	= undefined
+		return_val(%result5)
+}
+	return_val(%DiffStructx5Fx24x5Fx5Fsynx5Fdmul)
+}
+[export("_SWR26uninitialized_2Dxvariables10DiffStruct4core15IDifferentiable")]
+witness_table %257	: witness_table_t(%IDifferentiable)(%DiffStruct)
+{
+	witness_table_entry(%175,%247)
+
+	witness_table_entry(%173,%DiffStructx5FDifferential)
+
+	witness_table_entry(%177,%DiffStructx5Fx24x5Fx5Fsynx5Fdzero)
+
+	witness_table_entry(%179,%DiffStructx5Fx24x5Fx5Fsynx5Fdadd)
+
+	witness_table_entry(%181,%253)
+
+}
+
+[export("_SVR26uninitialized_2Dxvariables10DiffStruct3tex")]
+[nameHint("tex")]
+let  %tex	: _	= key
+let  %258	: _	= interface_req_entry(%259, %flavor)
+let  %260	: _	= interface_req_entry(%261, %dimensions)
+let  %262	: _	= interface_req_entry(%263, %planeDimensions)
+[BuiltinDecoration]
+[import("_ST4core15__ITextureShape")]
+[nameHint("__ITextureShape")]
+let  %x5Fx5FITextureShape	: Type	= interface(%258, %260, %262)
+[StaticRequirementDecoration]
+[import("_SV4core15__ITextureShape6flavor")]
+let  %259	: _	= key
+[nameHint("flavor")]
+[import("_SV4core15__ITextureShape6flavor")]
+let  %flavor	: Int	= globalConstant
+[StaticRequirementDecoration]
+[import("_SV4core15__ITextureShape10dimensions")]
+let  %261	: _	= key
+[nameHint("dimensions")]
+[import("_SV4core15__ITextureShape10dimensions")]
+let  %dimensions	: Int	= globalConstant
+[StaticRequirementDecoration]
+[import("_SV4core15__ITextureShape15planeDimensions")]
+let  %263	: _	= key
+[nameHint("planeDimensions")]
+[import("_SV4core15__ITextureShape15planeDimensions")]
+let  %planeDimensions	: Int	= globalConstant
+[export("_SW4core9__Shape2D4core15__ITextureShape")]
+witness_table %237	: witness_table_t(%x5Fx5FITextureShape)(TextureShape1DType)
+{
+	witness_table_entry(%259,2 : Int)
+
+	witness_table_entry(%261,2 : Int)
+
+	witness_table_entry(%263,2 : Int)
+
+}
+
+###

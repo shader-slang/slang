@@ -80,6 +80,23 @@ namespace Slang
         return false;
     }
 
+    bool synthesized(IRFunc* func)
+    {
+        const UnownedStringSlice slice = toSlice("$__syn_");
+
+        auto decoratorList = func->getDecorations();
+        for (auto head = decoratorList.first; head; head = head->next) {
+            if (auto name = as<IRNameHintDecoration>(head)) {
+                auto str = name->getName();
+                auto index = str.indexOf(slice);
+                if (index >= 0)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     List<IRInst*> concernableUsers(IRInst* inst)
     {
         List<IRInst*> users;
@@ -215,6 +232,12 @@ namespace Slang
 
     void checkForUsingUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     {
+        // Skip synthesized functions; this includes those generated from autodiff.
+        // We shall trust that synthesized functions are aware that they may be using
+        // undefined values.
+        if (synthesized(func))
+            return;
+
         auto firstBlock = func->getFirstBlock();
         if (!firstBlock)
             return;
@@ -242,16 +265,7 @@ namespace Slang
                 continue;
 
             auto loads = checkForUsingUndefinedValue(reachability, inst);
-            // if (loads.getCount()) {
-            //     printf("func:\n");
-            //     func->dump();
-            // }
-
             for (auto load : loads) {
-                printf("load instruction is:\n");
-                load->dump();
-                printf("inst is:\n");
-                inst->dump();
                 sink->diagnose(load,
                         as <IRReturn> (load)
                         ? Diagnostics::returningWithUninitializedValue
