@@ -827,6 +827,10 @@ static void emitReflectionTypeInfoJSON(
         writer.maybeComma();
         emitReflectionNameInfoJSON(writer, type->getName());
         break;
+    case slang::TypeReflection::Kind::DynamicResource:
+        writer.maybeComma();
+        writer << "\"kind\": \"DynamicResource\"";
+        break;
     default:
         assert(!"unhandled case");
         break;

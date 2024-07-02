@@ -2146,6 +2146,7 @@ extern "C"
         SLANG_TYPE_KIND_SPECIALIZED,
         SLANG_TYPE_KIND_FEEDBACK,
         SLANG_TYPE_KIND_POINTER,
+        SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -2721,6 +2722,7 @@ namespace slang
             Specialized = SLANG_TYPE_KIND_SPECIALIZED,
             Feedback = SLANG_TYPE_KIND_FEEDBACK,
             Pointer = SLANG_TYPE_KIND_POINTER,
+            DynamicResource = SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
         };
 
         enum ScalarType : SlangScalarTypeIntegral

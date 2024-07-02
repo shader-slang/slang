@@ -2066,10 +2066,11 @@ namespace Slang
                 if (overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
                 {
                     getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
-                    return;
                 }
-
-                getSink()->diagnose(varDecl, Diagnostics::ambiguousDefaultInitializerForType, type);
+                else
+                {
+                    getSink()->diagnose(varDecl, Diagnostics::ambiguousDefaultInitializerForType, type);
+                }
             }
             else if(overloadContext.bestCandidate)
             {
@@ -2082,16 +2083,17 @@ namespace Slang
                 if (overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
                 {
                     getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
-                    return;
                 }
-
-                // If we had a single best candidate *and* it was applicable,
-                // then we use it to construct a new initial-value expression
-                // for the variable, that will be used for all downstream
-                // code generation.
-                //
-                varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
-                getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{ *overloadContext.bestCandidate, 0});
+                else
+                {
+                    // If we had a single best candidate *and* it was applicable,
+                    // then we use it to construct a new initial-value expression
+                    // for the variable, that will be used for all downstream
+                    // code generation.
+                    //
+                    varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+                    getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{*overloadContext.bestCandidate, 0});
+                }
             }
         }
 

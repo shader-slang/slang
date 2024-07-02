@@ -242,6 +242,7 @@ struct RequiredLoweringPassSet
     bool glslGlobalVar;
     bool glslSSBO;
     bool byteAddressBuffer;
+    bool dynamicResource;
 };
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -344,6 +345,9 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
     case kIROp_HLSLRWByteAddressBufferType:
     case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
+        break;
+    case kIROp_DynamicResourceType:
+        result.dynamicResource = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1153,6 +1157,10 @@ Result linkAndOptimizeIR(
     // Legalize non struct parameters that are expected to be structs for HLSL. 
     if(isD3DTarget(targetRequest))
         legalizeNonStructParameterToStructForHLSL(irModule);
+
+    // Create aliases for all dynamic resource parameters.
+    if(requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
+        legalizeDynamicResourcesForGLSL(codeGenContext, irModule);
 
     // Legalize `ImageSubscript` loads.
     switch (target)
