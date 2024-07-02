@@ -3,7 +3,7 @@
 
 #include <filesystem>
 #include "parameter-encoder.h"
-#include "api_callId.h"
+#include "capture-format.h"
 
 namespace SlangCapture
 {
@@ -25,21 +25,6 @@ namespace SlangCapture
     private:
         void clearWithHeader(const ApiCallId& callId, uint64_t handleId);
         void clearWithTailer();
-
-        struct FunctionHeader
-        {
-            uint32_t         magic {0x44414548};
-            ApiCallId        callId {InvalidCallId};
-            uint64_t         handleId {0};
-            uint64_t         dataSizeInBytes {0};
-            uint64_t         threadId {0};
-        };
-
-        struct FunctionTailer
-        {
-            uint32_t     magic {0x4C494154};
-            uint32_t     dataSizeInBytes {0};
-        };
 
         MemoryStream m_memoryStream;
         std::unique_ptr<FileOutputStream> m_fileStream;

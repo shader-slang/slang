@@ -1,4 +1,4 @@
-#include "capture_utility.h"
+#include "capture-utility.h"
 #include "slang-composite-component-type.h"
 
 namespace SlangCapture

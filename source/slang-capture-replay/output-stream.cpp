@@ -1,5 +1,5 @@
 #include "output-stream.h"
-#include "capture_utility.h"
+#include "capture-utility.h"
 
 namespace SlangCapture
 {

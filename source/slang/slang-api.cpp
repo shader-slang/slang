@@ -6,7 +6,7 @@
 
 #include "../core/slang-shared-library.h"
 #include "../slang-capture-replay/slang-global-session.h"
-#include "../slang-capture-replay/capture_utility.h"
+#include "../slang-capture-replay/capture-utility.h"
 
 // implementation of C interface
 

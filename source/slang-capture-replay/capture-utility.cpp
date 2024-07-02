@@ -5,7 +5,7 @@
 #include <stdarg.h>
 #include <mutex>
 
-#include "capture_utility.h"
+#include "capture-utility.h"
 
 constexpr const char* kCaptureLayerEnvVar = "SLANG_CAPTURE_LAYER";
 constexpr const char* kCaptureLayerLogLevel = "SLANG_CAPTURE_LOG_LEVEL";

@@ -34,6 +34,8 @@ namespace SlangCapture
     typedef uint64_t AddressFormat;
 
     constexpr uint64_t g_globalFunctionHandle = 0;
+    constexpr uint32_t MAGIC_HEADER = 0x44414548;
+    constexpr uint32_t MAGIC_TAILER = 0x4C494154;
 
     enum ApiCallId : uint32_t
     {
@@ -147,5 +149,21 @@ namespace SlangCapture
         ITypeConformance_renameEntryPoint                    = makeApiCallId(Class_ITypeConformance, 0x000B),
         ITypeConformance_linkWithOptions                     = makeApiCallId(Class_ITypeConformance, 0x000C)
     };
+
+    struct FunctionHeader
+    {
+        uint32_t         magic {MAGIC_HEADER};
+        ApiCallId        callId {InvalidCallId};
+        uint64_t         handleId {0};
+        uint64_t         dataSizeInBytes {0};
+        uint64_t         threadId {0};
+    };
+
+    struct FunctionTailer
+    {
+        uint32_t     magic {MAGIC_TAILER};
+        uint32_t     dataSizeInBytes {0};
+    };
+
 }
 #endif

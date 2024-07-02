@@ -6,6 +6,7 @@
 #include <cstdint>
 
 #include "output-stream.h"
+#include "capture-format.h"
 
 namespace SlangCapture
 {
@@ -31,7 +32,7 @@ namespace SlangCapture
         void encodeString(const char* value);
         void encodePointer(const void* value, bool omitData = false, size_t size = 0);
         void encodePointer(ISlangBlob* blob);
-        void encodeAddress(const void* value) { encodeValue(reinterpret_cast<uint64_t>(value)); }
+        void encodeAddress(const void* value) { encodeValue(reinterpret_cast<SlangCapture::AddressFormat>(value)); }
 
         void encodeStruct(slang::SessionDesc const& desc);
         void encodeStruct(slang::PreprocessorMacroDesc const& desc);
