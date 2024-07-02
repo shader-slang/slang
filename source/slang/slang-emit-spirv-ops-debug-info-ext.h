@@ -146,4 +146,11 @@ SpvInst* emitOpDebugExpression(SpvInstParent* parent, IRInst* inst, const T& idR
     return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(31), operations);
 }
 
+template<typename T>
+SpvInst* emitOpDebugForwardRefsComposite(SpvInstParent* parent, IRInst* inst, const T& idResultType, SpvInst* set, IRInst* name, IRInst* tag, IRInst* source, IRInst* line, IRInst* col, SpvInst* scope, IRInst* linkageName, IRInst* size, IRInst* flags)
+{
+    static_assert(isSingular<T>);
+    return emitInst(parent, inst, SpvOpExtInstWithForwardRefsKHR, idResultType, kResultID, set, SpvWord(10), name, tag, source, line, col, scope, linkageName, size, flags);
+}
+
 #endif        // SLANG_IN_SPIRV_EMIT_CONTEXT
