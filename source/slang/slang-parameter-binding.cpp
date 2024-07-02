@@ -480,8 +480,8 @@ static bool isDigit(char c)
     return (c >= '0') && (c <= '9');
 }
 
-void splitNameAndIndex(
-    UnownedStringSlice const&       text,
+bool splitNameAndIndex(
+    UnownedStringSlice const& text,
     UnownedStringSlice& outName,
     UnownedStringSlice& outDigits)
 {
@@ -489,14 +489,17 @@ void splitNameAndIndex(
     char const* digitsEnd = text.end();
 
     char const* nameEnd = digitsEnd;
+    bool hasExplicitIndex = false;
     while( nameEnd != nameBegin && isDigit(*(nameEnd - 1)) )
     {
+        hasExplicitIndex = true;
         nameEnd--;
     }
     char const* digitsBegin = nameEnd;
 
     outName = UnownedStringSlice(nameBegin, nameEnd);
     outDigits = UnownedStringSlice(digitsBegin, digitsEnd);
+    return hasExplicitIndex;
 }
 
 LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerClassName)

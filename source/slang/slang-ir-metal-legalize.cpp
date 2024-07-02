@@ -10,103 +10,1330 @@
 
 namespace Slang
 {
-    void legalizeMeshEntryPoint(EntryPointInfo entryPoint)
+
+    struct EntryPointInfo
     {
-        auto func = entryPoint.entryPointFunc;
+        IRFunc* entryPointFunc;
+        IREntryPointDecoration* entryPointDecor;
+    };
 
-        if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Mesh)
-        {
-            return;
-        }
-
-        IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
-        for (auto param : func->getParams())
-        {
-            if(param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
-            {
-                IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
-
-                varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
-                auto paramVarLayout = varLayoutBuilder.build();
-                builder.addLayoutDecoration(param, paramVarLayout);
-            }
-        }
-
-    }
-
-    void legalizeDispatchMeshPayloadForMetal(EntryPointInfo entryPoint)
+    struct LegalizeMetalEntryPointContext
     {
-        if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Amplification)
+        ShortList<IRType*> permittedTypes_sv_target;
+        Dictionary<IRFunc*, IRInst*> entryPointToGroupThreadId;
+        const UnownedStringSlice groupThreadIDString = UnownedStringSlice("sv_groupthreadid");
+        HashSet<IRStructField*> semanticInfoToRemove;
+
+        DiagnosticSink* m_sink;
+        IRModule* m_module;
+
+        LegalizeMetalEntryPointContext(DiagnosticSink* sink, IRModule* module) : m_sink(sink), m_module(module)
         {
-            return;
         }
-        // Find out DispatchMesh function
-        IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
-        for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
+        
+        void removeSemanticLayoutsFromLegalizedStructs()
         {
-            if (const auto func = as<IRGlobalValueWithCode>(globalInst))
+            for (auto field : semanticInfoToRemove)
             {
-                if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
+                auto key = field->getKey();
+                bool foundDecoration = true; // Some decorations appear twice, destroy all
+                while (foundDecoration)
                 {
-                    if (dec->getName() == "DispatchMesh")
+                    foundDecoration = false;
+                    if (auto semanticDecor = key->findDecoration<IRSemanticDecoration>())
                     {
-                        SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
-                        dispatchMeshFunc = func;
+                        foundDecoration = true;
+                        semanticDecor->removeAndDeallocate();
+                        continue;
+                    }
+                    else if (auto layoutDecor = key->findDecoration<IRLayoutDecoration>())
+                    {
+                        foundDecoration = true;
+                        layoutDecor->removeAndDeallocate();
+                        continue;
                     }
                 }
             }
         }
 
-        if (!dispatchMeshFunc)
-            return;
+        void hoistEntryPointParameterFromStruct(EntryPointInfo entryPoint)
+        {
+            // If an entry point has a input parameter with a struct type, we want to hoist out
+            // all the fields of the struct type to be individual parameters of the entry point.
+            // This will canonicalize the entry point signature, so we can handle all cases uniformly.
 
-        IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
+            // For example, given an entry point:
+            // ```
+            // struct VertexInput { float3 pos; float 2 uv; int vertexId : SV_VertexID};
+            // void main(VertexInput vin) { ... }
+            // ```
+            // We will transform it to:
+            // ```
+            // void main(float3 pos, float2 uv, int vertexId : SV_VertexID) {
+            //     VertexInput vin = {pos,uv,vertexId};
+            //     ...
+            // }
+            // ```
 
-        // We'll rewrite the call to use mesh_grid_properties.set_threadgroups_per_grid
-        traverseUses(dispatchMeshFunc, [&](const IRUse* use) {
-            if (const auto call = as<IRCall>(use->getUser()))
+            auto func = entryPoint.entryPointFunc;
+            List<IRParam*> paramsToProcess;
+            for (auto param : func->getParams())
             {
-                SLANG_ASSERT(call->getArgCount() == 4);
-                const auto payload = call->getArg(3);
-
-                const auto payloadPtrType = composeGetters<IRPtrType>(
-                    payload,
-                    &IRInst::getDataType
-                );
-                SLANG_ASSERT(payloadPtrType);
-                const auto payloadType = payloadPtrType->getValueType();
-                SLANG_ASSERT(payloadType);
-
-                builder.setInsertBefore(entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
-                const auto annotatedPayloadType =
-                    builder.getPtrType(
-                        kIROp_RefType,
-                        payloadPtrType->getValueType(),
-                        AddressSpace::MetalObjectData
-                    );
-                auto packedParam = builder.emitParam(annotatedPayloadType);
-                builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
-                IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
-
-                // Add the MetalPayload resource info, so we can emit [[payload]]
-                varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
-                auto paramVarLayout = varLayoutBuilder.build();
-                builder.addLayoutDecoration(packedParam, paramVarLayout);
-
-                // Now we replace the call to DispatchMesh with a call to the mesh grid properties
-                // But first we need to create the parameter
-                const auto meshGridPropertiesType = builder.getMetalMeshGridPropertiesType();
-                auto mgp = builder.emitParam(meshGridPropertiesType);
-                builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
+                if (as<IRStructType>(param->getDataType()))
+                {
+                    paramsToProcess.add(param);
                 }
-            });
-    }
+            }
 
-    void legalizeEntryPointForMetal(EntryPointInfo entryPoint, DiagnosticSink* sink)
-    {
-        legalizeMeshEntryPoint(entryPoint);
-        legalizeDispatchMeshPayloadForMetal(entryPoint);
-    }
+            IRBuilder builder(func);
+            builder.setInsertBefore(func);
+            for (auto param : paramsToProcess)
+            {
+                auto structType = as<IRStructType>(param->getDataType());
+                builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+                auto varLayout = findVarLayout(param);
+
+                // If `param` already has a semantic, we don't want to hoist its fields out.
+                if (varLayout->findSystemValueSemanticAttr() != nullptr ||
+                    param->findDecoration<IRSemanticDecoration>())
+                    continue;
+
+                IRStructTypeLayout* structTypeLayout = nullptr;
+                if (varLayout)
+                    structTypeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
+                Index fieldIndex = 0;
+                List<IRInst*> fieldParams;
+                for (auto field : structType->getFields())
+                {
+                    auto fieldParam = builder.emitParam(field->getFieldType());
+                    IRCloneEnv cloneEnv;
+                    cloneInstDecorationsAndChildren(&cloneEnv, builder.getModule(), field->getKey(), fieldParam);
+
+                    IRVarLayout* fieldLayout = structTypeLayout ? structTypeLayout->getFieldLayout(fieldIndex) : nullptr;
+                    if (varLayout)
+                    {
+                        IRVarLayout::Builder varLayoutBuilder(&builder, fieldLayout->getTypeLayout());
+                        varLayoutBuilder.cloneEverythingButOffsetsFrom(fieldLayout);
+                        for (auto offsetAttr : fieldLayout->getOffsetAttrs())
+                        {
+                            auto parentOffsetAttr = varLayout->findOffsetAttr(offsetAttr->getResourceKind());
+                            UInt parentOffset = parentOffsetAttr ? parentOffsetAttr->getOffset() : 0;
+                            UInt parentSpace = parentOffsetAttr ? parentOffsetAttr->getSpace() : 0;
+                            auto resInfo = varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
+                            resInfo->offset = parentOffset + offsetAttr->getOffset();
+                            resInfo->space = parentSpace + offsetAttr->getSpace();
+                        }
+                        builder.addLayoutDecoration(fieldParam, varLayoutBuilder.build());
+                    }
+                    param->insertBefore(fieldParam);
+                    fieldParams.add(fieldParam);
+                    fieldIndex++;
+                }
+                builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+                auto reconstructedParam = builder.emitMakeStruct(structType, fieldParams.getCount(), fieldParams.getBuffer());
+                param->replaceUsesWith(reconstructedParam);
+                param->removeFromParent();
+            }
+            fixUpFuncType(func);
+        }
+
+        void flattenInputParameters(EntryPointInfo entryPoint)
+        {
+            auto func = entryPoint.entryPointFunc;
+            bool modified = false;
+            for (auto param : func->getParams())
+            {
+                auto layout = findVarLayout(param);
+                if (!layout)
+                    continue;
+                if (!layout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+                    continue;
+                if (param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
+                    continue;
+                if (auto structType = as<IRStructType>(param->getDataType()))
+                {
+                    IRBuilder builder(func);
+                    Dictionary<IRStructField*, IRStructField*> mapOldFieldToNewField;
+                    auto flattenedStruct = maybeFlattenNestedStructs(builder, structType, mapOldFieldToNewField, semanticInfoToRemove);
+                    if (flattenedStruct != structType)
+                    {
+                        fixFieldSemanticsOfFlatStruct(flattenedStruct);
+
+                        builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+                        param->setFullType(flattenedStruct);
+                        auto dstVal = builder.emitVar(structType);
+                        auto dstLoad = builder.emitLoad(dstVal);
+                        param->replaceUsesWith(dstLoad);
+                        builder.setInsertBefore(dstLoad);
+                        transformStructValue<(int)TransformStructValueOptions::flatStructIntoStruct>(builder, dstVal, structType, param, mapOldFieldToNewField);
+
+                        modified = true;
+                    }
+                }
+            }
+            if (modified)
+                fixUpFuncType(func);
+        }
+
+        void packStageInParameters(EntryPointInfo entryPoint)
+        {
+            // If the entry point has any parameters whose layout contains VaryingInput,
+            // we need to pack those parameters into a single `struct` type, and decorate
+            // the fields with the appropriate `[[attribute]]` decorations.
+            // For other parameters that are not `VaryingInput`, we need to leave them as is.
+            // 
+            // For example, given this code after `hoistEntryPointParameterFromStruct`:
+            // ```
+            // void main(float3 pos, float2 uv, int vertexId : SV_VertexID) {
+            //     VertexInput vin = {pos,uv,vertexId};
+            //     ...
+            // }
+            // ```
+            // We are going to transform it into:
+            // ```
+            // struct VertexInput {
+            //     float3 pos [[attribute(0)]];
+            //     float2 uv [[attribute(1)]];
+            // };
+            // void main(VertexInput vin, int vertexId : SV_VertexID) {
+            //     let pos = vin.pos;
+            //     let uv = vin.uv;
+            //     ...
+            // }
+
+            auto func = entryPoint.entryPointFunc;
+
+            bool isGeometryStage = false;
+            switch (entryPoint.entryPointDecor->getProfile().getStage())
+            {
+            case Stage::Vertex:
+            case Stage::Amplification:
+            case Stage::Mesh:
+            case Stage::Geometry:
+            case Stage::Domain:
+            case Stage::Hull:
+                isGeometryStage = true;
+                break;
+            }
+
+            List<IRParam*> paramsToPack;
+            for (auto param : func->getParams())
+            {
+                auto layout = findVarLayout(param);
+                if (!layout)
+                    continue;
+                if (!layout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+                    continue;
+                if (param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
+                    continue;
+                paramsToPack.add(param);
+            }
+
+            if (paramsToPack.getCount() == 0)
+                return;
+
+            IRBuilder builder(func);
+            builder.setInsertBefore(func);
+            IRStructType* structType = builder.createStructType();
+            auto stageText = getStageText(entryPoint.entryPointDecor->getProfile().getStage());
+            builder.addNameHintDecoration(structType, (String(stageText) + toSlice("Input")).getUnownedSlice());
+            List<IRStructKey*> keys;
+            IRStructTypeLayout::Builder layoutBuilder(&builder);
+            for (auto param : paramsToPack)
+            {
+                auto paramVarLayout = findVarLayout(param);
+                auto key = builder.createStructKey();
+                param->transferDecorationsTo(key);
+                builder.createStructField(structType, key, param->getDataType());
+                if (auto varyingInOffsetAttr = paramVarLayout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+                {
+                    if (!key->findDecoration<IRSemanticDecoration>() && !paramVarLayout->findAttr<IRSemanticAttr>())
+                    {
+                        // If the parameter doesn't have a semantic, we need to add one for semantic matching.
+                        builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)varyingInOffsetAttr->getOffset());
+                    }
+                }
+                if (isGeometryStage)
+                {
+                    // For geometric stages, we need to translate VaryingInput offsets to MetalAttribute offsets.
+                    IRVarLayout::Builder elementVarLayoutBuilder(&builder, paramVarLayout->getTypeLayout());
+                    elementVarLayoutBuilder.cloneEverythingButOffsetsFrom(paramVarLayout);
+                    for (auto offsetAttr : paramVarLayout->getOffsetAttrs())
+                    {
+                        auto resourceKind = offsetAttr->getResourceKind();
+                        if (resourceKind == LayoutResourceKind::VaryingInput)
+                        {
+                            resourceKind = LayoutResourceKind::MetalAttribute;
+                        }
+                        auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resourceKind);
+                        resInfo->offset = offsetAttr->getOffset();
+                        resInfo->space = offsetAttr->getSpace();
+                    }
+                    paramVarLayout = elementVarLayoutBuilder.build();
+                }
+                layoutBuilder.addField(key, paramVarLayout);
+                builder.addLayoutDecoration(key, paramVarLayout);
+                keys.add(key);
+            }
+            builder.setInsertInto(func->getFirstBlock());
+            auto packedParam = builder.emitParamAtHead(structType);
+            auto typeLayout = layoutBuilder.build();
+            IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
+
+            // Add a VaryingInput resource info to the packed parameter layout, so that we can emit
+            // the needed `[[stage_in]]` attribute in Metal emitter.
+            varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingInput);
+            auto paramVarLayout = varLayoutBuilder.build();
+            builder.addLayoutDecoration(packedParam, paramVarLayout);
+
+            // Replace the original parameters with the packed parameter
+            builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+            for (Index paramIndex = 0; paramIndex < paramsToPack.getCount(); paramIndex++)
+            {
+                auto param = paramsToPack[paramIndex];
+                auto key = keys[paramIndex];
+                auto paramField = builder.emitFieldExtract(param->getDataType(), packedParam, key);
+                param->replaceUsesWith(paramField);
+                param->removeFromParent();
+            }
+            fixUpFuncType(func);
+        }
+
+        struct MetalSystemValueInfo
+        {
+            String metalSystemValueName;
+            SystemValueSemanticName metalSystemValueNameEnum;
+            ShortList<IRType*> permittedTypes;
+            bool isUnsupported = false;
+            bool isSpecial = false;
+            MetalSystemValueInfo()
+            {
+                // most commonly need 2
+                permittedTypes.reserveOverflowBuffer(2);
+            }
+        };
+
+        IRType* getGroupThreadIdType(IRBuilder& builder)
+        {
+            return builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3));
+        }
+
+        ShortList<IRType*>& getPermittedTypes_sv_target(IRBuilder& builder)
+        {
+            permittedTypes_sv_target.reserveOverflowBuffer(5 * 4);
+            if (permittedTypes_sv_target.getCount() == 0)
+            {
+                for (auto baseType : { BaseType::Float, BaseType::Half, BaseType::Int, BaseType::UInt, BaseType::Int16, BaseType::UInt16 })
+                {
+                    for (IRIntegerValue i = 1; i <= 4; i++)
+                    {
+                        permittedTypes_sv_target.add(builder.getVectorType(builder.getBasicType(baseType), i));
+                    }
+                }
+            }
+            return permittedTypes_sv_target;
+        }
+
+        MetalSystemValueInfo getSystemValueInfo(String inSemanticName, String* optionalSemanticIndex, IRInst* parentVar)
+        {
+            IRBuilder builder(m_module);
+            MetalSystemValueInfo result = {};
+
+            UnownedStringSlice semanticName;
+            UnownedStringSlice semanticIndex;
+            auto hasExplicitIndex = splitNameAndIndex(inSemanticName.getUnownedSlice(), semanticName, semanticIndex);
+            if (!hasExplicitIndex && optionalSemanticIndex)
+                semanticIndex = optionalSemanticIndex->getUnownedSlice();
+
+            result.metalSystemValueNameEnum = convertSystemValueSemanticNameToEnum(semanticName);
+
+            switch (result.metalSystemValueNameEnum)
+            {
+            case SystemValueSemanticName::Position:
+            {
+                result.metalSystemValueName = toSlice("position");
+                result.permittedTypes.add(builder.getVectorType(builder.getBasicType(BaseType::Float), builder.getIntValue(builder.getIntType(), 4)));
+                break;
+            }
+            case SystemValueSemanticName::ClipDistance:
+            {
+                result.isSpecial = true;
+                break;
+            }
+            case SystemValueSemanticName::CullDistance:
+            {
+                result.isSpecial = true;
+                break;
+            }
+            case SystemValueSemanticName::Coverage:
+            {
+                result.metalSystemValueName = toSlice("sample_mask");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                break;
+            }
+            case SystemValueSemanticName::InnerCoverage:
+            {
+                result.isSpecial = true;
+                break;
+            }
+            case SystemValueSemanticName::Depth:
+            {
+                result.metalSystemValueName = toSlice("depth(any)");
+                result.permittedTypes.add(builder.getBasicType(BaseType::Float));
+                break;
+            }
+            case SystemValueSemanticName::DepthGreaterEqual:
+            {
+                result.metalSystemValueName = toSlice("depth(greater)");
+                result.permittedTypes.add(builder.getBasicType(BaseType::Float));
+                break;
+            }
+            case SystemValueSemanticName::DepthLessEqual:
+            {
+                result.metalSystemValueName = toSlice("depth(less)");
+                result.permittedTypes.add(builder.getBasicType(BaseType::Float));
+                break;
+            }
+            case SystemValueSemanticName::DispatchThreadID:
+            {
+                result.metalSystemValueName = toSlice("thread_position_in_grid");
+                result.permittedTypes.add(builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3)));
+                break;
+            }
+            case SystemValueSemanticName::DomainLsocation:
+            {
+                result.metalSystemValueName = toSlice("position_in_patch");
+                result.permittedTypes.add(builder.getVectorType(builder.getBasicType(BaseType::Float), builder.getIntValue(builder.getIntType(), 3)));
+                result.permittedTypes.add(builder.getVectorType(builder.getBasicType(BaseType::Float), builder.getIntValue(builder.getIntType(), 2)));
+                break;
+            }
+            case SystemValueSemanticName::GroupID:
+            {
+                result.metalSystemValueName = toSlice("threadgroup_position_in_grid");
+                result.permittedTypes.add(builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3)));
+                break;
+            }
+            case SystemValueSemanticName::GroupIndex:
+            {
+                result.isSpecial = true;
+                break;
+            }
+            case SystemValueSemanticName::GroupThreadID:
+            {
+                result.metalSystemValueName = toSlice("thread_position_in_threadgroup");
+                result.permittedTypes.add(getGroupThreadIdType(builder));
+                break;
+            }
+            case SystemValueSemanticName::GSInstanceID:
+            {
+                result.isUnsupported = true;
+                break;
+            }
+            case SystemValueSemanticName::InstanceID:
+            {
+                result.metalSystemValueName = toSlice("instance_id");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                break;
+            }
+            case SystemValueSemanticName::IsFrontFace:
+            {
+                result.metalSystemValueName = toSlice("front_facing");
+                result.permittedTypes.add(builder.getBasicType(BaseType::Bool));
+                break;
+            }
+            case SystemValueSemanticName::OutputControlPointID:
+            {
+                // In metal, a hull shader is just a compute shader.
+                // This needs to be handled separately, by lowering into an ordinary buffer.
+                break;
+            }
+            case SystemValueSemanticName::PointSize:
+            {
+                result.metalSystemValueName = toSlice("point_size");
+                result.permittedTypes.add(builder.getBasicType(BaseType::Float));
+                break;
+            }
+            case SystemValueSemanticName::PrimitiveID:
+            {
+                result.metalSystemValueName = toSlice("patch_id");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt16));
+                break;
+            }
+            case SystemValueSemanticName::RenderTargetArrayIndex:
+            {
+                result.metalSystemValueName = toSlice("render_target_array_index");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt16));
+                break;
+            }
+            case SystemValueSemanticName::SampleIndex:
+            {
+                result.metalSystemValueName = toSlice("sample_id");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                break;
+            }
+            case SystemValueSemanticName::StencilRef:
+            {
+                result.metalSystemValueName = toSlice("stencil");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                break;
+            }
+            case SystemValueSemanticName::TessFactor:
+            {
+                // Tessellation factor outputs should be lowered into a write into a normal buffer.
+                break;
+            }
+            case SystemValueSemanticName::VertexID:
+            {
+                result.metalSystemValueName = toSlice("vertex_id");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                break;
+            }
+            case SystemValueSemanticName::ViewID:
+            {
+                result.isUnsupported = true;
+                break;
+            }
+            case SystemValueSemanticName::ViewportArrayIndex:
+            {
+                result.metalSystemValueName = toSlice("viewport_array_index");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt16));
+                break;
+            }
+            case SystemValueSemanticName::Target:
+            {
+                result.metalSystemValueName = (StringBuilder() << "color("
+                    << (semanticIndex.getLength() != 0 ? semanticIndex : toSlice("0"))
+                    << ")").produceString();
+                result.permittedTypes = getPermittedTypes_sv_target(builder);
+
+                break;
+            }
+            default:
+                m_sink->diagnose(parentVar, Diagnostics::unimplementedSystemValueSemantic, semanticName);
+                return result;
+            }
+            return result;
+        }
+
+        void reportUnsupportedSystemAttribute(IRInst* param, String semanticName)
+        {
+            m_sink->diagnose(param->sourceLoc, Diagnostics::systemValueAttributeNotSupported, semanticName);
+        }
+
+        void ensureResultStructHasUserSemantic(IRStructType* structType, IRVarLayout* varLayout)
+        {
+            // Ensure each field in an output struct type has either a system semantic or a user semantic,
+            // so that signature matching can happen correctly.
+            auto typeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
+            Index index = 0;
+            IRBuilder builder(structType);
+            for (auto field : structType->getFields())
+            {
+                auto key = field->getKey();
+                if (auto semanticDecor = key->findDecoration<IRSemanticDecoration>())
+                {
+                    if (semanticDecor->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
+                    {
+                        auto indexAsString = String(UInt(semanticDecor->getSemanticIndex()));
+                        auto sysValInfo = getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, field);
+                        if (sysValInfo.isUnsupported || sysValInfo.isSpecial)
+                        {
+                            reportUnsupportedSystemAttribute(field, semanticDecor->getSemanticName());
+                        }
+                        else
+                        {
+                            builder.addTargetSystemValueDecoration(key, sysValInfo.metalSystemValueName.getUnownedSlice());
+                            semanticDecor->removeAndDeallocate();
+                        }
+                    }
+                    index++;
+                    continue;
+                }
+                typeLayout->getFieldLayout(index);
+                auto fieldLayout = typeLayout->getFieldLayout(index);
+                if (auto offsetAttr = fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                {
+                    UInt varOffset = 0;
+                    if (auto varOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                        varOffset = varOffsetAttr->getOffset();
+                    varOffset += offsetAttr->getOffset();
+                    builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)varOffset);
+                }
+                index++;
+            }
+        }
+
+
+        IRStructType* _flattenNestedStructs(IRBuilder& builder, IRStructType* dst, IRStructType* src, IRSemanticDecoration* parentSemanticDecoration,
+            IRLayoutDecoration* parentLayout, Dictionary<IRStructField*, IRStructField*>& mapFieldToField, HashSet<IRStructField*>& varsWithSemanticInfo)
+        {
+            for (auto oldField : src->getFields())
+            {
+                auto oldKey = oldField->getKey();
+                IRSemanticDecoration* fieldSemanticDecoration = parentSemanticDecoration;
+                if (auto oldSemanticDecoration = oldKey->findDecoration<IRSemanticDecoration>())
+                    fieldSemanticDecoration = oldSemanticDecoration;
+
+                IRLayoutDecoration* fieldLayout = parentLayout;
+                if (auto oldLayout = oldKey->findDecoration<IRLayoutDecoration>())
+                {
+                    fieldLayout = oldLayout;
+                }
+                if (fieldSemanticDecoration != parentSemanticDecoration || parentLayout != fieldLayout)
+                    varsWithSemanticInfo.add(oldField);
+
+                if (auto structFieldType = as<IRStructType>(oldField->getFieldType()))
+                {
+                    _flattenNestedStructs(builder, dst, structFieldType, fieldSemanticDecoration, fieldLayout, mapFieldToField, varsWithSemanticInfo);
+                    continue;
+                }
+
+                auto newKey = builder.createStructKey();
+                copyNameHintAndDebugDecorations(newKey, oldKey);
+
+                auto newField = builder.createStructField(dst, newKey, oldField->getFieldType());
+                copyNameHintAndDebugDecorations(newField, oldField);
+
+                if (fieldSemanticDecoration)
+                    builder.addSemanticDecoration(newKey, fieldSemanticDecoration->getSemanticName(), fieldSemanticDecoration->getSemanticIndex());
+
+                if (fieldLayout)
+                {
+                    IRLayout* oldLayout = fieldLayout->getLayout();
+                    List<IRInst*> instToCopy;
+                    // Only copy certain decorations needed for resolving system semantics
+                    for (UInt i = 0; i < oldLayout->getOperandCount(); i++)
+                    {
+                        auto operand = oldLayout->getOperand(i);
+                        if (as<IRVarOffsetAttr>(operand) || as<IRUserSemanticAttr>(operand) || as<IRSystemValueSemanticAttr>(operand) || as<IRStageAttr>(operand))
+                            instToCopy.add(operand);
+                    }
+                    IRVarLayout* newLayout = builder.getVarLayout(instToCopy);
+                    builder.addLayoutDecoration(newKey, newLayout);
+                }
+
+                mapFieldToField[oldField] = newField;
+            }
+
+            return dst;
+        }
+
+        // Returns a `IRStructType*` without any `IRStructType*` members. `src` may be returned if there was no struct flattening.
+        // @param mapFieldToField Behavior maps all `IRStructField` of `src` to the new struct's `IRStructFields`s
+        IRStructType* maybeFlattenNestedStructs(IRBuilder& builder, IRStructType* src, Dictionary<IRStructField*, IRStructField*>& mapFieldToField, HashSet<IRStructField*>& varsWithSemanticInfo)
+        {
+            // Find all values inside struct that need flattening and legalization. Find all already in-use semantic offsets
+            bool hasStructTypeMembers = false;
+            for (auto field : src->getFields())
+            {
+                if (as<IRStructType>(field->getFieldType()))
+                {
+                    hasStructTypeMembers = true;
+                    break;
+                }
+            }
+            if (!hasStructTypeMembers)
+                return src;
+
+            // We need to:
+            // 1. Make new struct 1:1 with old struct but without nestested structs (flatten)
+            // 2. Ensure semantic attributes propegate.
+            // 3. Store the mapping from old to new struct fields to allow copying a old-struct to new-struct
+            builder.setInsertAfter(src);
+            auto newStruct = builder.createStructType();
+            copyNameHintAndDebugDecorations(newStruct, src);
+            return _flattenNestedStructs(builder, newStruct, src, nullptr, nullptr, mapFieldToField, varsWithSemanticInfo);
+        }
+
+        template<typename CopyLogicFunc>
+        void _replaceAllReturnInst(IRBuilder& builder, IRFunc* targetFunc, IRStructType* newType, CopyLogicFunc copyLogicFunc)
+        {
+            for (auto block : targetFunc->getBlocks())
+            {
+                if (auto returnInst = as<IRReturn>(block->getTerminator()))
+                {
+                    builder.setInsertBefore(returnInst);
+                    auto returnVal = returnInst->getVal();
+                    returnInst->setOperand(0, copyLogicFunc(builder, newType, returnVal));
+                }
+            }
+        }
+
+        enum class TransformStructValueOptions : int
+        {
+            flatStructIntoStruct = 0,
+            structIntoFlatStruct = 1,
+        };
+
+        // Returns val with copied data. Assumes srcType and dstType map to each other with `mapSrcFieldToDstField`
+        template<int transformStructValueOptions>
+        void _transformStructValue(IRBuilder& builder, IRInst* val1, IRStructType* type1, IRInst* val2, IRStructType* type2, Dictionary<IRStructField*, IRStructField*> mapFieldToField)
+        {
+            for (auto field1 : type1->getFields())
+            {
+                IRInst* fieldAddr1 = nullptr;
+                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::flatStructIntoStruct)
+                {
+                    fieldAddr1 = builder.emitFieldAddress(type1, val1, field1->getKey());
+                }
+                else
+                {
+                    if (as<IRPtrTypeBase>(val1))
+                        val1 = builder.emitLoad(val1);
+                    fieldAddr1 = builder.emitFieldExtract(type1, val1, field1->getKey());
+                }
+
+                if (auto fieldAsStruct1 = as<IRStructType>(field1->getFieldType()))
+                {
+                    _transformStructValue<transformStructValueOptions>(builder, fieldAddr1, fieldAsStruct1, val2, type2, mapFieldToField);
+                    continue;
+                }
+
+                auto field2 = mapFieldToField[field1];
+                IRInst* fieldAddr2 = nullptr;
+                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::flatStructIntoStruct)
+                {
+                    if (as<IRPtrTypeBase>(val2))
+                        val2 = builder.emitLoad(val1);
+                    fieldAddr2 = builder.emitFieldExtract(type2, val2, field2->getKey());
+                }
+                else
+                {
+                    fieldAddr2 = builder.emitFieldAddress(type2, val2, field2->getKey());
+                }
+
+                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::flatStructIntoStruct)
+                {
+                    builder.emitStore(fieldAddr1, fieldAddr2);
+                }
+                else
+                {
+                    builder.emitStore(fieldAddr2, fieldAddr1);
+                }
+            }
+        }
+
+        template<int transformStructValueOptions>
+        void transformStructValue(IRBuilder& builder, IRInst* dstVal, IRStructType* dstType, IRInst* srcVal, Dictionary<IRStructField*, IRStructField*> mapFieldToField)
+        {
+            auto srcType = as<IRStructType>(srcVal->getDataType());
+            SLANG_ASSERT(srcType);
+            if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::flatStructIntoStruct)
+            {
+                _transformStructValue<transformStructValueOptions>(builder, dstVal, dstType, srcVal, srcType, mapFieldToField);
+            }
+            else
+            {
+                _transformStructValue<transformStructValueOptions>(builder, srcVal, srcType, dstVal, dstType, mapFieldToField);
+            }
+        }
+
+        UInt _returnNonOverlappingAttributeIndex(OrderedHashSet<UInt>& usedSemanticIndex)
+        {
+            // Find first unused semantic index of equal semantic type 
+            // to fill any gaps in user set semantic bindings
+            UInt prev = 0;
+            for (auto i : usedSemanticIndex)
+            {
+                if (i > prev + 1)
+                {
+                    break;
+                }
+                prev = i;
+            }
+            usedSemanticIndex.add(prev + 1);
+            return prev + 1;
+        }
+
+        template<typename T>
+        struct AttributeParentPair
+        {
+            IRLayoutDecoration* layoutDecor;
+            T* attr;
+        };
+
+        IRLayoutDecoration* _replaceAttributeOfLayout(IRBuilder& builder, IRLayoutDecoration* parentLayoutDecor, IRInst* instToReplace, IRInst* instToReplaceWith)
+        {
+            auto layout = parentLayoutDecor->getLayout();
+            // Find the exact same decoration `instToReplace` in-case multiple of the same type exist
+            List<IRInst*> opList;
+            opList.add(instToReplaceWith);
+            for (UInt i = 0; i < layout->getOperandCount(); i++)
+            {
+                if (layout->getOperand(i) != instToReplace)
+                    opList.add(layout->getOperand(i));
+            }
+            auto newLayoutDecor = builder.addLayoutDecoration(parentLayoutDecor->getParent(), builder.getVarLayout(opList));
+            parentLayoutDecor->removeAndDeallocate();
+            return newLayoutDecor;
+        }
+
+        IRLayoutDecoration* _legalizeUserSemanticNames(IRBuilder& builder, IRLayoutDecoration* layoutDecor)
+        {
+            SLANG_ASSERT(layoutDecor);
+            auto layout = layoutDecor->getLayout();
+            List<IRInst*> layoutOps;
+            layoutOps.reserve(3);
+            bool changed = false;
+            for(auto attr : layout->getAllAttrs())
+            {
+                if(auto userSemantic = as<IRUserSemanticAttr>(attr))
+                {
+                    UnownedStringSlice outName;
+                    UnownedStringSlice outIndex;
+                    bool hasStringIndex = splitNameAndIndex(userSemantic->getName(), outName, outIndex);
+                    if (hasStringIndex)
+                    {
+                        changed = true;
+                        auto loweredName = String(outName).toLower();
+                        auto loweredNameSlice = loweredName.getUnownedSlice();               
+                        auto newDecoration = builder.getUserSemanticAttr(loweredNameSlice, stringToInt(outIndex));
+                        userSemantic->replaceUsesWith(newDecoration);
+                        userSemantic->removeAndDeallocate();
+                        userSemantic = newDecoration;
+                    }
+                    layoutOps.add(userSemantic);
+                    continue;
+                }
+                layoutOps.add(attr);
+            }
+            if(changed)
+            {
+                auto parent = layoutDecor->parent;
+                layoutDecor->removeAndDeallocate();
+                builder.addLayoutDecoration(parent, builder.getVarLayout(layoutOps));
+            }
+            return layoutDecor;
+        }
+        // Find overlapping field semantics and legalize them
+        void fixFieldSemanticsOfFlatStruct(IRStructType* structType)
+        {
+            IRBuilder builder(this->m_module);
+
+            List<IRSemanticDecoration*> overlappingSemanticsDecor;
+            Dictionary<UnownedStringSlice, OrderedHashSet<UInt>> usedSemanticIndexSemanticDecor;
+
+            List<AttributeParentPair<IRVarOffsetAttr>> overlappingVarOffset;
+            Dictionary<UInt, OrderedHashSet<UInt>> usedSemanticIndexVarOffset;
+
+            List<AttributeParentPair<IRUserSemanticAttr>> overlappingUserSemantic;
+            Dictionary<UnownedStringSlice, OrderedHashSet<UInt>> usedSemanticIndexUserSemantic;
+
+            // We store a map from old `IRLayoutDecoration*` to new `IRLayoutDecoration*` since when legalizing
+            // we may destroy and remake a `IRLayoutDecoration*`
+            Dictionary<IRLayoutDecoration*, IRLayoutDecoration*> oldLayoutDecorToNew;
+
+            for (auto field : structType->getFields())
+            {
+                auto key = field->getKey();
+                if (auto semanticDecoration = key->findDecoration<IRSemanticDecoration>())
+                {
+                    // Ensure names are in a uniform lowercase format so we can bunch together simmilar semantics
+                    UnownedStringSlice outName;
+                    UnownedStringSlice outIndex;
+                    bool hasStringIndex = splitNameAndIndex(semanticDecoration->getSemanticName(), outName, outIndex);
+                    if (hasStringIndex)
+                    {
+                        auto loweredName = String(outName).toLower();
+                        auto loweredNameSlice = loweredName.getUnownedSlice();               
+                        auto newDecoration = builder.addSemanticDecoration(key, loweredNameSlice, stringToInt(outIndex));
+                        semanticDecoration->replaceUsesWith(newDecoration);
+                        semanticDecoration->removeAndDeallocate();
+                        semanticDecoration = newDecoration;
+                    }
+                    auto& semanticUse = usedSemanticIndexSemanticDecor[semanticDecoration->getSemanticName()];
+                    if (semanticUse.contains(semanticDecoration->getSemanticIndex()))
+                        overlappingSemanticsDecor.add(semanticDecoration);
+                    else
+                        semanticUse.add(semanticDecoration->getSemanticIndex());
+                }
+                if (auto layoutDecor = key->findDecoration<IRLayoutDecoration>())
+                {
+                    // Ensure names are in a uniform lowercase format so we can bunch together simmilar semantics
+                    layoutDecor = _legalizeUserSemanticNames(builder, layoutDecor);
+                    oldLayoutDecorToNew[layoutDecor] = layoutDecor;
+                    auto layout = layoutDecor->getLayout();
+                    for (auto attr : layout->getAllAttrs())
+                    {
+                        if (auto offset = as<IRVarOffsetAttr>(attr))
+                        {
+                            auto& semanticUse = usedSemanticIndexVarOffset[offset->getResourceKind()];
+                            if (semanticUse.contains(offset->getOffset()))
+                                overlappingVarOffset.add({ layoutDecor, offset });
+                            else
+                                semanticUse.add(offset->getOffset());
+                        }
+                        else if (auto userSemantic = as<IRUserSemanticAttr>(attr))
+                        {
+                            auto& semanticUse = usedSemanticIndexUserSemantic[userSemantic->getName()];
+                            if (semanticUse.contains(userSemantic->getIndex()))
+                                overlappingUserSemantic.add({ layoutDecor, userSemantic });
+                            else
+                                semanticUse.add(userSemantic->getIndex());
+                        }
+                    }
+                }
+            }
+            for (auto decor : overlappingSemanticsDecor)
+            {
+                auto newOffset = _returnNonOverlappingAttributeIndex(usedSemanticIndexSemanticDecor[decor->getSemanticName()]);
+                builder.addSemanticDecoration(decor->getParent(), decor->getSemanticName(), (int)newOffset);
+                decor->removeAndDeallocate();
+            }
+            
+            for (auto& varOffset : overlappingVarOffset)
+            {
+                auto newOffset = _returnNonOverlappingAttributeIndex(usedSemanticIndexVarOffset[varOffset.attr->getResourceKind()]);
+                auto newVarOffset = builder.getVarOffsetAttr(varOffset.attr->getResourceKind(), newOffset, varOffset.attr->getSpace());
+                oldLayoutDecorToNew[varOffset.layoutDecor] = _replaceAttributeOfLayout(builder, oldLayoutDecorToNew[varOffset.layoutDecor], varOffset.attr, newVarOffset);
+            }
+            for (auto& userSemantic : overlappingUserSemantic)
+            {
+                auto newOffset = _returnNonOverlappingAttributeIndex(usedSemanticIndexUserSemantic[userSemantic.attr->getName()]);
+                auto newUserSemantic = builder.getUserSemanticAttr(userSemantic.attr->getName(), newOffset);
+                oldLayoutDecorToNew[userSemantic.layoutDecor] = _replaceAttributeOfLayout(builder, oldLayoutDecorToNew[userSemantic.layoutDecor], userSemantic.attr, newUserSemantic);
+            }
+        }
+
+        void wrapReturnValueInStruct(EntryPointInfo entryPoint)
+        {
+            // Wrap return value into a struct if it is not already a struct.
+            // For example, given this entry point:
+            // ```
+            // float4 main() : SV_Target { return float3(1,2,3); }
+            // ```
+            // We are going to transform it into:
+            // ```
+            // struct Output {
+            //     float4 value : SV_Target;
+            // };
+            // Output main() { return {float3(1,2,3)}; }
+
+            auto func = entryPoint.entryPointFunc;
+
+            auto returnType = func->getResultType();
+            if (as<IRVoidType>(returnType))
+                return;
+            auto entryPointLayoutDecor = func->findDecoration<IRLayoutDecoration>();
+            if (!entryPointLayoutDecor)
+                return;
+            auto entryPointLayout = as<IREntryPointLayout>(entryPointLayoutDecor->getLayout());
+            if (!entryPointLayout)
+                return;
+            auto resultLayout = entryPointLayout->getResultLayout();
+
+            // If return type is already a struct, just make sure every field has a semantic.
+            if (auto returnStructType = as<IRStructType>(returnType))
+            {
+                // Flatten result struct type to ensure we do not have
+                // semantics on nested structs
+                IRBuilder builder(func);
+                Dictionary<IRStructField*, IRStructField*> mapOldFieldToNewField;
+                auto flattenedStruct = maybeFlattenNestedStructs(builder, returnStructType, mapOldFieldToNewField, semanticInfoToRemove);
+                if (returnStructType != flattenedStruct)
+                {
+                    _replaceAllReturnInst(builder, func, flattenedStruct,
+                        [&](IRBuilder& copyBuilder, IRStructType* dstType, IRInst* srcVal) -> IRInst*
+                        {
+                            auto srcStructType = as<IRStructType>(srcVal->getDataType());
+                            SLANG_ASSERT(srcStructType);
+                            auto dstVal = copyBuilder.emitVar(dstType);
+                            transformStructValue<(int)TransformStructValueOptions::structIntoFlatStruct>(copyBuilder, dstVal, dstType, srcVal, mapOldFieldToNewField);
+                            return builder.emitLoad(dstVal);
+                        }
+                    );
+                    fixUpFuncType(func, flattenedStruct);
+                }
+                fixFieldSemanticsOfFlatStruct(flattenedStruct);
+                ensureResultStructHasUserSemantic(flattenedStruct, resultLayout);
+                return;
+            }
+
+            IRBuilder builder(func);
+            builder.setInsertBefore(func);
+            IRStructType* structType = builder.createStructType();
+            auto stageText = getStageText(entryPoint.entryPointDecor->getProfile().getStage());
+            builder.addNameHintDecoration(structType, (String(stageText) + toSlice("Output")).getUnownedSlice());
+            auto key = builder.createStructKey();
+            builder.addNameHintDecoration(key, toSlice("output"));
+            builder.addLayoutDecoration(key, resultLayout);
+            builder.createStructField(structType, key, returnType);
+            IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
+            structTypeLayoutBuilder.addField(key, resultLayout);
+            auto typeLayout = structTypeLayoutBuilder.build();
+            IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
+            auto varLayout = varLayoutBuilder.build();
+            ensureResultStructHasUserSemantic(structType, varLayout);
+
+            _replaceAllReturnInst(builder, func, structType,
+                [](IRBuilder& copyBuilder, IRStructType* dstType, IRInst* srcVal) -> IRInst*
+                {
+                    return copyBuilder.emitMakeStruct(dstType, 1, &srcVal);
+                }
+            );
+
+            // Assign an appropriate system value semantic for stage output
+            auto stage = entryPoint.entryPointDecor->getProfile().getStage();
+            switch (stage)
+            {
+            case Stage::Compute:
+            case Stage::Fragment:
+            {
+                builder.addTargetSystemValueDecoration(key, toSlice("color(0)"));
+                break;
+            }
+            case Stage::Vertex:
+            {
+                builder.addTargetSystemValueDecoration(key, toSlice("position"));
+                break;
+            }
+            default:
+                SLANG_ASSERT(false);
+                return;
+            }
+
+            fixUpFuncType(func, structType);
+        }
+
+        void legalizeMeshEntryPoint(EntryPointInfo entryPoint)
+        {
+            auto func = entryPoint.entryPointFunc;
+
+            if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Mesh)
+            {
+                return;
+            }
+
+            IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
+            for (auto param : func->getParams())
+            {
+                if(param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
+                {
+                    IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+                    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+                    auto paramVarLayout = varLayoutBuilder.build();
+                    builder.addLayoutDecoration(param, paramVarLayout);
+                }
+            }
+
+        }
+
+        void legalizeDispatchMeshPayloadForMetal(EntryPointInfo entryPoint)
+        {
+            if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Amplification)
+            {
+                return;
+            }
+            // Find out DispatchMesh function
+            IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
+            for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
+            {
+                if (const auto func = as<IRGlobalValueWithCode>(globalInst))
+                {
+                    if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
+                    {
+                        if (dec->getName() == "DispatchMesh")
+                        {
+                            SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
+                            dispatchMeshFunc = func;
+                        }
+                    }
+                }
+            }
+
+            if (!dispatchMeshFunc)
+                return;
+
+            IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
+
+            // We'll rewrite the call to use mesh_grid_properties.set_threadgroups_per_grid
+            traverseUses(dispatchMeshFunc, [&](const IRUse* use) {
+                if (const auto call = as<IRCall>(use->getUser()))
+                {
+                    SLANG_ASSERT(call->getArgCount() == 4);
+                    const auto payload = call->getArg(3);
+
+                    const auto payloadPtrType = composeGetters<IRPtrType>(
+                        payload,
+                        &IRInst::getDataType
+                    );
+                    SLANG_ASSERT(payloadPtrType);
+                    const auto payloadType = payloadPtrType->getValueType();
+                    SLANG_ASSERT(payloadType);
+
+                    builder.setInsertBefore(entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+                    const auto annotatedPayloadType =
+                        builder.getPtrType(
+                            kIROp_RefType,
+                            payloadPtrType->getValueType(),
+                            AddressSpace::MetalObjectData
+                        );
+                    auto packedParam = builder.emitParam(annotatedPayloadType);
+                    builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
+                    IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+                    // Add the MetalPayload resource info, so we can emit [[payload]]
+                    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+                    auto paramVarLayout = varLayoutBuilder.build();
+                    builder.addLayoutDecoration(packedParam, paramVarLayout);
+
+                    // Now we replace the call to DispatchMesh with a call to the mesh grid properties
+                    // But first we need to create the parameter
+                    const auto meshGridPropertiesType = builder.getMetalMeshGridPropertiesType();
+                    auto mgp = builder.emitParam(meshGridPropertiesType);
+                    builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
+                    }
+                });
+        }
+
+        IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType)
+        {
+            auto fromType = val->getFullType();
+            if (auto fromVector = as<IRVectorType>(fromType))
+            {
+                if (auto toVector = as<IRVectorType>(toType))
+                {
+                    if (fromVector->getElementCount() != toVector->getElementCount())
+                    {
+                        fromType = builder.getVectorType(fromVector->getElementType(), toVector->getElementCount());
+                        val = builder.emitVectorReshape(fromType, val);
+                    }
+                }
+                else if (as<IRBasicType>(toType))
+                {
+                    UInt index = 0;
+                    val = builder.emitSwizzle(fromVector->getElementType(), val, 1, &index);
+                    if (toType->getOp() == kIROp_VoidType)
+                        return nullptr;
+                }
+            }
+            else if (auto fromBasicType = as<IRBasicType>(fromType))
+            {
+                if (fromBasicType->getOp() == kIROp_VoidType)
+                    return nullptr;
+                if (!as<IRBasicType>(toType))
+                    return nullptr;
+                if (toType->getOp() == kIROp_VoidType)
+                    return nullptr;
+            }
+            else
+            {
+                return nullptr;
+            }
+            return builder.emitCast(toType, val);
+        }
+
+        struct SystemValLegalizationWorkItem
+        {
+            IRInst* var;
+            String attrName;
+            UInt attrIndex;
+        };
+
+        std::optional<SystemValLegalizationWorkItem> tryToMakeSystemValWorkItem(IRInst* var)
+        {
+            if (auto semanticDecoration = var->findDecoration<IRSemanticDecoration>())
+            {
+                if (semanticDecoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
+                {
+                    return { { var, String(semanticDecoration->getSemanticName()).toLower(), (UInt)semanticDecoration->getSemanticIndex() } };
+                }
+            }
+
+            auto layoutDecor = var->findDecoration<IRLayoutDecoration>();
+            if (!layoutDecor)
+                return {};
+            auto sysValAttr = layoutDecor->findAttr<IRSystemValueSemanticAttr>();
+            if (!sysValAttr)
+                return {};
+            auto semanticName = String(sysValAttr->getName());
+            auto sysAttrIndex = sysValAttr->getIndex();
+
+            return std::make_optional<SystemValLegalizationWorkItem>({ var, semanticName, sysAttrIndex });
+        }
+
+
+        List<SystemValLegalizationWorkItem> collectSystemValFromEntryPoint(EntryPointInfo entryPoint)
+        {
+            List<SystemValLegalizationWorkItem> systemValWorkItems;
+            for (auto param : entryPoint.entryPointFunc->getParams())
+            {
+                auto maybeWorkItem = tryToMakeSystemValWorkItem(param);
+                if (maybeWorkItem.has_value())
+                    systemValWorkItems.add(std::move(maybeWorkItem.value()));
+            }
+            return systemValWorkItems;
+        }
+
+        void legalizeSystemValue(EntryPointInfo entryPoint, SystemValLegalizationWorkItem& workItem)
+        {
+            IRBuilder builder(entryPoint.entryPointFunc);
+
+            auto var = workItem.var;
+            auto semanticName = workItem.attrName;
+
+            auto indexAsString = String(workItem.attrIndex);
+            auto info = getSystemValueInfo(semanticName, &indexAsString, var);
+
+            if (info.isSpecial)
+            {
+                if (info.metalSystemValueNameEnum == SystemValueSemanticName::InnerCoverage)
+                {
+                    // Metal does not support conservative rasterization, so this is always false.
+                    auto val = builder.getBoolValue(false);
+                    var->replaceUsesWith(val);
+                    var->removeAndDeallocate();
+                }
+                else if (info.metalSystemValueNameEnum == SystemValueSemanticName::GroupIndex)
+                {
+                    // Ensure we have a cached "sv_groupthreadid" in our entry point
+                    if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
+                    {
+                        auto systemValWorkItems = collectSystemValFromEntryPoint(entryPoint);
+                        for (auto i : systemValWorkItems)
+                        {
+                            auto indexAsStringGroupThreadId = String(i.attrIndex);
+                            if (getSystemValueInfo(i.attrName, &indexAsStringGroupThreadId, i.var).metalSystemValueNameEnum == SystemValueSemanticName::GroupThreadID)
+                            {
+                                entryPointToGroupThreadId[entryPoint.entryPointFunc] = i.var;
+                            }
+                        }
+                        if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
+                        {
+                            // Add the missing groupthreadid needed to compute sv_groupindex
+                            IRBuilder groupThreadIdBuilder(builder);
+                            groupThreadIdBuilder.setInsertInto(entryPoint.entryPointFunc->getFirstBlock());
+                            auto groupThreadId = groupThreadIdBuilder.emitParamAtHead(getGroupThreadIdType(groupThreadIdBuilder));
+                            entryPointToGroupThreadId[entryPoint.entryPointFunc] = groupThreadId;
+                            groupThreadIdBuilder.addNameHintDecoration(groupThreadId, groupThreadIDString);
+
+                            // Since "sv_groupindex" will be translated out to a global var and no longer be considered a system value
+                            // we can reuse its layout and semantic info
+                            Index foundRequiredDecorations = 0;
+                            IRLayoutDecoration* layoutDecoration = nullptr;
+                            UInt semanticIndex = 0;
+                            for (auto decoration : var->getDecorations())
+                            {
+                                if (auto layoutDecorationTmp = as<IRLayoutDecoration>(decoration))
+                                {
+                                    layoutDecoration = layoutDecorationTmp;
+                                    foundRequiredDecorations++;
+                                }
+                                else if (auto semanticDecoration = as<IRSemanticDecoration>(decoration))
+                                {
+                                    semanticIndex = semanticDecoration->getSemanticIndex();
+                                    groupThreadIdBuilder.addSemanticDecoration(groupThreadId, groupThreadIDString, (int)semanticIndex);
+                                    foundRequiredDecorations++;
+                                }
+                                if (foundRequiredDecorations >= 2)
+                                    break;
+                            }
+                            SLANG_ASSERT(layoutDecoration);
+                            layoutDecoration->removeFromParent();
+                            layoutDecoration->insertAtStart(groupThreadId);
+                            SystemValLegalizationWorkItem newWorkItem = { groupThreadId, groupThreadIDString, semanticIndex };
+                            legalizeSystemValue(entryPoint, newWorkItem);
+                        }
+                    }
+
+                    IRBuilder svBuilder(builder.getModule());
+                    svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
+                    auto computeExtent = emitCalcGroupExtents(svBuilder, entryPoint.entryPointFunc, builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3)));
+                    auto groupIndexCalc = emitCalcGroupIndex(svBuilder, entryPointToGroupThreadId[entryPoint.entryPointFunc], computeExtent);
+                    svBuilder.addNameHintDecoration(groupIndexCalc, UnownedStringSlice("sv_groupindex"));
+
+                    var->replaceUsesWith(groupIndexCalc);
+                    var->removeAndDeallocate();
+                }
+            }
+            if (info.isUnsupported)
+            {
+                reportUnsupportedSystemAttribute(var, semanticName);
+                return;
+            }
+            if (!info.permittedTypes.getCount())
+                return;
+
+            builder.addTargetSystemValueDecoration(var, info.metalSystemValueName.getUnownedSlice());
+
+            bool varTypeIsPermitted = false;
+            auto varType = var->getFullType();
+            for (auto& permittedType : info.permittedTypes)
+            {
+                varTypeIsPermitted = varTypeIsPermitted || permittedType == varType;
+            }
+
+            if (!varTypeIsPermitted)
+            {
+                // Note: we do not currently prefer vector<T,N> to vector<P,N>.
+                // vector<T,N> to vector<T,N-1> is equally preferred.
+                bool foundAConversion = false;
+                for (auto permittedType : info.permittedTypes)
+                {
+                    var->setFullType(permittedType);
+                    builder.setInsertBefore(entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+                    
+                    // get uses before we `tryConvertValue` since this creates a new use
+                    List<IRUse*> uses;
+                    for (auto use = var->firstUse; use; use = use->nextUse)
+                        uses.add(use);
+
+                    auto convertedValue = tryConvertValue(builder, var, varType);
+                    if (convertedValue == nullptr)
+                        continue;
+
+                    foundAConversion = true;
+                    copyNameHintAndDebugDecorations(convertedValue, var);
+
+                    for (auto use : uses)
+                        builder.replaceOperand(use, convertedValue);
+                }
+                if (!foundAConversion)
+                {
+                    // If we can't convert the value, report an error.
+                    for (auto permittedType : info.permittedTypes)
+                    {
+                        StringBuilder typeNameSB;
+                        getTypeNameHint(typeNameSB, permittedType);
+                        m_sink->diagnose(var->sourceLoc, Diagnostics::systemValueTypeIncompatible, semanticName, typeNameSB.produceString());
+                    }
+                }
+            }
+        }
+
+        void legalizeSystemValueParameters(EntryPointInfo entryPoint)
+        {
+            List<SystemValLegalizationWorkItem> systemValWorkItems = collectSystemValFromEntryPoint(entryPoint);
+
+            for (auto index = 0; index < systemValWorkItems.getCount(); index++)
+            {
+                legalizeSystemValue(entryPoint, systemValWorkItems[index]);
+            }
+            fixUpFuncType(entryPoint.entryPointFunc);
+        }
+
+        void legalizeEntryPointForMetal(EntryPointInfo entryPoint)
+        {
+            //Input Parameter Legalize
+            hoistEntryPointParameterFromStruct(entryPoint);
+            packStageInParameters(entryPoint);
+            flattenInputParameters(entryPoint);
+
+            //System Value Legalize
+            legalizeSystemValueParameters(entryPoint);
+
+            //Output Value Legalize
+            wrapReturnValueInStruct(entryPoint);
+
+            //Other Legalize
+            legalizeMeshEntryPoint(entryPoint);
+            legalizeDispatchMeshPayloadForMetal(entryPoint);
+        }
+    };
 
     void legalizeFuncBody(IRFunc* func)
     {
@@ -186,9 +1413,10 @@ namespace Slang
             }
         }
 
-        legalizeEntryPointVaryingParamsForMetal(module, sink);
+        LegalizeMetalEntryPointContext context(sink, module);
         for (auto entryPoint : entryPoints)
-            legalizeEntryPointForMetal(entryPoint, sink);
+            context.legalizeEntryPointForMetal(entryPoint);
+        context.removeSemanticLayoutsFromLegalizedStructs();
 
         specializeAddressSpace(module);
     }
