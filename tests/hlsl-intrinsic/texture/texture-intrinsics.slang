@@ -43,6 +43,8 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     uint numLevels = 0, elements = 0;
     float fnumLevels = 0.0f, felements = 0.0f;
 
+    uint status;
+
     /*
         <Template Type> Object.SampleLevel()
     */     
@@ -244,6 +246,28 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     f4 = t2DArray.Gather(samplerState, float3(u, u, 0), int2(0, 0));
     val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
 
+    // Object.GatherGreen()
+    f4 = t2D.GatherGreen(samplerState, float2(u, u), int2(1, 2));
+    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+
+    f4 = t2D.GatherGreen(samplerState, float2(u, u), int2(1, 2), int2(3, 4), int2(5, 6), int2(7, 8));
+    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+
+    f4 = tCubeArray.GatherGreen(samplerState, float4(1.5, 1.5, 1.5, 1.5));
+    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+
+    // status variant
+#if !defined(VK)
+    f4 = t2D.GatherGreen(samplerState, float2(u, u), int2(1, 2), status);
+    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+
+    f4 = t2D.GatherGreen(samplerState, float2(u, u), int2(1, 2), int2(3, 4), int2(5, 6), int2(7, 8), status);
+    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+
+    f4 = tCubeArray.GatherGreen(samplerState, float4(1.5, 1.5, 1.5, 1.5), status);
+    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+#endif
+
     /*
         ret Object.Load()
     */
@@ -289,15 +313,15 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 // DX11: 313
 // DX11: 313
 // DX11: 313
-// DX12: 316
-// DX12: 316
-// DX12: 316
-// DX12: 316
-// DX12CS6: 339
-// DX12CS6: 339
-// DX12CS6: 339
-// DX12CS6: 339
-// VK: 339
-// VK: 339
-// VK: 339
-// VK: 339
+// DX12: 340
+// DX12: 340
+// DX12: 340
+// DX12: 340
+// DX12CS6: 363
+// DX12CS6: 363
+// DX12CS6: 363
+// DX12CS6: 363
+// VK: 351
+// VK: 351
+// VK: 351
+// VK: 351
