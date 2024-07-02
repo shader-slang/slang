@@ -28,6 +28,8 @@ using Slang::ComPtr;
 
 #include <chrono>
 
+static const ExampleResources resourceBase("shader-toy");
+
 using namespace gfx;
 
 // In order to display a shader toy effect using rasterization-based shader
@@ -109,7 +111,8 @@ Result loadShaderProgram(gfx::IDevice* device, ComPtr<gfx::IShaderProgram>& outS
     //      import shader_toy;
     //
     ComPtr<slang::IBlob> diagnosticsBlob;
-    slang::IModule* module = slangSession->loadModule("shader-toy", diagnosticsBlob.writeRef());
+    Slang::String shaderToyPath = resourceBase.resolveResource("shader-toy.slang");
+    slang::IModule* module = slangSession->loadModule(shaderToyPath.getBuffer(), diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     if(!module)
         return SLANG_FAIL;
@@ -197,9 +200,9 @@ Result loadShaderProgram(gfx::IDevice* device, ComPtr<gfx::IShaderProgram>& outS
     // same module, and to demonstrate that we will load a different
     // module to provide the effect type we will plug in.
     //
-    const char* effectModuleName = "example-effect";
     const char* effectTypeName = "ExampleEffect";
-    slang::IModule* effectModule = slangSession->loadModule(effectModuleName, diagnosticsBlob.writeRef());
+    Slang::String effectModulePath = resourceBase.resolveResource("example-effect.slang");
+    slang::IModule* effectModule = slangSession->loadModule(effectModulePath.getBuffer(), diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     if(!module)
         return SLANG_FAIL;

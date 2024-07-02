@@ -113,7 +113,15 @@ struct ByteAddressBuffer
     }
 
     [__readNone]
-    uint Load(int location, out uint status);
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer)]
+    uint Load(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load";
+        }
+    }
 
     [__readNone]
     [ForceInline]
@@ -155,7 +163,15 @@ struct ByteAddressBuffer
     }
 
     [__readNone]
-    uint2 Load2(int location, out uint status);
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer)]
+    uint2 Load2(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load2";
+        }
+    }
 
     [__readNone]
     [ForceInline]
@@ -197,7 +213,15 @@ struct ByteAddressBuffer
     }
 
     [__readNone]
-    uint3 Load3(int location, out uint status);
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer)]
+    uint3 Load3(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load3";
+        }
+    }
 
     [__readNone]
     [ForceInline]
@@ -239,7 +263,15 @@ struct ByteAddressBuffer
     }
 
     [__readNone]
-    uint4 Load4(int location, out uint status);
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer)]
+    uint4 Load4(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load4";
+        }
+    }
 
     [__readNone]
     [ForceInline]
@@ -691,7 +723,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
+    [require(hlsl, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __target_switch
@@ -1296,7 +1328,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
+    [require(hlsl, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __target_switch
@@ -2504,7 +2536,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(hlsl, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
@@ -2670,7 +2702,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(hlsl, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
@@ -2869,7 +2901,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(hlsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location, vector<int, Shape.dimensions+isArray> offset, out uint status)
     {
         __target_switch
@@ -3092,6 +3124,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
 
     [__readNone]
     [ForceInline]
+    [require(hlsl, texture_sm_4_1_compute_fragment)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, vector<int, Shape.dimensions+isArray> offset, out uint status)
     {
         __target_switch
@@ -3169,6 +3202,7 @@ struct __TextureMip<T, Shape : __ITextureShape, let isArray : int, let isCombine
         get { return tex.Load(__makeVector(pos, mip)); }
     }
 }
+
 struct __TextureMips<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
     __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
@@ -3183,6 +3217,38 @@ __generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, l
 extension __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
 {
     property __TextureMips<T, Shape, isArray, isCombined, format> mips
+    {
+        [__unsafeForceInlineEarly]
+        get { return { this }; }
+    }
+}
+
+// Definitions to support the .sample[][] operator.
+struct __TextureSample<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    int sample;
+    __subscript(vector<int, isArray + Shape.dimensions> pos)->T
+    {
+        [__unsafeForceInlineEarly]
+        get { return tex[pos, sample]; }
+    }
+}
+
+struct __TextureSampleMS<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+{
+    __TextureImpl<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    __subscript(int sample)->__TextureSample<T, Shape, isArray, isCombined, format>
+    {
+        [__unsafeForceInlineEarly]
+        get { return { tex, sample }; }
+    }
+}
+
+__generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+extension __TextureImpl<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
+{
+    property __TextureSampleMS<T, Shape, isArray, isCombined, format> sample
     {
         [__unsafeForceInlineEarly]
         get { return { this }; }
@@ -3231,7 +3297,7 @@ ${{{{
         auto requireString = requireStringBuilder.toString();
 }}}}
 $(requireString)
-typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(arrayPostFix[isArray])$(msPostFix[isMS])<T=float4, let sampleCount:int=0, let format:int=0> = __TextureImpl<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
+typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T=float4, let sampleCount:int=0, let format:int=0> = __TextureImpl<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
 ${{{{
 }
 }}}}
@@ -3764,7 +3830,7 @@ struct StructuredBuffer
     T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
-    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
+    [require(hlsl, structuredbuffer)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
     __generic<TIndex : __BuiltinIntegerType>
@@ -3894,7 +3960,15 @@ struct $(item.name)
     }
 
     [__NoSideEffect]
-    uint Load(int location, out uint status);
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    uint Load(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load";
+        }
+    }
 
     [__NoSideEffect]
     [ForceInline]
@@ -3936,7 +4010,15 @@ struct $(item.name)
     }
 
     [__NoSideEffect]
-    uint2 Load2(int location, out uint status);
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    uint2 Load2(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load2";
+        }
+    }
 
     [__NoSideEffect]
     [ForceInline]
@@ -3978,7 +4060,15 @@ struct $(item.name)
     }
 
     [__NoSideEffect]
-    uint3 Load3(int location, out uint status);
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    uint3 Load3(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load3";
+        }
+    }
 
     [__NoSideEffect]
     [ForceInline]
@@ -4020,7 +4110,15 @@ struct $(item.name)
     }
 
     [__NoSideEffect]
-    uint4 Load4(int location, out uint status);
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    uint4 Load4(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load4";
+        }
+    }
 
     [__NoSideEffect]
     [ForceInline]
@@ -5695,6 +5793,20 @@ double asdouble(uint lowbits, uint highbits)
     }
 }
 
+__glsl_extension(GL_ARB_gpu_shader5)
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+double2 asdouble(uint2 lowbits, uint2 highbits)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "asdouble($0, $1)";
+    default:
+        return double2(asdouble(lowbits.x, highbits.x), asdouble(lowbits.y, highbits.y));
+    }
+}
+
 // Reinterpret bits as a float (HLSL SM 4.0)
 
 [__readNone]
@@ -6622,7 +6734,15 @@ T copysign(T x, T y)
 
 
 // Check access status to tiled resource
-bool CheckAccessFullyMapped(uint status);
+[ForceInline]
+[require(hlsl, sm_5_0)]
+bool CheckAccessFullyMapped(out uint status)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "CheckAccessFullyMapped";
+    }
+}
 
 // Clamp (HLSL SM 1.0)
 __generic<T : __BuiltinIntegerType>
@@ -6903,6 +7023,7 @@ vector<T,N> cospi(vector<T,N> x)
 
 // Population count
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
 uint countbits(uint value)
 {
@@ -6919,6 +7040,27 @@ uint countbits(uint value)
         __intrinsic_asm "$P_countbits($0)";
     case spirv:
         return spirv_asm {OpBitCount $$uint result $value};
+    }
+}
+
+__generic <let N : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
+vector<uint, N> countbits(vector<uint, N> value)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "countbits";
+    case glsl:
+        __intrinsic_asm "bitCount";
+    case metal:
+        __intrinsic_asm "popcount";
+    case spirv:
+        return spirv_asm {OpBitCount $$vector<uint, N> result $value};
+    default:
+        VECTOR_MAP_UNARY(uint, N, countbits, value);
     }
 }
 
@@ -15143,6 +15285,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     char const* spvLoadInstName = (isReadOnly) ? "OpImageFetch" : "OpImageRead";
     char const* requireToSetQuery = (isReadOnly) ? "[require(glsl_hlsl_metal_spirv, texture_size)]" : "[require(glsl_hlsl_metal_spirv, image_size)]";
     char const* requireToSet = (isReadOnly) ? "[require(glsl_hlsl_metal_spirv, texture_sm_4_1)]" : "[require(glsl_hlsl_metal_spirv, texture_sm_4_1_compute_fragment)]";
+    char const* requireToSet_onlyHLSL = (isReadOnly) ? "[require(hlsl, texture_sm_4_1)]" : "[require(hlsl, texture_sm_4_1_compute_fragment)]";
 }}}}
 
 __generic<T, let format:int>
@@ -15183,8 +15326,14 @@ extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
     }
 
     $(isReadOnly?"[__readNone] ":"")
-    $(requireToSet)
-    T Load(int location, out uint status);
+    $(requireToSet_onlyHLSL)
+    T Load(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load";
+        }
+    }
 
     __subscript(uint index) -> T {
 
@@ -17268,19 +17417,20 @@ struct __SubpassImpl<T, let isMS:int>
 {
 }
 
-__generic<T, let isMS:int=0>
+__generic<T = float4, let isMS:int=0>
 typealias SubpassInput = __SubpassImpl<T, isMS>;
 
 __generic<T>
 extension __SubpassImpl<T, 0>
 {
     [ForceInline]
-    [require(hlsl_spirv, subpass)]
+    [require(glsl_hlsl_spirv, subpass)]
     T SubpassLoad()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm "$0.SubpassLoad()";
+        case glsl: __intrinsic_asm "subpassLoad($0)";
         case spirv:
         {
             let zeroVec = int2(0);
@@ -17294,19 +17444,20 @@ extension __SubpassImpl<T, 0>
     }
 }
 
-__generic<T, let isMS:int=1>
+__generic<T = float4, let isMS:int=1>
 typealias SubpassInputMS = __SubpassImpl<T, isMS>;
 
 __generic<T>
 extension __SubpassImpl<T, 1>
 {
     [ForceInline]
-    [require(hlsl_spirv, subpass)]
+    [require(glsl_hlsl_spirv, subpass)]
     T SubpassLoad(int sample)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm "$0.SubpassLoad($1)";
+        case glsl: __intrinsic_asm "subpassLoad($0, $1)";
         case spirv:
         {
             let zeroVec = int2(0);

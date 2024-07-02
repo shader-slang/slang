@@ -161,6 +161,22 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
     m_queueAllocCount = 0;
 
+    bool enableRayTracingValidation = false;
+
+    // Read properties from extended device descriptions
+    for (GfxIndex i = 0; i < m_desc.extendedDescCount; i++)
+    {
+        StructType stype;
+        memcpy(&stype, m_desc.extendedDescs[i], sizeof(stype));
+        switch (stype)
+        {
+        case StructType::RayTracingValidationDesc:
+            enableRayTracingValidation = static_cast<RayTracingValidationDesc*>(m_desc.extendedDescs[i])->enableRaytracingValidation;
+            break;
+        }
+    }
+
+
     VkInstance instance = VK_NULL_HANDLE;
     if (handles[0].handleValue == 0)
     {
@@ -288,7 +304,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
     if (!instance)
         return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
-    if (useValidationLayer && m_api.vkCreateDebugReportCallbackEXT)
+
+    if ((enableRayTracingValidation || useValidationLayer) && m_api.vkCreateDebugReportCallbackEXT)
     {
         VkDebugReportFlagsEXT debugFlags =
             VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
@@ -512,6 +529,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.fragmentShadingRateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.fragmentShadingRateFeatures;
 
+        // raytracing validation features
+        extendedFeatures.rayTracingValidationFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.rayTracingValidationFeatures;
+
         if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_2)
         {
             extendedFeatures.vulkan12Features.pNext = deviceFeatures2.pNext;
@@ -696,6 +717,17 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
             "computeDerivativeGroupLinear"
         );
+
+        // Only enable raytracing validation if both requested and supported
+        if(enableRayTracingValidation && extendedFeatures.rayTracingValidationFeatures.rayTracingValidation)
+        {
+            SIMPLE_EXTENSION_FEATURE(
+                extendedFeatures.rayTracingValidationFeatures,
+                rayTracingValidation,
+                VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME,
+                "ray-tracing-validation"
+            );
+        }
 
 #undef SIMPLE_EXTENSION_FEATURE
 
@@ -934,6 +966,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
     {
         installPipelineDumpLayer(m_api);
     }
+
     return SLANG_OK;
 }
 
