@@ -2901,7 +2901,6 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location, vector<int, Shape.dimensions+isArray> offset, out uint status)
     {
         __target_switch
@@ -3124,7 +3123,6 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, texture_sm_4_1_compute_fragment)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, vector<int, Shape.dimensions+isArray> offset, out uint status)
     {
         __target_switch
