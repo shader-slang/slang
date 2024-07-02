@@ -1890,6 +1890,7 @@ public vec2 textureQueryLod(__TextureImpl<
         __intrinsic_asm "textureQueryLod";
     case spirv:
         return spirv_asm {
+            OpCapability ImageQuery;
             result:$$float2 = OpImageQueryLod $sampler $p
         };
     default:
@@ -1922,6 +1923,7 @@ public vec2 textureQueryLod(__TextureImpl<
         __intrinsic_asm "textureQueryLod";
     case spirv:
         return spirv_asm {
+            OpCapability ImageQuery;
             result:$$float2 = OpImageQueryLod $sampler $p
         };
     default:

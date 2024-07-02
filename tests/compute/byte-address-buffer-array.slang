@@ -26,10 +26,10 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // CHECK1: {{.*}}[0] =  {{.*}}.data_0[0];
     // CHECK1: {{.*}}[1] =  {{.*}}.data_0[1];
     // CHECK1: vec4  {{.*}}[2];
-    // CHECK1: unpackStorage_0(buffer_0._data[0], {{.*}});
+    // CHECK1: unpackStorage_0(buffer_0._data[uint(0)], {{.*}});
     // CHECK1: vec4  {{.*}}[2] = buffer_0._data[0] = packStorage_0({{.*}});
-    // CHECK1: vec4 {{.*}} = buffer_2._data[1];
-    // CHECK1: vec4 {{.*}} = buffer_2._data[1] = vec4(buffer_1._data[1], buffer_1._data[2], buffer_1._data[3], buffer_1._data[4]);
+    // CHECK1: vec4 {{.*}} = buffer_2._data[uint(1)];
+    // CHECK1: vec4 {{.*}} = buffer_2._data[1] = vec4(buffer_1._data[uint(1)], buffer_1._data[uint(2)], buffer_1._data[uint(3)], buffer_1._data[uint(4)]);
 
     // CHECK2: float4 {{.*}}[int(2)] = (buffer_0).Load<float4 [int(2)] >(int(0));
     // CHECK2: buffer_0.Store(int(0),{{.*}});
