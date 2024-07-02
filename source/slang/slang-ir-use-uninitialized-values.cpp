@@ -1,14 +1,11 @@
 #include "slang-ir-use-uninitialized-values.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-util.h"
 #include "slang-ir-reachability.h"
 #include "slang-ir.h"
 
 namespace Slang
 {
-    // Marks all intruction operations which are
-    // permitted to use undefined values without concern
-    bool metaIntrinisc(IRInst* inst) {
+    bool metaOp(IRInst* inst) {
         switch (inst->getOp())
         {
         case kIROp_IsBool:
@@ -67,12 +64,29 @@ namespace Slang
             return true;
     }
 
+    bool aliasable(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        // These instructions generate (implicit) references to inst
+        case kIROp_GetElementPtr:
+        case kIROp_FieldExtract:
+        case kIROp_FieldAddress:
+            return true;
+        default:
+            break;
+        }
+
+        return false;
+    }
+
     List<IRInst*> concernableUsers(IRInst* inst)
     {
         List<IRInst*> users;
         for (auto use = inst->firstUse; use; use = use->nextUse) {
             IRInst* user = use->getUser();
-            if (!metaIntrinisc(user))
+            // Meta instructions only use the argument type
+            if (!metaOp(user))
                 users.add(user);
         }
 
@@ -87,13 +101,9 @@ namespace Slang
 
         addresses.add(inst);
         for (auto inst : users) {
-            switch (inst->getOp())
-            {
-            case kIROp_GetElementPtr:
-            case kIROp_FieldAddress:
-                addresses.add(inst);
-            default:
-                break;
+            if (aliasable(inst)) {
+                auto instAddresses = aliasableInstructions(inst);
+                addresses.addRange(instAddresses);
             }
         }
 
@@ -103,19 +113,24 @@ namespace Slang
     void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user)
     {
         // Meta intrinsics (which evaluate on type) do nothing
-        if (metaIntrinisc(user))
+        if (metaOp(user))
+            return;
+
+        // Ignore instructions generating more aliases
+        if (aliasable(user))
             return;
 
         switch (user->getOp())
         {
-        // Ignore these, they define new aliases
-        case kIROp_GetElementPtr:
-        case kIROp_FieldAddress:
-            break;
+        case kIROp_loop:
+            // TODO: Ignore loops for now
+            // printf("LOOP: (%p)\n", as<IRLoop>(user));
+            // user->dump();
+            return;
         // These instructions will store data...
         case kIROp_Store:
         case kIROp_SwizzledStore:
-        // TODO: for calls, should make sure that the function is passing as an out param
+        // TODO: for calls, should make check that the function is passing as an out param
         case kIROp_Call:
         case kIROp_SPIRVAsm:
         // For now assume that __intrinsic_asm blocks will do the right thing...
@@ -129,7 +144,6 @@ namespace Slang
             break;
         // ... and the rest will load/use them
         default:
-            // TODO: check if its an operand
             loads.add(user);
             break;
         }
@@ -139,14 +153,9 @@ namespace Slang
     {
         // Remove all loads which are reachable from stores
         for (auto store : stores) {
-            // printf("checking store: %s\n", getIROpInfo(store->m_op).name);
-
             for (Index i = 0; i < loads.getCount(); ) {
-                // printf("  on usage: %s\n", getIROpInfo(loads[i]->m_op).name);
-                if (reachability.isInstReachable(store, loads[i])) {
-                    // printf("    REACHABLE\n");
+                if (reachability.isInstReachable(store, loads[i]))
                     loads.fastRemoveAt(i);
-                }
                 else
                     i++;
             }
@@ -157,18 +166,6 @@ namespace Slang
     {
         // Collect all aliasable addresses
         auto addresses = aliasableInstructions(inst);
-
-        // printf("\n================================\n");
-        // printf("Undefined param from:\n");
-        // inst->dump();
-        //
-        // if (addresses.getCount() > 1) {
-        //     printf("aliasable from:\n");
-        //     for (auto inst : addresses)
-        //         inst->dump();
-        // }
-        //
-        // func->dump();
 
         // Partition instructions
         List<IRInst*> stores;
@@ -199,14 +196,6 @@ namespace Slang
     List<IRInst*> checkForUsingUndefinedValue(ReachabilityContext &reachability, IRInst* inst)
     {
         auto addresses = aliasableInstructions(inst);
-
-        // printf("\n================================\n");
-        // printf("Undefined value from:\n");
-        // inst->dump();
-
-        // printf("aliasable from:\n");
-        // for (auto inst : addresses)
-        //     inst->dump();
 
         // Partition instructions
         List<IRInst*> stores;
@@ -253,7 +242,16 @@ namespace Slang
                 continue;
 
             auto loads = checkForUsingUndefinedValue(reachability, inst);
+            // if (loads.getCount()) {
+            //     printf("func:\n");
+            //     func->dump();
+            // }
+
             for (auto load : loads) {
+                printf("load instruction is:\n");
+                load->dump();
+                printf("inst is:\n");
+                inst->dump();
                 sink->diagnose(load,
                         as <IRReturn> (load)
                         ? Diagnostics::returningWithUninitializedValue
@@ -263,7 +261,7 @@ namespace Slang
         }
     }
 
-    void checkForUsingUninitializedValues(IRModule *module, DiagnosticSink *sink)
+    void checkForUsingUninitializedValues(IRModule* module, DiagnosticSink* sink)
     {
         for (auto inst : module->getGlobalInsts()) {
             if (auto func = as<IRFunc>(inst)) {

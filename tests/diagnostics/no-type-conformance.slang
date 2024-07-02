@@ -8,7 +8,7 @@ interface IFoo
 
 void foo()
 {
-	IFoo obj;
+	IFoo obj = IFoo();
 	obj.get();
 }
 

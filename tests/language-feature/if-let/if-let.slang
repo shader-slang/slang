@@ -29,7 +29,7 @@ int test(IFoo foo, int idx)
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    MyImpl impl;
+    MyImpl impl = MyImpl();
     // CHECK: 0
     // CHECK: 1
     // CHECK: 2
