@@ -5525,10 +5525,6 @@ void Session::addBuiltinSource(
     }
 
     // Compiling stdlib should not yield any warnings.
-    if (sink.outputBuffer.getLength()) {
-        printf("SINK\n");
-        printf("%s\n", sink.outputBuffer.toString().begin());
-    }
     SLANG_ASSERT(sink.outputBuffer.getLength() == 0);
 
     // Extract the AST for the code we just parsed
