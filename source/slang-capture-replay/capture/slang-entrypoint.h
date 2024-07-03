@@ -1,27 +1,27 @@
-#ifndef SLANG_TYPE_CONFORMANCE_H
-#define SLANG_TYPE_CONFORMANCE_H
+#ifndef SLANG_ENTRY_POINT_H
+#define SLANG_ENTRY_POINT_H
 
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "slang-com-helper.h"
-#include "../core/slang-smart-pointer.h"
-#include "../core/slang-dictionary.h"
-#include "../slang/slang-compiler.h"
+#include "../../core/slang-smart-pointer.h"
+#include "../../core/slang-dictionary.h"
+#include "../../slang/slang-compiler.h"
 #include "capture-manager.h"
 
 namespace SlangCapture
 {
     using namespace Slang;
-    class TypeConformanceCapture: public slang::ITypeConformance, public RefObject
+    class EntryPointCapture : public slang::IEntryPoint, public RefObject
     {
     public:
-        SLANG_COM_INTERFACE(0x0e67d05d, 0xee0a, 0x41e1, { 0xb5, 0xa3, 0x23, 0xe3, 0xb0, 0xec, 0x33, 0xf1 })
+        SLANG_COM_INTERFACE(0xf4c1e23d, 0xb321, 0x4931, { 0x8f, 0x37, 0xf1, 0x22, 0x6a, 0xf9, 0x20, 0x85 })
 
         SLANG_REF_OBJECT_IUNKNOWN_ALL
         ISlangUnknown* getInterface(const Guid& guid);
 
-        explicit TypeConformanceCapture(slang::ITypeConformance* typeConformance, CaptureManager* captureManager);
-        ~TypeConformanceCapture();
+        explicit EntryPointCapture(slang::IEntryPoint* entryPoint, CaptureManager* captureManager);
+        ~EntryPointCapture();
 
         // Interfaces for `IComponentType`
         virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override;
@@ -66,12 +66,12 @@ namespace SlangCapture
             uint32_t compilerOptionEntryCount,
             slang::CompilerOptionEntry* compilerOptionEntries,
             ISlangBlob** outDiagnostics = nullptr) override;
-
-        slang::ITypeConformance* getActualTypeConformance() const { return m_actualTypeConformance; }
+        virtual SLANG_NO_THROW slang::FunctionReflection* SLANG_MCALL getFunctionReflection() override;
+        slang::IEntryPoint* getActualEntryPoint() const { return m_actualEntryPoint; }
     private:
-        Slang::ComPtr<slang::ITypeConformance> m_actualTypeConformance;
-        uint64_t                               m_typeConformanceHandle = 0;
-        CaptureManager*                        m_captureManager = nullptr;
+        Slang::ComPtr<slang::IEntryPoint>   m_actualEntryPoint;
+        uint64_t                            m_entryPointHandle = 0;
+        CaptureManager*                     m_captureManager = nullptr;
     };
 }
-#endif // SLANG_TYPE_CONFORMANCE_H
+#endif // SLANG_ENTRY_POINT_H

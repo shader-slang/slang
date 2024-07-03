@@ -1,6 +1,6 @@
 #include "slang-decoder.h"
 #include "parameter-decoder.h"
-#include "capture-utility.h"
+#include "../capture-utility.h"
 
 namespace SlangCapture
 {

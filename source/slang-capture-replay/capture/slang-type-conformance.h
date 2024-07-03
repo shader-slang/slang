@@ -1,25 +1,27 @@
-#ifndef SLANG_COMPOSITE_COMPONENT_TYPE_H
-#define SLANG_COMPOSITE_COMPONENT_TYPE_H
+#ifndef SLANG_TYPE_CONFORMANCE_H
+#define SLANG_TYPE_CONFORMANCE_H
 
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "slang-com-helper.h"
-#include "../core/slang-smart-pointer.h"
-#include "../core/slang-dictionary.h"
-#include "../slang/slang-compiler.h"
+#include "../../core/slang-smart-pointer.h"
+#include "../../core/slang-dictionary.h"
+#include "../../slang/slang-compiler.h"
 #include "capture-manager.h"
 
 namespace SlangCapture
 {
     using namespace Slang;
-    class CompositeComponentTypeCapture: public slang::IComponentType, public RefObject
+    class TypeConformanceCapture: public slang::ITypeConformance, public RefObject
     {
     public:
+        SLANG_COM_INTERFACE(0x0e67d05d, 0xee0a, 0x41e1, { 0xb5, 0xa3, 0x23, 0xe3, 0xb0, 0xec, 0x33, 0xf1 })
+
         SLANG_REF_OBJECT_IUNKNOWN_ALL
         ISlangUnknown* getInterface(const Guid& guid);
 
-        explicit CompositeComponentTypeCapture(slang::IComponentType* componentType, CaptureManager* captureManager);
-        ~CompositeComponentTypeCapture();
+        explicit TypeConformanceCapture(slang::ITypeConformance* typeConformance, CaptureManager* captureManager);
+        ~TypeConformanceCapture();
 
         // Interfaces for `IComponentType`
         virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override;
@@ -32,6 +34,10 @@ namespace SlangCapture
             SlangInt    targetIndex,
             slang::IBlob**     outCode,
             slang::IBlob**     outDiagnostics = nullptr) override;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt    targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics = nullptr) override;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
             SlangInt    entryPointIndex,
             SlangInt    targetIndex,
@@ -60,17 +66,12 @@ namespace SlangCapture
             uint32_t compilerOptionEntryCount,
             slang::CompilerOptionEntry* compilerOptionEntries,
             ISlangBlob** outDiagnostics = nullptr) override;
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
-            SlangInt    targetIndex,
-            slang::IBlob** outCode,
-            slang::IBlob** outDiagnostics = nullptr) override;
 
-        slang::IComponentType* getActualCompositeComponentType() const { return m_actualCompositeComponentType; }
+        slang::ITypeConformance* getActualTypeConformance() const { return m_actualTypeConformance; }
     private:
-        Slang::ComPtr<slang::IComponentType> m_actualCompositeComponentType;
-        uint64_t                             m_compositeComponentHandle = 0;
-        CaptureManager*                      m_captureManager = nullptr;
-
+        Slang::ComPtr<slang::ITypeConformance> m_actualTypeConformance;
+        uint64_t                               m_typeConformanceHandle = 0;
+        CaptureManager*                        m_captureManager = nullptr;
     };
 }
-#endif // SLANG_COMPOSITE_COMPONENT_TYPE_H
+#endif // SLANG_TYPE_CONFORMANCE_H

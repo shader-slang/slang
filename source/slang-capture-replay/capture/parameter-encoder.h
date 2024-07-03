@@ -6,7 +6,7 @@
 #include <cstdint>
 
 #include "output-stream.h"
-#include "capture-format.h"
+#include "../capture-format.h"
 
 namespace SlangCapture
 {

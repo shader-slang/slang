@@ -2,9 +2,9 @@
 #include <cstring>
 #include <cstdlib>
 #include <vector>
-#include "capture-format.h"
-#include "capture-utility.h"
-#include "../../slang.h"
+#include "../capture-format.h"
+#include "../capture-utility.h"
+#include "../../../slang.h"
 
 namespace SlangCapture
 {

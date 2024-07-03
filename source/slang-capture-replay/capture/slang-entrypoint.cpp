@@ -1,55 +1,53 @@
-#include "capture-utility.h"
-#include "slang-composite-component-type.h"
+#include "../capture-utility.h"
+#include "slang-entrypoint.h"
 
 namespace SlangCapture
 {
-    CompositeComponentTypeCapture::CompositeComponentTypeCapture(
-            slang::IComponentType* componentType, CaptureManager* captureManager)
-        : m_actualCompositeComponentType(componentType),
+    EntryPointCapture::EntryPointCapture(slang::IEntryPoint* entryPoint, CaptureManager* captureManager)
+        : m_actualEntryPoint(entryPoint),
           m_captureManager(captureManager)
     {
-        SLANG_CAPTURE_ASSERT(m_actualCompositeComponentType != nullptr);
+        SLANG_CAPTURE_ASSERT(m_actualEntryPoint != nullptr);
         SLANG_CAPTURE_ASSERT(m_captureManager != nullptr);
 
-        m_compositeComponentHandle = reinterpret_cast<uint64_t>(m_actualCompositeComponentType.get());
-        slangCaptureLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, componentType);
+        m_entryPointHandle = reinterpret_cast<uint64_t>(m_actualEntryPoint.get());
+        slangCaptureLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, entryPoint);
     }
 
-    CompositeComponentTypeCapture::~CompositeComponentTypeCapture()
+    EntryPointCapture::~EntryPointCapture()
     {
-        m_actualCompositeComponentType->release();
+        m_actualEntryPoint->release();
     }
 
-    ISlangUnknown* CompositeComponentTypeCapture::getInterface(const Guid& guid)
+    ISlangUnknown* EntryPointCapture::getInterface(const Guid& guid)
     {
-        if (guid == IComponentType::getTypeGuid())
-        {
+        if(guid == EntryPointCapture::getTypeGuid())
             return static_cast<ISlangUnknown*>(this);
-        }
-        return nullptr;
+        else
+            return nullptr;
     }
 
-    SLANG_NO_THROW slang::ISession* CompositeComponentTypeCapture::getSession()
+    SLANG_NO_THROW slang::ISession* EntryPointCapture::getSession()
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
 
         ParameterEncoder* encoder {};
         {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::ICompositeComponentType_getSession, m_compositeComponentHandle);
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::IEntryPoint_getSession, m_entryPointHandle);
             encoder = m_captureManager->endMethodCapture();
         }
 
-        slang::ISession* res = m_actualCompositeComponentType->getSession();
+        slang::ISession* session = m_actualEntryPoint->getSession();
 
         {
-            encoder->encodeAddress(res);
+            encoder->encodeAddress(session);
             m_captureManager->endMethodCaptureAppendOutput();
         }
 
-        return res;
+        return session;
     }
 
-    SLANG_NO_THROW slang::ProgramLayout* CompositeComponentTypeCapture::getLayout(
+    SLANG_NO_THROW slang::ProgramLayout* EntryPointCapture::getLayout(
         SlangInt    targetIndex,
         slang::IBlob**     outDiagnostics)
     {
@@ -57,12 +55,12 @@ namespace SlangCapture
 
         ParameterEncoder* encoder {};
         {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::ICompositeComponentType_getLayout, m_compositeComponentHandle);
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::IEntryPoint_getLayout, m_entryPointHandle);
             encoder->encodeInt64(targetIndex);
             encoder = m_captureManager->endMethodCapture();
         }
 
-        slang::ProgramLayout* programLayout = m_actualCompositeComponentType->getLayout(targetIndex, outDiagnostics);
+        slang::ProgramLayout* programLayout = m_actualEntryPoint->getLayout(targetIndex, outDiagnostics);
 
         {
             encoder->encodeAddress(*outDiagnostics);
@@ -73,15 +71,15 @@ namespace SlangCapture
         return programLayout;
     }
 
-    SLANG_NO_THROW SlangInt CompositeComponentTypeCapture::getSpecializationParamCount()
+    SLANG_NO_THROW SlangInt EntryPointCapture::getSpecializationParamCount()
     {
         // No need to capture this call as it is just a query.
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-        SlangInt res = m_actualCompositeComponentType->getSpecializationParamCount();
+        SlangInt res = m_actualEntryPoint->getSpecializationParamCount();
         return res;
     }
 
-    SLANG_NO_THROW SlangResult CompositeComponentTypeCapture::getEntryPointCode(
+    SLANG_NO_THROW SlangResult EntryPointCapture::getEntryPointCode(
         SlangInt    entryPointIndex,
         SlangInt    targetIndex,
         slang::IBlob**     outCode,
@@ -91,13 +89,13 @@ namespace SlangCapture
 
         ParameterEncoder* encoder {};
         {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::ICompositeComponentType_getEntryPointCode, m_compositeComponentHandle);
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::IEntryPoint_getEntryPointCode, m_entryPointHandle);
             encoder->encodeInt64(entryPointIndex);
             encoder->encodeInt64(targetIndex);
             encoder = m_captureManager->endMethodCapture();
         }
 
-        SlangResult res = m_actualCompositeComponentType->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+        SlangResult res = m_actualEntryPoint->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
 
         {
             encoder->encodeAddress(*outCode);
@@ -108,7 +106,7 @@ namespace SlangCapture
         return res;
     }
 
-    SLANG_NO_THROW SlangResult CompositeComponentTypeCapture::getTargetCode(
+    SLANG_NO_THROW SlangResult EntryPointCapture::getTargetCode(
         SlangInt    targetIndex,
         slang::IBlob** outCode,
         slang::IBlob** outDiagnostics)
@@ -117,12 +115,12 @@ namespace SlangCapture
 
         ParameterEncoder* encoder {};
         {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::ICompositeComponentType_getTargetCode, m_compositeComponentHandle);
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::IEntryPoint_getTargetCode, m_entryPointHandle);
             encoder->encodeInt64(targetIndex);
             encoder = m_captureManager->endMethodCapture();
         }
 
-        SlangResult res = m_actualCompositeComponentType->getTargetCode(targetIndex, outCode, outDiagnostics);
+        SlangResult res = m_actualEntryPoint->getTargetCode(targetIndex, outCode, outDiagnostics);
 
         {
             encoder->encodeAddress(*outCode);
@@ -133,7 +131,7 @@ namespace SlangCapture
         return res;
     }
 
-    SLANG_NO_THROW SlangResult CompositeComponentTypeCapture::getResultAsFileSystem(
+    SLANG_NO_THROW SlangResult EntryPointCapture::getResultAsFileSystem(
         SlangInt    entryPointIndex,
         SlangInt    targetIndex,
         ISlangMutableFileSystem** outFileSystem)
@@ -142,13 +140,13 @@ namespace SlangCapture
 
         ParameterEncoder* encoder {};
         {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::ICompositeComponentType_getResultAsFileSystem, m_compositeComponentHandle);
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::IEntryPoint_getResultAsFileSystem, m_entryPointHandle);
             encoder->encodeInt64(entryPointIndex);
             encoder->encodeInt64(targetIndex);
             encoder = m_captureManager->endMethodCapture();
         }
 
-        SlangResult res = m_actualCompositeComponentType->getResultAsFileSystem(entryPointIndex, targetIndex, outFileSystem);
+        SlangResult res = m_actualEntryPoint->getResultAsFileSystem(entryPointIndex, targetIndex, outFileSystem);
 
         {
             encoder->encodeAddress(*outFileSystem);
@@ -158,7 +156,7 @@ namespace SlangCapture
         return res;
     }
 
-    SLANG_NO_THROW void CompositeComponentTypeCapture::getEntryPointHash(
+    SLANG_NO_THROW void EntryPointCapture::getEntryPointHash(
         SlangInt    entryPointIndex,
         SlangInt    targetIndex,
         slang::IBlob**     outHash)
@@ -167,13 +165,13 @@ namespace SlangCapture
 
         ParameterEncoder* encoder {};
         {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::ICompositeComponentType_getEntryPointHash, m_compositeComponentHandle);
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::IEntryPoint_getEntryPointHash, m_entryPointHandle);
             encoder->encodeInt64(entryPointIndex);
             encoder->encodeInt64(targetIndex);
             encoder = m_captureManager->endMethodCapture();
         }
 
-        m_actualCompositeComponentType->getEntryPointHash(entryPointIndex, targetIndex, outHash);
+        m_actualEntryPoint->getEntryPointHash(entryPointIndex, targetIndex, outHash);
 
         {
             encoder->encodeAddress(*outHash);
@@ -181,7 +179,7 @@ namespace SlangCapture
         }
     }
 
-    SLANG_NO_THROW SlangResult CompositeComponentTypeCapture::specialize(
+    SLANG_NO_THROW SlangResult EntryPointCapture::specialize(
         slang::SpecializationArg const*    specializationArgs,
         SlangInt                    specializationArgCount,
         slang::IComponentType**            outSpecializedComponentType,
@@ -191,13 +189,13 @@ namespace SlangCapture
 
         ParameterEncoder* encoder {};
         {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::ICompositeComponentType_specialize, m_compositeComponentHandle);
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::IEntryPoint_specialize, m_entryPointHandle);
             encoder->encodeInt64(specializationArgCount);
             encoder->encodeStructArray(specializationArgs, specializationArgCount);
             encoder = m_captureManager->endMethodCapture();
         }
 
-        SlangResult res = m_actualCompositeComponentType->specialize(specializationArgs, specializationArgCount, outSpecializedComponentType, outDiagnostics);
+        SlangResult res = m_actualEntryPoint->specialize(specializationArgs, specializationArgCount, outSpecializedComponentType, outDiagnostics);
 
         {
             encoder->encodeAddress(*outSpecializedComponentType);
@@ -208,7 +206,7 @@ namespace SlangCapture
         return res;
     }
 
-    SLANG_NO_THROW SlangResult CompositeComponentTypeCapture::link(
+    SLANG_NO_THROW SlangResult EntryPointCapture::link(
         slang::IComponentType**            outLinkedComponentType,
         ISlangBlob**                outDiagnostics)
     {
@@ -216,11 +214,11 @@ namespace SlangCapture
 
         ParameterEncoder* encoder {};
         {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::ICompositeComponentType_link, m_compositeComponentHandle);
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::IEntryPoint_link, m_entryPointHandle);
             encoder = m_captureManager->endMethodCapture();
         }
 
-        SlangResult res = m_actualCompositeComponentType->link(outLinkedComponentType, outDiagnostics);
+        SlangResult res = m_actualEntryPoint->link(outLinkedComponentType, outDiagnostics);
 
         {
             encoder->encodeAddress(*outLinkedComponentType);
@@ -231,7 +229,7 @@ namespace SlangCapture
         return res;
     }
 
-    SLANG_NO_THROW SlangResult CompositeComponentTypeCapture::getEntryPointHostCallable(
+    SLANG_NO_THROW SlangResult EntryPointCapture::getEntryPointHostCallable(
         int                     entryPointIndex,
         int                     targetIndex,
         ISlangSharedLibrary**   outSharedLibrary,
@@ -241,13 +239,13 @@ namespace SlangCapture
 
         ParameterEncoder* encoder {};
         {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::ICompositeComponentType_getEntryPointHostCallable, m_compositeComponentHandle);
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::IEntryPoint_getEntryPointHostCallable, m_entryPointHandle);
             encoder->encodeInt32(entryPointIndex);
             encoder->encodeInt32(targetIndex);
             encoder = m_captureManager->endMethodCapture();
         }
 
-        SlangResult res = m_actualCompositeComponentType->getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
+        SlangResult res = m_actualEntryPoint->getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
 
         {
             encoder->encodeAddress(*outSharedLibrary);
@@ -258,19 +256,19 @@ namespace SlangCapture
         return res;
     }
 
-    SLANG_NO_THROW SlangResult CompositeComponentTypeCapture::renameEntryPoint(
+    SLANG_NO_THROW SlangResult EntryPointCapture::renameEntryPoint(
         const char* newName, IComponentType** outEntryPoint)
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
 
         ParameterEncoder* encoder {};
         {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::ICompositeComponentType_renameEntryPoint, m_compositeComponentHandle);
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::IEntryPoint_renameEntryPoint, m_entryPointHandle);
             encoder->encodeString(newName);
             encoder = m_captureManager->endMethodCapture();
         }
 
-        SlangResult res = m_actualCompositeComponentType->renameEntryPoint(newName, outEntryPoint);
+        SlangResult res = m_actualEntryPoint->renameEntryPoint(newName, outEntryPoint);
 
         {
             encoder->encodeAddress(*outEntryPoint);
@@ -280,7 +278,7 @@ namespace SlangCapture
         return res;
     }
 
-    SLANG_NO_THROW SlangResult CompositeComponentTypeCapture::linkWithOptions(
+    SLANG_NO_THROW SlangResult EntryPointCapture::linkWithOptions(
         IComponentType** outLinkedComponentType,
         uint32_t compilerOptionEntryCount,
         slang::CompilerOptionEntry* compilerOptionEntries,
@@ -290,13 +288,13 @@ namespace SlangCapture
 
         ParameterEncoder* encoder {};
         {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::ICompositeComponentType_linkWithOptions, m_compositeComponentHandle);
+            encoder = m_captureManager->beginMethodCapture(ApiCallId::IEntryPoint_linkWithOptions, m_entryPointHandle);
             encoder->encodeUint32(compilerOptionEntryCount);
             encoder->encodeStructArray(compilerOptionEntries, compilerOptionEntryCount);
             encoder = m_captureManager->endMethodCapture();
         }
 
-        SlangResult res = m_actualCompositeComponentType->linkWithOptions(outLinkedComponentType, compilerOptionEntryCount, compilerOptionEntries, outDiagnostics);
+        SlangResult res = m_actualEntryPoint->linkWithOptions(outLinkedComponentType, compilerOptionEntryCount, compilerOptionEntries, outDiagnostics);
 
         {
             encoder->encodeAddress(*outLinkedComponentType);
@@ -306,4 +304,10 @@ namespace SlangCapture
 
         return res;
     }
+
+    SLANG_NO_THROW slang::FunctionReflection* EntryPointCapture::getFunctionReflection()
+    {
+        return m_actualEntryPoint->getFunctionReflection();
+    }
+
 }

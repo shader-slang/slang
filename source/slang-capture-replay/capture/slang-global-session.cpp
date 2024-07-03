@@ -1,8 +1,8 @@
 #include "slang-global-session.h"
 #include "slang-session.h"
 #include "slang-filesystem.h"
-#include "../slang/slang-compiler.h"
-#include "capture-utility.h"
+#include "../../slang/slang-compiler.h"
+#include "../capture-utility.h"
 
 namespace SlangCapture
 {

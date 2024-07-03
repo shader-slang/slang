@@ -4,7 +4,7 @@
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "slang-com-helper.h"
-#include "../core/slang-smart-pointer.h"
+#include "../../core/slang-smart-pointer.h"
 #include "capture-manager.h"
 
 namespace SlangCapture

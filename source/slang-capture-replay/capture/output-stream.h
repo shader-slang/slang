@@ -2,7 +2,7 @@
 #define OUTPUT_STREAM_H
 
 #include <string>
-#include "../core/slang-stream.h"
+#include "../../core/slang-stream.h"
 
 namespace SlangCapture
 {

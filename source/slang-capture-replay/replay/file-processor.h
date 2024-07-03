@@ -2,8 +2,8 @@
 #define FILE_PROCESSOR_H
 
 #include <string>
-#include "../core/slang-stream.h"
-#include "capture-format.h"
+#include "../../core/slang-stream.h"
+#include "../capture-format.h"
 #include "slang-decoder.h"
 
 namespace SlangCapture
@@ -12,7 +12,6 @@ namespace SlangCapture
     {
     public:
         FileProcessor(const std::string& filePath);
-        ~FileProcessor();
         bool processNextBlock();
         bool processHeader(FunctionHeader& header);
         bool processTailer(FunctionTailer& tailer);
