@@ -702,7 +702,7 @@ struct OptionsParser
     void setProfile(RawTarget* rawTarget, Profile profile);
     void addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom);
 
-    SlangResult addEmbeddedLibrary(const CodeGenTarget format);
+    SlangResult addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option);
     
     void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode);
     
@@ -1621,6 +1621,12 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
         }
     }
 
+    // Hack. Library profile targets imply "whole program" compilation
+    if (profileName == "lib_6_6")
+    {
+        getCurrentTarget()->optionSet.addTargetFlags(SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
+    }
+
     // Any additional capability tokens will be assumed to represent `CapabilityAtom`s.
     // Those atoms will need to be added to the supported capabilities of the target.
     // 
@@ -1641,15 +1647,17 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
 }
 
 // Creates a target of the specified type whose output will be embedded as IR metadata
-SlangResult OptionsParser::addEmbeddedLibrary(const CodeGenTarget format)
+SlangResult OptionsParser::addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option)
 {
     RawTarget rawTarget;
     rawTarget.format = format;
     // Silently allow redundant targets if it is the same as the last specified target.
-    if (m_rawTargets.getCount() != 0 && m_rawTargets.getLast().format == rawTarget.format)
-        return SLANG_OK;
+    if (m_rawTargets.getCount() == 0 || m_rawTargets.getLast().format != rawTarget.format)
+    {
+        m_rawTargets.add(rawTarget);
+    }
 
-    m_rawTargets.add(rawTarget);
+    m_rawTargets.getLast().optionSet.add(option, true);
     return SLANG_OK;
 }
 
@@ -1943,8 +1951,8 @@ SlangResult OptionsParser::_parse(
                 linkage->m_optionSet.set(optionKind, compressionType);
                 break;
             }
-            case OptionKind::EmbedDXIL: SLANG_RETURN_ON_FAIL(addEmbeddedLibrary(CodeGenTarget::DXIL)); break;
-            case OptionKind::EmbedSPIRV: SLANG_RETURN_ON_FAIL(addEmbeddedLibrary(CodeGenTarget::SPIRV)); break;
+            case OptionKind::EmbedDXIL: SLANG_RETURN_ON_FAIL(addEmbeddedLibrary(CodeGenTarget::DXIL, CompilerOptionName::EmbedDXIL)); break;
+            case OptionKind::EmbedSPIRV: SLANG_RETURN_ON_FAIL(addEmbeddedLibrary(CodeGenTarget::SPIRV, CompilerOptionName::EmbedSPIRV)); break;
             case OptionKind::Target:
             {
                 CommandLineArg name;
@@ -2775,6 +2783,21 @@ SlangResult OptionsParser::_parse(
             if (rawTarget.optionSet.shouldUseScalarLayout())
             {
                 m_compileRequest->setTargetForceGLSLScalarBufferLayout(targetID, true);
+            }
+
+            if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))
+            {
+                m_compileRequest->setTargetGenerateWholeProgram(targetID, true);
+            }
+
+            if (rawTarget.optionSet.getBoolOption(CompilerOptionName::EmbedDXIL))
+            {
+                m_compileRequest->setTargetEmbedDXIL(targetID, true);
+            }
+
+            if (rawTarget.optionSet.getBoolOption(CompilerOptionName::EmbedSPIRV))
+            {
+                m_compileRequest->setTargetEmbedSPIRV(targetID, true);
             }
         }
 

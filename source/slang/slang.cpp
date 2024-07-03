@@ -3149,6 +3149,25 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         return SLANG_OK;
     }
 
+    // If requested, attempt to compile the translation unit all the way down to the target language
+    // and stash the result blob in an IR op.
+    for (auto targetReq : getLinkage()->targets)
+    {
+        if (targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL) ||
+            targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedSPIRV))
+        {
+            auto frontEndReq = getFrontEndReq();
+
+            for (auto translationUnit : frontEndReq->translationUnits)
+            {
+                translationUnit->getModule()->precompileForTargets(
+                    getSink(),
+                    this,
+                    targetReq);
+            }
+        }
+    }
+
     // If codegen is enabled, we need to move along to
     // apply any generic specialization that the user asked for.
     //
@@ -5756,6 +5775,21 @@ void EndToEndCompileRequest::setMatrixLayoutMode(SlangMatrixLayoutMode mode)
 void EndToEndCompileRequest::setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode  mode)
 {
     getTargetOptionSet(targetIndex).setMatrixLayoutMode(MatrixLayoutMode(mode));
+}
+
+void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
+}
+
+void EndToEndCompileRequest::setTargetEmbedDXIL(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDXIL, value);
+}
+
+void EndToEndCompileRequest::setTargetEmbedSPIRV(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedSPIRV, value);
 }
 
 void EndToEndCompileRequest::setTargetLineDirectiveMode(

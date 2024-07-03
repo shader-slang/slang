@@ -762,6 +762,11 @@ namespace Slang
 #   pragma warning(pop)
 #endif
 
+    SlangResult CodeGenContext::emitTranslationUnit(ComPtr<IArtifact>& outArtifact)
+    {
+        return emitWithDownstreamForEntryPoints(outArtifact);
+    }
+
     String GetHLSLProfileName(Profile profile)
     {
         switch( profile.getFamily() )
@@ -1084,6 +1089,23 @@ namespace Slang
         return SLANG_OK;
     }
 
+    bool CodeGenContext::isPrecompiled()
+    {
+        auto program = getProgram();
+
+        bool allPrecompiled = true;
+        program->enumerateIRModules([&](IRModule* irModule)
+            {
+                // TODO: Conditionalize this on target
+                if (!irModule->precompiledDXIL)
+                {
+                    allPrecompiled = false;
+                }
+            });
+
+        return allPrecompiled;
+    }
+
     SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact)
     {
         outArtifact.setNull();
@@ -1245,12 +1267,15 @@ namespace Slang
         }
         else
         {
-            CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
+            if (!isPrecompiled())
+            {
+                CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
 
-            SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
-            sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
+                SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
+                sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
 
-            sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
+                sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
+            }
         }
 
         if (sourceArtifact)
@@ -1539,6 +1564,29 @@ namespace Slang
 
             // Add all of the module libraries
             libraries.addRange(linkage->m_libModules.getBuffer(), linkage->m_libModules.getCount());
+        }
+
+        if (isPrecompiled())
+        {
+            auto program = getProgram();
+            program->enumerateIRModules([&](IRModule* irModule)
+                {
+                    // TODO: conditionalize on target
+                    if (irModule->precompiledDXIL)
+                    {
+                        ArtifactDesc desc = ArtifactDescUtil::makeDescForCompileTarget(SLANG_DXIL);
+                        desc.kind = ArtifactKind::Library;
+
+                        auto library = ArtifactUtil::createArtifact(desc);
+
+                        library->addRepresentationUnknown(irModule->precompiledDXIL);
+                        libraries.add(library);
+                    }
+                    else if (irModule->precompiledSPIRV)
+                    {
+                        // TODO
+                    }
+                });
         }
 
         options.compilerSpecificArguments = allocator.allocate(compilerSpecificArguments);

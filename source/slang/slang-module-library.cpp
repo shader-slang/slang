@@ -83,6 +83,19 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, String pat
                     module, &sink);
                 if (!loadedModule)
                     return SLANG_FAIL;
+
+                for (auto inst : module.irModule->getModuleInst()->getChildren())
+                {
+                    if (inst->getOp() == kIROp_EmbeddedDXIL)
+                    {
+                        auto slice = static_cast<IRBlobLit*>(inst->getOperand(0))->getStringSlice();
+                        module.irModule->precompiledDXIL = StringBlob::create(slice);
+                    }
+                    if (inst->getOp() == kIROp_EmbeddedSPIRV)
+                    {
+                        // TODO
+                    }
+                }
                 library->m_modules.add(loadedModule);
             }
         }
