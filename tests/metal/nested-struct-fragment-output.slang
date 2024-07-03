@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=METAL): -target metallib -stage fragment -entry fragmentMain
+//TEST:SIMPLE(filecheck=METAL): -target metal -stage fragment -entry fragmentMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage fragment -entry fragmentMain
 
 //METAL-DAG: color(0)
