@@ -93,6 +93,8 @@ jobs:
           7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc
           7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangd
           7z a ${SLANG_BINARY_ARCHIVE} docs/*.md
+          7z a ${SLANG_BINARY_ARCHIVE} README.md
+          7z a ${SLANG_BINARY_ARCHIVE} LICENSE
           echo "SLANG_BINARY_ARCHIVE=${SLANG_BINARY_ARCHIVE}" >> $GITHUB_OUTPUT
       - name: UploadBinary
         uses: softprops/action-gh-release@v1
