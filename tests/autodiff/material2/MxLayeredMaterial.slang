@@ -55,8 +55,7 @@ public struct MxLayeredMaterial : IMaterial
     public UsedMaterialInstance setupMaterialInstance(out MaterialInstanceData miData)
     {
         float3 albedo = getAlbedo(baseColor);
-        UsedMaterialInstance mi;
         for (uint i = 0; i < 3; i++) miData.data[i] = albedo[i];
-        return mi;
+        return UsedMaterialInstance();
     }
 }

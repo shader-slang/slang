@@ -8,6 +8,8 @@ namespace Slang
     bool metaOp(IRInst* inst) {
         switch (inst->getOp())
         {
+        // These instructions only look at the parameter's type,
+        // so passing an undefined value to them is permissible
         case kIROp_IsBool:
         case kIROp_IsInt:
         case kIROp_IsUnsignedInt:
@@ -96,6 +98,23 @@ namespace Slang
 
         return false;
     }
+    
+    bool constructor(IRFunc* func)
+    {
+        const UnownedStringSlice slice = toSlice("$init");
+
+        auto decoratorList = func->getDecorations();
+        for (auto head = decoratorList.first; head; head = head->next) {
+            if (auto name = as<IRNameHintDecoration>(head)) {
+                auto str = name->getName();
+                auto index = str.indexOf(slice);
+                if (index >= 0)
+                    return true;
+            }
+        }
+
+        return false;
+    }
 
     List<IRInst*> concernableUsers(IRInst* inst)
     {
@@ -141,24 +160,25 @@ namespace Slang
         {
         case kIROp_loop:
             // TODO: Ignore loops for now
-            // printf("LOOP: (%p)\n", as<IRLoop>(user));
-            // user->dump();
             return;
+
         // These instructions will store data...
         case kIROp_Store:
         case kIROp_SwizzledStore:
-        // TODO: for calls, should make check that the function is passing as an out param
+            // TODO: for calls, should make check that the function is passing as an out param
         case kIROp_Call:
         case kIROp_SPIRVAsm:
-        // For now assume that __intrinsic_asm blocks will do the right thing...
         case kIROp_GenericAsm:
+            // For now assume that __intrinsic_asm blocks will do the right thing...
             stores.add(user);
             break;
-        // For SPIRV asm instructions, need to check out the entire
-        // block when doing reachability checks
+
         case kIROp_SPIRVAsmOperandInst:
+            // For SPIRV asm instructions, need to check out the entire
+            // block when doing reachability checks
             stores.add(user->getParent());
             break;
+        
         // ... and the rest will load/use them
         default:
             loads.add(user);
@@ -236,6 +256,10 @@ namespace Slang
         // We shall trust that synthesized functions are aware that they may be using
         // undefined values.
         if (synthesized(func))
+            return;
+
+        // Also skip for constructors; can add more complex diagnosis for such cases later
+        if (constructor(func))
             return;
 
         auto firstBlock = func->getFirstBlock();

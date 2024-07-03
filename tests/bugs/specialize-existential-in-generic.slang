@@ -15,7 +15,7 @@ interface IFoo
 struct Impl : IFoo
 {
     struct Assoc : IAssoc { int getInner() { return 1; } }
-    Assoc getValue() { Assoc r; return r; }
+    Assoc getValue() { Assoc r = Assoc(); return r; }
 }
 
 struct GenType<T : IFoo>

@@ -1,28 +1,31 @@
+//TEST:SIMPLE(filecheck=CHK): -target spirv
+
+// Using unitialized values
 int use_undefined_value(int k)
 {
     int x;
     x += k;
+    //CHK: error 41015: use of uninitialized value 'x'
     return x;
 }
 
+// Returning uninitialized values
 __generic<T>
 T generic_undefined_return()
 {
     T x;
+    //CHK: warning 41018: returning without initializing 'x'
     return x;
 }
 
+// No warnings here, even thought autodiff generates
+// IR which frequently returns undefined values
 struct DiffStruct : IDifferentiable
 {
     Texture2D tex;
 }
 
-[BackwardDifferentiable]
-float f(float x)
-{
-    return x;
-}
-
+// Structs and nested structs
 struct Data
 {
     float value;
@@ -33,29 +36,31 @@ struct NestedData
     Data data;
 };
 
-RWStructuredBuffer<Data> inputBuffer;
-RWStructuredBuffer<Data> outputBuffer;
-
-[numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+// Empty structures should not generate diagnostics
+// for empty default constructors
+struct EmptyStruct
 {
-    uint tid = dispatchThreadID.x;
+    __init() {}
+};
 
-    Data inputData = inputBuffer[tid];
+float4 main()
+{
+    Data inputData = Data(1.0);
+
+    float undefVar;
     Data undefData;
     NestedData nestedData;
 
-    float uninitializedVariable;
+    float result = inputData.value;
 
-    // CHECK: warning
-    float outputData = inputData.value;
-    outputData += uninitializedVariable;
-    outputData += undefData.value;
-    outputData += nestedData.data.value;
+    //CHK: error 41015: use of uninitialized value 'undefVar'
+    result += undefVar;
+    
+    //CHK: error 41015: use of uninitialized value 'undefData'
+    result += undefData.value;
 
-    var dp = diffPair(1.0);
-    __bwd_diff(f)(dp, 1.0);
-    outputData += dp.d.x;
+    //CHK: error 41015: use of uninitialized value 'nestedData'
+    result += nestedData.data.value;
 
-    outputBuffer[tid].value = outputData;
+    return float4(result);
 }

@@ -67,8 +67,8 @@ int test1<T>(T t)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    MyImpl1 impl1;
-    MyImpl2 impl2;
+    MyImpl1 impl1 = MyImpl1();
+    MyImpl2 impl2 = MyImpl2();
     // CHECK: 1
     // CHECK: 7
     outputBuffer[0] = test(impl1, 1);
