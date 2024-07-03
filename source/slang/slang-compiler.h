@@ -1453,6 +1453,11 @@ namespace Slang
         /// Get the unique identity of the module.
         virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() override;
 
+        /// Precompile TU to target language
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTargets(
+            DiagnosticSink* sink,
+            EndToEndCompileRequest* endToEndReq,
+            TargetRequest* targetReq);
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
@@ -2672,6 +2677,8 @@ namespace Slang
         //
 
         SlangResult emitEntryPoints(ComPtr<IArtifact>& outArtifact);
+
+        SlangResult emitTranslationUnit(ComPtr<IArtifact>& outArtifact);
 
         void maybeDumpIntermediate(IArtifact* artifact);
 

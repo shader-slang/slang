@@ -761,6 +761,11 @@ namespace Slang
 #   pragma warning(pop)
 #endif
 
+    SlangResult CodeGenContext::emitTranslationUnit(ComPtr<IArtifact>& outArtifact)
+    {
+        return emitWithDownstreamForEntryPoints(outArtifact);
+    }
+
     String GetHLSLProfileName(Profile profile)
     {
         switch( profile.getFamily() )
@@ -1990,8 +1995,8 @@ namespace Slang
             {                
                 if (auto artifact = targetProgram->getExistingWholeProgramResult())
                 {
-		    // TODO: Is it a hack to flag targets as 'embedded' and then omit them from
-		    // artifacts like this?
+                    // TODO: Is it a hack to flag targets as 'embedded' and then omit them from
+                    // artifacts like this?
                     if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedOutputInIR))
                     {
                         artifacts.add(ComPtr<IArtifact>(artifact));
@@ -2266,6 +2271,7 @@ namespace Slang
             {
                 auto targetProgram = program->getTargetProgram(targetReq);
 
+#if 0
                 if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedOutputInIR))
                 {
                     // TODO:
@@ -2295,6 +2301,7 @@ namespace Slang
                         }
                     }
                 }
+#endif
             }
         }
         
