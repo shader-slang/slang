@@ -98,7 +98,7 @@ namespace Slang
 
         return false;
     }
-    
+
     bool constructor(IRFunc* func)
     {
         const UnownedStringSlice slice = toSlice("$init");
@@ -159,7 +159,8 @@ namespace Slang
         switch (user->getOp())
         {
         case kIROp_loop:
-            // TODO: Ignore loops for now
+        case kIROp_unconditionalBranch:
+            // TODO: Ignore branches for now
             return;
 
         // These instructions will store data...
@@ -178,7 +179,7 @@ namespace Slang
             // block when doing reachability checks
             stores.add(user->getParent());
             break;
-        
+
         // ... and the rest will load/use them
         default:
             loads.add(user);

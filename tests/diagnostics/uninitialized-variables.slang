@@ -1,5 +1,33 @@
 //TEST:SIMPLE(filecheck=CHK): -target spirv
 
+// Should not warn here (unconditionalBranch)
+float3 unconditional(int mode)
+{
+    float f(float) { return 1; }
+
+    float k0;
+    float k1;
+
+    if (mode == 1) {
+        k1 = 1;
+        k0 = 1;
+
+        const float w = k1 * f(1);
+        k0 = 4.0f * k0 * w;
+        k1 = 2.0f * k1 * w;
+    }
+
+    return k0 + k1;
+}
+
+// Warn here for branches using the variables
+int conditional()
+{
+    int k;
+    //CHK: error 41015: use of uninitialized value 'k'
+    return (k > 0);
+}
+
 // Using unitialized values
 int use_undefined_value(int k)
 {
@@ -55,7 +83,7 @@ float4 main()
 
     //CHK: error 41015: use of uninitialized value 'undefVar'
     result += undefVar;
-    
+
     //CHK: error 41015: use of uninitialized value 'undefData'
     result += undefData.value;
 
