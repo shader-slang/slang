@@ -136,9 +136,9 @@ namespace Slang
         auto users = concernableUsers(inst);
 
         addresses.add(inst);
-        for (auto inst : users) {
-            if (aliasable(inst)) {
-                auto instAddresses = aliasableInstructions(inst);
+        for (auto user : users) {
+            if (aliasable(user)) {
+                auto instAddresses = aliasableInstructions(user);
                 addresses.addRange(instAddresses);
             }
         }
