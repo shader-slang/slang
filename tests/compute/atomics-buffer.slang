@@ -11,7 +11,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
 // RWBuffer does not work with the GFX backend as expected with Metal
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
-//TEST:SIMPLE(METALLIB): -target metallib -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 //METALLIB: @computeMain
 
