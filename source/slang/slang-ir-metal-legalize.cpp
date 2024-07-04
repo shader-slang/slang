@@ -1041,7 +1041,6 @@ namespace Slang
                 builder.addSemanticDecoration(decor->getParent(), decor->getSemanticName(), (int)newOffset);
                 decor->removeAndDeallocate();
             }
-            
             for (auto& varOffset : overlappingVarOffset)
             {
                 auto newOffset = _returnNonOverlappingAttributeIndex(usedSemanticIndexVarOffset[varOffset.attr->getResourceKind()]);
