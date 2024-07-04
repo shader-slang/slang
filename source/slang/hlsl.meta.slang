@@ -8799,7 +8799,7 @@ for (const char *T: { "int", "uint" })
         [require(metal)]
         vector<$(T), 4> __metalImageInterlocked_$(atomicImageOp)(TextureType tex, uint coord, vector<$(T), 4> value)
         {
-            __intrinsic_asm "$0.atomic_fetch_$(atomicImageOp)($1, ($2))";
+            __intrinsic_asm "$0.atomic_fetch_$(atomicImageOp)($1, ($2))", $(T);
         }
 
         __generic<TextureType>
@@ -8807,7 +8807,7 @@ for (const char *T: { "int", "uint" })
         [require(metal)]
         void __metalImageInterlocked_$(atomicImageOp)(TextureType tex, uint coord, vector<$(T), 4> value, out $(T) original_value)
         {
-            original_value = __metalImageInterlocked_$(atomicImageOp)(tex, coord, value)[0];
+            __intrinsic_asm "(*($3)) = ($0.atomic_fetch_$(atomicImageOp)($1, ($2))[0])";
         }
 ${{{{
     }
@@ -8824,7 +8824,7 @@ ${{{{
     [require(metal)]
     void __metalImageInterlocked_exchange(TextureType tex, uint coord, vector<$(T), 4> value, out $(T) original_value)
     {
-        original_value = __metalImageInterlocked_exchange(tex, coord, value)[0];
+        __intrinsic_asm "(*($3)) = ($0.__metalImageInterlocked_exchange($1, ($2))[0])";
     }
 
     __generic<TextureType>
@@ -9887,7 +9887,7 @@ void InterlockedXor(__ref  int dest,  int value, out  int original_value)
         if (__isTextureAccess(dest))
             __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
         else
-            __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
+            __metalInterlocked_xor(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9911,7 +9911,7 @@ void InterlockedXor(__ref uint dest, uint value, out uint original_value)
         if (__isTextureAccess(dest))
             __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
         else
-            __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
+            __metalInterlocked_xor(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm

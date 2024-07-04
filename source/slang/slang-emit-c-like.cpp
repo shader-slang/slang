@@ -2571,6 +2571,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         // We should have legalized ImageSubscript before emit for metal targets
         if (isMetalTarget(this->getTargetReq()))
             getSink()->diagnose(inst, Diagnostics::unimplemented, "kIROp_ImageSubscript is unimplemented for Metal, expected legalization beforehand");
+        [[fallthrough]];
     case kIROp_GetElement:
     case kIROp_MeshOutputRef:
     case kIROp_GetElementPtr:
