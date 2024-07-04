@@ -11,7 +11,7 @@ RWStructuredBuffer<float> outputBuffer;
 struct NestedFragment
 {
     float2 p3;
-}
+};
 struct Fragment
 {
 	float4 p1;

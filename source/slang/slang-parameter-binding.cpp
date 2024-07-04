@@ -489,6 +489,9 @@ bool splitNameAndIndex(
     char const* digitsEnd = text.end();
 
     char const* nameEnd = digitsEnd;
+    // ExplicitIndex is when a semantic has an index at the end of its name
+    // "SV_TARGET1" has an ExplicitIndex
+    // "SV_TARGET" does not have an ExplicitIndex
     bool hasExplicitIndex = false;
     while( nameEnd != nameBegin && isDigit(*(nameEnd - 1)) )
     {

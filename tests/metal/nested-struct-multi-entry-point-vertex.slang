@@ -33,7 +33,7 @@ struct sharedStructWrapper
 {
     float2 uv;
     SharedStruct sharedData;
-}
+};
 struct VertexStageInput2
 {
 	sharedStructWrapper assembledVertex	: CoarseVertex;

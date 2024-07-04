@@ -8,6 +8,7 @@
 
 namespace Slang
 {
+    // Convert semantic name (ignores case) into equivlent `SystemValueSemanticName`
     SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticName)
     {
         auto semanticName = rawSemanticName.toLower();

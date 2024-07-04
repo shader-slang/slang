@@ -37,6 +37,7 @@ IRInst* emitCalcGroupIndex(
     IRInst* groupThreadID,
     IRInst* groupExtents);
 
+// SystemValueSemanticName member definition macro
 #define SYSTEM_VALUE_SEMANTIC_NAMES(M)              \
     M(Position,             SV_Position)            \
     M(ClipDistance,         SV_ClipDistance)        \

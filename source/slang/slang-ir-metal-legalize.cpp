@@ -17,11 +17,11 @@ namespace Slang
         IREntryPointDecoration* entryPointDecor;
     };
 
+    const UnownedStringSlice groupThreadIDString = UnownedStringSlice("sv_groupthreadid");
     struct LegalizeMetalEntryPointContext
     {
         ShortList<IRType*> permittedTypes_sv_target;
         Dictionary<IRFunc*, IRInst*> entryPointToGroupThreadId;
-        const UnownedStringSlice groupThreadIDString = UnownedStringSlice("sv_groupthreadid");
         HashSet<IRStructField*> semanticInfoToRemove;
 
         DiagnosticSink* m_sink;
@@ -33,25 +33,26 @@ namespace Slang
         
         void removeSemanticLayoutsFromLegalizedStructs()
         {
+            // Metal does not allow duplicate attributes to appear in the same shader.
+            // If we emit our own struct with `[[color(0)]`, all existing uses of `[[color(0)]]`
+            // must be removed.
             for (auto field : semanticInfoToRemove)
             {
                 auto key = field->getKey();
-                bool foundDecoration = true; // Some decorations appear twice, destroy all
-                while (foundDecoration)
+                // Some decorations appear twice, destroy all found
+                for (;;)
                 {
-                    foundDecoration = false;
                     if (auto semanticDecor = key->findDecoration<IRSemanticDecoration>())
                     {
-                        foundDecoration = true;
                         semanticDecor->removeAndDeallocate();
                         continue;
                     }
                     else if (auto layoutDecor = key->findDecoration<IRLayoutDecoration>())
                     {
-                        foundDecoration = true;
                         layoutDecor->removeAndDeallocate();
                         continue;
                     }
+                    break;
                 }
             }
         }
@@ -137,8 +138,91 @@ namespace Slang
             fixUpFuncType(func);
         }
 
+        // Flattens all struct parameters of an entryPoint to ensure parameters are a flat struct
         void flattenInputParameters(EntryPointInfo entryPoint)
         {
+            // Goal is to ensure we have a flattened IRParam (0 nested IRStructType members).
+            /*
+                // Assume the following code
+                struct NestedFragment
+                {
+                    float2 p3;
+                };
+                struct Fragment
+                {
+                    float4 p1;
+                    float3 p2;
+                    NestedFragment p3_nested;
+                };
+
+                // Fragment flattens into
+                struct Fragment
+                {
+                    float4 p1;
+                    float3 p2;
+                    float2 p3;
+                };
+            */
+
+            // This is important since Metal does not allow semantic's on a struct
+            /*
+                // Assume the following code
+                struct NestedFragment1
+                {
+                    float2 p3;
+                };
+                struct Fragment1
+                {
+                    float4 p1 : SV_TARGET0;
+                    float3 p2 : SV_TARGET1;
+                    NestedFragment p3_nested : SV_TARGET2; // error, semantic on struct
+                };
+                
+            */
+
+            // Metal does allow semantics on members of a nested struct but we are avoiding this 
+            // approach since there are senarios where legalization (and verification) is 
+            // hard/expensive without creating a flat struct:
+            // 1. Entry points may share structs, semantics may be inconsistent across entry points
+            // 2. Multiple of the same struct may be used in a param list
+            /*
+                // Assume the following code
+                struct NestedFragment
+                {
+                    float2 p3;
+                };
+                struct Fragment
+                {
+                    float4 p1 : SV_TARGET0;
+                    NestedFragment p2 : SV_TARGET1;
+                    NestedFragment p3 : SV_TARGET2;
+                };
+
+                // Legalized without flattening
+                struct NestedFragment1
+                {
+                    float2 p3 : SV_TARGET1; 
+                };
+                struct NestedFragment2
+                {
+                    float2 p3 : SV_TARGET2; 
+                };
+                struct Fragment
+                {
+                    float4 p1 : SV_TARGET0;
+                    NestedFragment1 p2;
+                    NestedFragment2 p3;
+                };
+
+                // Legalized with flattening -- current approach
+                struct Fragment
+                {
+                    float4 p1 : SV_TARGET0;
+                    float2 p2 : SV_TARGET1;
+                    float2 p3 : SV_TARGET2;
+                };
+            */
+
             auto func = entryPoint.entryPointFunc;
             bool modified = false;
             for (auto param : func->getParams())
@@ -150,22 +234,30 @@ namespace Slang
                     continue;
                 if (param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
                     continue;
+                // If we find a IRParam with a IRStructType member, we need to flatten the entire IRParam
                 if (auto structType = as<IRStructType>(param->getDataType()))
                 {
                     IRBuilder builder(func);
                     Dictionary<IRStructField*, IRStructField*> mapOldFieldToNewField;
+                    
+                    // Flatten struct if we have nested IRStructType
                     auto flattenedStruct = maybeFlattenNestedStructs(builder, structType, mapOldFieldToNewField, semanticInfoToRemove);
                     if (flattenedStruct != structType)
                     {
+                        // Validate/rearange all semantics which overlap in our flat struct
                         fixFieldSemanticsOfFlatStruct(flattenedStruct);
 
-                        builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+                        // Replace the 'old IRParam type' with a 'new IRParam type'
                         param->setFullType(flattenedStruct);
+
+                        // Emit a new variable at EntryPoint of 'old IRParam type'
+                        builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
                         auto dstVal = builder.emitVar(structType);
                         auto dstLoad = builder.emitLoad(dstVal);
                         param->replaceUsesWith(dstLoad);
                         builder.setInsertBefore(dstLoad);
-                        transformStructValue<(int)TransformStructValueOptions::flatStructIntoStruct>(builder, dstVal, structType, param, mapOldFieldToNewField);
+                        // Copy the 'new IRParam type' to our 'old IRParam type'
+                        transformStructValue<(int)TransformStructValueOptions::FlatStructIntoStruct>(builder, dstVal, param, mapOldFieldToNewField);
 
                         modified = true;
                     }
@@ -318,6 +410,7 @@ namespace Slang
             return builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3));
         }
 
+        // Get all permitted types of "sv_target" for Metal
         ShortList<IRType*>& getPermittedTypes_sv_target(IRBuilder& builder)
         {
             permittedTypes_sv_target.reserveOverflowBuffer(5 * 4);
@@ -338,9 +431,9 @@ namespace Slang
         {
             IRBuilder builder(m_module);
             MetalSystemValueInfo result = {};
-
             UnownedStringSlice semanticName;
             UnownedStringSlice semanticIndex;
+
             auto hasExplicitIndex = splitNameAndIndex(inSemanticName.getUnownedSlice(), semanticName, semanticIndex);
             if (!hasExplicitIndex && optionalSemanticIndex)
                 semanticIndex = optionalSemanticIndex->getUnownedSlice();
@@ -566,12 +659,20 @@ namespace Slang
             }
         }
 
-
         IRStructType* _flattenNestedStructs(IRBuilder& builder, IRStructType* dst, IRStructType* src, IRSemanticDecoration* parentSemanticDecoration,
             IRLayoutDecoration* parentLayout, Dictionary<IRStructField*, IRStructField*>& mapFieldToField, HashSet<IRStructField*>& varsWithSemanticInfo)
         {
+            // For all fields ('oldField') of a struct do the following:
+            // 1. Check for 'decorations which carry semantic info' (IRSemanticDecoration, IRLayoutDecoration), store these if found.
+            // Update varsWithSemanticInfo.
+            // 2. If IRStructType:
+            //  2a. Recurse this function with 'decorations that carry semantic info' from parent.
+            // 3. If not IRStructType:
+            //  3a. Emit 'newField' equal to 'oldField', add 'decorations which carry semantic info'.
+            //  3b. Store a mapping from 'oldField' to 'newField' in 'mapFieldToField'. This info is needed to copy between types.
             for (auto oldField : src->getFields())
             {
+                // step 1
                 auto oldKey = oldField->getKey();
                 IRSemanticDecoration* fieldSemanticDecoration = parentSemanticDecoration;
                 if (auto oldSemanticDecoration = oldKey->findDecoration<IRSemanticDecoration>())
@@ -585,12 +686,14 @@ namespace Slang
                 if (fieldSemanticDecoration != parentSemanticDecoration || parentLayout != fieldLayout)
                     varsWithSemanticInfo.add(oldField);
 
+                // step 2a
                 if (auto structFieldType = as<IRStructType>(oldField->getFieldType()))
                 {
                     _flattenNestedStructs(builder, dst, structFieldType, fieldSemanticDecoration, fieldLayout, mapFieldToField, varsWithSemanticInfo);
                     continue;
                 }
 
+                // step 3a
                 auto newKey = builder.createStructKey();
                 copyNameHintAndDebugDecorations(newKey, oldKey);
 
@@ -614,7 +717,7 @@ namespace Slang
                     IRVarLayout* newLayout = builder.getVarLayout(instToCopy);
                     builder.addLayoutDecoration(newKey, newLayout);
                 }
-
+                // step 3b
                 mapFieldToField[oldField] = newField;
             }
 
@@ -625,7 +728,7 @@ namespace Slang
         // @param mapFieldToField Behavior maps all `IRStructField` of `src` to the new struct's `IRStructFields`s
         IRStructType* maybeFlattenNestedStructs(IRBuilder& builder, IRStructType* src, Dictionary<IRStructField*, IRStructField*>& mapFieldToField, HashSet<IRStructField*>& varsWithSemanticInfo)
         {
-            // Find all values inside struct that need flattening and legalization. Find all already in-use semantic offsets
+            // Find all values inside struct that need flattening and legalization.
             bool hasStructTypeMembers = false;
             for (auto field : src->getFields())
             {
@@ -640,8 +743,8 @@ namespace Slang
 
             // We need to:
             // 1. Make new struct 1:1 with old struct but without nestested structs (flatten)
-            // 2. Ensure semantic attributes propegate.
-            // 3. Store the mapping from old to new struct fields to allow copying a old-struct to new-struct
+            // 2. Ensure semantic attributes propegate. This will create overlapping semantics (can be handled later).
+            // 3. Store the mapping from old to new struct fields to allow copying a old-struct to new-struct.
             builder.setInsertAfter(src);
             auto newStruct = builder.createStructType();
             copyNameHintAndDebugDecorations(newStruct, src);
@@ -664,18 +767,23 @@ namespace Slang
 
         enum class TransformStructValueOptions : int
         {
-            flatStructIntoStruct = 0,
-            structIntoFlatStruct = 1,
+            // Copy a flattened-struct into a struct
+            FlatStructIntoStruct = 0,
+
+            // Copy a struct into a flattened-struct
+            StructIntoFlatStruct = 1,
         };
 
-        // Returns val with copied data. Assumes srcType and dstType map to each other with `mapSrcFieldToDstField`
+        // Copies members of structs. Assumes srcType and dstType map to each other with `mapSrcFieldToDstField`.
+        // Assumes val1 or val2 is a flat struct based on `FlatStructIntoStruct` and `StructIntoFlatStruct`
         template<int transformStructValueOptions>
         void _transformStructValue(IRBuilder& builder, IRInst* val1, IRStructType* type1, IRInst* val2, IRStructType* type2, Dictionary<IRStructField*, IRStructField*> mapFieldToField)
         {
             for (auto field1 : type1->getFields())
             {
+                // Get member of val1
                 IRInst* fieldAddr1 = nullptr;
-                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::flatStructIntoStruct)
+                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::FlatStructIntoStruct)
                 {
                     fieldAddr1 = builder.emitFieldAddress(type1, val1, field1->getKey());
                 }
@@ -686,15 +794,17 @@ namespace Slang
                     fieldAddr1 = builder.emitFieldExtract(type1, val1, field1->getKey());
                 }
 
+                // If val1 is a struct, recurse
                 if (auto fieldAsStruct1 = as<IRStructType>(field1->getFieldType()))
                 {
                     _transformStructValue<transformStructValueOptions>(builder, fieldAddr1, fieldAsStruct1, val2, type2, mapFieldToField);
                     continue;
                 }
 
+                // Get member of val2 which maps to val1.member
                 auto field2 = mapFieldToField[field1];
                 IRInst* fieldAddr2 = nullptr;
-                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::flatStructIntoStruct)
+                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::FlatStructIntoStruct)
                 {
                     if (as<IRPtrTypeBase>(val2))
                         val2 = builder.emitLoad(val1);
@@ -705,7 +815,8 @@ namespace Slang
                     fieldAddr2 = builder.emitFieldAddress(type2, val2, field2->getKey());
                 }
 
-                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::flatStructIntoStruct)
+                // Copy val2/val1 member into val1/val2 member
+                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::FlatStructIntoStruct)
                 {
                     builder.emitStore(fieldAddr1, fieldAddr2);
                 }
@@ -716,18 +827,28 @@ namespace Slang
             }
         }
 
+        // Copies srcVal into dstVal using `mapFieldToField` to map srcVal to dstVal.
         template<int transformStructValueOptions>
-        void transformStructValue(IRBuilder& builder, IRInst* dstVal, IRStructType* dstType, IRInst* srcVal, Dictionary<IRStructField*, IRStructField*> mapFieldToField)
+        void transformStructValue(IRBuilder& builder, IRInst* dstVal, IRInst* srcVal, Dictionary<IRStructField*, IRStructField*> mapFieldToField)
         {
-            auto srcType = as<IRStructType>(srcVal->getDataType());
-            SLANG_ASSERT(srcType);
-            if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::flatStructIntoStruct)
+            auto srcStructType = as<IRStructType>(srcVal->getDataType());
+            SLANG_ASSERT(srcStructType);
+
+            auto dstType = dstVal->getDataType();
+            if(auto dstPtrType = as<IRPtrTypeBase>(dstType))
+                dstType = dstPtrType->getValueType();
+            auto dstStructType = as<IRStructType>(dstType);
+            SLANG_ASSERT(dstStructType);
+
+            if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::FlatStructIntoStruct)
             {
-                _transformStructValue<transformStructValueOptions>(builder, dstVal, dstType, srcVal, srcType, mapFieldToField);
+                // TransformStructValueOptions::FlatStructIntoStruct copy a flattened-struct into a struct
+                _transformStructValue<transformStructValueOptions>(builder, dstVal, dstStructType, srcVal, srcStructType, mapFieldToField);
             }
             else
             {
-                _transformStructValue<transformStructValueOptions>(builder, srcVal, srcType, dstVal, dstType, mapFieldToField);
+                // TransformStructValueOptions::StructIntoFlatStruct copy a struct into a flattened-struct
+                _transformStructValue<transformStructValueOptions>(builder, srcVal, srcStructType, dstVal, dstStructType, mapFieldToField);
             }
         }
 
@@ -757,6 +878,8 @@ namespace Slang
 
         IRLayoutDecoration* _replaceAttributeOfLayout(IRBuilder& builder, IRLayoutDecoration* parentLayoutDecor, IRInst* instToReplace, IRInst* instToReplaceWith)
         {
+            // Replace `instToReplace` with a `instToReplaceWith`
+
             auto layout = parentLayoutDecor->getLayout();
             // Find the exact same decoration `instToReplace` in-case multiple of the same type exist
             List<IRInst*> opList;
@@ -771,8 +894,10 @@ namespace Slang
             return newLayoutDecor;
         }
 
-        IRLayoutDecoration* _legalizeUserSemanticNames(IRBuilder& builder, IRLayoutDecoration* layoutDecor)
+        IRLayoutDecoration* _simplifyUserSemanticNames(IRBuilder& builder, IRLayoutDecoration* layoutDecor)
         {
+            // Ensure all 'ExplicitIndex' semantics such as "SV_TARGET0" are simplified into ("SV_TARGET", 0) using 'IRUserSemanticAttr'
+            // This is done to ensure we can check semantic groups using 'IRUserSemanticAttr1->getName() == IRUserSemanticAttr2->getName()'
             SLANG_ASSERT(layoutDecor);
             auto layout = layoutDecor->getLayout();
             List<IRInst*> layoutOps;
@@ -811,6 +936,27 @@ namespace Slang
         // Find overlapping field semantics and legalize them
         void fixFieldSemanticsOfFlatStruct(IRStructType* structType)
         {
+            // Goal is to ensure we do not have overlapping semantics:
+            /*
+                // Assume the following code
+                struct Fragment
+                {
+                    float4 p1 : SV_TARGET;
+                    float3 p2 : SV_TARGET;
+                    float2 p3 : SV_TARGET;
+                    float2 p4 : SV_TARGET;
+                };
+
+                // Translates into
+                struct Fragment
+                {
+                    float4 p1 : SV_TARGET0;
+                    float3 p2 : SV_TARGET1;
+                    float2 p3 : SV_TARGET2;
+                    float2 p4 : SV_TARGET3;
+                };
+            */
+
             IRBuilder builder(this->m_module);
 
             List<IRSemanticDecoration*> overlappingSemanticsDecor;
@@ -853,7 +999,7 @@ namespace Slang
                 if (auto layoutDecor = key->findDecoration<IRLayoutDecoration>())
                 {
                     // Ensure names are in a uniform lowercase format so we can bunch together simmilar semantics
-                    layoutDecor = _legalizeUserSemanticNames(builder, layoutDecor);
+                    layoutDecor = _simplifyUserSemanticNames(builder, layoutDecor);
                     oldLayoutDecorToNew[layoutDecor] = layoutDecor;
                     auto layout = layoutDecor->getLayout();
                     for (auto attr : layout->getAllAttrs())
@@ -928,25 +1074,26 @@ namespace Slang
             // If return type is already a struct, just make sure every field has a semantic.
             if (auto returnStructType = as<IRStructType>(returnType))
             {
-                // Flatten result struct type to ensure we do not have
-                // semantics on nested structs
                 IRBuilder builder(func);
                 Dictionary<IRStructField*, IRStructField*> mapOldFieldToNewField;
+                // Flatten result struct type to ensure we do not have nested semantics
                 auto flattenedStruct = maybeFlattenNestedStructs(builder, returnStructType, mapOldFieldToNewField, semanticInfoToRemove);
                 if (returnStructType != flattenedStruct)
                 {
+                    // Replace all return-values with the flattenedStruct we made.
                     _replaceAllReturnInst(builder, func, flattenedStruct,
                         [&](IRBuilder& copyBuilder, IRStructType* dstType, IRInst* srcVal) -> IRInst*
                         {
                             auto srcStructType = as<IRStructType>(srcVal->getDataType());
                             SLANG_ASSERT(srcStructType);
                             auto dstVal = copyBuilder.emitVar(dstType);
-                            transformStructValue<(int)TransformStructValueOptions::structIntoFlatStruct>(copyBuilder, dstVal, dstType, srcVal, mapOldFieldToNewField);
+                            transformStructValue<(int)TransformStructValueOptions::StructIntoFlatStruct>(copyBuilder, dstVal, srcVal, mapOldFieldToNewField);
                             return builder.emitLoad(dstVal);
                         }
                     );
                     fixUpFuncType(func, flattenedStruct);
                 }
+                // Ensure non-overlapping semantics
                 fixFieldSemanticsOfFlatStruct(flattenedStruct);
                 ensureResultStructHasUserSemantic(flattenedStruct, resultLayout);
                 return;
