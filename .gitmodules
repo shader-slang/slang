@@ -35,3 +35,7 @@
 [submodule "external/metal-cpp"]
 	path = external/metal-cpp
 	url = https://github.com/bkaradzic/metal-cpp
+[submodule "external/abseil-cpp"]
+	path = external/abseil-cpp
+	url = https://chromium.googlesource.com/chromium/src/third_party/abseil-cpp
+
