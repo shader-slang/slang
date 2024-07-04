@@ -972,6 +972,16 @@ namespace Slang
             // we may destroy and remake a `IRLayoutDecoration*`
             Dictionary<IRLayoutDecoration*, IRLayoutDecoration*> oldLayoutDecorToNew;
 
+            // Collect all "semantic info carrying decorations". Any collected decoration will 
+            // fill up their respective 'Dictionary<SEMANTIC_TYPE, OrderedHashSet<UInt>>' 
+            // to keep track of in-use offsets for a semantic type.
+            // Example: IRSemanticDecoration with name of "SV_TARGET1".
+            // * This will have SEMANTIC_TYPE of "sv_target".
+            // * This will use up index '1'
+            //
+            // Now if a second equal semantic "SV_TARGET1" is found, we add this decoration to
+            // a list of 'overlapping semantic info decorations' so we can legalize this 
+            // 'semantic info decoration' later.
             for (auto field : structType->getFields())
             {
                 auto key = field->getKey();
@@ -1023,6 +1033,8 @@ namespace Slang
                     }
                 }
             }
+
+            // Legalize all overlapping 'semantic info decorations'
             for (auto decor : overlappingSemanticsDecor)
             {
                 auto newOffset = _returnNonOverlappingAttributeIndex(usedSemanticIndexSemanticDecor[decor->getSemanticName()]);
