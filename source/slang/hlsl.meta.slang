@@ -8824,7 +8824,7 @@ ${{{{
     [require(metal)]
     void __metalImageInterlocked_exchange(TextureType tex, uint coord, vector<$(T), 4> value, out $(T) original_value)
     {
-        __intrinsic_asm "(*($3)) = ($0.__metalImageInterlocked_exchange($1, ($2))[0])";
+        __intrinsic_asm "(*($3)) = ($0.atomic_exchange($1, ($2))[0])";
     }
 
     __generic<TextureType>

@@ -13,7 +13,7 @@
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 //TEST:SIMPLE(METALLIB): -target metallib -stage compute -entry computeMain
 
-// METALLIB: @computeMain
+//METALLIB: @computeMain
 
 //TEST_INPUT:ubuffer(format=R_UInt32, data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):out,name outputBuffer
 
