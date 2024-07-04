@@ -2566,10 +2566,14 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
         break;
     }
+
+    case kIROp_ImageSubscript:
+        // We should have legalized ImageSubscript before emit for metal targets
+        if (isMetalTarget(this->getTargetReq()))
+            getSink()->diagnose(inst, Diagnostics::unimplemented, "kIROp_ImageSubscript is unimplemented for Metal, expected legalization beforehand");
     case kIROp_GetElement:
     case kIROp_MeshOutputRef:
     case kIROp_GetElementPtr:
-    case kIROp_ImageSubscript:
         // HACK: deal with translation of GLSL geometry shader input arrays.
         if(auto decoration = inst->getOperand(0)->findDecoration<IRGLSLOuterArrayDecoration>())
         {

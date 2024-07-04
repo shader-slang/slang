@@ -8746,6 +8746,24 @@ __intrinsic_op($(kIROp_MetalAtomicCast))
 [require(metal)]
 T* __getMetalAtomicRef(__ref T x);
 
+// Checks if input is a ImageSubscript
+__generic<T>
+__intrinsic_op($(kIROp_IsTextureAccess))
+[require(metal)]
+bool __isTextureAccess(__ref T x);
+
+// Accepts an ImageSubscript
+__generic<T>
+__intrinsic_op($(kIROp_ExtractTextureFromTextureAccess))
+[require(metal)]
+T* __extractTextureFromTextureAccess(__ref T x);
+
+// Accepts an ImageSubscript
+__generic<TextureAccess>
+__intrinsic_op($(kIROp_ExtractCoordFromTextureAccess))
+[require(metal)]
+uint __extractCoordFromTextureAccess(__ref TextureAccess x);
+
 ${{{{
 for (const char* fetchAndModify : {"add", "and", "max", "min", "or", "sub", "xor"})
 {
@@ -8769,12 +8787,79 @@ ${{{{
 } // fetchAndModify
 }}}}
 
+${{{{
+for (const char *T: { "int", "uint" })
+{
+    for (const char* atomicImageOp : {"add", "and", "max", "min", "or", "sub", "xor"})
+    {
+}}}}
+        // only valid for int/uint/ulong
+        __generic<TextureType>
+        [ForceInline]
+        [require(metal)]
+        vector<$(T), 4> __metalImageInterlocked_$(atomicImageOp)(TextureType tex, uint coord, vector<$(T), 4> value)
+        {
+            __intrinsic_asm "$0.atomic_fetch_$(atomicImageOp)($1, ($2))";
+        }
+
+        __generic<TextureType>
+        [ForceInline]
+        [require(metal)]
+        void __metalImageInterlocked_$(atomicImageOp)(TextureType tex, uint coord, vector<$(T), 4> value, out $(T) original_value)
+        {
+            original_value = __metalImageInterlocked_$(atomicImageOp)(tex, coord, value)[0];
+        }
+${{{{
+    }
+}}}}
+    __generic<TextureType>
+    [ForceInline]
+    [require(metal)]
+    vector<$(T), 4> __metalImageInterlocked_exchange(TextureType tex, uint coord, vector<$(T), 4> value)
+    {
+        __intrinsic_asm "($0.atomic_exchange($1, $2))", $(T);
+    }
+    __generic<TextureType>
+    [ForceInline]
+    [require(metal)]
+    void __metalImageInterlocked_exchange(TextureType tex, uint coord, vector<$(T), 4> value, out $(T) original_value)
+    {
+        original_value = __metalImageInterlocked_exchange(tex, coord, value)[0];
+    }
+
+    __generic<TextureType>
+    [ForceInline]
+    [require(metal)]
+    void __metalImageInterlocked_compare_exchange(TextureType tex, uint coord, __ref vector<$(T), 4> compare_value, vector<$(T), 4> value)
+    {
+        __intrinsic_asm "($0.atomic_compare_exchange_weak($1, $2, $3))";
+    }
+    __generic<TextureType>
+    [ForceInline]
+    [require(metal)]
+    void __metalImageInterlocked_compare_exchange(TextureType tex, uint coord, vector<$(T), 4> compare_value, vector<$(T), 4> value, out $(T) original_value)
+    {
+        __metalImageInterlocked_compare_exchange(tex, coord, compare_value, value);
+        original_value = compare_value[0];
+    }
+${{{{
+}
+}}}}
+
 __generic<AtomicType, T>
 [ForceInline]
 [require(metal)]
 void __metalInterlocked_exchange(AtomicType dest, T value, out T original_value)
 {
     __intrinsic_asm "((*($2)) = (($[0])(atomic_exchange_explicit($0, $1, memory_order_relaxed))))", T;
+}
+
+__generic<AtomicType, T>
+[ForceInline]
+[require(metal)]
+void __metalInterlocked_exchange(AtomicType dest, T value)
+{
+    __intrinsic_asm "(($[0])(atomic_exchange_explicit($0, $1, memory_order_relaxed)))";
 }
 
 __generic<AtomicType, T>
@@ -8805,7 +8890,10 @@ void InterlockedAdd(__ref  int dest,  int value)
     case cuda: __intrinsic_asm "atomicAdd($0, $1)";
     case glsl: __intrinsic_asm "$atomicAdd($A, $1)";
     case metal:
-        __metalInterlocked_add(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value));
+        else
+            __metalInterlocked_add(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -8826,7 +8914,10 @@ void InterlockedAdd(__ref uint dest, uint value)
     case cuda: __intrinsic_asm "atomicAdd((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicAdd($A, $1)";
     case metal:
-        __metalInterlocked_add(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
+        else
+            __metalInterlocked_add(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -8853,7 +8944,10 @@ void InterlockedAdd(__ref int dest, int value, out int original_value)
     case cuda: __intrinsic_asm "(*$2 = atomicAdd($0, $1))";
     case glsl: __intrinsic_asm "($2 = $atomicAdd($A, $1))";
     case metal:
-        __metalInterlocked_add(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
+        else
+            __metalInterlocked_add(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -8875,7 +8969,10 @@ void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicAdd((int*)$0, $1))";
     case glsl: __intrinsic_asm "($2 = $atomicAdd($A, $1))";
     case metal:
-        __metalInterlocked_add(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
+        else
+            __metalInterlocked_add(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -8977,7 +9074,10 @@ void InterlockedAnd(__ref int dest, int value)
     case cuda: __intrinsic_asm "atomicAnd($0, $1)";
     case glsl: __intrinsic_asm "$atomicAnd($A, $1)";
     case metal:
-        __metalInterlocked_and(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value));
+        else
+            __metalInterlocked_and(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -8997,7 +9097,10 @@ void InterlockedAnd(__ref uint dest, uint value)
     case cuda: __intrinsic_asm "atomicAnd((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicAnd($A, $1)";
     case metal:
-        __metalInterlocked_and(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
+        else
+            __metalInterlocked_and(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -9017,7 +9120,10 @@ void InterlockedAnd(__ref int dest, int value, out int original_value)
     case cuda: __intrinsic_asm "(*$2 = atomicAnd($0, $1))";
     case glsl: __intrinsic_asm "($2 = $atomicAnd($A, $1))";
     case metal:
-        __metalInterlocked_and(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
+        else
+            __metalInterlocked_and(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -9038,7 +9144,10 @@ void InterlockedAnd(__ref uint dest, uint value, out uint original_value)
     case glsl: __intrinsic_asm "($2 = atomicAnd($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicAnd((int*)$0, $1))";
     case metal:
-        __metalInterlocked_and(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
+        else
+            __metalInterlocked_and(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -9077,7 +9186,15 @@ void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value,
     case glsl: __intrinsic_asm "($3 = $atomicCompSwap($A, $1, $2))";
     case cuda: __intrinsic_asm "(*$3 = atomicCAS($0, $1, $2))";
     case metal:
-        __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
+        if (__isTextureAccess(dest))
+        {
+            vector<int, 4> vec_compare_value = vector<int, 4>(compare_value);
+            __metalImageInterlocked_compare_exchange(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vec_compare_value, vector<int, 4>(value), original_value);
+        }
+        else
+        {
+            __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
+        }
         return;
     case spirv:
         spirv_asm
@@ -9098,7 +9215,15 @@ void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value,
     case glsl: __intrinsic_asm "($3 = $atomicCompSwap($A, $1, $2))";
     case cuda: __intrinsic_asm "(*$3 = (uint)atomicCAS((int*)$0, $1, $2))";
     case metal:
-        __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
+        if (__isTextureAccess(dest))
+        {
+            vector<uint, 4> vec_compare_value = vector<uint, 4>(compare_value);
+            __metalImageInterlocked_compare_exchange(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vec_compare_value, vector<uint, 4>(value), original_value);
+        }
+        else
+        {
+            __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
+        }
         return;
     case spirv:
         spirv_asm
@@ -9116,6 +9241,7 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
     {
     case hlsl: __intrinsic_asm "InterlockedCompareExchangeFloatBitwise";
     case metal:
+        static_assert(!__isTextureAccess(dest), "float atomic texture operations are disallowed with Metal target's");
         __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value);
         return;
     }
@@ -9128,6 +9254,7 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
     {
     case hlsl: __intrinsic_asm "InterlockedCompareExchangeFloatBitwise";
     case metal:
+        static_assert(!__isTextureAccess(dest), "float atomic texture operations are disallowed with Metal target's");
         __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
         return;
     }
@@ -9229,7 +9356,10 @@ void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
     case glsl: __intrinsic_asm "($2 = $atomicExchange($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicExch($0, $1))";
     case metal:
-        __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_exchange(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
+        else
+            __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9250,7 +9380,10 @@ void InterlockedExchange(__ref uint dest, uint value, out uint original_value)
     case glsl: __intrinsic_asm "($2 = $atomicExchange($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicExch((int*)$0, $1))";
     case metal:
-        __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_exchange(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
+        else
+            __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9267,6 +9400,10 @@ void InterlockedExchange(__ref  float dest,  float value)
     __target_switch
     {
     case hlsl: __intrinsic_asm "InterlockedExchange";
+    case metal:
+        static_assert(!__isTextureAccess(dest), "'float' atomic texture operations are disallowed with Metal target's");
+        __metalInterlocked_exchange(__getMetalAtomicRef(dest), value);
+        return;
     }
 }
 
@@ -9277,6 +9414,7 @@ void InterlockedExchange(__ref  float dest,  float value, out  float original_va
     {
     case hlsl: __intrinsic_asm "InterlockedExchange";
     case metal:
+        static_assert(!__isTextureAccess(dest), "'float' atomic texture operations are disallowed with Metal target's");
         __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
         return;
     }
@@ -9328,7 +9466,10 @@ void InterlockedMax(__ref  int dest,  int value)
     case glsl: __intrinsic_asm "$atomicMax($A, $1)";
     case cuda: __intrinsic_asm "atomicMax($0, $1)";
     case metal:
-        __metalInterlocked_max(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value));
+        else
+            __metalInterlocked_max(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -9348,7 +9489,10 @@ void InterlockedMax(__ref uint dest, uint value)
     case glsl: __intrinsic_asm "$atomicMax($A, $1)";
     case cuda: __intrinsic_asm "atomicMax((int*)$0, $1)";
     case metal:
-        __metalInterlocked_max(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
+        else
+            __metalInterlocked_max(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -9368,7 +9512,10 @@ void InterlockedMax(__ref  int dest,  int value, out  int original_value)
     case glsl: __intrinsic_asm "($2 = $atomicMax($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicMax($0, $1))";
     case metal:
-        __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
+        else
+            __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9389,7 +9536,10 @@ void InterlockedMax(__ref uint dest, uint value, out uint original_value)
     case glsl: __intrinsic_asm "($2 = $atomicMax($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicMax((int*)$0, $1))";
     case metal:
-        __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
+        else
+            __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9446,7 +9596,10 @@ void InterlockedMin(__ref  int dest,  int value)
     case glsl: __intrinsic_asm "$atomicMin($A, $1)";
     case cuda: __intrinsic_asm "atomicMin($0, $1)";
     case metal:
-        __metalInterlocked_min(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value));
+        else
+            __metalInterlocked_min(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -9466,7 +9619,10 @@ void InterlockedMin(__ref uint dest, uint value)
     case glsl: __intrinsic_asm "$atomicMin($A, $1)";
     case cuda: __intrinsic_asm "atomicMin((int*)$0, $1)";
     case metal:
-        __metalInterlocked_min(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
+        else
+            __metalInterlocked_min(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -9486,7 +9642,10 @@ void InterlockedMin(__ref  int dest,  int value, out  int original_value)
     case glsl: __intrinsic_asm "($2 = $atomicMin($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicMin($0, $1))";
     case metal:
-        __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
+        else
+            __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9507,7 +9666,10 @@ void InterlockedMin(__ref uint dest, uint value, out uint original_value)
     case glsl: __intrinsic_asm "($2 = $atomicMin($A, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicMin((int*)$0, $1))";
     case metal:
-        __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
+        else
+            __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9564,7 +9726,10 @@ void InterlockedOr(__ref  int dest,  int value)
     case cuda: __intrinsic_asm "atomicOr((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicOr($A, $1)";
     case metal:
-        __metalInterlocked_or(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value));
+        else
+            __metalInterlocked_or(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -9584,7 +9749,10 @@ void InterlockedOr(__ref uint dest, uint value)
     case cuda: __intrinsic_asm "atomicOr((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicOr($A, $1)";
     case metal:
-        __metalInterlocked_or(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
+        else
+            __metalInterlocked_or(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -9604,7 +9772,10 @@ void InterlockedOr(__ref  int dest,  int value, out  int original_value)
     case glsl: __intrinsic_asm "($2 = atomicOr($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicOr($0, $1))";
     case metal:
-        __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
+        else
+            __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9625,7 +9796,10 @@ void InterlockedOr(__ref uint dest, uint value, out uint original_value)
     case glsl: __intrinsic_asm "($2 = atomicOr($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicOr((int*)$0, $1))";
     case metal:
-        __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
+        else
+            __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9664,7 +9838,10 @@ void InterlockedXor(__ref  int dest,  int value)
     case cuda: __intrinsic_asm "atomicXor((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicXor($A, $1)";
     case metal:
-        __metalInterlocked_xor(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value));
+        else
+            __metalInterlocked_xor(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -9684,7 +9861,10 @@ void InterlockedXor(__ref uint dest, uint value)
     case cuda: __intrinsic_asm "atomicXor((int*)$0, $1)";
     case glsl: __intrinsic_asm "$atomicXor($A, $1)";
     case metal:
-        __metalInterlocked_xor(__getMetalAtomicRef(dest), value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
+        else
+            __metalInterlocked_xor(__getMetalAtomicRef(dest), value);
         return;
     case spirv:
         spirv_asm
@@ -9704,7 +9884,10 @@ void InterlockedXor(__ref  int dest,  int value, out  int original_value)
     case glsl: __intrinsic_asm "($2 = atomicXor($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = atomicXor($0, $1))";
     case metal:
-        __metalInterlocked_xor(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
+        else
+            __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm
@@ -9725,7 +9908,10 @@ void InterlockedXor(__ref uint dest, uint value, out uint original_value)
     case glsl: __intrinsic_asm "($2 = atomicXor($0, $1))";
     case cuda: __intrinsic_asm "(*$2 = (uint)atomicXor((int*)$0, $1))";
     case metal:
-        __metalInterlocked_xor(__getMetalAtomicRef(dest), value, original_value);
+        if (__isTextureAccess(dest))
+            __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
+        else
+            __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
         return;
     case spirv:
         spirv_asm

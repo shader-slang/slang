@@ -9,7 +9,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
 // Atomics not available on CPU currently
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 //TEST_INPUT:ubuffer(format=R_UInt32, data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):out,name outputBuffer
 

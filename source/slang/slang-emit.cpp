@@ -51,6 +51,7 @@
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-legalize-image-subscript.h"
+#include "slang-ir-legalize-is-texture-access.h"
 #include "slang-ir-legalize-vector-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
@@ -789,6 +790,10 @@ Result linkAndOptimizeIR(
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     performForceInlining(irModule);
 
+    // Legalize `__isTextureAccess` checks.
+    if(isMetalTarget(targetRequest))
+        legalizeIsTextureAccess(irModule);
+
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
     // will run a DCE pass to clean up after the specialization.
@@ -1157,6 +1162,8 @@ Result linkAndOptimizeIR(
     // Legalize `ImageSubscript` loads.
     switch (target)
     {
+    case CodeGenTarget::MetalLibAssembly:
+    case CodeGenTarget::MetalLib:
     case CodeGenTarget::Metal:
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
