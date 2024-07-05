@@ -11,6 +11,7 @@
 *.slang-module
 *.zip
 *.ini
+*.DS_store
 .clang-format
 .gdb_history
 .vimspector

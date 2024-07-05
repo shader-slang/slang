@@ -263,6 +263,14 @@ namespace Slang
         //
         bool success = true;
 
+        auto maybeReportGeneralError = [&]()
+        {
+            if (context.mode != OverloadResolveContext::Mode::JustTrying)
+            {
+                getSink()->diagnose(context.loc, Diagnostics::cannotSpecializeGeneric, candidate.item.declRef);
+            }
+        };
+
         Index aa = 0;
         for (auto memberRef : getMembers(m_astBuilder, genericDeclRef))
         {
@@ -287,7 +295,10 @@ namespace Slang
                         // or this reference is ill-formed.
                         auto substType = typeParamRef.substitute(m_astBuilder, typeParamRef.getDecl()->initType.type);
                         if (!substType)
+                        {
+                            maybeReportGeneralError();
                             return false;
+                        }
                         checkedArgs.add(substType);
                         continue;
                     }
@@ -355,7 +366,10 @@ namespace Slang
                         ConstantFoldingCircularityInfo newCircularityInfo(valParamRef.getDecl(), nullptr);
                         auto defaultVal = tryConstantFoldExpr(valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr), ConstantFoldingKind::CompileTime, &newCircularityInfo);
                         if (!defaultVal)
+                        {
+                            maybeReportGeneralError();
                             return false;
+                        }
                         checkedArgs.add(defaultVal);
                         continue;
                     }
@@ -475,8 +489,9 @@ namespace Slang
             break;
 
         case OverloadCandidate::Flavor::Generic:
-            return TryCheckGenericOverloadCandidateTypes(context, candidate);
-
+            {
+                return TryCheckGenericOverloadCandidateTypes(context, candidate);
+            }
         default:
             SLANG_UNEXPECTED("unknown flavor of overload candidate");
             break;
@@ -522,7 +537,8 @@ namespace Slang
     {
         if(decl->hasModifier<MutatingAttribute>())
             return true;
-
+        if (decl->hasModifier<RefAttribute>())
+            return true;
         if(decl->hasModifier<NonmutatingAttribute>())
             return false;
 
@@ -695,7 +711,7 @@ namespace Slang
             {
                 if(context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
-                    subTypeWitness = isSubtype(sub, sup);
+                    subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
                     getSink()->diagnose(context.loc, Diagnostics::typeArgumentDoesNotConformToInterface, sub, sup);
                 }
                 return false;
@@ -1008,9 +1024,9 @@ namespace Slang
 
             if (!leftType->equals(rightType))
             {
-                if (isSubtype(leftType, rightType))
+                if (isSubtype(leftType, rightType, IsSubTypeOptions::None))
                     return -1;
-                if (isSubtype(rightType, leftType))
+                if (isSubtype(rightType, leftType, IsSubTypeOptions::None))
                     return 1;
             }
         }
@@ -2093,7 +2109,21 @@ namespace Slang
                 typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
             return CompleteOverloadCandidate(context, *context.bestCandidate);
         }
-        else if (auto typetype = as<TypeType>(funcExprType))
+
+        // If absolutely no viable candidates were extracted from the overloaded expression,
+        // we may be dealing with a composite type or an overloaded expression with composite types.
+        // 
+
+        auto typeExpr = funcExpr;
+        if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
+        {
+            if (overloadedExpr->lookupResult2.isValid() && overloadedExpr->lookupResult2.isOverloaded())
+            {
+                typeExpr = maybeResolveOverloadedExpr(overloadedExpr, LookupMask::type, nullptr);
+            }
+        }
+
+        if (auto typetype = as<TypeType>(typeExpr->type))
         {
             // We allow a special case when `funcExpr` represents a composite type,
             // in which case we will try to construct the type via memberwise assignment from the arguments.

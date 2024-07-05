@@ -16,6 +16,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -matrix-layout-row-major -shaderobj
 
+
 // Note: we are using a buffer of floating-point matrices, but fill it with integer
 // data, to allow this test to work on the Vulkan targets, which do not currently
 // support integer matrices, because of GLSL limitations.

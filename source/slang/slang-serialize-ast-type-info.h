@@ -78,47 +78,176 @@ struct PtrSerialTypeInfo<T, std::enable_if_t<std::is_base_of_v<Val, T>>>
 template <typename T>
 struct SerialTypeInfo<DeclRef<T>> : public SerialTypeInfo<DeclRefBase*> {};
 
+// UIntSet
+
 template<>
-struct SerialTypeInfo<CapabilitySet>
+struct SerialTypeInfo<CapabilityAtomSet>
 {
-    typedef CapabilitySet NativeType;
+    typedef CapabilityAtomSet NativeType;
     typedef SerialIndex SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
-        auto& src = *(const NativeType*)native;
+        auto& src = *(NativeType*)native;
         auto& dst = *(SerialType*)serial;
 
-        dst = writer->addArray(src.getExpandedAtoms().getBuffer(), src.getExpandedAtoms().getCount());
+        dst = writer->addArray(src.getBuffer().getBuffer(), src.getBuffer().getCount());
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
         auto& dst = *(NativeType*)native;
         auto& src = *(const SerialType*)serial;
 
-        reader->getArray(src, dst.getExpandedAtoms());
+        List<CapabilityAtomSet::Element> UIntSetBuffer;
+        reader->getArray(src, UIntSetBuffer);
+
+        dst = CapabilityAtomSet();
+        for(Index i = 0; i < UIntSetBuffer.getCount(); i++)
+            dst.addRawElement(UIntSetBuffer[i], i);
+    }
+};
+
+// ~UIntSet
+
+template<>
+struct SerialTypeInfo<CapabilityStageSet>
+{
+    struct SerialType
+    {
+        SerialIndex stage;
+        SerialIndex atomSet;
+    };
+
+    typedef CapabilityStageSet NativeType;
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+
+        List<SerialTypeInfo<CapabilityStageSet>::SerialType> SatomSetsList;
+        SatomSetsList.setCount(src.atomSet.has_value());
+        
+        if(src.atomSet)
+        {
+            auto& i = src.atomSet.value();
+            SerialTypeInfo<CapabilityAtomSet>::toSerial(writer, &i, &SatomSetsList[0]);
+        }
+        
+        SerialTypeInfo<CapabilityAtom>::toSerial(writer, &src.stage, &dst.stage);
+        dst.atomSet = writer->addSerialArray<CapabilityStageSet>(SatomSetsList.getBuffer(), SatomSetsList.getCount());
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        auto& dst = *(NativeType*)native;
+        auto& src = *(const SerialType*)serial;
+
+        CapabilityAtom stage;
+        List<CapabilityAtomSet> items;
+        SerialTypeInfo<CapabilityAtom>::toNative(reader, &src.stage, &stage);
+        reader->getArray(src.atomSet, items);
+
+        dst.stage = stage;
+
+        for (auto i : items)
+        {
+            dst.addNewSet(std::move(i));
+        }
     }
 };
 
 template<>
-struct SerialTypeInfo<CapabilityConjunctionSet>
+struct SerialTypeInfo<CapabilityTargetSet>
 {
-    typedef CapabilityConjunctionSet NativeType;
-    typedef SerialIndex SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    struct SerialType
+    {
+        SerialIndex target;
+        SerialIndex shaderStageSets;
+    };
+
+    typedef CapabilityTargetSet NativeType;
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
         auto& src = *(const NativeType*)native;
         auto& dst = *(SerialType*)serial;
 
-        dst = writer->addArray(src.getExpandedAtoms().getBuffer(), src.getExpandedAtoms().getCount());
+        List<SerialTypeInfo<CapabilityStageSet>::SerialType> SStageSetList;
+        SStageSetList.setCount(src.shaderStageSets.getCount());
+        Index iter = 0;
+        for (auto& i : src.shaderStageSets)
+        {
+            SerialTypeInfo<CapabilityStageSet>::toSerial(writer, &i.second, &SStageSetList[iter]);
+            iter++;
+        }
+
+        SerialTypeInfo<CapabilityAtom>::toSerial(writer, &src.target, &dst.target);
+        dst.shaderStageSets = writer->addSerialArray<CapabilityStageSet>(SStageSetList.getBuffer(), SStageSetList.getCount());
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
         auto& dst = *(NativeType*)native;
         auto& src = *(const SerialType*)serial;
 
-        reader->getArray(src, dst.getExpandedAtoms());
+        CapabilityAtom target;
+        List<CapabilityStageSet> items;
+        SerialTypeInfo<CapabilityAtom>::toNative(reader, &src.target, &target);
+        reader->getArray(src.shaderStageSets, items);
+
+        dst.target = target;
+
+        auto& shaderStageSets = dst.shaderStageSets;
+        shaderStageSets.clear();
+        shaderStageSets.reserve(items.getCount());
+        for (auto& i : items)
+        {
+            dst.shaderStageSets[i.stage] = i;
+        }
+    }
+};
+
+template<>
+struct SerialTypeInfo<CapabilitySet>
+{
+    struct SerialType
+    {
+        SerialIndex m_targetSets;
+    };
+
+    typedef CapabilitySet NativeType;
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+
+        List<SerialTypeInfo<CapabilityTargetSet>::SerialType> STargetSetList;
+        auto capabilityTargetSets = src.getCapabilityTargetSets();
+        STargetSetList.setCount(capabilityTargetSets.getCount());
+        Index iter = 0;
+        for (auto& i : capabilityTargetSets)
+        {
+            SerialTypeInfo<CapabilityTargetSet>::toSerial(writer, &i.second, &STargetSetList[iter]);
+            iter++;
+        }
+
+        dst.m_targetSets = writer->addSerialArray<CapabilityTargetSet>(STargetSetList.getBuffer(), STargetSetList.getCount());
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        auto& dst = *(NativeType*)native;
+        auto& src = *(const SerialType*)serial;
+        
+        List<CapabilityTargetSet> items;
+        reader->getArray(src.m_targetSets, items);
+
+        auto& targetSets = dst.getCapabilityTargetSets();
+        targetSets.clear();
+        targetSets.reserve(items.getCount());
+        for (auto& i : items)
+        {
+            targetSets[i.target] = i;
+        }
     }
 };
 

@@ -4,6 +4,7 @@
 #include "slang-ir-util.h"
 
 #include "../core/slang-basic.h"
+#include "../core/slang-writer.h"
 
 #include "slang-ir-dominators.h"
 
@@ -60,6 +61,8 @@ namespace Slang
             case kIROp_LineAdjInputPrimitiveTypeDecoration: 
             case kIROp_LineInputPrimitiveTypeDecoration: 
             case kIROp_NoInlineDecoration: 
+            case kIROp_DerivativeGroupQuadDecoration:
+            case kIROp_DerivativeGroupLinearDecoration:
             case kIROp_PointInputPrimitiveTypeDecoration: 
             case kIROp_PreciseDecoration: 
             case kIROp_PublicDecoration: 
@@ -331,7 +334,7 @@ namespace Slang
                 for (Index i = 0; i < count; ++i)
                 {
                     auto operand = cast<IRCapabilitySet>(getOperand(i));
-                    result.getExpandedAtoms().addRange(operand->getCaps().getExpandedAtoms());
+                    result.unionWith(operand->getCaps());
                 }
                 return result;
             }
@@ -555,7 +558,6 @@ namespace Slang
         case kIROp_Return:
         case kIROp_Unreachable:
         case kIROp_MissingReturn:
-        case kIROp_discard:
         case kIROp_GenericAsm:
             break;
 
@@ -851,7 +853,6 @@ namespace Slang
         case kIROp_conditionalBranch:
         case kIROp_loop:
         case kIROp_ifElse:
-        case kIROp_discard:
         case kIROp_Switch:
         case kIROp_Unreachable:
         case kIROp_MissingReturn:
@@ -2437,13 +2438,12 @@ namespace Slang
         // be a minimal list of atoms such that they will produce
         // the same `CapabilitySet` when expanded.
 
-        List<List<CapabilityAtom>> compactedAtoms;
-        caps.calcCompactedAtoms(compactedAtoms);
+        auto compactedAtoms = caps.getAtomSets();
         List<IRInst*> conjunctions;
-        for( auto atomConjunction : compactedAtoms )
+        for( auto& atomConjunctionSet : compactedAtoms )
         {
             List<IRInst*> args;
-            for (auto atom : atomConjunction)
+            for (auto atom : atomConjunctionSet)
                 args.add(getIntValue(capabilityAtomType, Int(atom)));
             auto conjunctionInst = createIntrinsicInst(
                 capabilitySetType, kIROp_CapabilityConjunction, args.getCount(), args.getBuffer());
@@ -2661,6 +2661,16 @@ namespace Slang
     IRBasicType* IRBuilder::getUInt64Type()
     {
         return (IRBasicType*)getType(kIROp_UInt64Type);
+    }
+
+    IRBasicType* IRBuilder::getUInt16Type()
+    {
+        return (IRBasicType*)getType(kIROp_UInt16Type);
+    }
+
+    IRBasicType* IRBuilder::getUInt8Type()
+    {
+        return (IRBasicType*)getType(kIROp_UInt8Type);
     }
 
     IRBasicType* IRBuilder::getCharType()
@@ -3201,6 +3211,18 @@ namespace Slang
         addInst(inst);
 
         return inst;
+    }
+
+    IRInst* IRBuilder::emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* value)
+    {
+        IRInst* args[] = { byteAddressBuffer, offset, getIntValue(getUIntType(), 0), value};
+        return emitIntrinsicInst(getVoidType(), kIROp_ByteAddressBufferStore, 4, args);
+    }
+
+    IRInst* IRBuilder::emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* alignment, IRInst* value)
+    {
+        IRInst* args[] = { byteAddressBuffer, offset, alignment, value };
+        return emitIntrinsicInst(getVoidType(), kIROp_ByteAddressBufferStore, 4, args);
     }
 
     IRInst* IRBuilder::emitReinterpret(IRInst* type, IRInst* value)
@@ -3872,7 +3894,23 @@ namespace Slang
     {
         auto targetVectorType = as<IRVectorType>(type);
         auto sourceVectorType = as<IRVectorType>(value->getDataType());
-        if (!targetVectorType)
+        if (targetVectorType && !sourceVectorType)
+        {
+            auto elementType = targetVectorType->getElementType();
+            Index elemCount = 1;
+            if(auto intLit = as<IRIntLit>(targetVectorType->getElementCount()))
+            {
+                elemCount = (Index)intLit->getValue();
+            }
+            IRInst* zeroVal = emitDefaultConstruct(elementType);
+            List<IRInst*> defaultVals;
+            defaultVals.reserve(elemCount);
+            defaultVals.add(value);
+            for(auto i = 1; i < elemCount; i++)
+                defaultVals.add(zeroVal);
+            return emitMakeVector(targetVectorType, defaultVals);
+        }
+        else if (!targetVectorType)
         {
             if (!sourceVectorType)
                 return emitCast(targetVectorType, value);
@@ -4803,17 +4841,18 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitImageLoad(IRType* type, IRInst* image, IRInst* coord)
+    /// @param params An ordered list of imageLoad parameters { image, coord, [optional] seperateArrayCoord, [optional] seperateSampleCoord }
+    IRInst* IRBuilder::emitImageLoad(IRType* type, ShortList<IRInst*> params)
     {
-        auto inst = createInst<IRImageLoad>(this, kIROp_ImageLoad, type, image, coord);
+        auto inst = createInst<IRImageLoad>(this, kIROp_ImageLoad, type, params.getCount(), params.getArrayView().getBuffer());
         addInst(inst);
         return inst;
     }
 
-    IRInst* IRBuilder::emitImageStore(IRType* type, IRInst* image, IRInst* coord, IRInst* value)
+    /// @param params An ordered list of imageStore parameters { image, coord, value, [optional] seperateArrayCoord, [optional] seperateSampleCoord }
+    IRInst* IRBuilder::emitImageStore(IRType* type, ShortList<IRInst*> params)
     {
-        IRInst* args[] = {image, coord, value};
-        auto inst = createInst<IRImageStore>(this, kIROp_ImageStore, type, 3, args);
+        auto inst = createInst<IRImageStore>(this, kIROp_ImageStore, type, params.getCount(), params.getArrayView().getBuffer());
         addInst(inst);
         return inst;
     }
@@ -5024,6 +5063,27 @@ namespace Slang
             else
             {
                 basePtr = emitElementAddress(basePtr, access);
+            }
+        }
+        return basePtr;
+    }
+
+    IRInst* IRBuilder::emitElementAddress(
+        IRInst* basePtr,
+        const ArrayView<IRInst*>& accessChain,
+        const ArrayView<IRInst*>& types)
+    {
+        for (Index i = 0; i < accessChain.getCount(); i++)
+        {
+            auto access = accessChain[i];
+            auto type = (IRType*)types[i];
+            if (auto structKey = as<IRStructKey>(access))
+            {
+                basePtr = emitFieldAddress(type, basePtr, structKey);
+            }
+            else
+            {
+                basePtr = emitElementAddress(type, basePtr, access);
             }
         }
         return basePtr;
@@ -7363,6 +7423,8 @@ namespace Slang
             case BaseType::UInt16:
             case BaseType::UInt:
             case BaseType::UInt64:
+            case BaseType::IntPtr:
+            case BaseType::UIntPtr:
                 return true;
             default:
                 return false;
@@ -8258,7 +8320,8 @@ namespace Slang
                     continue;
             }
 
-            if(!bestDecoration || decorationCaps.isBetterForTarget(bestCaps, targetCaps))
+            bool isEqual;
+            if(!bestDecoration || decorationCaps.isBetterForTarget(bestCaps, targetCaps, isEqual))
             {
                 bestDecoration = decoration;
                 bestCaps = decorationCaps;
@@ -8281,11 +8344,12 @@ namespace Slang
         IRInst* val,
         CapabilityName  targetCapabilityAtom);
 
-    bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition)
+    bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition, IRInst*& outInst)
     {
         if (auto decor = findBestTargetIntrinsicDecoration(callee, targetCaps))
         {
             outDefinition = decor->getDefinition();
+            outInst = decor;
             return true;
         }
         auto func = as<IRGlobalValueWithCode>(callee);
@@ -8296,6 +8360,7 @@ namespace Slang
             if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
             {
                 outDefinition = genAsm->getAsm();
+                outInst = genAsm;
                 return true;
             }
         }
@@ -8494,6 +8559,18 @@ namespace Slang
         return nullptr;
     }
 
+    bool hasDescendent(IRInst* inst, IRInst* child)
+    {
+        auto parent = child->getParent();
+        while (parent)
+        {
+            if (inst == parent)
+                return true;
+            parent = parent->getParent();
+        }
+        return false;
+    }
+
     IRInst* getGenericReturnVal(IRInst* inst)
     {
         if (auto gen = as<IRGeneric>(inst))
@@ -8603,6 +8680,25 @@ namespace Slang
         }
     }
 
+    void IRInst::dump()
+    {
+        if (auto intLit = as<IRIntLit>(this))
+        {
+            std::cout << intLit->getValue() << std::endl;
+        }
+        else if (auto stringLit = as<IRStringLit>(this))
+        {
+            std::cout << stringLit->getStringSlice().begin() << std::endl;
+        }
+        else
+        {
+            StringBuilder sb;
+            IRDumpOptions options;
+            StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
+            dumpIR(this, options, nullptr, &writer);
+            std::cout << sb.toString().begin() << std::endl;
+        }
+    }
 } // namespace Slang
 
 #if SLANG_VC

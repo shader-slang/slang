@@ -267,7 +267,7 @@ namespace Slang
                     }
                 }
             }
-            else if (auto defaultStmt = as<DefaultStmt>(sStmt))
+            else if (as<DefaultStmt>(sStmt))
             {
                 // check that there is at most one `default` clause
                 if (hasDefaultStmt)
@@ -340,7 +340,7 @@ namespace Slang
         }
 
         if (stmt->capabilityToken.getContentLength() != 0 &&
-            (set.getExpandedAtoms().getCount() != 1 || set.isInvalid() || set.isEmpty()))
+            (set.getCapabilityTargetSets().getCount() != 1 || set.isInvalid() || set.isEmpty()))
         {
             getSink()->diagnose(
                 stmt->capabilityToken.loc,
@@ -353,6 +353,13 @@ namespace Slang
         }
         WithOuterStmt subContext(this, stmt);
         subContext.checkStmt(stmt->body);
+    }
+
+    void SemanticsStmtVisitor::visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
+    {
+        WithOuterStmt subContext(this, stmt);
+        for (auto& arg : stmt->args)
+            arg = subContext.CheckExpr(arg);
     }
 
     void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)

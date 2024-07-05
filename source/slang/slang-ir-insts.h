@@ -118,6 +118,19 @@ struct IRTargetDecoration : IRTargetSpecificDefinitionDecoration
     IR_LEAF_ISA(TargetDecoration)
 };
 
+struct IRTargetSystemValueDecoration : IRDecoration
+{
+    enum { kOp = kIROp_TargetSystemValueDecoration };
+    IR_LEAF_ISA(TargetSystemValueDecoration)
+
+    IRStringLit* getSemanticOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getSemantic()
+    {
+        return getSemanticOperand()->getStringSlice();
+    }
+};
+
 struct IRTargetIntrinsicDecoration : IRTargetSpecificDefinitionDecoration
 {
     enum { kOp = kIROp_TargetIntrinsicDecoration };
@@ -313,6 +326,9 @@ IR_SIMPLE_DECORATION(VulkanHitAttributesDecoration)
 /// to it.
 IR_SIMPLE_DECORATION(VulkanHitObjectAttributesDecoration)
 
+IR_SIMPLE_DECORATION(PerVertexDecoration)
+
+IR_SIMPLE_DECORATION(SPIRVBlockDecoration)
 
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
@@ -348,6 +364,18 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
     IntegerLiteralValue getSPIRVVersion()
     {
         return getSPIRVVersionOperand()->value.intVal;
+    }
+};
+
+struct IRRequireCapabilityAtomDecoration : IRDecoration
+{
+    enum { kOp = kIROp_RequireCapabilityAtomDecoration };
+    IR_LEAF_ISA(RequireCapabilityAtomDecoration)
+
+    IRConstant* getCapabilityAtomOperand() { return cast<IRConstant>(getOperand(0)); }
+    CapabilityName getAtom()
+    {
+        return (CapabilityName)getCapabilityAtomOperand()->value.intVal;
     }
 };
 
@@ -393,6 +421,9 @@ IR_SIMPLE_DECORATION(HLSLExportDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
+IR_SIMPLE_DECORATION(NoRefInlineDecoration)
+IR_SIMPLE_DECORATION(DerivativeGroupQuadDecoration)
+IR_SIMPLE_DECORATION(DerivativeGroupLinearDecoration)
 IR_SIMPLE_DECORATION(AlwaysFoldIntoUseSiteDecoration)
 IR_SIMPLE_DECORATION(StaticRequirementDecoration)
 IR_SIMPLE_DECORATION(NonCopyableTypeDecoration)
@@ -406,11 +437,6 @@ struct IRGLSLLocationDecoration : IRDecoration
     IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
 };
 
-struct IRGLSLInputAttachmentIndexDecoration : IRDecoration
-{
-    IR_LEAF_ISA(GLSLInputAttachmentIndexDecoration)
-    IRIntLit* getIndex() { return cast<IRIntLit>(getOperand(0)); }
-};
 
 struct IRGLSLOffsetDecoration : IRDecoration
 {
@@ -1186,6 +1212,10 @@ struct IRDispatchKernel : IRInst
     IRInst* getDispatchSize() { return getOperand(2); }
     UInt getArgCount() { return getOperandCount() - 3; }
     IRInst* getArg(UInt i) { return getOperand(3 + i); }
+    IROperandList<IRInst> getArgsList()
+    {
+        return IROperandList<IRInst>(getOperands() + 3, getOperands() + getOperandCount());
+    }
 
     IR_LEAF_ISA(DispatchKernel)
 };
@@ -2245,6 +2275,10 @@ struct IRLayoutDecoration : IRDecoration
 };
 
 //
+struct IRAlignOf : IRInst
+{
+    IRInst* getBaseOp() { return getOperand(0); }
+};
 
 struct IRCall : IRInst
 {
@@ -2401,6 +2435,8 @@ struct IRImageSubscript : IRInst
     IR_LEAF_ISA(ImageSubscript);
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
+    bool hasSampleCoord() { return getOperandCount() > 2 && getOperand(2) != nullptr;  }
+    IRInst* getSampleCoord() { return getOperand(2); }
 };
 
 struct IRImageLoad : IRInst
@@ -2408,6 +2444,16 @@ struct IRImageLoad : IRInst
     IR_LEAF_ISA(ImageLoad);
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
+
+    /// If GLSL/SPIR-V, Sample coord
+    /// If Metal, Array or Sample coord
+    bool hasAuxCoord1() { return getOperandCount() > 2 && getOperand(2) != nullptr; }
+    IRInst* getAuxCoord1() { return getOperand(2); }
+
+    /// If Metal, Sample coord
+    bool hasAuxCoord2() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
+    IRInst* getAuxCoord2() { return getOperand(3); }
+
 };
 
 struct IRImageStore : IRInst
@@ -2416,6 +2462,15 @@ struct IRImageStore : IRInst
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
     IRInst* getValue() { return getOperand(2); }
+
+    /// If GLSL/SPIR-V, Sample coord
+    /// If Metal, Array or Sample coord
+    bool hasAuxCoord1() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
+    IRInst* getAuxCoord1() { return getOperand(3); }
+
+    /// If Metal, Sample coord
+    bool hasAuxCoord2() { return getOperandCount() > 4 && getOperand(4) != nullptr; }
+    IRInst* getAuxCoord2() { return getOperand(4); }
 };
 // Terminators
 
@@ -3153,7 +3208,10 @@ struct IRSPIRVAsmInst : IRInst
 
     IRSPIRVAsmOperand* getOpcodeOperand()
     {
-        const auto opcodeOperand = cast<IRSPIRVAsmOperand>(getOperand(0));
+        auto operand = getOperand(0);
+        if (auto globalRef = as<IRGlobalValueRef>(operand))
+            operand = globalRef->getValue();
+        const auto opcodeOperand = cast<IRSPIRVAsmOperand>(operand);
         // This must be either:
         // - An enum, such as 'OpNop'
         // - The __truncate pseudo-instruction
@@ -3206,6 +3264,16 @@ struct IRRequireGLSLExtension : IRInst
 {
     IR_LEAF_ISA(RequireGLSLExtension)
     UnownedStringSlice getExtensionName() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
+};
+
+struct IRRequireComputeDerivative : IRInst
+{
+    IR_LEAF_ISA(RequireComputeDerivative)
+};
+
+struct IRStaticAssert : IRInst
+{
+    IR_LEAF_ISA(StaticAssert)
 };
 
 struct IRBuilderSourceLocRAII;
@@ -3375,6 +3443,8 @@ public:
     IRBasicType* getInt64Type();
     IRBasicType* getUIntType();
     IRBasicType* getUInt64Type();
+    IRBasicType* getUInt16Type();
+    IRBasicType* getUInt8Type();
     IRBasicType* getCharType();
     IRStringType* getStringType();
     IRNativeStringType* getNativeStringType();
@@ -3423,6 +3493,9 @@ public:
     IRConstRefType* getConstRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
+    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace) { return getPtrType(op, valueType, (IRIntegerValue)addressSpace); }
+    IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace) { return getPtrType(kIROp_PtrType, valueType, (IRIntegerValue)addressSpace); }
+
     IRTextureTypeBase* getTextureType(
         IRType* elementType,
         IRInst* shape,
@@ -3558,6 +3631,11 @@ public:
         return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
     }
 
+    IRMetalMeshGridPropertiesType* getMetalMeshGridPropertiesType()
+    {
+        return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
+    }
+
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
     IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex = nullptr);
@@ -3657,6 +3735,13 @@ public:
         IRType*                 type,
         IRInst*                 func,
         List<IRInst*> const&    args)
+    {
+        return emitCallInst(type, func, args.getCount(), args.getBuffer());
+    }
+    IRCall* emitCallInst(
+        IRType* type,
+        IRInst* func,
+        ArrayView<IRInst*> args)
     {
         return emitCallInst(type, func, args.getCount(), args.getBuffer());
     }
@@ -3857,6 +3942,9 @@ public:
     IRInst* emitOutImplicitCast(IRInst* type, IRInst* value);
     IRInst* emitInOutImplicitCast(IRInst* type, IRInst* value);
 
+    IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* value);
+    IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* alignment, IRInst* value);
+
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
@@ -3976,14 +4064,11 @@ public:
 
     IRInst* emitImageLoad(
         IRType* type,
-        IRInst* image,
-        IRInst* coord);
+        ShortList<IRInst*> params);
 
     IRInst* emitImageStore(
         IRType* type,
-        IRInst* image,
-        IRInst* coord,
-        IRInst* value);
+        ShortList<IRInst*> params);
 
     IRInst* emitIsType(IRInst* value, IRInst* witness, IRInst* typeOperand, IRInst* targetWitness);
 
@@ -4030,6 +4115,10 @@ public:
     IRInst* emitElementAddress(
         IRInst* basePtr,
         const ArrayView<IRInst*>& accessChain);
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
+        const ArrayView<IRInst*>& accessChain,
+        const ArrayView<IRInst*>& types);
 
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, IRIntegerValue index, IRInst* newElement);
@@ -4152,6 +4241,16 @@ public:
         UInt            caseArgCount,
         IRInst* const* caseArgs);
 
+    IRInst* emitBeginFragmentShaderInterlock()
+    {
+        return emitIntrinsicInst(getVoidType(), kIROp_BeginFragmentShaderInterlock, 0, nullptr);
+    }
+
+    IRInst* emitEndFragmentShaderInterlock()
+    {
+        return emitIntrinsicInst(getVoidType(), kIROp_EndFragmentShaderInterlock, 0, nullptr);
+    }
+
     IRGlobalGenericParam* emitGlobalGenericParam(
         IRType* type);
 
@@ -4261,6 +4360,13 @@ public:
         return addDecoration(value, op, (IRInst* const*) nullptr, 0);
     }
 
+    IRDecoration* addDecorationIfNotExist(IRInst* value, IROp op)
+    {
+        if (auto decor = value->findDecorationImpl(op))
+            return decor;
+        return addDecoration(value, op);
+    }
+
     IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* operand)
     {
         return addDecoration(value, op, &operand, 1);
@@ -4285,12 +4391,18 @@ public:
     }
 
     template<typename T>
-    void addSimpleDecoration(IRInst* value)
+    IRDecoration* addSimpleDecoration(IRInst* value)
     {
-        addDecoration(value, IROp(T::kOp), (IRInst* const*) nullptr, 0);
+        return addDecoration(value, IROp(T::kOp), (IRInst* const*) nullptr, 0);
     }
 
     void addHighLevelDeclDecoration(IRInst* value, Decl* decl);
+
+    IRDecoration* addTargetSystemValueDecoration(IRInst* value, UnownedStringSlice sysValName, UInt index = 0)
+    {
+        IRInst* operands[] = { getStringValue(sysValName), getIntValue(getIntType(), index)};
+        return addDecoration(value, kIROp_TargetSystemValueDecoration, operands, SLANG_COUNT_OF(operands));
+    }
 
 //    void addLayoutDecoration(IRInst* value, Layout* layout);
     void addLayoutDecoration(IRInst* value, IRLayout* layout);
@@ -4485,6 +4597,11 @@ public:
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
         addDecoration(value, kIROp_RequireCUDASMVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
+    }
+
+    void addRequireCapabilityAtomDecoration(IRInst* value, CapabilityName atom)
+    {
+        addDecoration(value, kIROp_RequireCapabilityAtomDecoration, getIntValue(getUIntType(), IRIntegerValue(atom)));
     }
 
     void addPatchConstantFuncDecoration(IRInst* value, IRInst* patchConstantFunc)
@@ -4926,7 +5043,7 @@ IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*         val,
         CapabilityName  targetCapabilityAtom);
 
-bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition);
+bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition, IRInst*& outInst);
 
 inline IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(
     IRInst* inInst,

@@ -6,7 +6,6 @@
 //
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
-
 namespace Slang
 {
 struct GenericChildrenMigrationContextImpl;
@@ -181,7 +180,7 @@ IRType* dropNormAttributes(IRType* const t);
 void getTypeNameHint(StringBuilder& sb, IRInst* type);
 void copyNameHintAndDebugDecorations(IRInst* dest, IRInst* src);
 IRInst* getRootAddr(IRInst* addrInst);
-IRInst* getRootAddr(IRInst* addrInst, List<IRInst*>& outAccessChain);
+IRInst* getRootAddr(IRInst* addrInst, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes = nullptr);
 
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
@@ -313,10 +312,6 @@ static void overAllBlocks(IRModule* module, F f)
 
 void hoistInstOutOfASMBlocks(IRBlock* block);
 
-IRType* getSPIRVSampledElementType(IRInst* sampledType);
-
-IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
-
 inline bool isCompositeType(IRType* type)
 {
     switch (type->getOp())
@@ -330,7 +325,28 @@ inline bool isCompositeType(IRType* type)
     }
 }
 
+IRType* getSPIRVSampledElementType(IRInst* sampledType);
+
+IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
+
 IRParam* getParamAt(IRBlock* block, UIndex ii);
+
+void verifyComputeDerivativeGroupModifiers(
+    DiagnosticSink* sink,
+    SourceLoc errorLoc,
+    bool quadAttr,
+    bool linearAttr,
+    IRNumThreadsDecoration* numThreadsDecor);
+
+
+inline bool isSPIRV(CodeGenTarget codeGenTarget)
+{
+    return codeGenTarget == CodeGenTarget::SPIRV
+            || codeGenTarget == CodeGenTarget::SPIRVAssembly;
+}
+
+int getIRVectorElementSize(IRType* type);
+IRType* getIRVectorBaseType(IRType* type);
 
 }
 

@@ -588,8 +588,8 @@ extern "C"
         SLANG_TARGET_UNKNOWN,
         SLANG_TARGET_NONE,
         SLANG_GLSL,
-        SLANG_GLSL_VULKAN,              //< deprecated: just use `SLANG_GLSL`
-        SLANG_GLSL_VULKAN_ONE_DESC,     //< deprecated
+        SLANG_GLSL_VULKAN_DEPRECATED,              //< deprecated and removed: just use `SLANG_GLSL`.
+        SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED,     //< deprecated and removed.
         SLANG_HLSL,
         SLANG_SPIRV,
         SLANG_SPIRV_ASM,
@@ -612,6 +612,7 @@ extern "C"
         SLANG_METAL,                    ///< Metal shading language
         SLANG_METAL_LIB,                ///< Metal library
         SLANG_METAL_LIB_ASM,            ///< Metal library assembly
+        SLANG_HOST_SHARED_LIBRARY,      ///< A shared library/Dll for host code (for hosting CPU/OS)
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -840,7 +841,9 @@ extern "C"
             Language,
             MatrixLayoutColumn, // bool
             MatrixLayoutRow,    // bool
+            ZeroInitialize,     // bool
             IgnoreCapabilities, // bool
+            RestrictiveCapabilityCheck, // bool
             ModuleName,         // stringValue0: module name.
             Output,
             Profile,            // intValue0: profile
@@ -860,6 +863,12 @@ extern "C"
             SourceEmbedStyle,
             SourceEmbedName,
             SourceEmbedLanguage,
+            DisableShortCircuit,   // bool
+            MinimumSlangOptimization, // bool
+            DisableNonEssentialValidations, // bool
+            DisableSourceMap,       // bool
+            UnscopedEnum,           // bool
+            PreserveParameters,       // bool: preserve all resource parameters in the output code.
 
             // Target
 
@@ -943,6 +952,7 @@ extern "C"
             SaveStdLib,
             SaveStdLibBinSource,
             TrackLiveness,
+            LoopInversion,              // bool, enable loop inversion optimization
 
             // Deprecated
             ParameterBlocksUseRegisterSpaces,
@@ -1568,6 +1578,16 @@ extern "C"
     
     #define SLANG_UUID_ISlangWriter ISlangWriter::getTypeGuid()
 
+    struct ISlangProfiler : public ISlangUnknown
+    {
+        SLANG_COM_INTERFACE(0x197772c7, 0x0155, 0x4b91, { 0x84, 0xe8, 0x66, 0x68, 0xba, 0xff, 0x06, 0x19 })
+        virtual SLANG_NO_THROW size_t SLANG_MCALL getEntryCount() = 0;
+        virtual SLANG_NO_THROW const char* SLANG_MCALL getEntryName(uint32_t index) = 0;
+        virtual SLANG_NO_THROW long SLANG_MCALL getEntryTimeMS(uint32_t index) = 0;
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryInvocationTimes(uint32_t index) = 0;
+    };
+    #define SLANG_UUID_ISlangProfiler ISlangProfiler::getTypeGuid()
+
     namespace slang {
     struct IGlobalSession;
     struct ICompileRequest;
@@ -1705,6 +1725,17 @@ extern "C"
         SlangCompileRequest*    request,
         int targetIndex,
         bool forceScalarLayout);
+
+    /*! @see slang::ICompileRequest::setTargetUseMinimumSlangOptimization */
+    SLANG_API void spSetTargetUseMinimumSlangOptimization(
+        slang::ICompileRequest* request,
+        int targetIndex,
+        bool val);
+
+    /*! @see slang::ICompileRequest::setIngoreCapabilityCheck */
+    SLANG_API void spSetIgnoreCapabilityCheck(
+        slang::ICompileRequest* request,
+        bool val);
 
     /*! @see slang::ICompileRequest::setCodeGenTarget */
     SLANG_API void spSetCodeGenTarget(
@@ -2010,6 +2041,12 @@ extern "C"
     SLANG_API SlangResult spEnableReproCapture(
         SlangCompileRequest* request);
 
+    /*! @see slang::ICompileRequest::getCompileTimeProfile */
+    SLANG_API SlangResult spGetCompileTimeProfile(
+        SlangCompileRequest* request,
+        ISlangProfiler** compileTimeProfile,
+        bool shouldClear);
+
 
     /** Extract contents of a repro.
 
@@ -2261,6 +2298,12 @@ extern "C"
 
         // Metal resource binding points.
         SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
+
+        // Metal [[attribute]] inputs.
+        SLANG_PARAMETER_CATEGORY_METAL_ATTRIBUTE,
+
+        // Metal [[payload]] inputs
+        SLANG_PARAMETER_CATEGORY_METAL_PAYLOAD,
 
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
@@ -2835,6 +2878,8 @@ namespace slang
         MetalBuffer = SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER,
         MetalTexture = SLANG_PARAMETER_CATEGORY_METAL_TEXTURE,
         MetalArgumentBufferElement = SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
+        MetalAttribute = SLANG_PARAMETER_CATEGORY_METAL_ATTRIBUTE,
+        MetalPayload = SLANG_PARAMETER_CATEGORY_METAL_PAYLOAD,
 
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,
@@ -4396,6 +4441,13 @@ namespace slang
 
         virtual SLANG_NO_THROW void SLANG_MCALL setSkipSPIRVValidation(bool value) = 0;
 
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetUseMinimumSlangOptimization(int targetIndex, bool value) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setIgnoreCapabilityCheck(bool value) = 0;
+
+        // return a copy of internal profiling results, and if `shouldClear` is true, clear the internal profiling results before returning.
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool shouldClear) = 0;
+
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()
@@ -4903,6 +4955,11 @@ namespace slang
             uint32_t compilerOptionEntryCount,
             CompilerOptionEntry* compilerOptionEntries,
             ISlangBlob** outDiagnostics = nullptr) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt targetIndex,
+            IBlob** outCode,
+            IBlob** outDiagnostics = nullptr) = 0;
     };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
 
@@ -4971,6 +5028,16 @@ namespace slang
             SlangStage stage,
             IEntryPoint** outEntryPoint,
             ISlangBlob** outDiagnostics) = 0;
+
+        /// Get the number of dependency files that this module depends on.
+        /// This includes both the explicit source files, as well as any
+        /// additional files that were transitively referenced (e.g., via
+        /// a `#include` directive).
+        virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDependencyFileCount() = 0;
+
+        /// Get the path to a file this module depends on.
+        virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
+            SlangInt32 index) = 0;
     };
     
     #define SLANG_UUID_IModule IModule::getTypeGuid()

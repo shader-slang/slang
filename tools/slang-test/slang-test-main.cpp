@@ -998,6 +998,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
 
         case SLANG_HOST_EXECUTABLE:
         case SLANG_SHADER_SHARED_LIBRARY:
+        case SLANG_HOST_SHARED_LIBRARY:
         {
             return PassThroughFlag::Generic_C_CPP;
         }
@@ -1105,6 +1106,11 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
             target = SLANG_SPIRV;
             nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
             passThru = SLANG_PASS_THROUGH_GLSLANG;
+            break;
+        case RenderApiType::Metal:
+            target = SLANG_METAL_LIB;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_METAL;
+            passThru = SLANG_PASS_THROUGH_METAL;
             break;
         case RenderApiType::CPU:
             target = SLANG_SHADER_HOST_CALLABLE;

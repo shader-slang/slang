@@ -22,6 +22,7 @@ public:
 
 protected:
 
+    virtual void beforeComputeEmitActions(IRModule* module) SLANG_OVERRIDE;
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
     virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) SLANG_OVERRIDE;
@@ -125,9 +126,13 @@ protected:
 
     void _requireRayTracing();
 
+    void _requireRayQuery();
+
     void _requireFragmentShaderBarycentric();
 
     void _emitSpecialFloatImpl(IRType* type, const char* valueExpr);
+
+    Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints;
 
     RefPtr<GLSLExtensionTracker> m_glslExtensionTracker;
 };

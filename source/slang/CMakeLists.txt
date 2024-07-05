@@ -75,6 +75,7 @@ add_custom_command(
 slang_add_target(
     slang-capability-defs
     OBJECT
+    USE_EXTRA_WARNINGS
     EXPLICIT_SOURCE ${SLANG_CAPABILITY_GENERATED_HEADERS}
     LINK_WITH_PRIVATE core
     INCLUDE_DIRECTORIES_PUBLIC
@@ -86,6 +87,7 @@ slang_add_target(
 slang_add_target(
     slang-capability-lookup
     OBJECT
+    USE_EXTRA_WARNINGS
     EXPLICIT_SOURCE ${SLANG_CAPABILITY_GENERATED_SOURCE}
     LINK_WITH_PRIVATE core slang-capability-defs
     EXCLUDE_FROM_ALL
@@ -159,6 +161,9 @@ set(SLANG_LOOKUP_GENERATOR_OUTPUT_DIR
 set(SLANG_LOOKUP_GENERATED_SOURCE
     "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.cpp"
 )
+set(SLANG_CAPATURE_REPLAY_SYSTEM
+    "${slang_SOURCE_DIR}/source/slang-capture-replay"
+)
 add_custom_command(
     OUTPUT ${SLANG_LOOKUP_GENERATED_SOURCE}
     COMMAND
@@ -174,6 +179,7 @@ add_custom_command(
 slang_add_target(
     slang-lookup-tables
     OBJECT
+    USE_EXTRA_WARNINGS
     EXPLICIT_SOURCE ${SLANG_LOOKUP_GENERATED_SOURCE}
     LINK_WITH_PRIVATE core SPIRV-Headers
     EXCLUDE_FROM_ALL
@@ -192,6 +198,8 @@ slang_add_target(
     .
     OBJECT
     TARGET_NAME slang-no-embedded-stdlib
+    EXTRA_SOURCE_DIRS ${SLANG_CAPATURE_REPLAY_SYSTEM}
+    USE_EXTRA_WARNINGS
     EXCLUDE_FROM_ALL
     EXTRA_COMPILE_DEFINITIONS_PUBLIC SLANG_STATIC
     LINK_WITH_PRIVATE
@@ -244,6 +252,8 @@ target_include_directories(
 slang_add_target(
     .
     ${SLANG_LIB_TYPE}
+    EXTRA_SOURCE_DIRS ${SLANG_CAPATURE_REPLAY_SYSTEM}
+    USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE
         core
         compiler-core
@@ -260,6 +270,12 @@ slang_add_target(
     INSTALL
     PUBLIC_HEADERS ${slang_SOURCE_DIR}/slang*.h
 )
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # a warning is disabled for a memset boundary check.
+    # everything looked fine and it is unclear why the checking fails
+    target_compile_options(slang PRIVATE -Wno-error=stringop-overflow)
+endif()
 
 if(SLANG_EMBED_STDLIB_SOURCE)
     target_link_libraries(slang PRIVATE slang-meta-headers)

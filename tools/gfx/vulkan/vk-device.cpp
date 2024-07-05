@@ -161,6 +161,22 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
     m_queueAllocCount = 0;
 
+    bool enableRayTracingValidation = false;
+
+    // Read properties from extended device descriptions
+    for (GfxIndex i = 0; i < m_desc.extendedDescCount; i++)
+    {
+        StructType stype;
+        memcpy(&stype, m_desc.extendedDescs[i], sizeof(stype));
+        switch (stype)
+        {
+        case StructType::RayTracingValidationDesc:
+            enableRayTracingValidation = static_cast<RayTracingValidationDesc*>(m_desc.extendedDescs[i])->enableRaytracingValidation;
+            break;
+        }
+    }
+
+
     VkInstance instance = VK_NULL_HANDLE;
     if (handles[0].handleValue == 0)
     {
@@ -288,7 +304,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
     if (!instance)
         return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
-    if (useValidationLayer && m_api.vkCreateDebugReportCallbackEXT)
+
+    if ((enableRayTracingValidation || useValidationLayer) && m_api.vkCreateDebugReportCallbackEXT)
     {
         VkDebugReportFlagsEXT debugFlags =
             VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
@@ -460,6 +477,14 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.accelerationStructureFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.accelerationStructureFeatures;
 
+        // Variable pointer features.
+        extendedFeatures.variablePointersFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.variablePointersFeatures;
+        
+        // Compute shader derivative features.
+        extendedFeatures.computeShaderDerivativeFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.computeShaderDerivativeFeatures;
+
         // Extended dynamic states
         extendedFeatures.extendedDynamicStateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.extendedDynamicStateFeatures;
@@ -503,6 +528,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         // fragment shading rate features
         extendedFeatures.fragmentShadingRateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.fragmentShadingRateFeatures;
+
+        // raytracing validation features
+        extendedFeatures.rayTracingValidationFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.rayTracingValidationFeatures;
 
         if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_2)
         {
@@ -674,6 +703,31 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME,
             "shader-execution-reorder"
         );
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.variablePointersFeatures,
+            variablePointers,
+            VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME,
+            "variable-pointer"
+        );
+        
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.computeShaderDerivativeFeatures,
+            computeDerivativeGroupLinear,
+            VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
+            "computeDerivativeGroupLinear"
+        );
+
+        // Only enable raytracing validation if both requested and supported
+        if(enableRayTracingValidation && extendedFeatures.rayTracingValidationFeatures.rayTracingValidation)
+        {
+            SIMPLE_EXTENSION_FEATURE(
+                extendedFeatures.rayTracingValidationFeatures,
+                rayTracingValidation,
+                VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME,
+                "ray-tracing-validation"
+            );
+        }
 
 #undef SIMPLE_EXTENSION_FEATURE
 
@@ -912,6 +966,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
     {
         installPipelineDumpLayer(m_api);
     }
+
     return SLANG_OK;
 }
 
@@ -1667,7 +1722,7 @@ Result DeviceImpl::createTextureResource(
                 break;
             case SLANG_SCALAR_TYPE_UINT32:
                 for(int i = 0; i < 4; i++)
-                    clearColor.uint32[i] = *reinterpret_cast<uint32_t*>(const_cast<void*>(initData->data));                break;
+                    clearColor.uint32[i] = *reinterpret_cast<uint32_t*>(const_cast<void*>(initData->data));
                 break;
             case SLANG_SCALAR_TYPE_INT64:
             {
@@ -2178,26 +2233,10 @@ Result DeviceImpl::createBufferView(
 {
     auto resourceImpl = (BufferResourceImpl*)buffer;
 
-    // TODO: These should come from the `ResourceView::Desc`
-    auto stride = desc.bufferElementSize;
-    if (stride == 0)
-    {
-        if (desc.format == Format::Unknown)
-        {
-            stride = 1;
-        }
-        else
-        {
-            FormatInfo info;
-            gfxGetFormatInfo(desc.format, &info);
-            stride = info.blockSizeInBytes;
-            assert(info.pixelsPerBlock == 1);
-        }
-    }
-    VkDeviceSize offset = (VkDeviceSize)desc.bufferRange.firstElement * stride;
-    VkDeviceSize size = desc.bufferRange.elementCount == 0
+    VkDeviceSize offset = (VkDeviceSize)desc.bufferRange.offset;
+    VkDeviceSize size = desc.bufferRange.size == 0
         ? (buffer ? resourceImpl->getDesc()->sizeInBytes : 0)
-        : (VkDeviceSize)desc.bufferRange.elementCount * stride;
+        : (VkDeviceSize)desc.bufferRange.size;
 
     // There are two different cases we need to think about for buffers.
     //
@@ -2389,8 +2428,8 @@ Result DeviceImpl::createMutableShaderObject(
 {
     auto layoutImpl = static_cast<ShaderObjectLayoutImpl*>(layout);
 
-    RefPtr<MutableShaderObjectImpl> result = new MutableShaderObjectImpl();
-    SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
+    RefPtr<ShaderObjectImpl> result;
+    SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(this, layoutImpl, result.writeRef()));
     returnComPtr(outObject, result);
 
     return SLANG_OK;
@@ -2398,8 +2437,9 @@ Result DeviceImpl::createMutableShaderObject(
 
 Result DeviceImpl::createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
 {
-    RefPtr<MutableRootShaderObject> result =
-        new MutableRootShaderObject(this, static_cast<ShaderProgramBase*>(program));
+    RefPtr<MutableRootShaderObjectImpl> result = new MutableRootShaderObjectImpl();
+    auto programImpl = static_cast<ShaderProgramImpl*>(program);
+    SLANG_RETURN_ON_FAIL(result->init(this, programImpl->m_rootObjectLayout));
     returnComPtr(outObject, result);
     return SLANG_OK;
 }

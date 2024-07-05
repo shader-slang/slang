@@ -3,6 +3,7 @@
 // Test that a function/method can have an `out` parameter of opaque type
 
 //TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 //TEST_INPUT:set gX = ubuffer(data=[16 17 18 19], stride=4)
 RWStructuredBuffer<int> gX;

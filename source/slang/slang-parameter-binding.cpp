@@ -4,6 +4,7 @@
 #include "slang-lookup.h"
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
+#include "slang-ir-util.h"
 
 #include "../compiler-core/slang-artifact-desc-util.h"
 
@@ -479,9 +480,7 @@ static bool isDigit(char c)
     return (c >= '0') && (c <= '9');
 }
 
-/// Given a string that specifies a name and index (e.g., `COLOR0`),
-/// split it into slices for the name part and the index part.
-static void splitNameAndIndex(
+void splitNameAndIndex(
     UnownedStringSlice const&       text,
     UnownedStringSlice& outName,
     UnownedStringSlice& outDigits)
@@ -997,6 +996,16 @@ static void addExplicitParameterBindings_HLSL(
 
     // If the declaration has explicit binding modifiers, then
     // here is where we want to extract and apply them...
+    if (auto inputAttachmentIndexLayoutAttribute = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
+    {
+        LayoutSemanticInfo semanticInfo;
+        semanticInfo.index = (UInt)inputAttachmentIndexLayoutAttribute->location;
+        semanticInfo.space = 0;
+        semanticInfo.kind = LayoutResourceKind::InputAttachmentIndex;
+
+        if (auto varDeclBase = varDecl.as<VarDeclBase>())
+            addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, 1);
+    }
 
     // Look for HLSL `register` or `packoffset` semantics.
     for (auto semantic : varDecl.getDecl()->getModifiersOfType<HLSLLayoutSemantic>())
@@ -1048,7 +1057,7 @@ static void addExplicitParameterBindings_GLSL(
     RefPtr<VarLayout>           varLayout)
 {
     // We only want to apply GLSL-style layout modifers
-    // when compiling for a Khronos-related target.
+    // when compiling for a Khronos-related target. 
     //
     // TODO: This should have some finer granularity
     // so that we are able to distinguish between
@@ -1066,92 +1075,104 @@ static void addExplicitParameterBindings_GLSL(
     // the index/offset/etc.
     //
 
-    TypeLayout::ResourceInfo* resInfo = nullptr;
-    TypeLayout::ResourceInfo* foundResInfo = nullptr;
-
-    LayoutSemanticInfo semanticInfo;
-    semanticInfo.index = 0;
-    semanticInfo.space = 0;
-
-    LayoutSemanticInfo subpassSemanticInfo;
-    bool foundBinding = false;
-    bool foundSubpass = false;
-
-    if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
+    enum 
     {
-        for (auto dec : varDecl.getDecl()->modifiers)
+        kResInfo = 0,
+        kSubpassResInfo,
+        kMaxResCount,
+    };
+
+    TypeLayout::ResourceInfo* foundResInfo = nullptr;
+    struct ResAndSemanticInfo
+    {
+        TypeLayout::ResourceInfo* resInfo = nullptr;
+        LayoutSemanticInfo semanticInfo;
+        ResAndSemanticInfo()
         {
-            // Try to find `binding` and `set`
-            if (auto glslBindingAttr = as<GLSLBindingAttribute>(dec))
-            {
-                resInfo = foundResInfo;
-                semanticInfo.index = glslBindingAttr->binding;
-                semanticInfo.space = glslBindingAttr->set;
-                foundBinding = true;
-                if (foundSubpass) 
-                    break;
-            }
-            // Try to find `input_attachment_index`
-            else if (auto glslAttachmentIndexAttr = as<GLSLInputAttachmentIndexLayoutModifier>(dec))
-            {
-                // Subpass fills semantic info of a descriptor & subpass
-                subpassSemanticInfo.index = stringToInt(glslAttachmentIndexAttr->valToken.getContent());
-                subpassSemanticInfo.space = 0;
-                subpassSemanticInfo.kind = LayoutResourceKind::InputAttachmentIndex;
-                foundSubpass = true;
-                if (foundBinding) 
-                    break;
-            }
+            semanticInfo.index = 0;
+            semanticInfo.space = 0;
+        }
+    };
+    ResAndSemanticInfo info[kMaxResCount] = {};
+    
+    if (auto foundInputAttachmentIndex = typeLayout->FindResourceInfo(LayoutResourceKind::InputAttachmentIndex))
+    {
+        foundResInfo = foundInputAttachmentIndex;
+        // Try to find `input_attachment_index`
+        if (auto glslAttachmentIndexAttr = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
+        {
+            info[kSubpassResInfo].resInfo = foundResInfo;
+            // Subpass fills semantic info of a descriptor and subpass
+            info[kSubpassResInfo].semanticInfo.index = (UInt)glslAttachmentIndexAttr->location;
+            info[kSubpassResInfo].semanticInfo.space = 0;
         }
     }
-    else if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace)) != nullptr )
+
+    if(auto foundDescriptorTableSlot = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
     {
+        foundResInfo = foundDescriptorTableSlot;
+        // Try to find `binding` and `set`
+        if (auto glslBindingAttr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+        {
+            info[kResInfo].resInfo = foundResInfo;
+            info[kResInfo].semanticInfo.index = glslBindingAttr->binding;
+            info[kResInfo].semanticInfo.space = glslBindingAttr->set;
+        }
+    }
+    else if(auto foundSubElementRegisterSpace = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
+    {
+        foundResInfo = foundSubElementRegisterSpace;
         // Try to find `set`
         if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
         {
-            resInfo = foundResInfo;
+            info[kResInfo].resInfo = foundResInfo;
             if (attr->binding != 0)
             {
                 getSink(context)->diagnose(attr, Diagnostics::wholeSpaceParameterRequiresZeroBinding, varDecl.getName(), attr->binding);
             }
-            semanticInfo.index = attr->set;
-            semanticInfo.space = 0;
+            info[kResInfo].semanticInfo.index = attr->set;
+            info[kResInfo].semanticInfo.space = 0;
         }
     }
-    else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant)) != nullptr )
+    else if(auto foundSpecializationConstant = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant))
     {
+        info[kResInfo].resInfo = foundSpecializationConstant;
         DeclRef<Decl> varDecl2(varDecl);
 
         // Try to find `constant_id` binding
-        if(!findLayoutArg<GLSLConstantIDLayoutModifier>(varDecl2, &semanticInfo.index))
+        if(!findLayoutArg<GLSLConstantIDLayoutModifier>(varDecl2, &info[kResInfo].semanticInfo.index))
             return;
     }
 
-    // if we found resInfo, we add the explicit binding
-    if (resInfo)
+
+    auto varDeclBase = as<VarDeclBase>(varDecl);
+    bool hasABinding = false;
+    for (int i = 0; i < kMaxResCount; i++)
     {
-        auto kind = resInfo->kind;
-        auto count = resInfo->count;
+        auto* resInfoItem = info[i].resInfo;
+        auto& semanticInfo = info[i].semanticInfo;
+        if (!resInfoItem)
+            continue;
+
+        auto kind = resInfoItem->kind;
+        auto count = resInfoItem->count;
         semanticInfo.kind = kind;
+        hasABinding = true;
+        if(!varDeclBase)
+            break;
 
-        if (auto varDeclBase = varDecl.as<VarDeclBase>())
-        {
-            addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, count);
-            if (foundSubpass)
-                addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), subpassSemanticInfo, count);
-        }
-        return;
+        addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, count);
     }
+    if(hasABinding)
+        return;
 
-    // See if we can infer vulkan binding from HLSL if we have such options set, we know 
-    // we can't map
     auto hlslToVulkanLayoutOptions = context->getTargetProgram()->getHLSLToVulkanLayoutOptions();
-
-    // If we have the options, but cannot infer bindings, we don't need to go further
+    bool warnedMissingVulkanLayoutModifier = false;
+    // If we are not told how to infer bindings with a compile option, we warn
     if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
     {
+        warnedMissingVulkanLayoutModifier = true;
         _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-        return;
     }
 
     // We need an HLSL register semantic to to infer from
@@ -1188,23 +1209,41 @@ static void addExplicitParameterBindings_GLSL(
     }
 
     // If inference is not enabled for this kind, we can issue a warning
-    if (!hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
+    if (hlslToVulkanLayoutOptions && !hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
     {
-        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-        return;
+        if(!warnedMissingVulkanLayoutModifier)
+        {
+            _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+            warnedMissingVulkanLayoutModifier = true;
+        }
     }
 
     // We use the HLSL binding directly (even though this notionally for GLSL/Vulkan)
     // We'll do the shifting at later later point in _maybeApplyHLSLToVulkanShifts
-    resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
-    
-    semanticInfo.kind = resInfo->kind;
-    semanticInfo.index = UInt(hlslInfo.index);
-    semanticInfo.space = UInt(hlslInfo.space);
+    info[kResInfo].resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
 
-    const LayoutSize count = resInfo->count;
+    if (warnedMissingVulkanLayoutModifier)
+    {
+        // If we warn due to invalid bindings and user did not set how to interpret 'hlsl style bindings', we should map 
+        // `register` 1:1 with equivlent vulkan bindings.
+        if(!hlslToVulkanLayoutOptions
+            || hlslToVulkanLayoutOptions->getKindShiftEnabledFlags() == HLSLToVulkanLayoutOptions::KindFlag::None)
+        {
+            info[kResInfo].resInfo->kind = LayoutResourceKind::DescriptorTableSlot;
+            info[kResInfo].resInfo->count = 1;
+        }
+        else
+        {
+            return;
+        }
+    }
 
-    addExplicitParameterBinding(context, parameterInfo, as<VarDeclBase>(varDecl.getDecl()), semanticInfo, count);
+    info[kResInfo].semanticInfo.kind = info[kResInfo].resInfo->kind;
+    info[kResInfo].semanticInfo.index = UInt(hlslInfo.index);
+    info[kResInfo].semanticInfo.space = UInt(hlslInfo.space);
+    const LayoutSize count = info[kResInfo].resInfo->count;
+
+    addExplicitParameterBinding(context, parameterInfo, as<VarDeclBase>(varDecl.getDecl()), info[kResInfo].semanticInfo, count);
 }
 
 // Given a single parameter, collect whatever information we have on
@@ -1623,6 +1662,20 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
                 context->layoutContext,
                 type,
                 kEntryPointParameterDirection_Output);
+        }
+        else if (isSPIRV(context->getTargetRequest()->getTarget())
+             && (
+                    (state.directionMask & kEntryPointParameterDirection_Input && state.stage == Stage::Fragment)
+                    || (state.directionMask & kEntryPointParameterDirection_Output && state.stage == Stage::Vertex)
+                )
+            && sn == "sv_instanceid"
+            )
+        {
+            // This fragment-shader-input/vertex-shader-output is effectively not a system semantic for SPIR-V,
+            typeLayout = getSimpleVaryingParameterTypeLayout(
+                context->layoutContext,
+                type,
+                state.directionMask);
         }
         else
         {
@@ -2092,6 +2145,23 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
         return arrayTypeLayout;
     }
+    else if (auto patchType = as<HLSLPatchType>(type))
+    {
+        // Similar to the MeshOutput case, a `InputPatch` or `OutputPatch` type is just like an array.
+        //
+        auto elementTypeLayout = processEntryPointVaryingParameter(context, patchType->getElementType(), state, varLayout);
+
+        RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
+        arrayTypeLayout->elementTypeLayout = elementTypeLayout;
+        arrayTypeLayout->type = arrayType;
+
+        for (auto rr : elementTypeLayout->resourceInfos)
+        {
+            arrayTypeLayout->findOrAddResourceInfo(rr.kind)->count = rr.count;
+        }
+
+        return arrayTypeLayout;
+    }
     // Ignore a bunch of types that don't make sense here...
     else if (const auto subpassType = as<SubpassInputType>(type)) { return nullptr;  }
     else if (const auto textureType = as<TextureType>(type)) { return nullptr;  }
@@ -2152,9 +2222,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     state,
                     fieldVarLayout);
 
-                SLANG_ASSERT(fieldTypeLayout);
-                if(!fieldTypeLayout)
+                if (!fieldTypeLayout)
+                {
+                    getSink(context)->diagnose(field, Diagnostics::notValidVaryingParameter, field);
                     continue;
+                }
                 fieldVarLayout->typeLayout = fieldTypeLayout;
 
                 // The field needs to have offset information stored
@@ -4136,6 +4208,9 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
     if( !m_layout )
     {
         m_layout = generateParameterBindings(this, sink);
+        if (sink->getErrorCount() != 0)
+            return nullptr;
+
         if( m_layout )
         {
             m_irModuleForLayout = createIRModuleForLayout(sink);

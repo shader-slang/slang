@@ -1,6 +1,8 @@
 // half-conversion.slang
 
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage fragment
+
+// SPIRV: OpBitcast
 
 cbuffer C
 {

@@ -3,6 +3,7 @@
 #include "slang-ir-insts.h"
 #include "slang-diagnostics.h"
 #include "slang-ir-autodiff.h"
+#include "slang-ir-lower-cuda-builtin-types.h"
 
 namespace Slang
 {
@@ -13,10 +14,31 @@ static IRType* translateToTupleType(
 {
     if (as<IRVoidType>(type))
         return type;
-    if (as<IRBasicType>(type))
+    else if (as<IRBasicType>(type))
         return type;
     else if (as<IRTorchTensorType>(type))
         return type;
+    else if (auto matrixType = as<IRMatrixType>(type))
+    {
+        auto rowCount = as<IRIntLit>(matrixType->getRowCount());
+        auto colCount = as<IRIntLit>(matrixType->getColumnCount());
+        if (!rowCount || !colCount)
+        {
+            return nullptr;
+        }
+        List<IRType*> elementTypes;
+        for (IRIntegerValue i = 0; i < rowCount->getValue(); i++)
+        {
+            elementTypes.addRange(matrixType->getElementType());
+        }
+        auto elementTupleType = builder.getTargetTupleType((UInt)elementTypes.getCount(), elementTypes.getBuffer());
+        List<IRType*> rowTypes;
+        for (IRIntegerValue i = 0; i < colCount->getValue(); i++)
+        {
+            rowTypes.add(elementTupleType);
+        }
+        return builder.getTargetTupleType((UInt)rowTypes.getCount(), rowTypes.getBuffer());
+    }
     else if (auto vectorType = as<IRVectorType>(type))
     {
         auto count = as<IRIntLit>(vectorType->getElementCount());
@@ -60,6 +82,10 @@ static IRType* translateToTupleType(
         }
         return builder.getTargetTupleType((UInt)elementTypes.getCount(), elementTypes.getBuffer());
     }
+    else if (as<IRTargetTupleType>(type))
+    {
+        return type;
+    }
     else
     {
         return nullptr;
@@ -76,6 +102,38 @@ static IRInst* makeTargetTuple(IRBuilder& builder, IRInst* val)
         return val;
     else if (as<IRTorchTensorType>(type))
         return val;
+    else if (auto matrixType = as<IRMatrixType>(type))
+    {
+        auto rowCount = as<IRIntLit>(matrixType->getRowCount());
+        auto colCount = as<IRIntLit>(matrixType->getColumnCount());
+        if (!rowCount || !colCount)
+        {
+            return nullptr;
+        }
+        List<IRInst*> rowElements;
+        List<IRType*> rowTypes;
+        for (IRIntegerValue i = 0; i < rowCount->getValue(); i++)
+        {
+            List<IRInst*> colElements;
+            List<IRType*> colTypes;
+            for (IRIntegerValue j = 0; j < colCount->getValue(); j++)
+            {
+                auto elementVal = builder.emitElementExtract(val, builder.getIntValue(builder.getIntType(), i));
+                auto tupleElement = makeTargetTuple(builder, elementVal);
+                if (!tupleElement)
+                    return nullptr;
+                colElements.add(tupleElement);
+                colTypes.add(tupleElement->getFullType());
+            }
+            auto rowType = builder.getTargetTupleType((UInt)colTypes.getCount(), colTypes.getBuffer());
+            rowTypes.add(rowType);
+            rowElements.add(builder.emitMakeTargetTuple(rowType, (UInt)colElements.getCount(), colElements.getBuffer()));
+        }
+        return builder.emitMakeTargetTuple(
+            builder.getTargetTupleType((UInt)rowTypes.getCount(), rowTypes.getBuffer()), 
+            (UInt)rowElements.getCount(),
+            rowElements.getBuffer());
+    }
     else if (auto vectorType = as<IRVectorType>(type))
     {
         auto count = as<IRIntLit>(vectorType->getElementCount());
@@ -134,6 +192,10 @@ static IRInst* makeTargetTuple(IRBuilder& builder, IRInst* val)
         auto resultType = builder.getTargetTupleType((UInt)elementTypes.getCount(), elementTypes.getBuffer());
         return builder.emitMakeTargetTuple(resultType, (UInt)resultElements.getCount(), resultElements.getBuffer());
     }
+    else if (as<IRTargetTupleType>(type))
+    {
+        return val;
+    }
     else
     {
         return nullptr;
@@ -149,6 +211,25 @@ static IRInst* makeValueFromTargetTuple(IRBuilder& builder, IRType* type, IRInst
         return val;
     else if (as<IRTorchTensorType>(type))
         return val;
+    else if (auto matrixType = as<IRMatrixType>(type))
+    {
+        auto rowCount = as<IRIntLit>(matrixType->getRowCount());
+        auto colCount = as<IRIntLit>(matrixType->getColumnCount());
+        SLANG_ASSERT(rowCount && colCount);
+
+        List<IRInst*> resultElements;
+        auto rowType = builder.getTargetTupleType((UInt)colCount->getValue(), List<IRType*>().makeRepeated(matrixType->getElementType(), (Index)colCount->getValue()).getBuffer());
+        for (IRIntegerValue i = 0; i < rowCount->getValue(); i++)
+        {
+            auto rowElement = builder.emitTargetTupleGetElement(rowType, val, builder.getIntValue(builder.getIntType(), i));
+            for (IRIntegerValue j = 0; j < colCount->getValue(); j++)
+            {
+                auto element = builder.emitTargetTupleGetElement(matrixType->getElementType(), rowElement, builder.getIntValue(builder.getIntType(), j));
+                resultElements.add(element);
+            }
+        }
+        return builder.emitMakeMatrix(type, (UInt)resultElements.getCount(), resultElements.getBuffer());
+    }
     else if (auto vectorType = as<IRVectorType>(type))
     {
         auto count = as<IRIntLit>(vectorType->getElementCount());
@@ -181,6 +262,15 @@ static IRInst* makeValueFromTargetTuple(IRBuilder& builder, IRType* type, IRInst
         for (IRIntegerValue i = 0; i < arraySize->getValue(); i++)
         {
             auto tupleElement = builder.emitTargetTupleGetElement(tupleElementType, val, builder.getIntValue(builder.getIntType(), i));
+
+            // Make a name hint: <valname>_<i>
+            if (auto nameHint = val->findDecoration<IRNameHintDecoration>())
+            {
+                StringBuilder newName;
+                newName << nameHint->getName() << "_" << i;
+                builder.addNameHintDecoration(tupleElement, newName.getUnownedSlice());
+            }
+            
             auto convertedElement = makeValueFromTargetTuple(builder, elementType, tupleElement);
             if (!convertedElement)
                 return nullptr;
@@ -194,7 +284,22 @@ static IRInst* makeValueFromTargetTuple(IRBuilder& builder, IRType* type, IRInst
         IRIntegerValue i = 0;
         for (auto field : structType->getFields())
         {
-            auto tupleElement = builder.emitTargetTupleGetElement(translateToTupleType(builder, field->getFieldType()), val, builder.getIntValue(builder.getIntType(), i));
+            auto tupleElement = builder.emitTargetTupleGetElement(
+                translateToTupleType(builder, field->getFieldType()), 
+                val,
+                builder.getIntValue(builder.getIntType(), i));
+            
+            // Make a name hint: <valname>_<fieldname>
+            if (auto nameHint = val->findDecoration<IRNameHintDecoration>())
+            {
+                if (auto fieldHint = field->getKey()->findDecoration<IRNameHintDecoration>())
+                {
+                    StringBuilder newName;
+                    newName << nameHint->getName() << "_" << fieldHint->getName();
+                    builder.addNameHintDecoration(tupleElement, newName.getUnownedSlice());
+                }
+            }
+
             auto convertedElement = makeValueFromTargetTuple(builder, field->getFieldType(), tupleElement);
             if (!convertedElement)
                 return nullptr;
@@ -202,6 +307,10 @@ static IRInst* makeValueFromTargetTuple(IRBuilder& builder, IRType* type, IRInst
             i++;
         }
         return builder.emitMakeStruct(type, (UInt)resultElements.getCount(), resultElements.getBuffer());
+    }
+    else if (as<IRTargetTupleType>(type))
+    {
+        return val;
     }
     else
     {
@@ -318,43 +427,32 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
 
 IRType* translateToHostType(IRBuilder* builder, IRType* type, IRInst* func, DiagnosticSink* sink = nullptr)
 {
-    if (as<IRBasicType>(type) || as<IRVectorType>(type))
+    if (as<IRBasicType>(type) || as<IRVectorType>(type) || as<IRMatrixType>(type))
         return type;
 
     switch (type->getOp())
     {
     case kIROp_TensorViewType:
         return builder->getTorchTensorType(as<IRTensorViewType>(type)->getElementType());
-#if 0
-    case kIROp_VectorType:
-    {
-        // Create a new struct type representing the vector.
-        auto hostStructType = builder->createStructType();
-        const char* names[4] = { "x", "y", "z", "w" };
-        for (IRIntegerValue i = 0; i < getIntVal(as<IRVectorType>(type)->getElementCount()); i++)
-        {
-            auto key = builder->createStructKey();
-            if (i < 4)
-                builder->addNameHintDecoration(key, UnownedStringSlice(names[i]));
-            builder->createStructField(hostStructType, key, as<IRVectorType>(type)->getElementType());
-        }
-        return hostStructType;
-    }
-#endif
     case kIROp_StructType:
     {
         // Create a new struct type with translated fields.
         List<IRType*> fieldTypes;
+        List<IRNameHintDecoration*> fieldNames;
         for (auto field : as<IRStructType>(type)->getFields())
         {
             fieldTypes.add(translateToHostType(builder, field->getFieldType(), func, sink));
+            fieldNames.add(field->getKey()->findDecoration<IRNameHintDecoration>());
         }
         auto hostStructType = builder->createStructType();
 
         // Add fields to the struct.
         for (UInt i = 0; i < (UInt)fieldTypes.getCount(); i++)
         {
-            builder->createStructField(hostStructType, builder->createStructKey(), fieldTypes[i]);
+            auto structKey = builder->createStructKey();
+            if (fieldNames[i])
+                builder->addNameHintDecoration(structKey, fieldNames[i]->getName());
+            builder->createStructField(hostStructType, structKey, fieldTypes[i]);
         }
 
         return hostStructType;
@@ -375,6 +473,43 @@ IRType* translateToHostType(IRBuilder* builder, IRType* type, IRInst* func, Diag
     return nullptr;
 }
 
+// Propagates name hints through field extracts.
+IRInst* propagateNameHint(IRBuilder* builder, IRFieldExtract* inst)
+{
+    // If the field has a name hint, propagate it to the inst by appending the field name to the inst name 
+    // (which must be fetched from the inst's name hint decoration).
+    //
+    // This is useful for propagating the name hint from a struct field to the inst that extracts the field.
+    if (auto nameHint = inst->getField()->findDecoration<IRNameHintDecoration>())
+    {
+        if (auto instNameHint = inst->getBase()->findDecoration<IRNameHintDecoration>())
+        {
+            StringBuilder newName;
+            newName << instNameHint->getName() << "_" << nameHint->getName();
+            builder->addNameHintDecoration(inst, newName.getUnownedSlice());
+        }
+    }
+
+    return inst;
+}
+
+// Propagates name hints through array indexing
+IRInst* propagateNameHint(IRBuilder* builder, IRGetElement* inst)
+{
+    // If the index is a constant, we can propagate the name hint from the inst to the index.
+    if (auto intLit = as<IRIntLit>(inst->getIndex()))
+    {
+        if (auto nameHint = inst->getBase()->findDecoration<IRNameHintDecoration>())
+        {
+            StringBuilder newName;
+            newName << nameHint->getName() << "_" << intLit->getValue();
+            builder->addNameHintDecoration(inst, newName.getUnownedSlice());
+        }
+    }
+
+    return inst;
+}
+
 IRInst* castHostToCUDAType(IRBuilder* builder, IRType* hostType, IRType* cudaType, IRInst* inst)
 {
     if (hostType == cudaType)
@@ -386,18 +521,6 @@ IRInst* castHostToCUDAType(IRBuilder* builder, IRType* hostType, IRType* cudaTyp
     {
     case kIROp_TensorViewType:
         return builder->emitMakeTensorView(cudaType, inst);
-#if 0
-    case kIROp_VectorType:
-    {
-        List<IRInst*> args;
-        auto hostStructType = cast<IRStructType>(hostType);
-        for (auto field : hostStructType->getFields())
-        {
-            args.add(builder->emitFieldExtract(field->getFieldType(), inst, field->getKey()));
-        }
-        return builder->emitMakeVector(cudaType, args);
-    }
-#endif
     case kIROp_StructType:
     {
         auto cudaStructType = cast<IRStructType>(cudaType);
@@ -422,7 +545,9 @@ IRInst* castHostToCUDAType(IRBuilder* builder, IRType* hostType, IRType* cudaTyp
                 builder,
                 hostFieldType,
                 cudaFieldType,
-                builder->emitFieldExtract(hostFieldType, inst, hostField->getKey()));
+                propagateNameHint(
+                    builder,
+                    cast<IRFieldExtract>(builder->emitFieldExtract(hostFieldType, inst, hostField->getKey()))));
 
             SLANG_RELEASE_ASSERT(castedField);
             resultFields.add(castedField);
@@ -444,7 +569,9 @@ IRInst* castHostToCUDAType(IRBuilder* builder, IRType* hostType, IRType* cudaTyp
                 builder,
                 hostElementType,
                 cudaElementType,
-                builder->emitElementExtract(inst, builder->getIntValue(builder->getIntType(), i)));
+                propagateNameHint(
+                    builder, 
+                    cast<IRGetElement>(builder->emitElementExtract(inst, builder->getIntValue(builder->getIntType(), i)))));
 
             SLANG_RELEASE_ASSERT(castedElement);
             resultElements.add(castedElement);
@@ -575,7 +702,6 @@ void generateReflectionFunc(IRBuilder* builder, IRFunc* kernelFunc, IRFunc* host
 
     builder->addExternCppDecoration(reflectionFunc, reflFuncExportName.getUnownedSlice());
     builder->addTorchEntryPointDecoration(reflectionFunc, reflFuncExportName.getUnownedSlice());
-    builder->addHLSLExportDecoration(reflectionFunc);
     builder->addKeepAliveDecoration(reflectionFunc);
 }
 
@@ -591,7 +717,8 @@ IRInst* generateHostParamForCUDAParam(IRBuilder* builder, IRParam* param, Diagno
     }
     
     auto hostParam = builder->emitParam(type);
-    // Add a namehint to the param by appending the suffix "_host".
+
+    // Add a namehint to the param
     if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
     {
         builder->addNameHintDecoration(hostParam, nameHint->getName());
@@ -760,7 +887,6 @@ void generateReflectionForType(IRType* type, DiagnosticSink* sink)
  
     builder.addTorchEntryPointDecoration(reflFunc, reflFuncExportName.getUnownedSlice());
     builder.addExternCppDecoration(reflFunc, reflFuncExportName.getUnownedSlice());
-    builder.addHLSLExportDecoration(reflFunc);
     builder.addKeepAliveDecoration(reflFunc);
 }
 
@@ -842,7 +968,6 @@ IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
         // Mark for host-side emit logic.
         builder.addCudaHostDecoration(hostFunc);
         // Keep alive. This method will be accessed externally.
-        builder.addHLSLExportDecoration(hostFunc);
         builder.addKeepAliveDecoration(hostFunc);
     }
 
@@ -858,12 +983,138 @@ IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
     return hostFunc;
 }
 
-void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
+void lowerBuiltinTypesForKernelEntryPoints(IRModule* module, DiagnosticSink*)
 {
-    List<IRFunc*> workList;
     List<IRFunc*> cudaKernels;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(globalInst))
+        {
+            if (func->findDecoration<IRCudaKernelDecoration>())
+            {
+                cudaKernels.add(func);
+            }
+        }
+    }
+
+    BuiltinTypeLoweringEnv typeLoweringEnv;
+    IRBuilder builder(module);
+    for (auto func : cudaKernels)
+    {
+        // Go through parameters and replace any built-in types with their equivalent.
+        List<IRParam*> params;
+        for (auto param : func->getFirstBlock()->getParams())
+        {
+            params.add(param);
+        }
+
+        bool changed = false;
+        List<LoweredBuiltinTypeInfo> loweredParamTypes;
+        for (auto param : params)
+        {
+            LoweredBuiltinTypeInfo info = lowerType(&typeLoweringEnv, &builder, param->getDataType());
+            loweredParamTypes.add(info);
+
+            if (info.convertLoweredToOriginal != nullptr)
+            {
+                // Replace parameter with the lowered type.
+                auto originalType = param->getDataType();
+                param->setFullType(info.loweredType);
+
+                // Call the conversion function to convert the lowered parameter to the original parameter.
+                List<IRInst*> args;
+                args.add(param);
+
+                setInsertAfterOrdinaryInst(&builder, param);
+                auto convertedParam = builder.emitCallInst(originalType, info.convertLoweredToOriginal, args);
+
+                // Replace all uses of the lowered parameter with the converted parameter, except for the call instruction.
+                for (auto use = param->firstUse; use;)
+                {
+                    auto nextUse = use->nextUse;
+
+                    if (use->getUser() == convertedParam)
+                    {
+                        use = nextUse;
+                        continue;
+                    }
+
+                    use->set(convertedParam);
+                    use = nextUse;
+                }
+                
+                changed = true;
+            }
+        }
+
+        if (!changed)
+            continue;
+        
+        fixUpFuncType(func);
+
+        // Go through any calls to this function and insert a call to converOriginalToLowered before the call.
+        for (auto use = func->firstUse; use;)
+        {
+            auto nextUse = use->nextUse;
+            
+            if (as<IRCall>(use->getUser()) || as<IRDispatchKernel>(use->getUser()))
+            {
+                auto user = use->getUser();
+                IROperandList<IRInst> argsList;
+                if (auto callInst = as<IRCall>(user))
+                    argsList = callInst->getArgsList();
+                else if (auto dispatchInst = as<IRDispatchKernel>(user))
+                    argsList = dispatchInst->getArgsList();
+
+                // Insert a call to convertOriginalToLowered before the call.
+                List<IRInst*> convertedArgs;
+                IRBuilder callBuilder(func->getModule());
+                callBuilder.setInsertBefore(user);
+                for (auto arg : argsList)
+                {
+                    if (loweredParamTypes[convertedArgs.getCount()].convertOriginalToLowered != nullptr)
+                    {
+                        auto convertedArg = callBuilder.emitCallInst(
+                            loweredParamTypes[convertedArgs.getCount()].loweredType,
+                            loweredParamTypes[convertedArgs.getCount()].convertOriginalToLowered,
+                            List<IRInst*>(arg));
+                        convertedArgs.add(convertedArg);
+                    }
+                    else
+                    {
+                        convertedArgs.add(arg);
+                    }
+                }
+
+                // Rebuild the call/dispatch inst.
+                IRInst* newCall = nullptr;
+                
+                if (as<IRCall>(user))
+                    newCall = callBuilder.emitCallInst(user->getFullType(), func, convertedArgs);
+                else if (auto dispatchInst = as<IRDispatchKernel>(user))
+                    newCall = callBuilder.emitDispatchKernelInst(
+                        user->getFullType(),
+                        func,
+                        dispatchInst->getThreadGroupSize(),
+                        dispatchInst->getDispatchSize(),
+                        convertedArgs.getCount(),
+                        convertedArgs.getBuffer());
+
+                // Replace the call instruction.
+                user->replaceUsesWith(newCall);
+
+                // Remove the call instruction.
+                user->removeAndDeallocate();
+            }
+
+            use = nextUse;
+        }
+    }
+}
+
+void generateHostFunctionsForAutoBindCuda(IRModule* module, DiagnosticSink* sink)
+{
     List<IRFunc*> autoBindRequests;
-    List<IRType*> typesToExport;
     for (auto globalInst : module->getGlobalInsts())
     {
         if (auto func = as<IRFunc>(globalInst))
@@ -872,6 +1123,24 @@ void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
             {
                 autoBindRequests.add(func);
             }
+        }
+    }
+
+    for (auto func : autoBindRequests)
+    {
+        generateCUDAWrapperForFunc(func, sink);
+    }
+}
+
+void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
+{
+    List<IRFunc*> workList;
+    List<IRFunc*> cudaKernels;
+    List<IRType*> typesToExport;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(globalInst))
+        {
             if (func->findDecoration<IRTorchEntryPointDecoration>())
             {
                 workList.add(func);
@@ -892,16 +1161,6 @@ void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
                 if (auto decor = func->findDecoration<IRDllExportDecoration>())
                     decor->removeAndDeallocate();
             }
-        }
-    }
-
-    // Generate CUDA wrappers for all functions that have the auto-bind decoration.
-    for (auto func : autoBindRequests)
-    {
-        if (auto hostFunc = generateCUDAWrapperForFunc(func, sink))
-        {
-            // Add generated wrapper to worklist for python bindings.
-            workList.add(hostFunc);
         }
     }
 
@@ -967,7 +1226,27 @@ void handleAutoBindNames(IRModule* module)
                 nameBuilder << "__kernel__" << externCppHint->getName();
                 externCppHint->removeAndDeallocate();
                 builder.addExternCppDecoration(globalInst, nameBuilder.getUnownedSlice());
-                builder.addExternCDecoration(globalInst);
+            }
+        }
+    }
+}
+
+void removeTorchAndCUDAEntryPoints(IRModule* module)
+{
+    // Go through global insts, find cuda & torch related entry points and remove the keep-alive decoration.
+    IRBuilder builder(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(globalInst))
+        {
+            if (func->findDecoration<IRAutoPyBindCudaDecoration>() ||
+                func->findDecoration<IRTorchEntryPointDecoration>() ||
+                func->findDecoration<IRCudaKernelDecoration>())
+            {
+                if (auto keepAlive = func->findDecoration<IRKeepAliveDecoration>())
+                    keepAlive->removeAndDeallocate();
+                if (auto hlslExport = func->findDecoration<IRHLSLExportDecoration>())
+                    hlslExport->removeAndDeallocate();
             }
         }
     }
@@ -1011,7 +1290,13 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
                 List<IRInst*> params;
                 for (auto param : func->getFirstBlock()->getParams())
                 {
-                    params.add(builder.emitParam(param->getFullType()));
+                    auto newParam = builder.emitParam(param->getFullType());
+                    
+                    // Copy over the name hint.
+                    if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
+                        builder.addNameHintDecoration(newParam, nameHint->getName());
+
+                    params.add(newParam);
                 }
 
                 wrapperFunc->setFullType(func->getFullType());
@@ -1047,7 +1332,6 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
                     builder.addExternCppDecoration(wrapperFunc, nameBuilder.getUnownedSlice());
                 }
 
-                builder.addHLSLExportDecoration(wrapperFunc);
                 builder.addKeepAliveDecoration(wrapperFunc);
 
                 builder.addCudaKernelForwardDerivativeDecoration(func, wrapperFunc);
@@ -1070,7 +1354,13 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
                 List<IRInst*> params;
                 for (auto param : func->getFirstBlock()->getParams())
                 {
-                    params.add(builder.emitParam(param->getFullType()));
+                    auto newParam = builder.emitParam(param->getFullType());
+                    
+                    // Copy over the name hint.
+                    if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
+                        builder.addNameHintDecoration(newParam, nameHint->getName());
+
+                    params.add(newParam);
                 }
 
                 wrapperFunc->setFullType(func->getFullType());
@@ -1106,7 +1396,6 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
                     builder.addExternCppDecoration(wrapperFunc, nameBuilder.getUnownedSlice());
                 }
 
-                builder.addHLSLExportDecoration(wrapperFunc);
                 builder.addKeepAliveDecoration(wrapperFunc);
 
                 builder.addCudaKernelBackwardDerivativeDecoration(func, wrapperFunc);

@@ -1,21 +1,28 @@
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -emit-spirv-via-glsl -entry main -stage miss -profile glsl_460+GL_EXT_ray_tracing -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage miss -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage miss
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage miss -profile sm_6_5 -DNOMOTION
 
+// SPIRV-NOT: OpCapability RayQueryKHR
+// SPIRV-DAG: OpCapability RayTracingKHR
+// SPIRV-DAG: OpCapability RayTracingMotionBlurNV
+// SPIRV-DAG: SPV_KHR_ray_tracing
+// SPIRV-DAG: SPV_NV_ray_tracing_motion_blur
+
 // SPIRV: OpEntryPoint
 
-// SPIRV: OpLoad %v3uint %gl_LaunchIDEXT
-// SPIRV: OpLoad %v3uint %gl_LaunchSizeEXT
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchIdNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchSizeNV
+// SPIRV-DAG: OpDecorate %{{.*}} Binding 0
+// SPIRV-DAG: OpDecorate %{{.*}} DescriptorSet 0
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn WorldRayOriginNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn WorldRayDirectionNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayTminNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayTmaxNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn IncomingRayFlagsNV
 
 // SPIRV: OpTraceRayKHR
 // SPIRV: OpTraceRayMotionNV
-
-// SPIRV: OpLoad %v3float %gl_WorldRayOriginEXT
-// SPIRV: OpLoad %v3float %gl_WorldRayDirectionEXT
-// SPIRV: OpLoad %float %gl_RayTminEXT
-// SPIRV: OpLoad %float %gl_RayTmaxEXT
-// SPIRV: OpLoad %uint %gl_IncomingRayFlagsEXT
-
 // SPIRV: OpExecuteCallableKHR
 
 // DXIL: main

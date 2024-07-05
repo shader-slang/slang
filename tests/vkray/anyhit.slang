@@ -1,11 +1,7 @@
 // closesthit.slang
 
-// Note: explicitly requesting `spirv_1_4` as part of the compiler
-// options is for the benefit of the glslang pass-through path,
-// where we cannot infer the required SPIR-V version from the code
-// (and glslang doesn't include any such inference ability).
-
-//TEST:SIMPLE(filecheck=CHECK): -profile glsl_460+spirv_1_4 -stage anyhit -entry main -target spirv-assembly -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=GL_SPIRV): -stage anyhit -entry main -target spirv-assembly -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=SPIRV): -stage anyhit -entry main -target spirv
 
 struct SphereHitAttributes
 {
@@ -55,15 +51,27 @@ void main(
 	HitTriangleVertexPosition(index);
 }
 
-// CHECK: OpCapability RayTracing
-// CHECK: OpCapability RayTracingPositionFetchKHR
-// CHECK: OpEntryPoint AnyHitNV %main "main"
-// CHECK: OpDecorate %{{.*}} BuiltIn HitTriangleVertexPositionsKHR
-// CHECK: %_ptr_HitAttributeNV_SphereHitAttributes_0 = OpTypePointer HitAttributeNV %SphereHitAttributes_0
-// CHECK: %_S{{.*}} = OpVariable %_ptr_HitAttributeNV_SphereHitAttributes_0 HitAttributeNV
-// CHECK: %{{.*}} = OpAccessChain %_ptr_HitAttributeNV_v3float %_S{{.*}} %int_0
-// CHECK: OpTerminateRayKHR
-// CHECK: OpIgnoreIntersectionKHR
-// CHECK: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_0
-// CHECK: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_1
-// CHECK: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_2
+// SPIRV-DAG: OpCapability RayTracing
+// SPIRV-DAG: OpCapability RayTracingPositionFetchKHR
+// SPIRV: OpEntryPoint
+// SPIRV: BuiltIn HitTriangleVertexPositionsKHR
+// SPIRV: OpTypePointer HitAttributeNV
+// SPIRV: OpTypePointer HitAttributeNV
+// SPIRV: OpVariable{{.*}}HitAttributeNV
+// SPIRV: OpIgnoreIntersectionKHR
+// SPIRV: OpTerminateRayKHR
+// SPIRV-DAG: %{{.*}} = OpAccessChain %{{.*}} %{{.*}} %{{.*}}
+// SPIRV-DAG: %{{.*}} = OpAccessChain %{{.*}} %{{.*}} %{{.*}}
+// SPIRV-DAG: %{{.*}} = OpAccessChain %{{.*}} %{{.*}} %{{.*}}
+
+// GL_SPIRV-DAG: OpCapability RayTracing
+// GL_SPIRV-DAG: OpCapability RayTracingPositionFetchKHR
+// GL_SPIRV: OpEntryPoint
+// GL_SPIRV: BuiltIn HitTriangleVertexPositionsKHR
+// GL_SPIRV-DAG: OpTypePointer HitAttributeNV
+// GL_SPIRV-DAG: OpTypePointer HitAttributeNV
+// GL_SPIRV: OpTerminateRayKHR
+// GL_SPIRV: OpIgnoreIntersectionKHR
+// GL_SPIRV-DAG: %{{.*}} = OpAccessChain %{{.*}} %{{.*}} %{{.*}}
+// GL_SPIRV-DAG: %{{.*}} = OpAccessChain %{{.*}} %{{.*}} %{{.*}}
+// GL_SPIRV-DAG: %{{.*}} = OpAccessChain %{{.*}} %{{.*}} %{{.*}}

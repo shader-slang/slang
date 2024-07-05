@@ -192,6 +192,9 @@ INST(Nop, nop, 0, 0)
             INST(PrimitivesType, Primitives, 2, HOISTABLE)
         INST_RANGE(MeshOutputType, VerticesType, PrimitivesType)
 
+        /* Metal Mesh Grid Properties */
+            INST(MetalMeshGridPropertiesType, mesh_grid_properties, 0, HOISTABLE)
+
         /* HLSLStructuredBufferTypeBase */
             INST(HLSLStructuredBufferType,                  StructuredBuffer,                   0, HOISTABLE)
             INST(HLSLRWStructuredBufferType,                RWStructuredBuffer,                 0, HOISTABLE)
@@ -363,7 +366,7 @@ INST(InterfaceRequirementEntry, interface_req_entry, 2, GLOBAL)
 
 // An inst to represent the workgroup size of the calling entry point.
 // We will materialize this inst during `translateGLSLGlobalVar`.
-INST(GetWorkGroupSize, kIROp_GetWorkGroupSize, 0, HOISTABLE)
+INST(GetWorkGroupSize, GetWorkGroupSize, 0, HOISTABLE)
 
 INST(Param, param, 0, 0)
 INST(StructField, field, 2, 0)
@@ -428,25 +431,27 @@ INST(ImageStore, imageStore, 3, 0)
 
 // Load (almost) arbitrary-type data from a byte-address buffer
 //
-// %dst = byteAddressBufferLoad(%buffer, %offset)
+// %dst = byteAddressBufferLoad(%buffer, %offset, %alignment)
 //
 // where
 // - `buffer` is a value of some `ByteAddressBufferTypeBase` type
 // - `offset` is an `int`
+// - `alignment` is an `int`
 // - `dst` is a value of some type containing only ordinary data
 //
-INST(ByteAddressBufferLoad, byteAddressBufferLoad, 2, 0)
+INST(ByteAddressBufferLoad, byteAddressBufferLoad, 3, 0)
 
 // Store (almost) arbitrary-type data to a byte-address buffer
 //
-// byteAddressBufferLoad(%buffer, %offset, %src)
+// byteAddressBufferLoad(%buffer, %offset, %alignment, %src)
 //
 // where
 // - `buffer` is a value of some `ByteAddressBufferTypeBase` type
 // - `offset` is an `int`
+// - `alignment` is an `int`
 // - `src` is a value of some type containing only ordinary data
 //
-INST(ByteAddressBufferStore, byteAddressBufferStore, 3, 0)
+INST(ByteAddressBufferStore, byteAddressBufferStore, 4, 0)
 
 // Load data from a structured buffer
 //
@@ -583,8 +588,6 @@ INST(TargetSwitch, targetSwitch, 1, 0)
 // A generic asm inst has an return semantics that terminates the control flow.
 INST(GenericAsm, GenericAsm, 1, 0)
 
-INST(discard, discard, 0, 0)
-
 /* IRUnreachable */
 INST(MissingReturn, missingReturn, 0, 0)
 INST(Unreachable, unreachable, 0, 0)
@@ -592,8 +595,12 @@ INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
 INST_RANGE(TerminatorInst, Return, Unreachable)
 
+INST(discard, discard, 0, 0)
+
 INST(RequirePrelude, RequirePrelude, 1, 0)
 INST(RequireGLSLExtension, RequireGLSLExtension, 1, 0)
+INST(RequireComputeDerivative, RequireComputeDerivative, 0, 0)
+INST(StaticAssert, StaticAssert, 2, 0)
 
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point
@@ -653,6 +660,8 @@ INST(SampleGrad, sampleGrad, 4, 0)
 
 INST(GroupMemoryBarrierWithGroupSync, GroupMemoryBarrierWithGroupSync, 0, 0)
 
+INST(ControlBarrier, ControlBarrier, 0, 0)
+
 // GPU_FOREACH loop of the form 
 INST(GpuForeach, gpuForeach, 3, 0)
 
@@ -671,9 +680,12 @@ INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
 
 INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 0)
 
-INST(GetLegalizedSPIRVGlobalParamAddr, kIROp_GetLegalizedSPIRVGlobalParamAddr, 1, 0)
+INST(GetLegalizedSPIRVGlobalParamAddr, GetLegalizedSPIRVGlobalParamAddr, 1, 0)
+
+INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, 0)
 
 INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
+INST(MetalAtomicCast, MetalAtomicCast, 1, 0)
 
 INST(MakeArrayList, makeArrayList, 0, 0)
 INST(MakeTensorView, makeTensorView, 0, 0)
@@ -709,6 +721,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST_RANGE(TargetSpecificDecoration, TargetDecoration, RequirePreludeDecoration)
     INST(GLSLOuterArrayDecoration,          glslOuterArray,         1, 0)
     
+    INST(TargetSystemValueDecoration,       TargetSystemValue,      2, 0)
+
     INST(InterpolationModeDecoration,       interpolationMode,      1, 0)
     INST(NameHintDecoration,                nameHint,               1, 0)
 
@@ -732,6 +746,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
     INST(RequireCUDASMVersionDecoration,    requireCUDASMVersion,   1, 0)
+    INST(RequireCapabilityAtomDecoration,   requireCapabilityAtom, 1, 0)
 
     INST(HasExplicitHLSLBindingDecoration, HasExplicitHLSLBinding, 0, 0)
 
@@ -861,6 +876,10 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
         /// Applie to an IR function and signals that inlining should not be performed unless unavoidable.
     INST(NoInlineDecoration, noInline, 0, 0)
+    INST(NoRefInlineDecoration, noRefInline, 0, 0)
+
+    INST(DerivativeGroupQuadDecoration, DerivativeGroupQuad, 0, 0)
+    INST(DerivativeGroupLinearDecoration, DerivativeGroupLinear, 0, 0)
 
         // Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
     INST(NonCopyableTypeDecoration, nonCopyable, 0, 0)
@@ -874,7 +893,6 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(GlobalOutputDecoration, output, 0, 0)
     INST(GlobalInputDecoration, output, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
-    INST(GLSLInputAttachmentIndexDecoration, glslInputAttachmentIndex, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
@@ -890,6 +908,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         // Marks an inst that represents the gl_Position input.
     INST(GLPositionInputDecoration, PositionInput, 0, 0)
 
+        // Marks a fragment shader input as per-vertex.
+    INST(PerVertexDecoration, PerVertex, 0, 0)
 
     /* StageAccessDecoration */
         INST(StageReadAccessDecoration, stageReadAccess, 0, 0)
@@ -1162,6 +1182,9 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 
 /* Differentiable Type Dictionary */
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
+
+INST(BeginFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
+INST(EndFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
 
 /* DebugInfo */
 INST(DebugSource, DebugSource, 2, HOISTABLE)

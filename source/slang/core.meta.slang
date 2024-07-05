@@ -74,6 +74,13 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
+__magic_type(DefaultInitializableType)
+interface IDefaultInitializableType
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::DefaultInitializableConstructor))
+    __init();
+}
+
 interface IComparable
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::Equals))
@@ -187,7 +194,9 @@ interface IFloat : IArithmetic, IDifferentiable
 /// A type that can be used as an operand for builtins
 [sealed]
 [builtin]
-interface __BuiltinType {}
+interface __BuiltinType 
+{
+}
 
 /// A type that can be used for arithmetic operations
 [sealed]
@@ -243,6 +252,9 @@ void __requirePrelude(constexpr String preludeText);
 
 __intrinsic_op($(kIROp_RequireGLSLExtension))
 void __requireGLSLExtension(constexpr String preludeText);
+
+__intrinsic_op($(kIROp_StaticAssert))
+void static_assert(constexpr bool condition, NativeString errorMessage);
 
 /// Interface to denote types as differentiable.
 /// Allows for user-specified differential types as
@@ -382,20 +394,6 @@ interface IArray<T>
     }
 }
 
-__generic<T, let N:int>
-__magic_type(ArrayExpressionType)
-struct Array : IArray<T>
-{
-    [ForceInline]
-    int getCount() { return N; }
-
-    __subscript(int index) -> T
-    {
-        __intrinsic_op($(kIROp_GetElement))
-        get;
-    }
-}
-
 // The "comma operator" is effectively just a generic function that returns its second
 // argument. The left-to-right evaluation order guaranteed by Slang then ensures that
 // `left` is evaluated before `right`.
@@ -421,6 +419,8 @@ __generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,
 // Allow real-number types to be cast into each other
 __intrinsic_op($(kIROp_FloatCast))
     T __realCast<T : __BuiltinRealType, U : __BuiltinRealType>(U val);
+__intrinsic_op($(kIROp_CastIntToFloat))
+    T __realCast<T : __BuiltinRealType, U : __BuiltinIntegerType>(U val);
 __intrinsic_op($(kIROp_IntCast))
     T __intCast<T : __BuiltinType, U : __BuiltinType>(U val);
 ${{{{
@@ -572,7 +572,7 @@ ${{{{
         __intrinsic_op($(kIROp_Rsh)) This shr(int other);
         __intrinsic_op($(kIROp_BitAnd)) This bitAnd(This other);
         __intrinsic_op($(kIROp_BitOr)) This bitOr(This other);
-        [__unsafeForceInlineEarly] This and(This other) {return __intCast<This>(__intCast<bool>(this) && __intCast<bool>(other)); }
+        [__unsafeForceInlineEarly] This and(This other) {return __intCast<This>(and(__intCast<bool>(this), __intCast<bool>(other))); }
         [__unsafeForceInlineEarly] This or(This other) {return __intCast<This>(__intCast<bool>(this) || __intCast<bool>(other)); }
         __intrinsic_op($(kIROp_BitXor)) This bitXor(This other);
         __intrinsic_op($(kIROp_BitNot)) This bitNot();
@@ -694,7 +694,8 @@ struct Ptr
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(int64_t val);
 
-    __subscript(int index) -> T
+    __generic<TInt : __BuiltinIntegerType>
+    __subscript(TInt index) -> T
     {
         __intrinsic_op($(kIROp_GetOffsetPtr))
         ref;
@@ -891,26 +892,31 @@ __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String
 {
-    __target_intrinsic(cpp)
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(int val);
-    __target_intrinsic(cpp)
+
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(uint val);
-    __target_intrinsic(cpp)
+
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(int64_t val);
-    __target_intrinsic(cpp)
+
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(uint64_t val);
-    __target_intrinsic(cpp)
+
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(float val);
-    __target_intrinsic(cpp)
+
+    [require(cpp)]
     __intrinsic_op($(kIROp_MakeString))
     __init(double val);
 
-    __target_intrinsic(cpp)
+    [require(cpp)]
     int64_t getLength();
 
     property int length
@@ -925,11 +931,23 @@ __magic_type(NativeStringType)
 __intrinsic_type($(kIROp_NativeStringType))
 struct NativeString
 {
-    __target_intrinsic(cpp, "int(strlen($0))")
-    int getLength();
+    [require(cpp)]
+    int getLength()
+    {
+        __target_switch
+        {
+        case cpp: __intrinsic_asm "int(strlen($0))";
+        }
+    }
 
-    __target_intrinsic(cpp, "(void*)((const char*)($0))")
-    Ptr<void> getBuffer();
+    [require(cpp)]
+    Ptr<void> getBuffer()
+    {
+        __target_switch
+        {
+        case cpp: __intrinsic_asm "(void*)((const char*)($0))";
+        }
+    }
 
     property int length { [__unsafeForceInlineEarly] get{return getLength();} }
 
@@ -1012,6 +1030,20 @@ extension int16_t : IRangedValue
 {
     static const int16_t maxValue = 32767;
     static const int16_t minValue = -32768;
+}
+
+__generic<T, let N:int>
+__magic_type(ArrayExpressionType)
+struct Array : IArray<T>
+{
+    [ForceInline]
+    int getCount() { return N; }
+
+    __subscript(int index) -> T
+    {
+        __intrinsic_op($(kIROp_GetElement))
+        get;
+    }
 }
 
     /// An `N` component vector with elements of type `T`.
@@ -1176,6 +1208,31 @@ extension matrix<int16_t,R,C,L>
     typealias T = int16_t;
     __implicit_conversion($(kConversionCost_IntegerTruncate))
     __init(int value) { this = matrix<T,R,C,L>(T(value)); }
+}
+
+__intrinsic_op(makeVector)
+__generic<T, let N:int>
+vector<T,N*2> __makeVector(vector<T,N> vec1, vector<T,N> vec2);
+
+__generic<T>
+extension vector<T, 4>
+{
+    __generic<let L : int>
+    [__unsafeForceInlineEarly]
+    __init(matrix<T, 2, 2, L> value)
+    {
+        this = __makeVector(value[0], value[1]);
+    }
+}
+__generic<T, let L : int>
+extension matrix<T, 2, 2, L>
+{
+    [__unsafeForceInlineEarly]
+    __init(vector<T, 4> value)
+    {
+        this[0] = value.xy;
+        this[1] = value.zw;
+    }
 }
 
 ${{{{
@@ -1968,83 +2025,88 @@ int getStringHash(String string);
 /// Use will produce a syntax error in downstream compiler
 /// Useful for testing diagnostics around compilation errors of downstream compiler
 /// It 'returns' an int so can be used in expressions without the front end complaining.
-__target_intrinsic(hlsl, " @ ")
-__target_intrinsic(glsl, " @ ")
-__target_intrinsic(cuda, " @ ")
-__target_intrinsic(cpp, " @ ")
-int __SyntaxError();
+[require(cpp_cuda_glsl_hlsl)]
+int __SyntaxError()
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm " @ ";
+    case cuda: __intrinsic_asm " @ ";
+    case glsl: __intrinsic_asm " @ ";
+    case hlsl: __intrinsic_asm " @ ";
+    }
+}
 
 /// For downstream compilers that allow sizeof/alignof/offsetof
 /// Can't be called in the C/C++ style. Need to use __size_of<some_type>() as opposed to sizeof(some_type).
 __generic<T>
-__target_intrinsic(cuda, "sizeof($G0)")
-__target_intrinsic(cpp, "sizeof($G0)")
 [__readNone]
-int __sizeOf();
+[require(cpp_cuda)]
+int __sizeOf()
+{
+    __intrinsic_asm "sizeof($[0])", T;
+}
 
 __generic<T>
-__target_intrinsic(cuda, "sizeof($T0)")
-__target_intrinsic(cpp, "sizeof($T0)")
 [__readNone]
-int __sizeOf(T v);
+[require(cpp_cuda)]
+int __sizeOf(T v)
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "sizeof($T0)";
+    case cuda: __intrinsic_asm "sizeof($T0)";
+    }
+}
 
 __generic<T>
-__target_intrinsic(cuda, "SLANG_ALIGN_OF($G0)")
-__target_intrinsic(cpp, "SLANG_ALIGN_OF($G0)")
 [__readNone]
-int __alignOf();
+[require(cpp_cuda)]
+int __alignOf()
+{
+    __target_switch
+    {
+    case cuda :
+    case cpp :
+        __intrinsic_asm "SLANG_ALIGN_OF($[0])", T;
+    }
+}
 
 __generic<T>
-__target_intrinsic(cuda, "SLANG_ALIGN_OF($T0)")
-__target_intrinsic(cpp, "SLANG_ALIGN_OF($T0)")
 [__readNone]
-int __alignOf(T v);
+[require(cpp_cuda)]
+int __alignOf(T v)
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "SLANG_ALIGN_OF($T0)";
+    case cuda: __intrinsic_asm "SLANG_ALIGN_OF($T0)";
+    }
+}
 
 // It would be nice to have offsetof equivalent, but it's not clear how that would work in terms of the Slang language.
 // Here we allow calculating the offset of a field in bytes from an *instance* of the type.
 __generic<T,F>
-__target_intrinsic(cuda, "int(((char*)&($1)) - ((char*)&($0)))")
-__target_intrinsic(cpp, "int(((char*)&($1)) - ((char*)&($0))")
 [__readNone]
-int __offsetOf(in T t, in F field);
+[require(cpp_cuda)]
+int __offsetOf(in T t, in F field)
+{
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "int(((char*)&($1)) - ((char*)&($0))";
+    case cuda: __intrinsic_asm "int(((char*)&($1)) - ((char*)&($0)))";
+    }
+}
 
 /// Mark beginning of "interlocked" operations in a fragment shader.
-__glsl_extension(GL_ARB_fragment_shader_interlock)
-__glsl_version(420)
-void beginInvocationInterlock()
-{
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "beginInvocationInterlockARB";
-    case spirv:
-        spirv_asm {
-            OpCapability FragmentShaderPixelInterlockEXT;
-            OpExtension "SPV_EXT_fragment_shader_interlock";
-            OpExecutionMode __entryPoint PixelInterlockOrderedEXT;
-            OpBeginInvocationInterlockEXT;
-        };
-    }
-}
+[require(glsl_spirv, GL_ARB_fragment_shader_interlock, fragment)]
+__intrinsic_op($(kIROp_BeginFragmentShaderInterlock))
+void beginInvocationInterlock();
 
 /// Mark end of "interlocked" operations in a fragment shader.
-__glsl_extension(GL_ARB_fragment_shader_interlock)
-__glsl_version(420)
-void endInvocationInterlock()
-{
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "endInvocationInterlockARB";
-    case spirv:
-        spirv_asm {
-            OpCapability FragmentShaderPixelInterlockEXT;
-            OpExtension "SPV_EXT_fragment_shader_interlock";
-            OpExecutionMode __entryPoint PixelInterlockOrderedEXT;
-            OpEndInvocationInterlockEXT;
-        };
-    }
-}
+[require(glsl_spirv, GL_ARB_fragment_shader_interlock, fragment)]
+__intrinsic_op($(kIROp_EndFragmentShaderInterlock))
+void endInvocationInterlock();
 
 // Operators to apply to `enum` types
 
@@ -2185,6 +2247,14 @@ T operator &&(T v0, T v1)
 {
     return v0.and(v1);
 }
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+bool and(bool v0, bool v1)
+{
+    return __and(v0, v1);
+}
+
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
@@ -2358,12 +2428,24 @@ int __naturalStrideOf()
     return __naturalStrideOf_impl(__declVal<T>());
 }
 
+__intrinsic_op($(kIROp_AlignOf))
+int __alignOf_intrinsic_impl<T>(T t);
+
+[ForceInline]
+int __alignOf_intrinsic<T>()
+{
+    return __alignOf_intrinsic_impl<T>(__default<T>());
+}
+
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
 
 __generic<T>
 __intrinsic_op($(kIROp_GetLegalizedSPIRVGlobalParamAddr))
 Ptr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
+
+__intrinsic_op($(kIROp_RequireComputeDerivative))
+void __requireComputeDerivative();
 
 // Binding Attributes
 
@@ -2392,6 +2474,9 @@ attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [vk_spirv_instruction(op : int, set : String = "")]     : SPIRVInstructionOpAttribute;
+
+__attributeTarget(VarDeclBase)
+attribute_syntax [vk_input_attachment_index(location : int)] : GLSLInputAttachmentIndexLayoutAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [spv_target_env_1_3] : SPIRVTargetEnv13Attribute;
@@ -2504,6 +2589,9 @@ attribute_syntax [nonmutating] : NonmutatingAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [constref] : ConstRefAttribute;
 
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [__ref] : RefAttribute;
+
     /// Indicates that a function computes its result as a function of its arguments without loading/storing any memory or other state.
     ///
     /// This is equivalent to the LLVM `readnone` function attribute.
@@ -2515,6 +2603,7 @@ enum _AttributeTargets
     Struct = $( (int) UserDefinedAttributeTargets::Struct),
     Var = $( (int) UserDefinedAttributeTargets::Var),
     Function = $( (int) UserDefinedAttributeTargets::Function),
+    Param = $( (int) UserDefinedAttributeTargets::Param),
 };
 __attributeTarget(StructDecl)
 attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;
@@ -2628,3 +2717,12 @@ attribute_syntax [NonUniformReturn] : NonDynamicUniformAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__GLSLRequireShaderInputParameter(parameterNumber:int)] : GLSLRequireShaderInputParameterAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [DerivativeGroupQuad] : DerivativeGroupQuadAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [noRefInline] : NoRefInlineAttribute;

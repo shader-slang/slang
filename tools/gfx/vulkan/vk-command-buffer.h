@@ -34,6 +34,7 @@ public:
     BreakableReference<TransientResourceHeapImpl> m_transientHeap;
     bool m_isPreCommandBufferEmpty = true;
     RootShaderObjectImpl m_rootObject;
+    RefPtr<MutableRootShaderObjectImpl> m_mutableRootShaderObject;
 
     RefPtr<ResourceCommandEncoder> m_resourceCommandEncoder;
     RefPtr<ComputeCommandEncoder> m_computeCommandEncoder;

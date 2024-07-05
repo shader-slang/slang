@@ -19,6 +19,13 @@ namespace Slang
         return sink->diagnose(pos, info, args...);
     }
 
+    enum class IsSubTypeOptions
+    {
+        None = 0,
+        /// Type may not be finished 'DeclCheckState::ReadyForLookup`
+        NotReadyForLookup = 1 << 0,
+    };
+
         /// Should the given `decl` be treated as a static rather than instance declaration?
     bool isEffectivelyStatic(
         Decl*           decl);
@@ -549,6 +556,45 @@ namespace Slang
         FacetList facets;
     };
 
+        /// Cached information about how to convert between two types.
+    struct ImplicitCastMethod
+    {
+        OverloadCandidate conversionFuncOverloadCandidate = OverloadCandidate();
+        ConversionCost cost = kConversionCost_Impossible;
+        bool isAmbiguous = false;
+    };
+
+    struct ImplicitCastMethodKey
+    {
+        Type* fromType; // nullptr means default construct.
+        bool isLValue;
+        Type* toType;
+        uint64_t constantVal;
+        bool isConstant;
+        HashCode getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(fromType), Slang::getHashCode(toType), Slang::getHashCode(constantVal), (HashCode32)isConstant, (HashCode32)isLValue);
+        }
+        bool operator == (const ImplicitCastMethodKey& other) const
+        {
+            return fromType == other.fromType && toType == other.toType && isConstant == other.isConstant && constantVal == other.constantVal && isLValue == other.isLValue;
+        }
+        ImplicitCastMethodKey() = default;
+        ImplicitCastMethodKey(QualType fromType, Type* toType, Expr* fromExpr)
+            : fromType(fromType)
+            , toType(toType)
+            , constantVal(0)
+            , isConstant(false)
+            , isLValue(fromType.isLeftValue)
+        {
+            if (auto constInt = as<IntegerLiteralExpr>(fromExpr))
+            {
+                constantVal = constInt->value;
+                isConstant = true;
+            }
+        }
+    };
+
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
@@ -656,6 +702,14 @@ namespace Slang
         {
             auto pair = TypePair{ sub, sup };
             m_mapTypePairToSubtypeWitness[pair] = outWitness;
+        }
+        ImplicitCastMethod* tryGetImplicitCastMethod(ImplicitCastMethodKey key)
+        {
+            return m_mapTypePairToImplicitCastMethod.tryGetValue(key);
+        }
+        void cacheImplicitCastMethod(ImplicitCastMethodKey key, ImplicitCastMethod candidate)
+        {
+            m_mapTypePairToImplicitCastMethod[key] = candidate;
         }
 
     private:
@@ -776,6 +830,7 @@ namespace Slang
         Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
         Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
         Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
+        Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
     };
 
         /// Local/scoped state of the semantic-checking system
@@ -798,7 +853,13 @@ namespace Slang
             : m_shared(shared)
             , m_sink(shared->getSink())
             , m_astBuilder(shared->getLinkage()->getASTBuilder())
-        {}
+        {
+            if (shared->getLinkage()->m_optionSet.hasOption(CompilerOptionName::DisableShortCircuit))
+            {
+                m_shouldShortCircuitLogicExpr =
+                    !shared->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DisableShortCircuit);
+            }
+        }
 
         SharedSemanticsContext* getShared() { return m_shared; }
         CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
@@ -818,6 +879,9 @@ namespace Slang
             result.m_sink = sink;
             return result;
         }
+
+        FunctionDeclBase* getParentFuncOfVisitor() { return m_parentFunc; }
+        void setParentFuncOfVisitor(FunctionDeclBase* funcDecl) { m_parentFunc = funcDecl; }
 
         SemanticsContext withParentFunc(FunctionDeclBase* parentFunc)
         {
@@ -1326,6 +1390,9 @@ namespace Slang
         Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
         Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
 
+        // Helper function to check if a struct can be used as its own differential type.
+        bool canStructBeUsedAsSelfDifferentialType(AggTypeDecl *aggTypeDecl);
+        void markSelfDifferentialMembersOfType(AggTypeDecl *parent, Type* type);
         
     public:
 
@@ -2045,9 +2112,15 @@ namespace Slang
             ///
         SubtypeWitness* isSubtype(
             Type*                   subType,
-            Type*                   superType);
+            Type*                   superType,
+            IsSubTypeOptions        isSubTypeOptions
+        );
 
-        SubtypeWitness* checkAndConstructSubtypeWitness(Type* subType, Type* superType);
+        SubtypeWitness* checkAndConstructSubtypeWitness(
+            Type* subType,
+            Type* superType,
+            IsSubTypeOptions isSubTypeOptions
+        );
 
         bool isValidGenericConstraintType(Type* type);
 
@@ -2067,7 +2140,7 @@ namespace Slang
             Type* subType,
             Type* superType)
         {
-            return isSubtype(subType, superType);
+            return isSubtype(subType, superType, IsSubTypeOptions::None);
         }
 
             /// Check whether `type` conforms to `interfaceDeclRef`,
@@ -2616,6 +2689,8 @@ namespace Slang
 
         Expr* visitAsTypeExpr(AsTypeExpr* expr);
 
+        void maybeCheckKnownBuiltinInvocation(Expr* invokeExpr);
+
         //
         // Some syntax nodes should not occur in the concrete input syntax,
         // and will only appear *after* checking is complete. We need to
@@ -2672,6 +2747,8 @@ namespace Slang
 
         Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
 
+        Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr);
+
         Expr* visitSPIRVAsmExpr(SPIRVAsmExpr*);
 
             /// Perform semantic checking on a `modifier` that is being applied to the given `type`
@@ -2725,7 +2802,7 @@ namespace Slang
 
         void visitTargetCaseStmt(TargetCaseStmt* stmt);
 
-        void visitIntrinsicAsmStmt(IntrinsicAsmStmt*) {}
+        void visitIntrinsicAsmStmt(IntrinsicAsmStmt*);
 
         void visitDefaultStmt(DefaultStmt* stmt);
 
@@ -2777,7 +2854,14 @@ namespace Slang
 
     DeclVisibility getDeclVisibility(Decl* decl);
 
-    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom);
+    // If `type` is unsized, return the trailing unsized array field that makes it so.
+    VarDeclBase* getTrailingUnsizedArrayElement(Type* type, VarDeclBase* rootObject, ArrayExpressionType*& outArrayType);
+
+    // Test if `type` can be an opaque handle on certain targets, this includes
+    // texture, buffer, sampler, acceleration structure, etc.
+    bool isOpaqueHandleType(Type* type);
+
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl = false);
 
     void _ensureAllDeclsRec(
         SemanticsDeclVisitorBase* visitor,

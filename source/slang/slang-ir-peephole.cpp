@@ -11,13 +11,15 @@ struct PeepholeContext : InstPassBase
 {
     PeepholeContext(IRModule* inModule)
         : InstPassBase(inModule)
-    {}
+    {
+    }
 
     bool changed = false;
     FloatingPointMode floatingPointMode = FloatingPointMode::Precise;
     bool removeOldInst = true;
     bool isInGeneric = false;
     bool isPrelinking = false;
+    bool useFastAnalysis = false;
 
     TargetProgram* targetProgram;
 
@@ -250,6 +252,37 @@ struct PeepholeContext : InstPassBase
 
         switch (inst->getOp())
         {
+        case kIROp_AlignOf:
+        case kIROp_SizeOf:
+            {
+                if (!targetProgram)
+                    break;
+
+                // Save the alignment information and exit early if it is invalid
+                IRSizeAndAlignment sizeAlignment;
+                IRType* baseType = nullptr;
+                if (auto t = as<IRType>(inst->getOperand(0)))
+                    baseType = t;
+                else
+                    baseType = inst->getOperand(0)->getDataType();
+
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), baseType, &sizeAlignment)))
+                    break;
+                if (sizeAlignment.size == 0)
+                    break;
+
+                IRBuilder builder(module);
+                builder.setInsertBefore(inst);
+                IRInst* resultVal = nullptr;
+                if (inst->getOp() == kIROp_AlignOf)
+                    resultVal = builder.getIntValue(inst->getDataType(), sizeAlignment.alignment);
+                else
+                    resultVal = builder.getIntValue(inst->getDataType(), sizeAlignment.size);
+                inst->replaceUsesWith(resultVal);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
         case kIROp_GetResultError:
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultError)
             {
@@ -867,7 +900,7 @@ struct PeepholeContext : InstPassBase
                             // Never remove param inst.
                             changed = true;
                         }
-                        else
+                        else if (!useFastAnalysis)
                         {
                             // If argValue is defined locally,
                             // we can replace only if argVal dominates inst.
@@ -1090,7 +1123,8 @@ struct PeepholeContext : InstPassBase
 
     bool processFunc(IRInst* func)
     {
-        func->getModule()->invalidateAllAnalysis();
+        if (!useFastAnalysis)
+            func->getModule()->invalidateAllAnalysis();
 
         bool lastIsInGeneric = isInGeneric;
         if (!isInGeneric)
@@ -1123,6 +1157,9 @@ bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizat
     PeepholeContext context = PeepholeContext(module);
     context.targetProgram = target;
     context.isPrelinking = options.isPrelinking;
+    context.useFastAnalysis = target
+        ? target->getOptionSet().getBoolOption(CompilerOptionName::MinimumSlangOptimization)
+        : true;
     return context.processModule();
 }
 
@@ -1130,6 +1167,9 @@ bool peepholeOptimize(TargetProgram* target, IRInst* func)
 {
     PeepholeContext context = PeepholeContext(func->getModule());
     context.targetProgram = target;
+    context.useFastAnalysis = target
+        ? target->getOptionSet().getBoolOption(CompilerOptionName::MinimumSlangOptimization)
+        : true;
     return context.processFunc(func);
 }
 
@@ -1137,7 +1177,7 @@ bool peepholeOptimizeGlobalScope(TargetProgram* target, IRModule* module)
 {
     PeepholeContext context = PeepholeContext(module);
     context.targetProgram = target;
-
+    context.useFastAnalysis = true;
     bool result = false;
     for (;;)
     {
@@ -1159,6 +1199,7 @@ bool tryReplaceInstUsesWithSimplifiedValue(TargetProgram* target, IRModule* modu
     PeepholeContext context = PeepholeContext(inst->getModule());
     context.targetProgram = target;
     context.removeOldInst = false;
+    context.useFastAnalysis = true;
     context.processInst(inst);
     return context.changed;
 }

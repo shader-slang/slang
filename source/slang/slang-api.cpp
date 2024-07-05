@@ -5,6 +5,8 @@
 #include "slang-repro.h"
 
 #include "../core/slang-shared-library.h"
+#include "../slang-capture-replay/slang-global-session.h"
+#include "../slang-capture-replay/capture_utility.h"
 
 // implementation of C interface
 
@@ -116,7 +118,18 @@ SLANG_API SlangResult slang_createGlobalSession(
         }
     }
 
-    *outGlobalSession = globalSession.detach();
+    // Check if the SLANG_CAPTURE_ENABLE_ENV is enabled
+    if (SlangCapture::isCaptureLayerEnabled())
+    {
+        SlangCapture::GlobalSessionCapture* globalSessionCapture =
+            new SlangCapture::GlobalSessionCapture(globalSession.detach());
+        Slang::ComPtr<SlangCapture::GlobalSessionCapture> result(globalSessionCapture);
+        *outGlobalSession = result.detach();
+    }
+    else
+    {
+        *outGlobalSession = globalSession.detach();
+    }
 
 #ifdef SLANG_ENABLE_IR_BREAK_ALLOC
     // Reset inst debug alloc counter to 0 so IRInsts for user code always starts from 0.
@@ -289,6 +302,18 @@ SLANG_API void spSetTargetForceGLSLScalarBufferLayout(
 {
     SLANG_ASSERT(request);
     request->setTargetForceGLSLScalarBufferLayout(targetIndex, forceScalarLayout);
+}
+
+SLANG_API void spSetTargetUseMinimumSlangOptimization(slang::ICompileRequest* request, int targetIndex, bool val)
+{
+    SLANG_ASSERT(request);
+    request->setTargetUseMinimumSlangOptimization(targetIndex, val);
+}
+
+SLANG_API void spSetIgnoreCapabilityCheck(slang::ICompileRequest* request, bool ignore)
+{
+    SLANG_ASSERT(request);
+    request->setIgnoreCapabilityCheck(ignore);
 }
 
 SLANG_API void spSetTargetLineDirectiveMode(
@@ -771,6 +796,16 @@ SLANG_API SlangResult spCompileRequest_getEntryPoint(
 {
     SLANG_ASSERT(request);
     return request->getEntryPoint(entryPointIndex, outEntryPoint);
+}
+
+/*! @see slang::ICompileRequest::getCompileTimeProfile */
+SLANG_API SlangResult spGetCompileTimeProfile(
+    slang::ICompileRequest* request,
+    ISlangProfiler** compileTimeProfile,
+    bool shouldClear)
+{
+    SLANG_ASSERT(request);
+    return request->getCompileTimeProfile(compileTimeProfile, shouldClear);
 }
 
 // Get the output code associated with a specific translation unit

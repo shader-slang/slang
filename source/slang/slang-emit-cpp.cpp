@@ -329,6 +329,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                 out << ">";
                 return SLANG_OK;
             }
+            return SLANG_FAIL;
         }
         case kIROp_IntLit:
         {
@@ -1111,6 +1112,7 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 void CPPSourceEmitter::emitIntrinsicCallExprImpl(
     IRCall*                         inst,
     UnownedStringSlice              intrinsicDefinition,
+    IRInst*                         intrinsicInst,
     EmitOpInfo const&               inOuterPrec)
 {
     // TODO: Much of this logic duplicates code that is already
@@ -1175,7 +1177,7 @@ void CPPSourceEmitter::emitIntrinsicCallExprImpl(
     }
 
     // Use default impl (which will do intrinsic special macro expansion as necessary)
-    return Super::emitIntrinsicCallExprImpl(inst, intrinsicDefinition, inOuterPrec);
+    return Super::emitIntrinsicCallExprImpl(inst, intrinsicDefinition, intrinsicInst, inOuterPrec);
 }
 
 void CPPSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* decl)
@@ -1727,6 +1729,10 @@ void CPPSourceEmitter::emitPreModuleImpl()
         m_writer->emit("#ifdef SLANG_PRELUDE_NAMESPACE\n");
         m_writer->emit("using namespace SLANG_PRELUDE_NAMESPACE;\n");
         m_writer->emit("#endif\n\n");
+    }
+    else if (m_target == CodeGenTarget::HostCPPSource)
+    {
+        m_writer->emit("namespace Slang{ inline void handleSignal(SignalType, char const*) {} }\n");
     }
     Super::emitPreModuleImpl();
 }

@@ -1,35 +1,36 @@
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage anyhit -profile glsl_460+GL_EXT_ray_tracing -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage anyhit -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage anyhit
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage anyhit -profile sm_6_5 -DNOMOTION
 
+// SPIRV-NOT: OpCapability RayQueryKHR
+// SPIRV-DAG: RayTracingKHR
+// SPIRV-DAG: SPV_KHR_ray_tracing
+
 // SPIRV: OpEntryPoint
 
-// SPIRV: OpLoad %v3uint %gl_LaunchIDEXT
-// SPIRV: OpLoad %v3uint %gl_LaunchSizeEXT
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchIdNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchSizeNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn WorldRayOriginNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn WorldRayDirectionNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayTminNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayTmaxNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn IncomingRayFlagsNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn InstanceId
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn InstanceCustomIndexNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayGeometryIndexKHR
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn ObjectRayOriginNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn ObjectRayDirectionNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn ObjectToWorldNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn WorldToObjectNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn HitKindNV
 
-// SPIRV: OpLoad %v3float %gl_WorldRayOriginEXT
-// SPIRV: OpLoad %v3float %gl_WorldRayDirectionEXT
-// SPIRV: OpLoad %float %gl_RayTminEXT
-// SPIRV: OpLoad %float %gl_RayTmaxEXT
-// SPIRV: OpLoad %uint %gl_IncomingRayFlagsEXT
-
-// SPIRV: OpLoad %int %gl_InstanceID
-// SPIRV: OpLoad %int %gl_InstanceCustomIndexEXT
-// SPIRV: OpLoad %int %gl_GeometryIndexEXT
-// SPIRV: OpLoad %int %gl_PrimitiveID
-// SPIRV: OpLoad %v3float %gl_ObjectRayOriginEXT
-// SPIRV: OpLoad %v3float %gl_ObjectRayDirectionEXT
-// SPIRV: OpLoad %mat4v3float %gl_ObjectToWorldEXT
-// SPIRV: OpLoad %mat4v3float %gl_ObjectToWorldEXT
-// SPIRV: OpLoad %mat4v3float %gl_WorldToObjectEXT
-// SPIRV: OpLoad %mat4v3float %gl_WorldToObjectEXT
-// SPIRV: OpLoad %uint %gl_HitKindEXT
-
-// SPIRV: OpLoad %v3float %gl_ObjectRayOriginEXT
-// SPIRV: OpLoad %v3float %gl_ObjectRayDirectionEXT
-// SPIRV: OpLoad %float %gl_RayTmaxEXT
-// SPIRV: OpTerminateRayKHR
-// SPIRV: OpIgnoreIntersectionKHR
+// SPIRV-DAG: OpTypePointer HitAttributeNV
+// SPIRV-DAG: OpTypePointer IncomingRayPayloadNV
+ 
+// SPIRV-DAG: OpTerminateRayKHR
+// SPIRV-DAG: OpIgnoreIntersectionKHR
 
 // DXIL: main
 

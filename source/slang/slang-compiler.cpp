@@ -433,6 +433,44 @@ namespace Slang
         return UnownedStringSlice();
     }
 
+    Stage getStageFromAtom(CapabilityAtom atom)
+    {
+        switch (atom)
+        {
+        case CapabilityAtom::vertex:
+            return Stage::Vertex;
+        case CapabilityAtom::hull:
+            return Stage::Hull;
+        case CapabilityAtom::domain:
+            return Stage::Domain;
+        case CapabilityAtom::geometry:
+            return Stage::Geometry;
+        case CapabilityAtom::fragment:
+            return Stage::Fragment;
+        case CapabilityAtom::compute:
+            return Stage::Compute;
+        case CapabilityAtom::mesh:
+            return Stage::Mesh;
+        case CapabilityAtom::amplification:
+            return Stage::Amplification;
+        case CapabilityAtom::anyhit:
+            return Stage::AnyHit;
+        case CapabilityAtom::closesthit:
+            return Stage::ClosestHit;
+        case CapabilityAtom::intersection:
+            return Stage::Intersection;
+        case CapabilityAtom::raygen:
+            return Stage::RayGeneration;
+        case CapabilityAtom::miss:
+            return Stage::Miss;
+        case CapabilityAtom::callable:
+            return Stage::Callable;
+        default:
+            SLANG_UNEXPECTED("unknown stage atom");
+            UNREACHABLE_RETURN(Stage::Unknown);
+        }
+    }
+
     SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
     {
         // Check if the type is supported on this compile
@@ -525,11 +563,6 @@ namespace Slang
             {
                 return PassThroughMode::Dxc;
             }
-            case CodeGenTarget::GLSL_Vulkan:
-            case CodeGenTarget::GLSL_Vulkan_OneDesc:
-            {
-                return PassThroughMode::Glslang;
-            }
             case CodeGenTarget::MetalLib:
             case CodeGenTarget::MetalLibAssembly:
             {
@@ -539,6 +572,7 @@ namespace Slang
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:
             case CodeGenTarget::HostHostCallable:
+            case CodeGenTarget::HostSharedLibrary:
             {
                 // We need some C/C++ compiler
                 return PassThroughMode::GenericCCpp;
@@ -613,11 +647,11 @@ namespace Slang
         GLSLExtensionTracker*   extensionTracker,
         CapabilitySet const&    caps)
     {
-        for( auto conjunctions : caps.getExpandedAtoms() )
+        for(auto& conjunctions : caps.getAtomSets() )
         {
-            for (auto atom : conjunctions.getExpandedAtoms())
+            for (auto atom : conjunctions)
             {
-                switch (atom)
+                switch (asAtom(atom))
                 {
                 default:
                     break;
@@ -955,6 +989,7 @@ namespace Slang
             }
             case CodeGenTarget::HostHostCallable:
             case CodeGenTarget::HostExecutable:
+            case CodeGenTarget::HostSharedLibrary:
             {
                 return CodeGenTarget::HostCPPSource;
             }
@@ -1279,8 +1314,14 @@ namespace Slang
         // Set the source type
         options.sourceLanguage = SlangSourceLanguage(sourceLanguage);
         
-        // Disable exceptions and security checks
-        options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
+        switch (target)
+        {
+        case CodeGenTarget::ShaderHostCallable:
+        case CodeGenTarget::ShaderSharedLibrary:
+            // Disable exceptions and security checks
+            options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
+            break;
+        }
 
         Profile profile;
 
@@ -1586,6 +1627,7 @@ namespace Slang
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:
             case CodeGenTarget::HostHostCallable:
+            case CodeGenTarget::HostSharedLibrary:
                 SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
                 return SLANG_OK;
 
@@ -1617,6 +1659,7 @@ namespace Slang
         case CodeGenTarget::ShaderHostCallable:
         case CodeGenTarget::ShaderSharedLibrary:
         case CodeGenTarget::HostExecutable:
+        case CodeGenTarget::HostSharedLibrary:
             {
                 SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 
@@ -1659,6 +1702,7 @@ namespace Slang
             SLANG_UNEXPECTED("unhandled code generation target");
             break;
         }
+        return SLANG_FAIL;
     }
 
     void EndToEndCompileRequest::writeArtifactToStandardOutput(IArtifact* artifact, DiagnosticSink* sink)
@@ -2427,12 +2471,27 @@ namespace Slang
         return nullptr;
     }
 
+    SLANG_NO_THROW SlangInt32 SLANG_MCALL Module::getDependencyFileCount()
+    {
+        return (SlangInt32)getFileDependencies().getCount();
+    }
+
+    SLANG_NO_THROW char const* SLANG_MCALL Module::getDependencyFilePath(
+        SlangInt32 index)
+    {
+        SourceFile* sourceFile = getFileDependencies()[index];
+        return sourceFile->getPathInfo().hasFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : nullptr;
+    }
+
     void validateEntryPoint(
         EntryPoint* entryPoint,
         DiagnosticSink* sink);
 
-    void Module::_discoverEntryPoints(DiagnosticSink* sink)
+    void Module::_discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets)
     {
+        if (m_entryPoints.getCount() > 0)
+            return;
+
         for (auto globalDecl : m_moduleDecl->members)
         {
             auto maybeFuncDecl = globalDecl;
@@ -2466,11 +2525,44 @@ namespace Slang
             else
             {
                 // If there isn't a [shader] attribute, look for a [numthreads] attribute
-                // since that implicitly means a compute shader.
-                auto numThreadsAttr = funcDecl->findModifier<NumThreadsAttribute>();
-                if (numThreadsAttr)
-                    profile.setStage(Stage::Compute);
-                else
+                // since that implicitly means a compute shader. We'll not do this when compiling for
+                // CUDA/Torch since [numthreads] attributes are utilized differently for those targets.
+                // 
+
+                bool allTargetsCUDARelated = true;
+                for (auto target : targets)
+                {
+                    if (!isCUDATarget(target) && 
+                        target->getTarget() != CodeGenTarget::PyTorchCppBinding)
+                    {
+                        allTargetsCUDARelated = false;
+                        break;
+                    }
+                }
+
+                if (allTargetsCUDARelated && targets.getCount() > 0)
+                    continue;
+
+                bool canDetermineStage = false;
+                for (auto modifier : funcDecl->modifiers)
+                {
+                    if (as<NumThreadsAttribute>(modifier))
+                    {
+                        if (funcDecl->findModifier<OutputTopologyAttribute>())
+                            profile.setStage(Stage::Mesh);
+                        else
+                            profile.setStage(Stage::Compute);
+                        canDetermineStage = true;
+                        break;
+                    }
+                    else if (as<PatchConstantFuncAttribute>(modifier))
+                    {
+                        profile.setStage(Stage::Hull);
+                        canDetermineStage = true;
+                        break;
+                    }
+                }
+                if (!canDetermineStage)
                     continue;
             }
 

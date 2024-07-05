@@ -31,7 +31,7 @@ Note that the `#include`d files do not become additional source units; they are 
 Source units (such as files) are grouped into _translation units_, and each translation unit will produce a single _module_ when compiled.
 
 While the source units are all preprocessed and parsed independently, semantic checking is applied to a translation unit as a whole.
-One source file in a translation unit may freely refer to declarations in another translation unit without any need for forward declarations. For example:
+One source file in a translation unit may freely refer to declarations in another source file from the same translation unit without any need for forward declarations. For example:
 
 ```hlsl
 // A.slang
@@ -63,7 +63,7 @@ Slang supports two models for identifying entry points when compiling.
 
 ### Entry Point Attributes
 
-By default, the compiler wll scan a translation unit for function declarations marked with the `[shader(...)]` attribute; each such function will be identified as an entry point in the module.
+By default, the compiler will scan a translation unit for function declarations marked with the `[shader(...)]` attribute; each such function will be identified as an entry point in the module.
 Developers are encouraged to use this model because it directly documents intention and makes source code less dependent on external compiler configuration options.
 
 ### Explicit Entry Point Options
@@ -319,8 +319,10 @@ A Slang _global session_ uses the interface `slang::IGlobalSession` and it repre
 A global session is created using the function `slang::createGlobalSession()`:
 
 ```c++
+using namespace slang;
+
 Slang::ComPtr<IGlobalSession> globalSession;
-slang::createGlobalSession(globalSession.writeRef());
+createGlobalSession(globalSession.writeRef());
 ```
 
 When a global session is created, the Slang system will load its internal representation of the _standard library_ that the compiler provides to user code.
@@ -413,7 +415,7 @@ For example:
 
 ```c++
 TargetDesc targetDesc;
-targetDesc.format = SLANG_FORMAT_SPIRV;
+targetDesc.format = SLANG_SPIRV;
 ```
 
 The `profile` field must be set with the ID of one of the profiles supported by the Slang compiler.
@@ -463,7 +465,7 @@ of the `SessionDesc` or `TargetDesc` structures. See the [Compiler Options](#com
 The simplest way to load code into a session is with `ISession::loadModule()`:
 
 ```c++
-Slang::ComPtr<IModule> module = session->loadModule("MyShaders");
+IModule* module = session->loadModule("MyShaders");
 ```
 
 Executing `loadModule("MyShaders")` in host C++ code is similar to using `import MyShaders` in Slang code.

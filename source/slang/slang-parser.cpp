@@ -4213,13 +4213,8 @@ namespace Slang
             case ASTNodeType::SubscriptDecl:
             case ASTNodeType::PropertyDecl:
             case ASTNodeType::AssocTypeDecl:
-            case ASTNodeType::TypeAliasDecl:
-            case ASTNodeType::TypeDefDecl:
             case ASTNodeType::VarDecl:
             case ASTNodeType::LetDecl:
-            case ASTNodeType::StructDecl:
-            case ASTNodeType::ClassDecl:
-            case ASTNodeType::EnumDecl:
             case ASTNodeType::GenericDecl:
             case ASTNodeType::ConstructorDecl:
                 return true;
@@ -4311,6 +4306,7 @@ namespace Slang
             case ASTNodeType::TypeAliasDecl:
             case ASTNodeType::TypeDefDecl:
             case ASTNodeType::ExtensionDecl:
+            case ASTNodeType::SubscriptDecl:
                 return true;
             default:
                 return false;
@@ -4456,8 +4452,6 @@ namespace Slang
         // Or add any modifiers
         if (as<NamespaceDecl>(decl) && decl->parentDecl)
         {
-            // Presumably we have no modifiers.
-            SLANG_ASSERT(modifiers.isEmpty());
             return;
         }
 
@@ -4537,7 +4531,6 @@ namespace Slang
         parser->pendingModifiers = &modifiers;
 
         auto loc = parser->tokenReader.peekLoc();
-        auto ptoken = parser->tokenReader.peekToken();
         switch (peekTokenType(parser))
         {
         case TokenType::Identifier:
@@ -4914,14 +4907,38 @@ namespace Slang
         // TODO: diagnose this with a warning some day, and move
         // toward deprecating it.
         //
-        AdvanceIf(parser, "class");
+        bool isEnumClass = AdvanceIf(parser, "class");
+        bool isUnscoped = false;
+
+        if (!isEnumClass)
+        {
+            if (parser->options.optionSet.getBoolOption(CompilerOptionName::UnscopedEnum))
+            {
+                isUnscoped = true;
+            }
+        }
 
         AdvanceIf(parser, TokenType::CompletionRequest);
 
         parser->FillPosition(decl);
 
-        decl->nameAndLoc = expectIdentifier(parser);
+        if (parser->tokenReader.peekTokenType() != TokenType::Identifier)
+        {
+            decl->nameAndLoc.name = generateName(parser);
+            decl->nameAndLoc.loc = decl->loc;
+            isUnscoped = true;
+        }
+        else
+        {
+            decl->nameAndLoc = expectIdentifier(parser);
+        }
 
+        // If the type needs to be unscoped, insert modifiers to make it so.
+        if (isUnscoped)
+        {
+            addModifier(decl, parser->astBuilder->create<UnscopedEnumAttribute>());
+            addModifier(decl, parser->astBuilder->create<TransparentModifier>());
+        }
 
         return parseOptGenericDecl(parser, [&](GenericDecl*)
         {
@@ -5076,6 +5093,12 @@ namespace Slang
         parser->ReadToken();
         
         stmt->asmText = getStringLiteralTokenValue(parser->ReadToken(TokenType::StringLiteral));
+
+        while (AdvanceIf(parser, TokenType::Comma))
+        {
+            stmt->args.add(parser->ParseArgExpr());
+        }
+
         parser->ReadToken(TokenType::Semicolon);
         return stmt;
     }
@@ -5326,9 +5349,9 @@ namespace Slang
         {
             statement = ParseExpressionStatement();
         }
-        else if (LookAheadToken(TokenType::Identifier))
+        else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
         {
-            if (LookAheadToken(TokenType::Colon, 1))
+            if (LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Colon, 1))
             {
                 // An identifier followed by an ":" is a label.
                 return parseLabelStatement();
@@ -8036,7 +8059,9 @@ namespace Slang
         ModifierListBuilder listBuilder;
 
         GLSLLayoutLocalSizeAttribute* numThreadsAttrib = nullptr;
-
+        GLSLLayoutDerivativeGroupQuadAttribute* derivativeGroupQuadAttrib = nullptr;
+        GLSLLayoutDerivativeGroupLinearAttribute* derivativeGroupLinearAttrib = nullptr; 
+        GLSLInputAttachmentIndexLayoutAttribute* inputAttachmentIndexLayoutAttribute = nullptr;
         ImageFormat format;
 
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupBegin>());
@@ -8081,6 +8106,25 @@ namespace Slang
 
                     numThreadsAttrib->args[localSizeIndex] = expr;
                 }
+            }
+            else if (nameText == "derivative_group_quadsNV")
+            {
+                derivativeGroupQuadAttrib = parser->astBuilder->create<GLSLLayoutDerivativeGroupQuadAttribute>();
+            }
+            else if (nameText == "derivative_group_linearNV")
+            {
+                derivativeGroupLinearAttrib = parser->astBuilder->create<GLSLLayoutDerivativeGroupLinearAttribute>();
+            }
+            else if (nameText == "input_attachment_index")
+            {
+                inputAttachmentIndexLayoutAttribute = parser->astBuilder->create<GLSLInputAttachmentIndexLayoutAttribute>();
+                if (AdvanceIf(parser, TokenType::OpAssign))
+                {
+                    auto token = parser->ReadToken(TokenType::IntegerLiteral);
+                    auto intVal = getIntegerLiteralValue(token);
+                    inputAttachmentIndexLayoutAttribute->location = intVal;
+                }
+
             }
             else if (nameText == "binding" ||
                 nameText == "set")
@@ -8132,7 +8176,6 @@ namespace Slang
                 CASE(scalar, GLSLScalarModifier)
                 CASE(offset, GLSLOffsetLayoutAttribute)
                 CASE(location, GLSLLocationLayoutModifier) 
-                CASE(input_attachment_index, GLSLInputAttachmentIndexLayoutModifier)
                 {
                     modifier = parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
                 }
@@ -8189,9 +8232,13 @@ namespace Slang
 #undef CASE
 
         if (numThreadsAttrib)
-        {
             listBuilder.add(numThreadsAttrib);
-        }
+        if(derivativeGroupQuadAttrib)
+            listBuilder.add(derivativeGroupQuadAttrib);
+        if(derivativeGroupLinearAttrib)
+            listBuilder.add(derivativeGroupLinearAttrib);
+        if(inputAttachmentIndexLayoutAttribute)
+            listBuilder.add(inputAttachmentIndexLayoutAttribute);
 
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupEnd>());
 

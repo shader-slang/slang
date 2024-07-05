@@ -256,8 +256,6 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     {
         case SLANG_TARGET_UNKNOWN:                return Desc::make(Kind::Unknown, Payload::None, Style::Unknown, 0);
         case SLANG_TARGET_NONE:                   return Desc::make(Kind::None, Payload::None, Style::Unknown, 0);
-        case SLANG_GLSL_VULKAN:
-        case SLANG_GLSL_VULKAN_ONE_DESC:
         case SLANG_GLSL:
         {
             // For the moment we Desc::make all just map to GLSL, but we could use flags
@@ -276,6 +274,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         case SLANG_HOST_CPP_SOURCE:         return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
         case SLANG_CPP_PYTORCH_BINDING:     return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
         case SLANG_HOST_EXECUTABLE:         return Desc::make(Kind::Executable, Payload::HostCPU, Style::Host, 0);
+        case SLANG_HOST_SHARED_LIBRARY:     return Desc::make(Kind::SharedLibrary, Payload::HostCPU, Style::Host, 0);
         case SLANG_SHADER_SHARED_LIBRARY:   return Desc::make(Kind::SharedLibrary, Payload::HostCPU, Style::Kernel, 0);
         case SLANG_SHADER_HOST_CALLABLE:    return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Kernel, 0);
         case SLANG_CUDA_SOURCE:             return Desc::make(Kind::Source, Payload::CUDA, Style::Kernel, 0);
@@ -357,7 +356,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
             switch (desc.kind)
             {
                 case Kind::Executable:              return SLANG_HOST_EXECUTABLE;
-                case Kind::SharedLibrary:           return SLANG_SHADER_SHARED_LIBRARY;
+                case Kind::SharedLibrary:           return desc.style == ArtifactStyle::Host ? SLANG_HOST_SHARED_LIBRARY : SLANG_SHADER_SHARED_LIBRARY;
                 case Kind::HostCallable:            return desc.style == ArtifactStyle::Host ? SLANG_HOST_HOST_CALLABLE : SLANG_SHADER_HOST_CALLABLE;
                 case Kind::ObjectCode:              return SLANG_OBJECT_CODE;
                 default: break;

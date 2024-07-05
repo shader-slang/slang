@@ -11,8 +11,7 @@ env:
 jobs:
   build:
     runs-on: [Windows, self-hosted]
-    timeout-minutes: 100
-    continue-on-error: true
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v4
       with:
@@ -37,6 +36,7 @@ jobs:
         repository: "shader-slang/VK-GL-CTS"
         sparse-checkout: |
           test-lists/slang-passing-tests.txt
+          test-lists/slang-waiver-tests.xml
         path: test-lists
         sparse-checkout-cone-mode: false
     - name: vkcts setup
@@ -49,8 +49,32 @@ jobs:
 
         copy ${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
 
+        copy ${{ github.workspace }}\test-lists\test-lists\slang-waiver-tests.xml ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-waiver-tests.xml
+
         copy ${{ github.workspace }}\bin\windows-x64\release\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\test-server.exe
     - name: vkcts run
       working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
       run: |
-        .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
+        .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt --deqp-waiver-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-waiver-tests.xml
+    - name: success notification
+      id: slack-notify-success
+      if: ${{ success() }}
+      uses: slackapi/slack-github-action@v1.26.0
+      with:
+        payload: |
+          {
+            "CTS-Nightly": ":green-check-mark: CTS nightly status: ${{ job.status }}"
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    - name: failure notification
+      id: slack-notify-failure
+      if : ${{ !success() }}
+      uses: slackapi/slack-github-action@v1.26.0
+      with:
+        payload: |
+          {
+            "CTS-Nightly": ":alert: :alert: :alert: :alert: :alert: :alert:\nCTS nightly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

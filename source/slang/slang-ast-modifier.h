@@ -242,11 +242,6 @@ class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier
     SLANG_AST_CLASS(GLSLLocationLayoutModifier)
 };
 
-class GLSLInputAttachmentIndexLayoutModifier : public GLSLParsedLayoutModifier
-{
-    SLANG_AST_CLASS(GLSLInputAttachmentIndexLayoutModifier)
-};
-
 class GLSLBufferDataLayoutModifier : public GLSLParsedLayoutModifier
 {
     SLANG_AST_CLASS(GLSLBufferDataLayoutModifier)
@@ -775,6 +770,14 @@ class GLSLSimpleIntegerLayoutAttribute : public Attribute
     int32_t value = 0;
 };
 
+/// [[vk_input_attachment_index]]
+class GLSLInputAttachmentIndexLayoutAttribute : public Attribute
+{
+    SLANG_AST_CLASS(GLSLInputAttachmentIndexLayoutAttribute)
+
+    IntegerLiteralValue location;
+};
+
 // [[vk_location]]
 class GLSLLocationAttribute : public GLSLSimpleIntegerLayoutAttribute 
 {
@@ -818,6 +821,16 @@ class GLSLLayoutLocalSizeAttribute : public Attribute
     IntVal* x;
     IntVal* y;
     IntVal* z;
+};
+
+class GLSLLayoutDerivativeGroupQuadAttribute : public Attribute
+{
+    SLANG_AST_CLASS(GLSLLayoutDerivativeGroupQuadAttribute)
+};
+
+class GLSLLayoutDerivativeGroupLinearAttribute : public Attribute
+{
+    SLANG_AST_CLASS(GLSLLayoutDerivativeGroupLinearAttribute)
 };
 
 // TODO: for attributes that take arguments, the syntax node
@@ -994,13 +1007,20 @@ class NonmutatingAttribute : public Attribute
 };
 
 // A `[constref]` attribute, which indicates that the `this` parameter of
-// a member function should be passed by reference.
+// a member function should be passed by const reference.
 //
 class ConstRefAttribute : public Attribute
 {
     SLANG_AST_CLASS(ConstRefAttribute)
 };
 
+// A `[ref]` attribute, which indicates that the `this` parameter of
+// a member function should be passed by reference.
+//
+class RefAttribute : public Attribute
+{
+    SLANG_AST_CLASS(RefAttribute)
+};
 
 // A `[__readNone]` attribute, which indicates that a function
 // computes its results strictly based on argument values, without
@@ -1437,6 +1457,23 @@ class NoInlineAttribute : public Attribute
     SLANG_AST_CLASS(NoInlineAttribute)
 };
 
+    /// A `[noRefInline]` attribute represents a request to not force inline a 
+    /// function specifically due to a refType parameter.
+class NoRefInlineAttribute : public Attribute
+{
+    SLANG_AST_CLASS(NoRefInlineAttribute)
+};
+
+class DerivativeGroupQuadAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DerivativeGroupQuadAttribute)
+};
+
+class DerivativeGroupLinearAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DerivativeGroupLinearAttribute)
+};
+
     /// A `[payload]` attribute indicates that a `struct` type will be used as
     /// a ray payload for `TraceRay()` calls, and thus also as input/output
     /// for shaders in the ray tracing pipeline that might be invoked for
@@ -1604,6 +1641,7 @@ public:
             kWriteOnly    = 0b100,
             kVolatile     = 0b1000,
             kRestrict     = 0b10000,
+            kRasterizerOrdered = 0b100000,
         };
     };
 

@@ -212,9 +212,9 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
     return Super::calcTypeName(type, target, out);
 }
 
-void CUDASourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
+void CUDASourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling, EmitLayoutSemanticOption layoutSemanticOption)
 {
-    Super::emitLayoutSemanticsImpl(inst, uniformSemanticSpelling);
+    Super::emitLayoutSemanticsImpl(inst, uniformSemanticSpelling, layoutSemanticOption);
 }
 
 void CUDASourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
@@ -432,7 +432,7 @@ void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IRUse* operand
     m_writer->emit("\n}");
 }
 
-void CUDASourceEmitter::emitIntrinsicCallExprImpl(IRCall* inst, UnownedStringSlice intrinsicDefinition, EmitOpInfo const& inOuterPrec)
+void CUDASourceEmitter::emitIntrinsicCallExprImpl(IRCall* inst, UnownedStringSlice intrinsicDefinition, IRInst* intrinsicInst, EmitOpInfo const& inOuterPrec)
 {
     // This works around the problem, where some intrinsics that require the "half" type enabled don't use the half/float16_t type.
     // For example `f16tof32` can operate on float16_t *and* uint. If the input is uint, although we are 
@@ -442,7 +442,7 @@ void CUDASourceEmitter::emitIntrinsicCallExprImpl(IRCall* inst, UnownedStringSli
         m_extensionTracker->requireBaseType(BaseType::Half);
     }
 
-    Super::emitIntrinsicCallExprImpl(inst, intrinsicDefinition, inOuterPrec);
+    Super::emitIntrinsicCallExprImpl(inst, intrinsicDefinition, intrinsicInst, inOuterPrec);
 }
 
 bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)

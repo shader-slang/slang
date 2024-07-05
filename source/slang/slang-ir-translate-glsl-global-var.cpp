@@ -3,11 +3,10 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-ir-call-graph.h"
 
 namespace Slang
 {
-    void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints, IRModule* module);
-
     struct GlobalVarTranslationContext
     {
         CodeGenContext* context;
@@ -80,10 +79,6 @@ namespace Slang
                     auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
                     auto key = builder.createStructKey();
                     inputKeys.add(key);
-                    if (auto nameHint = input->findDecoration<IRNameHintDecoration>())
-                    {
-                        builder.addNameHintDecoration(key, nameHint->getName());
-                    }
                     builder.createStructField(inputStructType, key, inputType);
                     IRTypeLayout::Builder fieldTypeLayout(&builder);
                     IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
@@ -152,10 +147,6 @@ namespace Slang
                     for (auto output : outputVars)
                     {
                         auto key = builder.createStructKey();
-                        if (auto nameHint = output->findDecoration<IRNameHintDecoration>())
-                        {
-                            builder.addNameHintDecoration(key, nameHint->getName());
-                        }
                         auto ptrType = as<IRPtrTypeBase>(output->getDataType());
                         builder.createStructField(resultType, key, ptrType->getValueType());
                         IRTypeLayout::Builder fieldTypeLayout(&builder);
@@ -184,6 +175,7 @@ namespace Slang
                             outputVarIndex++;
                         }
                         typeLayoutBuilder.addField(key, varLayoutBuilder.build());
+                        output->transferDecorationsTo(key);
                     }
                     auto resultTypeLayout = typeLayoutBuilder.build();
                     IRVarLayout::Builder resultVarLayoutBuilder(&builder, resultTypeLayout);
@@ -270,7 +262,10 @@ namespace Slang
             // We need to introduce a global variable and assign value to it in each entry point.
 
             if (!workgroupSizeInst->hasUses())
+            {
+                workgroupSizeInst->removeAndDeallocate();
                 return;
+            }
             builder.setInsertBefore(workgroupSizeInst);
             auto globalVar = builder.createGlobalVar(workgroupSizeInst->getFullType());
 

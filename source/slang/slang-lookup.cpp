@@ -224,6 +224,12 @@ static void _lookUpDirectAndTransparentMembers(
         }
     }
 
+    // Don't look up transparent members if we are looking for attributes, since
+    // they are always defined at global scope in the stdlib. Trying to lookup transparent
+    // members during attribute lookup can lead to infinite recursion on transparent types.
+    if ((int)request.mask & (int)LookupMask::Attribute)
+        return;
+
     for(auto transparentInfo : containerDecl->getTransparentMembers())
     {
         // The reference to the transparent member should use the same
@@ -858,6 +864,13 @@ static void _lookUpInScopes(
                 else if (funcDeclRef.getDecl()->hasModifier<MutatingAttribute>())
                 {
                     // In a non-`static` method marked `[mutating]` there is
+                    // an implicit `this` parameter that is mutable.
+                    //
+                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
+                }
+                else if (funcDeclRef.getDecl()->hasModifier<RefAttribute>())
+                {
+                    // In a non-`static` method marked `[ref]` there is
                     // an implicit `this` parameter that is mutable.
                     //
                     thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;

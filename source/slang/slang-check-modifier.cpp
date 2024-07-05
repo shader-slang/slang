@@ -212,10 +212,14 @@ namespace Slang
         attrDecl->nameAndLoc.loc = structDecl->nameAndLoc.loc;
         attrDecl->loc = structDecl->loc;
 
-        AttributeTargetModifier* targetModifier = m_astBuilder->create<AttributeTargetModifier>();
-        targetModifier->syntaxClass = attrUsageAttr->targetSyntaxClass;
-        targetModifier->loc = attrUsageAttr->loc;
-        addModifier(attrDecl, targetModifier);
+        while(attrUsageAttr)
+        {
+            AttributeTargetModifier* targetModifier = m_astBuilder->create<AttributeTargetModifier>();
+            targetModifier->syntaxClass = attrUsageAttr->targetSyntaxClass;
+            targetModifier->loc = attrUsageAttr->loc;
+            addModifier(attrDecl, targetModifier);
+            attrUsageAttr = as<AttributeUsageAttribute>(attrUsageAttr->next);
+        }
 
         // Every attribute declaration is associated with the type
         // of syntax nodes it constructs (via reflection/RTTI).
@@ -316,6 +320,11 @@ namespace Slang
         if (typeFlags == (int)UserDefinedAttributeTargets::Function)
         {
             cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("FuncDecl"));
+            return true;
+        }
+        if (typeFlags == (int)UserDefinedAttributeTargets::Param)
+        {
+            cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("ParamDecl"));
             return true;
         }
         return false;
@@ -464,6 +473,17 @@ namespace Slang
                 return false;
             }
             overloadRankAttr->rank = int32_t(rank->getValue());
+        }
+        else if (auto inputAttachmentIndexLayoutAttribute = as<GLSLInputAttachmentIndexLayoutAttribute>(attr))
+        {
+            if (attr->args.getCount() != 1)
+                return false;
+    
+            auto location = checkConstantIntVal(attr->args[0]);
+            if(!location)
+                return false;
+
+            inputAttachmentIndexLayoutAttribute->location = location->getValue();
         }
         else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
         {
@@ -1096,7 +1116,7 @@ namespace Slang
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
-        case ASTNodeType::GLSLInputAttachmentIndexLayoutModifier:
+        case ASTNodeType::GLSLInputAttachmentIndexLayoutAttribute:
         case ASTNodeType::GLSLOffsetLayoutAttribute:
         case ASTNodeType::GLSLUnparsedLayoutModifier:
         case ASTNodeType::GLSLLayoutModifierGroupMarker:
@@ -1176,7 +1196,7 @@ namespace Slang
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
-        case ASTNodeType::GLSLInputAttachmentIndexLayoutModifier:
+        case ASTNodeType::GLSLInputAttachmentIndexLayoutAttribute:
         case ASTNodeType::GLSLOffsetLayoutAttribute:
         case ASTNodeType::GLSLUnparsedLayoutModifier:
         case ASTNodeType::GLSLLayoutModifierGroupMarker:
@@ -1632,8 +1652,7 @@ namespace Slang
                     previous = m;
                     continue;
                 }
-                for(auto& con : req->capabilitySet.getExpandedAtoms())
-                    firstRequire->capabilitySet.unionWith(con);
+                firstRequire->capabilitySet.unionWith(req->capabilitySet);
                 if(previous)
                     previous->next = next;
                 continue;

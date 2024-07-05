@@ -29,6 +29,8 @@ struct InliningPassBase
         /// The module that we are optimizing/transforming
     IRModule* m_module = nullptr;
 
+    HashSet<IRInst*>* m_modifiedFuncs = nullptr;
+
         /// Initialize an inlining pass to operate on the given `module`
     InliningPassBase(IRModule* module)
         : m_module(module)
@@ -157,6 +159,11 @@ struct InliningPassBase
         // given call site, we hand off the a worker routine
         // that does the meat of the work.
         //
+        if (m_modifiedFuncs)
+        {
+            if (auto parentFunc = getParentFunc(call))
+                m_modifiedFuncs->add(parentFunc);
+        }
         inlineCallSite(callSite);
         return true;
     }
@@ -698,26 +705,27 @@ struct MandatoryEarlyInliningPass : InliningPassBase
 };
 
 
-void performMandatoryEarlyInlining(IRModule* module)
+bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedFuncs)
 {
     SLANG_PROFILE;
 
     MandatoryEarlyInliningPass pass(module);
-    pass.considerAllCallSites();
+    pass.m_modifiedFuncs = modifiedFuncs;
+    return pass.considerAllCallSites();
 }
 
 namespace { // anonymous
 
 // Inlines calls that involve String types
-struct StringInliningPass : InliningPassBase
+struct TypeInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
 
-    StringInliningPass(IRModule* module)
+    TypeInliningPass(IRModule* module)
         : Super(module)
     {}
 
-    bool doesTypeRequireInline(IRType* type)
+    bool doesTypeRequireInline(IRType* type, IRFunc* callee)
     {
         // TODO(JS):
         // I guess there is a question here about what type around string requires
@@ -727,6 +735,12 @@ struct StringInliningPass : InliningPassBase
         const auto op = type->getOp();
         switch (op)
         {
+            case kIROp_RefType:
+            {
+                if(callee->findDecoration<IRNoRefInlineDecoration>())
+                    return false;
+                return true;
+            }
             case kIROp_StringType:
             case kIROp_NativeStringType:
             {
@@ -742,7 +756,7 @@ struct StringInliningPass : InliningPassBase
     {
         auto callee = info.callee;
 
-        if (doesTypeRequireInline(callee->getResultType()))
+        if (doesTypeRequireInline(callee->getResultType(), callee))
         {
             return true;
         }
@@ -750,7 +764,7 @@ struct StringInliningPass : InliningPassBase
         const auto count = Count(callee->getParamCount());
         for (Index i = 0; i < count; ++i)
         {
-            if (doesTypeRequireInline(callee->getParamType(UInt(i))))
+            if (doesTypeRequireInline(callee->getParamType(UInt(i)), callee))
             {
                 return true;
             }
@@ -762,7 +776,7 @@ struct StringInliningPass : InliningPassBase
 
 } // anonymous
 
-Result performStringInlining(IRModule* module, DiagnosticSink* sink)
+Result performTypeInlining(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
 
@@ -780,7 +794,7 @@ Result performStringInlining(IRModule* module, DiagnosticSink* sink)
     // 
     while(true)
     {
-        StringInliningPass pass(module);
+        TypeInliningPass pass(module);
         if (pass.considerAllCallSites())
         {
             // If there was a change try inlining again
@@ -936,7 +950,7 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
     }
 };
 
-void performGLSLResourceReturnFunctionInlining(IRModule* module)
+void performGLSLResourceReturnFunctionInlining(TargetProgram* targetProgram, IRModule* module)
 {
     GLSLResourceReturnFunctionInliningPass pass(module);
     bool changed = true;
@@ -944,7 +958,7 @@ void performGLSLResourceReturnFunctionInlining(IRModule* module)
     while (changed)
     {
         changed = pass.considerAllCallSites();
-        simplifyIR(nullptr, module, IRSimplificationOptions::getFast());
+        simplifyIR(nullptr, module, IRSimplificationOptions::getFast(targetProgram));
     }
 }
 

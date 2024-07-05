@@ -45,6 +45,10 @@ function(slang_glob_sources var dir)
         list(FILTER files EXCLUDE REGEX "(^|/)vulkan/.*")
     endif()
 
+    if(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin")
+        list(FILTER files EXCLUDE REGEX "(^|/)metal/.*")
+    endif()
+
     if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
         list(FILTER files EXCLUDE REGEX "(^|/)open-gl/.*")
     endif()

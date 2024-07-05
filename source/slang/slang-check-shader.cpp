@@ -312,6 +312,8 @@ namespace Slang
     {
         if (as<ResourceType>(type))
             return true;
+        if (as<SubpassInputType>(type))
+            return true;
         if (as<HLSLStructuredBufferTypeBase>(type))
             return true;
         if (as<UntypedBufferResourceType>(type))
@@ -519,30 +521,60 @@ namespace Slang
             targetCaps.join(stageCapabilitySet);
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
-                diagnoseCapabilityErrors(sink, linkage->m_optionSet, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
-                auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getExpandedAtoms();
-
+                maybeDiagnose(sink, linkage->m_optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
+                
                 // Find out what exactly is incompatible and print out a trace of provenance to
                 // help user diagnose their code.
-                auto& conjunctions = targetCaps.getExpandedAtoms();
-                if (conjunctions.getCount() == 1 && interredCapConjunctions.getCount() == 1)
+                // TODO: provedence should have a way to filter out for provenance that are missing X capabilitySet from their caps, else in big functions we get junk errors
+                // This is specifically a problem for when a function is missing a target but otherwise has identical capabilities.
+                
+                const auto interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getAtomSets();
+                const auto compileCaps = targetCaps.getAtomSets();
+                if (compileCaps && interredCapConjunctions)
                 {
-                    for (auto atom : conjunctions[0].getExpandedAtoms())
+                    for (auto inferredAtom : *interredCapConjunctions.begin())
                     {
-                        for (auto inferredAtom : interredCapConjunctions[0].getExpandedAtoms())
+                        CapabilityAtom inferredAtomFormatted = asAtom(inferredAtom);
+                        if (!compileCaps->contains((UInt)inferredAtom))
                         {
-                            if (CapabilityConjunctionSet(inferredAtom).isIncompatibleWith(atom))
-                            {
-                                diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtom);
-                                goto breakLabel;
-                            }
+                            diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtomFormatted);
                         }
                     }
                 }
             }
+            else
+            {
+                // Only attempt to error if a user adds to slangc either `-profile` or `-capability`
+                if (
+                    (
+                        target->getOptionSet().hasOption(CompilerOptionName::Capability)
+                        ||
+                        target->getOptionSet().hasOption(CompilerOptionName::Profile)
+                        )
+                    && targetCaps.atLeastOneSetImpliedInOther(entryPointFuncDecl->inferredCapabilityRequirements) == CapabilitySet::ImpliesReturnFlags::NotImplied
+                    )
+                {
+                    CapabilitySet combinedSets = targetCaps;
+                    combinedSets.join(entryPointFuncDecl->inferredCapabilityRequirements);
+                    CapabilityAtomSet addedAtoms{};
+                    if (auto targetCapSet = targetCaps.getAtomSets())
+                    {
+                        if (auto combinedSet = combinedSets.getAtomSets())
+                        {
+                            CapabilityAtomSet::calcSubtract(addedAtoms, (*combinedSet), (*targetCapSet));
+                        }
+                    }
+                    maybeDiagnoseWarningOrError(
+                        sink,
+                        target->getOptionSet(),
+                        DiagnosticCategory::Capability,
+                        entryPointFuncDecl->loc,
+                        Diagnostics::profileImplicitlyUpgraded,
+                        Diagnostics::profileImplicitlyUpgradedRestrictive,
+                        addedAtoms.getElements<CapabilityAtom>());
+                }
+            }
         }
-        breakLabel:;
-
     }
 
     // Given an entry point specified via API or command line options,
@@ -918,7 +950,7 @@ namespace Slang
             for (Index tt = 0; tt < translationUnitCount; ++tt)
             {
                 auto translationUnit = translationUnits[tt];
-                translationUnit->getModule()->_discoverEntryPoints(sink);
+                translationUnit->getModule()->_discoverEntryPoints(sink, this->getLinkage()->targets);
             }
         }
     }
@@ -1081,7 +1113,7 @@ namespace Slang
                         auto interfaceType = getSup(getLinkage()->getASTBuilder(), DeclRef<GenericTypeConstraintDecl>(constraintDecl));
 
                         // Use our semantic-checking logic to search for a witness to the required conformance
-                        auto witness = visitor.isSubtype(argType, interfaceType);
+                        auto witness = visitor.isSubtype(argType, interfaceType, IsSubTypeOptions::None);
                         if(!witness)
                         {
                             // If no witness was found, then we will be unable to satisfy
@@ -1113,7 +1145,7 @@ namespace Slang
                         argType = getLinkage()->getASTBuilder()->getErrorType();
                     }
 
-                    auto witness = visitor.isSubtype(argType, interfaceType);
+                    auto witness = visitor.isSubtype(argType, interfaceType, IsSubTypeOptions::None);
                     if (!witness)
                     {
                             // If no witness was found, then we will be unable to satisfy
@@ -1264,7 +1296,7 @@ namespace Slang
                 }
 
                 auto sup = getSup(astBuilder, constraintDeclRef);
-                auto subTypeWitness = visitor.isSubtype(sub, sup);
+                auto subTypeWitness = visitor.isSubtype(sub, sup, IsSubTypeOptions::None);
                 if(subTypeWitness)
                 {
                     genericArgs.add(subTypeWitness);
@@ -1304,7 +1336,7 @@ namespace Slang
             auto paramType = as<Type>(param.object);
             auto argType = as<Type>(specializationArg.val);
 
-            auto witness = visitor.isSubtype(argType, paramType);
+            auto witness = visitor.isSubtype(argType, paramType, IsSubTypeOptions::None);
             if (!witness)
             {
                 // If no witness was found, then we will be unable to satisfy
@@ -1462,7 +1494,7 @@ namespace Slang
 
             ExpandedSpecializationArg arg;
             arg.val = argType;
-            arg.witness = visitor.isSubtype(argType, paramType);
+            arg.witness = visitor.isSubtype(argType, paramType, IsSubTypeOptions::None);
             specializationArgs.add(arg);
         }
 

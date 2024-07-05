@@ -83,7 +83,7 @@ A C++ class or COM component can implement an existential type, with the constra
 Many modern languages (e.g., Go) support adapting existing types to new interfaces, so that a "pointer" of interface type is actually a fat pointer: one for the object, and one for the interface dispatch table.
 Our examples so far have assumed that the type `T` needs to be passed around separately from the witness table `W`, but that isn't strictly required in some implementations.
 
-In type theory, the most important operation you can do with an existential type is to "open" it, which means to have a limited scope in which you can refer to the constinuent pieces of a "bundled up" value of a type like `IImage`.
+In type theory, the most important operation you can do with an existential type is to "open" it, which means to have a limited scope in which you can refer to the constituent pieces of a "bundled up" value of a type like `IImage`.
 We could imagine "opening" an existential as something like:
 
 ```
@@ -97,7 +97,7 @@ void myFunc(IImage img)
 		// and `obj` is a value of type `T`.
 		//
 		doSomethingCool<T>(obj);
-    }
+	}
 }
 ```
 
@@ -125,18 +125,18 @@ Knowing the implementation strategy outline above, we can re-phrase this questio
 
 For simple interfaces this is sometimes possible, but in the general case there are other desirable language features that get in the way:
 
-* When an interface has associated types, there is no type that can be chosen as the associated type for the interface's existential type. The "obvious" approach of using the constraints on the associatd type can lead to unsound logic when interface methods take associated types as parameters.
+* When an interface has associated types, there is no type that can be chosen as the associated type for the interface's existential type. The "obvious" approach of using the constraints on the associated type can lead to unsound logic when interface methods take associated types as parameters.
 
-* When an interface uses the "this type" (e.g., an `IComparable` interface with a `compareTo(ThisType other)` method), it isn't correct to simplify the this type to the interface type (just because you have to `IComarable` values doesn't mean you can compare them - they have to be of the same concrete type!)
+* When an interface uses the "this type" (e.g., an `IComparable` interface with a `compareTo(ThisType other)` method), it isn't correct to simplify the this type to the interface type (just because you have two `IComarable` values doesn't mean you can compare them - they have to be of the same concrete type!)
 
-* If we allow for `static` method on interfaces, then what implementation would we use for these methods on the interface existential type?
+* If we allow for `static` method on interfaces, then what implementation would we use for these methods on the interface's existential type?
 
 Encoding Existentials in the IR
 -------------------------------
 
 Existentials are encoded in the Slang IR quite simply. We have an operation `makeExistential(T, obj, W)` that takes a type `T`, a value `obj` that must have type `T`, and a witness table `W` that shows how `T` conforms to some interface `I`. The result of the `makeExistential` operation is then a value of the type `I`.
 
-Rather than include an IR operation to "open" an existential, we can instead just provide accessors for the pieces of information in an existential: one to extract the type field, one to extract the value, and one to extract the witness table. These would idomatically be used like:
+Rather than include an IR operation to "open" an existential, we can instead just provide accessors for the pieces of information in an existential: one to extract the type field, one to extract the value, and one to extract the witness table. These would idiomatically be used like:
 
 ```
 let e : ISomeInterface = /* some existential */
@@ -172,7 +172,7 @@ We require further transformation passes to allow specialization in more general
 * Function specialization, is needed so that a function with existential parameters is specialized based on the actual types used at call sites
 
 Transformations just like these are already required when working with resource types (textures/samplers) on targets that don't support first-class computation on resources, so it is possible to share some of the same logic.
-Similarly, any effort we put into validation (to ensure that code is written in a way that *can* be simplified) can hopefully be shared between existentials and reources.
+Similarly, any effort we put into validation (to ensure that code is written in a way that *can* be simplified) can hopefully be shared between existentials and resources.
 
 Compositions
 ------------
@@ -186,7 +186,7 @@ The hardest part of supporting composition of interfaces is actually in how to l
 Why are we passing along the type?
 ----------------------------------
 
-I'm glossing over something pretty significant here, which is why anybody would pass around the type as part of the existential value, when none of our examples so far have made us of it.
+I'm glossing over something pretty significant here, which is why anybody would pass around the type as part of the existential value, when none of our examples so far have made use of it.
 This sort of thing isn't very important for languages where interface polymorphism is limited to heap-allocated "reference" types (or values that have been "boxed" into reference types), because the dynamic type of an object can almost always be read out of the object itself.
 
 When dealing with a value type, though, we have to deal with things like making *copies*:
@@ -235,7 +235,7 @@ This is the reason for passing through the type `T` as part of an existential va
 
 If we only wanted to deal with reference types, this would all be greatly simplified, because the `sizeInBytes` and the copy/move semantics would be fixed: everything is a single pointer.
 
-All of the same issues arise if we making copies of existential values:
+All of the same issues arise if we're making copies of existential values:
 
 ```
 IWritable copyAndClobberExistential(IWritable obj)

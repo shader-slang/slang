@@ -63,6 +63,7 @@ Result TransientResourceHeapImpl::createCommandBuffer(ICommandBuffer** outCmdBuf
     if (m_commandBufferAllocId < (uint32_t)m_commandBufferPool.getCount())
     {
         auto result = m_commandBufferPool[m_commandBufferAllocId];
+        result->m_transientHeap.establishStrongReference();
         result->beginCommandBuffer();
         m_commandBufferAllocId++;
         returnComPtr(outCmdBuffer, result);

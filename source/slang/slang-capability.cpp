@@ -25,11 +25,11 @@ enum class CapabilityNameFlavor : int32_t
     Concrete,
 
     // An abstract capability represents a class of feature
-    // where multiple different implementations might be possible.
-    // For example, "ray tracing" might be an abstract feature
-    // that a function can require, but a specific target will
-    // only be able to provide that abstract feature via some
-    // specific concrete feature (e.g., `GL_EXT_ray_tracing`).
+    // where multiple distinct implementations might be possible.
+    // 'raytracing' may be allowed with a 'raygen' "stage", but 
+    // not a 'vertex' "stage"
+    // For more information (and a clearer description of the rules), 
+    // read `slang-capabilities.capdef`
     Abstract,
 
     // An alias capability atom is one that is exactly equivalent
@@ -60,17 +60,11 @@ struct CapabilityAtomInfo
     /// Ranking to use when deciding if this atom is a "better" one to select.
     uint32_t                    rank;
 
-    /// Canonical representation in the form of disjunction-of-conjunction of atoms.
-    ArrayView<ArrayView<CapabilityName>> canonicalRepresentation;
+    /// Canonical representation of atoms in the form of disjoint conjunctions of atoms.
+    ArrayView<CapabilityAtomSet*> canonicalRepresentation;
 };
 
 #include "slang-generated-capability-defs-impl.h"
-
-static CapabilityAtom asAtom(CapabilityName name)
-{
-    SLANG_ASSERT((CapabilityAtom)name < CapabilityAtom::Count);
-    return (CapabilityAtom)name;
-}
 
 /// Get the extended information structure for the given capability `atom`
 static CapabilityAtomInfo const& _getInfo(CapabilityName atom)
@@ -106,13 +100,51 @@ bool isDirectChildOfAbstractAtom(CapabilityAtom name)
     return _getInfo(name).abstractBase != CapabilityName::Invalid;
 }
 
+bool isTargetVersionAtom(CapabilityAtom name)
+{
+    if (name >= CapabilityAtom::_spirv_1_0 && name <= getLatestSpirvAtom())
+        return true;
+    if (name >= CapabilityAtom::metallib_2_3 && name <= getLatestMetalAtom())
+        return true;
+    return false;
+}
+
+bool isSpirvExtensionAtom(CapabilityAtom name)
+{
+    return UnownedStringSlice(_getInfo(name).name).startsWith("SPV_");
+}
+
 bool lookupCapabilityName(const UnownedStringSlice& str, CapabilityName& value);
 
 CapabilityName findCapabilityName(UnownedStringSlice const& name)
 {
-    CapabilityName result;
+    CapabilityName result{};
     if (!lookupCapabilityName(name, result))
         return CapabilityName::Invalid;
+    return result;
+}
+
+CapabilityAtom getLatestSpirvAtom()
+{
+    static CapabilityAtom result = CapabilityAtom::Invalid;
+    if (result == CapabilityAtom::Invalid)
+    {
+        CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::_spirv_latest);
+        auto latestSpirvCapSetElements = latestSpirvCapSet.getAtomSets()->getElements<CapabilityAtom>();
+        result = asAtom(latestSpirvCapSetElements[latestSpirvCapSetElements.getCount() - 2]); //-1 gets shader stage
+    }
+    return result;
+}
+
+CapabilityAtom getLatestMetalAtom()
+{
+    static CapabilityAtom result = CapabilityAtom::Invalid;
+    if (result == CapabilityAtom::Invalid)
+    {
+        CapabilitySet latestMetalCapSet = CapabilitySet(CapabilityName::metallib_latest);
+        auto latestMetalCapSetElements = latestMetalCapSet.getAtomSets()->getElements<CapabilityAtom>();
+        result = asAtom(latestMetalCapSetElements[latestMetalCapSetElements.getCount() - 2]); //-1 gets shader stage
+    }
     return result;
 }
 
@@ -126,671 +158,118 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
     const auto& info = kCapabilityNameInfos[Index(atom)];
     for (auto cur : info.canonicalRepresentation)
     {
-        for (auto cbase : cur)
-            if (asAtom(cbase) == base)
-                return true;
+        if (cur->contains((UInt)base))
+            return true;
     }
 
     return false;
 }
 
-//
-// CapabilityConjunctionSet
-//
+//// CapabiltySet
 
-// The current design choice in `CapabilityConjunctionSet` is that it stores
-// an expanded, deduplicated, and sorted list of the capability
-// atoms in the set. "Expanded" here means that it includes the
-// transitive closure of the inheritance graph of those atoms.
-//
-// This choice is intended to make certain operations on
-// capability sets more efficient, since use things like
-// binary searches to efficiently detect whether an atom
-// is present in a set.
-
-CapabilityConjunctionSet::CapabilityConjunctionSet()
-{}
-
-CapabilityConjunctionSet::CapabilityConjunctionSet(Int atomCount, CapabilityAtom const* atoms)
+CapabilityAtom getTargetAtomInSet(const CapabilityAtomSet& atomSet)
 {
-    _init(atomCount, atoms);
+    auto targetSet = getAtomSetOfTargets();
+    CapabilityAtomSet out;
+    CapabilityAtomSet::calcIntersection(out, targetSet, atomSet);
+    auto iter = out.begin();
+    if (iter == out.end())
+        return CapabilityAtom::Invalid;
+    return asAtom(*iter);
 }
 
-CapabilityConjunctionSet::CapabilityConjunctionSet(CapabilityAtom atom)
+CapabilityAtom getStageAtomInSet(const CapabilityAtomSet& atomSet)
 {
-    _init(1, &atom);
+    auto stageSet = getAtomSetOfStages();
+    CapabilityAtomSet out;
+    CapabilityAtomSet::calcIntersection(out, stageSet, atomSet);
+    auto iter = out.begin();
+    if (iter == out.end())
+        return CapabilityAtom::Invalid;
+    return asAtom(*iter);
 }
 
-CapabilityConjunctionSet::CapabilityConjunctionSet(List<CapabilityAtom> const& atoms)
+template<CapabilityName keyholeAtomToPermuteWith>
+void CapabilitySet::addPermutationsOfConjunctionForEachInContainer(CapabilityAtomSet& setToPermutate, const CapabilityAtomSet& elementsToPermutateWith, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom)
 {
-    _init(atoms.getCount(), atoms.getBuffer());
+    SLANG_UNUSED(knownTargetAtom);
+    SLANG_UNUSED(knownStageAtom);
+    for(auto i : elementsToPermutateWith)
+    {
+        CapabilityName atom = (CapabilityName)i;
+        CapabilityAtomSet conjunctionPermutation = setToPermutate;
+        auto targetInfo = _getInfo(atom);
+        conjunctionPermutation.add(*targetInfo.canonicalRepresentation[0]);
+
+        if constexpr (keyholeAtomToPermuteWith == CapabilityName::target)
+        {
+            addConjunction(conjunctionPermutation, asAtom(atom), knownStageAtom);
+        }
+        else if constexpr (keyholeAtomToPermuteWith == CapabilityName::stage)
+        {
+            addConjunction(conjunctionPermutation, knownTargetAtom, asAtom(atom));
+        }
+        else
+        {
+            addConjunction(conjunctionPermutation, knownTargetAtom, knownStageAtom);
+        }
+    }
 }
 
-CapabilityConjunctionSet CapabilityConjunctionSet::makeEmpty()
+void CapabilitySet::addConjunction(CapabilityAtomSet conjunction, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom)
 {
-    return CapabilityConjunctionSet();
+    if (knownTargetAtom == CapabilityAtom::Invalid)
+    {
+        knownTargetAtom = getTargetAtomInSet(conjunction);
+        // if no target in conjunction, add a permutation of the conjunction with every target
+        if (knownTargetAtom == CapabilityAtom::Invalid)
+        {
+            addPermutationsOfConjunctionForEachInContainer<CapabilityName::target>(conjunction, getAtomSetOfTargets(), CapabilityAtom::Invalid, getStageAtomInSet(conjunction));
+            return;
+        }
+    }
+    auto& capabilitySetToTargetSet = m_targetSets[knownTargetAtom];
+    capabilitySetToTargetSet.target = knownTargetAtom;
+
+    if (knownStageAtom == CapabilityAtom::Invalid)
+    {
+        knownStageAtom = getStageAtomInSet(conjunction);
+        // if no target in conjunction, add a permutation of the conjunction with every stage
+        if (knownStageAtom == CapabilityAtom::Invalid)
+        {
+            capabilitySetToTargetSet.shaderStageSets.reserve(kCapabilityStageCount);
+            addPermutationsOfConjunctionForEachInContainer<CapabilityName::stage>(conjunction, getAtomSetOfStages(), knownTargetAtom, CapabilityAtom::Invalid);
+            return;
+        }
+    }
+    auto& targetSetToStageSet = capabilitySetToTargetSet.shaderStageSets[knownStageAtom];
+    targetSetToStageSet.stage = knownStageAtom;
+    targetSetToStageSet.addNewSet(std::move(conjunction));
 }
 
-CapabilityConjunctionSet CapabilityConjunctionSet::makeInvalid()
+void CapabilitySet::addUnexpandedCapabilites(CapabilityName atom)
 {
-    // An invalid capability set will always be a singleton
-    // set of the `Invalid` atom, and we will construct
-    // the set directly rather than use the more expensive
-    // logic in `_init()`.
-    //
-    CapabilityConjunctionSet result;
-    result.m_expandedAtoms.add(CapabilityAtom::Invalid);
+    auto info = _getInfo(atom);
+    for (const auto cr : info.canonicalRepresentation)
+        addConjunction(*cr, CapabilityAtom::Invalid, CapabilityAtom::Invalid);
+}
+
+CapabilityAtom CapabilitySet::getUniquelyImpliedStageAtom() const
+{
+    CapabilityAtom result = CapabilityAtom::Invalid;
+    for (auto& targetKV : m_targetSets)
+    {
+        if (targetKV.second.shaderStageSets.getCount() == 1)
+        {
+            auto thisStage = targetKV.second.shaderStageSets.begin()->first;
+            if (result == CapabilityAtom::Invalid)
+                result = thisStage;
+            else if (result != thisStage)
+                return CapabilityAtom::Invalid;
+        }
+    }
     return result;
 }
-
-void CapabilityConjunctionSet::_init(Int atomCount, CapabilityAtom const* atoms)
-{
-    // We will use an explicit hash set to deduplicate input atoms.
-    //
-    HashSet<CapabilityAtom> expandedAtomsSet;
-    for(Int i = 0; i < atomCount; ++i)
-    {
-        if (expandedAtomsSet.add(atoms[i]))
-        {
-            auto& info = _getInfo(atoms[i]);
-
-            // Add the base items that this atom implies.
-            if (info.canonicalRepresentation.getCount() == 1)
-            {
-                // The atom must have only one conjunction.
-                SLANG_ASSERT(info.canonicalRepresentation.getCount() == 1);
-
-                for (auto base : info.canonicalRepresentation[0])
-                {
-                    expandedAtomsSet.add(asAtom(base));
-                }
-            }
-        }
-    }
-
-    // We can then translate the set of atoms into a list,
-    // and then sort that list to produce the data that
-    // we use in all our other queries.
-    //
-    for(auto atom : expandedAtomsSet)
-    {
-        m_expandedAtoms.add(atom);
-    }
-    m_expandedAtoms.sort();
-}
-
-void CapabilityConjunctionSet::calcCompactedAtoms(List<CapabilityAtom>& outAtoms) const
-{
-    // A "compacted" list of atoms is one that starts with
-    // the "expanded" list and removes any atoms that are
-    // implied by another atom already in the list.
-    //
-    // If the expanded list contains atom A, and A inherits
-    // from B, then we know that the expanded list also contains B,
-    // but the compacted list should not.
-    //
-    // We can thus look through the list of atoms A and for
-    // each base B of A, add it to a set of "redundant" atoms
-    // that need not appear in the compacted list.
-    //
-    HashSet<CapabilityAtom> redundantAtomsSet;
-    for( auto atom : m_expandedAtoms )
-    {
-        auto& atomInfo = _getInfo(atom);
-        if (atomInfo.canonicalRepresentation.getCount() != 1)
-        {
-            // If the atom is not a single conjunction, skip.
-            continue;
-        }
-        for(auto baseAtom : atomInfo.canonicalRepresentation[0])
-        {
-            // Note: don't add atom itself into redundant set.
-            if(asAtom(baseAtom) == atom)
-                continue;
-
-            redundantAtomsSet.add(asAtom(baseAtom));
-        }
-    }
-
-    // Once we are done figuring out which atoms are redundant,
-    // we can iterate over the expanded list and add all the
-    // non-redundant ones to the compacted output list.
-    //
-    outAtoms.clear();
-    for( auto atom : m_expandedAtoms )
-    {
-        if(!redundantAtomsSet.contains(atom))
-        {
-            outAtoms.add(atom);
-        }
-    }
-}
-
-bool CapabilityConjunctionSet::isEmpty() const
-{
-    // Checking if a capability set is empty is trivial in any representation;
-    // all we need to know is if it has zero atoms in its definition.
-    //
-    return m_expandedAtoms.getCount() == 0;
-}
-
-bool CapabilityConjunctionSet::isInvalid() const
-{
-    // We will assume here that there is only one canonical representation of
-    // an invalid capability set, which is a singleton set of the `Invalid`
-    // atom.
-    //
-    // TODO: We should ensure that any algorithms that make new capability
-    // sets by combining others properly ensure that they return the
-    // canonical invalid set rather than any other set that happens to be
-    // invalid (e.g., a set {A,B} would be invalid if A and B are incompatible,
-    // but it would not be in the canonical form this subroutine checks).
-    //
-    if(m_expandedAtoms.getCount() != 1) return false;
-    return m_expandedAtoms[0] == CapabilityAtom::Invalid;
-}
-
-bool CapabilityConjunctionSet::isIncompatibleWith(CapabilityAtom that) const
-{
-    // Checking for incompatibility is complicated, and it is best
-    // to only implement it for full (expanded) sets.
-    //
-    return isIncompatibleWith(CapabilityConjunctionSet(that));
-}
-
-static UIntSet _calcConflictMask(CapabilityAtom atom)
-{
-    UIntSet mask;
-    auto abstractBase = _getInfo(atom).abstractBase;
-    if (abstractBase != CapabilityName::Invalid)
-    {
-        mask.add((UInt)abstractBase);
-    }
-    return mask;
-}
-
-static UIntSet _calcConflictMask(const CapabilityConjunctionSet& set)
-{
-    // Given a capbility set, we want to compute the mask representing
-    // all groups of features for which it holds a potentially-conflicting atom.
-    //
-    UIntSet mask;
-    for (auto atom : set.getExpandedAtoms())
-    {
-        auto abstractBase = _getInfo(atom).abstractBase;
-        if (abstractBase != CapabilityName::Invalid)
-        {
-            mask.add((UInt)abstractBase);
-        }
-    }
-    return mask;
-}
-
-bool CapabilityConjunctionSet::isIncompatibleWith(CapabilityConjunctionSet const& that) const
-{
-    // The `this` and `that` sets are incompatible if there exists
-    // an atom A in `this` and an atom `B` in `that` such that
-    // A and B are not equal, but the two have overlapping "conflict group."
-    //
-    // Equivalently, we can say that the two are in conflict if
-    //
-    // * One of the two sets contains an atom A with conflict mask M
-    // * The other set contains at least one atom that conflicts with M
-    // * The other set does not contain A
-    //
-    // Our approach here is all about minimizing the number of
-    // iterations we take over lists of atoms, and trying to
-    // avoid anything super-linear.
-
-    // We start by identifying the OR of the conflict masks for
-    // all features in `this` and `that`.
-    //
-    UIntSet thisMask = _calcConflictMask(*this);
-    UIntSet thatMask = _calcConflictMask(that);
-
-    // Note: there is a possible early-exit opportunity here if
-    // `thisMask` and `thatMask` have no overlap: there could
-    // be no conflicts in that case.
-
-    // Next we will iterate over the two sets in tandem (O(N) time
-    // in the size of the larger set), and identify any elements
-    // that are present in one and not the other.
-    //
-    Index thisCount = this->m_expandedAtoms.getCount();
-    Index thatCount = that.m_expandedAtoms.getCount();
-    Index thisIndex = 0;
-    Index thatIndex = 0;
-    for(;;)
-    {
-        if(thisIndex == thisCount) break;
-        if(thatIndex == thatCount) break;
-
-        auto thisAtom = this->m_expandedAtoms[thisIndex];
-        auto thatAtom = that.m_expandedAtoms[thatIndex];
-
-        if(thisAtom == thatAtom)
-        {
-            thisIndex++;
-            thatIndex++;
-            continue;
-        }
-
-        if( thisAtom < thatAtom )
-        {
-            // `thisAtom` is present in `this` but not `that.
-            //
-            // If `thisAtom` has a conflict mask that overlaps
-            // with `thatMask`, then we have a conflict: the
-            // other set doesn't include `thisAtom`, but *does*
-            // include something with an overlapping mask
-            // (we don't know what at this point in the code).
-            //
-            auto thisConflictMask = Slang::_calcConflictMask(thisAtom);
-            if(UIntSet::hasIntersection(thisConflictMask, thatMask))
-                return true;
-            thisIndex++;
-        }
-        else
-        {
-            SLANG_ASSERT(thisAtom > thatAtom);
-
-            // `thatAtom` is present in `that` but not `this.
-            //
-            // The logic here is the mirror image of the case above.
-            //
-            auto thatConflictMask = Slang::_calcConflictMask(thatAtom);
-            if(UIntSet::hasIntersection(thatConflictMask, thisMask))
-                return true;
-            thatIndex++;
-        }
-    }
-
-    return false;
-}
-
-bool CapabilityConjunctionSet::implies(CapabilityConjunctionSet const& that) const
-{
-    // One capability set implies another if it is a super-set
-    // of the other one. Think of it this way: if your target
-    // supports features {X, Y, Z}, then that implies it also
-    // supports features {X,Z}.
-    //
-    // Because both `this` and `that` have expanded lists
-    // of all the capability atoms they imply *and* those
-    // lists are sorted, we can simply walk through the
-    // lists in tandem and see if there are any entries
-    // in `that` which are not present in `this.
-
-    Index thisCount = this->m_expandedAtoms.getCount();
-    Index thatCount = that.m_expandedAtoms.getCount();
-
-    // We cannot possibly have `this` contain all the atoms
-    // in `that` if the latter is has more atoms.
-    //
-    if(thatCount > thisCount)
-        return false;
-
-    // Note: the following iteration is O(N) in the size
-    // of the larger of the two sets, which is probably
-    // needlessly inefficient. We might expect that `that`
-    // will often be a much smaller set, and we'd like to
-    // scale in its size rather than the size of `this`.
-    //
-    // A more advanced algorithm here would be to do
-    // something recursive:
-    //
-    // * If `that` is  singleton set, then we can find
-    //   whether `this` contains it via binary search.
-    //
-    // * Otherwise, we can split `that` into two
-    //   equally-sized subsets. By taking a "pivot" value
-    //   from where that split took place we can then
-    //   use a binary search to partition `this` into
-    //   two subsets and recurse on each side of that
-    //   partition.
-    //
-    // In practice, the size of the sets we are dealing
-    // with right now doesn't justify such a "clever" algorithm.
-
-    Index thisIndex = 0;
-    Index thatIndex = 0;
-    for(;;)
-    {
-        if(thisIndex == thisCount) break;
-        if(thatIndex == thatCount) break;
-
-        auto thisAtom = this->m_expandedAtoms[thisIndex];
-        auto thatAtom = that.m_expandedAtoms[thatIndex];
-
-        if( thisAtom == thatAtom )
-        {
-            // We have an atom that both sets contain;
-            // we should skip past it and keep looking.
-            //
-            thisIndex++;
-            thatIndex++;
-            continue;
-        }
-
-        if( thisAtom < thatAtom )
-        {
-            // We have an atom that `this` contains,
-            // but `that` doesn't; that is consistent
-            // with `this` being a super-set, so we
-            // just skip the item and keep searching.
-            //
-            thisIndex++;
-        }
-        else
-        {
-            SLANG_ASSERT(thisAtom > thatAtom);
-
-            // We have an atom in `that` which isn't
-            // also in `this`, so we know it cannot
-            // be a subset.
-            //
-            return false;
-        }
-    }
-    // We reached the end of either this or that atom.
-    // If we reached the end of 'that', we know everything in 'that'
-    // is also contained in this, so this implies that.
-    return thatIndex == thatCount;
-}
-
-    /// Helper functor for binary search on lists of `CapabilityAtom`
-struct CapabilityAtomComparator
-{
-    int operator()(CapabilityAtom left, CapabilityAtom right)
-    {
-        return int(Int(left) - Int(right));
-    }
-};
-
-bool CapabilityConjunctionSet::implies(CapabilityAtom atom) const
-{
-    // Every non-alias atom that `this` implies should
-    // be presented in the `m_expandedAtoms` list.
-    //
-    // Because the list is sorted, we can find out whether
-    // it contains `atom` with a binary search.
-    //
-    Index result = m_expandedAtoms.binarySearch(atom, CapabilityAtomComparator());
-    return result >= 0;
-}
-
-Int CapabilityConjunctionSet::countIntersectionWith(CapabilityConjunctionSet const& that) const
-{
-    // The goal of this subroutine is to count the number of
-    // elements in the intersection of `this` and `that`,
-    // without explicitly forming that intersection.
-    //
-    // Our approach here will be to iterate over the two
-    // sets in tandem (O(N) in the size of the larger set)
-    // and check for elements that both contain.
-    //
-    // TODO: There should be an asymptotically faster
-    // recursive algorithm here.
-
-    Int intersectionCount = 0;
-
-    Index thisCount = this->m_expandedAtoms.getCount();
-    Index thatCount = that.m_expandedAtoms.getCount();
-    Index thisIndex = 0;
-    Index thatIndex = 0;
-    for(;;)
-    {
-        if(thisIndex == thisCount) break;
-        if(thatIndex == thatCount) break;
-
-        auto thisAtom = this->m_expandedAtoms[thisIndex];
-        auto thatAtom = that.m_expandedAtoms[thatIndex];
-
-        if( thisAtom == thatAtom )
-        {
-            // An item both contain.
-
-            intersectionCount++;
-            thisIndex++;
-            thatIndex++;
-            continue;
-        }
-
-        if( thisAtom < thatAtom )
-        {
-            // An item in `this` but not `that`.
-
-            thisIndex++;
-        }
-        else
-        {
-            SLANG_ASSERT(thisAtom > thatAtom);
-
-            // An item in `that` but not `this`.
-
-            thatIndex++;
-        }
-    }
-    return intersectionCount;
-}
-
-bool CapabilityConjunctionSet::isBetterForTarget(
-    CapabilityConjunctionSet const& existingCaps,
-    CapabilityConjunctionSet const& targetCaps) const
-{
-    auto& candidateCaps = *this;
-
-    // The task here is to determine if `candidateCaps` should
-    // be considered "better" than `existingCaps` in the context
-    // of compilation for a target with the given `targetCaps`.
-    //
-    // In an ideal world, this computation could be quite simple:
-    //
-    // * If either `candidateCaps` or `existingCaps` is not implied by
-    //   `targetCaps` (that is, they include requirements that aren't
-    //   provided by the target), then the other is automatically "better."
-    //
-    // * Otherwise, one set is "better" than the other if it is a
-    //   super-set (which is what `implies()` tests).
-    //
-    // There are two main reasons we can't use that simple logic:
-    //
-    // 1. Currently a user of Slang can compile for a target but
-    //    not actually spell out its capabilities fully or correctly.
-    //    They might compile for `sm_5_0` but use ray tracing features
-    //    that require `sm_6_2` and expect the compiler to figure out
-    //    what they "obviously" meant. Thus we cannot assume that
-    //    `targetCaps` can be used to rule out candidates fully.
-    //
-    // 2. Sometimes there are multiple ways for a target to provide
-    //    the same feature (e.g., multiple extensions) and because of (1)
-    //    we cannot always rely on the `targetCaps` to tell us which to
-    //    use. Thus we cannot rely on pure subset/`implies()` to define
-    //    better-ness, and need some way to break ties.
-    //
-    // The following logic is a bunch of "do what I mean" nonsense that
-    // tries to capture a reasonable intuition of what "better"-ness
-    // should mean with these caveats.
-
-    // First, if either candidate is fundamentally incompatible
-    // with the target, we shouldn't favor it.
-    //
-    if(candidateCaps.isIncompatibleWith(targetCaps)) return false;
-    if(existingCaps.isIncompatibleWith(targetCaps)) return true;
-
-    // Next, we want to compare the candidates to the `targetCaps`
-    // to figure out whether one is obviously "more specialized" for
-    // the target.
-    //
-    // We measure the degree to which a candidate is specialized for
-    // the target as the size of its set intersection with `targetCaps`.
-    //
-    // TODO: If both `candidateCaps` and `existingCaps` are implied
-    // by `targetCaps`, then this amounts to just measuring the
-    // size of each set. We probably want this size-based check to
-    // come later in the overall process.
-    //
-    // TODO: A better model here might be to actually compute the actual
-    // intersected sets, and then check if one is a super-set of the other.
-    //
-    auto candidateIntersectionSize = targetCaps.countIntersectionWith(candidateCaps);
-    auto existingIntersectionSize = targetCaps.countIntersectionWith(existingCaps);
-    if(candidateIntersectionSize != existingIntersectionSize)
-        return candidateIntersectionSize > existingIntersectionSize;
-
-    // Next we want to consider that if one of the two candidates
-    // is actually available on the target (meaning that it is
-    // implied by `targetCaps`) then we probably want to pick that one
-    // (since we can use that candidate on the chosen target without
-    // enabling any additional features the user didn't ask for).
-    //
-    // TODO: This step currently needs to come after the preceeding
-    // one because otherwise we risk selecting a `__target_intrinsic`
-    // decoration with *no* requirements (which are currently being
-    // added implicitly in many places) over any one with explicit
-    // requirements (since every target implies the empty set of
-    // requirements).
-    //
-    // In many ways the counting-based logic above amounts to a quick
-    // fix to prefer a non-empty set of requirements over an empty one,
-    // so long as something in that non-empty set overlaps with the target.
-    //
-    // TODO: The best fix is probably to figure out how "catch-all"
-    // intrinsic function definitions should be encoded; we clearly
-    // want them to be used only as a fallback when no target-specific
-    // variants are present.
-    //
-    bool candidateIsAvailable = targetCaps.implies(candidateCaps);
-    bool existingIsAvailable = targetCaps.implies(existingCaps);
-    if(candidateIsAvailable != existingIsAvailable)
-        return candidateIsAvailable;
-
-    // All preceding factors being equal, we prefer
-    // a candidate that is strictly more specialized than the other.
-    //
-    // We want to avoid choosing the candidate that uses
-    // optional features if they aren't necessary.
-    // For example, the set {glsl, optionalFeature} should not be preferred
-    // over the set {glsl}, if optionalFeature isn't requested explictly.
-    //
-    // The solution here is that we want to partition
-    // `candidateCaps` and `existingCaps` into two parts: their
-    // intersection with `targetCaps` and their difference with it.
-    //
-    // For the intersection part of things, we'd want to favor a
-    // definition that is more specialized, while for the difference
-    // part we'd actually wnat to favor a definition that is less
-    // specialized.
-    //
-    CapabilityConjunctionSet candidateCapsIntersection;
-    CapabilityConjunctionSet candidateCapsDifference;
-    for (auto atom : candidateCaps.m_expandedAtoms)
-    {
-        if (targetCaps.implies(atom))
-            candidateCapsIntersection.m_expandedAtoms.add(atom);
-        else
-            candidateCapsDifference.m_expandedAtoms.add(atom);
-    }
-    CapabilityConjunctionSet existingCapsIntersection;
-    CapabilityConjunctionSet existingCapsDifference;
-    for (auto atom : existingCaps.m_expandedAtoms)
-    {
-        if (targetCaps.implies(atom))
-            existingCapsIntersection.m_expandedAtoms.add(atom);
-        else
-            existingCapsDifference.m_expandedAtoms.add(atom);
-    }
-    auto scoreCandidate = candidateCapsIntersection.m_expandedAtoms.getCount() - candidateCapsDifference.m_expandedAtoms.getCount();
-    auto scoreExisting = existingCapsIntersection.m_expandedAtoms.getCount() - existingCapsDifference.m_expandedAtoms.getCount();
-    if (scoreCandidate != scoreExisting)
-        return scoreCandidate > scoreExisting;
-
-    // At this point we have the problem that neither candidate
-    // appears to be "obviously" better for the target, but we
-    // want some way to disambiguate them.
-    //
-    // What we want to do now is scan through what makes each candidate
-    // different from the other, and see if anything in either case
-    // has a ranking that should make it be preferred.
-    //
-    auto candidateScore = candidateCapsDifference._calcDifferenceScoreWith(existingCapsDifference);
-    auto existingScore = existingCapsDifference._calcDifferenceScoreWith(candidateCapsDifference);
-    if(candidateScore != existingScore)
-        return candidateScore > existingScore;
-
-    return false;
-}
-
-uint32_t CapabilityConjunctionSet::_calcDifferenceScoreWith(CapabilityConjunctionSet const& that) const
-{
-    uint32_t score = 0;
-
-    // Our approach here will be to scan through `this` and `that`
-    // to identify atoms that are in `this` but not `that` (that is,
-    // the atoms that would be present in the set difference `this - that`)
-    // and then compute the maximum rank/score of those atoms.
-
-    Index thisCount = this->m_expandedAtoms.getCount();
-    Index thatCount = that.m_expandedAtoms.getCount();
-    Index thisIndex = 0;
-    Index thatIndex = 0;
-    for(;;)
-    {
-        if(thisIndex == thisCount) break;
-        if(thatIndex == thatCount) break;
-
-        auto thisAtom = this->m_expandedAtoms[thisIndex];
-        auto thatAtom = that.m_expandedAtoms[thatIndex];
-
-        if( thisAtom == thatAtom )
-        {
-            thisIndex++;
-            thatIndex++;
-            continue;
-        }
-
-        if( thisAtom < thatAtom )
-        {
-            // `thisAtom` is not present in `that`, so it
-            // should contribute to our ranking of the difference.
-            //
-            auto thisAtomInfo = _getInfo(thisAtom);
-            auto thisAtomRank = thisAtomInfo.rank;
-
-            if( thisAtomRank > score )
-            {
-                score = thisAtomRank;
-            }
-
-            thisIndex++;
-        }
-        else
-        {
-            SLANG_ASSERT(thisAtom > thatAtom);
-            thatIndex++;
-        }
-    }
-    return score;
-}
-
-
-bool CapabilityConjunctionSet::operator==(CapabilityConjunctionSet const& other) const
-{
-    return m_expandedAtoms == other.m_expandedAtoms;
-}
-
-bool CapabilityConjunctionSet::operator<(CapabilityConjunctionSet const& that) const
-{
-    for (Index i = 0; i < Math::Min(m_expandedAtoms.getCount(), that.m_expandedAtoms.getCount()); i++)
-    {
-        if (m_expandedAtoms[i] < that.m_expandedAtoms[i])
-            return true;
-        else if (m_expandedAtoms[i] > that.m_expandedAtoms[i])
-            return false;
-    }
-    return m_expandedAtoms.getCount() < that.m_expandedAtoms.getCount();
-}
-
 
 CapabilitySet::CapabilitySet()
 {}
@@ -803,14 +282,8 @@ CapabilitySet::CapabilitySet(Int atomCount, CapabilityName const* atoms)
 
 CapabilitySet::CapabilitySet(CapabilityName atom)
 {
-    auto info = _getInfo(atom);
-    for (auto conjunction : info.canonicalRepresentation)
-    {
-        CapabilityConjunctionSet set;
-        for (auto atomName : conjunction)
-            set.getExpandedAtoms().add(asAtom(atomName));
-        m_conjunctions.add(_Move(set));
-    }
+    this->m_targetSets.reserve(kCapabilityTargetCount);
+    addUnexpandedCapabilites(atom);
 }
 
 CapabilitySet::CapabilitySet(List<CapabilityName> const& atoms)
@@ -826,13 +299,9 @@ CapabilitySet CapabilitySet::makeEmpty()
 
 CapabilitySet CapabilitySet::makeInvalid()
 {
-    // An invalid capability set will always be a singleton
-    // set of the `Invalid` atom, and we will construct
-    // the set directly rather than use the more expensive
-    // logic in `_init()`.
-    //
     CapabilitySet result;
-    result.m_conjunctions.add(CapabilityConjunctionSet(CapabilityAtom::Invalid));
+    result.m_targetSets[CapabilityAtom::Invalid].target = CapabilityAtom::Invalid;
+
     return result;
 }
 
@@ -843,24 +312,23 @@ void CapabilitySet::addCapability(CapabilityName name)
 
 bool CapabilitySet::isEmpty() const
 {
-    return m_conjunctions.getCount() == 0;
+    return m_targetSets.getCount() == 0;
 }
 
 bool CapabilitySet::isInvalid() const
 {
-    return m_conjunctions.getCount() == 1 && m_conjunctions[0].isInvalid();
+    return m_targetSets.containsKey(CapabilityAtom::Invalid);
 }
 
 bool CapabilitySet::isIncompatibleWith(CapabilityAtom other) const
 {
+    // should be a target or derivative, otherwise this makes no sense.
+
     if (isEmpty())
         return false;
-
-    // If all conjunctions are incompatible with the atom, then we are incompatible.
-    for (auto& c : m_conjunctions)
-        if (!c.isIncompatibleWith(other))
-            return false;
-    return true;
+    
+    CapabilitySet otherSet((CapabilityName)other);
+    return isIncompatibleWith(otherSet);
 }
 
 bool CapabilitySet::isIncompatibleWith(CapabilityName other) const
@@ -871,18 +339,6 @@ bool CapabilitySet::isIncompatibleWith(CapabilityName other) const
     return isIncompatibleWith(otherSet);
 }
 
-bool CapabilitySet::isIncompatibleWith(CapabilityConjunctionSet const& other) const
-{
-    if (isEmpty())
-        return false;
-
-    // If all conjunctions are incompatible with the atom, then we are incompatible.
-    for (auto& c : m_conjunctions)
-        if (!c.isIncompatibleWith(other))
-            return false;
-    return true;
-}
-
 bool CapabilitySet::isIncompatibleWith(CapabilitySet const& other) const
 {
     if (isEmpty())
@@ -890,348 +346,438 @@ bool CapabilitySet::isIncompatibleWith(CapabilitySet const& other) const
     if (other.isEmpty())
         return false;
 
-    // If all conjunctions in other are incompatible with the this set, then we are incompatible.
-    for (auto& oc : other.m_conjunctions)
-        for (auto& c : m_conjunctions)
-            if (!c.isIncompatibleWith(oc))
-                return false;
+    // Incompatible means there are 0 intersecting abstract nodes from sets in `other` with sets in `this`
+    for (auto& otherSet : other.m_targetSets)
+    {
+        auto targetSet = this->m_targetSets.tryGetValue(otherSet.first);
+        if (!targetSet)
+            continue;
+
+        for (auto& otherStageSet : otherSet.second.shaderStageSets)
+        {
+            auto stageSet = targetSet->shaderStageSets.tryGetValue(otherStageSet.first);
+            if (!stageSet)
+                continue;
+
+            return false;
+        }
+    }
+    return true;
+}
+
+const CapabilityAtomSet& getAtomSetOfTargets()
+{
+    return kAnyTargetUIntSetBuffer;
+}
+const CapabilityAtomSet& getAtomSetOfStages()
+{
+    return kAnyStageUIntSetBuffer;
+}
+
+bool hasTargetAtom(const CapabilityAtomSet& setIn, CapabilityAtom& targetAtom)
+{
+    CapabilityAtomSet intersection;
+    setIn.calcIntersection(intersection, getAtomSetOfTargets(), setIn);
+
+    if (intersection.isEmpty())
+        return false;
+
+    targetAtom = intersection.getElements<CapabilityAtom>().getLast();
     return true;
 }
 
 bool CapabilitySet::implies(CapabilityAtom atom) const
 {
-    if (isEmpty())
+    if (isEmpty() || atom == CapabilityAtom::Invalid)
         return false;
 
-    for (auto& c : m_conjunctions)
-        if (c.implies(atom))
-            return true;
+    CapabilitySet tmpSet = CapabilitySet(CapabilityName(atom));
 
-    return false;
+    return this->implies(tmpSet);
 }
 
-bool CapabilitySet::implies(const CapabilityConjunctionSet& set) const
-{
-    if (isEmpty())
-        return false;
-
-    for (auto& c : m_conjunctions)
-        if (c.implies(set))
-            return true;
-
-    return false;
-}
-
-bool CapabilitySet::implies(CapabilitySet const& other) const
+CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(CapabilitySet const& otherSet, ImpliesFlags flags) const
 {
     // x implies (c | d) only if (x implies c) and (x implies d).
-    if (other.isEmpty())
-        return true;
-    for (auto& c : other.m_conjunctions)
-        if (!implies(c))
-            return false;
-    return true;
-}
 
-bool CapabilitySet::operator==(CapabilitySet const& that) const
-{
-    return m_conjunctions == that.m_conjunctions;
-}
+    bool onlyRequireSingleImply = ((int)flags & (int)ImpliesFlags::OnlyRequireASingleValidImply);
+    int flagsCollected = (int)CapabilitySet::ImpliesReturnFlags::NotImplied;
 
-void CapabilitySet::calcCompactedAtoms(List<List<CapabilityAtom>>& outAtoms) const
-{
-    for (auto& c : m_conjunctions)
+    if (otherSet.isEmpty())
+        return CapabilitySet::ImpliesReturnFlags::Implied;
+
+    for (const auto& otherTarget : otherSet.m_targetSets)
     {
-        List<CapabilityAtom> atoms;
-        c.calcCompactedAtoms(atoms);
-        outAtoms.add(atoms);
-    }
-}
-
-void CapabilitySet::unionWith(const CapabilityConjunctionSet& conjunctionToAdd)
-{
-    // We add conjunctionToAdd to resultSet only if it does not imply any existing conjunctions.
-    // For example, if `resultSet` is (a), and conjunctionToAdd is (ab), then we don't want to add the conjunction
-    // to form (a | ab) because that would reduce to (a).
-    bool skipAdd = false;
-    for (auto& c : m_conjunctions)
-    {
-        if (conjunctionToAdd.implies(c))
+        auto thisTarget = this->m_targetSets.tryGetValue(otherTarget.first);
+        if (!thisTarget)
         {
-            skipAdd = true;
-            break;
-        }
-    }
-    if (!skipAdd)
-    {
-        // Once we added the new conjunction, any existing conjunctions that implies the new one can be
-        // removed.
-        // For example, if resultSet was (ab), and we are adding (a), the result should be just (a).
-        for (Index i = 0; i < m_conjunctions.getCount();)
-        {
-            if (m_conjunctions[i].implies(conjunctionToAdd))
-            {
-                m_conjunctions.fastRemoveAt(i);
-            }
-            else
-            {
-                i++;
-            }
-        }
-        m_conjunctions.add(conjunctionToAdd);
-    }
-}
-
-void CapabilitySet::canonicalize()
-{
-    // Make sure conjunctions are sorted so equality tests are trivial.
-    m_conjunctions.sort();
-}
-
-CapabilitySet CapabilitySet::getTargetsThisIsMissingFromOther(const CapabilitySet& other)
-{
-    CapabilitySet conflicts{};
-    List<CapabilityConjunctionSet> textualTargetsNotHandled;
-    for (auto conjunction : this->m_conjunctions)
-    {
-        textualTargetsNotHandled.add({});
-        auto& currentList = textualTargetsNotHandled.getLast();
-        for (auto thatNode : conjunction.getExpandedAtoms())
-        {
-            // To make this faster we can make an assumption that the nodes are:
-            // {textualTarget, targetAbstract(), targetAbstract(), nonTarget}
-            // this assumption is not being used since it relies on ordering of .capdef file
-            if (_getInfo(thatNode).abstractBase == CapabilityName::target)
-                currentList.getExpandedAtoms().add(thatNode);
-        }
-    }
-    for (auto& thatConjunction : other.m_conjunctions)
-    {
-        // Worth the check to early leave due to ~5*5 elements to loop around
-        if (textualTargetsNotHandled.getCount() == 0)
-            break;
-
-        for (int i = 0 ; i < textualTargetsNotHandled.getCount(); i++)
-        {
-            auto& textualTargets = textualTargetsNotHandled[i];
-
-            if (textualTargets.countIntersectionWith(thatConjunction) != textualTargets.getExpandedAtoms().getCount())
+            if (onlyRequireSingleImply)
                 continue;
-            
-            textualTargetsNotHandled[i] = textualTargets.makeEmpty();
+            // 'this' lacks a target 'other' has.
+            return CapabilitySet::ImpliesReturnFlags::NotImplied;
         }
-    }
-    CapabilitySet set;
-    for (auto& i : textualTargetsNotHandled)
-    {
-        if (i.isEmpty())
-            continue;
-        set.unionWith(i);
-    }
-    return set;
-}
 
-// We only run 'join' logic on "this" conjunctions which are compatiable with "other" conjunctions.
-// We only add specific nodes which satisfy the abstractMask.
-// Any non-compatible conjunctions with "other"s cconjunctions will be preserved and unmodified.
-void CapabilitySet::simpleJoinWithSetMask(const CapabilitySet& other, CapabilityName abstractMask)
-{
-    CapabilitySet resultSet;
-    HashSet<CapabilityConjunctionSet*> setUsed;
-    // get used abstract mask nodes per conjunction so we can trivially check 
-    // if we need to add the abstract mask node to avoid duplicates
-    List<HashSet<CapabilityAtom>> abstractMaskNodeInUse;
-    abstractMaskNodeInUse.growToCount(m_conjunctions.getCount());
-    for (int i = 0; i < m_conjunctions.getCount(); i++)
-    {
-        auto& thisConjunction = m_conjunctions[i];
-        auto& setOfInUseNode = abstractMaskNodeInUse[i];
-
-        for (auto& atom : thisConjunction.getExpandedAtoms())
+        for (const auto& otherStage : otherTarget.second.shaderStageSets)
         {
-            if (_getInfo(atom).abstractBase != abstractMask)
-                continue;
-            setOfInUseNode.add(atom);
-        }
-    }
-
-    for (auto& thatConjunction : other.m_conjunctions)
-    {
-        for (int i = 0; i < m_conjunctions.getCount(); i++)
-        {
-            auto& thisConjunction = m_conjunctions[i];
-            auto& setOfInUseNode = abstractMaskNodeInUse[i];
-            CapabilityConjunctionSet conjunctionToAddToResultSet;
-
-            if (thisConjunction.isIncompatibleWith(thatConjunction))
-                continue;
-            conjunctionToAddToResultSet = thisConjunction;
-            setUsed.add(&thisConjunction);
-            for (auto atom : thatConjunction.getExpandedAtoms())
+            auto thisStage = thisTarget->shaderStageSets.tryGetValue(otherStage.first);
+            if (!thisStage)
             {
-                if (_getInfo(atom).abstractBase != abstractMask
-                    || setOfInUseNode.contains(atom))
+                if (onlyRequireSingleImply)
                     continue;
-                conjunctionToAddToResultSet.getExpandedAtoms().add(atom);
+                // 'this' lacks a stage 'other' has.
+                return CapabilitySet::ImpliesReturnFlags::NotImplied;
             }
-            conjunctionToAddToResultSet.getExpandedAtoms().sort();
-            resultSet.unionWith(conjunctionToAddToResultSet);
-        }
-    }
-    for (auto& c : m_conjunctions)
-    {
-        if (!setUsed.contains(&c))
-            resultSet.m_conjunctions.add(c);
-    }
-    m_conjunctions = resultSet.m_conjunctions;
-}    
 
-void CapabilitySet::join(const CapabilitySet& other)
-{
-    if (isEmpty() || other.isInvalid())
-    {
-        *this = other;
-        return;
-    }
-    if (isInvalid())
-        return;
-    if (other.isEmpty())
-        return;
-
-    CapabilitySet resultSet;
-    for (auto& thatConjunction : other.m_conjunctions)
-    {
-        for (auto& thisConjunction : m_conjunctions)
-        {
-            if (thisConjunction.isIncompatibleWith(thatConjunction))
-                continue;
-
-            CapabilityConjunctionSet conjunction;
-            CapabilityConjunctionSet *conjunctionToAdd = nullptr;
-
-            // Add atoms from thatConjunction that are not existant in thisConjunction.
-            for (auto atom : thatConjunction.getExpandedAtoms())
+            // all stage sets that are in 'other' must be contained by 'this'
+            if (thisStage->atomSet)
             {
-                if (thisConjunction.getExpandedAtoms().binarySearch(atom, CapabilityAtomComparator()) == -1)
+                auto& thisStageSet = thisStage->atomSet.value();
+                if (otherStage.second.atomSet)
                 {
-                    conjunction.getExpandedAtoms().add(atom);
-                }
-            }
-
-            if (conjunction.getExpandedAtoms().getCount() != 0)
-            {
-                // If we find any capabilities in thatConjunction that is missing from thisConjunction,
-                // create a new ConjunctionSet that contains atoms from both, and add it to the disjunction set.
-                conjunction.getExpandedAtoms().addRange(thisConjunction.getExpandedAtoms());
-                conjunction.getExpandedAtoms().sort();
-                conjunctionToAdd = &conjunction;
-            }
-            else
-            {
-                // Otherwise, thisConjunction implies thatConjunction, so we just add thisConjunction to resultSet.
-                conjunctionToAdd = &thisConjunction;
-            }
-            resultSet.unionWith(*conjunctionToAdd);
-        }
-    }
-    m_conjunctions = _Move(resultSet.m_conjunctions);
-
-    if (m_conjunctions.getCount() == 0)
-    {
-        // If the result is empty, then we should return as impossible.
-        *this = CapabilitySet::makeInvalid();
-    }
-    else
-    {
-        canonicalize();
-    }
-}
-
-bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps) const
-{
-    if (targetCaps.isIncompatibleWith(*this))
-        return false;
-    if (targetCaps.isIncompatibleWith(that))
-        return true;
-
-    ArrayView<CapabilityConjunctionSet> thisSets = m_conjunctions.getArrayView();
-    ArrayView<CapabilityConjunctionSet> thatSets = that.m_conjunctions.getArrayView();
-    CapabilityConjunctionSet emtpySet = CapabilityConjunctionSet::makeEmpty();
-
-    if (isEmpty())
-        thisSets = makeArrayViewSingle(emtpySet);
-    if (that.isEmpty())
-        thatSets = makeArrayViewSingle(emtpySet);
-
-    // It is hard to think about what it means exactly to compare a general disjunction set to another with regard
-    // to a target that itself is also a disjunction set.
-    // Instead of trying to find a meaning for the general case, we just want to extend the logic
-    // for conjunction sets to disjunction sets in a way that common situations are handled correctly.
-    // Note that when we reach here, most of these sets are likely to contain only one conjunction, so
-    // we just need to make sure the more general logic here yields correct result for that case.
-    // 
-    // Right now, we define betterness for disjunctions as follows:
-    // A capability set X is determined to be better for a target T than capability set Y,
-    // if we find a conjunction A in X and a conjunction B in Y and a conjunction C in T such that
-    // A is better then B for target C.
-    //
-    struct ViableConjunctionIndex
-    {
-        Index index;
-        UIntSet targetConjunctionIndices;
-    };
-    auto getViableConjunction = [&](ArrayView<CapabilityConjunctionSet> set, List<ViableConjunctionIndex>& outList)
-        {
-            for (Index i = 0; i < set.getCount(); i++)
-            {
-                auto& conjunction = set[i];
-                ViableConjunctionIndex viableConjunction;
-                viableConjunction.index = i;
-                for (Index j = 0; j < targetCaps.m_conjunctions.getCount(); j++)
-                {
-                    auto& targetConjunction = targetCaps.m_conjunctions[j];
-                    if (conjunction.isIncompatibleWith(targetConjunction))
-                        continue;
-                    viableConjunction.targetConjunctionIndices.add(j);
-                }
-                if (!viableConjunction.targetConjunctionIndices.isEmpty())
-                {
-                    outList.add(viableConjunction);
-                }
-            }
-        };
-    List<ViableConjunctionIndex> viableConjunctionsThis;
-    List<ViableConjunctionIndex> viableConjunctionsThat;
-
-    getViableConjunction(thisSets, viableConjunctionsThis);
-    getViableConjunction(thatSets, viableConjunctionsThat);
-    
-    for (auto& thisConjunctionIndex : viableConjunctionsThis)
-    {
-        auto& thisConjunction = thisSets[thisConjunctionIndex.index];
-        for (auto& thatConjunctionIndex : viableConjunctionsThat)
-        {
-            auto& thatConjunction = thatSets[thatConjunctionIndex.index];
-            UIntSet intersection = thisConjunctionIndex.targetConjunctionIndices;
-            intersection.intersectWith(thatConjunctionIndex.targetConjunctionIndices);
-            if (!intersection.isEmpty())
-            {
-                for (Index targetConjunctionIndex = 0; targetConjunctionIndex < targetCaps.m_conjunctions.getCount(); targetConjunctionIndex++)
-                {
-                    if (!intersection.contains((UInt)targetConjunctionIndex))
-                        continue;
-                    if (thisConjunction.isBetterForTarget(thatConjunction, targetCaps.m_conjunctions[targetConjunctionIndex]))
+                    auto contained = thisStageSet.contains(otherStage.second.atomSet.value());
+                    if (!onlyRequireSingleImply && !contained)
                     {
-                        return true;
+                        return CapabilitySet::ImpliesReturnFlags::NotImplied;
+                    }
+                    else if (onlyRequireSingleImply && contained)
+                    {
+                        return CapabilitySet::ImpliesReturnFlags::Implied;
                     }
                 }
             }
         }
     }
-    return false;
+    if (!onlyRequireSingleImply)
+        flagsCollected |= (int)CapabilitySet::ImpliesReturnFlags::Implied;
+
+    return (CapabilitySet::ImpliesReturnFlags)flagsCollected;
 }
 
-bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, const CapabilityConjunctionSet*& outFailedAvailableSet)
+bool CapabilitySet::implies(CapabilitySet const& other) const
+{
+    return (int)_implies(other, ImpliesFlags::None) & (int)CapabilitySet::ImpliesReturnFlags::Implied;
+}
+CapabilitySet::ImpliesReturnFlags CapabilitySet::atLeastOneSetImpliedInOther(CapabilitySet const& other) const
+{
+    return _implies(other, ImpliesFlags::OnlyRequireASingleValidImply);
+}
+
+void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
+{
+    for (auto otherStageSet : other.shaderStageSets)
+    {
+        auto& thisStageSet = this->shaderStageSets[otherStageSet.first];
+        thisStageSet.stage = otherStageSet.first;
+
+        if (!thisStageSet.atomSet)
+            thisStageSet.atomSet = otherStageSet.second.atomSet;
+        else
+            if(otherStageSet.second.atomSet)
+                thisStageSet.atomSet->unionWith(*otherStageSet.second.atomSet);
+    }
+}
+
+void CapabilitySet::unionWith(const CapabilitySet& other)
+{
+    if (this->isInvalid() || other.isInvalid())
+        return;
+
+    this->m_targetSets.reserve(other.m_targetSets.getCount());
+    for (auto otherTargetSet : other.m_targetSets)
+    {
+        CapabilityTargetSet& thisTargetSet = this->m_targetSets[otherTargetSet.first];
+        thisTargetSet.target = otherTargetSet.first;
+        thisTargetSet.shaderStageSets.reserve(otherTargetSet.second.shaderStageSets.getCount());
+        thisTargetSet.unionWith(otherTargetSet.second);
+    }
+}
+
+/// Join sets, but: 
+/// 1. do not destroy target set's which are incompatible with `other` (destroying shaderStageSets is fine)
+/// 2. do not create an `CapabilityAtom::Invalid` target set.
+void CapabilitySet::nonDestructiveJoin(const CapabilitySet& other)
+{
+    if (this->isInvalid() || other.isInvalid())
+        return;
+
+    if (this->isEmpty())
+    {
+        this->m_targetSets = other.m_targetSets;
+        return;
+    }
+    for (auto& thisTargetSet : this->m_targetSets)
+    {
+        thisTargetSet.second.tryJoin(other.m_targetSets);
+    }
+}
+
+CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySet& other)
+{
+    CapabilitySet newSet{};
+    for (auto& i : this->m_targetSets)
+    {
+        if (other.m_targetSets.tryGetValue(i.first))
+            continue;
+
+        newSet.m_targetSets[i.first] = this->m_targetSets[i.first];
+    }
+    return newSet;
+}
+
+bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
+{
+    const CapabilityStageSet* otherStageSet = other.shaderStageSets.tryGetValue(this->stage);
+    if (!otherStageSet)
+        return false;
+
+    // should not exceed far beyond 2*2 or 1*1 elements
+    if(otherStageSet->atomSet && this->atomSet)
+        this->atomSet->add(*otherStageSet->atomSet);
+
+    return true;
+}
+
+bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
+{
+    const CapabilityTargetSet* otherTargetSet = other.tryGetValue(this->target);
+    if (otherTargetSet == nullptr)
+        return false;
+
+    List<CapabilityAtom> destroySet;
+    destroySet.reserve(this->shaderStageSets.getCount());
+    for (auto& shaderStageSet : this->shaderStageSets)
+    {
+        if (!shaderStageSet.second.tryJoin(*otherTargetSet))
+            destroySet.add(shaderStageSet.first);
+    }
+    if (destroySet.getCount() == Slang::Index(this->shaderStageSets.getCount()))
+        return false;
+
+    for (const auto& i : destroySet)
+        this->shaderStageSets.remove(i);
+
+    return true;
+}
+
+void CapabilitySet::join(const CapabilitySet& other)
+{
+    if (this->isEmpty() || other.isInvalid())
+    {
+        *this = other;
+        return;
+    }
+    if (this->isInvalid())
+        return;
+    if (other.isEmpty())
+        return;
+
+    List<CapabilityAtom> destroySet;
+    destroySet.reserve(this->m_targetSets.getCount());
+    for (auto& thisTargetSet : this->m_targetSets)
+    {
+        if (!thisTargetSet.second.tryJoin(other.m_targetSets))
+        {
+            destroySet.add(thisTargetSet.first);
+        }
+    }
+    for (const auto& i : destroySet)
+    {
+        this->m_targetSets.remove(i);
+    }
+    // join made a invalid CapabilitySet
+    if (this->m_targetSets.getCount() == 0)
+        this->m_targetSets[CapabilityAtom::Invalid].target = CapabilityAtom::Invalid;
+}
+
+static uint32_t _calcAtomListDifferenceScore(List<CapabilityAtom> const& thisList, List<CapabilityAtom> const& thatList)
+{
+    uint32_t score = 0;
+
+    // Our approach here will be to scan through `this` and `that`
+    // to identify atoms that are in `this` but not `that` (that is,
+    // the atoms that would be present in the set difference `this - that`)
+    // and then compute the maximum rank/score of those atoms.
+
+    Index thisCount = thisList.getCount();
+    Index thatCount = thatList.getCount();
+    Index thisIndex = 0;
+    Index thatIndex = 0;
+    for (;;)
+    {
+        if (thisIndex == thisCount) break;
+        if (thatIndex == thatCount) break;
+
+        auto thisAtom = thisList[thisIndex];
+        auto thatAtom = thatList[thatIndex];
+
+        if (thisAtom == thatAtom)
+        {
+            thisIndex++;
+            thatIndex++;
+            continue;
+        }
+
+        if (thisAtom < thatAtom)
+        {
+            // `thisAtom` is not present in `that`, so it
+            // should contribute to our ranking of the difference.
+            //
+            auto thisAtomInfo = _getInfo(thisAtom);
+            auto thisAtomRank = thisAtomInfo.rank;
+
+            if (thisAtomRank > score)
+            {
+                score = thisAtomRank;
+            }
+
+            thisIndex++;
+        }
+        else
+        {
+            SLANG_ASSERT(thisAtom > thatAtom);
+            thatIndex++;
+        }
+    }
+    return score;
+}
+
+bool CapabilitySet::hasSameTargets(const CapabilitySet& other) const
+{
+    for (const auto& i : this->m_targetSets)
+    {
+        if (!other.m_targetSets.tryGetValue(i.first))
+            return false;
+    }
+    return this->m_targetSets.getCount() == other.m_targetSets.getCount();
+}
+
+
+// MSVC incorrectly throws warning
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable:4702)
+#endif
+bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const
+{
+    if (this->isEmpty() && (that.isEmpty() || that.isInvalid()))
+    {
+        if(this->isEmpty() && that.isEmpty())
+            isEqual = true;
+        return true;
+    }
+
+    // required to have target.
+    for (auto& targetWeNeed : targetCaps.m_targetSets)
+    {
+        auto thisTarget = this->m_targetSets.tryGetValue(targetWeNeed.first);
+        if (!thisTarget)
+        {
+            isEqual = hasSameTargets(that);
+            return false;
+        }
+        auto thatTarget = that.m_targetSets.tryGetValue(targetWeNeed.first);
+        if (!thatTarget)
+        {
+            isEqual = hasSameTargets(that);
+            return true;
+        }
+
+        // required to have shader stage
+        for (auto& shaderStageSetsWeNeed : targetWeNeed.second.shaderStageSets)
+        {
+            auto thisStageSets = thisTarget->shaderStageSets.tryGetValue(shaderStageSetsWeNeed.first);
+            if (!thisStageSets)
+                return false;
+            auto thatStageSets = thatTarget->shaderStageSets.tryGetValue(shaderStageSetsWeNeed.first);
+            if (!thatStageSets)
+                return true;
+
+            // We want the smallest (most specialized) set which is still contained by this/that. This means:
+            // 1. target.contains(this/that)
+            // 2. choose smallest super set
+            // 3. rank each super set and their atoms, choose the smallest rank'd set (most specialized)
+            if(shaderStageSetsWeNeed.second.atomSet)
+            {
+                auto& shaderStageSetWeNeed = shaderStageSetsWeNeed.second.atomSet.value();
+
+                CapabilityAtomSet tmp_set{};
+                Index tmpCount = 0;
+                CapabilityAtomSet thisSet{};
+                Index thisSetCount = 0;
+                CapabilityAtomSet thatSet{};
+                Index thatSetCount = 0;
+
+                // subtraction of the set we want gets us the "elements which 'targetSet' has but `this/that` is less specialized for"
+                if(thisStageSets->atomSet)
+                {
+                    auto& thisStageSet = thisStageSets->atomSet.value();
+                    // if `thisStageSet` is more specialized than the target, `thisStageSet` should not be a candidate
+                    if (thisStageSet == shaderStageSetWeNeed)
+                        return true; 
+                    if (shaderStageSetWeNeed.contains(thisStageSet))
+                    {
+                        CapabilityAtomSet::calcSubtract(tmp_set, shaderStageSetWeNeed, thisStageSet);
+                        tmpCount = tmp_set.countElements();
+                        if (thisSetCount < tmpCount)
+                        {
+                            thisSet = tmp_set;
+                            thisSetCount = tmpCount;
+                        }
+                    }
+                }
+                if (thatStageSets->atomSet)
+                {
+                    auto& thatStageSet = thatStageSets->atomSet.value();
+                    if (thatStageSet == shaderStageSetWeNeed)
+                        return false;
+                    if (shaderStageSetWeNeed.contains(thatStageSet))
+                    {
+                        CapabilityAtomSet::calcSubtract(tmp_set, shaderStageSetWeNeed, thatStageSet);
+                        tmpCount = tmp_set.countElements();
+                        if (thatSetCount < tmpCount)
+                        {
+                            thatSet = tmp_set;
+                            thatSetCount = tmpCount;
+                        }
+                    }
+                }
+
+                if (thisSet == thatSet)
+                    isEqual = true;
+                
+                //empty means no candidate
+                if (thisSet.areAllZero())
+                    return false;
+                if (thatSet.areAllZero())
+                    return true;
+                if (thisSetCount < thatSetCount)
+                    return true;
+                else if (thisSetCount > thatSetCount)
+                    return false;
+                
+                auto thisSetElements = thisSet.getElements<CapabilityAtom>();
+                auto thatSetElements = thisSet.getElements<CapabilityAtom>();
+                auto shaderStageSetWeNeedElements = shaderStageSetWeNeed.getElements<CapabilityAtom>();
+
+                auto thisDiffScore = _calcAtomListDifferenceScore(thisSetElements, shaderStageSetWeNeedElements);
+                auto thatDiffScore = _calcAtomListDifferenceScore(thisSetElements, shaderStageSetWeNeedElements);
+
+                return thisDiffScore < thatDiffScore;
+            }
+        }
+    }
+    return true;
+}
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+CapabilitySet::AtomSets::Iterator CapabilitySet::getAtomSets() const
+{
+    return CapabilitySet::AtomSets::Iterator(&this->getCapabilityTargetSets()).begin();
+}
+
+bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, CapabilityAtomSet& outFailedAvailableSet)
 {
     // Requirements x are met by available disjoint capabilities (a | b) iff
     // both 'a' satisfies x and 'b' satisfies x.
@@ -1243,75 +789,132 @@ bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, C
     // We will check that for every capability conjunction X of F(), there is one capability conjunction Y in g() such that X implies Y.
     // 
 
-    outFailedAvailableSet = nullptr;
+    // if empty there is no body, all capabilities are supported.
+    if (required.isEmpty())
+        return true;
 
     if (required.isInvalid())
+    {
+        outFailedAvailableSet.add((UInt)CapabilityAtom::Invalid);
         return false;
+    }
 
     // If F's capability is empty, we can satisfy any non-empty requirements.
     //
     if (available.isEmpty() && !required.isEmpty())
         return false;
-
-    for (auto& availTargetSet : available.getExpandedAtoms())
+    
+    
+    // if all sets in `available` are not a super-set to at least 1 `required` set, then we have an err
+    for (auto& availableTarget : available.m_targetSets)
     {
-        bool implied = false;
-        for (auto& requiredTargetSet : required.getExpandedAtoms())
+        auto reqTarget = required.m_targetSets.tryGetValue(availableTarget.first);
+        if (!reqTarget)
         {
-            if (availTargetSet.implies(requiredTargetSet))
-            {
-                implied = true;
-                break;
-            }
-        }
-        if (!implied)
-        {
-            outFailedAvailableSet = &availTargetSet;
+            outFailedAvailableSet.add((UInt)availableTarget.first);
             return false;
         }
+
+        for (auto& availableStage : availableTarget.second.shaderStageSets)
+        {
+            auto reqStage = reqTarget->shaderStageSets.tryGetValue(availableStage.first);
+            if (!reqStage)
+            {
+                outFailedAvailableSet.add((UInt)availableStage.first);
+                return false;
+            }
+
+            const CapabilityAtomSet* lastBadStage = nullptr;
+            if(availableStage.second.atomSet)
+            {
+                const auto& availableStageSet = availableStage.second.atomSet.value();
+                lastBadStage = nullptr;
+                if(reqStage->atomSet)
+                {
+                    const auto& reqStageSet = reqStage->atomSet.value();
+                    if (availableStageSet.contains(reqStageSet))
+                        break;
+                    else 
+                        lastBadStage = &reqStageSet;
+                }
+                if (lastBadStage)
+                {
+                    // get missing atoms
+                    CapabilityAtomSet::calcSubtract(outFailedAvailableSet, *lastBadStage, availableStageSet);
+                    return false;
+                }
+            }
+        }               
     }
 
     return true;
 }
 
-bool CapabilitySet::isExactSubset(CapabilitySet const& maybeSuperSet)
+/// Converts spirv version atom to the glsl_spirv equivlent. If not possible, Invalid is returned
+inline CapabilityName maybeConvertSpirvVersionToGlslSpirvVersion(CapabilityName& atom)
 {
-    // This should only be used when absolutely required due to the 
-    // cost for complex sets. Simple sets are fine (glsl|spirv...)
-    for (auto& thisCon : m_conjunctions)
+    if (atom >= CapabilityName::_spirv_1_0 && asAtom(atom) <= getLatestSpirvAtom())
     {
-        bool foundEqualCon = false;
-        for (auto& thatCon : maybeSuperSet.m_conjunctions)
-        {
-            if (thisCon == thatCon)
-                foundEqualCon = true;
-        }
-        if (foundEqualCon == false)
-            return false;
+        return (CapabilityName)((Int)CapabilityName::glsl_spirv_1_0 + ((Int)atom - (Int)CapabilityName::_spirv_1_0));
     }
-    return true;
+    return CapabilityName::Invalid;
+}
+
+void CapabilitySet::addSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& other)
+{
+    if (auto* otherTargetSet = other.m_targetSets.tryGetValue(CapabilityAtom::spirv))
+    {
+        auto* thisTargetSet = m_targetSets.tryGetValue(CapabilityAtom::glsl);
+        if (!thisTargetSet)
+            return;
+
+        for (auto& otherStageSet : otherTargetSet->shaderStageSets)
+        {
+            if (!otherStageSet.second.atomSet)
+                continue;
+
+            auto* thisStageSet = thisTargetSet->shaderStageSets.tryGetValue(otherStageSet.first);
+            if (!thisStageSet || !thisStageSet->atomSet)
+                continue;
+
+            CapabilityAtomSet::Iterator otherAtom = otherStageSet.second.atomSet->begin();
+            while (otherAtom != otherStageSet.second.atomSet->end())
+            {
+                otherAtom++;
+                auto otherAtomName = (CapabilityName)*otherAtom;
+                if (otherAtomName > (CapabilityName)getLatestSpirvAtom())
+                {
+                    otherAtom = otherStageSet.second.atomSet->end();
+                    continue;
+                }
+                auto maybeConvertedSpirvVersionAtom = maybeConvertSpirvVersionToGlslSpirvVersion(otherAtomName);
+                if (maybeConvertedSpirvVersionAtom == CapabilityName::Invalid)
+                    continue;
+
+                thisStageSet->atomSet->add((UInt)maybeConvertedSpirvVersionAtom);
+            }
+        }
+    }
 }
 
 void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
 {
     bool isFirstSet = true;
-    for (auto& set : capSet.getExpandedAtoms())
+    for (auto& set : capSet.getAtomSets())
     {
-        List<CapabilityAtom> compactAtomList;
-        set.calcCompactedAtoms(compactAtomList);
-
         if (!isFirstSet)
         {
             sb<< " | ";
         }
         bool isFirst = true;
-        for (auto atom : compactAtomList)
+        for (auto atom : set)
         {
+            CapabilityName formattedAtom = (CapabilityName)atom;
             if (!isFirst)
             {
                 sb << " + ";
             }
-            auto name = capabilityNameToString((CapabilityName)atom);
+            auto name = capabilityNameToString((CapabilityName)formattedAtom);
             if (name.startsWith("_"))
                 name = name.tail(1);
             sb << name;
@@ -1330,5 +933,290 @@ void printDiagnosticArg(StringBuilder& sb, CapabilityName name)
 {
     sb << _getInfo(name).name;
 }
+
+void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)
+{
+    sb << "{";
+    auto count = list.getCount();
+    for(Index i = 0; i < count; i++)
+    {
+        printDiagnosticArg(sb, list[i]);
+        if (i + 1 != count)
+            sb << ", ";
+    }
+    sb << "}";
+}
+
+
+#ifdef UNIT_TEST_CAPABILITIES
+
+#define CHECK_CAPS(inData) SLANG_ASSERT(inData>0)
+
+int TEST_findTargetCapSet(CapabilitySet& capSet, CapabilityAtom target)
+{
+    return true
+        && capSet.getCapabilityTargetSets().containsKey(target);
+}
+
+int TEST_findTargetStage(
+    CapabilitySet& capSet,
+    CapabilityAtom target,
+    CapabilityAtom stage)
+{
+    return capSet.getCapabilityTargetSets()[target].shaderStageSets.containsKey(stage);
+}
+
+
+int TEST_targetCapSetWithSpecificAtomInStage(
+    CapabilitySet& capSet,
+    CapabilityAtom target,
+    CapabilityAtom stage,
+    CapabilityAtom atom)
+{
+    return capSet.getCapabilityTargetSets()[target].shaderStageSets[stage].atomSet->contains((UInt)atom);
+}
+
+int TEST_targetCapSetWithSpecificSetInStage(
+    CapabilitySet& capSet,
+    CapabilityAtom target,
+    CapabilityAtom stage,
+    List<CapabilityAtom> setToFind)
+{
+
+    bool containsStageKey = capSet.getCapabilityTargetSets()[target].shaderStageSets.containsKey(stage);
+    if (!containsStageKey) 
+        return 0;
+
+    auto& stageSet = capSet.getCapabilityTargetSets()[target].shaderStageSets[stage];
+    if (stage != stageSet.stage)
+        return -1;
+
+    CapabilityAtomSet set;
+    for (auto i : setToFind)
+        set.add(UInt(i));
+
+    if (stageSet.atomSet)
+    {
+        auto& i = stageSet.atomSet.value();
+        if (i == set)
+            return true;
+    }
+
+    return -2;
+}
+
+void TEST_CapabilitySet_addAtom()
+{
+    CapabilitySet testCapSet{};
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_ADD_1);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::vertex,
+        { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::vertex,
+        CapabilityAtom::_sm_4_0, CapabilityAtom::_sm_4_1 }));
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::vertex,
+        { CapabilityAtom::textualTarget, CapabilityAtom::glsl, CapabilityAtom::vertex,
+        CapabilityAtom::_GLSL_130 }));
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::spirv_1_0));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::spirv_1_0, CapabilityAtom::vertex,
+        { CapabilityAtom::spirv_1_0, CapabilityAtom::vertex,
+        CapabilityAtom::spirv_1_1 }));
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::metal));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::metal, CapabilityAtom::vertex,
+        { CapabilityAtom::textualTarget, CapabilityAtom::metal, CapabilityAtom::vertex }));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_ADD_2);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::compute,
+        { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::compute,
+        CapabilityAtom::_sm_4_0, CapabilityAtom::_sm_4_1 }));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment,
+        { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::fragment,
+        CapabilityAtom::_sm_4_0, CapabilityAtom::_sm_4_1 }));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_ADD_3);
+
+    CHECK_CAPS((int)!TEST_findTargetCapSet(testCapSet, CapabilityAtom::spirv_1_0));
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment,
+        { CapabilityAtom::textualTarget, CapabilityAtom::glsl, CapabilityAtom::fragment,
+        CapabilityAtom::_GLSL_130 }));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_1);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
+    CHECK_CAPS((int)!TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::vertex));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_0));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_5_0));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_2);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
+    CHECK_CAPS((int)!TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_5));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_5_0));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_3);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_NV_shader_texture_footprint));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_NV_compute_shader_derivatives));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_4);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_findTargetStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_NV_shader_texture_footprint));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::glsl, CapabilityAtom::fragment, CapabilityAtom::_GL_ARB_shader_image_size));
+
+    // ------------------------------------------------------------
+
+    testCapSet = CapabilitySet(CapabilityName::TEST_GEN_5);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSet, CapabilityAtom::hlsl));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_5));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_4));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificAtomInStage(testCapSet, CapabilityAtom::hlsl, CapabilityAtom::fragment, CapabilityAtom::_sm_6_0));
+}
+
+void TEST_CapabilitySet_join()
+{
+    CapabilitySet testCapSetA{};
+    CapabilitySet testCapSetB{};
+
+    // ------------------------------------------------------------
+
+    testCapSetA = CapabilitySet(CapabilityName::TEST_JOIN_1A);
+    testCapSetB = CapabilitySet(CapabilityName::TEST_JOIN_1B);
+    testCapSetA.join(testCapSetB);
+
+    CHECK_CAPS((int)!TEST_findTargetCapSet(testCapSetA, CapabilityAtom::hlsl));
+    CHECK_CAPS((int)!TEST_findTargetCapSet(testCapSetA, CapabilityAtom::glsl));
+
+    // ------------------------------------------------------------
+
+    testCapSetA = CapabilitySet(CapabilityName::TEST_JOIN_2A);
+    testCapSetB = CapabilitySet(CapabilityName::TEST_JOIN_2B);
+    testCapSetA.join(testCapSetB);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSetA, CapabilityAtom::hlsl));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSetA, CapabilityAtom::hlsl, CapabilityAtom::vertex,
+        { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::vertex,
+        CapabilityAtom::_sm_4_0, CapabilityAtom::_sm_4_1 }));
+    
+    // ------------------------------------------------------------
+
+    testCapSetA = CapabilitySet(CapabilityName::TEST_JOIN_3A);
+    testCapSetB = CapabilitySet(CapabilityName::TEST_JOIN_3B);
+    testCapSetA.join(testCapSetB);
+
+    CHECK_CAPS((int)!TEST_findTargetCapSet(testCapSetA, CapabilityAtom::spirv_1_0));
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSetA, CapabilityAtom::glsl));
+    CHECK_CAPS((int)!TEST_findTargetStage(testCapSetA, CapabilityAtom::glsl, CapabilityAtom::raygen));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSetA, CapabilityAtom::glsl, CapabilityAtom::fragment,
+        { CapabilityAtom::textualTarget, CapabilityAtom::glsl, CapabilityAtom::fragment,
+        CapabilityAtom::_GLSL_130, CapabilityAtom::_GLSL_140 }));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSetA, CapabilityAtom::glsl, CapabilityAtom::vertex,
+        { CapabilityAtom::textualTarget, CapabilityAtom::glsl, CapabilityAtom::vertex,
+        CapabilityAtom::_GLSL_130, CapabilityAtom::_GLSL_140 }));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSetA, CapabilityAtom::hlsl, CapabilityAtom::fragment,
+        { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::fragment,
+        CapabilityAtom::_sm_4_0, CapabilityAtom::_sm_4_1 }));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSetA, CapabilityAtom::hlsl, CapabilityAtom::vertex,
+        { CapabilityAtom::textualTarget, CapabilityAtom::hlsl, CapabilityAtom::vertex,
+        CapabilityAtom::_sm_4_0 }));
+
+    // ------------------------------------------------------------
+
+    testCapSetA = CapabilitySet(CapabilityName::TEST_JOIN_4A);
+    testCapSetB = CapabilitySet(CapabilityName::TEST_JOIN_4B);
+    testCapSetA.join(testCapSetB);
+
+    CHECK_CAPS(TEST_findTargetCapSet(testCapSetA, CapabilityAtom::glsl));
+    CHECK_CAPS(TEST_targetCapSetWithSpecificSetInStage(testCapSetA, CapabilityAtom::glsl, CapabilityAtom::fragment,
+        { CapabilityAtom::textualTarget, CapabilityAtom::glsl, CapabilityAtom::fragment,
+        CapabilityAtom::_GLSL_130, CapabilityAtom::_GLSL_140, CapabilityAtom::_GLSL_150, CapabilityAtom::_GL_EXT_texture_query_lod, CapabilityAtom::_GL_EXT_texture_shadow_lod }));
+
+    // ------------------------------------------------------------
+
+
+}
+
+void TEST_CapabilitySet()
+{
+    TEST_CapabilitySet_addAtom();
+    TEST_CapabilitySet_join();
+}
+
+/*
+/// Test Capabilities
+
+alias TEST_ADD_1 = _sm_4_1 | _GLSL_130 | spirv_1_1 | metal;
+alias TEST_ADD_2 = _sm_4_1 |& _sm_4_0 + compute_fragment;
+alias TEST_ADD_3 = _GLSL_130 + compute_fragment_geometry_vertex;
+
+alias TEST_GEN_1 = _sm_6_5 + fragment | _sm_6_0 + vertex;
+alias TEST_GEN_2 = _sm_6_5 + fragment;
+alias TEST_GEN_3 = GL_NV_shader_texture_footprint + GL_NV_compute_shader_derivatives + fragment | _GL_NV_shader_texture_footprint + fragment;
+alias TEST_GEN_4 = GL_ARB_shader_image_size |& GL_NV_shader_texture_footprint + fragment;
+alias TEST_GEN_5 = sm_6_0 + compute_fragment| sm_6_5;
+
+alias TEST_JOIN_1A = hlsl;
+alias TEST_JOIN_1B = glsl;
+
+alias TEST_JOIN_2A = hlsl;
+alias TEST_JOIN_2B = _sm_4_1 | glsl;
+
+alias TEST_JOIN_3A = glsl + fragment | _sm_4_0 + fragment 
+                    | glsl + vertex | hlsl + vertex
+                    ;
+alias TEST_JOIN_3B = _sm_4_1 + fragment 
+                    | _sm_4_0 + vertex
+                    | _sm_4_0 + compute
+                    | _GLSL_140 + vertex
+                    | _GLSL_140 + fragment
+                    | spirv_1_0 + fragment
+                    | glsl + raygen 
+                    | hlsl + raygen
+                    ;
+
+alias TEST_JOIN_4A = _GLSL_140 + _GL_EXT_texture_query_lod;
+alias TEST_JOIN_4B = _GLSL_150 + _GL_EXT_texture_shadow_lod;
+
+// Will cause capability generator failiure
+alias TEST_ERROR_GEN_1 = GL_NV_shader_texture_footprint + GL_NV_compute_shader_derivatives + fragment | _GL_NV_shader_texture_footprint + _GL_NV_shader_atomic_fp16_vector + fragment;
+alias TEST_ERROR_GEN_2 = GL_NV_shader_texture_footprint | GL_NV_ray_tracing_motion_blur;
+alias TEST_ERROR_GEN_3 = GL_ARB_shader_image_size | GL_NV_shader_texture_footprint + fragment;
+alias TEST_ERROR_GEN_4 = _sm_6_5 + fragment + vertex + cpp;
+
+///
+*/
+#undef CHECK_CAPS
+
+#endif
 
 }

@@ -3,18 +3,6 @@
 namespace Slang
 {
 
-static bool _areAllZero(const UIntSet::Element* elems, Index count)
-{
-    for (Index i = 0; count; ++i)
-    {
-        if (elems[i])
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
 UIntSet& UIntSet::operator=(UIntSet&& other)
 {
     m_buffer = _Move(other.m_buffer);
@@ -49,14 +37,8 @@ void UIntSet::setAll()
 
 void UIntSet::resize(UInt size)
 {
-    const Index oldCount = m_buffer.getCount();
     const Index newCount = Index((size + kElementMask) >> kElementShift);
-    m_buffer.setCount(newCount);
-
-    if (newCount > oldCount)
-    {
-        ::memset(m_buffer.getBuffer() + oldCount, 0, (newCount - oldCount) * sizeof(Element));
-    }
+    resizeBackingBufferDirectly(newCount);
 }
 
 void UIntSet::clear()
@@ -66,17 +48,7 @@ void UIntSet::clear()
 
 bool UIntSet::isEmpty() const
 {
-    const Element*const src = m_buffer.getBuffer();
-    const Index count = m_buffer.getCount();
-
-    for (Index i = 0; i < count; ++i)
-    {
-        if (src[i])
-        {
-            return false;
-        }
-    }
-    return true;
+    return _areAllZero(m_buffer.getBuffer(), m_buffer.getCount());
 }
 
 void UIntSet::clearAndDeallocate()
@@ -106,7 +78,7 @@ bool UIntSet::operator==(const UIntSet& set) const
 
     const Index minCount = Math::Min(aCount, bCount);
     
-    return ::memcmp(aElems, bElems, minCount) == 0 &&
+    return ::memcmp(aElems, bElems, minCount*sizeof(Element)) == 0 &&
         _areAllZero(aElems + minCount, aCount - minCount) &&
         _areAllZero(bElems + minCount, bCount - minCount);
 }
@@ -123,9 +95,18 @@ void UIntSet::intersectWith(const UIntSet& set)
     }
 }
 
+void UIntSet::subtractWith(const UIntSet& set)
+{
+    const Index minCount = Math::Min(this->m_buffer.getCount(), set.m_buffer.getCount());
+    for (Index i = 0; i < minCount; i++)
+    {
+        this->m_buffer[i] = this->m_buffer[i] & (~set.m_buffer[i]);
+    }
+}
+
 /* static */void UIntSet::calcUnion(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
-    outRs.m_buffer.setCount(Math::Max(set1.m_buffer.getCount(), set2.m_buffer.getCount()));
+    outRs.resizeBackingBufferDirectly(Math::Max(set1.m_buffer.getCount(), set2.m_buffer.getCount()));
     outRs.clear();
     for (Index i = 0; i < set1.m_buffer.getCount(); i++)
         outRs.m_buffer[i] |= set1.m_buffer[i];
@@ -136,7 +117,7 @@ void UIntSet::intersectWith(const UIntSet& set)
 /* static */void UIntSet::calcIntersection(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
     const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
-    outRs.m_buffer.setCount(minCount);
+    outRs.resizeBackingBufferDirectly(minCount);
 
     for (Index i = 0; i < minCount; i++)
         outRs.m_buffer[i] = set1.m_buffer[i] & set2.m_buffer[i];
@@ -144,7 +125,7 @@ void UIntSet::intersectWith(const UIntSet& set)
 
 /* static */void UIntSet::calcSubtract(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
-    outRs.m_buffer.setCount(set1.m_buffer.getCount());
+    outRs.resizeBackingBufferDirectly(set1.m_buffer.getCount());
 
     const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
     for (Index i = 0; i < minCount; i++)
@@ -160,6 +141,25 @@ void UIntSet::intersectWith(const UIntSet& set)
             return true;
     }
     return false;
+}
+
+Index UIntSet::countElements() const
+{
+    // TODO: This can be made faster using SIMD intrinsics to count set bits.
+    uint64_t tmp;
+    constexpr Index loopSize = ((sizeof(Element) / sizeof(tmp)) != 0) ? sizeof(Element) / sizeof(tmp) : 1;
+    Index count = 0;
+    for (auto index = 0; index < this->m_buffer.getCount(); index++)
+    {
+        for (auto i = 0; i < loopSize; i++)
+        {
+            tmp = m_buffer[index] >> (sizeof(tmp) * i);
+            tmp = tmp - ((tmp >> 1) & 0x5555555555555555);
+            tmp = (tmp & 0x3333333333333333) + ((tmp >> 2) & 0x3333333333333333);
+            count += ((tmp + (tmp >> 4) & 0xF0F0F0F0F0F0F0F) * 0x101010101010101) >> 56;
+        }
+    }
+    return count;
 }
 
 }

@@ -96,6 +96,7 @@ static Result _calcSizeAndAlignment(
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::HostSharedLibrary:
         kPointerSize = (int)sizeof(void*);
         break;
     }
@@ -496,7 +497,6 @@ struct Std140LayoutRules : IRTypeLayoutRules
 Result getNaturalSizeAndAlignment(CompilerOptionSet& optionSet, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
     return getSizeAndAlignment(optionSet, IRTypeLayoutRules::getNatural(), type, outSizeAndAlignment);
-
 }
 
 Result getNaturalOffset(CompilerOptionSet& optionSet, IRStructField* field, IRIntegerValue* outOffset)

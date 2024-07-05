@@ -49,17 +49,22 @@ struct SpecializationContext
     IRModule* module;
     DiagnosticSink* sink;
     TargetProgram* targetProgram;
-
     bool changed = false;
 
 
     SpecializationContext(IRModule* inModule, TargetProgram* target)
         : workList(*inModule->getContainerPool().getList<IRInst>())
         , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
-        , cleanInsts(*module->getContainerPool().getHashSet<IRInst>())
+        , cleanInsts(*inModule->getContainerPool().getHashSet<IRInst>())
         , module(inModule)
         , targetProgram(target)
     {
+    }
+    ~SpecializationContext()
+    {
+        module->getContainerPool().free(&workList);
+        module->getContainerPool().free(&workListSet);
+        module->getContainerPool().free(&cleanInsts);
     }
 
     // An instruction is then fully specialized if and only
@@ -442,7 +447,7 @@ struct SpecializationContext
                         // that our args are fully specialized/concrete.
                         //
                         UCount argCount = specInst->getArgCount();
-                        List<IRInst*> args;
+                        ShortList<IRInst*> args;
                         for (UIndex ii = 0; ii < argCount; ii++)
                             args.add(specInst->getArg(ii));
 
@@ -454,7 +459,7 @@ struct SpecializationContext
                             builder.getTypeKind(),
                             specDiffFunc->getBase()->getDataType(),
                             argCount,
-                            args.getBuffer());
+                            args.getArrayView().getBuffer());
 
                         // Specialize the custom derivative function with the original arguments.
                         builder.setInsertBefore(specInst);
@@ -462,7 +467,7 @@ struct SpecializationContext
                             (IRType*)newDiffFuncType,
                             specDiffFunc->getBase(),
                             argCount,
-                            args.getBuffer());
+                            args.getArrayView().getBuffer());
 
                         // Add the new spec insts to the list so they get specialized with 
                         // the usual logic.
@@ -722,6 +727,7 @@ struct SpecializationContext
         builder.setInsertInto(moduleInst);
         auto dictInst = builder.emitIntrinsicInst(nullptr, dictOp, 0, nullptr);
         builder.setInsertInto(dictInst);
+        List<IRInst*> args;
         for (const auto& [key, value] : dict)
         {
             if (!value->parent)
@@ -731,10 +737,10 @@ struct SpecializationContext
                 if (!keyVal->parent) goto next;
             }
             {
-                List<IRInst*> args;
+                args.clear();
                 args.add(value);
                 args.addRange(key.vals);
-                builder.emitIntrinsicInst(nullptr, kIROp_SpecializationDictionaryItem, args.getCount(), args.getBuffer());
+                builder.emitIntrinsicInst(nullptr, kIROp_SpecializationDictionaryItem, (UInt)args.getCount(), args.getBuffer());
             }
         next:;
         }
@@ -854,7 +860,7 @@ struct SpecializationContext
             if (iterChanged)
             {
                 this->changed = true;
-                eliminateDeadCode(module->getModuleInst(), IRDeadCodeEliminationOptions());
+                eliminateDeadCode(module->getModuleInst());
             }
 
             // Once the work list has gone dry, we should have the invariant
@@ -955,11 +961,11 @@ struct SpecializationContext
                     IRBuilder builder(module);
                     builder.setInsertBefore(inst);
 
-                    List<IRInst*> args;
+                    ShortList<IRInst*> args;
                     args.add(wrapExistential->getWrappedValue());
                     for (UInt i = 1; i < inst->getArgCount(); i++)
                         args.add(inst->getArg(i));
-                    List<IRInst*> slotOperands;
+                    ShortList<IRInst*> slotOperands;
                     UInt slotOperandCount = wrapExistential->getSlotOperandCount();
                     for (UInt ii = 0; ii < slotOperandCount; ++ii)
                     {
@@ -977,9 +983,9 @@ struct SpecializationContext
                         innerResultType = builder.getPtrType(elementType);
                     }
                     auto newCallee = getNewSpecializedBufferLoadCallee(inst->getCallee(), sbType, innerResultType);
-                    auto newCall = builder.emitCallInst(innerResultType, newCallee, args);
+                    auto newCall = builder.emitCallInst(innerResultType, newCallee, (UInt)args.getCount(), args.getArrayView().getBuffer());
                     auto newWrapExistential = builder.emitWrapExistential(
-                        resultType, newCall, slotOperandCount, slotOperands.getBuffer());
+                        resultType, newCall, slotOperandCount, slotOperands.getArrayView().getBuffer());
                     inst->replaceUsesWith(newWrapExistential);
                     workList.remove(inst);
                     inst->removeAndDeallocate();
@@ -1147,7 +1153,7 @@ struct SpecializationContext
         // We will start by constructing the argument list for the new call.
         //
         argCounter = 0;
-        List<IRInst*> newArgs;
+        ShortList<IRInst*> newArgs;
         for (auto param : calleeFunc->getParams())
         {
             auto arg = inst->getArg(argCounter++);
@@ -1193,7 +1199,7 @@ struct SpecializationContext
 
         builder->setInsertBefore(inst);
         auto newCall = builder->emitCallInst(
-            inst->getFullType(), specializedCallee, newArgs);
+            inst->getFullType(), specializedCallee, (UInt)newArgs.getCount(), newArgs.getArrayView().getBuffer());
 
         // We will completely replace the old `call` instruction with the
         // new one, and will go so far as to transfer any decorations
@@ -1235,6 +1241,7 @@ struct SpecializationContext
     }
 
     // Test if a type is compile time constant.
+    HashSet<IRInst*> seenTypeSet;
     bool isCompileTimeConstantType(IRInst* inst)
     {
         // TODO: We probably need/want a more robust test here.
@@ -1243,10 +1250,11 @@ struct SpecializationContext
         if (!isInstFullySpecialized(inst))
             return false;
 
-        List<IRInst*> localWorkList;
-        HashSet<IRInst*> processedInsts;
+        ShortList<IRInst*> localWorkList;
+        seenTypeSet.clear();
+
         localWorkList.add(inst);
-        processedInsts.add(inst);
+        seenTypeSet.add(inst);
 
         while (localWorkList.getCount() != 0)
         {
@@ -1269,10 +1277,8 @@ struct SpecializationContext
             for (UInt i = 0; i < curInst->getOperandCount(); ++i)
             {
                 auto operand = curInst->getOperand(i);
-                if (processedInsts.add(operand))
-                {
+                if (seenTypeSet.add(operand))
                     localWorkList.add(operand);
-                }
             }
         }
         return true;
@@ -1375,7 +1381,7 @@ struct SpecializationContext
         // the lists here because we don't yet have a basic
         // block, or even a function, to insert them into.
         //
-        List<IRParam*> newParams;
+        ShortList<IRParam*, 16> newParams;
         UInt argCounter = 0;
         for (auto oldParam : oldFunc->getParams())
         {
@@ -1481,14 +1487,14 @@ struct SpecializationContext
         // In order to construct the type of the new function, we
         // need to extract the types of all its parameters.
         //
-        List<IRType*> newParamTypes;
+        ShortList<IRType*> newParamTypes;
         for (auto newParam : newParams)
         {
             newParamTypes.add(newParam->getFullType());
         }
         IRType* newFuncType = builder->getFuncType(
             newParamTypes.getCount(),
-            newParamTypes.getBuffer(),
+            newParamTypes.getArrayView().getBuffer(),
             oldFunc->getResultType());
         newFunc->setFullType(newFuncType);
 
@@ -1546,7 +1552,7 @@ struct SpecializationContext
         //
         addToWorkList(newFunc);
 
-        simplifyFunc(targetProgram, newFunc, IRSimplificationOptions::getFast());
+        simplifyFunc(targetProgram, newFunc, IRSimplificationOptions::getFast(targetProgram));
 
         return newFunc;
     }
@@ -1690,7 +1696,7 @@ struct SpecializationContext
                 return false;
 
 
-            List<IRInst*> slotOperands;
+            ShortList<IRInst*> slotOperands;
             UInt slotOperandCount = wrapInst->getSlotOperandCount();
             for (UInt ii = 0; ii < slotOperandCount; ++ii)
             {
@@ -1702,7 +1708,7 @@ struct SpecializationContext
                 resultType,
                 newLoadInst,
                 slotOperandCount,
-                slotOperands.getBuffer());
+                slotOperands.getArrayView().getBuffer());
 
             addUsersToWorkList(inst);
 
@@ -1823,7 +1829,7 @@ struct SpecializationContext
 
             auto foundFieldType = foundField->getFieldType();
 
-            List<IRInst*> slotOperands;
+            ShortList<IRInst*> slotOperands;
             UInt slotOperandCount = calcExistentialBoxSlotCount(foundFieldType);
 
             for (UInt ii = 0; ii < slotOperandCount; ++ii)
@@ -1840,7 +1846,7 @@ struct SpecializationContext
                 resultType,
                 newGetField,
                 slotOperandCount,
-                slotOperands.getBuffer());
+                slotOperands.getArrayView().getBuffer());
 
             addUsersToWorkList(inst);
             inst->replaceUsesWith(newWrapExistentialInst);
@@ -1913,7 +1919,7 @@ struct SpecializationContext
 
             auto foundFieldType = foundField->getFieldType();
 
-            List<IRInst*> slotOperands;
+            ShortList<IRInst*> slotOperands;
             UInt slotOperandCount = calcExistentialBoxSlotCount(foundFieldType);
 
             for (UInt ii = 0; ii < slotOperandCount; ++ii)
@@ -1930,7 +1936,7 @@ struct SpecializationContext
                 resultType,
                 newGetFieldAddr,
                 slotOperandCount,
-                slotOperands.getBuffer());
+                slotOperands.getArrayView().getBuffer());
 
             addUsersToWorkList(inst);
             inst->replaceUsesWith(newWrapExistentialInst);
@@ -1958,7 +1964,7 @@ struct SpecializationContext
 
             auto elementType = cast<IRArrayTypeBase>(val->getDataType())->getElementType();
 
-            List<IRInst*> slotOperands;
+            ShortList<IRInst*> slotOperands;
             UInt slotOperandCount = wrapInst->getSlotOperandCount();
 
             for (UInt ii = 0; ii < slotOperandCount; ++ii)
@@ -1969,7 +1975,7 @@ struct SpecializationContext
             auto newGetElement = builder.emitElementExtract(elementType, val, index);
 
             auto newWrapExistentialInst = builder.emitWrapExistential(
-                resultType, newGetElement, slotOperandCount, slotOperands.getBuffer());
+                resultType, newGetElement, slotOperandCount, slotOperands.getArrayView().getBuffer());
 
             addUsersToWorkList(inst);
             inst->replaceUsesWith(newWrapExistentialInst);
@@ -1999,7 +2005,7 @@ struct SpecializationContext
             IRBuilder builder(module);
             builder.setInsertBefore(inst);
 
-            List<IRInst*> slotOperands;
+            ShortList<IRInst*> slotOperands;
             UInt slotOperandCount = wrapInst->getSlotOperandCount();
 
             for (UInt ii = 0; ii < slotOperandCount; ++ii)
@@ -2011,7 +2017,7 @@ struct SpecializationContext
             auto newElementAddr = builder.emitElementAddress(elementPtrType, val, index);
 
             auto newWrapExistentialInst = builder.emitWrapExistential(
-                resultType, newElementAddr, slotOperandCount, slotOperands.getBuffer());
+                resultType, newElementAddr, slotOperandCount, slotOperands.getArrayView().getBuffer());
 
             addUsersToWorkList(inst);
             inst->replaceUsesWith(newWrapExistentialInst);
@@ -2407,7 +2413,7 @@ IRInst* specializeGenericImpl(
                 {
                     if (auto func = as<IRFunc>(specializedVal))
                     {
-                        simplifyFunc(context->targetProgram, func, IRSimplificationOptions::getFast());
+                        simplifyFunc(context->targetProgram, func, IRSimplificationOptions::getFast(context->targetProgram));
                     }
                 }
 

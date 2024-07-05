@@ -3,6 +3,9 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -profile glsl_450 -stage compute -entry computeMain -line-directive-mode none
 
+// Metal does not support custom data layout.
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 

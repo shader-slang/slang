@@ -4,6 +4,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 

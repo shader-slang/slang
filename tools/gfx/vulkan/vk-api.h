@@ -283,6 +283,14 @@ struct VulkanExtendedFeatureProperties
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_INVOCATION_REORDER_FEATURES_NV
     };
 
+    VkPhysicalDeviceVariablePointerFeaturesKHR variablePointersFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTER_FEATURES_KHR
+    };
+
+    VkPhysicalDeviceComputeShaderDerivativesFeaturesNV computeShaderDerivativeFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_NV
+    };
+
     // Clock features
     VkPhysicalDeviceShaderClockFeaturesKHR clockFeatures = { 
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR
@@ -307,6 +315,12 @@ struct VulkanExtendedFeatureProperties
     VkPhysicalDeviceVulkan12Features vulkan12Features = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
     };
+
+    // Ray tracing validation features
+    VkPhysicalDeviceRayTracingValidationFeaturesNV rayTracingValidationFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV
+    };
+
 };
 
 struct VulkanApi

@@ -20,6 +20,13 @@ namespace Slang
 class CLikeSourceEmitter: public SourceEmitterBase
 {
 public:
+
+    enum class EmitLayoutSemanticOption
+    {
+        kPreType,
+        kPostType
+    };
+
     struct Desc
     {
         CodeGenContext* codeGenContext = nullptr;
@@ -306,7 +313,7 @@ public:
 
     void emitArgs(IRInst* inst);
 
-    
+    void emitRateQualifiers(IRInst* value);
     void emitRateQualifiersAndAddressSpace(IRInst* value);
 
     void emitInstResultDecl(IRInst* inst);
@@ -316,8 +323,8 @@ public:
     IRTargetIntrinsicDecoration* _findBestTargetIntrinsicDecoration(IRInst* inst);
 
     // Find the definition of a target intrinsic either from __target_intrinsic decoration, or from
-    // a genericAsm inst in the function body.
-    bool findTargetIntrinsicDefinition(IRInst* callee, UnownedStringSlice& outDefinition);
+    // a genericAsm inst in the function body. `outInst` is the decoration or the genericAsm inst.
+    bool findTargetIntrinsicDefinition(IRInst* callee, UnownedStringSlice& outDefinition, IRInst*& outInst);
 
     // Check if the string being used to define a target intrinsic
     // is an "ordinary" name, such that we can simply emit a call
@@ -329,6 +336,7 @@ public:
     void emitIntrinsicCallExpr(
         IRCall*                         inst,
         UnownedStringSlice              intrinsicDefinition,
+        IRInst*                         intrinsicInst,
         EmitOpInfo const&               inOuterPrec);
 
     void emitCallExpr(IRCall* inst, EmitOpInfo outerPrec);
@@ -343,7 +351,8 @@ public:
     void emitSemantics(IRInst* inst, bool allowOffsets = false);
     void emitSemanticsUsingVarLayout(IRVarLayout* varLayout);
 
-    void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
+    void emitDecorationLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling);
+    void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling);
 
         /// Emit high-level language statements from a structured region.
     void emitRegion(Region* inRegion);
@@ -430,7 +439,7 @@ public:
     void emitFrontMatter(TargetRequest* targetReq) { emitFrontMatterImpl(targetReq); }
 
     void emitPreModule() { emitPreModuleImpl(); }
-
+    void emitPostModule() { emitPostModuleImpl(); }
     void emitModule(IRModule* module, DiagnosticSink* sink)
         { m_irModule = module; emitModuleImpl(module, sink); }
 
@@ -460,9 +469,9 @@ public:
     protected:
 
 
-
+    virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual bool doesTargetSupportPtrTypes() { return false; }
-    virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
+    virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling, EmitLayoutSemanticOption layoutSemanticOption) { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); SLANG_UNUSED(layoutSemanticOption); }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) = 0;
 
@@ -475,6 +484,9 @@ public:
         /// For example on targets that don't have built in vector/matrix support, this is where
         /// the appropriate generated declarations occur.
     virtual void emitPreModuleImpl();
+    virtual void emitPostModuleImpl();
+
+    virtual void beforeComputeEmitActions(IRModule* module) { SLANG_UNUSED(module); };
 
     virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace) { SLANG_UNUSED(rate); SLANG_UNUSED(addressSpace); }
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout) { SLANG_UNUSED(inst); SLANG_UNUSED(allowOffsetLayout); }
@@ -493,7 +505,7 @@ public:
     virtual void emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitParamTypeImpl(IRType* type, String const& name);
-    virtual void emitIntrinsicCallExprImpl(IRCall* inst, UnownedStringSlice intrinsicDefinition, EmitOpInfo const& inOuterPrec);
+    virtual void emitIntrinsicCallExprImpl(IRCall* inst, UnownedStringSlice intrinsicDefinition, IRInst* intrinsicInst, EmitOpInfo const& inOuterPrec);
     virtual void emitFunctionPreambleImpl(IRInst* inst) { SLANG_UNUSED(inst); }
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) { SLANG_UNUSED(decl); }
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) { SLANG_UNUSED(ifInst); }
@@ -588,6 +600,10 @@ public:
     Dictionary<IRInst*, String> m_mapInstToName;
 
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
+    struct RequiredAfter
+    {
+        String requireComputeDerivatives;
+    }m_requiredAfter;
 };
 
 }

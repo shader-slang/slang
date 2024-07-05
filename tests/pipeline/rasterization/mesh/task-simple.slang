@@ -1,6 +1,11 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -task -output-using-type -dx12 -use-dxil -profile sm_6_6 -render-features mesh-shader
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -task -output-using-type -vk -profile glsl_450+spirv_1_4 -render-features mesh-shader
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -task -output-using-type -vk -profile sm_6_5 -render-features mesh-shader
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry meshMain -stage mesh
+//TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv -entry taskMain -stage amplification
+
+// CHECK_SPV: OpEntryPoint
+// CHECK_SPV: TaskPayloadWorkgroupEXT
+
 
 // To test a simple mesh shader, we'll generate 4 triangles, the vertices of
 // each one will hold the triangle index and a value (the square). The fragment

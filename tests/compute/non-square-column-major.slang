@@ -8,6 +8,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -xslang -matrix-layout-column-major -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -xslang -matrix-layout-column-major -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -xslang -matrix-layout-column-major -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=METAL):-slang  -output-using-type -shaderobj -mtl
 
 // matrix<R, C>
 //TEST_INPUT:cbuffer(data=[1.0 0.0 10.0 0.0  0.0 1.0 20.0 0.0]):name matrixBuffer
@@ -25,6 +26,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     
     float2 r = mul(v, M);
 
+    // Metal always uses scalar layout + row major, so it is computing
+    //              [1  0]
+    // [ 1 2 1]  *  [10 0]  = [ 21 1 ]
+    //              [0  1]
+    // METAL: 21
+    // METAL: 1
     output[0] = r.x;
     output[1] = r.y;
 }

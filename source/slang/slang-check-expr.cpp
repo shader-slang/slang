@@ -598,37 +598,60 @@ namespace Slang
         {
         case BuiltinRequirementKind::DifferentialType:
             {
-                auto structDecl = m_astBuilder->create<StructDecl>();
-                auto conformanceDecl = m_astBuilder->create<InheritanceDecl>();
-                conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
-                conformanceDecl->parentDecl = structDecl;
-                structDecl->members.add(conformanceDecl);
-                structDecl->parentDecl = parent;
+                if (!canStructBeUsedAsSelfDifferentialType(parent))
+                {
+                    // Need to create a new struct type for the differential.
+                    //
+                    auto structDecl = m_astBuilder->create<StructDecl>();
+                    auto conformanceDecl = m_astBuilder->create<InheritanceDecl>();
+                    conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
+                    conformanceDecl->parentDecl = structDecl;
+                    structDecl->members.add(conformanceDecl);
+                    structDecl->parentDecl = parent;
 
-                synthesizedDecl = structDecl;
-                auto typeDef = m_astBuilder->create<TypeAliasDecl>();
-                typeDef->nameAndLoc.name = getName("Differential");
-                typeDef->parentDecl = structDecl;
+                    synthesizedDecl = structDecl;
+                    auto typeDef = m_astBuilder->create<TypeAliasDecl>();
+                    typeDef->nameAndLoc.name = getName("Differential");
+                    typeDef->parentDecl = structDecl;
 
-                auto synthDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
+                    auto synthDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
 
-                typeDef->type.type = DeclRefType::create(m_astBuilder, synthDeclRef);
-                structDecl->members.add(typeDef);
+                    typeDef->type.type = DeclRefType::create(m_astBuilder, synthDeclRef);
+                    structDecl->members.add(typeDef);
+
+                    synthesizedDecl->parentDecl = parent;
+                    synthesizedDecl->nameAndLoc.name = item.declRef.getName();
+                    synthesizedDecl->loc = parent->loc;
+                    parent->members.add(synthesizedDecl);
+                    parent->invalidateMemberDictionary();
+
+                    // Mark the newly synthesized decl as `ToBeSynthesized` so future checking can differentiate it
+                    // from user-provided definitions, and proceed to fill in its definition.
+                    auto toBeSynthesized = m_astBuilder->create<ToBeSynthesizedModifier>();
+                    addModifier(synthesizedDecl, toBeSynthesized);
+                }
+                else
+                {
+                    // There's no need for a new struct decl. 
+                    // We can simply add a typealias to the existing concrete type.
+                    //
+                    auto typeDef = m_astBuilder->create<TypeAliasDecl>();
+                    typeDef->nameAndLoc.name = item.declRef.getName();
+                    typeDef->parentDecl = parent;
+                    typeDef->type.type = subType;
+                    
+                    synthesizedDecl = parent;
+
+                    parent->members.add(typeDef);
+                    parent->invalidateMemberDictionary();
+
+                    markSelfDifferentialMembersOfType(parent, subType);
+                }
             }
             break;
         default:
             return nullptr;
         }
-        synthesizedDecl->parentDecl = parent;
-        synthesizedDecl->nameAndLoc.name = item.declRef.getName();
-        synthesizedDecl->loc = parent->loc;
-        parent->members.add(synthesizedDecl);
-        parent->invalidateMemberDictionary();
-
-        // Mark the newly synthesized decl as `ToBeSynthesized` so future checking can differentiate it
-        // from user-provided definitions, and proceed to fill in its definition.
-        auto toBeSynthesized = m_astBuilder->create<ToBeSynthesizedModifier>();
-        addModifier(synthesizedDecl, toBeSynthesized);
 
         auto synthDeclMemberRef = m_astBuilder->getMemberDeclRef(subType->getDeclRef(), synthesizedDecl);
         return ConstructDeclRefExpr(
@@ -1143,6 +1166,51 @@ namespace Slang
         }
 
         return nullptr;
+    }
+
+    bool SemanticsVisitor::canStructBeUsedAsSelfDifferentialType(AggTypeDecl *aggTypeDecl)
+    {
+        // A struct can be used as its own differential type if all its members are differentiable
+        // and their differential types are the same as the original types. 
+        //
+        bool canBeUsed = true;
+        for (auto member : aggTypeDecl->members)
+        {
+            if (auto varDecl = as<VarDecl>(member))
+            {
+                // Try to get the differential type of the member.
+                Type* diffType = tryGetDifferentialType(getASTBuilder(), varDecl->getType());
+                if (!diffType || !diffType->equals(varDecl->getType()))
+                {
+                    canBeUsed = false;
+                    break;
+                }
+            }
+        }
+        return canBeUsed;
+    }
+
+    void SemanticsVisitor::markSelfDifferentialMembersOfType(AggTypeDecl *parent, Type* type)
+    {
+        // TODO: Handle extensions.
+        // Add derivative member attributes to all the fields pointing to themselves.
+        for (auto member : parent->getMembersOfType<VarDeclBase>())
+        {   
+            auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
+            auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
+            fieldLookupExpr->type.type = member->getType();
+
+            auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+            baseTypeExpr->base.type = type;
+            auto baseTypeType = m_astBuilder->getOrCreate<TypeType>(type);
+            baseTypeExpr->type.type = baseTypeType;
+            fieldLookupExpr->baseExpression = baseTypeExpr;
+
+            fieldLookupExpr->declRef = makeDeclRef(member);
+
+            derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
+            addModifier(member, derivativeMemberModifier);
+        }
     }
 
     Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc)
@@ -2548,6 +2616,9 @@ namespace Slang
 
         auto checkedExpr = CheckInvokeExprWithCheckedOperands(expr);
 
+        // Perform additional validation for known built-in functions.
+        maybeCheckKnownBuiltinInvocation(checkedExpr);
+
         if (m_parentDifferentiableAttr)
         {
             FunctionDifferentiableLevel callerDiffLevel = FunctionDifferentiableLevel::None;
@@ -2662,7 +2733,7 @@ namespace Slang
         // Get a reference to the builtin 'IDifferentiable' interface
         auto differentiableInterface = getASTBuilder()->getDifferentiableInterfaceType();
 
-        auto conformanceWitness = as<Witness>(isSubtype(primalType, differentiableInterface));
+        auto conformanceWitness = as<Witness>(isSubtype(primalType, differentiableInterface, IsSubTypeOptions::None));
         // Check if the provided type inherits from IDifferentiable.
         // If not, return the original type.
         if (conformanceWitness)
@@ -3045,6 +3116,12 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsExprVisitor::visitDefaultConstructExpr(DefaultConstructExpr* expr)
+    {
+        return expr;
+    }
+
+
     static bool _isSizeOfType(Type* type)
     {
         if (!type)
@@ -3266,7 +3343,7 @@ namespace Slang
             valueType = typeType->getType();
 
         // If value is a subtype of `type`, then this expr is always true.
-        if(isSubtype(valueType, expr->typeExpr.type))
+        if(isSubtype(valueType, expr->typeExpr.type, IsSubTypeOptions::None))
         {
             // Instead of returning a BoolLiteralExpr, we use a field to indicate this scenario,
             // so that the language server can still see the original syntax tree.
@@ -3331,6 +3408,43 @@ namespace Slang
 
         expr->typeExpr = typeExpr.exp;
         return expr;
+    }
+
+    void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
+    {
+        auto checkedInvokeExpr = as<InvokeExpr>(invokeExpr);
+        if (!checkedInvokeExpr)
+            return;
+        auto declRefFuncExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr);
+        if (!declRefFuncExpr)
+            return;
+        auto callee = declRefFuncExpr->declRef.getDecl();
+        if (!callee)
+            return;
+        auto knownBuiltinAttr = callee->findModifier<KnownBuiltinAttribute>();
+        if (!knownBuiltinAttr)
+            return;
+        if (knownBuiltinAttr->name == "GetAttributeAtVertex")
+        {
+            if (checkedInvokeExpr->arguments.getCount() != 2)
+                return;
+            auto vertexAttributeArg = checkedInvokeExpr->arguments[0];
+            auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
+            if (!vertexAttributeArgDeclRefExpr)
+            {
+                getSink()->diagnose(invokeExpr, Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
+            auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
+            if (!vertexAttributeArgDecl)
+                return;
+            if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
+                !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
+            {
+                getSink()->diagnose(vertexAttributeArgDeclRefExpr, Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
+        }
     }
 
     Expr* SemanticsVisitor::MaybeDereference(Expr* inExpr)
@@ -4062,6 +4176,10 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
     {
+        // If we are assigned a type, expr has already been legalized
+        if(expr->type)
+            return expr;
+        
         // When faced with an initializer list, we first just check the sub-expressions blindly.
         // Actually making them conform to a desired type will wait for when we know the desired
         // type based on context.
@@ -4102,6 +4220,10 @@ namespace Slang
             else if( auto funcDeclBase = as<FunctionDeclBase>(containerDecl) )
             {
                 if( funcDeclBase->hasModifier<MutatingAttribute>() )
+                {
+                    expr->type.isLeftValue = true;
+                }
+                else if (funcDeclBase->hasModifier<RefAttribute>())
                 {
                     expr->type.isLeftValue = true;
                 }

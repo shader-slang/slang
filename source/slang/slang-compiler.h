@@ -71,8 +71,6 @@ namespace Slang
         Unknown             = SLANG_TARGET_UNKNOWN,
         None                = SLANG_TARGET_NONE,
         GLSL                = SLANG_GLSL,
-        GLSL_Vulkan         = SLANG_GLSL_VULKAN,
-        GLSL_Vulkan_OneDesc = SLANG_GLSL_VULKAN_ONE_DESC,
         HLSL                = SLANG_HLSL,
         SPIRV               = SLANG_SPIRV,
         SPIRVAssembly       = SLANG_SPIRV_ASM,
@@ -85,6 +83,7 @@ namespace Slang
         PyTorchCppBinding   = SLANG_CPP_PYTORCH_BINDING,
         HostCPPSource       = SLANG_HOST_CPP_SOURCE,
         HostExecutable      = SLANG_HOST_EXECUTABLE,
+        HostSharedLibrary   = SLANG_HOST_SHARED_LIBRARY,
         ShaderSharedLibrary = SLANG_SHADER_SHARED_LIBRARY,
         ShaderHostCallable  = SLANG_SHADER_HOST_CALLABLE,
         CUDASource          = SLANG_CUDA_SOURCE,
@@ -200,10 +199,16 @@ namespace Slang
         Name* getName() { return m_name; }
 
             /// Get the stage that the entry point is to be compiled for
-        Stage getStage() { return m_profile.getStage(); }
+        Stage getStage() 
+        {
+            return m_profile.getStage();
+        }
 
             /// Get the profile that the entry point is to be compiled for
-        Profile getProfile() { return m_profile; }
+        Profile getProfile()
+        {
+            return m_profile;
+        }
 
             /// Get the index to the translation unit
         int getTranslationUnitIndex() const { return m_translationUnitIndex; }
@@ -308,6 +313,10 @@ namespace Slang
             SlangInt        targetIndex,
             slang::IBlob**  outCode,
             slang::IBlob**  outDiagnostics) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
             SlangInt    entryPointIndex,
@@ -601,11 +610,12 @@ namespace Slang
             Index                       argCount,
             DiagnosticSink*             sink) SLANG_OVERRIDE;
 
-    private:
+    public:
         CompositeComponentType(
             Linkage*                            linkage,
             List<RefPtr<ComponentType>> const&  childComponents);
 
+    private:
         List<RefPtr<ComponentType>> m_childComponents;
 
         // The following arrays hold the concatenated entry points, parameters,
@@ -878,6 +888,14 @@ namespace Slang
             return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt        targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetCode(targetIndex, outCode, outDiagnostics);
+        }
+
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
             SlangInt        entryPointIndex,
             SlangInt        targetIndex,
@@ -1111,6 +1129,14 @@ namespace Slang
             return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt        targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetCode(targetIndex, outCode, outDiagnostics);
+        }
+
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
             SlangInt        entryPointIndex,
             SlangInt        targetIndex,
@@ -1285,6 +1311,14 @@ namespace Slang
             return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
+            SlangInt        targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetCode(targetIndex, outCode, outDiagnostics);
+        }
+
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
             SlangInt        entryPointIndex,
             SlangInt        targetIndex,
@@ -1334,6 +1368,11 @@ namespace Slang
             char const*             name,
             slang::IEntryPoint**     outEntryPoint) SLANG_OVERRIDE
         {
+            if (outEntryPoint == nullptr)
+            {
+                return SLANG_E_INVALID_ARG;
+            }
+
             ComPtr<slang::IEntryPoint> entryPoint(findEntryPointByName(UnownedStringSlice(name)));
             if((!entryPoint))
                 return SLANG_FAIL;
@@ -1348,6 +1387,11 @@ namespace Slang
             slang::IEntryPoint** outEntryPoint,
             ISlangBlob** outDiagnostics) override
         {
+            if (outEntryPoint == nullptr)
+            {
+                return SLANG_E_INVALID_ARG;
+            }
+
             ComPtr<slang::IEntryPoint> entryPoint(findAndCheckEntryPoint(UnownedStringSlice(name), stage, outDiagnostics));
             if ((!entryPoint))
                 return SLANG_FAIL;
@@ -1365,6 +1409,11 @@ namespace Slang
         {
             if (index < 0 || index >= m_entryPoints.getCount())
                 return SLANG_E_INVALID_ARG;
+
+            if (outEntryPoint == nullptr)
+            {
+                return SLANG_E_INVALID_ARG;
+            }
 
             ComPtr<slang::IEntryPoint> entryPoint(m_entryPoints[index].Ptr());
             *outEntryPoint = entryPoint.detach();
@@ -1404,6 +1453,15 @@ namespace Slang
         /// Get the unique identity of the module.
         virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() override;
 
+        /// Get the number of dependency files that this module depends on.
+        /// This includes both the explicit source files, as well as any
+        /// additional files that were transitively referenced (e.g., via
+        /// a `#include` directive).
+        virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDependencyFileCount() override;
+
+        /// Get the path to a file this module depends on.
+        virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
+            SlangInt32 index) override;
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
@@ -1483,7 +1541,7 @@ namespace Slang
             ///
         void _collectShaderParams();
 
-        void _discoverEntryPoints(DiagnosticSink* sink);
+        void _discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets);
 
         class ModuleSpecializationInfo : public SpecializationInfo
         {
@@ -1540,7 +1598,7 @@ namespace Slang
         // List of source files this module depends on
         FileDependencyList m_fileDependencyList;
 
-        // Entry points that were defined in thsi module
+        // Entry points that were defined in this module
         //
         // Note: the entry point defined in the module are *not*
         // part of the memory image/layout of the module when
@@ -1722,6 +1780,8 @@ namespace Slang
         CompilerOptionSet& getOptionSet() { return optionSet; }
 
         CapabilitySet getTargetCaps();
+
+        void setTargetCaps(CapabilitySet capSet);
 
         HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();
 
@@ -2762,6 +2822,9 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setSkipSPIRVValidation(bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetUseMinimumSlangOptimization(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setIgnoreCapabilityCheck(bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool isClear) SLANG_OVERRIDE;
 
         void setTrackLiveness(bool v);
 
@@ -2834,6 +2897,8 @@ namespace Slang
             CompilerOptionSet targetOptions;
         };
         Dictionary<TargetRequest*, RefPtr<TargetInfo>> m_targetInfos;
+
+        CompilerOptionSet m_optionSetForDefaultTarget;
 
         CompilerOptionSet& getTargetOptionSet(TargetRequest* req);
 
@@ -3301,6 +3366,34 @@ struct CompileTimerRAII
         session->addTotalCompileTime(elapsedTime);
     }
 };
+
+// helpers for error/warning reporting
+enum class DiagnosticCategory
+{
+    None = 0,
+    Capability = 1 << 0,
+};
+template<typename P, typename... Args>
+bool maybeDiagnose(DiagnosticSink* sink, CompilerOptionSet& optionSet, DiagnosticCategory errorType, P const& pos, DiagnosticInfo const& info, Args const&... args)
+{
+    if ((int)errorType & (int)DiagnosticCategory::Capability && optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+        return false;
+    return sink->diagnose(pos, info, args...);
+}
+
+template<typename P, typename... Args>
+bool maybeDiagnoseWarningOrError(DiagnosticSink* sink, CompilerOptionSet& optionSet, DiagnosticCategory errorType, P const& pos, DiagnosticInfo const& warningInfo, DiagnosticInfo const& errorInfo, Args const&... args)
+{
+    if ((int)errorType & (int)DiagnosticCategory::Capability && optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck))
+    {
+        return maybeDiagnose(sink, optionSet, errorType, pos, errorInfo, args...);
+    }
+    else
+    {
+        return maybeDiagnose(sink, optionSet, errorType, pos, warningInfo, args...);
+    }
+}
+
 }
 
 #endif

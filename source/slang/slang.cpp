@@ -246,6 +246,7 @@ void Session::_initCodeGenTransitionMap()
             // is available. We prefer LLVM if that's available. If it's not we can use generic C/C++ compiler
 
             map.addTransition(source, CodeGenTarget::ShaderSharedLibrary, PassThroughMode::GenericCCpp);
+            map.addTransition(source, CodeGenTarget::HostSharedLibrary, PassThroughMode::GenericCCpp);
             map.addTransition(source, CodeGenTarget::HostExecutable, PassThroughMode::GenericCCpp);
             map.addTransition(source, CodeGenTarget::ObjectCode, PassThroughMode::GenericCCpp);
         }
@@ -315,6 +316,14 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
         return SLANG_FAIL;
     }
 
+#ifdef _DEBUG
+    // Print a message in debug builds to notice the user that compiling the stdlib
+    // can take a while.
+    time_t beginTime;
+    time(&beginTime);
+    fprintf(stderr, "Compiling stdlib on debug build, this can take a while.\n");
+#endif
+
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     StringBuilder stdLibSrcBuilder;
     stdLibSrcBuilder
@@ -365,6 +374,11 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
     finalizeSharedASTBuilder();
 
+#ifdef _DEBUG
+    time_t endTime;
+    time(&endTime);
+    fprintf(stderr, "Compiling stdlib took %.2f seconds.\n", difftime(endTime, beginTime));
+#endif
     return SLANG_OK;
 }
 
@@ -912,8 +926,6 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         break;
 
     case CodeGenTarget::GLSL:
-    case CodeGenTarget::GLSL_Vulkan:
-    case CodeGenTarget::GLSL_Vulkan_OneDesc:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         if(targetProfile.getFamily() != ProfileFamily::GLSL)
@@ -1259,6 +1271,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
     slang::IComponentType**         outCompositeComponentType,
     ISlangBlob**                    outDiagnostics)
 {
+    if (outCompositeComponentType == nullptr)
+        return SLANG_E_INVALID_ARG;
+
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     // Attempting to create a "composite" of just one component type should
@@ -1484,6 +1499,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
     SlangInt conformanceIdOverride,
     ISlangBlob** outDiagnostics)
 {
+    if (outConformanceComponentType == nullptr)
+        return SLANG_E_INVALID_ARG;
+
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     RefPtr<TypeConformance> result;
@@ -1495,7 +1513,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         SharedSemanticsContext sharedSemanticsContext(this, nullptr, &sink);
         SemanticsVisitor visitor(&sharedSemanticsContext);
         auto witness =
-            visitor.isSubtype((Slang::Type*)type, (Slang::Type*)interfaceType);
+            visitor.isSubtype((Slang::Type*)type, (Slang::Type*)interfaceType, IsSubTypeOptions::None);
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
         {
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
@@ -1646,6 +1664,12 @@ HLSLToVulkanLayoutOptions* TargetRequest::getHLSLToVulkanLayoutOptions()
     return hlslToVulkanOptions.get();
 }
 
+void TargetRequest::setTargetCaps(CapabilitySet capSet)
+{
+    cookedCapabilities = capSet;
+
+}
+
 CapabilitySet TargetRequest::getTargetCaps()
 {
     if(!cookedCapabilities.isEmpty())
@@ -1671,12 +1695,15 @@ CapabilitySet TargetRequest::getTargetCaps()
     // are available where can be directly encoded on the declarations.
 
     List<CapabilityName> atoms;
+
+    // If the user specified a explicit profile, we should pull
+    // a corresponding atom representing the target version from the profile.
+    CapabilitySet profileCaps = CapabilitySet(optionSet.getProfile().getCapabilityName());
+
     bool isGLSLTarget = false;
     switch(getTarget())
     {
     case CodeGenTarget::GLSL:
-    case CodeGenTarget::GLSL_Vulkan:
-    case CodeGenTarget::GLSL_Vulkan_OneDesc:
         isGLSLTarget = true;
         atoms.add(CapabilityName::glsl);
         break;
@@ -1684,12 +1711,46 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::SPIRVAssembly:
         if (getOptionSet().shouldEmitSPIRVDirectly())
         {
-            atoms.add(CapabilityName::spirv_1_5);
+            // Default to SPIRV 1.5 if the user has not specified a target version.
+            bool hasTargetVersionAtom = false;
+            if (!profileCaps.isEmpty())
+            {
+                profileCaps.join(CapabilitySet(CapabilityName::spirv_1_0));
+                for (auto profileCapAtomSet : profileCaps.getAtomSets())
+                {
+                    for (auto atom : profileCapAtomSet)
+                    {
+                        if (isTargetVersionAtom(asAtom(atom)))
+                        {
+                            atoms.add((CapabilityName)atom);
+                            hasTargetVersionAtom = true;
+                        }
+                    }
+                }
+            }
+            if (!hasTargetVersionAtom)
+            {
+                atoms.add(CapabilityName::spirv_1_5);
+            }
+            // If the user specified any SPIR-V extensions in the profile,
+            // pull them in.
+            for (auto profileCapAtomSet : profileCaps.getAtomSets())
+            {
+                for (auto atom : profileCapAtomSet)
+                {
+                    if (isSpirvExtensionAtom(asAtom(atom)))
+                    {
+                        atoms.add((CapabilityName)atom);
+                        hasTargetVersionAtom = true;
+                    }
+                }
+            }
         }
         else
         {
             isGLSLTarget = true;
             atoms.add(CapabilityName::glsl);
+            profileCaps.addSpirvVersionFromOtherAsGlslSpirvVersion(profileCaps);
         }
         break;
 
@@ -1709,6 +1770,7 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::PyTorchCppBinding:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
         atoms.add(CapabilityName::cpp);
@@ -1731,30 +1793,24 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     CapabilitySet targetCap = CapabilitySet(atoms);
 
-    CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
-    CapabilityName latestSpirvAtom = (CapabilityName)latestSpirvCapSet.getExpandedAtoms()[0].getExpandedAtoms().getLast();
+    if (profileCaps.atLeastOneSetImpliedInOther(targetCap) == CapabilitySet::ImpliesReturnFlags::Implied)
+        targetCap.join(profileCaps);
+    
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
-        auto atom = (CapabilityName)atomVal.intValue;
-        if (isGLSLTarget)
-        {
-            // If we are emitting GLSL code, we need to
-            // translate all spirv_*_* capabilities to
-            // glsl_spirv_*_* instead.
-            //
-            if (atom >= CapabilityName::spirv_1_0 && atom <= latestSpirvAtom)
-            {
-                atom = (CapabilityName)((Int)CapabilityName::glsl_spirv_1_0 + ((Int)atom - (Int)CapabilityName::spirv_1_0));
-            }
-        }
-        if (!targetCap.isIncompatibleWith(atom))
-        {
-            // Only add atoms that are compatible with the current target.
-            atoms.add(atom);
-        }
+        auto toAdd = CapabilitySet((CapabilityName)atomVal.intValue);
+        
+        if(isGLSLTarget)
+            targetCap.addSpirvVersionFromOtherAsGlslSpirvVersion(toAdd);
+
+        if (!targetCap.isIncompatibleWith(toAdd))
+            targetCap.join(toAdd);
     }
 
-    cookedCapabilities = CapabilitySet(atoms);
+    cookedCapabilities = targetCap;
+    
+    SLANG_ASSERT(!cookedCapabilities.isInvalid());
+        
     return cookedCapabilities;
 }
 
@@ -3796,7 +3852,6 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(Module* module, TranslationUn
 
     IncludeSystem includeSystem;
     auto sourceFile = findFile(name, loc, includeSystem);
-
     if (!sourceFile)
     {
         sink->diagnose(loc, Diagnostics::cannotOpenFile, getText(name));
@@ -4302,6 +4357,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     auto targetProgram = getTargetProgram(target);
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
     IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
@@ -4594,6 +4650,57 @@ void ComponentType::enumerateIRModules(EnumerateIRModulesCallback callback, void
 {
     EnumerateIRModulesVisitor visitor(callback, userData);
     acceptVisitor(&visitor, nullptr);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCode(
+    Int             targetIndex,
+    slang::IBlob** outCode,
+    slang::IBlob** outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+
+    // If the user hasn't specified any entry points, then we should
+    // discover all entrypoints that are defined in linked modules, and
+    // include all of them in the compile.
+    //
+    if (getEntryPointCount() == 0)
+    {
+        List<Module*> modules;
+        this->enumerateModules([&](Module* module)
+            {
+                modules.add(module);
+            });
+        List<RefPtr<ComponentType>> components;
+        components.add(this);
+        for (auto module : modules)
+        {
+            for (auto entryPoint : module->getEntryPoints())
+            {
+                components.add(entryPoint);
+            }
+        }
+        RefPtr<CompositeComponentType> composite = new CompositeComponentType(linkage, components);
+        ComPtr<IComponentType> linkedComponentType;
+        SLANG_RETURN_ON_FAIL(composite->link(linkedComponentType.writeRef(), outDiagnostics));
+        return linkedComponentType->getTargetCode(targetIndex, outCode, outDiagnostics);
+    }
+
+    auto target = linkage->targets[targetIndex];
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    IArtifact* artifact = targetProgram->getOrCreateWholeProgramResult(&sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    if (artifact == nullptr)
+        return SLANG_FAIL;
+
+    return artifact->loadBlob(ArtifactKeep::Yes, outCode);
 }
 
 //
@@ -5335,7 +5442,7 @@ void Linkage::prepareDeserializedModule(SerialContainerData::Module& moduleEntry
     module->setPathInfo(filePathInfo);
     module->setDigest(moduleEntry.digest);
     module->_collectShaderParams();
-    module->_discoverEntryPoints(sink);
+    module->_discoverEntryPoints(sink, targets);
 
     // Hook up fileDecl's scope to module's scope.
     auto moduleDecl = module->getModuleDecl();
@@ -5530,6 +5637,7 @@ void EndToEndCompileRequest::_completeTargetRequest(UInt targetIndex)
     TargetRequest* targetRequest = linkage->targets[Index(targetIndex)];
 
     targetRequest->getOptionSet().inheritFrom(getLinkage()->m_optionSet);
+    targetRequest->getOptionSet().inheritFrom(m_optionSetForDefaultTarget);
 }
 
 void EndToEndCompileRequest::setCodeGenTarget(SlangCompileTarget target)
@@ -5671,6 +5779,16 @@ void EndToEndCompileRequest::setReportPerfBenchmark(bool value)
 void EndToEndCompileRequest::setSkipSPIRVValidation(bool value)
 {
     getOptionSet().set(CompilerOptionName::SkipSPIRVValidation, value);
+}
+
+void EndToEndCompileRequest::setTargetUseMinimumSlangOptimization(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::MinimumSlangOptimization, value);
+}
+
+void EndToEndCompileRequest::setIgnoreCapabilityCheck(bool value)
+{
+    getOptionSet().set(CompilerOptionName::IgnoreCapabilities, value);
 }
 
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)
@@ -6169,6 +6287,25 @@ void const* EndToEndCompileRequest::getEntryPointCode(int entryPointIndex, size_
     return (void*)blob->getBufferPointer();
 }
 
+SlangResult EndToEndCompileRequest::getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool shouldClear)
+{
+    if (compileTimeProfile == nullptr)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    SlangProfiler* profiler = new SlangProfiler(PerformanceProfiler::getProfiler());
+
+    if (shouldClear)
+    {
+        PerformanceProfiler::getProfiler()->clear();
+    }
+
+    ComPtr<ISlangProfiler> result(profiler);
+    *compileTimeProfile = result.detach();
+    return SLANG_OK;
+}
+
 static SlangResult _getEntryPointResult(
     EndToEndCompileRequest* req,
     int                     entryPointIndex,
@@ -6444,6 +6581,9 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
     ComPtr<IArtifact> artifact;
     if (SLANG_FAILED(_getEntryPointResult(this, static_cast<int>(entryPointIndex), static_cast<int>(targetIndex), artifact)))
         return SLANG_E_INVALID_ARG;
+
+    if (!artifact)
+        return SLANG_E_NOT_AVAILABLE;
 
     // Find a rep
     auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);

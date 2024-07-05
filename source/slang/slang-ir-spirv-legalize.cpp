@@ -7,6 +7,7 @@
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-call-graph.h"
 #include "slang-emit-base.h"
 #include "slang-glsl-extension-tracker.h"
 #include "slang-ir-lower-buffer-element-type.h"
@@ -135,7 +136,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             break;
         }
         builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
-        builder.addDecoration(structType, kIROp_SPIRVBlockDecoration);
+        if (m_sharedContext->isSpirv14OrLater())
+            builder.addDecorationIfNotExist(structType, kIROp_SPIRVBlockDecoration);
+        else
+            builder.addDecorationIfNotExist(structType, kIROp_SPIRVBufferBlockDecoration);
 
         result.structType = structType;
         result.arrayKey = arrayKey;
@@ -181,6 +185,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRBuilder builder(cbParamInst);
         builder.setInsertBefore(cbParamInst);
         auto structType = builder.createStructType();
+        addToWorkList(structType);
         StringBuilder sb;
         sb << "cbuffer_";
         getTypeNameHint(sb, innerType);
@@ -219,7 +224,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             if(user->getOp() == kIROp_GetLegalizedSPIRVGlobalParamAddr)
             {
-                user->replaceUsesWith(use->get());
+                user->replaceUsesWith(addr);
                 user->removeAndDeallocate();
             }
             else if((as<IRGetElement>(user) || as<IRFieldExtract>(user)) &&
@@ -249,10 +254,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 // Skip load's for referenced `Input` variables since a ref implies
                 // passing as is, which needs to be a pointer (pass as is).
-                if (user->getDataType() 
+                if (user->getDataType()
                     && user->getDataType()->getOp() == kIROp_RefType
                     && storageClass == SpvStorageClassInput)
+                {
+                    builder.replaceOperand(use, addr);
                     continue;
+                }
                 // If this is being used in an asm block, insert the load to
                 // just prior to the block.
                 const auto asmBlock = spirvAsmOperand->getAsmBlock();
@@ -274,7 +282,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
 
         for (auto i : instsToRemove)
+        {
             i->removeAndDeallocate();
+        }
     }
 
     // Returns true if the given type that should be decorated as in `UniformConstant` address space.
@@ -584,7 +594,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 {
                     innerType = wrapConstantBufferElement(inst);
                 }
-                builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
+                builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
                 
                 auto varLayoutInst = inst->findDecoration<IRLayoutDecoration>();
                 if (paramBlockType)
@@ -621,18 +631,33 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(innerType))
             {
                 innerType = lowerStructuredBufferType(structuredBufferType).structType;
-                storageClass = SpvStorageClassStorageBuffer;
+                storageClass = getStorageBufferStorageClass();
                 needLoad = false;
+
+                auto memoryFlags = MemoryQualifierSetModifier::Flags::kNone;
 
                 // structured buffers in GLSL should be annotated as ReadOnly
                 if (as<IRHLSLStructuredBufferType>(structuredBufferType))
-                    builder.addMemoryQualifierSetDecoration(inst, MemoryQualifierSetModifier::Flags::kReadOnly);
+                    memoryFlags = MemoryQualifierSetModifier::Flags::kReadOnly;
+                if (as<IRHLSLRasterizerOrderedStructuredBufferType>(structuredBufferType))
+                    memoryFlags = MemoryQualifierSetModifier::Flags::kRasterizerOrdered;
+
+                if (memoryFlags != MemoryQualifierSetModifier::Flags::kNone)
+                    builder.addMemoryQualifierSetDecoration(inst, memoryFlags);
             }
             else if (auto glslShaderStorageBufferType = as<IRGLSLShaderStorageBufferType>(innerType))
             {
                 innerType = glslShaderStorageBufferType->getElementType();
-                builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
-                storageClass = SpvStorageClassStorageBuffer;
+                if (m_sharedContext->isSpirv14OrLater())
+                {
+                    builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
+                    storageClass = SpvStorageClassStorageBuffer;
+                }
+                else
+                {
+                    builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBufferBlockDecoration);
+                    storageClass = SpvStorageClassUniform;
+                }
                 needLoad = false;
             }
 
@@ -697,7 +722,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             break;
         case LayoutResourceKind::ShaderResource:
         case LayoutResourceKind::UnorderedAccess:
-            storageClass = SpvStorageClassStorageBuffer;
+            storageClass = getStorageBufferStorageClass();
             break;
         case LayoutResourceKind::PushConstantBuffer:
             storageClass = SpvStorageClassPushConstant;
@@ -1130,6 +1155,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    SpvStorageClass getStorageBufferStorageClass()
+    {
+        return m_sharedContext->isSpirv14OrLater() ? SpvStorageClassStorageBuffer : SpvStorageClassUniform;
+    }
+
     void processStructuredBufferLoad(IRInst* loadInst)
     {
         auto sb = loadInst->getOperand(0);
@@ -1138,7 +1168,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(loadInst);
         IRInst* args[] = { sb, index };
         auto addrInst = builder.emitIntrinsicInst(
-            builder.getPtrType(kIROp_PtrType, translateToStorageBufferPointer(loadInst->getFullType()), SpvStorageClassStorageBuffer),
+            builder.getPtrType(kIROp_PtrType, translateToStorageBufferPointer(loadInst->getFullType()), getStorageBufferStorageClass()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             args);
@@ -1157,7 +1187,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(storeInst);
         IRInst* args[] = { sb, index };
         auto addrInst = builder.emitIntrinsicInst(
-            builder.getPtrType(kIROp_PtrType, value->getFullType(), SpvStorageClassStorageBuffer),
+            builder.getPtrType(kIROp_PtrType, value->getFullType(), getStorageBufferStorageClass()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             args);
@@ -1213,7 +1243,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     break;
                 case kIROp_GetElementPtr:
                     // Ignore when `NonUniformResourceIndex` is not on the index
-                    if (user->getOperand(0)->getOp() != kIROp_NonUniformResourceIndex)
+                    if (user->getOperand(1) == inst)
                     {
                         // Replace gep(pArray, nonUniformRes(x)), into nonUniformRes(gep(pArray, x))
                         newUser = builder.emitElementAddress(user->getFullType(), user->getOperand(0), inst->getOperand(0));
@@ -1280,12 +1310,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 IRBuilder builder(operand);
                 builder.addSPIRVNonUniformResourceDecoration(operand);
-                inst->replaceUsesWith(operand);
-                inst->removeAndDeallocate();
             }
+            inst->replaceUsesWith(operand);
+            inst->removeAndDeallocate();
         }
-        nonUniformResourceIndexInst->removeFromParent();
-        m_instsToRemove.add(nonUniformResourceIndexInst);
     }
 
     void processImageSubscript(IRImageSubscript* subscript)
@@ -1662,142 +1690,194 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     }
 
-    // Opcodes that can exist in global scope, as long as the operands are.
-    bool isLegalGlobalInst(IRInst* inst)
+    struct GlobalInstInliningContext
     {
-        switch (inst->getOp())
-        {
-        case kIROp_MakeStruct:
-        case kIROp_MakeArray:
-        case kIROp_MakeArrayFromElement:
-        case kIROp_MakeVector:
-        case kIROp_MakeMatrix:
-        case kIROp_MakeMatrixFromScalar:
-        case kIROp_MakeVectorFromScalar:
-            return true;
-        default:
-            return false;
-        }
-    }
+        Dictionary<IRInst*, bool> m_mapGlobalInstToShouldInline;
 
-    // Opcodes that can be inlined into function bodies.
-    bool isInlinableGlobalInst(IRInst* inst)
-    {
-        switch (inst->getOp())
-        {
-        case kIROp_Add:
-        case kIROp_Sub:
-        case kIROp_Mul:
-        case kIROp_FRem:
-        case kIROp_IRem:
-        case kIROp_Lsh:
-        case kIROp_Rsh:
-        case kIROp_And:
-        case kIROp_Or:
-        case kIROp_Not:
-        case kIROp_Neg:
-        case kIROp_Div:
-        case kIROp_FieldExtract:
-        case kIROp_FieldAddress:
-        case kIROp_GetElement:
-        case kIROp_GetElementPtr:
-        case kIROp_GetOffsetPtr:
-        case kIROp_UpdateElement:
-        case kIROp_MakeTuple:
-        case kIROp_GetTupleElement:
-        case kIROp_MakeStruct:
-        case kIROp_MakeArray:
-        case kIROp_MakeArrayFromElement:
-        case kIROp_MakeVector:
-        case kIROp_MakeMatrix:
-        case kIROp_MakeMatrixFromScalar:
-        case kIROp_MakeVectorFromScalar:
-        case kIROp_swizzle:
-        case kIROp_swizzleSet:
-        case kIROp_MatrixReshape:
-        case kIROp_MakeString:
-        case kIROp_MakeResultError:
-        case kIROp_MakeResultValue:
-        case kIROp_GetResultError:
-        case kIROp_GetResultValue:
-        case kIROp_CastFloatToInt:
-        case kIROp_CastIntToFloat:
-        case kIROp_CastIntToPtr:
-        case kIROp_PtrCast:
-        case kIROp_CastPtrToBool:
-        case kIROp_CastPtrToInt:
-        case kIROp_BitAnd:
-        case kIROp_BitNot:
-        case kIROp_BitOr:
-        case kIROp_BitXor:
-        case kIROp_BitCast:
-        case kIROp_IntCast:
-        case kIROp_FloatCast:
-        case kIROp_Greater:
-        case kIROp_Less:
-        case kIROp_Geq:
-        case kIROp_Leq:
-        case kIROp_Neq:
-        case kIROp_Eql:
-        case kIROp_Call:
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    bool shouldInlineInst(IRInst* inst)
-    {
-        if (!isInlinableGlobalInst(inst))
-            return false;
-        if (isLegalGlobalInst(inst))
-        {
-            for (UInt i = 0; i < inst->getOperandCount(); i++)
-                if (shouldInlineInst(inst->getOperand(i)))
-                    return true;
-            return false;
-        }
-        return true;
-    }
-
-    /// Inline `inst` in the local function body so they can be emitted as a local inst.
-    ///
-    IRInst* maybeInlineGlobalValue(IRBuilder& builder, IRInst* inst, IRCloneEnv& cloneEnv)
-    {
-        if (!shouldInlineInst(inst))
+        // Opcodes that can exist in global scope, as long as the operands are.
+        bool isLegalGlobalInst(IRInst* inst)
         {
             switch (inst->getOp())
             {
-            case kIROp_Func:
-            case kIROp_Specialize:
-            case kIROp_Generic:
-            case kIROp_LookupWitness:
-                return inst;
+            case kIROp_MakeStruct:
+            case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
+            case kIROp_MakeVector:
+            case kIROp_MakeMatrix:
+            case kIROp_MakeMatrixFromScalar:
+            case kIROp_MakeVectorFromScalar:
+                return true;
+            default:
+                if (as<IRConstant>(inst))
+                    return true;
+                if (as<IRSPIRVAsmOperand>(inst))
+                    return true;
+                return false;
             }
-            if (as<IRType>(inst))
-                return inst;
+        }
 
-            // If we encounter a global value that shouldn't be inlined, e.g. a const literal,
-            // we should insert a GlobalValueRef() inst to wrap around it, so all the dependent uses
-            // can be pinned to the function body.
-            auto result = builder.emitGlobalValueRef(inst);
-            cloneEnv.mapOldValToNew[inst] = result;
+        // Opcodes that can be inlined into function bodies.
+        bool isInlinableGlobalInst(IRInst* inst)
+        {
+            switch (inst->getOp())
+            {
+            case kIROp_Add:
+            case kIROp_Sub:
+            case kIROp_Mul:
+            case kIROp_FRem:
+            case kIROp_IRem:
+            case kIROp_Lsh:
+            case kIROp_Rsh:
+            case kIROp_And:
+            case kIROp_Or:
+            case kIROp_Not:
+            case kIROp_Neg:
+            case kIROp_Div:
+            case kIROp_FieldExtract:
+            case kIROp_FieldAddress:
+            case kIROp_GetElement:
+            case kIROp_GetElementPtr:
+            case kIROp_GetOffsetPtr:
+            case kIROp_UpdateElement:
+            case kIROp_MakeTuple:
+            case kIROp_GetTupleElement:
+            case kIROp_MakeStruct:
+            case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
+            case kIROp_MakeVector:
+            case kIROp_MakeMatrix:
+            case kIROp_MakeMatrixFromScalar:
+            case kIROp_MakeVectorFromScalar:
+            case kIROp_swizzle:
+            case kIROp_swizzleSet:
+            case kIROp_MatrixReshape:
+            case kIROp_MakeString:
+            case kIROp_MakeResultError:
+            case kIROp_MakeResultValue:
+            case kIROp_GetResultError:
+            case kIROp_GetResultValue:
+            case kIROp_CastFloatToInt:
+            case kIROp_CastIntToFloat:
+            case kIROp_CastIntToPtr:
+            case kIROp_PtrCast:
+            case kIROp_CastPtrToBool:
+            case kIROp_CastPtrToInt:
+            case kIROp_BitAnd:
+            case kIROp_BitNot:
+            case kIROp_BitOr:
+            case kIROp_BitXor:
+            case kIROp_BitCast:
+            case kIROp_IntCast:
+            case kIROp_FloatCast:
+            case kIROp_Greater:
+            case kIROp_Less:
+            case kIROp_Geq:
+            case kIROp_Leq:
+            case kIROp_Neq:
+            case kIROp_Eql:
+            case kIROp_Call:
+            case kIROp_SPIRVAsm:
+                return true;
+            default:
+                if (as<IRSPIRVAsmInst>(inst))
+                    return true;
+                if (as<IRSPIRVAsmOperand>(inst))
+                    return true;
+                return false;
+            }
+        }
+
+        bool shouldInlineInstImpl(IRInst* inst)
+        {
+            if (!isInlinableGlobalInst(inst))
+                return false;
+            if (isLegalGlobalInst(inst))
+            {
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    if (shouldInlineInst(inst->getOperand(i)))
+                        return true;
+                return false;
+            }
+            return true;
+        }
+
+        bool shouldInlineInst(IRInst* inst)
+        {
+            bool result = false;
+            if (m_mapGlobalInstToShouldInline.tryGetValue(inst, result))
+                return result;
+            result = shouldInlineInstImpl(inst);
+            m_mapGlobalInstToShouldInline[inst] = result;
             return result;
         }
 
-        // If the global value is inlinable, we make all its operands avaialble locally, and then copy it
-        // to the local scope.
-        ShortList<IRInst*> args;
-        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        IRInst* inlineInst(IRBuilder& builder, IRCloneEnv& cloneEnv, IRInst* inst)
         {
-            auto operand = inst->getOperand(i);
-            auto inlinedOperand = maybeInlineGlobalValue(builder, operand, cloneEnv);
-            args.add(inlinedOperand);
+            IRInst* result;
+            if (cloneEnv.mapOldValToNew.tryGetValue(inst, result))
+                return result;
+
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                auto operand = inst->getOperand(i);
+                IRBuilder operandBuilder(builder);
+                setInsertBeforeOutsideASM(operandBuilder, builder.getInsertLoc().getInst());
+                maybeInlineGlobalValue(operandBuilder, inst, operand, cloneEnv);
+            }
+            result = cloneInstAndOperands(&cloneEnv, &builder, inst);
+            cloneEnv.mapOldValToNew[inst] = result;
+            IRBuilder subBuilder(builder);
+            subBuilder.setInsertInto(result);
+            for (auto child : inst->getDecorations())
+            {
+                cloneInst(&cloneEnv, &subBuilder, child);
+            }
+            for (auto child : inst->getChildren())
+            {
+                inlineInst(subBuilder, cloneEnv, child);
+            }
+            return result;
         }
-        auto result = cloneInst(&cloneEnv, &builder, inst);
-        cloneEnv.mapOldValToNew[inst] = result;
-        return result;
-    }
+
+        /// Inline `inst` in the local function body so they can be emitted as a local inst.
+        ///
+        IRInst* maybeInlineGlobalValue(IRBuilder& builder, IRInst* user, IRInst* inst, IRCloneEnv& cloneEnv)
+        {
+            if (!shouldInlineInst(inst))
+            {
+                switch (inst->getOp())
+                {
+                case kIROp_Func:
+                case kIROp_Specialize:
+                case kIROp_Generic:
+                case kIROp_LookupWitness:
+                    return inst;
+                }
+                if (as<IRType>(inst))
+                    return inst;
+
+                // If we encounter a global value that shouldn't be inlined, e.g. a const literal,
+                // we should insert a GlobalValueRef() inst to wrap around it, so all the dependent uses
+                // can be pinned to the function body.
+                auto result = inst;
+                bool shouldWrapGlobalRef = true;
+                if (!isLegalGlobalInst(user) && !getIROpInfo(user->getOp()).isHoistable())
+                    shouldWrapGlobalRef = false;
+                else if (as<IRSPIRVAsmOperand>(user) && as<IRSPIRVAsmOperandInst>(user))
+                    shouldWrapGlobalRef = false;
+                else if (as<IRSPIRVAsmInst>(user))
+                    shouldWrapGlobalRef = false;
+                if (shouldWrapGlobalRef)
+                    result = builder.emitGlobalValueRef(inst);
+                cloneEnv.mapOldValToNew[inst] = result;
+                return result;
+            }
+
+            // If the global value is inlinable, we make all its operands avaialble locally, and then copy it
+            // to the local scope.
+            return inlineInst(builder, cloneEnv, inst);
+        }
+    };
 
     void processBranch(IRInst* branch)
     {
@@ -1815,8 +1895,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (oldValueType != newValueType || !ptrType->hasAddressSpace())
             {
                 IRBuilder builder(m_module);
-                return builder.getPtrType(ptrType->getOp(), newValueType,
-                    ptrType->hasAddressSpace() ? ptrType->getAddressSpace() : SpvStorageClassPhysicalStorageBuffer);
+                IRIntegerValue addressSpace = (ptrType->hasAddressSpace() ? ptrType->getAddressSpace() : IRIntegerValue(SpvStorageClassPhysicalStorageBuffer));
+                return builder.getPtrType(ptrType->getOp(), newValueType, addressSpace);
             }
             return ptrType;
         }
@@ -2050,7 +2130,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    void setInsertBeforeOutsideASM(IRBuilder& builder, IRInst* beforeInst)
+    static void setInsertBeforeOutsideASM(IRBuilder& builder, IRInst* beforeInst)
     {
         auto parent = beforeInst->getParent();
         while (parent)
@@ -2065,8 +2145,95 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(beforeInst);
     }
 
+    void determineSpirvVersion()
+    {
+        // Determine minimum spirv version from target request.
+        auto targetCaps = m_sharedContext->m_targetProgram->getTargetReq()->getTargetCaps();
+        for (auto targetAtomSet : targetCaps.getAtomSets())
+        {
+            for (auto atom : targetAtomSet)
+            {
+                auto spirvAtom = ((CapabilityName)atom);
+                switch (spirvAtom)
+                {
+                case CapabilityName::_spirv_1_0:
+                    m_sharedContext->requireSpirvVersion(0x10000);
+                    break;
+                case CapabilityName::_spirv_1_1:
+                    m_sharedContext->requireSpirvVersion(0x10100);
+                    break;
+                case CapabilityName::_spirv_1_2:
+                    m_sharedContext->requireSpirvVersion(0x10200);
+                    break;
+                case CapabilityName::_spirv_1_3:
+                    m_sharedContext->requireSpirvVersion(0x10300);
+                    break;
+                case CapabilityName::_spirv_1_4:
+                    m_sharedContext->requireSpirvVersion(0x10400);
+                    break;
+                case CapabilityName::_spirv_1_5:
+                    m_sharedContext->requireSpirvVersion(0x10500);
+                    break;
+                case CapabilityName::_spirv_1_6:
+                    m_sharedContext->requireSpirvVersion(0x10600);
+                    break;
+                case CapabilityName::SPV_EXT_demote_to_helper_invocation:
+                    m_sharedContext->m_useDemoteToHelperInvocationExtension = true;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+        // Scan through the entry points and find the max version required.
+        auto processInst = [&](IRInst* globalInst)
+        {
+            for (auto decor : globalInst->getDecorations())
+            {
+                switch (decor->getOp())
+                {
+                case kIROp_RequireCapabilityAtomDecoration:
+                    {
+                        auto atomDecor = as<IRRequireCapabilityAtomDecoration>(decor);
+                        switch (atomDecor->getAtom())
+                        {
+                        case CapabilityName::spirv_1_3:
+                            m_sharedContext->requireSpirvVersion(0X10300);
+                            break;
+                        case CapabilityName::spirv_1_4:
+                            m_sharedContext->requireSpirvVersion(0X10400);
+                            break;
+                        case CapabilityName::spirv_1_5:
+                            m_sharedContext->requireSpirvVersion(0X10500);
+                            break;
+                        case CapabilityName::spirv_1_6:
+                            m_sharedContext->requireSpirvVersion(0X10600);
+                            break;
+                        }
+                        break;
+                    }
+                }
+            }
+        };
+
+        processInst(m_module->getModuleInst());
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            processInst(globalInst);
+        }
+
+        if (m_sharedContext->m_spvVersion < 0x10300)
+        {
+            // Direct SPIRV backend does not support generating SPIRV before 1.3,
+            // we will issue an error message here.
+            m_sharedContext->m_sink->diagnose(SourceLoc(), Diagnostics::spirvVersionNotSupported);
+        }
+    }
+
     void processModule()
     {
+        determineSpirvVersion();
+
         // Process global params before anything else, so we don't generate inefficient
         // array marhalling code for array-typed global params.
         for (auto globalInst : m_module->getGlobalInsts())
@@ -2105,7 +2272,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto lowered = lowerStructuredBufferType(t);
             IRBuilder builder(t);
             builder.setInsertBefore(t);
-            t->replaceUsesWith(builder.getPtrType(kIROp_PtrType, lowered.structType, SpvStorageClassStorageBuffer));
+            t->replaceUsesWith(builder.getPtrType(kIROp_PtrType, lowered.structType, getStorageBufferStorageClass()));
         }
         for (auto t : textureFootprintTypes)
         {
@@ -2118,6 +2285,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Inline global values that can't represented by SPIRV constant inst
         // to their use sites.
         List<IRUse*> globalInstUsesToInline;
+        GlobalInstInliningContext globalInstInliningContext;
 
         for (auto globalInst : m_module->getGlobalInsts())
         {
@@ -2132,7 +2300,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 sortBlocksInFunc(func);
             }
             
-            if (isInlinableGlobalInst(globalInst))
+            if (globalInstInliningContext.isInlinableGlobalInst(globalInst))
             {
                 for (auto use = globalInst->firstUse; use; use = use->nextUse)
                 {
@@ -2148,7 +2316,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(user);
             setInsertBeforeOutsideASM(builder, user);
             IRCloneEnv cloneEnv;
-            auto val = maybeInlineGlobalValue(builder, use->get(), cloneEnv);
+            auto val = globalInstInliningContext.maybeInlineGlobalValue(builder, use->getUser(), use->get(), cloneEnv);
             if (val != use->get())
                 builder.replaceOperand(use, val);
         }
@@ -2243,102 +2411,6 @@ void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module)
     context.processModule();
 }
 
-void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints, IRModule* module)
-{
-    struct WorkItem
-    {
-        IRFunc* entryPoint; IRInst* inst; 
-    
-        HashCode getHashCode() const
-        {
-            return combineHash(Slang::getHashCode(entryPoint), Slang::getHashCode(inst));
-        }
-        bool operator == (const WorkItem& other) const
-        {
-            return entryPoint == other.entryPoint && inst == other.inst;
-        }
-    };
-    HashSet<WorkItem> workListSet;
-    List<WorkItem> workList;
-    auto addToWorkList = [&](WorkItem item)
-    {
-        if (workListSet.add(item))
-            workList.add(item);
-    };
-
-    auto registerEntryPointReference = [&](IRFunc* entryPoint, IRInst* inst)
-        {
-            if (auto set = referencingEntryPoints.tryGetValue(inst))
-                set->add(entryPoint);
-            else
-            {
-                HashSet<IRFunc*> newSet;
-                newSet.add(entryPoint);
-                referencingEntryPoints.add(inst, _Move(newSet));
-            }
-        };
-    auto visit = [&](IRFunc* entryPoint, IRInst* inst)
-        {
-            if (auto code = as<IRGlobalValueWithCode>(inst))
-            {
-                registerEntryPointReference(entryPoint, inst);
-                for (auto child : code->getChildren())
-                {
-                    addToWorkList({ entryPoint, child });
-                }
-                return;
-            }
-            switch (inst->getOp())
-            {
-            case kIROp_GlobalParam:
-            case kIROp_SPIRVAsmOperandBuiltinVar:
-                registerEntryPointReference(entryPoint, inst);
-                break;
-            case kIROp_Block:
-            case kIROp_SPIRVAsm:
-                for (auto child : inst->getChildren())
-                {
-                    addToWorkList({ entryPoint, child });
-                }
-                break;
-            case kIROp_Call:
-                {
-                    auto call = as<IRCall>(inst);
-                    addToWorkList({ entryPoint, call->getCallee() });
-                }
-                break;
-            case kIROp_SPIRVAsmOperandInst:
-                {
-                    auto operand = as<IRSPIRVAsmOperandInst>(inst);
-                    addToWorkList({ entryPoint, operand->getValue() });
-                }
-                break;
-            }
-            for (UInt i = 0; i < inst->getOperandCount(); i++)
-            {
-                auto operand = inst->getOperand(i);
-                switch (operand->getOp())
-                {
-                case kIROp_GlobalParam:
-                case kIROp_GlobalVar:
-                case kIROp_SPIRVAsmOperandBuiltinVar:
-                    addToWorkList({ entryPoint, operand });
-                    break;
-                }
-            }
-        };
-
-    for (auto globalInst : module->getGlobalInsts())
-    {
-        if (globalInst->getOp() == kIROp_Func && globalInst->findDecoration<IREntryPointDecoration>())
-        {
-            visit(as<IRFunc>(globalInst), globalInst);
-        }
-    }
-    for (Index i = 0; i < workList.getCount(); i++)
-        visit(workList[i].entryPoint, workList[i].inst);
-}
-
 void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink, IRModule* module)
 {
     bool changed = true;
@@ -2379,6 +2451,95 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
     }
 }
 
+static bool isRasterOrderedResource(IRInst* inst)
+{
+    if (auto memoryQualifierDecoration = inst->findDecoration<IRMemoryQualifierSetDecoration>())
+    {
+        if (memoryQualifierDecoration->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kRasterizerOrdered)
+            return true;
+    }
+    auto type = inst->getDataType();
+    for (;;)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            type = ptrType->getValueType();
+            continue;
+        }
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        break;
+    }
+    if (auto textureType = as<IRTextureTypeBase>(type))
+    {
+        if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
+            return true;
+    }
+    return false;
+}
+
+static bool hasExplicitInterlockInst(IRFunc* func)
+{
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (inst->getOp() == kIROp_BeginFragmentShaderInterlock)
+                return true;
+        }
+    }
+    return false;
+}
+
+void insertFragmentShaderInterlock(SPIRVEmitSharedContext* context, IRModule* module)
+{
+    HashSet<IRFunc*> fragmentShaders;
+    for (auto& [inst, entryPoints] : context->m_referencingEntryPoints)
+    {
+        if (isRasterOrderedResource(inst))
+        {
+            for (auto entryPoint : entryPoints)
+            {
+                auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
+                if (!entryPointDecor)
+                    continue;
+
+                if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                {
+                    fragmentShaders.add(entryPoint);
+                }
+            }
+        }
+    }
+
+    IRBuilder builder(module);
+    for (auto entryPoint : fragmentShaders)
+    {
+        if (hasExplicitInterlockInst(entryPoint))
+            continue;
+        auto firstBlock = entryPoint->getFirstBlock();
+        if (!firstBlock)
+            continue;
+        builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+        builder.emitBeginFragmentShaderInterlock();
+        for (auto block : entryPoint->getBlocks())
+        {
+            if (auto inst = block->getTerminator())
+            {
+                if (inst->getOp() == kIROp_Return || 
+                    !context->isSpirv16OrLater() && inst->getOp() == kIROp_discard)
+                {
+                    builder.setInsertBefore(inst);
+                    builder.emitEndFragmentShaderInterlock();
+                }
+            }
+        }
+    }
+}
+
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
@@ -2389,6 +2550,7 @@ void legalizeIRForSPIRV(
     legalizeSPIRV(context, module);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
+    insertFragmentShaderInterlock(context, module);
 }
 
 } // namespace Slang

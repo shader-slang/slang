@@ -10,6 +10,7 @@
 #include "slang-legalize-types.h"
 #include "slang-ir-layout.h"
 #include "slang/slang-ir.h"
+#include "slang-ir-call-graph.h"
 
 #include <assert.h>
 
@@ -24,6 +25,11 @@ GLSLSourceEmitter::GLSLSourceEmitter(const Desc& desc) :
 {
     m_glslExtensionTracker = dynamicCast<GLSLExtensionTracker>(desc.codeGenContext->getExtensionTracker());
     SLANG_ASSERT(m_glslExtensionTracker);
+}
+
+void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
+{
+    buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
 }
 
 SlangResult GLSLSourceEmitter::init()
@@ -66,6 +72,13 @@ void GLSLSourceEmitter::_requireRayTracing()
 {
     m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_ray_tracing"));
     m_glslExtensionTracker->requireSPIRVVersion(SemanticVersion(1, 4));
+    m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
+}
+
+void GLSLSourceEmitter::_requireRayQuery()
+{
+    m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_ray_query"));
+    m_glslExtensionTracker->requireSPIRVVersion(SemanticVersion(1, 4)); // required due to glslang bug which enables `SPV_KHR_ray_tracing` regardless of context
     m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
 }
 
@@ -738,6 +751,11 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifierWithBindingKinds(LayoutResourceK
             m_writer->emit("layout(shaderRecordEXT)\n");
             break;
 
+        case LayoutResourceKind::InputAttachmentIndex:
+            m_writer->emit("layout(input_attachment_index = ");
+            m_writer->emit(index);
+            m_writer->emit(")\n");
+            break;
     }
     return true;
 }
@@ -1325,7 +1343,7 @@ void GLSLSourceEmitter::_emitGLSLPerVertexVaryingFragmentInput(IRGlobalParam* pa
 
     emitSemantics(param, false);
 
-    emitLayoutSemantics(param);
+    emitLayoutSemantics(param, "register");
 
     m_writer->emit(";\n\n");
 }
@@ -2008,21 +2026,33 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         case kIROp_ImageLoad:
         {
+            auto imageOp = as<IRImageLoad>(inst);
             m_writer->emit("imageLoad(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
             m_writer->emit(",");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
+            if (imageOp->hasAuxCoord1())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
+            }
             m_writer->emit(")");
             return true;
         }
         case kIROp_ImageStore:
         {
+            auto imageOp = as<IRImageStore>(inst);
             m_writer->emit("imageStore(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
             m_writer->emit(",");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
+            if (imageOp->hasAuxCoord1())
+            {
+                m_writer->emit(",");
+                emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
+            }
             m_writer->emit(",");
-            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            emitOperand(imageOp->getValue(), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }
@@ -2038,7 +2068,10 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
             m_writer->emit("._data[");
+            // glsl only support int/uint as array index
+            m_writer->emit("uint(");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
             m_writer->emit("]");
 
             maybeCloseParens(needClose);
@@ -2081,6 +2114,20 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_nonuniform_qualifier"));
 
             // Handled
+            return true;
+        }
+        case kIROp_BeginFragmentShaderInterlock:
+        {
+            _requireGLSLVersion(420);
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_fragment_shader_interlock"));
+            m_writer->emit("beginInvocationInterlockARB()");
+            return true;
+        }
+        case kIROp_EndFragmentShaderInterlock:
+        {
+            _requireGLSLVersion(420);
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_fragment_shader_interlock"));
+            m_writer->emit("endInvocationInterlockARB()");
             return true;
         }
         default: break;
@@ -2171,7 +2218,7 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
         }
     }
 
-    // The function may have IRRequireGLSLExtensionInst in its body. We also need to look for them.
+    // The function may have various requirment declaring functions its body. We also need to look for them.
     auto func = as<IRFunc>(inst);
     if (!func)
         return;
@@ -2183,6 +2230,34 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
         if (auto requireGLSLExt = as<IRRequireGLSLExtension>(childInst))
         {
             _requireGLSLExtension(requireGLSLExt->getExtensionName());
+        }
+        else if (const auto requireComputeDerivative = as<IRRequireComputeDerivative>(childInst))
+        {
+            // only allowed 1 of derivative_group_quadsNV or derivative_group_linearNV
+            if (m_entryPointStage != Stage::Compute
+                || m_requiredAfter.requireComputeDerivatives.getLength() > 0)
+                return;
+
+            _requireGLSLExtension(UnownedStringSlice("GL_NV_compute_shader_derivatives"));
+
+            // This will only run once per program.
+            HashSet<IRFunc*>* entryPointsUsingInst = getReferencingEntryPoints(m_referencingEntryPoints, func);
+
+            for (auto entryPoint : *entryPointsUsingInst)
+            {
+                bool isQuad = !entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>();
+                auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
+                if (isQuad)
+                {
+                    verifyComputeDerivativeGroupModifiers(getSink(), inst->sourceLoc, true, false, numThreadsDecor);
+                    m_requiredAfter.requireComputeDerivatives = "layout(derivative_group_quadsNV) in;";
+                }
+                else
+                {
+                    verifyComputeDerivativeGroupModifiers(getSink(), inst->sourceLoc, false, true, numThreadsDecor);
+                    m_requiredAfter.requireComputeDerivatives = "layout(derivative_group_linearNV) in;";
+                }
+            }
         }
     }
 }
@@ -2536,16 +2611,13 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             case kIROp_RaytracingAccelerationStructureType:
             {
-                _requireRayTracing();
+                if (!isRaytracingStage(m_entryPointStage))
+                    _requireRayQuery();
+                else
+                    _requireRayTracing();
                 m_writer->emit("accelerationStructureEXT");
                 break;
             }
-
-                // TODO: These "translations" are obviously wrong for GLSL.
-            case kIROp_HLSLByteAddressBufferType:                   m_writer->emit("ByteAddressBuffer");                  break;
-            case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
-            case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
-
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
                 break;
@@ -2556,7 +2628,8 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     auto decorated = getResolvedInstForDecorations(type);
     UnownedStringSlice intrinsicDef;
-    if (findTargetIntrinsicDefinition(decorated, intrinsicDef))
+    IRInst* intrinsicInst;
+    if (findTargetIntrinsicDefinition(decorated, intrinsicDef, intrinsicInst))
     {
         m_writer->emit(intrinsicDef);
         return;
@@ -2712,6 +2785,11 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         {
             prefix = toSlice("hitAttribute");
         }
+        else if (as<IRPerVertexDecoration>(decoration))
+        {
+            _requireGLSLExtension(toSlice("GL_EXT_fragment_shader_barycentric"));
+            prefix = toSlice("pervertex");
+        }
         else
         {
             IRIntegerValue locationValue = -1;
@@ -2755,16 +2833,6 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         break;
     }
 
-    // non raytracing decorations
-    for (auto decoration : varDecl->getDecorations())
-    {        
-        if (auto glslInputAttachment = as<IRGLSLInputAttachmentIndexDecoration>(decoration))
-        {
-            m_writer->emit(toSlice("layout(input_attachment_index = "));
-            m_writer->emit(glslInputAttachment->getIndex()->getValue());
-            m_writer->emit(toSlice(")\n"));
-        }
-    }
 }
 
 void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)

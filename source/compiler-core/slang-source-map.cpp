@@ -148,7 +148,7 @@ void SourceMap::advanceToLine(Index nextLineIndex)
     const auto lastEntryIndex = m_lineEntries.getCount();
 
     // For all the new entries they will need to point to the end 
-    m_lineStarts.setCount(nextLineIndex + 1);
+    m_lineStarts.growToCount(nextLineIndex + 1);
 
     Index* starts = m_lineStarts.getBuffer();
     for (Index i = currentLineIndex + 1; i < nextLineIndex + 1; ++i)

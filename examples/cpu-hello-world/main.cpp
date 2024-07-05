@@ -25,6 +25,7 @@
 
 // This includes a useful small function for setting up the prelude (described more further below).
 #include "../../source/core/slang-test-tool-util.h"
+#include "examples/example-base/example-base.h"
 
 // Slang namespace is used for elements support code (like core) which we use here
 // for ComPtr<> and TestToolUtil
@@ -39,6 +40,8 @@ using namespace Slang;
 // laid out in the manner that the generated slang code expects. 
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
+
+static const ExampleResources resourceBase("cpu-hello-world");
 
 struct UniformState;
 
@@ -102,7 +105,8 @@ static SlangResult _innerMain(int argc, char** argv)
     // We will load source code for our translation unit from the file `shader.slang`.
     // There are also variations of this API for adding source code from application-provided buffers.
     //
-    spAddTranslationUnitSourceFile(slangRequest, translationUnitIndex, "shader.slang");
+    Slang::String path = resourceBase.resolveResource("shader.slang");
+    spAddTranslationUnitSourceFile(slangRequest, translationUnitIndex, path.getBuffer());
 
     // Once all of the input options for the compiler have been specified,
     // we can invoke `spCompile` to run the compiler and see if any errors

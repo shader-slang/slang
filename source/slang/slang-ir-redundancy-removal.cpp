@@ -25,9 +25,9 @@ struct RedundancyRemovalContext
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                 {
                     auto operand = inst->getOperand(i);
-                    if (getParentFunc(operand) != func)
+                    if (!hasDescendent(func, operand))
                     {
-                        // Global value won't prevent hoisting.
+                        // Only prevent hoisting from operands local to this function
                         continue;
                     }
                     auto operandParent = as<IRBlock>(operand->getParent());

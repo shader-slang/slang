@@ -77,11 +77,12 @@ Download and install CMake from [CMake.org/download](https://cmake.org/download)
 
 Run CMake with the following command to generate a Visual Studio 2022 Solution:
 ```
-# For VisualStudio 2022
-C:\git\slang> cmake.exe --preset vs2022
+C:\git\slang> cmake.exe --preset vs2022 # For VisualStudio 2022
+C:\git\slang> cmake.exe --preset vs2019 # For VisualStudio 2019
 ```
 
-Open slang.sln with VisualStudio IDE and build it for "x64".
+Open `build/slang.sln` with VisualStudio IDE and build it for "x64".
+> Warning: there is another file, `slang.sln`, at the root directory. When you use cmake workflow, you must use one in the `build` directory.
 
 Or you can build with a following command:
 ```
@@ -93,6 +94,7 @@ Install CMake and Ninja.
 ```
 $ sudo apt-get install cmake ninja-build
 ```
+> Warning: Currently the required CMake version is 3.25 or above.
 
 Run CMake with a following command to generate Makefile:
 ```

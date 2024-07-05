@@ -28,6 +28,7 @@ DIAGNOSTIC(-1, Note, implicitParameterMatchingFailedBecauseShaderDoesNotDefineCo
 DIAGNOSTIC(-1, Note, implicitParameterMatchingFailedBecauseTypeMismatch, "implicit parameter matching failed because the component of the same name does not match parameter type '$0'.")
 DIAGNOSTIC(-1, Note, noteShaderIsTargetingPipeine, "shader '$0' is targeting pipeline '$1'")
 DIAGNOSTIC(-1, Note, seeDefinitionOf, "see definition of '$0'")
+DIAGNOSTIC(-1, Note, seeConstantBufferDefinition, "see constant buffer definition.")
 DIAGNOSTIC(-1, Note, seeInterfaceDefinitionOf, "see interface definition of '$0'")
 DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
 DIAGNOSTIC(-1, Note, seeDefinitionOfShader, "see definition of shader '$0'")
@@ -325,7 +326,10 @@ DIAGNOSTIC(30066, Error, classCanOnlyBeInitializedWithNew, "a class can only be 
 DIAGNOSTIC(30067, Error, mutatingMethodOnFunctionInputParameterError, "mutating method '$0' called on `in` parameter '$1'; changes will not be visible to caller. copy the parameter into a local variable if this behavior is intended")
 DIAGNOSTIC(30068, Warning, mutatingMethodOnFunctionInputParameterWarning, "mutating method '$0' called on `in` parameter '$1'; changes will not be visible to caller. copy the parameter into a local variable if this behavior is intended")
 
-DIAGNOSTIC(30070, Error, unsizedMemberMustAppearLast, "unsized member can only appear as the last member in a composite type.")
+DIAGNOSTIC(30070, Error, unsizedMemberMustAppearLast, "member with unknown size at compile time can only appear as the last member in a composite type.")
+DIAGNOSTIC(30071, Error, varCannotBeUnsized, "cannot instantiate a variable of unsized type.")
+
+DIAGNOSTIC(30075, Error, cannotSpecializeGeneric, "cannot specialize generic '$0' with the provided arguments.")
 
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
 DIAGNOSTIC(30101, Error, cannotDereferenceType, "cannot dereference type '$0', do you mean to use '.'?")
@@ -384,12 +388,12 @@ DIAGNOSTIC(36104, Error, useOfUndeclaredCapabilityOfInterfaceRequirement, "'$0' 
 DIAGNOSTIC(36105, Error, unknownCapability, "unknown capability name '$0'.")
 DIAGNOSTIC(36106, Error, expectCapability, "expect a capability name.")
 DIAGNOSTIC(36107, Error, entryPointUsesUnavailableCapability, "entrypoint '$0' requires capability '$1', which is incompatible with the current compilation target '$2'.")
-DIAGNOSTIC(36108, Error, declHasDependenciesNotDefinedOnTarget, "'$0' has dependencies that are not defined on the required target '$1'.")
+DIAGNOSTIC(36108, Error, declHasDependenciesNotCompatibleOnTarget, "'$0' has dependencies that are not compatible on the required target '$1'.")
 DIAGNOSTIC(36109, Error, invalidTargetSwitchCase, "'$0' cannot be used as a target_switch case.")
 DIAGNOSTIC(36110, Error, stageIsInCompatibleWithCapabilityDefinition, "'$0' is defined for stage '$1', which is incompatible with the declared capability set '$2'.")
 
 // Attributes
-DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
+DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
 DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects $1 arguments ($2 provided)")
 DIAGNOSTIC(31002, Error, attributeNotApplicable, "attribute '$0' is not valid here")
 
@@ -449,8 +453,13 @@ DIAGNOSTIC(31203, Error, cannotExportIncompleteType, "cannot export incomplete t
 DIAGNOSTIC(31204, Error, incompleteTypeCannotBeUsedInBuffer, "incomplete type '$0' cannot be used in a buffer")
 DIAGNOSTIC(31205, Error, incompleteTypeCannotBeUsedInUniformParameter, "incomplete type '$0' cannot be used in a uniform parameter")
 DIAGNOSTIC(31206, Error, memoryQualifierNotAllowedOnANonImageTypeParameter, "modifier $0 is not allowed on a non image type parameter.")
-DIAGNOSTIC(31207, Error, InputAttachmentIndexOnlyAllowedOnSubpass, "input_attachment_index is only allowed on subpass images.")
 DIAGNOSTIC(31208, Error, requireInputDecoratedVarForParameter, "$0 expects for argument $1 a type which is a shader input (`in`) variable.")
+DIAGNOSTIC(31210, Error, derivativeGroupQuadMustBeMultiple2ForXYThreads, "compute derivative group quad requires thread dispatch count of X and Y to each be at a multiple of 2")
+DIAGNOSTIC(31211, Error, derivativeGroupLinearMustBeMultiple4ForTotalThreadCount, "compute derivative group linear requires total thread dispatch count to be at a multiple of 4")
+DIAGNOSTIC(31212, Error, onlyOneOfDerivativeGroupLinearOrQuadCanBeSet, "cannot set compute derivative group linear and compute derivative group quad at the same time")
+DIAGNOSTIC(31213, Error, cudaKernelMustReturnVoid, "return type of a CUDA kernel function cannot be non-void.")
+DIAGNOSTIC(31214, Error, differentiableKernelEntryPointCannotHaveDifferentiableParams, "differentiable kernel entry point cannot have differentiable parameters. Consider using DiffTensorView to pass differentiable data, or marking this parameter with 'no_diff'")
+DIAGNOSTIC(31215, Error, cannotUseUnsizedTypeInConstantBuffer, "cannot use unsized type '$0' in a constant buffer.")
 
 // Enums
 
@@ -682,6 +691,11 @@ DIAGNOSTIC(39024, Warning, cannotInferVulkanBindingWithoutRegisterModifier, "sha
 DIAGNOSTIC(39025, Error, conflictingVulkanInferredBindingForParameter, "conflicting vulkan inferred binding for parameter '$0' overlap is $1 and $2")
 
 DIAGNOSTIC(39026, Error, matrixLayoutModifierOnNonMatrixType, "matrix layout modifier cannot be used on non-matrix type '$0'.")
+
+DIAGNOSTIC(39027, Error, getAttributeAtVertexMustReferToPerVertexInput, "'GetAttributeAtVertex' must reference a vertex input directly, and the vertex input must be decorated with 'pervertex' or 'nointerpolation'.")
+
+DIAGNOSTIC(39028, Error, notValidVaryingParameter, "parameter '$0' is not a valid varying parameter.")
+
 //
 
 // 4xxxx - IL code generation.
@@ -717,6 +731,9 @@ DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to itself.")
 
 DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'void' function")
+DIAGNOSTIC(41011, Error, profileIncompatibleWithTargetSwitch, "__target_switch has no compatable target with current profile '$0'")
+DIAGNOSTIC(41012, Warning, profileImplicitlyUpgraded, "user set `profile` had an implicit upgrade applied to it, atoms added: '$0'")
+DIAGNOSTIC(41012, Error, profileImplicitlyUpgradedRestrictive, "user set `profile` had an implicit upgrade applied to it, atoms added: '$0'")
 DIAGNOSTIC(41015, Error, usingUninitializedValue, "use of uninitialized value '$0'")
 DIAGNOSTIC(41016, Warning, returningWithUninitializedOut, "returning without initializing out parameter '$0'")
 DIAGNOSTIC(41017, Warning, returningWithPartiallyUninitializedOut, "returning without fully initializing out parameter '$0'")
@@ -730,6 +747,8 @@ DIAGNOSTIC(41025, Error, lossOfDerivativeUsingNonDifferentiableLocationAsOutArg,
 DIAGNOSTIC(41021, Error, differentiableFuncMustHaveOutput, "a differentiable function must have at least one differentiable output.")
 DIAGNOSTIC(41022, Error, differentiableFuncMustHaveInput, "a differentiable function must have at least one differentiable input.")
 DIAGNOSTIC(41023, Error, getStringHashMustBeOnStringLiteral, "getStringHash can only be called when argument is statically resolvable to a string literal")
+
+DIAGNOSTIC(41030, Warning, operatorShiftLeftOverflow, "left shift amount exceeds the number of bits and the result will be always zero, (`$0` << `$1`).")
 
 DIAGNOSTIC(41901, Error, unsupportedUseOfLValueForAutoDiff, "unsupported use of L-value for auto differentiation.")
 DIAGNOSTIC(41902, Error, cannotDifferentiateDynamicallyIndexedData, "cannot auto-differentiate mixed read/write access to dynamically indexed data in '$0'.")
@@ -748,12 +767,21 @@ DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this loca
 DIAGNOSTIC(41202, Error, notEqualBitCastSize, "invalid to bit_cast differently sized types: '$0' with size '$1' casted into '$2' with size '$3'")
 DIAGNOSTIC(41203, Warning, notEqualReinterpretCastSize, "reinterpret<> into not equally sized types: '$0' with size '$1' casted into '$2' with size '$3'")
 
+DIAGNOSTIC(41300, Error, byteAddressBufferUnaligned, "invalid alignment `$0` specified for the byte address buffer resource with the element size of `$1`")
+
+DIAGNOSTIC(41400, Error, staticAssertionFailure, "static assertion failed, $0")
+DIAGNOSTIC(41401, Error, staticAssertionFailureWithoutMessage, "static assertion failed.")
+DIAGNOSTIC(41402, Error, staticAssertionConditionNotConstant, "condition for static assertion cannot be evaluated at the compile-time.")
+
+DIAGNOSTIC(41402, Error, multiSampledTextureDoesNotAllowWrites, "cannot write to a multisampled texture with target '$0'.")
+
 //
 // 5xxxx - Target code generation.
 //
 
 DIAGNOSTIC(50010, Internal, missingExistentialBindingsForParameter, "missing argument for existential parameter slot")
-
+DIAGNOSTIC(50011, Warning, spirvVersionNotSupported, "Slang's SPIR-V backend only supports SPIR-V version 1.3 and later."
+                                                   " Use `-emit-spirv-via-glsl` option to produce SPIR-V 1.0 through 1.2.")
 DIAGNOSTIC(50020, Error, invalidTessCoordType, "TessCoord must have vec2 or vec3 type.")
 DIAGNOSTIC(50020, Error, invalidFragCoordType, "FragCoord must be a vec4.")
 DIAGNOSTIC(50020, Error, invalidInvocationIdType, "InvocationId must have int type.")
@@ -815,9 +843,14 @@ DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid param
 
 DIAGNOSTIC(55200, Error, unsupportedBuiltinType, "'$0' is not a supported builtin type for the target.")
 DIAGNOSTIC(55201, Error, unsupportedRecursion, "recursion detected in call to '$0', but the current code generation target does not allow recursion.")
+DIAGNOSTIC(55202, Error, systemValueAttributeNotSupported, "system value semantic '$0' is not supported for the current target.")
+DIAGNOSTIC(55203, Error, systemValueTypeIncompatible, "system value semantic '$0' should have type '$1' or convertible to type '$1'.")
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
 
+
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
+DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
+DIAGNOSTIC(57003, Error, unknownTessPartitioning, "unknown tessellation partitioning '$0'.")
 
 // GLSL Compatibility
 DIAGNOSTIC(58001, Error, entryPointMustReturnVoidWhenGlobalOutputPresent, "entry point must return 'void' when global output variables are present.")

@@ -58,9 +58,11 @@ namespace Slang
         }
         return SLANG_FAIL;
     }
-
+    auto downstreamStartTime = std::chrono::high_resolution_clock::now();
     SLANG_RETURN_ON_FAIL(compiler->convert(artifact, assemblyDesc, outArtifact));
-
+    auto downstreamElapsedTime =
+        (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
+    session->addDownstreamCompileTime(downstreamElapsedTime);
     return SLANG_OK;
 }
 

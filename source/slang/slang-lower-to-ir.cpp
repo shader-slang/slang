@@ -12,6 +12,7 @@
 #include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-loop-inversion.h"
 #include "slang-ir.h"
+#include "slang-ir-util.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
@@ -22,6 +23,7 @@
 #include "slang-ir-check-differentiability.h"
 #include "slang-ir-check-recursive-type.h"
 #include "slang-ir-missing-return.h"
+#include "slang-ir-operator-shift-overflow.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-strip.h"
@@ -1383,21 +1385,27 @@ static void addLinkageDecoration(
         {
             builder->addCudaKernelDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addHLSLExportDecoration(inst);
+
+            // Temp decorations to get this function through the linker.
             builder->addKeepAliveDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
         }
         else if (as<TorchEntryPointAttribute>(modifier))
         {
             builder->addTorchEntryPointDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addCudaHostDecoration(inst);
-            builder->addHLSLExportDecoration(inst);
-            builder->addKeepAliveDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+
+            // Temp decorations to get this function through the linker.
+            builder->addKeepAliveDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
         }
         else if (as<AutoPyBindCudaAttribute>(modifier))
         {
             builder->addAutoPyBindCudaDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addAutoPyBindExportInfoDecoration(inst);
+
+            // Temp decorations to get this function through the linker.
             builder->addKeepAliveDecoration(inst);
             builder->addHLSLExportDecoration(inst);
         }
@@ -2204,16 +2212,6 @@ void addVarDecorations(
             builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
                 builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
         }
-        else if (auto glslInputAttachmentMod = as<GLSLInputAttachmentIndexLayoutModifier>(mod))
-        {
-            auto subpassType = as<IRSubpassInputType>(inst->getDataType());
-
-            if (!subpassType)
-                context->getSink()->diagnose(inst, Diagnostics::InputAttachmentIndexOnlyAllowedOnSubpass);
-
-            builder->addDecoration(inst, kIROp_GLSLInputAttachmentIndexDecoration,
-                builder->getIntValue(builder->getIntType(), stringToInt(glslInputAttachmentMod->valToken.getContent())));
-        }
         else if (auto glslOffsetMod = as<GLSLOffsetLayoutAttribute>(mod))
         {
             builder->addDecoration(inst, kIROp_GLSLOffsetDecoration,
@@ -2223,7 +2221,7 @@ void addVarDecorations(
         {
             builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
         }
-        else if (auto dynamicUniform = as<DynamicUniformModifier>(mod))
+        else if (as<DynamicUniformModifier>(mod))
         {
             builder->addDynamicUniformDecoration(inst);
         }
@@ -2515,7 +2513,15 @@ void addArg(
             // pass in the actual pointer.
             //
             IRInst* argPtr = getAddress(context, argVal, loc);
-            addInArg(context, ioArgs, LoweredValInfo::simple(argPtr));
+            if (argPtr)
+                addInArg(context, ioArgs, LoweredValInfo::simple(argPtr));
+            else
+            {
+                // If arg can't be converted to a pointer, we have already
+                // reported an error, so just pass a null pointer to allow
+                // the remaining lowering steps to finish.
+                addInArg(context, ioArgs, LoweredValInfo::simple(context->irBuilder->getNullVoidPtrValue()));
+            }
         }
         break;
 
@@ -2707,6 +2713,10 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     else if (parentDecl->hasModifier<ConstRefAttribute>())
     {
         return kParameterDirection_ConstRef;
+    }
+    else if (parentDecl->hasModifier<RefAttribute>())
+    {
+        return kParameterDirection_Ref;
     }
 
     // A `set` accessor on a property or subscript declaration
@@ -4400,6 +4410,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 return LoweredValInfo::simple(getBuilder()->getIntValue(irType, 0));
             }
+            else if (declRef.as<InterfaceDecl>())
+            {
+                return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
+            }
             else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
                 List<IRInst*> args;
@@ -4424,6 +4438,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             }
         }
         return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
+    }
+
+    LoweredValInfo visitDefaultConstructExpr(DefaultConstructExpr* expr)
+    {
+        return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(lowerType(context, expr->type)));
     }
 
     LoweredValInfo getDefaultVal(DeclRef<VarDeclBase> decl)
@@ -6409,8 +6428,22 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     void visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
     {
         auto builder = getBuilder();
-        IRInst* arg = builder->getStringValue(stmt->asmText.getUnownedSlice());
-        builder->emitIntrinsicInst(nullptr, kIROp_GenericAsm, 1, &arg);
+        ShortList<IRInst*> args;
+        args.add(builder->getStringValue(stmt->asmText.getUnownedSlice()));
+        for (auto argExpr : stmt->args)
+        {
+            if (auto typetype = as<TypeType>(argExpr->type))
+            {
+                auto type = lowerType(context, typetype->getType());
+                args.add(type);
+            }
+            else
+            {
+                auto argVal = lowerRValueExpr(context, argExpr);
+                args.add(argVal.val);
+            }
+        }
+        builder->emitIntrinsicInst(nullptr, kIROp_GenericAsm, args.getCount(), args.getArrayView().getBuffer());
     }
 
     void visitSwitchStmt(SwitchStmt* stmt)
@@ -6736,6 +6769,14 @@ LoweredValInfo tryGetAddress(
             UInt elementCount = originalSwizzleInfo->elementCount;
 
             auto newBase = tryGetAddress(context, originalBase, TryGetAddressMode::Aggressive);
+            if (newBase.flavor == LoweredValInfo::Flavor::Ptr && elementCount == 1)
+            {
+                // A special case is when we have a single element swizzle,
+                // we can just emit an element address.
+                auto elementPtr = context->irBuilder->emitElementAddress(newBase.val, originalSwizzleInfo->elementIndices[0]);
+                return LoweredValInfo::ptr(elementPtr);
+            }
+            
             RefPtr<SwizzledLValueInfo> newSwizzleInfo = new SwizzledLValueInfo();
             context->shared->extValues.add(newSwizzleInfo);
 
@@ -7264,26 +7305,61 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 #undef IGNORED_CASE
 
+    void getAllEntryPointsNoOverride(List<IRInst*>& entryPoints)
+    {
+        if(entryPoints.getCount() != 0 )
+            return;
+        for(const auto d : context->irBuilder->getModule()->getModuleInst()->getGlobalInsts())
+            if(d->findDecoration<IREntryPointDecoration>())
+                entryPoints.add(d);
+    }
+
     LoweredValInfo visitEmptyDecl(EmptyDecl* decl)
     {
+        bool verifyComputeDerivativeGroupModifier = false;
+        List<IRInst*> entryPoints {};
         for(const auto modifier : decl->modifiers)
         {
             if(const auto layoutLocalSizeAttr = as<GLSLLayoutLocalSizeAttribute>(modifier))
             {
-                for(const auto d : context->irBuilder->getModule()->getModuleInst()->getGlobalInsts())
-                {
-                    if(d->findDecoration<IREntryPointDecoration>())
-                    {
-                        getBuilder()->addNumThreadsDecoration(
+                verifyComputeDerivativeGroupModifier = true;
+                getAllEntryPointsNoOverride(entryPoints);
+                for(auto d : entryPoints)
+                    as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
                             d,
                             getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->x)),
                             getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->y)),
                             getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->z))
-                        );
-                    }
-                }
+                        ));
+            }
+            else if(as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
+            {
+                verifyComputeDerivativeGroupModifier = true;
+                getAllEntryPointsNoOverride(entryPoints);
+                for(auto d : entryPoints)
+                    getBuilder()->addSimpleDecoration<IRDerivativeGroupQuadDecoration>(d);
+            }
+            else if(as<GLSLLayoutDerivativeGroupLinearAttribute>(modifier))
+            {
+                verifyComputeDerivativeGroupModifier = true;
+                getAllEntryPointsNoOverride(entryPoints);
+                for(auto d : entryPoints)
+                    getBuilder()->addSimpleDecoration<IRDerivativeGroupLinearDecoration>(d);
             }
         }
+        
+        if(!verifyComputeDerivativeGroupModifier)
+            return LoweredValInfo();
+        for(auto d : entryPoints)
+        {
+            verifyComputeDerivativeGroupModifiers(
+                getSink(),
+                decl->loc,
+                d->findDecoration<IRDerivativeGroupQuadDecoration>(), 
+                d->findDecoration<IRDerivativeGroupLinearDecoration>(),
+                d->findDecoration<IRNumThreadsDecoration>());
+        }
+
         return LoweredValInfo();
     }
 
@@ -7712,6 +7788,33 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return false;
     }
 
+    struct NestedContext
+    {
+        IRGenEnv        subEnvStorage;
+        IRBuilder       subBuilderStorage;
+        IRGenContext    subContextStorage;
+
+        NestedContext(DeclLoweringVisitor* outer)
+            : subBuilderStorage(*outer->getBuilder())
+            , subContextStorage(*outer->context)
+        {
+            auto outerContext = outer->context;
+
+            subEnvStorage.outer = outerContext->env;
+
+            subContextStorage.irBuilder = &subBuilderStorage;
+            subContextStorage.env = &subEnvStorage;
+
+            subContextStorage.thisType = outerContext->thisType;
+            subContextStorage.thisTypeWitness = outerContext->thisTypeWitness;
+
+            subContextStorage.returnDestination = LoweredValInfo();
+        }
+
+        IRBuilder* getBuilder() { return &subBuilderStorage; }
+        IRGenContext* getContext() { return &subContextStorage; }
+    };
+
     LoweredValInfo lowerGlobalShaderParam(VarDecl* decl)
     {
         IRType* paramType = lowerType(context, decl->getType());
@@ -7868,46 +7971,50 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return lowerGlobalConstantDecl(decl);
         }
 
-        IRType* varType = lowerType(context, decl->getType());
+        NestedContext nested(this);
+        auto subBuilder = nested.getBuilder();
+        auto subContext = nested.getContext();
 
-        auto builder = getBuilder();
+        IRGeneric* outerGeneric = nullptr;
+
+        // If we are static, then we need to insert the declaration before the parent.
+        // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl` functionality
+        if (isFunctionStaticVarDecl(decl))
+        {
+            // We need to insert the constant at a level above
+            // the function being emitted. This will usually
+            // be the global scope, but it might be an outer
+            // generic if we are lowering a generic function.
+            subBuilder->setInsertBefore(subBuilder->getFunc());
+        }
+        else if (!isFunctionVarDecl(decl))
+        {
+            outerGeneric = emitOuterGenerics(subContext, decl, decl);
+        }
+
+        IRType* varType = lowerType(subContext, decl->getType());
 
         // TODO(JS): Do we create something derived from IRGlobalVar? Or do we use 
         // a decoration to identify an *actual* global?
 
-        IRGlobalValueWithCode* irGlobal = builder->createGlobalVar(varType);
-        LoweredValInfo globalVal = LoweredValInfo::ptr(irGlobal);
+        IRGlobalValueWithCode* irGlobal = subBuilder->createGlobalVar(varType);
 
-        addLinkageDecoration(context, irGlobal, decl);
-        addNameHint(context, irGlobal, decl);
+        addLinkageDecoration(subContext, irGlobal, decl);
+        addNameHint(subContext, irGlobal, decl);
 
-        maybeSetRate(context, irGlobal, decl);
+        maybeSetRate(subContext, irGlobal, decl);
 
-        addVarDecorations(context, irGlobal, decl);
-        maybeAddDebugLocationDecoration(context, irGlobal);
+        addVarDecorations(subContext, irGlobal, decl);
+        maybeAddDebugLocationDecoration(subContext, irGlobal);
 
         if (decl)
         {
-            builder->addHighLevelDeclDecoration(irGlobal, decl);
+            subBuilder->addHighLevelDeclDecoration(irGlobal, decl);
         }
-
-        // A global variable's SSA value is a *pointer* to
-        // the underlying storage.
-        context->setGlobalValue(decl, globalVal);
 
         if( auto initExpr = decl->initExpr )
         {
-            IRBuilder subBuilderStorage = *getBuilder();
-            IRBuilder* subBuilder = &subBuilderStorage;
-
             subBuilder->setInsertInto(irGlobal);
-
-            IRGenContext subContextStorage = *context;
-            IRGenContext* subContext = &subContextStorage;
-
-            subContext->irBuilder = subBuilder;
-
-            // TODO: set up a parent IR decl to put the instructions into
 
             IRBlock* entryBlock = subBuilder->emitBlock();
             subBuilder->setInsertInto(entryBlock);
@@ -7916,37 +8023,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContext->irBuilder->emitReturn(getSimpleVal(subContext, initVal));
         }
 
-        irGlobal->moveToEnd();
+        // A global variable's SSA value is a *pointer* to
+        // the underlying storage.
+        auto loweredValue = LoweredValInfo::ptr(finishOuterGenerics(subBuilder, irGlobal, outerGeneric));
+        context->setGlobalValue(decl, loweredValue);
 
-        return globalVal;
+        return loweredValue;
     }
-
-    struct NestedContext
-    {
-        IRGenEnv        subEnvStorage;
-        IRBuilder       subBuilderStorage;
-        IRGenContext    subContextStorage;
-
-        NestedContext(DeclLoweringVisitor* outer)
-            : subBuilderStorage(*outer->getBuilder())
-            , subContextStorage(*outer->context)
-        {
-            auto outerContext = outer->context;
-
-            subEnvStorage.outer = outerContext->env;
-
-            subContextStorage.irBuilder = &subBuilderStorage;
-            subContextStorage.env = &subEnvStorage;
-
-            subContextStorage.thisType = outerContext->thisType;
-            subContextStorage.thisTypeWitness = outerContext->thisTypeWitness;
-
-            subContextStorage.returnDestination = LoweredValInfo();
-        }
-
-        IRBuilder* getBuilder() { return &subBuilderStorage; }
-        IRGenContext* getContext() { return &subContextStorage; }
-    };
 
     LoweredValInfo lowerFunctionStaticConstVarDecl(
         VarDeclBase* decl)
@@ -8552,7 +8635,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     lowerPackOffsetModifier(fieldKey, packOffsetModifier);
                 }
-                else if (auto dynamicUniformModifer = as<DynamicUniformModifier>(mod))
+                else if (as<DynamicUniformModifier>(mod))
                 {
                     subBuilder->addDynamicUniformDecoration(fieldKey);
                 }
@@ -8787,7 +8870,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGenContext*               subContext,
         GenericTypeConstraintDecl*  constraintDecl)
     {
-        auto supType = lowerType(context, constraintDecl->sup.type);
+        auto supType = lowerType(subContext, constraintDecl->sup.type);
         auto value = emitGenericConstraintValue(subContext, constraintDecl, supType);
         subContext->setValue(constraintDecl, LoweredValInfo::simple(value));
     }
@@ -8936,9 +9019,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto operand = value->getOperand(i);
                 markInstsToClone(valuesToClone, parentBlock, operand);
             }
+            if (value->getFullType())
+                markInstsToClone(valuesToClone, parentBlock, value->getFullType());
+            for (auto child : value->getDecorationsAndChildren())
+                markInstsToClone(valuesToClone, parentBlock, child);
         }
-        for (auto child : value->getChildren())
-            markInstsToClone(valuesToClone, parentBlock, child);
         auto parent = parentBlock->getParent();
         while (parent && parent != parentBlock)
         {
@@ -8989,7 +9074,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), returnType);
                 // For Function Types, we always clone all generic parameters regardless of whether
                 // the generic parameter appears in the function signature or not.
-                if (returnType->getOp() == kIROp_FuncType)
+                if (returnType->getOp() == kIROp_FuncType ||
+                    returnType->getOp() == kIROp_Generic)
                 {
                     for (auto genericParam : parentGeneric->getParams())
                     {
@@ -9677,6 +9763,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         addBitFieldAccessorDecorations(irFunc, decl);
 
+        IRNumThreadsDecoration* numThreadsDecor = nullptr;
+        IRDecoration* derivativeGroupQuadDecor = nullptr;
+        IRDecoration* derivativeGroupLinearDecor = nullptr;
         for (auto modifier : decl->modifiers)
         {
             if (as<RequiresNVAPIAttribute>(modifier))
@@ -9691,6 +9780,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
             }
+            else if (as<DerivativeGroupQuadAttribute>(modifier))
+            {
+                derivativeGroupQuadDecor = getBuilder()->addSimpleDecoration<IRDerivativeGroupQuadDecoration>(irFunc);
+            }
+            else if (as<DerivativeGroupLinearAttribute>(modifier))
+            {
+                derivativeGroupLinearDecor = getBuilder()->addSimpleDecoration<IRDerivativeGroupLinearDecoration>(irFunc);
+            }
+            else if (as<NoRefInlineAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRNoRefInlineDecoration>(irFunc);
+            }
             else if (auto instanceAttr = as<InstanceAttribute>(modifier))
             {
                 IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), instanceAttr);
@@ -9703,12 +9804,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
-                getBuilder()->addNumThreadsDecoration(
-                    irFunc,
-                    getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
-                    getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
-                    getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
-                );
+                numThreadsDecor = as<IRNumThreadsDecoration>(
+                    getBuilder()->addNumThreadsDecoration(
+                        irFunc,
+                        getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
+                        getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
+                        getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
+                    ));
             }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
@@ -9858,9 +9960,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
             else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
                 getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
-            else if (auto nonUniform= as<NonDynamicUniformAttribute>(modifier))
+            else if (as<NonDynamicUniformAttribute>(modifier))
                 getBuilder()->addDecoration(irFunc, kIROp_NonDynamicUniformReturnDecoration);
         }
+
+        verifyComputeDerivativeGroupModifiers(
+            getSink(),
+            decl->loc,
+            derivativeGroupQuadDecor,
+            derivativeGroupLinearDecor,
+            numThreadsDecor);
 
         if (!isInline)
         {
@@ -9987,6 +10096,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         else if (auto typedefDecl = as<TypeDefDecl>(genDecl->inner))
         {
             return ensureDecl(context, typedefDecl);
+        }
+        else if (auto subscriptDecl = as<SubscriptDecl>(genDecl->inner))
+        {
+            return ensureDecl(context, subscriptDecl);
         }
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
@@ -10135,10 +10248,10 @@ bool canDeclLowerToAGeneric(Decl* decl)
     // a generic that returns a type (a simple type-level function).
     if(as<TypeDefDecl>(decl)) return true;
 
-    // If we have a variable declaration that is *static* and *const* we can lower to a generic
+    // A static member variable declaration can be lowered into a generic.
     if (auto varDecl = as<VarDecl>(decl))
     {
-        if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
+        if (varDecl->hasModifier<HLSLStaticModifier>())
         {
             return !isFunctionVarDecl(varDecl);
         }
@@ -10260,7 +10373,9 @@ LoweredValInfo emitDeclRef(
         // We can only really specialize things that map to single values.
         // It would be an error if we got a non-`None` value that
         // wasn't somehow a single value.
-        auto irGenericVal = getSimpleVal(context, genericVal);
+        genericVal = materialize(context, genericVal);
+        auto irGenericVal = genericVal.val;
+        SLANG_ASSERT(irGenericVal);
 
         // We have the IR value for the generic we'd like to specialize,
         // and now we need to get the value for the arguments.
@@ -10292,8 +10407,16 @@ LoweredValInfo emitDeclRef(
             irGenericVal,
             irArgs.getCount(),
             irArgs.getBuffer());
-
-        return LoweredValInfo::simple(irSpecializedVal);
+        switch (genericVal.flavor)
+        {
+        case LoweredValInfo::Flavor::Simple:
+            return LoweredValInfo::simple(irSpecializedVal);
+        case LoweredValInfo::Flavor::Ptr:
+            return LoweredValInfo::ptr(irSpecializedVal);
+        default:
+            SLANG_UNEXPECTED("unhandled lowered value flavor");
+            UNREACHABLE_RETURN(LoweredValInfo());
+        }
     }
     else if(auto thisTypeSubst = as<LookupDeclRef>(subst))
     {
@@ -10591,6 +10714,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     auto session = translationUnit->getSession();
     auto compileRequest = translationUnit->compileRequest;
+    Linkage* linkage = compileRequest->getLinkage();
 
     SharedIRGenContext sharedContextStorage(
         session,
@@ -10706,36 +10830,36 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // Generate DebugValue insts to store values into debug variables,
     // if debug symbols are enabled.
-    if (compileRequest->getLinkage()->m_optionSet.getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation) != DebugInfoLevel::None)
+    if (context->includeDebugInfo)
     {
         insertDebugValueStore(module);
     }
+
 
     // Next, attempt to promote local variables to SSA
     // temporaries and do basic simplifications.
     //
     constructSSA(module);
-    simplifyCFG(module, CFGSimplificationOptions::getDefault());
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-    peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
+    
+    bool minimumOptimizations = linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
+    if (!minimumOptimizations)
+    {
+        simplifyCFG(module, CFGSimplificationOptions::getDefault());
+        auto peepholeOptions = PeepholeOptimizationOptions::getPrelinking();
+        peepholeOptimize(nullptr, module, peepholeOptions);
+    }
+
+    IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
+    dceOptions.keepExportsAlive = true;
+    dceOptions.keepLayoutsAlive = true;
+    dceOptions.useFastAnalysis = true;
 
     for (auto inst : module->getGlobalInsts())
     {
         if (auto func = as<IRGlobalValueWithCode>(inst))
-            eliminateDeadCode(func);
+            eliminateDeadCode(func, dceOptions);
     }
-    // Next, inline calls to any functions that have been
-    // marked for mandatory "early" inlining.
-    //
-    // Note: We performed certain critical simplifications
-    // above, before this step, so that the body of functions
-    // subject to mandatory inlining can be simplified ahead
-    // of time. By simplifying the body before inlining it,
-    // we can make sure that things like superfluous temporaries
-    // are eliminated from the callee, and not copied into
-    // call sites.
-    //
-    performMandatoryEarlyInlining(module);
 
     // Where possible, move loop condition checks to the end of loops, and wrap
     // the loop in an 'if(condition)'.
@@ -10753,46 +10877,70 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // - If sccp is unable to eliminate the outer 'if' then we end up with
     //   duplicated code the the conditional value. Users don't tend to put
     //   huge gobs of code in the conditional expression in loops however.
+    if (compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::LoopInversion))
+    {
+        invertLoops(module);
+    }
 
-    invertLoops(module);
-
-    // Next, attempt to promote local variables to SSA
-    // temporaries and do basic simplifications.
+    // Next, inline calls to any functions that have been
+    // marked for mandatory "early" inlining.
     //
+    // Note: We performed certain critical simplifications
+    // above, before this step, so that the body of functions
+    // subject to mandatory inlining can be simplified ahead
+    // of time. By simplifying the body before inlining it,
+    // we can make sure that things like superfluous temporaries
+    // are eliminated from the callee, and not copied into
+    // call sites.
+    //
+    InstHashSet modifiedFuncs(module);
     for (;;)
     {
         bool changed = false;
-        performMandatoryEarlyInlining(module);
-        changed |= constructSSA(module);
-        simplifyCFG(module, CFGSimplificationOptions::getDefault());
-        changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-        changed |= peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
-        for (auto inst : module->getGlobalInsts())
+        modifiedFuncs.clear();
+        changed = performMandatoryEarlyInlining(module, &modifiedFuncs.getHashSet());
+        if (changed)
         {
-            if (auto func = as<IRGlobalValueWithCode>(inst))
-                eliminateDeadCode(func);
+            changed = peepholeOptimizeGlobalScope(nullptr, module);
+            if (!minimumOptimizations)
+            {
+                for (auto func : modifiedFuncs.getHashSet())
+                {
+                    auto codeInst = as<IRGlobalValueWithCode>(func);
+                    changed |= constructSSA(func);
+                    changed |= applySparseConditionalConstantPropagation(func, compileRequest->getSink());
+                    changed |= peepholeOptimize(nullptr, func);
+                    changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
+                    eliminateDeadCode(func, dceOptions);
+                }
+            }
         }
         if (!changed)
             break;
     }
 
-    // Propagate `constexpr`-ness through the dataflow graph (and the
-    // call graph) based on constraints imposed by different instructions.
-    propagateConstExpr(module, compileRequest->getSink());
+    if (compileRequest->getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
+    {
+        // Propagate `constexpr`-ness through the dataflow graph (and the
+        // call graph) based on constraints imposed by different instructions.
+        propagateConstExpr(module, compileRequest->getSink());
 
-    // TODO: give error messages if any `undefined` or
-    // `unreachable` instructions remain.
+        // Check for using uninitialized out parameters.
+        checkForUsingUninitializedOutParams(module, compileRequest->getSink());
+        
+        // TODO: give error messages if any `undefined` or
+        // instructions remain.
 
-    // Check for using uninitialized out parameters.
-    checkForUsingUninitializedOutParams(module, compileRequest->getSink());
+        checkForMissingReturns(module, compileRequest->getSink());
 
-    checkForMissingReturns(module, compileRequest->getSink());
+        // We don't allow recursive types.
+        checkForRecursiveTypes(module, compileRequest->getSink());
 
-    // We don't allow recursive types.
-    checkForRecursiveTypes(module, compileRequest->getSink());
+        // Check for invalid differentiable function body.
+        checkAutoDiffUsages(module, compileRequest->getSink());
 
-    // Check for invalid differentiable function body.
-    checkAutoDiffUsages(module, compileRequest->getSink());
+        checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
+    }
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions
@@ -10818,8 +10966,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         //
         IRStripOptions stripOptions;
 
-        Linkage* linkage = compileRequest->getLinkage();
-
         stripOptions.shouldStripNameHints = linkage->m_optionSet.shouldObfuscateCode();
 
         // If we are generating an obfuscated source map, we don't want to strip locs, 
@@ -10840,16 +10986,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // pass here, but make sure to set our options so that we don't
         // eliminate anything that has been marked for export.
         //
-        IRDeadCodeEliminationOptions options;
-        options.keepExportsAlive = true;
-        eliminateDeadCode(module, options);
+        eliminateDeadCode(module, dceOptions);
 
-        if (linkage->m_optionSet.shouldObfuscateCode())
+        if (stripOptions.shouldStripNameHints && linkage->m_optionSet.shouldHaveSourceMap())
         {
             // The obfuscated source map is stored on the module
             obfuscateModuleLocs(module, compileRequest->getSourceManager());
         }
     }
+
 
     // TODO: consider doing some more aggressive optimizations
     // (in particular specialization of generics) here, so
@@ -11458,6 +11603,9 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
     builder->addLayoutDecoration(irModule->getModuleInst(), irGlobalScopeVarLayout);
 
+    auto latestSpirvAtom = getLatestSpirvAtom();
+    auto latestMetalAtom = getLatestMetalAtom();
+
     for( auto entryPointLayout : programLayout->entryPoints )
     {
         auto funcDeclRef = entryPointLayout->entryPoint;
@@ -11474,6 +11622,19 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         if( !irFunc->findDecoration<IRLinkageDecoration>() )
         {
             builder->addImportDecoration(irFunc, getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
+        }
+
+        for (auto atomSet : as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements.getAtomSets())
+        {
+            for (auto atomVal : atomSet)
+            {
+                auto atom = asAtom(atomVal);
+                if (atom >= CapabilityAtom::_spirv_1_0 && atom <= latestSpirvAtom ||
+                    atom >= CapabilityAtom::metallib_2_3 && atom <= latestMetalAtom)
+                {
+                    builder->addRequireCapabilityAtomDecoration(irFunc, (CapabilityName)atom);
+                }
+            }
         }
 
         auto irEntryPointLayout = lowerEntryPointLayout(context, entryPointLayout);

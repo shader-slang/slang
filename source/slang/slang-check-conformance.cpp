@@ -51,19 +51,26 @@ namespace Slang
 
     SubtypeWitness* SemanticsVisitor::isSubtype(
         Type* subType,
-        Type* superType)
+        Type* superType,
+        IsSubTypeOptions isSubTypeOptions
+    )
     {
         SubtypeWitness* result = nullptr;
         if (getShared()->tryGetSubtypeWitnessFromCache(subType, superType, result))
             return result;
-        result = checkAndConstructSubtypeWitness(subType, superType);
+        result = checkAndConstructSubtypeWitness(subType, superType, isSubTypeOptions);
+        
+        if(int(isSubTypeOptions) & int(IsSubTypeOptions::NotReadyForLookup))
+            return result;    
+        
         getShared()->cacheSubtypeWitness(subType, superType, result);
         return result;
     }
 
     SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         Type*                   subType,
-        Type*                   superType)
+        Type*                   superType,
+        IsSubTypeOptions          isSubTypeOptions)
     {
         // TODO: The Slang codebase is currently being quite slippery by conflating
         // multiple concepts, all under the banner of a "subtype" test:
@@ -105,11 +112,14 @@ namespace Slang
         // tangling convertibility into it.
 
         // First, make sure both sub type and super type decl are ready for lookup.
-        if (auto subDeclRefType = as<DeclRefType>(subType))
+        if ( !(int(isSubTypeOptions) & int(IsSubTypeOptions::NotReadyForLookup)) )
         {
-            ensureDecl(subDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
+            if (auto subDeclRefType = as<DeclRefType>(subType))
+            {
+                ensureDecl(subDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
+            }
         }
-        if (auto superDeclRefType = as<DeclRefType>(subType))
+        if (auto superDeclRefType = as<DeclRefType>(superType))
         {
             ensureDecl(superDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
         }
@@ -189,10 +199,10 @@ namespace Slang
             // We therefore simply recursively test both `T <: L`
             // and `T <: R`.
             //
-            auto leftWitness = isSubtype(subType, conjunctionSuperType->getLeft());
+            auto leftWitness = isSubtype(subType, conjunctionSuperType->getLeft(), IsSubTypeOptions::None);
             if (!leftWitness) return nullptr;
             //
-            auto rightWitness = isSubtype(subType, conjunctionSuperType->getRight());
+            auto rightWitness = isSubtype(subType, conjunctionSuperType->getRight(), IsSubTypeOptions::None);
             if (!rightWitness) return nullptr;
 
             // If both of the sub-relationships hold, we can construct
@@ -238,7 +248,7 @@ namespace Slang
 
     bool SemanticsVisitor::isTypeDifferentiable(Type* type)
     {
-        return isSubtype(type, m_astBuilder->getDiffInterfaceType());
+        return isSubtype(type, m_astBuilder->getDiffInterfaceType(), IsSubTypeOptions::None);
     }
 
     bool SemanticsVisitor::doesTypeHaveTag(Type* type, TypeTag tag)
@@ -272,9 +282,10 @@ namespace Slang
                     sized = true;
                 }
             }
-            else if (auto intVal = arrayType->getElementCount())
+            else if (arrayType->getElementCount())
             {
-                sized = !intVal->isLinkTimeVal();
+                sized = true;
+                typeTag = (TypeTag)((int)typeTag | (int)TypeTag::LinkTimeSized);
             }
             if (!sized)
                 typeTag = (TypeTag)((int)typeTag | (int)TypeTag::Unsized);
@@ -318,7 +329,7 @@ namespace Slang
         Type*   type,
         Type*   interfaceType)
     {
-        return isSubtype(type, interfaceType);
+        return isSubtype(type, interfaceType, IsSubTypeOptions::None);
     }
 
     TypeEqualityWitness* SemanticsVisitor::createTypeEqualityWitness(
