@@ -5,7 +5,7 @@
 
 namespace Slang
 {
-    bool isMetaOp(IRInst* inst)
+    static bool isMetaOp(IRInst* inst)
     {
         switch (inst->getOp())
         {
@@ -30,12 +30,12 @@ namespace Slang
 
     // Casting to IRUndefined is currently vacuous
     // (e.g. any IRInst can be cast to IRUndefined)
-    bool isUndefinedValue(IRInst* inst)
+    static bool isUndefinedValue(IRInst* inst)
     {
         return (inst->m_op == kIROp_undefined);
     }
 
-    bool isUndefinedParam(IRParam* param)
+    static bool isUndefinedParam(IRParam* param)
     {
             auto outType = as<IROutType>(param->getFullType());
             if (!outType)
@@ -61,7 +61,7 @@ namespace Slang
             return true;
     }
 
-    bool isAliasable(IRInst* inst)
+    static bool isAliasable(IRInst* inst)
     {
         switch (inst->getOp())
         {
@@ -69,6 +69,7 @@ namespace Slang
         case kIROp_GetElementPtr:
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:
+            // TODO: array index
             return true;
         default:
             break;
@@ -77,17 +78,34 @@ namespace Slang
         return false;
     }
 
-    bool isDefaultConstructable(IRType* type)
+    static bool isDifferentiableFunc(IRInst* func)
     {
-        // If there are no fields, there is no risk
-        // TODO: check for primitive types?
-        if (type->getFirstChild() == nullptr)
-            return true;
+        for (auto decor = func->getFirstDecoration(); decor; decor = decor->getNextDecoration())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_ForwardDerivativeDecoration:
+            case kIROp_ForwardDifferentiableDecoration:
+            case kIROp_BackwardDerivativeDecoration:
+            case kIROp_BackwardDifferentiableDecoration:
+            case kIROp_UserDefinedBackwardDerivativeDecoration:
+                return true;
+            default:
+                break;
+            }
+        }
 
         return false;
     }
 
-    List<IRInst*> getConcernableUsers(IRInst* inst)
+    static bool isDefaultConstructable(IRType* type)
+    {
+        // If there are no fields in the struct, there is no risk
+        return (type->getFirstChild() == nullptr)
+            && (as<IRStructType>(type));
+    }
+
+    static List<IRInst*> getConcernableUsers(IRInst* inst)
     {
         List<IRInst*> users;
         for (auto use = inst->firstUse; use; use = use->nextUse)
@@ -101,7 +119,7 @@ namespace Slang
         return users;
     }
 
-    List<IRInst*> getAliasableInstructions(IRInst* inst)
+    static List<IRInst*> getAliasableInstructions(IRInst* inst)
     {
         List<IRInst*> addresses;
 
@@ -120,7 +138,7 @@ namespace Slang
         return addresses;
     }
 
-    void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user)
+    static void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user)
     {
         // Meta intrinsics (which evaluate on type) do nothing
         if (isMetaOp(user))
@@ -161,7 +179,7 @@ namespace Slang
         }
     }
 
-    void cancelLoads(ReachabilityContext &reachability, const List<IRInst*>& stores, List<IRInst*>& loads)
+    static void cancelLoads(ReachabilityContext &reachability, const List<IRInst*>& stores, List<IRInst*>& loads)
     {
         // Remove all loads which are reachable from stores
         for (auto store : stores)
@@ -176,7 +194,7 @@ namespace Slang
         }
     }
 
-    List<IRInst*> checkForUsingOutParam(ReachabilityContext &reachability, IRFunc* func, IRInst* inst)
+    static List<IRInst*> checkForUsingOutParam(ReachabilityContext &reachability, IRFunc* func, IRInst* inst)
     {
         // Collect all aliasable addresses
         auto addresses = getAliasableInstructions(inst);
@@ -210,7 +228,7 @@ namespace Slang
         return loads;
     }
 
-    List<IRInst*> checkForUsingUndefinedValue(ReachabilityContext &reachability, IRInst* inst)
+    static List<IRInst*> checkForUsingUndefinedValue(ReachabilityContext &reachability, IRInst* inst)
     {
         auto addresses = getAliasableInstructions(inst);
 
@@ -232,17 +250,10 @@ namespace Slang
         return loads;
     }
 
-    void checkForUsingUninitializedValues(IRFunc* func, DiagnosticSink* sink)
+    static void checkForUsingUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     {
-        // Skip synthesized functions; this includes those generated from autodiff.
-        // We shall trust that synthesized functions are aware that they may be using
-        // undefined values.
-        // if (isSynthesized(func))
-        //     return;
-
-        // Also skip for constructors; can add more complex diagnosis for such cases later
-        // if (isConstructor(func))
-        //     return;
+        if (isDifferentiableFunc(func))
+            return;
 
         auto firstBlock = func->getFirstBlock();
         if (!firstBlock)

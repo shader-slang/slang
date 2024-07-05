@@ -9,6 +9,11 @@ struct B : IDifferentiable
     typedef B Differential;
 
     float z;
+
+    __init()
+    {
+        z = 1.0f;
+    }
 };
 
 struct A : IDifferentiable
@@ -59,6 +64,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         A a = {1.0, 2.0};
         B b = {0.2};
+        B bb;
 
         dpA dpa = dpA(a, b);
 

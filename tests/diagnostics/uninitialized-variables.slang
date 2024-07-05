@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHK): -target spirv
 
-/* Should not warn here (unconditionalBranch)
+// Should not warn here (unconditionalBranch)
 float3 unconditional(int mode)
 {
     float f(float) { return 1; }
@@ -44,26 +44,35 @@ T generic_undefined_return()
     T x;
     //CHK-DAG: warning 41018: returning without initializing 'x'
     return x;
-} */
+}
 
 // Structs and nested structs
-/* struct Data
+struct Data
 {
     float value;
-}; */
+};
 
-/*
 struct NestedData
 {
     Data data;
-}; */
+};
 
-/* No warnings here, even thought autodiff generates
+// No warnings here, even thought autodiff generates
 // IR which frequently returns undefined values
 struct DiffStruct : IDifferentiable
 {
-    Data d;
-} */
+    Data data;
+    float x;
+}
+
+// Same story here
+[ForwardDifferentiable]
+DiffStruct differentiable(float x)
+{
+    DiffStruct ds;
+    ds.x = x;
+    return ds;
+}
 
 // Empty structures should not generate diagnostics
 // for empty default constructors
@@ -72,27 +81,29 @@ struct EmptyStruct
     __init() {}
 };
 
+// No warnings for empty structs even without __init()
 struct NonEmptyStruct
 {
     int field;
-    // TODO: specific warning for leaving constructor
-    // without fully initializing some fields
+
     __init() {
+        // TODO: specialized warning for initialized
+        // fields in the constructors
         field = 1;
     }
 };
 
-/* struct NoDefault {
+struct NoDefault {
     int f(int i) {
         return i;
     }
-}; */
+};
 
 float4 main()
 {
     EmptyStruct empty;
-    // NoDefault no_default;
-    /* Data inputData = Data(1.0);
+    NoDefault no_default;
+    Data inputData = Data(1.0);
 
     float undefVar;
     Data undefData;
@@ -109,8 +120,5 @@ float4 main()
     //CHK-DAG: error 41015: use of uninitialized value 'nestedData'
     result += nestedData.data.value;
 
-    return float4(result); */
-
-    return 0.0f;
-    // return no_default.f(1);
+    return float4(result);
 }

@@ -42,7 +42,6 @@ void twoOkReturns(bool b, out float y)
     return;
 }
 
-/*
 // TODO: This should warn that n is potentially uninitialized
 int ok(bool b, out int n)
 {
@@ -55,4 +54,4 @@ int ok(bool b, out int n)
 void partial(out float arr[2])
 {
     arr[0] = 1;
-} */
+}
