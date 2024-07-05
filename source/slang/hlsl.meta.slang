@@ -8848,7 +8848,7 @@ ${{{{
             static_assert(T is int || T is uint, "__metalImageInterlocked only allows 'int'/'uint' textures");
             static_assert(Coord is uint || Coord is vector<uint,2> || Coord is vector<uint,3> || Coord is vector<uint,4>,
                     "__metalImageInterlocked implementation only allows 'uint' coordinates");
-            __intrinsic_asm "(*$(threeParamsOutputParamASMString) = ($0.atomic_fetch_$(atomicOperation)($(threeParamsASMString))[0])";
+            __intrinsic_asm "(*$(threeParamsOutputParamASMString) = ($0.atomic_fetch_$(atomicOperation)($(threeParamsASMString))[0]))";
         }
 ${{{{
     } // atomicOperation
@@ -8960,7 +8960,7 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(glsl)]
     void __glslInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value)
     {
-        __intrinsic_asm "atomic$(atomicOp.glslSuffix)($A, $1)";
+        __intrinsic_asm "$atomic$(atomicOp.glslSuffix)($A, $1)";
     }
 
     __generic<T>
@@ -8968,7 +8968,7 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(glsl)]
     void __glslInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value, out T original_value)
     {
-        __intrinsic_asm "($2 = atomic$(atomicOp.glslSuffix)($A, $1))";
+        __intrinsic_asm "($2 = $atomic$(atomicOp.glslSuffix)($A, $1))";
     }
 
     __generic<T>
@@ -8976,7 +8976,7 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(hlsl)]
     void __hlslInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value)
     {
-        __intrinsic_asm "Interlocked$(atomicOp.hlslSuffix)($0, $1)";
+        __intrinsic_asm "Interlocked$(atomicOp.hlslSuffix)";
     }
 
     __generic<T>
@@ -8984,7 +8984,7 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(hlsl)]
     void __hlslInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value, out T original_value)
     {
-        __intrinsic_asm "Interlocked$(atomicOp.hlslSuffix)($0, $1, $2)";
+        __intrinsic_asm "Interlocked$(atomicOp.hlslSuffix)";
     }
 ${{{{
 } // fetchAndModify
@@ -9026,14 +9026,14 @@ __generic<T>
 [require(glsl)]
 void __glslInterlocked_exchange(__ref T dest, T value)
 {
-    __intrinsic_asm "atomicExchange($0, $1)";
+    __intrinsic_asm "$atomicExchange($0, $1)";
 }
 __generic<T>
 [ForceInline]
 [require(glsl)]
 void __glslInterlocked_exchange(__ref T dest, T value, out T original_value)
 {
-    __intrinsic_asm "($2 = atomicExchange($0, $1))";
+    __intrinsic_asm "($2 = $atomicExchange($0, $1))";
 }
 
 __generic<T>
@@ -9041,14 +9041,14 @@ __generic<T>
 [require(hlsl)]
 void __hlslInterlocked_exchange(__ref T dest, T value)
 {
-    __intrinsic_asm "InterlockedExchange($0, $1)";
+    __intrinsic_asm "InterlockedExchange";
 }
 __generic<T>
 [ForceInline]
 [require(hlsl)]
 void __hlslInterlocked_exchange(__ref T dest, T value, out T original_value)
 {
-    __intrinsic_asm "InterlockedExchange($0, $1, $2)";
+    __intrinsic_asm "InterlockedExchange";
 }
 
 
@@ -9090,7 +9090,7 @@ __generic<T>
 [require(glsl)]
 void __glslInterlocked_compare_exchange(__ref T dest, __ref T compare_value, T value)
 {
-    __intrinsic_asm "atomicCompSwap($A, $1, $2)";
+    __intrinsic_asm "$atomicCompSwap($A, $1, $2)";
 }
 
 __generic<T>
@@ -9098,7 +9098,7 @@ __generic<T>
 [require(glsl)]
 void __glslInterlocked_compare_exchange(__ref T dest, T compare_value, T value, out T original_value)
 {
-    __intrinsic_asm "($3 = atomicCompSwap($A, $1, $2))";
+    __intrinsic_asm "($3 = $atomicCompSwap($A, $1, $2))";
 }
 
 __generic<T>
@@ -9106,7 +9106,7 @@ __generic<T>
 [require(hlsl)]
 void __hlslInterlocked_compare_exchange(__ref T dest, __ref T compare_value, T value)
 {
-    __intrinsic_asm "InterlockedCompareExchange($0, $1, $2))";
+    __intrinsic_asm "InterlockedCompareExchange";
 }
 
 __generic<T>
@@ -9114,7 +9114,7 @@ __generic<T>
 [require(hlsl)]
 void __hlslInterlocked_compare_exchange(__ref T dest, T compare_value, T value, out T original_value)
 {
-    __intrinsic_asm "InterlockedCompareExchange($0, $1, $2, $3)";
+    __intrinsic_asm "InterlockedCompareExchange";
 }
 
 __generic<T>
