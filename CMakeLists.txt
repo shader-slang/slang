@@ -554,6 +554,15 @@ if(SLANG_ENABLE_GFX)
 endif()
 
 #
+# Installing any documentation
+#
+
+file(GLOB_RECURSE docs CONFIGURE_DEPENDS docs/*.md)
+if(docs)
+    install(FILES ${docs} DESTINATION ${CMAKE_INSTALL_DOCDIR})
+endif()
+
+#
 # The test executables and runtime-loaded modules
 #
 if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENABLE_SLANGRT)
@@ -789,18 +798,4 @@ endif()
 #
 # Packaging
 #
-set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
-set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE ON)
-install(FILES
-  "${slang_SOURCE_DIR}/README.md"
-  "${slang_SOURCE_DIR}/LICENSE"
-  DESTINATION .
-  COMPONENT metadata
-  EXCLUDE_FROM_ALL
-)
-install(DIRECTORY
-  "${slang_SOURCE_DIR}/docs/"
-  DESTINATION share/doc/slang
-)
-
 include(CPack)
