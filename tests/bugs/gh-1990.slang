@@ -28,7 +28,8 @@ struct StandardBSDF : IBSDF
 struct StandardMaterial : IMaterial
 {
     typedef StandardBSDF BSDF;
-    StandardBSDF setupBSDF() {
+    StandardBSDF setupBSDF()
+    {
         StandardBSDF g = StandardBSDF();
         return g;
     }

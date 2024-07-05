@@ -5,7 +5,8 @@
 
 namespace Slang
 {
-    bool metaOp(IRInst* inst) {
+    bool opIsMeta(IRInst* inst)
+    {
         switch (inst->getOp())
         {
         // These instructions only look at the parameter's type,
@@ -29,19 +30,13 @@ namespace Slang
 
     // Casting to IRUndefined is currently vacuous
     // (e.g. any IRInst can be cast to IRUndefined)
-    bool undefinedValue(IRInst* inst) {
-        auto type = inst->getDataType();
-        if (!type)
-            return false;
-
-        if (type->getOp() == kIROp_VoidType)
-            return false;
-
-        // TODO: is this alone sufficient?
+    bool undefinedValue(IRInst* inst)
+    {
         return (inst->m_op == kIROp_undefined);
     }
 
-    bool undefinedOut(IRParam* param) {
+    bool undefinedOut(IRParam* param)
+    {
             auto outType = as<IROutType>(param->getFullType());
             if (!outType)
                 return false;
@@ -87,8 +82,10 @@ namespace Slang
         const UnownedStringSlice slice = toSlice("$__syn_");
 
         auto decoratorList = func->getDecorations();
-        for (auto head = decoratorList.first; head; head = head->next) {
-            if (auto name = as<IRNameHintDecoration>(head)) {
+        for (auto head = decoratorList.first; head; head = head->next)
+        {
+            if (auto name = as<IRNameHintDecoration>(head))
+            {
                 auto str = name->getName();
                 auto index = str.indexOf(slice);
                 if (index >= 0)
@@ -104,8 +101,10 @@ namespace Slang
         const UnownedStringSlice slice = toSlice("$init");
 
         auto decoratorList = func->getDecorations();
-        for (auto head = decoratorList.first; head; head = head->next) {
-            if (auto name = as<IRNameHintDecoration>(head)) {
+        for (auto head = decoratorList.first; head; head = head->next)
+        {
+            if (auto name = as<IRNameHintDecoration>(head))
+            {
                 auto str = name->getName();
                 auto index = str.indexOf(slice);
                 if (index >= 0)
@@ -119,10 +118,11 @@ namespace Slang
     List<IRInst*> concernableUsers(IRInst* inst)
     {
         List<IRInst*> users;
-        for (auto use = inst->firstUse; use; use = use->nextUse) {
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
             IRInst* user = use->getUser();
             // Meta instructions only use the argument type
-            if (!metaOp(user))
+            if (!opIsMeta(user))
                 users.add(user);
         }
 
@@ -136,8 +136,10 @@ namespace Slang
         auto users = concernableUsers(inst);
 
         addresses.add(inst);
-        for (auto user : users) {
-            if (aliasable(user)) {
+        for (auto user : users)
+        {
+            if (aliasable(user))
+            {
                 auto instAddresses = aliasableInstructions(user);
                 addresses.addRange(instAddresses);
             }
@@ -149,7 +151,7 @@ namespace Slang
     void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user)
     {
         // Meta intrinsics (which evaluate on type) do nothing
-        if (metaOp(user))
+        if (opIsMeta(user))
             return;
 
         // Ignore instructions generating more aliases
@@ -190,8 +192,10 @@ namespace Slang
     void cancelLoads(ReachabilityContext &reachability, const List<IRInst*>& stores, List<IRInst*>& loads)
     {
         // Remove all loads which are reachable from stores
-        for (auto store : stores) {
-            for (Index i = 0; i < loads.getCount(); ) {
+        for (auto store : stores)
+        {
+            for (Index i = 0; i < loads.getCount(); )
+            {
                 if (reachability.isInstReachable(store, loads[i]))
                     loads.fastRemoveAt(i);
                 else
@@ -209,16 +213,19 @@ namespace Slang
         List<IRInst*> stores;
         List<IRInst*> loads;
 
-        for (auto alias : addresses) {
+        for (auto alias : addresses)
+        {
             // TODO: Mark specific parts assigned to for partial initialization checks
-            for (auto use = alias->firstUse; use; use = use->nextUse) {
+            for (auto use = alias->firstUse; use; use = use->nextUse)
+            {
                 IRInst* user = use->getUser();
                 collectLoadStore(stores, loads, user);
             }
         }
 
         // Only for out params we shall add all returns
-        for (const auto& b : func->getBlocks()) {
+        for (const auto& b : func->getBlocks())
+        {
             auto t = as<IRReturn>(b->getTerminator());
             if (!t)
                 continue;
@@ -239,8 +246,10 @@ namespace Slang
         List<IRInst*> stores;
         List<IRInst*> loads;
 
-        for (auto alias : addresses) {
-            for (auto use = alias->firstUse; use; use = use->nextUse) {
+        for (auto alias : addresses)
+        {
+            for (auto use = alias->firstUse; use; use = use->nextUse)
+            {
                 IRInst* user = use->getUser();
                 collectLoadStore(stores, loads, user);
             }
@@ -270,12 +279,14 @@ namespace Slang
         ReachabilityContext reachability(func);
 
         // Check out parameters
-        for (auto param : firstBlock->getParams()) {
+        for (auto param : firstBlock->getParams())
+        {
             if (!undefinedOut(param))
                 continue;
 
             auto loads = checkForUsingOutParam(reachability, func, param);
-            for (auto load : loads) {
+            for (auto load : loads)
+            {
                 sink->diagnose(load,
                         as <IRReturn> (load)
                         ? Diagnostics::returningWithUninitializedOut
@@ -285,12 +296,14 @@ namespace Slang
         }
 
         // Check ordinary instructions
-        for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->getNextInst()) {
+        for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->getNextInst())
+        {
             if (!undefinedValue(inst))
                 continue;
 
             auto loads = checkForUsingUndefinedValue(reachability, inst);
-            for (auto load : loads) {
+            for (auto load : loads)
+            {
                 sink->diagnose(load,
                         as <IRReturn> (load)
                         ? Diagnostics::returningWithUninitializedValue
@@ -302,10 +315,14 @@ namespace Slang
 
     void checkForUsingUninitializedValues(IRModule* module, DiagnosticSink* sink)
     {
-        for (auto inst : module->getGlobalInsts()) {
-            if (auto func = as<IRFunc>(inst)) {
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (auto func = as<IRFunc>(inst))
+            {
                 checkForUsingUninitializedValues(func, sink);
-            } else if (auto generic = as<IRGeneric>(inst)) {
+            }
+            else if (auto generic = as<IRGeneric>(inst))
+            {
                 auto retVal = findGenericReturnVal(generic);
                 if (auto funcVal = as<IRFunc>(retVal))
                     checkForUsingUninitializedValues(funcVal, sink);
