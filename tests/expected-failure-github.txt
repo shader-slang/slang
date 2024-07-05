@@ -1,4 +1,3 @@
-tests/cpu-program/gfx-smoke.slang (cpu)
 tests/language-feature/spirv-asm/imageoperands-warning.slang (vk)
 tests/language-feature/saturated-cooperation/simple.slang (vk)
 tests/language-feature/saturated-cooperation/fuse3.slang (vk)
