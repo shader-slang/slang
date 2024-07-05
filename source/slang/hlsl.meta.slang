@@ -8848,7 +8848,7 @@ ${{{{
             static_assert(T is int || T is uint, "__metalImageInterlocked only allows 'int'/'uint' textures");
             static_assert(Coord is uint || Coord is vector<uint,2> || Coord is vector<uint,3> || Coord is vector<uint,4>,
                     "__metalImageInterlocked implementation only allows 'uint' coordinates");
-            __intrinsic_asm "(*$(threeParamsOutputParamASMString) = ($0.atomic_fetch_$(atomicOperation)($(threeParamsASMString))[0]))";
+            original_value = __metalImageInterlocked_$(atomicOperation)(tex, $(coordFetchString), value)[0];
         }
 ${{{{
     } // atomicOperation
@@ -8872,7 +8872,7 @@ ${{{{
         static_assert(T is int || T is uint, "Metal atomic texture operations only allow 'int'/'uint' textures");
         static_assert(Coord is uint || Coord is vector<uint,2> || Coord is vector<uint,3> || Coord is vector<uint,4>,
                     "__metalImageInterlocked implementation only allows 'uint' coordinates");
-        __intrinsic_asm "(*$(threeParamsOutputParamASMString) = ($0.atomic_exchange($(threeParamsASMString))[0])";
+        original_value = __metalImageInterlocked_exchange(tex, $(coordFetchString), value)[0];
     }
 
     __generic<TextureType, T, Coord>
@@ -8995,7 +8995,7 @@ __generic<AtomicType, T>
 [require(metal)]
 void __metalInterlocked_exchange(AtomicType dest, T value)
 {
-    __intrinsic_asm "(($0)(atomic_exchange_explicit($0, $1, memory_order_relaxed)))";
+    __intrinsic_asm "(($[0])(atomic_exchange_explicit($0, $1, memory_order_relaxed)))";
 }
 
 __generic<AtomicType, T>
@@ -9003,7 +9003,7 @@ __generic<AtomicType, T>
 [require(metal)]
 void __metalInterlocked_exchange(AtomicType dest, T value, out T original_value)
 {
-    __intrinsic_asm "((*($2)) = (($0)(atomic_exchange_explicit($0, $1, memory_order_relaxed))))";
+    __intrinsic_asm "((*($2)) = (($[0])(atomic_exchange_explicit($0, $1, memory_order_relaxed))))", T;
 }
 
 __generic<T>
@@ -9070,6 +9070,7 @@ void __metalInterlocked_compare_exchange(AtomicType dest, T compare_value, T val
 }
 
 __generic<T>
+__glsl_version(430)
 [ForceInline]
 [require(cuda)]
 void __cudaInterlocked_compare_exchange(__ref T dest, __ref T compare_value, T value)
@@ -9137,7 +9138,7 @@ void __hlslInterlocked_compare_exchange_float_bitwise(__ref T dest, T compare_va
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
 void InterlockedAdd(__ref  int dest,  int value)
-{   
+{
     static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
     __target_switch
     {
