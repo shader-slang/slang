@@ -16,7 +16,7 @@ namespace Slang
         
         builder.setInsertBefore(storeInst);
         auto getElementPtr = as<IRGetElementPtr>(storeInst->getOperand(0));
-        IRImageSubscript* imageSubscript = as<IRImageSubscript>(getRootAddr(storeInst));
+        IRImageSubscript* imageSubscript = as<IRImageSubscript>(getRootAddr(storeInst->getOperand(0)));
         SLANG_ASSERT(imageSubscript);
         SLANG_ASSERT(imageSubscript->getImage());
         IRTextureType* textureType = as<IRTextureType>(imageSubscript->getImage()->getFullType());
