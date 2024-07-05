@@ -8802,7 +8802,6 @@ for (bool isArray : {false, true})
     coordFetchBuilder << "coord";
     
     threeParamsASMBuilder << "$1, $2";
-    threeParamsOutputParamASMBuilder << "$1, $2";
 
     fourParamsASMBuilder << "$1, $2, $3";
     if(isArray)
