@@ -21,7 +21,7 @@ jobs:
           # Exclude invalid or undesired os/compiler
           - { os: linux, compiler: cl }
           - { os: macos, compiler: cl }
-          # - { os: macos, compiler: gcc }
+          - { os: macos, compiler: gcc }
           - { os: windows, compiler: gcc }
           - { os: windows, compiler: clang }
           # or os/config combinations
@@ -29,7 +29,7 @@ jobs:
           # Default to x64, but aarch64 on osx
           - { os: linux, platform: aarch64 }
           - { os: windows, platform: aarch64 }
-          # - { os: macos, platform: x64 }
+          - { os: macos, platform: x64 }
         include:
           - { os: linux, runs-on: ubuntu-20.04 }
           - { os: windows, runs-on: windows-latest }
