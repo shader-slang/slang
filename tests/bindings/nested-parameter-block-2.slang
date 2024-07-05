@@ -37,6 +37,10 @@ ParameterBlock<MyBuffer> pb2;
 [numthreads(4,1,1)]
 void computeMain(uint3 sv_dispatchThreadID : SV_DispatchThreadID)
 {
-    // CHECK: 4
+    // CHECK: type: uint32_t
+    // CHECK-NEXT: 4
+    // CHECK-NEXT: 4
+    // CHECK-NEXT: 4
+    // CHECK-NEXT: 4
     pb2.resultBuffer[sv_dispatchThreadID.x] = scene.sceneCb.value.x + scene.data[0].x + scene.material.cb.value.x + scene.material.data[0].x;
 }
