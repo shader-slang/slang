@@ -70,7 +70,6 @@ namespace Slang
         case kIROp_FieldAddress:
         case kIROp_GetElement:
         case kIROp_GetElementPtr:
-            // TODO: array index
             return true;
         default:
             break;
@@ -104,12 +103,13 @@ namespace Slang
         if (as<IRVoidType>(type))
             return true;
 
-        if (as<IRBoolType>(type))
-            return true;
-
         // For structs, ignore if its empty
         if (as<IRStructType>(type))
             return (type->getFirstChild() == nullptr);
+
+        // Nothing to initialize for a pure interface
+        if (as<IRInterfaceType>(type))
+            return true;
 
         return false;
     }
@@ -180,6 +180,12 @@ namespace Slang
             // For SPIRV asm instructions, need to check out the entire
             // block when doing reachability checks
             stores.add(user->getParent());
+            break;
+
+        case kIROp_MakeExistential:
+        case kIROp_MakeExistentialWithRTTI:
+            // For specializing generic structs
+            stores.add(user);
             break;
 
         // ... and the rest will load/use them

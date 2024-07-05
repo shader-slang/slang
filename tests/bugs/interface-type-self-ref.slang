@@ -27,6 +27,6 @@ int f(IFoo p)
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
-    Impl impl = Impl();
+    Impl impl;
     outputBuffer[index] = f(impl);
 }

@@ -67,7 +67,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
    
     // Err.. even though IGetE doesn't require an instanciation, not clear how to set it. So lets try with instanciation
-    B b = B();
+    B b;
     IGetE g = b;
 
     let e = g.getE();

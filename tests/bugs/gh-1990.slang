@@ -28,11 +28,7 @@ struct StandardBSDF : IBSDF
 struct StandardMaterial : IMaterial
 {
     typedef StandardBSDF BSDF;
-    StandardBSDF setupBSDF()
-    {
-        StandardBSDF g = StandardBSDF();
-        return g;
-    }
+    StandardBSDF setupBSDF() { StandardBSDF g; return g; }
 };
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=gOutputBuffer
