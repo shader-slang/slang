@@ -62,7 +62,7 @@ jobs:
         cmake --workflow --preset "${{matrix.config}}"
     - name: Copy Slang to Falcor
       run: |
-        cp --recursive --target-directory ./FalcorBin/build/windows-vs2022/bin/Release build/Release/bin/*
+        cp --verbose --recursive --target-directory ./FalcorBin/build/windows-vs2022/bin/Release build/Release/bin/*
     - name: falcor-unit-test
       shell: pwsh
       run: |
