@@ -10,51 +10,15 @@
 
 namespace Slang
 {
-    IRImageSubscript* getImageSubscriptFromInst(IRInst* inst)
-    {
-        IRImageSubscript* imageSubscript = nullptr;
-        auto getElementPtr = as<IRGetElementPtr>(inst->getOperand(0));
-        if (getElementPtr)
-            imageSubscript = as<IRImageSubscript>(getElementPtr->getBase());
-        else
-            imageSubscript = as<IRImageSubscript>(inst->getOperand(0));
-        SLANG_ASSERT(imageSubscript);
-        SLANG_ASSERT(imageSubscript->getImage());
-        return imageSubscript;
-    }
-    void legalizeExtractTextureFromTextureAccess(IRBuilder& builder, IRInst* inst)
-    {
-        SLANG_ASSERT(inst);
-
-        builder.setInsertBefore(inst);
-        IRImageSubscript* imageSubscript = getImageSubscriptFromInst(inst);
-        inst->replaceUsesWith(imageSubscript->getImage());
-        inst->removeAndDeallocate();
-        // Ensure we are done processing the imageSubscript before we remove it
-        if (!imageSubscript->hasUses())
-            imageSubscript->removeAndDeallocate();
-    }
-
-    void legalizeExtractCoordFromTextureAccess(IRBuilder& builder, IRInst* inst)
-    {
-        SLANG_ASSERT(inst);
-
-        builder.setInsertBefore(inst);
-        IRImageSubscript* imageSubscript = getImageSubscriptFromInst(inst);
-        inst->replaceUsesWith(builder.emitCast(builder.getUIntType(), imageSubscript->getCoord()));
-        inst->removeAndDeallocate();
-        // Ensure we are done processing the imageSubscript before we remove it
-        if (!imageSubscript->hasUses())
-            imageSubscript->removeAndDeallocate();
-    }
-    
     void legalizeStore(TargetRequest* target, IRBuilder& builder, IRInst* storeInst, DiagnosticSink* sink)
     {
         SLANG_ASSERT(storeInst);
         
         builder.setInsertBefore(storeInst);
         auto getElementPtr = as<IRGetElementPtr>(storeInst->getOperand(0));
-        IRImageSubscript* imageSubscript = getImageSubscriptFromInst(storeInst);
+        IRImageSubscript* imageSubscript = as<IRImageSubscript>(getRootAddr(storeInst));
+        SLANG_ASSERT(imageSubscript);
+        SLANG_ASSERT(imageSubscript->getImage());
         IRTextureType* textureType = as<IRTextureType>(imageSubscript->getImage()->getFullType());
         SLANG_ASSERT(textureType);
         auto imageElementType = cast<IRPtrTypeBase>(imageSubscript->getDataType())->getValueType();
@@ -216,17 +180,9 @@ namespace Slang
                     next = inst->getNextInst();
                     switch (inst->getOp())
                     {
-                    case kIROp_ExtractCoordFromTextureAccess:
-                        if (getRootAddr(inst->getOperand(0))->getOp() == kIROp_ImageSubscript)
-                            legalizeExtractCoordFromTextureAccess(builder, inst);
-                        continue;
-                    case kIROp_ExtractTextureFromTextureAccess:
-                        if (getRootAddr(inst->getOperand(0))->getOp() == kIROp_ImageSubscript)
-                            legalizeExtractTextureFromTextureAccess(builder, inst);
-                        continue;
                     case kIROp_Store:
                     case kIROp_SwizzledStore:
-                        if (getRootAddr(inst->getOperand(0))->getOp() == kIROp_ImageSubscript)
+                        if (as<IRImageSubscript>(getRootAddr(inst->getOperand(0))))
                             legalizeStore(target, builder, inst, sink);
                         continue;
                     }

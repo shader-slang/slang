@@ -50,6 +50,7 @@
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-legalize-extract-from-texture-access.h"
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-is-texture-access.h"
 #include "slang-ir-legalize-vector-types.h"
@@ -790,10 +791,6 @@ Result linkAndOptimizeIR(
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     performForceInlining(irModule);
 
-    // Legalize `__isTextureAccess` checks.
-    if(isMetalTarget(targetRequest))
-        legalizeIsTextureAccess(irModule);
-
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
     // will run a DCE pass to clean up after the specialization.
@@ -911,6 +908,9 @@ Result linkAndOptimizeIR(
     }
 
     legalizeVectorTypes(irModule, sink);
+
+    // Legalize `__isTextureAccess` and related.
+    legalizeIsTextureAccess(irModule);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
@@ -1158,6 +1158,8 @@ Result linkAndOptimizeIR(
     // Legalize non struct parameters that are expected to be structs for HLSL. 
     if(isD3DTarget(targetRequest))
         legalizeNonStructParameterToStructForHLSL(irModule);
+
+    legalizeExtractFromTextureAccess(irModule);
 
     // Legalize `ImageSubscript` loads.
     switch (target)

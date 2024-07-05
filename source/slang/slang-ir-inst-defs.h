@@ -688,8 +688,11 @@ INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
 INST(MetalAtomicCast, MetalAtomicCast, 1, 0)
 
 INST(IsTextureAccess, IsTextureAccess, 1, 0)
+INST(IsTextureScalarAccess, IsTextureScalarAccess, 1, 0)
+INST(IsTextureArrayAccess, IsTextureArrayAccess, 1, 0)
 INST(ExtractTextureFromTextureAccess, ExtractTextureFromTextureAccess, 1, 0)
 INST(ExtractCoordFromTextureAccess, ExtractCoordFromTextureAccess, 1, 0)
+INST(ExtractArrayCoordFromTextureAccess, ExtractArrayCoordFromTextureAccess, 1, 0)
 
 INST(MakeArrayList, makeArrayList, 0, 0)
 INST(MakeTensorView, makeTensorView, 0, 0)

@@ -422,6 +422,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-insts.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-layout.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-array-return-type.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-extract-from-texture-access.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-image-subscript.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-is-texture-access.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-mesh-outputs.h" />
@@ -667,6 +668,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-insert-debug-value-store.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-layout.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-array-return-type.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-extract-from-texture-access.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-image-subscript.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-is-texture-access.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-mesh-outputs.cpp" />
