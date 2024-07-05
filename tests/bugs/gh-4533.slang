@@ -16,5 +16,5 @@ RWStructuredBuffer<uint> outputBuffer;
 void computeMain(uint tid : SV_GroupIndex)
 {
     vector<float,1> k = float1(tid);
-    outputBuffer[tid] = all(k) && any(k) && bool(asint(k)) && bool(asuint(k));
+    outputBuffer[tid] = all(k) && any(k) && bool(asint(k)) && bool(asuint(k)) && bool(sign(k));
 }
