@@ -15,17 +15,19 @@ RWStructuredBuffer<uint> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint tid : SV_GroupIndex)
 {
-    bool a, b, c;
-    c = and(a, b);
+    bool K = (bool)outputBuffer[tid];
 
-    bool1 i, j, k;
-    bool2 l, m, n;
-    bool3 o, p, q;
-    bool4 r, s, t;
-    k = and(i, j);
-    n = and(m, l);
-    q = and(o, p);
-    t = and(r, s);
+    bool c = and(K, K);
+
+    bool1 K1 = K;
+    bool2 K2 = K;
+    bool3 K3 = K;
+    bool4 K4 = K;
+
+    bool1 k = and(K, K);
+    bool2 n = and(K, K);
+    bool3 q = and(K, K);
+    bool4 t = and(K, K);
 
     k = !and(k, false);
     n = !and(n, false);
