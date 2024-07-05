@@ -5,7 +5,7 @@
 
 namespace Slang
 {
-    bool opIsMeta(IRInst* inst)
+    bool isMetaOp(IRInst* inst)
     {
         switch (inst->getOp())
         {
@@ -30,12 +30,12 @@ namespace Slang
 
     // Casting to IRUndefined is currently vacuous
     // (e.g. any IRInst can be cast to IRUndefined)
-    bool undefinedValue(IRInst* inst)
+    bool isUndefinedValue(IRInst* inst)
     {
         return (inst->m_op == kIROp_undefined);
     }
 
-    bool undefinedOut(IRParam* param)
+    bool isUndefinedParam(IRParam* param)
     {
             auto outType = as<IROutType>(param->getFullType());
             if (!outType)
@@ -61,7 +61,7 @@ namespace Slang
             return true;
     }
 
-    bool aliasable(IRInst* inst)
+    bool isAliasable(IRInst* inst)
     {
         switch (inst->getOp())
         {
@@ -77,70 +77,42 @@ namespace Slang
         return false;
     }
 
-    bool synthesized(IRFunc* func)
+    bool isDefaultConstructable(IRType* type)
     {
-        const UnownedStringSlice slice = toSlice("$__syn_");
-
-        auto decoratorList = func->getDecorations();
-        for (auto head = decoratorList.first; head; head = head->next)
-        {
-            if (auto name = as<IRNameHintDecoration>(head))
-            {
-                auto str = name->getName();
-                auto index = str.indexOf(slice);
-                if (index >= 0)
-                    return true;
-            }
-        }
+        // If there are no fields, there is no risk
+        // TODO: check for primitive types?
+        if (type->getFirstChild() == nullptr)
+            return true;
 
         return false;
     }
 
-    bool constructor(IRFunc* func)
-    {
-        const UnownedStringSlice slice = toSlice("$init");
-
-        auto decoratorList = func->getDecorations();
-        for (auto head = decoratorList.first; head; head = head->next)
-        {
-            if (auto name = as<IRNameHintDecoration>(head))
-            {
-                auto str = name->getName();
-                auto index = str.indexOf(slice);
-                if (index >= 0)
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
-    List<IRInst*> concernableUsers(IRInst* inst)
+    List<IRInst*> getConcernableUsers(IRInst* inst)
     {
         List<IRInst*> users;
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
             IRInst* user = use->getUser();
             // Meta instructions only use the argument type
-            if (!opIsMeta(user))
+            if (!isMetaOp(user))
                 users.add(user);
         }
 
         return users;
     }
 
-    List<IRInst*> aliasableInstructions(IRInst* inst)
+    List<IRInst*> getAliasableInstructions(IRInst* inst)
     {
         List<IRInst*> addresses;
 
-        auto users = concernableUsers(inst);
+        auto users = getConcernableUsers(inst);
 
         addresses.add(inst);
         for (auto user : users)
         {
-            if (aliasable(user))
+            if (isAliasable(user))
             {
-                auto instAddresses = aliasableInstructions(user);
+                auto instAddresses = getAliasableInstructions(user);
                 addresses.addRange(instAddresses);
             }
         }
@@ -151,11 +123,11 @@ namespace Slang
     void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user)
     {
         // Meta intrinsics (which evaluate on type) do nothing
-        if (opIsMeta(user))
+        if (isMetaOp(user))
             return;
 
         // Ignore instructions generating more aliases
-        if (aliasable(user))
+        if (isAliasable(user))
             return;
 
         switch (user->getOp())
@@ -207,7 +179,7 @@ namespace Slang
     List<IRInst*> checkForUsingOutParam(ReachabilityContext &reachability, IRFunc* func, IRInst* inst)
     {
         // Collect all aliasable addresses
-        auto addresses = aliasableInstructions(inst);
+        auto addresses = getAliasableInstructions(inst);
 
         // Partition instructions
         List<IRInst*> stores;
@@ -240,7 +212,7 @@ namespace Slang
 
     List<IRInst*> checkForUsingUndefinedValue(ReachabilityContext &reachability, IRInst* inst)
     {
-        auto addresses = aliasableInstructions(inst);
+        auto addresses = getAliasableInstructions(inst);
 
         // Partition instructions
         List<IRInst*> stores;
@@ -265,12 +237,12 @@ namespace Slang
         // Skip synthesized functions; this includes those generated from autodiff.
         // We shall trust that synthesized functions are aware that they may be using
         // undefined values.
-        if (synthesized(func))
-            return;
+        // if (isSynthesized(func))
+        //     return;
 
         // Also skip for constructors; can add more complex diagnosis for such cases later
-        if (constructor(func))
-            return;
+        // if (isConstructor(func))
+        //     return;
 
         auto firstBlock = func->getFirstBlock();
         if (!firstBlock)
@@ -281,7 +253,7 @@ namespace Slang
         // Check out parameters
         for (auto param : firstBlock->getParams())
         {
-            if (!undefinedOut(param))
+            if (!isUndefinedParam(param))
                 continue;
 
             auto loads = checkForUsingOutParam(reachability, func, param);
@@ -298,8 +270,12 @@ namespace Slang
         // Check ordinary instructions
         for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->getNextInst())
         {
-            if (!undefinedValue(inst))
+            if (!isUndefinedValue(inst))
                 continue;
+
+            IRType* type = inst->getFullType();
+            if (isDefaultConstructable(type))
+               continue;
 
             auto loads = checkForUsingUndefinedValue(reachability, inst);
             for (auto load : loads)

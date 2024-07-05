@@ -30,7 +30,7 @@ float use(IFoo o, float x)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    B b = B();
+    B b;
     var p = diffPair(1.0);
     __bwd_diff(use)(b, p, 1.0);
     outputBuffer[0] = p.d;

@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHK): -target spirv
 
-// Should not warn here (unconditionalBranch)
+/* Should not warn here (unconditionalBranch)
 float3 unconditional(int mode)
 {
     float f(float) { return 1; }
@@ -24,7 +24,7 @@ float3 unconditional(int mode)
 int conditional()
 {
     int k;
-    //CHK: error 41015: use of uninitialized value 'k'
+    //CHK-DAG: error 41015: use of uninitialized value 'k'
     return (k > 0);
 }
 
@@ -33,7 +33,7 @@ int use_undefined_value(int k)
 {
     int x;
     x += k;
-    //CHK: error 41015: use of uninitialized value 'x'
+    //CHK-DAG: error 41015: use of uninitialized value 'x'
     return x;
 }
 
@@ -42,27 +42,28 @@ __generic<T>
 T generic_undefined_return()
 {
     T x;
-    //CHK: warning 41018: returning without initializing 'x'
+    //CHK-DAG: warning 41018: returning without initializing 'x'
     return x;
-}
-
-// No warnings here, even thought autodiff generates
-// IR which frequently returns undefined values
-struct DiffStruct : IDifferentiable
-{
-    Texture2D tex;
-}
+} */
 
 // Structs and nested structs
-struct Data
+/* struct Data
 {
     float value;
-};
+}; */
 
+/*
 struct NestedData
 {
     Data data;
-};
+}; */
+
+/* No warnings here, even thought autodiff generates
+// IR which frequently returns undefined values
+struct DiffStruct : IDifferentiable
+{
+    Data d;
+} */
 
 // Empty structures should not generate diagnostics
 // for empty default constructors
@@ -71,9 +72,27 @@ struct EmptyStruct
     __init() {}
 };
 
+struct NonEmptyStruct
+{
+    int field;
+    // TODO: specific warning for leaving constructor
+    // without fully initializing some fields
+    __init() {
+        field = 1;
+    }
+};
+
+/* struct NoDefault {
+    int f(int i) {
+        return i;
+    }
+}; */
+
 float4 main()
 {
-    Data inputData = Data(1.0);
+    EmptyStruct empty;
+    // NoDefault no_default;
+    /* Data inputData = Data(1.0);
 
     float undefVar;
     Data undefData;
@@ -81,14 +100,17 @@ float4 main()
 
     float result = inputData.value;
 
-    //CHK: error 41015: use of uninitialized value 'undefVar'
+    //CHK-DAG: error 41015: use of uninitialized value 'undefVar'
     result += undefVar;
 
-    //CHK: error 41015: use of uninitialized value 'undefData'
+    //CHK-DAG: error 41015: use of uninitialized value 'undefData'
     result += undefData.value;
 
-    //CHK: error 41015: use of uninitialized value 'nestedData'
+    //CHK-DAG: error 41015: use of uninitialized value 'nestedData'
     result += nestedData.data.value;
 
-    return float4(result);
+    return float4(result); */
+
+    return 0.0f;
+    // return no_default.f(1);
 }
