@@ -66,9 +66,10 @@ namespace Slang
         switch (inst->getOp())
         {
         // These instructions generate (implicit) references to inst
-        case kIROp_GetElementPtr:
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:
+        case kIROp_GetElement:
+        case kIROp_GetElementPtr:
             // TODO: array index
             return true;
         default:
@@ -98,11 +99,19 @@ namespace Slang
         return false;
     }
 
-    static bool isDefaultConstructable(IRType* type)
+    static bool canIgnoreType(IRType* type)
     {
-        // If there are no fields in the struct, there is no risk
-        return (type->getFirstChild() == nullptr)
-            && (as<IRStructType>(type));
+        if (as<IRVoidType>(type))
+            return true;
+
+        if (as<IRBoolType>(type))
+            return true;
+
+        // For structs, ignore if its empty
+        if (as<IRStructType>(type))
+            return (type->getFirstChild() == nullptr);
+
+        return false;
     }
 
     static List<IRInst*> getConcernableUsers(IRInst* inst)
@@ -158,7 +167,8 @@ namespace Slang
         // These instructions will store data...
         case kIROp_Store:
         case kIROp_SwizzledStore:
-            // TODO: for calls, should make check that the function is passing as an out param
+            // TODO: for calls, should make check that the
+            // function is passing as an out param
         case kIROp_Call:
         case kIROp_SPIRVAsm:
         case kIROp_GenericAsm:
@@ -285,7 +295,7 @@ namespace Slang
                 continue;
 
             IRType* type = inst->getFullType();
-            if (isDefaultConstructable(type))
+            if (canIgnoreType(type))
                continue;
 
             auto loads = checkForUsingUndefinedValue(reachability, inst);

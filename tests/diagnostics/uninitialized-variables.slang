@@ -46,6 +46,21 @@ T generic_undefined_return()
     return x;
 }
 
+// Array variables
+float undefined_array()
+{
+    float array[2];
+    //CHK-DAG: warning 41018: returning without initializing 'array'
+    return array[0];
+}
+
+float filled_array(int mode)
+{
+    float array[2];
+    array[0] = 1.0f;
+    return array[0];
+}
+
 // Structs and nested structs
 struct Data
 {
