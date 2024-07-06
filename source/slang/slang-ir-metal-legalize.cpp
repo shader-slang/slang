@@ -198,7 +198,7 @@ namespace Slang
                     NestedFragment p3 : SV_TARGET2;
                 };
 
-                // Legalized without flattening
+                // Legalized without flattening -- abandoned
                 struct NestedFragment1
                 {
                     float2 p3 : SV_TARGET1; 
@@ -238,7 +238,7 @@ namespace Slang
                 if (auto structType = as<IRStructType>(param->getDataType()))
                 {
                     IRBuilder builder(func);
-                    Dictionary<IRStructField*, IRStructField*> mapOldFieldToNewField;
+                    MapStructToFlatStruct mapOldFieldToNewField;
                     
                     // Flatten struct if we have nested IRStructType
                     auto flattenedStruct = maybeFlattenNestedStructs(builder, structType, mapOldFieldToNewField, semanticInfoToRemove);
@@ -257,7 +257,7 @@ namespace Slang
                         param->replaceUsesWith(dstLoad);
                         builder.setInsertBefore(dstLoad);
                         // Copy the 'new IRParam type' to our 'old IRParam type'
-                        transformStructValue<(int)TransformStructValueOptions::FlatStructIntoStruct>(builder, dstVal, param, mapOldFieldToNewField);
+                        mapOldFieldToNewField.emitCopy<(int)MapStructToFlatStruct::CopyOptions::FlatStructIntoStruct>(builder, dstVal, param);
 
                         modified = true;
                     }
@@ -659,11 +659,190 @@ namespace Slang
             }
         }
 
+        // Stores a hicharchy of members and children which map 'oldStruct->member' to 'flatStruct->member'
+        // Note: this map assumes we map to FlatStruct since it is easier/faster to process
+        struct MapStructToFlatStruct
+        {
+        /* 
+        We need a hicharchy map to resolve dependencies for mapping 
+        oldStruct to newStruct efficently. Example:
+        
+        MyStruct
+            |
+          / | \
+         /  |  \
+        /   |   \
+    M0<A> M1<A> M2<B>
+       |    |    |
+      A_0  A_0  B_0
+      
+      Without storing hicharchy information, there will be no way to tell apart
+      `myStruct.M0.A0` from `myStruct.M1.A0` since IRStructKey/IRStructField
+      only has 1 instance of `A::A0`
+      */
+
+        enum CopyOptions : int
+        {
+            // Copy a flattened-struct into a struct
+            FlatStructIntoStruct = 0,
+
+            // Copy a struct into a flattened-struct
+            StructIntoFlatStruct = 1,
+        };
+
+        private:
+            // Children of member if applicable.
+            Dictionary<IRStructField*, MapStructToFlatStruct> members;
+
+            // Field correlating to MapStructToFlatStruct Node.
+            IRInst* node;
+            IRStructKey* getKey()
+            {
+                SLANG_ASSERT(as<IRStructField>(node));
+                return as<IRStructField>(node)->getKey();
+            }
+            IRInst* getNode()
+            {
+                return node;
+            }
+            IRType* getFieldType()
+            {
+                SLANG_ASSERT(as<IRStructField>(node));
+                return as<IRStructField>(node)->getFieldType();
+            }
+
+            // Whom node maps to inside target flatStruct
+            IRStructField* targetMapping;
+
+            auto begin()
+            {
+                return members.begin();
+            }
+            auto end()
+            {
+                return members.end();
+            }
+
+            // Copies members of oldStruct to/from newFlatStruct. Assumes members of val1 maps to members in val2
+            // using `MapStructToFlatStruct`
+            template<int copyOptions>
+            static void _emitCopy(IRBuilder& builder, IRInst* val1, IRStructType* type1, IRInst* val2, IRStructType* type2, MapStructToFlatStruct& node)
+            {
+                for (auto& field1Pair : node)
+                {
+                    auto& field1 = field1Pair.second;
+
+                    // Get member of val1
+                    IRInst* fieldAddr1 = nullptr;
+                    if constexpr (copyOptions == (int)CopyOptions::FlatStructIntoStruct)
+                    {
+                        fieldAddr1 = builder.emitFieldAddress(type1, val1, field1.getKey());
+                    }
+                    else
+                    {
+                        if (as<IRPtrTypeBase>(val1))
+                            val1 = builder.emitLoad(val1);
+                        fieldAddr1 = builder.emitFieldExtract(type1, val1, field1.getKey());
+                    }
+
+                    // If val1 is a struct, recurse
+                    if (auto fieldAsStruct1 = as<IRStructType>(field1.getFieldType()))
+                    {
+                        _emitCopy<copyOptions>(builder, fieldAddr1, fieldAsStruct1, val2, type2, field1);
+                        continue;
+                    }
+
+                    // Get member of val2 which maps to val1.member
+                    auto field2 = field1.getMapping();
+                    SLANG_ASSERT(field2);
+                    IRInst* fieldAddr2 = nullptr;
+                    if constexpr (copyOptions == (int)CopyOptions::FlatStructIntoStruct)
+                    {
+                        if (as<IRPtrTypeBase>(val2))
+                            val2 = builder.emitLoad(val1);
+                        fieldAddr2 = builder.emitFieldExtract(type2, val2, field2->getKey());
+                    }
+                    else
+                    {
+                        fieldAddr2 = builder.emitFieldAddress(type2, val2, field2->getKey());
+                    }
+
+                    // Copy val2/val1 member into val1/val2 member
+                    if constexpr (copyOptions == (int)CopyOptions::FlatStructIntoStruct)
+                    {
+                        builder.emitStore(fieldAddr1, fieldAddr2);
+                    }
+                    else
+                    {
+                        builder.emitStore(fieldAddr2, fieldAddr1);
+                    }
+                }
+            }
+
+        public:
+            void setNode(IRInst* newNode)
+            {
+                node = newNode;
+            }
+            // Get 'MapStructToFlatStruct' that is a child of 'parent'.
+            // Make 'MapStructToFlatStruct' if no 'member' is currently mapped to 'parent'.
+            MapStructToFlatStruct& getMember(IRStructField* member)
+            {
+                return members[member];
+            }
+            MapStructToFlatStruct& operator[](IRStructField* member)
+            {
+                return getMember(member);
+            }
+
+            void setMapping(IRStructField* newTargetMapping)
+            {
+                targetMapping = newTargetMapping;
+            }
+            // Get 'MapStructToFlatStruct' that is a child of 'parent'.
+            // Return nullptr if no member is mapped to 'parent'
+            IRStructField* getMapping()
+            {
+                return targetMapping;
+            }
+
+            // Copies srcVal into dstVal using hicharchy map.
+            template<int copyOptions>
+            void emitCopy(IRBuilder& builder, IRInst* dstVal, IRInst* srcVal)
+            {
+                auto dstType = dstVal->getDataType();
+                if (auto dstPtrType = as<IRPtrTypeBase>(dstType))
+                    dstType = dstPtrType->getValueType();
+                auto dstStructType = as<IRStructType>(dstType);
+                SLANG_ASSERT(dstStructType);
+
+                auto srcType = srcVal->getDataType();
+                if (auto srcPtrType = as<IRPtrTypeBase>(srcType))
+                    srcType = srcPtrType->getValueType();
+                auto srcStructType = as<IRStructType>(srcType);
+                SLANG_ASSERT(srcStructType);
+
+                if constexpr (copyOptions == (int)CopyOptions::FlatStructIntoStruct)
+                {
+                    // CopyOptions::FlatStructIntoStruct copy a flattened-struct (mapped member) into a struct
+                    SLANG_ASSERT(node == dstStructType);
+                    _emitCopy<copyOptions>(builder, dstVal, dstStructType, srcVal, srcStructType, *this);
+                }
+                else
+                {
+                    // CopyOptions::StructIntoFlatStruct copy a struct into a flattened-struct
+                    SLANG_ASSERT(node == srcStructType);
+                    _emitCopy<copyOptions>(builder, srcVal, srcStructType, dstVal, dstStructType, *this);
+                }
+            }
+        };
+
         IRStructType* _flattenNestedStructs(IRBuilder& builder, IRStructType* dst, IRStructType* src, IRSemanticDecoration* parentSemanticDecoration,
-            IRLayoutDecoration* parentLayout, Dictionary<IRStructField*, IRStructField*>& mapFieldToField, HashSet<IRStructField*>& varsWithSemanticInfo)
+            IRLayoutDecoration* parentLayout, MapStructToFlatStruct& mapFieldToField, HashSet<IRStructField*>& varsWithSemanticInfo)
         {
             // For all fields ('oldField') of a struct do the following:
             // 1. Check for 'decorations which carry semantic info' (IRSemanticDecoration, IRLayoutDecoration), store these if found.
+            //  * Do not propagate semantic info if the current node has *any* form of semantic information.
             // Update varsWithSemanticInfo.
             // 2. If IRStructType:
             //  2a. Recurse this function with 'decorations that carry semantic info' from parent.
@@ -672,16 +851,26 @@ namespace Slang
             //  3b. Store a mapping from 'oldField' to 'newField' in 'mapFieldToField'. This info is needed to copy between types.
             for (auto oldField : src->getFields())
             {
+                auto& fieldMappingNode = mapFieldToField[oldField];
+                fieldMappingNode.setNode(oldField);
+
                 // step 1
+                bool foundSemanticDecor = false;
                 auto oldKey = oldField->getKey();
                 IRSemanticDecoration* fieldSemanticDecoration = parentSemanticDecoration;
                 if (auto oldSemanticDecoration = oldKey->findDecoration<IRSemanticDecoration>())
+                {
+                    foundSemanticDecor = true;
                     fieldSemanticDecoration = oldSemanticDecoration;
+                    parentLayout = nullptr;
+                }
 
                 IRLayoutDecoration* fieldLayout = parentLayout;
                 if (auto oldLayout = oldKey->findDecoration<IRLayoutDecoration>())
                 {
                     fieldLayout = oldLayout;
+                    if (!foundSemanticDecor)
+                        fieldSemanticDecoration = nullptr;
                 }
                 if (fieldSemanticDecoration != parentSemanticDecoration || parentLayout != fieldLayout)
                     varsWithSemanticInfo.add(oldField);
@@ -689,7 +878,7 @@ namespace Slang
                 // step 2a
                 if (auto structFieldType = as<IRStructType>(oldField->getFieldType()))
                 {
-                    _flattenNestedStructs(builder, dst, structFieldType, fieldSemanticDecoration, fieldLayout, mapFieldToField, varsWithSemanticInfo);
+                    _flattenNestedStructs(builder, dst, structFieldType, fieldSemanticDecoration, fieldLayout, fieldMappingNode, varsWithSemanticInfo);
                     continue;
                 }
 
@@ -718,15 +907,15 @@ namespace Slang
                     builder.addLayoutDecoration(newKey, newLayout);
                 }
                 // step 3b
-                mapFieldToField[oldField] = newField;
+                fieldMappingNode.setMapping(newField);
             }
 
             return dst;
         }
 
         // Returns a `IRStructType*` without any `IRStructType*` members. `src` may be returned if there was no struct flattening.
-        // @param mapFieldToField Behavior maps all `IRStructField` of `src` to the new struct's `IRStructFields`s
-        IRStructType* maybeFlattenNestedStructs(IRBuilder& builder, IRStructType* src, Dictionary<IRStructField*, IRStructField*>& mapFieldToField, HashSet<IRStructField*>& varsWithSemanticInfo)
+        // @param mapFieldToField Behavior maps all `IRStructField` of `src` to the new struct `IRStructFields`s
+        IRStructType* maybeFlattenNestedStructs(IRBuilder& builder, IRStructType* src, MapStructToFlatStruct& mapFieldToField, HashSet<IRStructField*>& varsWithSemanticInfo)
         {
             // Find all values inside struct that need flattening and legalization.
             bool hasStructTypeMembers = false;
@@ -748,9 +937,12 @@ namespace Slang
             builder.setInsertAfter(src);
             auto newStruct = builder.createStructType();
             copyNameHintAndDebugDecorations(newStruct, src);
+            mapFieldToField.setNode(src);
             return _flattenNestedStructs(builder, newStruct, src, nullptr, nullptr, mapFieldToField, varsWithSemanticInfo);
         }
 
+        // Replaces all 'IRReturn' by copying the current 'IRReturn' to a new var of type 'newType'.
+        // Copying logic from 'IRReturn' to 'newType' is controlled by 'copyLogicFunc' function.
         template<typename CopyLogicFunc>
         void _replaceAllReturnInst(IRBuilder& builder, IRFunc* targetFunc, IRStructType* newType, CopyLogicFunc copyLogicFunc)
         {
@@ -762,93 +954,6 @@ namespace Slang
                     auto returnVal = returnInst->getVal();
                     returnInst->setOperand(0, copyLogicFunc(builder, newType, returnVal));
                 }
-            }
-        }
-
-        enum class TransformStructValueOptions : int
-        {
-            // Copy a flattened-struct into a struct
-            FlatStructIntoStruct = 0,
-
-            // Copy a struct into a flattened-struct
-            StructIntoFlatStruct = 1,
-        };
-
-        // Copies members of structs. Assumes srcType and dstType map to each other with `mapSrcFieldToDstField`.
-        // Assumes val1 or val2 is a flat struct based on `FlatStructIntoStruct` and `StructIntoFlatStruct`
-        template<int transformStructValueOptions>
-        void _transformStructValue(IRBuilder& builder, IRInst* val1, IRStructType* type1, IRInst* val2, IRStructType* type2, Dictionary<IRStructField*, IRStructField*> mapFieldToField)
-        {
-            for (auto field1 : type1->getFields())
-            {
-                // Get member of val1
-                IRInst* fieldAddr1 = nullptr;
-                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::FlatStructIntoStruct)
-                {
-                    fieldAddr1 = builder.emitFieldAddress(type1, val1, field1->getKey());
-                }
-                else
-                {
-                    if (as<IRPtrTypeBase>(val1))
-                        val1 = builder.emitLoad(val1);
-                    fieldAddr1 = builder.emitFieldExtract(type1, val1, field1->getKey());
-                }
-
-                // If val1 is a struct, recurse
-                if (auto fieldAsStruct1 = as<IRStructType>(field1->getFieldType()))
-                {
-                    _transformStructValue<transformStructValueOptions>(builder, fieldAddr1, fieldAsStruct1, val2, type2, mapFieldToField);
-                    continue;
-                }
-
-                // Get member of val2 which maps to val1.member
-                auto field2 = mapFieldToField[field1];
-                IRInst* fieldAddr2 = nullptr;
-                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::FlatStructIntoStruct)
-                {
-                    if (as<IRPtrTypeBase>(val2))
-                        val2 = builder.emitLoad(val1);
-                    fieldAddr2 = builder.emitFieldExtract(type2, val2, field2->getKey());
-                }
-                else
-                {
-                    fieldAddr2 = builder.emitFieldAddress(type2, val2, field2->getKey());
-                }
-
-                // Copy val2/val1 member into val1/val2 member
-                if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::FlatStructIntoStruct)
-                {
-                    builder.emitStore(fieldAddr1, fieldAddr2);
-                }
-                else
-                {
-                    builder.emitStore(fieldAddr2, fieldAddr1);
-                }
-            }
-        }
-
-        // Copies srcVal into dstVal using `mapFieldToField` to map srcVal to dstVal.
-        template<int transformStructValueOptions>
-        void transformStructValue(IRBuilder& builder, IRInst* dstVal, IRInst* srcVal, Dictionary<IRStructField*, IRStructField*> mapFieldToField)
-        {
-            auto srcStructType = as<IRStructType>(srcVal->getDataType());
-            SLANG_ASSERT(srcStructType);
-
-            auto dstType = dstVal->getDataType();
-            if(auto dstPtrType = as<IRPtrTypeBase>(dstType))
-                dstType = dstPtrType->getValueType();
-            auto dstStructType = as<IRStructType>(dstType);
-            SLANG_ASSERT(dstStructType);
-
-            if constexpr (transformStructValueOptions == (int)TransformStructValueOptions::FlatStructIntoStruct)
-            {
-                // TransformStructValueOptions::FlatStructIntoStruct copy a flattened-struct into a struct
-                _transformStructValue<transformStructValueOptions>(builder, dstVal, dstStructType, srcVal, srcStructType, mapFieldToField);
-            }
-            else
-            {
-                // TransformStructValueOptions::StructIntoFlatStruct copy a struct into a flattened-struct
-                _transformStructValue<transformStructValueOptions>(builder, srcVal, srcStructType, dstVal, dstStructType, mapFieldToField);
             }
         }
 
@@ -982,6 +1087,9 @@ namespace Slang
             // Now if a second equal semantic "SV_TARGET1" is found, we add this decoration to
             // a list of 'overlapping semantic info decorations' so we can legalize this 
             // 'semantic info decoration' later.
+            //
+            // NOTE: this is a flat struct, all members are children of the initial
+            // IRStructType.
             for (auto field : structType->getFields())
             {
                 auto key = field->getKey();
@@ -1086,7 +1194,7 @@ namespace Slang
             if (auto returnStructType = as<IRStructType>(returnType))
             {
                 IRBuilder builder(func);
-                Dictionary<IRStructField*, IRStructField*> mapOldFieldToNewField;
+                MapStructToFlatStruct mapOldFieldToNewField;
                 // Flatten result struct type to ensure we do not have nested semantics
                 auto flattenedStruct = maybeFlattenNestedStructs(builder, returnStructType, mapOldFieldToNewField, semanticInfoToRemove);
                 if (returnStructType != flattenedStruct)
@@ -1098,7 +1206,7 @@ namespace Slang
                             auto srcStructType = as<IRStructType>(srcVal->getDataType());
                             SLANG_ASSERT(srcStructType);
                             auto dstVal = copyBuilder.emitVar(dstType);
-                            transformStructValue<(int)TransformStructValueOptions::StructIntoFlatStruct>(copyBuilder, dstVal, srcVal, mapOldFieldToNewField);
+                            mapOldFieldToNewField.emitCopy<(int)MapStructToFlatStruct::CopyOptions::StructIntoFlatStruct>(copyBuilder, dstVal, srcVal);
                             return builder.emitLoad(dstVal);
                         }
                     );
@@ -1311,7 +1419,7 @@ namespace Slang
             auto semanticName = String(sysValAttr->getName());
             auto sysAttrIndex = sysValAttr->getIndex();
 
-            return std::make_optional<SystemValLegalizationWorkItem>({ var, semanticName, sysAttrIndex });
+            return { { var, semanticName, sysAttrIndex } };
         }
 
 
@@ -1427,8 +1535,12 @@ namespace Slang
 
             if (!varTypeIsPermitted)
             {
-                // Note: we do not currently prefer vector<T,N> to vector<P,N>.
-                // vector<T,N> to vector<T,N-1> is equally preferred.
+                // Note: we do not currently prefer any conversion
+                // example:
+                // * allowed types for semantic: `float4`, `uint4`, `int4`
+                // * user used, `float2`
+                // * Slang will equally prefer `float4` to `uint4` to `int4`. 
+                //   This means the type may lose data if slang selects `uint4` or `int4`.
                 bool foundAConversion = false;
                 for (auto permittedType : info.permittedTypes)
                 {
