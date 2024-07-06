@@ -565,6 +565,7 @@ Result linkAndOptimizeIR(
 
     switch (target)
     {
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::PyTorchCppBinding:
     break;
