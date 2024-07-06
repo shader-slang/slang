@@ -126,7 +126,7 @@ public property uint3 gl_NumWorkGroups {
 public property uint3 gl_WorkGroupSize
 {
     [__unsafeForceInlineEarly]
-    [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+    [require(compute)]
     get
     {
         return WorkgroupSize();
@@ -1402,15 +1402,7 @@ __generic<let N:int>
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public vector<uint,N> bitCount(vector<uint,N> value)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitCount";
-    case spirv: return spirv_asm {
-        result:$$vector<uint,N> = OpBitCount $value
-    };
-    default:
-        VECTOR_MAP_UNARY(uint, N, countbits, value);
-    }
+    return countbits(value);
 }
 
 [__readNone] 
@@ -1636,8 +1628,6 @@ public typealias sampler2DMS = Sampler2DMS<float4>;
 public typealias isampler2DMS = Sampler2DMS<int4>;
 public typealias usampler2DMS = Sampler2DMS<uint4>;
 
-__generic<T=float4, let sampleCount:int=0, let format:int=0>
-public typealias Sampler2DMSArray = Sampler2DArrayMS<T, sampleCount, format>;
 public typealias sampler2DMSArray = Sampler2DMSArray<float4>;
 public typealias isampler2DMSArray = Sampler2DMSArray<int4>;
 public typealias usampler2DMSArray = Sampler2DMSArray<uint4>;
@@ -1900,6 +1890,7 @@ public vec2 textureQueryLod(__TextureImpl<
         __intrinsic_asm "textureQueryLod";
     case spirv:
         return spirv_asm {
+            OpCapability ImageQuery;
             result:$$float2 = OpImageQueryLod $sampler $p
         };
     default:
@@ -1932,6 +1923,7 @@ public vec2 textureQueryLod(__TextureImpl<
         __intrinsic_asm "textureQueryLod";
     case spirv:
         return spirv_asm {
+            OpCapability ImageQuery;
             result:$$float2 = OpImageQueryLod $sampler $p
         };
     default:
@@ -9566,20 +9558,7 @@ ${{{{
     [require(glsl_hlsl_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,0> subpass)
     {
-        __target_switch
-        {
-        case hlsl: return subpass.SubpassLoad();
-        case glsl: __intrinsic_asm "subpassLoad($0)";
-        case spirv:
-        {
-            let zeroVec = ivec2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $subpass $zeroVec
-            };
-        }
-        }
+        return subpass.SubpassLoad();
     }
     __generic<T>
     [__NoSideEffect]
@@ -9587,20 +9566,7 @@ ${{{{
     [require(glsl_hlsl_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,1> subpass, int sample)
     {
-        __target_switch
-        {
-        case hlsl: return subpass.SubpassLoad(sample);
-        case glsl: __intrinsic_asm "subpassLoad($0, $1)";
-        case spirv:
-        {
-            let zeroVec = ivec2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $subpass $zeroVec Sample $sample
-            };
-        }
-        }
+        return subpass.SubpassLoad(sample);
     }
 
 /// Section 8.19. Shader Invocation Group Functions

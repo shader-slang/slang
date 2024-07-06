@@ -51,6 +51,7 @@
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-vector-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
@@ -1175,14 +1176,28 @@ Result linkAndOptimizeIR(
     if(isD3DTarget(targetRequest))
         legalizeNonStructParameterToStructForHLSL(irModule);
 
-    // Legalize `ImageSubscript` and constant buffer loads for GLSL.
+    // Legalize `ImageSubscript` loads.
+    switch (target)
+    {
+    case CodeGenTarget::Metal:
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        {
+            legalizeImageSubscript(targetRequest, irModule, sink);
+        } 
+        break;
+    default:
+        break;
+    }
+
+    // Legalize constant buffer loads.
     switch (target)
     {
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         {
-            legalizeImageSubscriptForGLSL(irModule);
             legalizeConstantBufferLoadForGLSL(irModule);
             legalizeDispatchMeshPayloadForGLSL(irModule);
         }
@@ -1279,7 +1294,8 @@ Result linkAndOptimizeIR(
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
-    legalizeArrayReturnType(irModule);
+    if(!isMetalTarget(targetRequest))
+        legalizeArrayReturnType(irModule);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {

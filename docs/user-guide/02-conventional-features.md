@@ -144,6 +144,9 @@ struct MyData
 > #### Note ####
 > Slang allows for a trailing semicolon (`;`) on `struct` declarations, but does not require it.
 
+> #### Note ####
+> Unlike C/C++, `class` is not a valid keyword for GPU code and it is reserved for CPU/host side logic.
+
 Structure types can have constructors. Constructors are defined with the `__init` keyword:
 
 ```hlsl

@@ -166,6 +166,14 @@ newoption {
 }
 
 newoption {
+    trigger     = "enable-examples",
+    description = "(Optional) If true build the examples for slang.",
+    value       = "bool",
+    default     = "true",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
+newoption {
     trigger     = "disable-stdlib-source",
     description = "(Optional) If true stdlib source will not be included in binary.",
     value       = "bool",
@@ -254,6 +262,7 @@ enableOptix = not not (_OPTIONS["enable-optix"] == "true" or optixPath)
 enableProfile = (_OPTIONS["enable-profile"] == "true")
 enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
 enableXlib = (_OPTIONS["enable-xlib"] == "true")
+enableExamples = (_OPTIONS["enable-examples"] == "true")
 skipSourceGeneration = (_OPTIONS["skip-source-generation"] == "true")
 deployLLVM = (_OPTIONS["deploy-slang-llvm"] == "true")
 deployGLSLang = (_OPTIONS["deploy-slang-glslang"] == "true")
@@ -847,46 +856,46 @@ function generatorProject(name, sourcePath, projectKind)
     end
 end
 
---
--- With all of these helper routines defined, we can now define the
--- actual projects quite simply. For example, here is the entire
--- declaration of the "Hello, World" example project:
---
-example "hello-world"
-    kind "ConsoleApp"
-    includedirs {"external/vulkan/include"}
+-- Enable examples conditionally
+if enableExamples then
+    -- With all of these helper routines defined, we can now define the
+    -- actual projects quite simply. For example, here is the entire
+    -- declaration of the "Hello, World" example project:
+    example "hello-world"
+        kind "ConsoleApp"
+        includedirs {"external/vulkan/include"}
 
--- Note how we are calling our custom `example()` subroutine with
--- the same syntax sugar that Premake usually advocates for their
--- `project()` function. This allows us to treat `example` as
--- a kind of specialized "subclass" of `project`
---
+    -- Note how we are calling our custom `example()` subroutine with
+    -- the same syntax sugar that Premake usually advocates for their
+    -- `project()` function. This allows us to treat `example` as
+    -- a kind of specialized "subclass" of `project`
 
--- Let's go ahead and set up the projects for our other example now.
-example "platform-test"
+    -- Let's go ahead and set up the projects for our other example now.
+    example "platform-test"
 
-example "triangle"
+    example "triangle"
 
-example "ray-tracing"
-example "ray-tracing-pipeline"
+    example "ray-tracing"
+    example "ray-tracing-pipeline"
 
-example "autodiff-texture"
+    example "autodiff-texture"
 
-example "gpu-printing"
-    kind "ConsoleApp"
+    example "gpu-printing"
+        kind "ConsoleApp"
 
-example "shader-toy"
+    example "shader-toy"
 
-example "model-viewer"
+    example "model-viewer"
 
-example "shader-object"
-    kind "ConsoleApp"
+    example "shader-object"
+        kind "ConsoleApp"
 
-example "cpu-com-example"
-    kind "ConsoleApp"
+    example "cpu-com-example"
+        kind "ConsoleApp"
 
-example "cpu-hello-world"
-    kind "ConsoleApp"
+    example "cpu-hello-world"
+        kind "ConsoleApp"
+end
 
 if enableAftermath then
     example "nv-aftermath-example"

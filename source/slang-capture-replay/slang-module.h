@@ -7,6 +7,7 @@
 #include "../core/slang-smart-pointer.h"
 #include "../slang/slang-compiler.h"
 #include "slang-entrypoint.h"
+#include "capture-manager.h"
 
 namespace SlangCapture
 {
@@ -19,7 +20,7 @@ namespace SlangCapture
         SLANG_REF_OBJECT_IUNKNOWN_ALL
         ISlangUnknown* getInterface(const Guid& guid);
 
-        explicit ModuleCapture(slang::IModule* module);
+        explicit ModuleCapture(slang::IModule* module, CaptureManager* captureManager);
         ~ModuleCapture();
 
         // Interfaces for `IModule`
@@ -35,6 +36,9 @@ namespace SlangCapture
         virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() override;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL findAndCheckEntryPoint(
             char const* name, SlangStage stage, slang::IEntryPoint** outEntryPoint, ISlangBlob** outDiagnostics) override;
+        virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDependencyFileCount() override;
+        virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
+            SlangInt32 index) override;
 
         // Interfaces for `IComponentType`
         virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override;
@@ -84,6 +88,8 @@ namespace SlangCapture
     private:
         EntryPointCapture* getEntryPointCapture(slang::IEntryPoint* entryPoint);
         Slang::ComPtr<slang::IModule> m_actualModule;
+        uint64_t                      m_moduleHandle = 0;
+        CaptureManager*               m_captureManager = nullptr;
 
         // `IEntryPoint` can only be created from 'IModule', so we need to capture it in
         // this class, and create a map such that we don't create new `EntryPointCapture`

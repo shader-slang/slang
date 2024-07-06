@@ -345,6 +345,9 @@ inline bool isSPIRV(CodeGenTarget codeGenTarget)
             || codeGenTarget == CodeGenTarget::SPIRVAssembly;
 }
 
+int getIRVectorElementSize(IRType* type);
+IRType* getIRVectorBaseType(IRType* type);
+
 }
 
 #endif
