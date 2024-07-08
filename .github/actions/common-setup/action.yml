@@ -130,7 +130,8 @@ runs:
     # Put spirv-tools in path
     - shell: bash
       run: |
-        win_platform="${{inputs.platform/x86_64/x64}}"
+        win_platform="${{ inputs.platform }}"
+        win_platform="${win_platform//x86_64/x64}"
         case "${{inputs.os}}" in
           windows*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/windows-$win_platform/bin" >> "$GITHUB_PATH";;
           linux*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/$(uname -m)-linux/bin" >> "$GITHUB_PATH";;
