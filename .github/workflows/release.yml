@@ -11,7 +11,7 @@ jobs:
       matrix:
         os: [linux, macos, windows]
         config: [release]
-        platform: [x64, aarch64]
+        platform: [x86_64, aarch64]
         test-category: [smoke]
         include:
           - {os: linux, runs-on: ubuntu-20.04, compiler: gcc}
@@ -62,7 +62,7 @@ jobs:
           fi
           if [ "${{matrix.platform}}" = "aarch64" ]; then
             export CMAKE_OSX_ARCHITECTURES="-DCMAKE_OSX_ARCHITECTURES=arm64"
-          else if [ "${{matrix.platform}}" = "x64" ]; then
+          else if [ "${{matrix.platform}}" = "x86_64" ]; then
             export CMAKE_OSX_ARCHITECTURES="-DCMAKE_OSX_ARCHITECTURES=x86_64"
           fi
 
@@ -163,7 +163,6 @@ jobs:
           version=${triggering_ref#v}
           os_name=${{ matrix.os }}
           arch_name=${{ matrix.platform }}
-          arch_name=${arch_name/x64/x86_64}
           base=$(pwd)/slang-${version}-${os_name}-${arch_name}
 
           mv "$(pwd)/build/dist-${config}/slang.zip" "${base}.zip"
