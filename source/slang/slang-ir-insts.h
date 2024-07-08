@@ -1292,12 +1292,6 @@ struct IRGetSequentialID : IRInst
     IRInst* getRTTIOperand() { return getOperand(0); }
 };
 
-struct IRLookupWitnessTable : IRInst
-{
-    IRUse sourceType;
-    IRUse interfaceType;
-};
-
 /// Allocates space from local stack.
 ///
 struct IRAlloca : IRInst

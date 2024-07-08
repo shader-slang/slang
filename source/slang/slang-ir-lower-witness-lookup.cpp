@@ -325,29 +325,31 @@ struct WitnessLookupLoweringContext
         return resultValue;
     }
 
-    void rewriteCallSite(IRCall* call, IRInst* dispatchFunc, IRInst* initialExistentialObject)
+    void rewriteCallSite(IRCall* call, IRInst* dispatchFunc, IRInst* witnessTableInst)
     {
         SLANG_RELEASE_ASSERT(call->getArgCount() != 0);
         call->setOperand(0, dispatchFunc);
         IRBuilder builder(call);
         builder.setInsertBefore(call);
-        auto witnessTable = builder.emitExtractExistentialWitnessTable(initialExistentialObject);
+        auto interfaceType = as<IRWitnessTableType>(witnessTableInst->getDataType())->getConformanceType();
         auto newExistentialObject = builder.emitMakeExistential(
-            initialExistentialObject->getDataType(), call->getOperand(1), witnessTable);
+            (IRType*)interfaceType, call->getOperand(1), witnessTableInst);
         call->setOperand(1, newExistentialObject);
     }
 
     bool processWitnessLookup(IRLookupWitnessMethod* lookupInst)
     {
         auto witnessTableOperand = lookupInst->getWitnessTable();
-        auto extractInst = as<IRExtractExistentialWitnessTable>(witnessTableOperand);
-        if (!extractInst)
+        if (!as<IRWitnessTableType>(witnessTableOperand->getDataType()))
             return false;
+        //auto extractInst = as<IRExtractExistentialWitnessTable>(witnessTableOperand);
+        //if (!extractInst)
+        //    return false;
         auto dispatchFunc = findOrCreateDispatchFunc(lookupInst);
         if (!dispatchFunc)
             return false;
         bool changed = false;
-        auto existentialObject = extractInst->getOperand(0);
+        //auto existentialObject = extractInst->getOperand(0);
 
         IRBuilder builder(lookupInst);
         builder.setInsertBefore(lookupInst);
@@ -374,14 +376,14 @@ struct WitnessLookupLoweringContext
                             if (auto call = as<IRCall>(specializeUse->getUser()))
                             {
                                 changed = true;
-                                rewriteCallSite(call, newSpecialize, existentialObject);
+                                rewriteCallSite(call, newSpecialize, witnessTableOperand);
                             }
                         });
                 }
                 else if (auto call = as<IRCall>(use->getUser()))
                 {
                     changed = true;
-                    rewriteCallSite(call, dispatchFunc, existentialObject);
+                    rewriteCallSite(call, dispatchFunc, witnessTableOperand);
                 }
             });
         return changed;

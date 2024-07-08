@@ -10288,7 +10288,7 @@ static void _addFlattenedTupleArgs(
 
 bool isAbstractWitnessTable(IRInst* inst)
 {
-    if (as<IRThisTypeWitness>(inst))
+    if (as<IRThisTypeWitness>(inst) || as<IRInterfaceRequirementEntry>(inst))
         return true;
     if (auto lookup = as<IRLookupWitnessMethod>(inst))
         return isAbstractWitnessTable(lookup->getWitnessTable());
@@ -10425,6 +10425,11 @@ LoweredValInfo emitDeclRef(
             // This is a reference to the ThisType from the interface,
             // therefore we should just lower it as the sub type.
             return lowerType(context, thisTypeSubst->getWitness()->getSub());
+        }
+
+        if ( as<AssocTypeDecl>(decl) )
+        {
+            // For associated types, the lookup
         }
 
         if(isInterfaceRequirement(decl))
