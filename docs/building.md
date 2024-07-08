@@ -138,10 +138,10 @@ pass the install path to the cross building CMake invocation using
 # build the generators
 cmake --workflow --preset generators --fresh
 mkdir my-build-platform-generators
-unzip build/dist-release/slang-generators.zip -d my-build-platform-generators
+cmake --install build --config Release --component generators --prefix my-build-platform-generators
 # reconfigure, pointing to these generators
 cmake \
-  --preset release \
+  --preset default \
   --fresh \
   -DSLANG_GENERATORS_PATH=my-build-platform-generators/bin \
   -Dwhatever-other-necessary-options-for-your-cross-build
