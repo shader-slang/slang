@@ -73,7 +73,7 @@ jobs:
               "$@"
           }
 
-          case "${{inputs.os}}" in
+          case "${{ matrix.os }}" in
             linux*) if [ "${{matrix.platform}}" = "aarch64" ]; then
                 config \
                   -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
