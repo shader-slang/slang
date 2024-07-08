@@ -55,7 +55,7 @@ jobs:
       - name: Install cross tools on Ubuntu
         if: ${{matrix.runs-on == 'ubuntu-20.04' && matrix.platform == 'aarch64'}}
         run: |
-          apt-get install -y crossbuild-essential-arm64
+          sudo apt-get install -y crossbuild-essential-arm64
 
       - name: Build Slang
         run: |
@@ -80,12 +80,14 @@ jobs:
               else
                 config
               fi
-            windows*) config
+              ;;
+            windows*) config;;
             macos*) if [ "${{matrix.platform}}" == "aarch64" ]; then
                 config -DCMAKE_OSX_ARCHITECTURES=arm64
               else
                 config -DCMAKE_OSX_ARCHITECTURES=x86_64
               fi
+              ;;
           esac
 
           cmake --workflow --preset "${{matrix.config}}"
