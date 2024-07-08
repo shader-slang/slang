@@ -53,7 +53,7 @@ namespace Slang
             TreeMapNode& getNextLargestParentNode()
             {
                 // We have do not have a 'parent', we are the largest node.
-                auto parent = getParentNodeRef();
+                auto& parent = getParentNodeRef();
                 if (!parent)
                     return parent;
                 // If we are a 'leftNode' of 'parent', we are smaller.
@@ -288,7 +288,6 @@ namespace Slang
             auto currentNode = getNodeRef(currentNodeIndex);
             auto parentNodeIndex = currentNode.getParentNodeIndex();
             auto parentNode = currentNode.getParentNodeRef();
-            auto grandParentNodeIndex = parentNode.getParentNodeIndex();
             auto grandParentNode = parentNode.getParentNodeRef();
             while (currentNodeIndex != m_rootNode && parentNode.getNodeColor() == NodeColor::Red)
             {
