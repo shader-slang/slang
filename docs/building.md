@@ -138,8 +138,9 @@ pass the install path to the cross building CMake invocation using
 # build the generators
 cmake --workflow --preset generators --fresh
 mkdir my-build-platform-generators
-cmake --install build --config Release --component generators --prefix my-build-platform-generators
+cmake --install build --config Release --prefix my-build-platform-generators --component generators
 # reconfigure, pointing to these generators
+# Here is also where you should set up any cross compiling environment
 cmake \
   --preset default \
   --fresh \
