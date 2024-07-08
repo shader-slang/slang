@@ -8,7 +8,8 @@ float3 unconditional(int mode)
     float k0;
     float k1;
 
-    if (mode == 1) {
+    if (mode == 1)
+    {
         k1 = 1;
         k0 = 1;
 
@@ -61,6 +62,21 @@ float filled_array(int mode)
     return array[0];
 }
 
+// Using groupshared variables
+groupshared float4 gsConstexpr = float4(1.0f);
+groupshared float4 gsUndefined;
+
+float use_constexpr_initialized_gs()
+{
+    return gsConstexpr.x;
+}
+
+float use_undefined_gs()
+{
+    //CHK-DAG: error 41015: use of uninitialized value 'gsUndefined'
+    return gsUndefined.x;
+}
+
 // Structs and nested structs
 struct Data
 {
@@ -101,15 +117,18 @@ struct NonEmptyStruct
 {
     int field;
 
-    __init() {
+    __init()
+    {
         // TODO: specialized warning for initialized
         // fields in the constructors
         field = 1;
     }
 };
 
-struct NoDefault {
-    int f(int i) {
+struct NoDefault
+{
+    int f(int i)
+    {
         return i;
     }
 };
@@ -134,6 +153,9 @@ float4 main()
 
     //CHK-DAG: error 41015: use of uninitialized value 'nestedData'
     result += nestedData.data.value;
+
+    //CHK-NOT: error 41015
+    //CHK-NOT: warning 41018
 
     return float4(result);
 }

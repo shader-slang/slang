@@ -210,7 +210,7 @@ namespace Slang
         }
     }
 
-    static List<IRInst*> checkForUsingOutParam(ReachabilityContext &reachability, IRFunc* func, IRInst* inst)
+    static List<IRInst*> getUnresolvedParamLoads(ReachabilityContext &reachability, IRFunc* func, IRInst* inst)
     {
         // Collect all aliasable addresses
         auto addresses = getAliasableInstructions(inst);
@@ -244,7 +244,7 @@ namespace Slang
         return loads;
     }
 
-    static List<IRInst*> checkForUsingUndefinedValue(ReachabilityContext &reachability, IRInst* inst)
+    static List<IRInst*> getUnresolvedVariableLoads(ReachabilityContext &reachability, IRInst* inst)
     {
         auto addresses = getAliasableInstructions(inst);
 
@@ -266,7 +266,7 @@ namespace Slang
         return loads;
     }
 
-    static void checkForUsingUninitializedValues(IRFunc* func, DiagnosticSink* sink)
+    static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     {
         if (isDifferentiableFunc(func))
             return;
@@ -283,7 +283,7 @@ namespace Slang
             if (!isUndefinedParam(param))
                 continue;
 
-            auto loads = checkForUsingOutParam(reachability, func, param);
+            auto loads = getUnresolvedParamLoads(reachability, func, param);
             for (auto load : loads)
             {
                 sink->diagnose(load,
@@ -304,7 +304,7 @@ namespace Slang
             if (canIgnoreType(type))
                continue;
 
-            auto loads = checkForUsingUndefinedValue(reachability, inst);
+            auto loads = getUnresolvedVariableLoads(reachability, inst);
             for (auto load : loads)
             {
                 sink->diagnose(load,
@@ -316,19 +316,55 @@ namespace Slang
         }
     }
 
+    static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sink)
+    {
+        // Check for initialization blocks
+        for (auto inst : variable->getChildren()) {
+            if (auto block = as<IRBlock>(inst))
+                return;
+        }
+
+        auto addresses = getAliasableInstructions(variable);
+        
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        for (auto alias : addresses) {
+            for (auto use = alias->firstUse; use; use = use->nextUse) {
+                IRInst* user = use->getUser();
+                collectLoadStore(stores, loads, user);
+
+                // Disregard if there is at least one store,
+                // since we cannot tell what the control flow is
+                if (stores.getCount())
+                    return;
+            }
+        }
+
+        for (auto load : loads) {
+            sink->diagnose(load,
+                Diagnostics::usingUninitializedValue,
+                variable);
+        }
+    }
+
     void checkForUsingUninitializedValues(IRModule* module, DiagnosticSink* sink)
     {
         for (auto inst : module->getGlobalInsts())
         {
             if (auto func = as<IRFunc>(inst))
             {
-                checkForUsingUninitializedValues(func, sink);
+                checkUninitializedValues(func, sink);
             }
             else if (auto generic = as<IRGeneric>(inst))
             {
                 auto retVal = findGenericReturnVal(generic);
                 if (auto funcVal = as<IRFunc>(retVal))
-                    checkForUsingUninitializedValues(funcVal, sink);
+                    checkUninitializedValues(funcVal, sink);
+            }
+            else if (auto global = as<IRGlobalVar>(inst))
+            {
+                checkUninitializedGlobals(global, sink);
             }
         }
     }
