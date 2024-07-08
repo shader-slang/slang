@@ -313,7 +313,6 @@ namespace Slang
                         parentNodeIndex = currentNode.getParentNodeIndex();
                         parentNode = currentNode.getParentNodeRef();
 
-                        grandParentNodeIndex = parentNode.getParentNodeIndex();
                         grandParentNode = parentNode.getParentNodeRef();
 
                         if (isParentNodeALeftChild)
