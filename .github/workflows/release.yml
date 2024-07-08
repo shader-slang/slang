@@ -80,6 +80,7 @@ jobs:
           cmake --preset default --fresh \
             -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
             -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DSLANG_EMBED_STDLIB=ON \
             -DSLANG_SLANG_LLVM_FLAVOR=$(
               [[ ${{matrix.build-llvm}} = "true" ]] && echo "USE_SYSTEM_LLVM" || echo "DISABLE")
 
