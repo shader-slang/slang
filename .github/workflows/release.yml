@@ -46,7 +46,6 @@ jobs:
           cmake --workflow --preset generators --fresh
           mkdir build-platform-generators
           cmake --install build --config Release --component generators --prefix build-platform-generators
-          rm -rf build
 
       - name: Change dev tools to host arch
         uses: ilammy/msvc-dev-cmd@v1
