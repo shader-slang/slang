@@ -60,11 +60,8 @@ jobs:
             export CC=aarch64-linux-gnu-gcc
             export CXX=aarch64-linux-gnu-g++
           fi
-          if [ "${{matrix.platform}}" = "aarch64" ]; then
-            export CMAKE_OSX_ARCHITECTURES="arm64"
-          elif [ "${{matrix.platform}}" = "x86_64" ]; then
-            export CMAKE_OSX_ARCHITECTURES="x86_64"
-          fi
+          CMAKE_OSX_ARCHITECTURES="${{matrix.platform}}"
+          CMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES//aarch64/arm64}
 
           echo "CC=$CC" >> "$GITHUB_ENV"
           echo "CXX=$CXX" >> "$GITHUB_ENV"
