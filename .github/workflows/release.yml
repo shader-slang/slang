@@ -148,9 +148,9 @@ jobs:
         run: |
           find build/dist-release ! -iname '*.md' ! -iname '*.h' -type f | xargs file
           if [ "${{matrix.os}}" = "macos" ]; then
-            find build/dist-release ! -iname '*.md' ! -iname '*.h' -type f
-              | xargs codesign --verify --verbose=2
-              || echo "code signing failed"
+            find build/dist-release ! -iname '*.md' ! -iname '*.h' -type f |
+              xargs codesign --verify --verbose=2 ||
+              echo "code signing failed"
           fi
 
       - name: Package Slang
