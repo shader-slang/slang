@@ -40,6 +40,23 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: ${{matrix.build-slang-llvm}}
+
+      - name: Build slang generators
+        run: |
+          cmake --workflow --preset generators --fresh
+          mkdir build-platform-generators
+          cmake --install build --config Release --component generators --prefix build-platform-generators
+
+      - name: Change dev tools to host arch
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{matrix.platform == 'aarch64' && 'amd64_arm64' || 'amd64'}}
+
+      - name: Install cross tools on Ubuntu
+        if: ${{matrix.runs-on == 'ubuntu-20.04' && matrix.platform == 'aarch64'}}
+        run: |
+          apt-get install -y crossbuild-essential-arm64
+
       - name: Build Slang
         run: |
           if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" ]]; then
@@ -47,14 +64,38 @@ jobs:
             exit 1
           endif
 
-          cmake --workflow --preset generators --fresh
-          mkdir build-platform-generators
-          cmake --install build --config Release --component generators --prefix build-platform-generators
+          config(){
+            cmake --preset default --fresh \
+              -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
+              -DSLANG_ENABLE_EXAMPLES=OFF \
+              -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+              "$@"
+          }
 
-          cmake --preset default --fresh \
-            -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
-            -DSLANG_ENABLE_EXAMPLES=OFF
+          case "${{inputs.os}}" in
+            linux*) config \
+              if [ "${{matrix.platform}}" == "aarch64" ]; then
+                config \
+                  -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+                  -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+              else
+                config
+              fi
+            windows*)
+              config
+            macos*)
+              if [ "${{matrix.platform}}" == "aarch64" ]; then
+                config -DCMAKE_OSX_ARCHITECTURES=arm64
+              else
+                config -DCMAKE_OSX_ARCHITECTURES=x86_64
+              fi
+          esac
+
           cmake --workflow --preset "${{matrix.config}}"
+
+      - name: File check
+        run: |
+          find build/dist-release ! -iname '*.md' ! -iname '*.h' -type f | xargs file
 
       - name: Package Slang
         id: package
