@@ -73,8 +73,7 @@ jobs:
           }
 
           case "${{inputs.os}}" in
-            linux*) config \
-              if [ "${{matrix.platform}}" == "aarch64" ]; then
+            linux*) if [ "${{matrix.platform}}" == "aarch64" ]; then
                 config \
                   -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
                   -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
