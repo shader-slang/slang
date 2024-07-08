@@ -9,14 +9,17 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [linux, macos, windows]
-        config: [release]
-        platform: [x64, aarch64]
-        test-category: [smoke]
         include:
-          - {os: linux, runs-on: ubuntu-20.04, compiler: gcc}
-          - {os: windows, runs-on: windows-latest, compiler: cl}
-          - {os: macos, runs-on: macos-latest, compiler: clang}
+          - {os: linux, config: release, platform: aarch64, test-category: smoke, runs-on: ubuntu-20.04, compiler: gcc, build-slang-llvm: false}
+        # os: [linux, macos, windows]
+        # config: [release]
+        # platform: [x64, aarch64]
+        # test-category: [smoke]
+        # include:
+        #   - {os: linux, runs-on: ubuntu-20.04, compiler: gcc}
+        #   - {os: windows, runs-on: windows-latest, compiler: cl}
+        #   - {os: macos, runs-on: macos-latest, compiler: clang}
+        #   - {platform: aarch64, build-slang-llvm: false}
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
