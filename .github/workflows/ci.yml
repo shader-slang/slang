@@ -15,7 +15,7 @@ jobs:
         os: [linux, macos, windows]
         compiler: [gcc, clang, cl]
         config: [debug, release]
-        platform: [x64, aarch64]
+        platform: [x86_64, aarch64]
         full-gpu-tests: [false]
         exclude:
           # Exclude invalid or undesired os/compiler
@@ -29,7 +29,7 @@ jobs:
           # Default to x64, but aarch64 on osx
           - { os: linux, platform: aarch64 }
           - { os: windows, platform: aarch64 }
-          - { os: macos, platform: x64 }
+          - { os: macos, platform: x86_64 }
         include:
           - { os: linux, runs-on: ubuntu-20.04 }
           - { os: windows, runs-on: windows-latest }
@@ -54,7 +54,7 @@ jobs:
           # Self-hosted full gpu build
           - os: windows
             compiler: cl
-            platform: x64
+            platform: x86_64
             config: release
             warnings-as-errors: false
             test-category: full

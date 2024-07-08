@@ -19,7 +19,7 @@ jobs:
           # Self-hosted falcor tests
           - os: windows
             compiler: cl
-            platform: x64
+            platform: x86_64
             config: release
             warnings-as-errors: false
             test-category: full
