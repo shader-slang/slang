@@ -349,7 +349,7 @@
     <ClInclude Include="..\..\..\source\core\slang-test-tool-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-text-io.h" />
     <ClInclude Include="..\..\..\source\core\slang-token-reader.h" />
-+    <ClInclude Include="..\..\..\source\core\slang-tree-map.h" />
+    <ClInclude Include="..\..\..\source\core\slang-tree-map.h" />
     <ClInclude Include="..\..\..\source\core\slang-type-convert-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-type-text-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-type-traits.h" />
