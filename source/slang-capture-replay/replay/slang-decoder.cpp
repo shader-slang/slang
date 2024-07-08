@@ -1,5 +1,6 @@
 #include "slang-decoder.h"
 #include "parameter-decoder.h"
+#include "decoder-helper.h"
 #include "../util/capture-utility.h"
 
 namespace SlangCapture
@@ -8,33 +9,34 @@ namespace SlangCapture
     bool SlangDecoder::processMethodCall(FunctionHeader const& header, ParameterBlock const& parameterBlock)
     {
         ApiClassId classId = static_cast<ApiClassId>(getClassId(header.callId));
+        ObjectID objectId = header.handleId;
         switch(classId)
         {
         default:
             slangCaptureLog(LogLevel::Error, "Unhandled Slang Class Id: %d\n", classId);
             return false;
         case ApiClassId::Class_IGlobalSession:
-            return processIGlobalSessionMethods(header.callId, parameterBlock);
+            return processIGlobalSessionMethods(header.callId, objectId, parameterBlock);
             break;
         case ApiClassId::Class_ISession:
-            return processISessionMethods(header.callId, parameterBlock);
+            return processISessionMethods(header.callId, objectId, parameterBlock);
             break;
         case ApiClassId::Class_IModule:
-            return processIModuleMethods(header.callId, parameterBlock);
+            return processIModuleMethods(header.callId, objectId, parameterBlock);
             break;
         case ApiClassId::Class_IEntryPoint:
-            return processIEntryPointMethods(header.callId, parameterBlock);
+            return processIEntryPointMethods(header.callId, objectId, parameterBlock);
             break;
         case ApiClassId::Class_ICompositeComponentType:
-            return processICompositeComponentTypeMethods(header.callId, parameterBlock);
+            return processICompositeComponentTypeMethods(header.callId, objectId, parameterBlock);
             break;
         case ApiClassId::Class_ITypeConformance:
-            return processITypeConformanceMethods(header.callId, parameterBlock);
+            return processITypeConformanceMethods(header.callId, objectId, parameterBlock);
             break;
         }
     }
 
-    bool SlangDecoder::processIGlobalSessionMethods(ApiCallId callId, ParameterBlock const& parameterBlock)
+    bool SlangDecoder::processIGlobalSessionMethods(ApiCallId callId, ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         switch(callId)
         {
@@ -42,92 +44,92 @@ namespace SlangCapture
             slangCaptureLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId);
             break;
         case ApiCallId::ICreateGlobalSession:
-            ICreateGlobalSession(callId, parameterBlock);
+            ICreateGlobalSession(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_createSession:
-            IGlobalSession_createSession(callId, parameterBlock);
+            IGlobalSession_createSession(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_findProfile:
-            IGlobalSession_findProfile(callId, parameterBlock);
+            IGlobalSession_findProfile(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_setDownstreamCompilerPath:
-            IGlobalSession_setDownstreamCompilerPath(callId, parameterBlock);
+            IGlobalSession_setDownstreamCompilerPath(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_setDownstreamCompilerPrelude:
-            IGlobalSession_setDownstreamCompilerPrelude(callId, parameterBlock);
+            IGlobalSession_setDownstreamCompilerPrelude(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_getDownstreamCompilerPrelude:
-            IGlobalSession_getDownstreamCompilerPrelude(callId, parameterBlock);
+            IGlobalSession_getDownstreamCompilerPrelude(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_getBuildTagString:
-            IGlobalSession_getBuildTagString(callId, parameterBlock);
+            IGlobalSession_getBuildTagString(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_setDefaultDownstreamCompiler:
-            IGlobalSession_setDefaultDownstreamCompiler(callId, parameterBlock);
+            IGlobalSession_setDefaultDownstreamCompiler(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_getDefaultDownstreamCompiler:
-            IGlobalSession_getDefaultDownstreamCompiler(callId, parameterBlock);
+            IGlobalSession_getDefaultDownstreamCompiler(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_setLanguagePrelude:
-            IGlobalSession_setLanguagePrelude(callId, parameterBlock);
+            IGlobalSession_setLanguagePrelude(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_getLanguagePrelude:
-            IGlobalSession_getLanguagePrelude(callId, parameterBlock);
+            IGlobalSession_getLanguagePrelude(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_createCompileRequest:
-            IGlobalSession_createCompileRequest(callId, parameterBlock);
+            IGlobalSession_createCompileRequest(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_addBuiltins:
-            IGlobalSession_addBuiltins(callId, parameterBlock);
+            IGlobalSession_addBuiltins(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_setSharedLibraryLoader:
-            IGlobalSession_setSharedLibraryLoader(callId, parameterBlock);
+            IGlobalSession_setSharedLibraryLoader(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_getSharedLibraryLoader:
-            IGlobalSession_getSharedLibraryLoader(callId, parameterBlock);
+            IGlobalSession_getSharedLibraryLoader(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_checkCompileTargetSupport:
-            IGlobalSession_checkCompileTargetSupport(callId, parameterBlock);
+            IGlobalSession_checkCompileTargetSupport(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_checkPassThroughSupport:
-            IGlobalSession_checkPassThroughSupport(callId, parameterBlock);
+            IGlobalSession_checkPassThroughSupport(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_compileStdLib:
-            IGlobalSession_compileStdLib(callId, parameterBlock);
+            IGlobalSession_compileStdLib(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_loadStdLib:
-            IGlobalSession_loadStdLib(callId, parameterBlock);
+            IGlobalSession_loadStdLib(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_saveStdLib:
-            IGlobalSession_saveStdLib(callId, parameterBlock);
+            IGlobalSession_saveStdLib(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_findCapability:
-            IGlobalSession_findCapability(callId, parameterBlock);
+            IGlobalSession_findCapability(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_setDownstreamCompilerForTransition:
-            IGlobalSession_setDownstreamCompilerForTransition(callId, parameterBlock);
+            IGlobalSession_setDownstreamCompilerForTransition(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_getDownstreamCompilerForTransition:
-            IGlobalSession_getDownstreamCompilerForTransition(callId, parameterBlock);
+            IGlobalSession_getDownstreamCompilerForTransition(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_getCompilerElapsedTime:
-            IGlobalSession_getCompilerElapsedTime(callId, parameterBlock);
+            IGlobalSession_getCompilerElapsedTime(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_setSPIRVCoreGrammar:
-            IGlobalSession_setSPIRVCoreGrammar(callId, parameterBlock);
+            IGlobalSession_setSPIRVCoreGrammar(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_parseCommandLineArguments:
-            IGlobalSession_parseCommandLineArguments(callId, parameterBlock);
+            IGlobalSession_parseCommandLineArguments(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_getSessionDescDigest:
-            IGlobalSession_getSessionDescDigest(callId, parameterBlock);
+            IGlobalSession_getSessionDescDigest(objectId, parameterBlock);
             break;
         }
         return true;
     }
 
 
-    bool SlangDecoder::processISessionMethods(ApiCallId callId, ParameterBlock const& parameterBlock)
+    bool SlangDecoder::processISessionMethods(ApiCallId callId, ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         switch(callId)
         {
@@ -135,67 +137,64 @@ namespace SlangCapture
             slangCaptureLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId);
             return false;
         case ApiCallId::ISession_getGlobalSession:
-            ISession_getGlobalSession(callId, parameterBlock);
+            ISession_getGlobalSession(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_loadModule:
-            ISession_loadModule(callId, parameterBlock);
-            break;
-        case ApiCallId::ISession_loadModuleFromBlob:
-            ISession_loadModuleFromBlob(callId, parameterBlock);
+            ISession_loadModule(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_loadModuleFromIRBlob:
-            ISession_loadModuleFromIRBlob(callId, parameterBlock);
+            ISession_loadModuleFromIRBlob(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_loadModuleFromSource:
-            ISession_loadModuleFromSource(callId, parameterBlock);
+            ISession_loadModuleFromSource(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_loadModuleFromSourceString:
-            ISession_loadModuleFromSourceString(callId, parameterBlock);
+            ISession_loadModuleFromSourceString(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_createCompositeComponentType:
-            ISession_createCompositeComponentType(callId, parameterBlock);
+            ISession_createCompositeComponentType(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_specializeType:
-            ISession_specializeType(callId, parameterBlock);
+            ISession_specializeType(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_getTypeLayout:
-            ISession_getTypeLayout(callId, parameterBlock);
+            ISession_getTypeLayout(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_getContainerType:
-            ISession_getContainerType(callId, parameterBlock);
+            ISession_getContainerType(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_getDynamicType:
-            ISession_getDynamicType(callId, parameterBlock);
+            ISession_getDynamicType(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_getTypeRTTIMangledName:
-            ISession_getTypeRTTIMangledName(callId, parameterBlock);
+            ISession_getTypeRTTIMangledName(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_getTypeConformanceWitnessMangledName:
-            ISession_getTypeConformanceWitnessMangledName(callId, parameterBlock);
+            ISession_getTypeConformanceWitnessMangledName(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_getTypeConformanceWitnessSequentialID:
-            ISession_getTypeConformanceWitnessSequentialID(callId, parameterBlock);
+            ISession_getTypeConformanceWitnessSequentialID(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_createTypeConformanceComponentType:
-            ISession_createTypeConformanceComponentType(callId, parameterBlock);
+            ISession_createTypeConformanceComponentType(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_createCompileRequest:
-            ISession_createCompileRequest(callId, parameterBlock);
+            ISession_createCompileRequest(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_getLoadedModuleCount:
-            ISession_getLoadedModuleCount(callId, parameterBlock);
+            ISession_getLoadedModuleCount(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_getLoadedModule:
-            ISession_getLoadedModule(callId, parameterBlock);
+            ISession_getLoadedModule(objectId, parameterBlock);
             break;
         case ApiCallId::ISession_isBinaryModuleUpToDate:
-            ISession_isBinaryModuleUpToDate(callId, parameterBlock);
+            ISession_isBinaryModuleUpToDate(objectId, parameterBlock);
             break;
         }
         return true;
     }
 
-    bool SlangDecoder::processIModuleMethods(ApiCallId callId, ParameterBlock const& parameterBlock)
+    bool SlangDecoder::processIModuleMethods(ApiCallId callId, ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         switch(callId)
         {
@@ -203,73 +202,73 @@ namespace SlangCapture
             slangCaptureLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId);
             return false;
         case ApiCallId::IModule_findEntryPointByName:
-            IModule_findEntryPointByName(callId, parameterBlock);
+            IModule_findEntryPointByName(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getDefinedEntryPointCount:
-            IModule_getDefinedEntryPointCount(callId, parameterBlock);
+            IModule_getDefinedEntryPointCount(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getDefinedEntryPoint:
-            IModule_getDefinedEntryPoint(callId, parameterBlock);
+            IModule_getDefinedEntryPoint(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_serialize:
-            IModule_serialize(callId, parameterBlock);
+            IModule_serialize(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_writeToFile:
-            IModule_writeToFile(callId, parameterBlock);
+            IModule_writeToFile(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getName:
-            IModule_getName(callId, parameterBlock);
+            IModule_getName(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getFilePath:
-            IModule_getFilePath(callId, parameterBlock);
+            IModule_getFilePath(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getUniqueIdentity:
-            IModule_getUniqueIdentity(callId, parameterBlock);
+            IModule_getUniqueIdentity(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_findAndCheckEntryPoint:
-            IModule_findAndCheckEntryPoint(callId, parameterBlock);
+            IModule_findAndCheckEntryPoint(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getSession:
-            IModule_getSession(callId, parameterBlock);
+            IModule_getSession(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getLayout:
-            IModule_getLayout(callId, parameterBlock);
+            IModule_getLayout(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getSpecializationParamCount:
-            IModule_getSpecializationParamCount(callId, parameterBlock);
+            IModule_getSpecializationParamCount(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getEntryPointCode:
-            IModule_getEntryPointCode(callId, parameterBlock);
+            IModule_getEntryPointCode(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getTargetCode:
-            IModule_getTargetCode(callId, parameterBlock);
+            IModule_getTargetCode(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getResultAsFileSystem:
-            IModule_getResultAsFileSystem(callId, parameterBlock);
+            IModule_getResultAsFileSystem(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getEntryPointHash:
-            IModule_getEntryPointHash(callId, parameterBlock);
+            IModule_getEntryPointHash(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_specialize:
-            IModule_specialize(callId, parameterBlock);
+            IModule_specialize(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_link:
-            IModule_link(callId, parameterBlock);
+            IModule_link(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_getEntryPointHostCallable:
-            IModule_getEntryPointHostCallable(callId, parameterBlock);
+            IModule_getEntryPointHostCallable(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_renameEntryPoint:
-            IModule_renameEntryPoint(callId, parameterBlock);
+            IModule_renameEntryPoint(objectId, parameterBlock);
             break;
         case ApiCallId::IModule_linkWithOptions:
-            IModule_linkWithOptions(callId, parameterBlock);
+            IModule_linkWithOptions(objectId, parameterBlock);
             break;
         }
         return true;
     }
 
-    bool SlangDecoder::processIEntryPointMethods(ApiCallId callId, ParameterBlock const& parameterBlock)
+    bool SlangDecoder::processIEntryPointMethods(ApiCallId callId, ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         switch(callId)
         {
@@ -277,46 +276,46 @@ namespace SlangCapture
             slangCaptureLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId);
             return false;
         case ApiCallId::IEntryPoint_getSession:
-            IEntryPoint_getSession(callId, parameterBlock);
+            IEntryPoint_getSession(objectId, parameterBlock);
             break;
         case ApiCallId::IEntryPoint_getLayout:
-            IEntryPoint_getLayout(callId, parameterBlock);
+            IEntryPoint_getLayout(objectId, parameterBlock);
             break;
         case ApiCallId::IEntryPoint_getSpecializationParamCount:
-            IEntryPoint_getSpecializationParamCount(callId, parameterBlock);
+            IEntryPoint_getSpecializationParamCount(objectId, parameterBlock);
             break;
         case ApiCallId::IEntryPoint_getEntryPointCode:
-            IEntryPoint_getEntryPointCode(callId, parameterBlock);
+            IEntryPoint_getEntryPointCode(objectId, parameterBlock);
             break;
         case ApiCallId::IEntryPoint_getTargetCode:
-            IEntryPoint_getTargetCode(callId, parameterBlock);
+            IEntryPoint_getTargetCode(objectId, parameterBlock);
             break;
         case ApiCallId::IEntryPoint_getResultAsFileSystem:
-            IEntryPoint_getResultAsFileSystem(callId, parameterBlock);
+            IEntryPoint_getResultAsFileSystem(objectId, parameterBlock);
             break;
         case ApiCallId::IEntryPoint_getEntryPointHash:
-            IEntryPoint_getEntryPointHash(callId, parameterBlock);
+            IEntryPoint_getEntryPointHash(objectId, parameterBlock);
             break;
         case ApiCallId::IEntryPoint_specialize:
-            IEntryPoint_specialize(callId, parameterBlock);
+            IEntryPoint_specialize(objectId, parameterBlock);
             break;
         case ApiCallId::IEntryPoint_link:
-            IEntryPoint_link(callId, parameterBlock);
+            IEntryPoint_link(objectId, parameterBlock);
             break;
         case ApiCallId::IEntryPoint_getEntryPointHostCallable:
-            IEntryPoint_getEntryPointHostCallable(callId, parameterBlock);
+            IEntryPoint_getEntryPointHostCallable(objectId, parameterBlock);
             break;
         case ApiCallId::IEntryPoint_renameEntryPoint:
-            IEntryPoint_renameEntryPoint(callId, parameterBlock);
+            IEntryPoint_renameEntryPoint(objectId, parameterBlock);
             break;
         case ApiCallId::IEntryPoint_linkWithOptions:
-            IEntryPoint_linkWithOptions(callId, parameterBlock);
+            IEntryPoint_linkWithOptions(objectId, parameterBlock);
             break;
         }
         return true;
     }
 
-    bool SlangDecoder::processICompositeComponentTypeMethods(ApiCallId callId, ParameterBlock const& parameterBlock)
+    bool SlangDecoder::processICompositeComponentTypeMethods(ApiCallId callId, ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         switch(callId)
         {
@@ -324,46 +323,46 @@ namespace SlangCapture
             slangCaptureLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId);
             break;
         case ApiCallId::ICompositeComponentType_getSession:
-            ICompositeComponentType_getSession(callId, parameterBlock);
+            ICompositeComponentType_getSession(objectId, parameterBlock);
             break;
         case ApiCallId::ICompositeComponentType_getLayout:
-            ICompositeComponentType_getLayout(callId, parameterBlock);
+            ICompositeComponentType_getLayout(objectId, parameterBlock);
             break;
         case ApiCallId::ICompositeComponentType_getSpecializationParamCount:
-            ICompositeComponentType_getSpecializationParamCount(callId, parameterBlock);
+            ICompositeComponentType_getSpecializationParamCount(objectId, parameterBlock);
             break;
         case ApiCallId::ICompositeComponentType_getEntryPointCode:
-            ICompositeComponentType_getEntryPointCode(callId, parameterBlock);
+            ICompositeComponentType_getEntryPointCode(objectId, parameterBlock);
             break;
         case ApiCallId::ICompositeComponentType_getTargetCode:
-            ICompositeComponentType_getTargetCode(callId, parameterBlock);
+            ICompositeComponentType_getTargetCode(objectId, parameterBlock);
             break;
         case ApiCallId::ICompositeComponentType_getResultAsFileSystem:
-            ICompositeComponentType_getResultAsFileSystem(callId, parameterBlock);
+            ICompositeComponentType_getResultAsFileSystem(objectId, parameterBlock);
             break;
         case ApiCallId::ICompositeComponentType_getEntryPointHash:
-            ICompositeComponentType_getEntryPointHash(callId, parameterBlock);
+            ICompositeComponentType_getEntryPointHash(objectId, parameterBlock);
             break;
         case ApiCallId::ICompositeComponentType_specialize:
-            ICompositeComponentType_specialize(callId, parameterBlock);
+            ICompositeComponentType_specialize(objectId, parameterBlock);
             break;
         case ApiCallId::ICompositeComponentType_link:
-            ICompositeComponentType_link(callId, parameterBlock);
+            ICompositeComponentType_link(objectId, parameterBlock);
             break;
         case ApiCallId::ICompositeComponentType_getEntryPointHostCallable:
-            ICompositeComponentType_getEntryPointHostCallable(callId, parameterBlock);
+            ICompositeComponentType_getEntryPointHostCallable(objectId, parameterBlock);
             break;
         case ApiCallId::ICompositeComponentType_renameEntryPoint:
-            ICompositeComponentType_renameEntryPoint(callId, parameterBlock);
+            ICompositeComponentType_renameEntryPoint(objectId, parameterBlock);
             break;
         case ApiCallId::ICompositeComponentType_linkWithOptions:
-            ICompositeComponentType_linkWithOptions(callId, parameterBlock);
+            ICompositeComponentType_linkWithOptions(objectId, parameterBlock);
             break;
         }
         return true;
     }
 
-    bool SlangDecoder::processITypeConformanceMethods(ApiCallId callId, ParameterBlock const& parameterBlock)
+    bool SlangDecoder::processITypeConformanceMethods(ApiCallId callId, ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         switch(callId)
         {
@@ -371,40 +370,40 @@ namespace SlangCapture
             slangCaptureLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId);
             return false;
         case ApiCallId::ITypeConformance_getSession:
-            ITypeConformance_getSession(callId, parameterBlock);
+            ITypeConformance_getSession(objectId, parameterBlock);
             break;
         case ApiCallId::ITypeConformance_getLayout:
-            ITypeConformance_getLayout(callId, parameterBlock);
+            ITypeConformance_getLayout(objectId, parameterBlock);
             break;
         case ApiCallId::ITypeConformance_getSpecializationParamCount:
-            ITypeConformance_getSpecializationParamCount(callId, parameterBlock);
+            ITypeConformance_getSpecializationParamCount(objectId, parameterBlock);
             break;
         case ApiCallId::ITypeConformance_getEntryPointCode:
-            ITypeConformance_getEntryPointCode(callId, parameterBlock);
+            ITypeConformance_getEntryPointCode(objectId, parameterBlock);
             break;
         case ApiCallId::ITypeConformance_getTargetCode:
-            ITypeConformance_getTargetCode(callId, parameterBlock);
+            ITypeConformance_getTargetCode(objectId, parameterBlock);
             break;
         case ApiCallId::ITypeConformance_getResultAsFileSystem:
-            ITypeConformance_getResultAsFileSystem(callId, parameterBlock);
+            ITypeConformance_getResultAsFileSystem(objectId, parameterBlock);
             break;
         case ApiCallId::ITypeConformance_getEntryPointHash:
-            ITypeConformance_getEntryPointHash(callId, parameterBlock);
+            ITypeConformance_getEntryPointHash(objectId, parameterBlock);
             break;
         case ApiCallId::ITypeConformance_specialize:
-            ITypeConformance_specialize(callId, parameterBlock);
+            ITypeConformance_specialize(objectId, parameterBlock);
             break;
         case ApiCallId::ITypeConformance_link:
-            ITypeConformance_link(callId, parameterBlock);
+            ITypeConformance_link(objectId, parameterBlock);
             break;
         case ApiCallId::ITypeConformance_getEntryPointHostCallable:
-            ITypeConformance_getEntryPointHostCallable(callId, parameterBlock);
+            ITypeConformance_getEntryPointHostCallable(objectId, parameterBlock);
             break;
         case ApiCallId::ITypeConformance_renameEntryPoint:
-            ITypeConformance_renameEntryPoint(callId, parameterBlock);
+            ITypeConformance_renameEntryPoint(objectId, parameterBlock);
             break;
         case ApiCallId::ITypeConformance_linkWithOptions:
-            ITypeConformance_linkWithOptions(callId, parameterBlock);
+            ITypeConformance_linkWithOptions(objectId, parameterBlock);
             break;
         }
         return true;
@@ -412,434 +411,1564 @@ namespace SlangCapture
 
     bool SlangDecoder::processFunctionCall(FunctionHeader const& header, ParameterBlock const& parameterBlock)
     {
+        return false;
     }
 
 
-    void SlangDecoder::ICreateGlobalSession(ApiCallId callId, ParameterBlock const& parameterBlock)
+    bool SlangDecoder::ICreateGlobalSession(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
-
+        return false;
     }
 
-    void SlangDecoder::IGlobalSession_createSession(ApiCallId callId, ParameterBlock const& parameterBlock)
+    bool SlangDecoder::IGlobalSession_createSession(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
-        TypeDecoder<slang::SessionDesc> sessionDesc;
-        ParameterDecoder::decodeStruct(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, sessionDesc);
+        StructDecoder<slang::SessionDesc> sessionDesc;
+        sessionDesc.decode(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize);
+
+        ObjectID outSessionId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSessionId);
 
         for (auto consumer: m_consumers)
         {
-            // consume the session desc
-            // consumer->IGlobalSession_createSession(object, sessionDesc);
+            consumer->IGlobalSession_createSession(objectId, sessionDesc.getValue(), outSessionId);
+        }
+
+        return true;
+    }
+
+    void SlangDecoder::IGlobalSession_findProfile(ObjectID objectId, ParameterBlock const& parameterBlock)
+    {
+        StringDecoder name;
+        ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, name);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_findProfile(objectId, name.getPointer());
         }
     }
 
-    void SlangDecoder::IGlobalSession_findProfile(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_setDownstreamCompilerPath(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        SlangPassThrough passThrough {};
+        readByte = ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, passThrough);
+        StringDecoder path;
+        readByte += ParameterDecoder::decodeString(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, path);
 
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_setDownstreamCompilerPath(objectId, passThrough, path.getPointer());
+        }
     }
 
-    void SlangDecoder::IGlobalSession_setDownstreamCompilerPath(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_setDownstreamCompilerPrelude(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
-    }
+        size_t readByte = 0;
+        SlangPassThrough passThrough {};
+        readByte = ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, passThrough);
+        StringDecoder prelude;
+        readByte += ParameterDecoder::decodeString(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, prelude);
 
-    void SlangDecoder::IGlobalSession_setDownstreamCompilerPrelude(ApiCallId callId, ParameterBlock const& parameterBlock)
-    {
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_setDownstreamCompilerPrelude(objectId, passThrough, prelude.getPointer());
+        }
     }
 
-    void SlangDecoder::IGlobalSession_getDownstreamCompilerPrelude(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_getDownstreamCompilerPrelude(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        SlangPassThrough passThrough {};
+        ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, passThrough);
+
+        ObjectID outPreludeId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outPreludeId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_getDownstreamCompilerPrelude(objectId, passThrough, outPreludeId);
+        }
     }
 
-    void SlangDecoder::IGlobalSession_getBuildTagString(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_getBuildTagString(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IGlobalSession_setDefaultDownstreamCompiler(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_setDefaultDownstreamCompiler(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        SlangSourceLanguage sourceLanguage {};
+        SlangPassThrough defaultCompiler {};
+        readByte  = ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, sourceLanguage);
+        readByte += ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, defaultCompiler);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_setDefaultDownstreamCompiler(objectId, sourceLanguage, defaultCompiler);
+        }
     }
 
-    void SlangDecoder::IGlobalSession_getDefaultDownstreamCompiler(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_getDefaultDownstreamCompiler(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        SlangSourceLanguage sourceLanguage {};
+        ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, sourceLanguage);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_getDefaultDownstreamCompiler(objectId, sourceLanguage);
+        }
     }
 
-    void SlangDecoder::IGlobalSession_setLanguagePrelude(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_setLanguagePrelude(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        SlangSourceLanguage sourceLanguage {};
+        StringDecoder prelude;
+        readByte  = ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, sourceLanguage);
+        readByte += ParameterDecoder::decodeString(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, prelude);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_setLanguagePrelude(objectId, sourceLanguage, prelude.getPointer());
+        }
     }
 
-    void SlangDecoder::IGlobalSession_getLanguagePrelude(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_getLanguagePrelude(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        SlangSourceLanguage sourceLanguage {};
+        ObjectID outPreludeId = 0;
+        ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, sourceLanguage);
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outPreludeId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_getLanguagePrelude(objectId, sourceLanguage, outPreludeId);
+        }
     }
 
-    void SlangDecoder::IGlobalSession_createCompileRequest(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_createCompileRequest(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        ObjectID outCompileRequestId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outCompileRequestId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_createCompileRequest(objectId, outCompileRequestId);
+        }
     }
 
-    void SlangDecoder::IGlobalSession_addBuiltins(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_addBuiltins(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readBytes = 0;
+        StringDecoder sourcePath;
+        StringDecoder sourceString;
+        readBytes  = ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, sourcePath);
+        readBytes += ParameterDecoder::decodeString(parameterBlock.parameterBuffer + readBytes, parameterBlock.parameterBufferSize - readBytes, sourceString);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_addBuiltins(objectId, sourcePath.getPointer(), sourceString.getPointer());
+        }
     }
 
-    void SlangDecoder::IGlobalSession_setSharedLibraryLoader(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_setSharedLibraryLoader(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        // TODO: Not sure if we need to capture this function. Because this functions is something like the file system
+        // override, it's provided by user code. So capturing it makes no sense. The only way is to wrapper this interface
+        // by our own implementation, and capture it there.
+        slangCaptureLog(LogLevel::Error, "%s should not be called\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IGlobalSession_getSharedLibraryLoader(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_getSharedLibraryLoader(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        ObjectID outLoaderId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outLoaderId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_getSharedLibraryLoader(objectId, outLoaderId);
+        }
     }
 
-    void SlangDecoder::IGlobalSession_checkCompileTargetSupport(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_checkCompileTargetSupport(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IGlobalSession_checkPassThroughSupport(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_checkPassThroughSupport(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IGlobalSession_compileStdLib(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_compileStdLib(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slang::CompileStdLibFlags flags {};
+        ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, flags);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_compileStdLib(objectId, flags);
+        }
     }
 
-    void SlangDecoder::IGlobalSession_loadStdLib(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_loadStdLib(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        PointerDecoder<void*> stdLib;
+        ParameterDecoder::decodePointer(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, stdLib);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_loadStdLib(objectId, stdLib.getPointer(), stdLib.getDataSize());
+        }
     }
 
-    void SlangDecoder::IGlobalSession_saveStdLib(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_saveStdLib(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        SlangArchiveType archiveType {};
+        ObjectID outBlobId = 0;
+        ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, archiveType);
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outBlobId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_saveStdLib(objectId, archiveType, outBlobId);
+        }
     }
 
-    void SlangDecoder::IGlobalSession_findCapability(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_findCapability(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IGlobalSession_setDownstreamCompilerForTransition(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_setDownstreamCompilerForTransition(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        SlangCompileTarget source {};
+        SlangCompileTarget target {};
+        SlangPassThrough compiler {};
+
+        readByte = ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, source);
+        readByte += ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, target);
+        readByte += ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, compiler);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_setDownstreamCompilerForTransition(objectId, source, target, compiler);
+        }
     }
 
-    void SlangDecoder::IGlobalSession_getDownstreamCompilerForTransition(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_getDownstreamCompilerForTransition(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IGlobalSession_getCompilerElapsedTime(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_getCompilerElapsedTime(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IGlobalSession_setSPIRVCoreGrammar(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_setSPIRVCoreGrammar(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IGlobalSession_parseCommandLineArguments(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_parseCommandLineArguments(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        int argc = 0;
+        size_t readByte = 0;
+        readByte = ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, argc);
+        std::vector<char*> argv;
+
+        if (argc > 0)
+        {
+            uint32_t arrayCount = 0;
+            readByte += ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, arrayCount);
+
+            SLANG_CAPTURE_ASSERT(arrayCount == (uint32_t)argc);
+            argv.resize(arrayCount);
+
+            readByte += ParameterDecoder::decodeStringArray(parameterBlock.parameterBuffer + readByte,
+                parameterBlock.parameterBufferSize - readByte, argv.data(), arrayCount);
+        }
+
+        ObjectID outSessionDescId = 0;
+        ObjectID outAllocationId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSessionDescId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outAllocationId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_parseCommandLineArguments(objectId, argc, argv.data(), outSessionDescId, outAllocationId);
+        }
     }
 
-    void SlangDecoder::IGlobalSession_getSessionDescDigest(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_getSessionDescDigest(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        StructDecoder<slang::SessionDesc> sessionDesc;
+        ObjectID outBlobId = 0;
+        size_t readByte = 0;
+        sessionDesc.decode(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize);
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outBlobId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IGlobalSession_getSessionDescDigest(objectId, &sessionDesc.getValue(), outBlobId);
+        }
     }
 
 
-    void SlangDecoder::ISession_getGlobalSession(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_getGlobalSession(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::ISession_loadModule(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_loadModule(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
-    }
+        size_t readByte = 0;
+        StringDecoder moduleName;
+        readByte += ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, moduleName);
 
-    void SlangDecoder::ISession_loadModuleFromBlob(ApiCallId callId, ParameterBlock const& parameterBlock)
-    {
+        ObjectID outDiagnosticsId = 0;
+        ObjectID outModuleId = 0;
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outModuleId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_loadModule(objectId, moduleName.getPointer(), outDiagnosticsId, outModuleId);
+        }
     }
 
-    void SlangDecoder::ISession_loadModuleFromIRBlob(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_loadModuleFromIRBlob(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        StringDecoder moduleName;
+        StringDecoder path;
+        BlobDecoder source;
+        readByte  = ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, moduleName);
+        readByte += ParameterDecoder::decodeString(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, path);
+        readByte += source.decode(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte);
+
+        ObjectID outDiagnosticsId = 0;
+        ObjectID outModuleId = 0;
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outModuleId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_loadModuleFromIRBlob(objectId, moduleName.getPointer(), path.getPointer(), source.getBlob(), outDiagnosticsId, outModuleId);
+        }
     }
 
-    void SlangDecoder::ISession_loadModuleFromSource(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_loadModuleFromSource(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        StringDecoder moduleName;
+        StringDecoder path;
+        BlobDecoder source;
+        readByte  = ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, moduleName);
+        readByte += ParameterDecoder::decodeString(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, path);
+        readByte += source.decode(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte);
+
+        ObjectID outDiagnosticsId = 0;
+        ObjectID outModuleId = 0;
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outModuleId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_loadModuleFromSource(objectId, moduleName.getPointer(), path.getPointer(), source.getBlob(), outDiagnosticsId, outModuleId);
+        }
     }
 
-    void SlangDecoder::ISession_loadModuleFromSourceString(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_loadModuleFromSourceString(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        StringDecoder moduleName;
+        StringDecoder path;
+        StringDecoder source;
+        readByte  = ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, moduleName);
+        readByte += ParameterDecoder::decodeString(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, path);
+        readByte += ParameterDecoder::decodeString(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, source);
+
+        ObjectID outDiagnosticsId = 0;
+        ObjectID outModuleId = 0;
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outModuleId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_loadModuleFromSourceString(objectId, moduleName.getPointer(), path.getPointer(), source.getPointer(), outDiagnosticsId, outModuleId);
+        }
     }
 
-    void SlangDecoder::ISession_createCompositeComponentType(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_createCompositeComponentType(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        std::vector<ObjectID> componentTypeIdList;
+        uint32_t arrayCount = 0;
+        readByte  = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, arrayCount);
+
+        componentTypeIdList.resize(arrayCount);
+        readByte += ParameterDecoder::decodeAddressArray(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, componentTypeIdList.data(), arrayCount);
+
+        ObjectID outCompositeComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte =  ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outCompositeComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_createCompositeComponentType(objectId, componentTypeIdList.data(), componentTypeIdList.size(), outCompositeComponentTypeId, outDiagnosticsId);
+        }
+
     }
 
-    void SlangDecoder::ISession_specializeType(ApiCallId callId, ParameterBlock const& parameterBlock)
+    // TODO: See https://github.com/shader-slang/slang/issues/4624 for more details
+    void SlangDecoder::ISession_specializeType(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection app is not captured\n", __PRETTY_FUNCTION__);
+
+        size_t readByte = 0;
+        ObjectID typeId = 0;
+        uint32_t arrayCount = 0;
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, typeId);
+        readByte += ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, arrayCount);
+
+        std::vector<slang::SpecializationArg> specializationArgs;
+        specializationArgs.resize(arrayCount);
+        readByte += ParameterDecoder::decodeStructArray(parameterBlock.parameterBuffer + readByte,
+                parameterBlock.parameterBufferSize - readByte, specializationArgs.data(), arrayCount);
+
+        ObjectID outDiagnosticsId = 0;
+        ObjectID outTypeReflectionId = 0;
+
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outTypeReflectionId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_specializeType(objectId, typeId, specializationArgs.data(), specializationArgs.size(), outDiagnosticsId, outTypeReflectionId);
+        }
     }
 
-    void SlangDecoder::ISession_getTypeLayout(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_getTypeLayout(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection app is not captured\n", __PRETTY_FUNCTION__);
+
+        size_t readByte = 0;
+        ObjectID typeId = 0;
+        int64_t targetIndex = 0;
+        slang::LayoutRules rules {};
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, typeId);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+        readByte += ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, rules);
+
+        ObjectID outDiagnosticsId = 0;
+        ObjectID outTypeLayoutReflectionId = 0;
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outTypeLayoutReflectionId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_getTypeLayout(objectId, typeId, targetIndex, rules, outDiagnosticsId, outTypeLayoutReflectionId);
+        }
     }
 
-    void SlangDecoder::ISession_getContainerType(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_getContainerType(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection app is not captured\n", __PRETTY_FUNCTION__);
+
+        size_t readByte = 0;
+        ObjectID elementType = 0;
+        slang::ContainerType containerType {};
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, elementType);
+        readByte += ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, containerType);
+
+        ObjectID outDiagnosticsId = 0;
+        ObjectID outTypeReflectionId = 0;
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outTypeReflectionId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_getContainerType(objectId, elementType, containerType, outDiagnosticsId, outTypeReflectionId);
+        }
     }
 
-    void SlangDecoder::ISession_getDynamicType(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_getDynamicType(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection app is not captured\n", __PRETTY_FUNCTION__);
+
+        ObjectID outTypeReflectionId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outTypeReflectionId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_getDynamicType(objectId, outTypeReflectionId);
+        }
     }
 
-    void SlangDecoder::ISession_getTypeRTTIMangledName(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_getTypeRTTIMangledName(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection app is not captured\n", __PRETTY_FUNCTION__);
+
+        ObjectID typeId = 0;
+        ObjectID outNameBlobId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, typeId);
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outNameBlobId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_getTypeRTTIMangledName(objectId, typeId, outNameBlobId);
+        }
     }
 
-    void SlangDecoder::ISession_getTypeConformanceWitnessMangledName(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_getTypeConformanceWitnessMangledName(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection app is not captured\n", __PRETTY_FUNCTION__);
+
+        size_t readByte = 0;
+        ObjectID typeId = 0;
+        ObjectID interfaceTypeId = 0;
+        ObjectID outNameBlobId = 0;
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, typeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, interfaceTypeId);
+
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outNameBlobId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_getTypeConformanceWitnessMangledName(objectId, typeId, interfaceTypeId, outNameBlobId);
+        }
     }
 
-    void SlangDecoder::ISession_getTypeConformanceWitnessSequentialID(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_getTypeConformanceWitnessSequentialID(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection app is not captured\n", __PRETTY_FUNCTION__);
+
+        size_t readByte = 0;
+
+        ObjectID typeId = 0;
+        ObjectID interfaceTypeId = 0;
+
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, typeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, interfaceTypeId);
+
+        uint32_t outSequentialId = 0;
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_getTypeConformanceWitnessSequentialID(objectId, typeId, interfaceTypeId, outSequentialId);
+        }
     }
 
-    void SlangDecoder::ISession_createTypeConformanceComponentType(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_createTypeConformanceComponentType(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection app is not captured\n", __PRETTY_FUNCTION__);
+
+        size_t readByte = 0;
+        ObjectID typeId = 0;
+        ObjectID interfaceTypeId = 0;
+        int64_t conformanceIdOverride = 0;
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, typeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, interfaceTypeId);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, conformanceIdOverride);
+
+        ObjectID outDiagnosticsId = 0;
+        ObjectID outConformanceId = 0;
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outConformanceId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_createTypeConformanceComponentType(objectId, typeId, interfaceTypeId, conformanceIdOverride, outConformanceId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::ISession_createCompileRequest(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_createCompileRequest(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        ObjectID outCompileRequestId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outCompileRequestId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_createCompileRequest(objectId, outCompileRequestId);
+        }
     }
 
-    void SlangDecoder::ISession_getLoadedModuleCount(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_getLoadedModuleCount(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::ISession_getLoadedModule(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_getLoadedModule(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        int64_t index = 0;
+        ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, index);
+
+        ObjectID outModuleId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outModuleId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ISession_getLoadedModule(objectId, index, outModuleId);
+        }
     }
 
-    void SlangDecoder::ISession_isBinaryModuleUpToDate(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ISession_isBinaryModuleUpToDate(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
 
-    void SlangDecoder::IModule_findEntryPointByName(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_findEntryPointByName(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        StringDecoder name;
+        ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, name);
+
+        ObjectID outEntryPointId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outEntryPointId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_findEntryPointByName(objectId, name.getPointer(), outEntryPointId);
+        }
     }
 
-    void SlangDecoder::IModule_getDefinedEntryPointCount(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getDefinedEntryPointCount(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IModule_getDefinedEntryPoint(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getDefinedEntryPoint(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        int32_t index;
+        ObjectID outEntryPointId = 0;
+        ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, index);
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outEntryPointId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_getDefinedEntryPoint(objectId, index, outEntryPointId);
+        }
     }
 
-    void SlangDecoder::IModule_serialize(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_serialize(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        ObjectID outSerializedBlobId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSerializedBlobId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_serialize(objectId, outSerializedBlobId);
+        }
     }
 
-    void SlangDecoder::IModule_writeToFile(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_writeToFile(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        StringDecoder fileName;
+        ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, fileName);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_writeToFile(objectId, fileName.getPointer());
+        }
     }
 
-    void SlangDecoder::IModule_getName(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getName(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IModule_getFilePath(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getFilePath(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IModule_getUniqueIdentity(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getUniqueIdentity(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IModule_findAndCheckEntryPoint(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_findAndCheckEntryPoint(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        StringDecoder name;
+        SlangStage stage {};
+        size_t readByte = 0;
+        readByte  = ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, name);
+        readByte += ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, stage);
+
+        ObjectID outEntryPointId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outEntryPointId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_findAndCheckEntryPoint(objectId, name.getPointer(), stage, outEntryPointId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::IModule_getSession(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getSession(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IModule_getLayout(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getLayout(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        int64_t targetIndex = 0;
+        ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, targetIndex);
+        ObjectID outDiagnosticsId = 0;
+        ObjectID programLayoutId = 0;
+
+        size_t readByte = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, programLayoutId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_getLayout(objectId, targetIndex, outDiagnosticsId, programLayoutId);
+        }
     }
 
-    void SlangDecoder::IModule_getSpecializationParamCount(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getSpecializationParamCount(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IModule_getEntryPointCode(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getEntryPointCode(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outCodeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outCodeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_getEntryPointCode(objectId, entryPointIndex, targetIndex, outCodeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::IModule_getTargetCode(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getTargetCode(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, targetIndex);
+
+        ObjectID outCodeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outCodeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_getTargetCode(objectId, targetIndex, outCodeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::IModule_getResultAsFileSystem(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getResultAsFileSystem(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outFileSystemId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outFileSystemId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_getResultAsFileSystem(objectId, entryPointIndex, targetIndex, outFileSystemId);
+        }
     }
 
-    void SlangDecoder::IModule_getEntryPointHash(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getEntryPointHash(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outBlobId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outBlobId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_getEntryPointHash(objectId, entryPointIndex, targetIndex, outBlobId);
+        }
     }
 
-    void SlangDecoder::IModule_specialize(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_specialize(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection interfaces are not captured\n", __PRETTY_FUNCTION__);
+
+        size_t readByte = 0;
+        uint32_t specializationArgCount = 0;
+        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
+
+        std::vector<slang::SpecializationArg> specializationArgs;
+
+        uint32_t arraySize = 0;
+        readByte += ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer + readByte,
+            parameterBlock.parameterBufferSize - readByte, arraySize);
+
+        SLANG_CAPTURE_ASSERT(arraySize == specializationArgCount);
+
+        specializationArgs.resize(specializationArgCount);
+        readByte += ParameterDecoder::decodeStructArray(parameterBlock.parameterBuffer + readByte,
+                parameterBlock.parameterBufferSize - readByte, specializationArgs.data(), specializationArgCount);
+
+        ObjectID outSpecializedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSpecializedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_specialize(objectId, specializationArgs.data(), specializationArgCount, outSpecializedComponentTypeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::IModule_link(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_link(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        ObjectID outLinkedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outLinkedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_link(objectId, outLinkedComponentTypeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::IModule_getEntryPointHostCallable(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outSharedLibraryId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_getEntryPointHostCallable(objectId, entryPointIndex, targetIndex, outSharedLibraryId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::IModule_renameEntryPoint(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_renameEntryPoint(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        StringDecoder newName;
+        ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, newName);
+
+        ObjectID outEntryPointId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outEntryPointId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_renameEntryPoint(objectId, newName.getPointer(), outEntryPointId);
+        }
     }
 
-    void SlangDecoder::IModule_linkWithOptions(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IModule_linkWithOptions(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
-    }
+        size_t readByte = 0;
+        uint32_t compilerOptionEntryCount = 0;
+        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, compilerOptionEntryCount);
+
+        std::vector<slang::CompilerOptionEntry> compilerOptionEntries;
+
+        uint32_t arrayCount = 0;
+        readByte += ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer + readByte,
+            parameterBlock.parameterBufferSize - readByte, arrayCount);
+
+        SLANG_CAPTURE_ASSERT(arrayCount == compilerOptionEntryCount);
+        compilerOptionEntries.resize(compilerOptionEntryCount);
+
+        readByte += ParameterDecoder::decodeStructArray(parameterBlock.parameterBuffer + readByte,
+                parameterBlock.parameterBufferSize - readByte, compilerOptionEntries.data(), compilerOptionEntryCount);
 
+        ObjectID outLinkedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outLinkedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
 
-    void SlangDecoder::IEntryPoint_getSession(ApiCallId callId, ParameterBlock const& parameterBlock)
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_linkWithOptions(objectId, outLinkedComponentTypeId, compilerOptionEntryCount, compilerOptionEntries.data(), outDiagnosticsId);
+        }
+    }
+
+    void SlangDecoder::IEntryPoint_getSession(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IEntryPoint_getLayout(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IEntryPoint_getLayout(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        int64_t targetIndex = 0;
+        ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, targetIndex);
+
+        ObjectID outDiagnosticsId = 0;
+        ObjectID programLayoutId = 0;
+
+        size_t readByte = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, programLayoutId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IEntryPoint_getLayout(objectId, targetIndex, outDiagnosticsId, programLayoutId);
+        }
     }
 
-    void SlangDecoder::IEntryPoint_getSpecializationParamCount(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IEntryPoint_getSpecializationParamCount(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IEntryPoint_getEntryPointCode(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IEntryPoint_getEntryPointCode(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outCodeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outCodeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IEntryPoint_getEntryPointCode(objectId, entryPointIndex, targetIndex, outCodeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::IEntryPoint_getTargetCode(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IEntryPoint_getTargetCode(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, targetIndex);
+
+        ObjectID outCodeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outCodeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IEntryPoint_getTargetCode(objectId, targetIndex, outCodeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::IEntryPoint_getResultAsFileSystem(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IEntryPoint_getResultAsFileSystem(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outFileSystemId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outFileSystemId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IEntryPoint_getResultAsFileSystem(objectId, entryPointIndex, targetIndex, outFileSystemId);
+        }
     }
 
-    void SlangDecoder::IEntryPoint_getEntryPointHash(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IEntryPoint_getEntryPointHash(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outBlobId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outBlobId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IEntryPoint_getEntryPointHash(objectId, entryPointIndex, targetIndex, outBlobId);
+        }
     }
 
-    void SlangDecoder::IEntryPoint_specialize(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IEntryPoint_specialize(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection interfaces are not captured\n", __PRETTY_FUNCTION__);
+
+        size_t readByte = 0;
+        uint32_t specializationArgCount = 0;
+        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
+
+        std::vector<slang::SpecializationArg> specializationArgs;
+
+        uint32_t arraySize = 0;
+        readByte += ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer + readByte,
+            parameterBlock.parameterBufferSize - readByte, arraySize);
+
+        SLANG_CAPTURE_ASSERT(arraySize == specializationArgCount);
+
+        specializationArgs.resize(specializationArgCount);
+        readByte += ParameterDecoder::decodeStructArray(parameterBlock.parameterBuffer + readByte,
+                parameterBlock.parameterBufferSize - readByte, specializationArgs.data(), specializationArgCount);
+
+        ObjectID outSpecializedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSpecializedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IEntryPoint_specialize(objectId, specializationArgs.data(), specializationArgCount, outSpecializedComponentTypeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::IEntryPoint_link(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IEntryPoint_link(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        ObjectID outLinkedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outLinkedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IEntryPoint_link(objectId, outLinkedComponentTypeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::IEntryPoint_getEntryPointHostCallable(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IEntryPoint_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outSharedLibraryId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IEntryPoint_getEntryPointHostCallable(objectId, entryPointIndex, targetIndex, outSharedLibraryId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::IEntryPoint_renameEntryPoint(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IEntryPoint_renameEntryPoint(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        StringDecoder newName;
+        ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, newName);
+
+        ObjectID outEntryPointId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outEntryPointId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IEntryPoint_renameEntryPoint(objectId, newName.getPointer(), outEntryPointId);
+        }
     }
 
-    void SlangDecoder::IEntryPoint_linkWithOptions(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IEntryPoint_linkWithOptions(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        uint32_t compilerOptionEntryCount = 0;
+        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, compilerOptionEntryCount);
+
+        std::vector<slang::CompilerOptionEntry> compilerOptionEntries;
+
+        uint32_t arrayCount = 0;
+        readByte += ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer + readByte,
+            parameterBlock.parameterBufferSize - readByte, arrayCount);
+
+        SLANG_CAPTURE_ASSERT(arrayCount == compilerOptionEntryCount);
+        compilerOptionEntries.resize(compilerOptionEntryCount);
+
+        readByte += ParameterDecoder::decodeStructArray(parameterBlock.parameterBuffer + readByte,
+                parameterBlock.parameterBufferSize - readByte, compilerOptionEntries.data(), compilerOptionEntryCount);
+
+        ObjectID outLinkedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outLinkedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IEntryPoint_linkWithOptions(objectId, outLinkedComponentTypeId, compilerOptionEntryCount, compilerOptionEntries.data(), outDiagnosticsId);
+        }
     }
 
 
-    void SlangDecoder::ICompositeComponentType_getSession(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_getSession(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::ICompositeComponentType_getLayout(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_getLayout(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        int64_t targetIndex = 0;
+        ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, targetIndex);
+        ObjectID outDiagnosticsId = 0;
+        ObjectID programLayoutId = 0;
+
+        size_t readByte = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, programLayoutId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ICompositeComponentType_getLayout(objectId, targetIndex, outDiagnosticsId, programLayoutId);
+        }
     }
 
-    void SlangDecoder::ICompositeComponentType_getSpecializationParamCount(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_getSpecializationParamCount(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::ICompositeComponentType_getEntryPointCode(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_getEntryPointCode(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outCodeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outCodeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ICompositeComponentType_getEntryPointCode(objectId, entryPointIndex, targetIndex, outCodeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::ICompositeComponentType_getTargetCode(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_getTargetCode(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, targetIndex);
+
+        ObjectID outCodeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outCodeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ICompositeComponentType_getTargetCode(objectId, targetIndex, outCodeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::ICompositeComponentType_getResultAsFileSystem(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_getResultAsFileSystem(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outFileSystemId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outFileSystemId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ICompositeComponentType_getResultAsFileSystem(objectId, entryPointIndex, targetIndex, outFileSystemId);
+        }
     }
 
-    void SlangDecoder::ICompositeComponentType_getEntryPointHash(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_getEntryPointHash(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outBlobId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outBlobId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ICompositeComponentType_getEntryPointHash(objectId, entryPointIndex, targetIndex, outBlobId);
+        }
     }
 
-    void SlangDecoder::ICompositeComponentType_specialize(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_specialize(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection interfaces are not captured\n", __PRETTY_FUNCTION__);
+
+        size_t readByte = 0;
+        uint32_t specializationArgCount = 0;
+        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
+
+        std::vector<slang::SpecializationArg> specializationArgs;
+
+        uint32_t arraySize = 0;
+        readByte += ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer + readByte,
+            parameterBlock.parameterBufferSize - readByte, arraySize);
+
+        SLANG_CAPTURE_ASSERT(arraySize == specializationArgCount);
+
+        specializationArgs.resize(specializationArgCount);
+        readByte += ParameterDecoder::decodeStructArray(parameterBlock.parameterBuffer + readByte,
+                parameterBlock.parameterBufferSize - readByte, specializationArgs.data(), specializationArgCount);
+
+        ObjectID outSpecializedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSpecializedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ICompositeComponentType_specialize(objectId, specializationArgs.data(), specializationArgCount, outSpecializedComponentTypeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::ICompositeComponentType_link(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_link(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        ObjectID outLinkedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outLinkedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ICompositeComponentType_link(objectId, outLinkedComponentTypeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::ICompositeComponentType_getEntryPointHostCallable(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outSharedLibraryId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ICompositeComponentType_getEntryPointHostCallable(objectId, entryPointIndex, targetIndex, outSharedLibraryId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::ICompositeComponentType_renameEntryPoint(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_renameEntryPoint(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        StringDecoder newName;
+        ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, newName);
+
+        ObjectID outEntryPointId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outEntryPointId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ICompositeComponentType_renameEntryPoint(objectId, newName.getPointer(), outEntryPointId);
+        }
     }
 
-    void SlangDecoder::ICompositeComponentType_linkWithOptions(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ICompositeComponentType_linkWithOptions(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        uint32_t compilerOptionEntryCount = 0;
+        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, compilerOptionEntryCount);
+
+        std::vector<slang::CompilerOptionEntry> compilerOptionEntries;
+
+        uint32_t arrayCount = 0;
+        readByte += ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer + readByte,
+            parameterBlock.parameterBufferSize - readByte, arrayCount);
+
+        SLANG_CAPTURE_ASSERT(arrayCount == compilerOptionEntryCount);
+        compilerOptionEntries.resize(compilerOptionEntryCount);
+
+        readByte += ParameterDecoder::decodeStructArray(parameterBlock.parameterBuffer + readByte,
+                parameterBlock.parameterBufferSize - readByte, compilerOptionEntries.data(), compilerOptionEntryCount);
+
+        ObjectID outLinkedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outLinkedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ICompositeComponentType_linkWithOptions(objectId, outLinkedComponentTypeId, compilerOptionEntryCount, compilerOptionEntries.data(), outDiagnosticsId);
+        }
     }
 
 
-    void SlangDecoder::ITypeConformance_getSession(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_getSession(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::ITypeConformance_getLayout(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_getLayout(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        int64_t targetIndex = 0;
+        ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, targetIndex);
+        ObjectID outDiagnosticsId = 0;
+        ObjectID programLayoutId = 0;
+
+        size_t readByte = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, programLayoutId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ITypeConformance_getLayout(objectId, targetIndex, outDiagnosticsId, programLayoutId);
+        }
     }
 
-    void SlangDecoder::ITypeConformance_getSpecializationParamCount(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_getSpecializationParamCount(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        (void)objectId;
+        (void)parameterBlock;
+        slangCaptureLog(LogLevel::Debug, "%s should not be called, it'a not captured\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::ITypeConformance_getEntryPointCode(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_getEntryPointCode(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outCodeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outCodeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ITypeConformance_getEntryPointCode(objectId, entryPointIndex, targetIndex, outCodeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::ITypeConformance_getTargetCode(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_getTargetCode(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, targetIndex);
+
+        ObjectID outCodeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outCodeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ITypeConformance_getTargetCode(objectId, targetIndex, outCodeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::ITypeConformance_getResultAsFileSystem(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_getResultAsFileSystem(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outFileSystemId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outFileSystemId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ITypeConformance_getResultAsFileSystem(objectId, entryPointIndex, targetIndex, outFileSystemId);
+        }
     }
 
-    void SlangDecoder::ITypeConformance_getEntryPointHash(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_getEntryPointHash(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outBlobId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outBlobId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ITypeConformance_getEntryPointHash(objectId, entryPointIndex, targetIndex, outBlobId);
+        }
     }
 
-    void SlangDecoder::ITypeConformance_specialize(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_specialize(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        slangCaptureLog(LogLevel::Error, "%s: The shader reflection interfaces are not captured\n", __PRETTY_FUNCTION__);
+
+        size_t readByte = 0;
+        uint32_t specializationArgCount = 0;
+        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
+
+        std::vector<slang::SpecializationArg> specializationArgs;
+
+        uint32_t arraySize = 0;
+        readByte += ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer + readByte,
+            parameterBlock.parameterBufferSize - readByte, arraySize);
+
+        SLANG_CAPTURE_ASSERT(arraySize == specializationArgCount);
+
+        specializationArgs.resize(specializationArgCount);
+        readByte += ParameterDecoder::decodeStructArray(parameterBlock.parameterBuffer + readByte,
+                parameterBlock.parameterBufferSize - readByte, specializationArgs.data(), specializationArgCount);
+
+        ObjectID outSpecializedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSpecializedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->IModule_specialize(objectId, specializationArgs.data(), specializationArgCount, outSpecializedComponentTypeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::ITypeConformance_link(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_link(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        ObjectID outLinkedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outLinkedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ITypeConformance_link(objectId, outLinkedComponentTypeId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::ITypeConformance_getEntryPointHostCallable(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        size_t readByte = 0;
+        int64_t entryPointIndex = 0;
+        int64_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+
+        ObjectID outSharedLibraryId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ITypeConformance_getEntryPointHostCallable(objectId, entryPointIndex, targetIndex, outSharedLibraryId, outDiagnosticsId);
+        }
     }
 
-    void SlangDecoder::ITypeConformance_renameEntryPoint(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_renameEntryPoint(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
+        StringDecoder newName;
+        ParameterDecoder::decodeString(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, newName);
+
+        ObjectID outEntryPointId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outEntryPointId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ITypeConformance_renameEntryPoint(objectId, newName.getPointer(), outEntryPointId);
+        }
     }
 
-    void SlangDecoder::ITypeConformance_linkWithOptions(ApiCallId callId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::ITypeConformance_linkWithOptions(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
-    }
+        size_t readByte = 0;
+        uint32_t compilerOptionEntryCount = 0;
+        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, compilerOptionEntryCount);
 
+        std::vector<slang::CompilerOptionEntry> compilerOptionEntries;
+
+        uint32_t arrayCount = 0;
+        readByte += ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer + readByte,
+            parameterBlock.parameterBufferSize - readByte, arrayCount);
+
+        SLANG_CAPTURE_ASSERT(arrayCount == compilerOptionEntryCount);
+        compilerOptionEntries.resize(compilerOptionEntryCount);
+
+        readByte += ParameterDecoder::decodeStructArray(parameterBlock.parameterBuffer + readByte,
+                parameterBlock.parameterBufferSize - readByte, compilerOptionEntries.data(), compilerOptionEntryCount);
+
+        ObjectID outLinkedComponentTypeId = 0;
+        ObjectID outDiagnosticsId = 0;
+        readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outLinkedComponentTypeId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->ITypeConformance_linkWithOptions(objectId, outLinkedComponentTypeId, compilerOptionEntryCount, compilerOptionEntries.data(), outDiagnosticsId);
+        }
+    }
 }

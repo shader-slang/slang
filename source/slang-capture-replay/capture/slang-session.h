@@ -26,12 +26,6 @@ namespace SlangCapture
         SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModule(
             const char* moduleName,
             slang::IBlob**     outDiagnostics = nullptr) override;
-        slang::IModule* SLANG_MCALL loadModuleFromBlob(
-            const char* moduleName,
-            const char* path,
-            slang::IBlob* source,
-            ModuleBlobType blobType,
-            slang::IBlob** outDiagnostics = nullptr);
         SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromIRBlob(
             const char* moduleName,
             const char* path,

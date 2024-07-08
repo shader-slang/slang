@@ -415,6 +415,7 @@ namespace SlangCapture
         ParameterEncoder* encoder {};
         {
             encoder = m_captureManager->beginMethodCapture(ApiCallId::IGlobalSession_parseCommandLineArguments, m_globalSessionHandle);
+            encoder->encodeInt32(argc);
             encoder->encodeStringArray(argv, argc);
             encoder = m_captureManager->endMethodCapture();
         }
@@ -422,7 +423,7 @@ namespace SlangCapture
         SlangResult res = m_actualGlobalSession->parseCommandLineArguments(argc, argv, outSessionDesc, outAllocation);
 
         {
-            encoder->encodeStruct(*outSessionDesc);
+            encoder->encodeAddress(outSessionDesc);
             encoder->encodeAddress(*outAllocation);
             m_captureManager->endMethodCaptureAppendOutput();
         }

@@ -1,5 +1,4 @@
 #include "parameter-encoder.h"
-#include "../util/capture-format.h"
 
 namespace SlangCapture
 {

@@ -8,71 +8,10 @@
 #include "../util/capture-format.h"
 #include "../util/capture-utility.h"
 #include "../../../slang.h"
+#include "decoder-helper.h"
 
 namespace SlangCapture
 {
-    // This class is used to allocate memory for the type decoder
-    class DecoderAllocatorSingleton
-    {
-    public:
-        static DecoderAllocatorSingleton* getInstance()
-        {
-            thread_local DecoderAllocatorSingleton instance;
-            return &instance;
-        }
-
-        void* allocate(size_t size)
-        {
-            void* data = calloc(1, size);
-            m_allocations.push_back(data);
-            return data;
-        }
-
-        ~DecoderAllocatorSingleton()
-        {
-            for (auto allocation : m_allocations)
-            {
-                free(allocation);
-            }
-        }
-    private:
-        DecoderAllocatorSingleton() = default;
-        std::vector<void*> m_allocations;
-    };
-
-    class DecoderBase
-    {
-    public:
-        virtual ~DecoderBase() = default;
-        void* allocate(size_t size) { return m_allocator->allocate(size); }
-    protected:
-        DecoderAllocatorSingleton* m_allocator = DecoderAllocatorSingleton::getInstance();
-    };
-
-    // We don't allow pointer type to be used as a template parameter
-    template <typename T, typename = typename std::enable_if< !std::is_pointer<T>::value >::type>
-    class TypeDecoder : public DecoderBase
-    {
-    public:
-        T& getValue() { return m_typeValue;}
-
-    protected:
-        T m_typeValue {};
-    };
-
-    // We only allow pointer type to be used as a template parameter
-    template <class T, typename = typename std::enable_if< std::is_pointer<T>::value >::type>
-    class PointerDecoder : public DecoderBase
-    {
-    public:
-        void setPointer(void* data) { m_pointer = static_cast<T>(data); }
-        T getPointer()             { return m_pointer; }
-        void setPointerAddress(uint64_t address) { m_pointerAddress = address; }
-    private:
-        T m_pointer {nullptr};
-        uint64_t m_pointerAddress = 0;
-    };
-
     class ParameterDecoder
     {
     public:
@@ -100,21 +39,20 @@ namespace SlangCapture
         static size_t decodeString(const uint8_t* buffer,  int64_t bufferSize, PointerDecoder<char*>& typeDecoder);
 
         static size_t decodePointer(const uint8_t* buffer, int64_t bufferSize, PointerDecoder<void*>& pointerDecoder);
-        static void decodePointer(ISlangBlob* blob);
 
         static size_t decodeAddress(const uint8_t* buffer, int64_t bufferSize, SlangCapture::AddressFormat& address)
         {
             return decodeValue(buffer, bufferSize, address);
         }
-        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::SessionDesc>& sessionDesc);
-        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::PreprocessorMacroDesc>& desc);
-        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::CompilerOptionEntry>& entry);
-        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::CompilerOptionValue>& value);
-        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::TargetDesc>& targetDesc);
-        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::SpecializationArg>& specializationArg);
+        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::SessionDesc>& sessionDesc);
+        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::PreprocessorMacroDesc>& desc);
+        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::CompilerOptionEntry>& entry);
+        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::CompilerOptionValue>& value);
+        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::TargetDesc>& targetDesc);
+        static size_t decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::SpecializationArg>& specializationArg);
 
         template <typename T>
-        static size_t decodeValueArray(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<T>* valueArray, size_t count)
+        static size_t decodeValueArray(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<T>* valueArray, size_t count)
         {
             SLANG_CAPTURE_ASSERT((buffer != nullptr) && (bufferSize > 0));
 
@@ -150,15 +88,14 @@ namespace SlangCapture
             size_t bufferRead = 0;
             for (size_t i = 0; i < count; ++i)
             {
-                TypeDecoder<T> item;
+                ValueDecoder<T> item;
                 bufferRead += decodeStruct(buffer + bufferRead, bufferSize - bufferRead, item);
                 outputArray[i] = item.getValue();
             }
             return bufferRead;
         }
 
-        template <typename T>
-        static size_t encodeAddressArray(const uint8_t* buffer, int64_t bufferSize, uint64_t* addressArray, size_t count)
+        static size_t decodeAddressArray(const uint8_t* buffer, int64_t bufferSize, uint64_t* addressArray, size_t count)
         {
             SLANG_CAPTURE_ASSERT((buffer != nullptr) && (bufferSize > 0));
 
@@ -167,6 +104,8 @@ namespace SlangCapture
             {
                 bufferRead += decodeAddress(buffer + bufferRead, bufferSize - bufferRead, addressArray[i]);
             }
+
+            return bufferRead;
         }
 
 

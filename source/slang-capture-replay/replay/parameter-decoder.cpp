@@ -26,6 +26,7 @@ namespace SlangCapture
         uint8_t* data = (uint8_t*)typeDecoder.allocate(stringLength + 1);
         memcpy(data, buffer + readByte, stringLength);
         typeDecoder.setPointer(data);
+        typeDecoder.setDataSize(stringLength + 1);
         return readByte + stringLength;
     }
 
@@ -42,7 +43,7 @@ namespace SlangCapture
         size_t readByte = decodeAddress(buffer, bufferSize, address);
         pointerDecoder.setPointerAddress(address);
 
-        size_t dataSize = 0;
+        uint64_t dataSize = 0;
         readByte += decodeUint64(buffer + readByte, bufferSize - readByte, dataSize);
 
         // return if the data size is 0
@@ -56,13 +57,11 @@ namespace SlangCapture
         uint8_t* data = (uint8_t*)pointerDecoder.allocate(dataSize);
         memcpy(data, buffer + readByte, dataSize);
         pointerDecoder.setPointer(data);
+        pointerDecoder.setDataSize(dataSize);
         return readByte + dataSize;
     }
 
-    void ParameterDecoder::decodePointer(ISlangBlob* blob)
-    {}
-
-    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::SessionDesc>& sessionDesc)
+    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::SessionDesc>& sessionDesc)
     {
         SLANG_CAPTURE_ASSERT((buffer != nullptr) && (bufferSize > 0));
 
@@ -73,7 +72,11 @@ namespace SlangCapture
 
         size_t readByte = 0;
         slang::SessionDesc& desc = sessionDesc.getValue();
-        readByte = decodeUint64(buffer, bufferSize, desc.structureSize);
+
+        uint64_t structSize = 0;
+        readByte = decodeUint64(buffer, bufferSize, structSize);
+        desc.structureSize = structSize;
+
         readByte += decodeInt64(buffer + readByte, bufferSize - readByte, desc.targetCount);
 
         if (desc.targetCount > 0)
@@ -118,7 +121,7 @@ namespace SlangCapture
         return readByte;
     }
 
-    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::PreprocessorMacroDesc>& desc)
+    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::PreprocessorMacroDesc>& desc)
     {
         SLANG_CAPTURE_ASSERT((buffer != nullptr) && (bufferSize > 0));
 
@@ -135,21 +138,21 @@ namespace SlangCapture
         return readByte;
     }
 
-    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::CompilerOptionEntry>& entry)
+    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::CompilerOptionEntry>& entry)
     {
         SLANG_CAPTURE_ASSERT((buffer != nullptr) && (bufferSize > 0));
 
         size_t readByte = 0;
         readByte = decodeEnumValue(buffer, bufferSize, entry.getValue().name);
 
-        TypeDecoder<slang::CompilerOptionValue> value;
+        ValueDecoder<slang::CompilerOptionValue> value;
         readByte += decodeStruct(buffer + readByte, bufferSize - readByte, value);
         entry.getValue().value = value.getValue();
 
         return readByte;
     }
 
-    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::CompilerOptionValue>& value)
+    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::CompilerOptionValue>& value)
     {
         SLANG_CAPTURE_ASSERT((buffer != nullptr) && (bufferSize > 0));
 
@@ -167,12 +170,15 @@ namespace SlangCapture
         return 0;
     }
 
-    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::TargetDesc>& targetDesc)
+    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::TargetDesc>& targetDesc)
     {
         SLANG_CAPTURE_ASSERT((buffer != nullptr) && (bufferSize > 0));
 
         size_t readByte = 0;
-        readByte  = decodeUint64(buffer, bufferSize, targetDesc.getValue().structureSize);
+        uint64_t structSize = 0;
+        readByte  = decodeUint64(buffer, bufferSize, structSize);
+        targetDesc.getValue().structureSize = structSize;
+
         readByte += decodeEnumValue(buffer + readByte, bufferSize - readByte, targetDesc.getValue().format);
         readByte += decodeEnumValue(buffer + readByte, bufferSize - readByte, targetDesc.getValue().profile);
         readByte += decodeEnumValue(buffer + readByte, bufferSize - readByte, targetDesc.getValue().flags);
@@ -192,7 +198,7 @@ namespace SlangCapture
         return readByte;
     }
 
-    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, TypeDecoder<slang::SpecializationArg>& specializationArg)
+    size_t ParameterDecoder::decodeStruct(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<slang::SpecializationArg>& specializationArg)
     {
         SLANG_CAPTURE_ASSERT((buffer != nullptr) && (bufferSize > 0));
 

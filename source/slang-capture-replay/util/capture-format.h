@@ -31,7 +31,11 @@ namespace SlangCapture
         Class_ITypeConformance           = 7,
     };
 
+    // Store the pointer value in a 64-bit integer
     typedef uint64_t AddressFormat;
+
+    // Use the address directly to represent the slang object.
+    typedef AddressFormat ObjectID;
 
     constexpr uint64_t g_globalFunctionHandle = 0;
     constexpr uint32_t MAGIC_HEADER = 0x44414548;
@@ -70,7 +74,6 @@ namespace SlangCapture
 
         ISession_getGlobalSession                            = makeApiCallId(Class_ISession, 0x0001),
         ISession_loadModule                                  = makeApiCallId(Class_ISession, 0x0002),
-        ISession_loadModuleFromBlob                          = makeApiCallId(Class_ISession, 0x0003),
         ISession_loadModuleFromIRBlob                        = makeApiCallId(Class_ISession, 0x0004),
         ISession_loadModuleFromSource                        = makeApiCallId(Class_ISession, 0x0005),
         ISession_loadModuleFromSourceString                  = makeApiCallId(Class_ISession, 0x0006),
@@ -154,7 +157,7 @@ namespace SlangCapture
     {
         uint32_t         magic {MAGIC_HEADER};
         ApiCallId        callId {InvalidCallId};
-        uint64_t         handleId {0};
+        ObjectID         handleId {0};
         uint64_t         dataSizeInBytes {0};
         uint64_t         threadId {0};
     };

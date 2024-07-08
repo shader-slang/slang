@@ -44,6 +44,7 @@ namespace SlangCapture
         template <typename T>
         void encodeValueArray(const T* array, size_t count)
         {
+            encodeInt32(count);
             for (size_t i = 0; i < count; ++i)
             {
                 encodeValue(array[i]);
@@ -52,6 +53,7 @@ namespace SlangCapture
 
         void encodeStringArray(const char* const* array, size_t count)
         {
+            encodeInt32(count);
             for (size_t i = 0; i < count; ++i)
             {
                 encodeString(array[i]);
@@ -61,6 +63,7 @@ namespace SlangCapture
         template <typename T>
         void encodeStructArray(T const* array, size_t count)
         {
+            encodeInt32(count);
             for (size_t i = 0; i < count; ++i)
             {
                 encodeStruct(array[i]);
@@ -70,6 +73,7 @@ namespace SlangCapture
         template <typename T>
         void encodeAddressArray(T* const* array, size_t count)
         {
+            encodeInt32(count);
             for (size_t i = 0; i < count; ++i)
             {
                 encodeAddress(array[i]);

@@ -217,18 +217,7 @@ namespace SlangCapture
     {
         slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
 
-        ParameterEncoder* encoder {};
-        {
-            encoder = m_captureManager->beginMethodCapture(ApiCallId::IModule_getSession, m_moduleHandle);
-            encoder = m_captureManager->endMethodCapture();
-        }
-
         slang::ISession* session = m_actualModule->getSession();
-
-        {
-            encoder->encodeAddress(session);
-            m_captureManager->endMethodCaptureAppendOutput();
-        }
 
         return session;
     }
@@ -336,6 +325,7 @@ namespace SlangCapture
 
         {
             encoder->encodeAddress(*outFileSystem);
+            m_captureManager->endMethodCaptureAppendOutput();
         }
 
         // TODO: We might need to wrap the file system object.
