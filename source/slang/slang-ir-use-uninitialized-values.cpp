@@ -318,9 +318,14 @@ namespace Slang
 
     static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sink)
     {
+        IRType* type = variable->getFullType();
+        IRRateQualifiedType* rq = as<IRRateQualifiedType>(type);
+        if (!rq || !as<IRGroupSharedRate>(rq->getRate()))
+            return;
+
         // Check for initialization blocks
         for (auto inst : variable->getChildren()) {
-            if (auto block = as<IRBlock>(inst))
+            if (as<IRBlock>(inst))
                 return;
         }
 
