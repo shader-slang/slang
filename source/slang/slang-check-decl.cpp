@@ -10152,6 +10152,11 @@ namespace Slang
         }
     }
 
+    static void _propagateSeeDefinitionOf(SemanticsVisitor* visitor, Decl* funcDecl, DiagnosticCategory diagnosticCategory)
+    {
+        maybeDiagnose(visitor->getSink(), visitor->getOptionSet(), diagnosticCategory, funcDecl, Diagnostics::seeDefinitionOf, funcDecl);
+    }
+
     static void _propagateRequirement(SemanticsVisitor* visitor, CapabilitySet& resultCaps, SyntaxNode* userNode, SyntaxNode* referencedNode, const CapabilitySet& nodeCaps, SourceLoc referenceLoc)
     {
         auto referencedDecl = as<Decl>(referencedNode);
@@ -10235,20 +10240,22 @@ namespace Slang
 
     CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt);
 
-    template<typename ProcessFunc>
+    template<typename ProcessFunc, typename ParentDiagnosticFunc>
     struct CapabilityDeclReferenceVisitor
-        : public SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc>>
+        : public SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc>>
     {
-        typedef SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc>> Base;
+        typedef SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc>> Base;
 
-        const ProcessFunc& handleReferenceFunc;
+        const ProcessFunc handleProcessFunc;
+        const ParentDiagnosticFunc handleParentDiagnosticFunc;
         RequireCapabilityAttribute* maybeRequireCapability;
         SemanticsContext& outerContext;
-        CapabilityDeclReferenceVisitor(const ProcessFunc& processFunc, RequireCapabilityAttribute* maybeRequireCapability, SemanticsContext& outer)
-            : handleReferenceFunc(processFunc)
+        CapabilityDeclReferenceVisitor(const ProcessFunc& processFunc, const ParentDiagnosticFunc& parentDiagnosticFunc, RequireCapabilityAttribute* maybeRequireCapability, SemanticsContext& outer)
+            : handleProcessFunc(processFunc)
+            , handleParentDiagnosticFunc(parentDiagnosticFunc)
             , maybeRequireCapability(maybeRequireCapability)
             , outerContext(outer)
-            , SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc>>(outer)
+            , SemanticsDeclReferenceVisitor<CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc>>(outer)
         {
         }
         virtual void processReferencedDecl(Decl* decl) override
@@ -10256,16 +10263,16 @@ namespace Slang
             SourceLoc loc = SourceLoc();
             if (Base::sourceLocStack.getCount())
                 loc = Base::sourceLocStack.getLast();
-            handleReferenceFunc(decl, decl->inferredCapabilityRequirements, loc);
+            handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
         }
         virtual void processDeclModifiers(Decl* decl) override
         {
             if (decl)
-                handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+                handleProcessFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
         }
         void visitDiscardStmt(DiscardStmt* stmt)
         {
-            handleReferenceFunc(stmt, CapabilitySet(CapabilityName::fragment), stmt->loc);
+            handleProcessFunc(stmt, CapabilitySet(CapabilityName::fragment), stmt->loc);
         }
         void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
         {
@@ -10304,6 +10311,19 @@ namespace Slang
                 else
                 {
                     targetCap = CapabilitySet(CapabilityName(stmt->targetCases[targetCaseIndex]->capability));
+                    
+                    if (maybeRequireCapability)
+                    {
+                        CapabilitySet testingForInvalid = maybeRequireCapability->capabilitySet;
+                        // Ensure case statement is valid with parent `[require(...)]`
+                        testingForInvalid.join(targetCap);
+                        if (testingForInvalid.isInvalid())
+                        {
+                            maybeDiagnose(Base::getSink(), outerContext.getOptionSet(), DiagnosticCategory::Capability, stmt->targetCases[targetCaseIndex]->loc,
+                                Diagnostics::conflictingCapabilityDueToStatement, targetCap, maybeRequireCapability, maybeRequireCapability->capabilitySet);
+                            handleParentDiagnosticFunc(DiagnosticCategory::Capability);
+                        }
+                    }
                 }
                 auto targetCase = stmt->targetCases[targetCaseIndex];
                 auto oldCap = targetCap;
@@ -10312,22 +10332,23 @@ namespace Slang
                 if (targetCap.isInvalid())
                 {
                     maybeDiagnose(Base::getSink(), outerContext.getOptionSet(), DiagnosticCategory::Capability, targetCase->body->loc, Diagnostics::conflictingCapabilityDueToStatement, bodyCap, "target_switch", oldCap);
+                    handleParentDiagnosticFunc(DiagnosticCategory::Capability);
                 }
                 set.unionWith(targetCap);
             }
-            handleReferenceFunc(stmt, set, stmt->loc);
+            handleProcessFunc(stmt, set, stmt->loc);
         }
 
         void visitRequireCapabilityDecl(RequireCapabilityDecl* decl)
         {
-            handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+            handleProcessFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
         }
     };
 
-    template<typename ProcessFunc>
-    void visitReferencedDecls(SemanticsContext& context, NodeBase* node, SourceLoc initialLoc, RequireCapabilityAttribute* maybeRequireCapability, const ProcessFunc& func)
+    template<typename ProcessFunc, typename ParentDiagnosticFunc>
+    void visitReferencedDecls(SemanticsContext& context, NodeBase* node, SourceLoc initialLoc, RequireCapabilityAttribute* maybeRequireCapability, const ProcessFunc& processFunc, const ParentDiagnosticFunc& parentDiagnosticFunc)
     {
-        CapabilityDeclReferenceVisitor<ProcessFunc> visitor(func, maybeRequireCapability, context);
+        CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc> visitor(processFunc, parentDiagnosticFunc, maybeRequireCapability, context);
         visitor.sourceLocStack.add(initialLoc);
 
         if (auto val = as<Val>(node))
@@ -10346,19 +10367,31 @@ namespace Slang
             return CapabilitySet();
 
         CapabilitySet inferredRequirements;
-        visitReferencedDecls(*visitor, stmt, stmt->loc, nullptr, [&](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
-            {
-                _propagateRequirement(visitor, inferredRequirements, stmt, node, nodeCaps, refLoc);
-            });
+        visitReferencedDecls(*visitor, stmt, stmt->loc, nullptr,
+                [&](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+                {
+                    _propagateRequirement(visitor, inferredRequirements, stmt, node, nodeCaps, refLoc);
+                },
+                [](DiagnosticCategory category)
+                {
+                    SLANG_UNUSED(category);
+                }
+            );
         return inferredRequirements;
     }
 
     void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
-        visitReferencedDecls(*this, varDecl->type.type, varDecl->loc, varDecl->findModifier<RequireCapabilityAttribute>(), [this, varDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
-            {
-                _propagateRequirement(this, varDecl->inferredCapabilityRequirements, varDecl, node, nodeCaps, refLoc);
-            });
+        visitReferencedDecls(*this, varDecl->type.type, varDecl->loc, varDecl->findModifier<RequireCapabilityAttribute>(),
+                [this, varDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+                {
+                    _propagateRequirement(this, varDecl->inferredCapabilityRequirements, varDecl, node, nodeCaps, refLoc);
+                },
+                [this, varDecl](DiagnosticCategory category)
+                {
+                    _propagateSeeDefinitionOf(this, varDecl, category);
+                }
+            );
     }
 
     CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* decl)
@@ -10408,8 +10441,8 @@ namespace Slang
         decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
     }
 
-    template<typename ProcessFunc>
-    static inline void _dispatchCapabilitiesVisitorOfFunctionDecl(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, ProcessFunc propegateFuncForReferences)
+    template<typename ProcessFunc, typename ParentDiagnosticFunc>
+    static inline void _dispatchCapabilitiesVisitorOfFunctionDecl(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, const ProcessFunc& processFunc, const ParentDiagnosticFunc& parentDiagnosticFunc)
     {
         visitor->setParentFuncOfVisitor(funcDecl);
 
@@ -10419,7 +10452,7 @@ namespace Slang
             _propagateRequirement(visitor, funcDecl->inferredCapabilityRequirements, funcDecl, member, member->inferredCapabilityRequirements, member->loc);
         }
 
-        visitReferencedDecls(*visitor, funcDecl->body, funcDecl->loc, funcDecl->findModifier<RequireCapabilityAttribute>(), propegateFuncForReferences);
+        visitReferencedDecls(*visitor, funcDecl->body, funcDecl->loc, funcDecl->findModifier<RequireCapabilityAttribute>(), processFunc, parentDiagnosticFunc);
 
         if (!isEffectivelyStatic(funcDecl))
         {
@@ -10435,10 +10468,15 @@ namespace Slang
     void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
     {
         _dispatchCapabilitiesVisitorOfFunctionDecl(this, funcDecl, 
-            [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
-            {
-                _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, node, nodeCaps, refLoc);
-            });
+                [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+                {
+                    _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, node, nodeCaps, refLoc);
+                },
+                [this, funcDecl](DiagnosticCategory category)
+                {
+                    _propagateSeeDefinitionOf(this, funcDecl, category);
+                }
+            );
 
         auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
 

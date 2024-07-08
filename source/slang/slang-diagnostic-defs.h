@@ -393,6 +393,7 @@ DIAGNOSTIC(36107, Error, entryPointUsesUnavailableCapability, "entrypoint '$0' r
 DIAGNOSTIC(36108, Error, declHasDependenciesNotCompatibleOnTarget, "'$0' has dependencies that are not compatible on the required target '$1'.")
 DIAGNOSTIC(36109, Error, invalidTargetSwitchCase, "'$0' cannot be used as a target_switch case.")
 DIAGNOSTIC(36110, Error, stageIsInCompatibleWithCapabilityDefinition, "'$0' is defined for stage '$1', which is incompatible with the declared capability set '$2'.")
+DIAGNOSTIC(36111, Error, unexpectedCapability, "'$0' resolves into a disallowed `$1` Capability.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
