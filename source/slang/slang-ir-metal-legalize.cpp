@@ -1067,12 +1067,15 @@ namespace Slang
 
             List<IRSemanticDecoration*> overlappingSemanticsDecor;
             Dictionary<UnownedStringSlice, TreeMap<UInt>> usedSemanticIndexSemanticDecor;
+            usedSemanticIndexSemanticDecor.reserve(2);
 
             List<AttributeParentPair<IRVarOffsetAttr>> overlappingVarOffset;
             Dictionary<UInt, TreeMap<UInt>> usedSemanticIndexVarOffset;
+            usedSemanticIndexVarOffset.reserve(2);
 
             List<AttributeParentPair<IRUserSemanticAttr>> overlappingUserSemantic;
             Dictionary<UnownedStringSlice, TreeMap<UInt>> usedSemanticIndexUserSemantic;
+            usedSemanticIndexUserSemantic.reserve(2);
 
             // We store a map from old `IRLayoutDecoration*` to new `IRLayoutDecoration*` since when legalizing
             // we may destroy and remake a `IRLayoutDecoration*`

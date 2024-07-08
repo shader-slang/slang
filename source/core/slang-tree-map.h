@@ -8,7 +8,7 @@
 namespace Slang
 {
 
-    // Array backed red-black tree map
+    // Array-backed Red-black Tree Map.
     template<typename T>
     class TreeMap
     {
@@ -22,11 +22,9 @@ namespace Slang
 
         class TreeMapNode
         {
-            // Context
-            TreeMap<T>* m_treeMap = nullptr;
-            // Index of the data this node links to inside m_treeMap->m_data
+            // Index of the data this node links to TreeMap->m_data
             Index m_dataIndex = kInvalidIndex;
-            // Index of nodes this node has a relationship. Indices relate to m_treeMap->m_nodes
+            // Index of nodes this node has a relationship. Indices relate to TreeMap->m_nodes
             Index m_parentNodeIndex = kInvalidIndex;
             Index m_leftNodeIndex = kInvalidIndex;
             Index m_rightNodeIndex = kInvalidIndex;
@@ -38,9 +36,9 @@ namespace Slang
             {
             }
 
-            TreeMapNode(TreeMap<T>* treeMap, Index dataIndex, Index parentNodeIndex,
+            TreeMapNode(Index dataIndex, Index parentNodeIndex,
                 Index leftNodeIndex, Index rightNodeIndex, NodeColor nodeColor)
-                : m_treeMap(treeMap), m_dataIndex(dataIndex), m_parentNodeIndex(parentNodeIndex),
+                : m_dataIndex(dataIndex), m_parentNodeIndex(parentNodeIndex),
                 m_leftNodeIndex(leftNodeIndex), m_rightNodeIndex(rightNodeIndex), m_nodeColor(nodeColor)
             {
             }
@@ -50,19 +48,48 @@ namespace Slang
                 return {};
             }
 
-            TreeMapNode& getNextLargestParentNode()
+            // Assumes this is the same TreeMap context
+            bool operator==(const TreeMapNode& other) const
+            {
+                return other.m_dataIndex == this->m_dataIndex;
+            }
+
+            bool operator!=(const TreeMapNode& other) const
+            {
+                return !(other == *this);
+            }
+
+            explicit operator bool() const
+            {// this->operator!=
+                return TreeMap<T>::getInvalidNode() != *this;
+            }
+
+            TreeMapNode& getNextLargestParentNode(TreeMap<T>* context)
             {
                 // We have do not have a 'parent', we are the largest node.
-                auto& parent = getParentNodeRef();
+                auto& parent = getParentNodeRef(context);
                 if (!parent)
                     return parent;
                 // If we are a 'leftNode' of 'parent', we are smaller.
-                else if (parent.getLeftNodeRef() == *this)
+                else if (parent.getLeftNodeRef(context) == *this)
                     return parent;
                 // If we are a 'rightNode' of parent, 'parent.parent' is next largest
                 // as long as 'parent.parent.left' is equal to 'parent' 
                 else
-                    return parent.getNextLargestParentNode();
+                    return parent.getNextLargestParentNode(context);
+            }
+            TreeMapNode& getNextLargestNode(TreeMap<T>* context)
+            {
+                // Next largest node if available
+                if (auto rightNode = getRightNodeRef(context))
+                {
+                    *this = rightNode;
+                    return *this;
+                }
+
+                // If we don't have a rightNode, parent may be the next largest.
+                *this = getNextLargestParentNode(context);
+                return *this;
             }
 
             NodeColor getNodeColor()
@@ -75,16 +102,16 @@ namespace Slang
                 m_nodeColor = color;
             }
 
-            TreeMapNode& getSiblingNodeRef(bool& isThisNodeALeftChild)
+            TreeMapNode& getSiblingNodeRef(TreeMap<T>* context, bool& isThisNodeALeftChild)
             {
-                auto parent = getParentNodeRef();
-                if (*this == parent.getLeftNodeRef())
+                auto parent = getParentNodeRef(context);
+                if (*this == parent.getLeftNodeRef(context))
                 {
                     isThisNodeALeftChild = true;
-                    return parent.getRightNodeRef();
+                    return parent.getRightNodeRef(context);
                 }
                 isThisNodeALeftChild = false;
-                return parent.getLeftNodeRef();
+                return parent.getLeftNodeRef(context);
             }
 
             Index getParentNodeIndex()
@@ -92,14 +119,14 @@ namespace Slang
                 return m_parentNodeIndex;
             }
 
-            TreeMapNode& getParentNodeRef()
+            TreeMapNode& getParentNodeRef(TreeMap<T>* context)
             {
-                return m_treeMap->getNodeRef(m_parentNodeIndex);
+                return context->getNodeRef(m_parentNodeIndex);
             }
 
-            TreeMapNode getParentNode()
+            TreeMapNode getParentNode(TreeMap<T>* context)
             {
-                return m_treeMap->getNodeRef(m_parentNodeIndex);
+                return context->getNodeRef(m_parentNodeIndex);
             }
 
             void setParentNode(Index nodeIndex)
@@ -112,14 +139,9 @@ namespace Slang
                 return m_leftNodeIndex;
             }
 
-            TreeMapNode getLeftNode()
+            TreeMapNode& getLeftNodeRef(TreeMap<T>* context)
             {
-                return m_treeMap->getNodeRef(m_leftNodeIndex);
-            }
-
-            TreeMapNode& getLeftNodeRef()
-            {
-                return m_treeMap->getNodeRef(m_leftNodeIndex);
+                return context->getNodeRef(m_leftNodeIndex);
             }
 
             void setLeftNode(Index nodeIndex)
@@ -132,14 +154,9 @@ namespace Slang
                 return m_rightNodeIndex;
             }
 
-            TreeMapNode getRightNode()
+            TreeMapNode& getRightNodeRef(TreeMap<T>* context)
             {
-                return m_treeMap->getNodeRef(m_rightNodeIndex);
-            }
-
-            TreeMapNode& getRightNodeRef()
-            {
-                return m_treeMap->getNodeRef(m_rightNodeIndex);
+                return context->getNodeRef(m_rightNodeIndex);
             }
 
             void setRightNode(Index nodeIndex)
@@ -152,39 +169,47 @@ namespace Slang
                 return m_dataIndex;
             }
 
-            TreeMapNode& operator++()
+            T getData(TreeMap<T>* context)
             {
-                // Next largest node if available
-                if (auto rightNode = getRightNodeRef())
-                {
-                    *this = rightNode;
-                    return *this;
-                }
+                return context->getData(getDataIndex());
+            }
+        };
 
-                // If we don't have a rightNode, parent may be the next largest.
-                *this = getNextLargestParentNode();
+        struct Iterator
+        {
+            TreeMap* m_context;
+            TreeMapNode m_currentNode;
+
+
+            Iterator(TreeMap* context, TreeMapNode currentNode) : m_context(context), m_currentNode(currentNode)
+            {
+            }
+            
+            Iterator& operator++()
+            {
+                m_currentNode = m_currentNode.getNextLargestNode(m_context);
                 return *this;
             }
 
-            bool operator==(const TreeMapNode& other) const
+            bool operator==(const Iterator& other) const
             {
-                return other.m_treeMap == this->m_treeMap
-                    && other.m_dataIndex == this->m_dataIndex;
+                return other.m_context == this->m_context
+                    && other.m_currentNode == this->m_currentNode;
             }
 
-            bool operator!=(const TreeMapNode& other) const
+            bool operator!=(const Iterator& other) const
             {
                 return !(*this == other);
             }
 
             explicit operator bool() const
             {
-                return *this != TreeMap<T>::getInvalidNode();
+                return m_currentNode != TreeMap<T>::getInvalidNode();
             }
 
             T& operator*()
             {
-                return m_treeMap->getData(m_dataIndex);
+                return m_context->getData(m_currentNode.getDataIndex());
             }
         };
 
@@ -227,7 +252,7 @@ namespace Slang
         {
             Index newDataIndex = m_data.getCount();
             m_data.add(obj);
-            TreeMapNode newNode = TreeMapNode( this, newDataIndex, parentNodeIndex, kInvalidIndex, kInvalidIndex, nodeColor);
+            TreeMapNode newNode = TreeMapNode(newDataIndex, parentNodeIndex, kInvalidIndex, kInvalidIndex, nodeColor);
             Index nodeIndex = m_nodes.getCount();
             m_nodes.add(newNode);
             return nodeIndex;
@@ -240,12 +265,12 @@ namespace Slang
             
             auto currentNode = getNodeRef(currentNodeIndex);
             auto rightNodeIndex = currentNode.getRightNodeIndex();
-            auto rightNode = currentNode.getRightNodeRef();
+            auto rightNode = currentNode.getRightNodeRef(this);
             currentNode.setRightNode(rightNode.getLeftNodeIndex());
-            if (auto leftNode = rightNode.getLeftNode())
-                leftNode.getLeftNodeRef().setParentNode(currentNodeIndex);
+            if (auto leftNode = rightNode.getLeftNodeRef(this))
+                leftNode.getLeftNodeRef(this).setParentNode(currentNodeIndex);
             auto parentNodeIndex = currentNode.getParentNodeIndex();
-            auto parentNode = currentNode.getParentNode();
+            auto parentNode = currentNode.getParentNodeRef(this);
             rightNode.setParentNode(parentNodeIndex);
             if (parentNodeIndex == kInvalidIndex)
                 m_rootNode = parentNodeIndex;
@@ -264,12 +289,12 @@ namespace Slang
 
             auto currentNode = getNodeRef(currentNodeIndex);
             auto leftNodeIndex = currentNode.getLeftNodeIndex();
-            auto leftNode = currentNode.getLeftNodeRef();
+            auto leftNode = currentNode.getLeftNodeRef(this);
             currentNode.setLeftNode(leftNode.getRightNodeIndex());
-            if (auto rightNode = leftNode.getRightNode())
-                rightNode.getRightNodeRef().setParentNode(currentNodeIndex);
+            if (auto rightNode = leftNode.getRightNodeRef(this))
+                rightNode.getRightNodeRef(this).setParentNode(currentNodeIndex);
             auto parentNodeIndex = currentNode.getParentNodeIndex();
-            auto parentNode = currentNode.getParentNode();
+            auto parentNode = currentNode.getParentNodeRef(this);
             leftNode.setParentNode(parentNodeIndex);
             if (parentNodeIndex == kInvalidIndex)
                 m_rootNode = parentNodeIndex;
@@ -287,12 +312,12 @@ namespace Slang
         {
             auto currentNode = getNodeRef(currentNodeIndex);
             auto parentNodeIndex = currentNode.getParentNodeIndex();
-            auto parentNode = currentNode.getParentNodeRef();
-            auto grandParentNode = parentNode.getParentNodeRef();
+            auto parentNode = currentNode.getParentNodeRef(this);
+            auto grandParentNode = parentNode.getParentNodeRef(this);
             while (currentNodeIndex != m_rootNode && parentNode.getNodeColor() == NodeColor::Red)
             {
                 bool isParentNodeALeftChild = false;
-                auto uncleNode = parentNode.getSiblingNodeRef(isParentNodeALeftChild);
+                auto uncleNode = parentNode.getSiblingNodeRef(this, isParentNodeALeftChild);
                 // Case 1
                 if (uncleNode.getNodeColor() == NodeColor::Red)
                 {
@@ -311,9 +336,9 @@ namespace Slang
                         currentNode = getNodeRef(currentNodeIndex);
 
                         parentNodeIndex = currentNode.getParentNodeIndex();
-                        parentNode = currentNode.getParentNodeRef();
+                        parentNode = currentNode.getParentNodeRef(this);
 
-                        grandParentNode = parentNode.getParentNodeRef();
+                        grandParentNode = parentNode.getParentNodeRef(this);
 
                         if (isParentNodeALeftChild)
                             leftRotation(currentNodeIndex);
@@ -349,12 +374,12 @@ namespace Slang
         {
             TreeMapNode& currentNode = getNodeRef(currentNodeIndex);
             // Don't duplicate an already existing node
-            if (obj == *currentNode)
+            if (obj == currentNode.getData(this))
                 return;
-            else if (obj > *currentNode)
+            else if (obj > currentNode.getData(this))
             {
                 addNewNodeInfo |= (int)AddNewNodeInfo::MovedRight;
-                if (currentNode.getRightNodeRef())
+                if (currentNode.getRightNodeRef(this))
                 {
                     _add(std::move(obj), currentNode.getRightNodeIndex(), addNewNodeInfo);
                 }
@@ -371,10 +396,10 @@ namespace Slang
                     validateAndFixInsert(nodeIndex);
                 }
             }
-            else if (obj < *currentNode)
+            else if (obj < currentNode.getData(this))
             {
                 addNewNodeInfo |= (int)AddNewNodeInfo::MovedLeft;
-                if (currentNode.getLeftNodeRef())
+                if (currentNode.getLeftNodeRef(this))
                 {
                     _add(std::move(obj), currentNode.getLeftNodeIndex(), addNewNodeInfo);
                 }
@@ -398,12 +423,12 @@ namespace Slang
         {
             if (!currentNode)
                 return false;
-            else if (*currentNode == obj)
+            else if (currentNode.getData(this) == obj)
                 return true;
-            else if (*currentNode < obj)
-                return _contains(obj, currentNode.getRightNodeRef());
+            else if (currentNode.getData(this) < obj)
+                return _contains(obj, currentNode.getRightNodeRef(this));
             else // (*currentNode > obj)
-                return _contains(obj, currentNode.getLeftNodeRef());
+                return _contains(obj, currentNode.getLeftNodeRef(this));
         }
 
     public:
@@ -433,14 +458,14 @@ namespace Slang
         }
         
         // Iterator is not stable if elements are added
-        TreeMapNode begin()
+        Iterator begin()
         {
-            return getNodeRef(m_smallestNode);
+            return Iterator(this, getNodeRef(m_smallestNode));
         }
 
-        TreeMapNode end()
+        Iterator end()
         {
-            return getInvalidNode();
+            return Iterator(this, getInvalidNode());
         }
     };
 
