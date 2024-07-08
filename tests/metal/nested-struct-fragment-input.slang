@@ -1,13 +1,24 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage fragment -entry fragmentMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage fragment -entry fragmentMain
 
-// METAL: color(7)
-// METAL: color(6)
-// METAL-DAG: color({{1|2|3|4}})
-// METAL-DAG: color({{1|2|3|4}})
-// METAL: color(0)
-// METAL-DAG: color({{1|2|3|4}})
-// METAL-DAG: color({{1|2|3|4}})
+// METAL: COARSEVERTEX_7
+// METAL: COARSEVERTEX_6
+
+// Ensure each attribute which may vary only appears once.
+// Ensure 1, 2, 3, 4 all appear
+
+// METAL-DAG: [[ATTR1:COARSEVERTEX_(1|2|3|4)]]
+
+// METAL-NOT: [[ATTR1]]
+// METAL-DAG: [[ATTR2:COARSEVERTEX_(1|2|3|4)]]
+
+// METAL: COARSEVERTEX{{(_0|())}}
+
+// METAL-NOT: [[ATTR2]]
+// METAL-DAG: [[ATTR3:COARSEVERTEX_(1|2|3|4)]]
+
+// METAL-NOT: [[ATTR3]]
+// METAL-DAG: [[ATTR4:COARSEVERTEX_(1|2|3|4)]]
 
 // METALLIB: @fragmentMain
 
@@ -42,15 +53,15 @@ struct FragmentStageInput
 
 float4 fragmentMain(FragmentStageInput input)
 {
-    // METAL-DAG: {{.*}}.p1{{.*}}=
+    // METAL-DAG: {{.*}}->p1{{.*}}=
 
-    // METAL-DAG: {{.*}}.p2{{.*}}.p1{{.*}}=
-    // METAL-DAG: {{.*}}.p2{{.*}}.p2{{.*}}.p1{{.*}}=
-    // METAL-DAG: {{.*}}.p2{{.*}}.p3{{.*}}.p1{{.*}}=
+    // METAL-DAG: {{.*}}->p2{{.*}}->p1{{.*}}=
+    // METAL-DAG: {{.*}}->p2{{.*}}->p2{{.*}}->p1{{.*}}=
+    // METAL-DAG: {{.*}}->p2{{.*}}->p3{{.*}}->p1{{.*}}=
 
-    // METAL-DAG: {{.*}}.p3{{.*}}.p1=
-    // METAL-DAG: {{.*}}.p3{{.*}}.p2{{.*}}.p1{{.*}}=
-    // METAL-DAG: {{.*}}.p3{{.*}}.p3{{.*}}.p1{{.*}}=
+    // METAL-DAG: {{.*}}->p3{{.*}}->p1{{.*}}=
+    // METAL-DAG: {{.*}}->p3{{.*}}->p2{{.*}}->p1{{.*}}=
+    // METAL-DAG: {{.*}}->p3{{.*}}->p3{{.*}}->p1{{.*}}=
 
     outputBuffer[0] = input.coarseVertex.p1 + input.coarseVertex.p2.p1 + +input.coarseVertex.p3.p1;
     return float4(0, 0, 0, 0);

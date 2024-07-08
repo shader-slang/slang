@@ -1,5 +1,6 @@
 #include "slang-ir-metal-legalize.h"
 
+#include "../core/slang-tree-map.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
@@ -957,7 +958,7 @@ namespace Slang
             }
         }
 
-        UInt _returnNonOverlappingAttributeIndex(OrderedHashSet<UInt>& usedSemanticIndex)
+        UInt _returnNonOverlappingAttributeIndex(TreeMap<UInt>& usedSemanticIndex)
         {
             // Find first unused semantic index of equal semantic type 
             // to fill any gaps in user set semantic bindings
@@ -1065,13 +1066,13 @@ namespace Slang
             IRBuilder builder(this->m_module);
 
             List<IRSemanticDecoration*> overlappingSemanticsDecor;
-            Dictionary<UnownedStringSlice, OrderedHashSet<UInt>> usedSemanticIndexSemanticDecor;
+            Dictionary<UnownedStringSlice, TreeMap<UInt>> usedSemanticIndexSemanticDecor;
 
             List<AttributeParentPair<IRVarOffsetAttr>> overlappingVarOffset;
-            Dictionary<UInt, OrderedHashSet<UInt>> usedSemanticIndexVarOffset;
+            Dictionary<UInt, TreeMap<UInt>> usedSemanticIndexVarOffset;
 
             List<AttributeParentPair<IRUserSemanticAttr>> overlappingUserSemantic;
-            Dictionary<UnownedStringSlice, OrderedHashSet<UInt>> usedSemanticIndexUserSemantic;
+            Dictionary<UnownedStringSlice, TreeMap<UInt>> usedSemanticIndexUserSemantic;
 
             // We store a map from old `IRLayoutDecoration*` to new `IRLayoutDecoration*` since when legalizing
             // we may destroy and remake a `IRLayoutDecoration*`
