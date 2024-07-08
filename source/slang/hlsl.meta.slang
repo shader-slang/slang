@@ -5573,6 +5573,8 @@ __generic<T : __BuiltinType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv)]
 bool all(vector<T,N> x)
 {
+    if(N == 1)
+        return all(x[0]);
     __target_switch
     {
     case hlsl:
@@ -5708,6 +5710,8 @@ __generic<T : __BuiltinType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv)]
 bool any(vector<T, N> x)
 {
+    if(N == 1)
+        return any(x[0]);
     __target_switch
     {
     case hlsl:
@@ -6064,6 +6068,8 @@ __generic<let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<int, N> asint(vector<uint, N> x)
 {
+    if(N == 1)
+        return vector<int, N>(asint(x[0]));
     __target_switch
     {
     case glsl: __intrinsic_asm "ivec$N0($0)";
@@ -6205,6 +6211,8 @@ __generic<let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
 vector<uint, N> asuint(vector<int, N> x)
 {
+    if(N == 1)
+        return vector<uint, N>(asuint(x[0]));
     __target_switch
     {
     case glsl: __intrinsic_asm "uvec$N0($0)";
@@ -12052,6 +12060,8 @@ __generic<T : __BuiltinSignedArithmeticType, let N : int>
 [__readNone]
 vector<int, N> sign(vector<T, N> x)
 {
+    if(N == 1)
+        return vector<int, N>(sign(x[0]));
     __target_switch
     {
     case hlsl: __intrinsic_asm "sign";
