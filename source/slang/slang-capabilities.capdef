@@ -58,6 +58,7 @@ def c : target + textualTarget;
 def cpp : target + textualTarget;
 def cuda : target + textualTarget;
 def metal : target + textualTarget;
+def wgsl : target + textualTarget;
 def spirv : target;
 
 // Capabilities that stand for target spirv version for GLSL backend.

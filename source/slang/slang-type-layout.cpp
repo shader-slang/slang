@@ -1773,6 +1773,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
 
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
+    case CodeGenTarget::WGSL:
     case CodeGenTarget::SPIRVAssembly:
         return &kGLSLLayoutRulesFamilyImpl;
 

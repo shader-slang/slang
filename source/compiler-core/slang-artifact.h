@@ -143,6 +143,7 @@ enum class ArtifactPayload : uint8_t
     CUDA,           ///< CUDA source
     Metal,          ///< Metal source
     Slang,          ///< Slang source
+    WGSL,           ///< WGSL source
 
     KernelLike,     ///< GPU Kernel like
 

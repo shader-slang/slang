@@ -94,6 +94,7 @@ namespace Slang
         Metal               = SLANG_METAL,
         MetalLib            = SLANG_METAL_LIB,
         MetalLibAssembly    = SLANG_METAL_LIB_ASM,
+        WGSL                = SLANG_WGSL,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
@@ -1266,6 +1267,7 @@ namespace Slang
         LLVM = SLANG_PASS_THROUGH_LLVM,                     ///< LLVM 'compiler'
         SpirvOpt = SLANG_PASS_THROUGH_SPIRV_OPT,            ///< pass thorugh spirv to spirv-opt
         MetalC = SLANG_PASS_THROUGH_METAL,
+        Tint = SLANG_PASS_THROUGH_TINT,                     ///< pass through spirv to Tint API
         CountOf = SLANG_PASS_THROUGH_COUNT_OF,              
     };
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);
@@ -2705,6 +2707,7 @@ namespace Slang
         SlangResult emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact);
             
         SlangResult emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact);
+        SlangResult emitWithTint(ComPtr<IArtifact> intermediateArtifact, ComPtr<IArtifact>& outArtifact);
 
         /* Determines a suitable filename to identify the input for a given entry point being compiled.
         If the end-to-end compile is a pass-through case, will attempt to find the (unique) source file

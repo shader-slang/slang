@@ -515,6 +515,7 @@ namespace Slang
                 return SourceLanguage::CUDA;
             }
             case PassThroughMode::SpirvDis:
+            case PassThroughMode::Tint:
             {
                 return SourceLanguage::SPIRV;
             }
@@ -567,6 +568,10 @@ namespace Slang
             case CodeGenTarget::MetalLibAssembly:
             {
                 return PassThroughMode::MetalC;
+            }
+            case CodeGenTarget::WGSL:
+            {
+                return PassThroughMode::Tint;
             }
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
@@ -998,6 +1003,7 @@ namespace Slang
             case CodeGenTarget::DXIL:               return CodeGenTarget::HLSL;
             case CodeGenTarget::SPIRV:              return CodeGenTarget::GLSL;
             case CodeGenTarget::MetalLib:           return CodeGenTarget::Metal;
+            case CodeGenTarget::WGSL:               return CodeGenTarget::SPIRV;
             default: break;
         }
         return CodeGenTarget::Unknown;
@@ -1573,6 +1579,33 @@ namespace Slang
         CodeGenContext* codeGenContext,
         ComPtr<IArtifact>& outArtifact);
 
+    SlangResult CodeGenContext::emitWithTint(ComPtr<IArtifact> intermediateArtifact, ComPtr<IArtifact>& outArtifact)
+    {
+        outArtifact.setNull();
+
+        PassThroughMode const compilerType {PassThroughMode::Tint};
+        IDownstreamCompiler* compiler = getSession()->getOrLoadDownstreamCompiler(compilerType, getSink());
+        if (!compiler)
+        {
+            auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)compilerType);
+            getSink()->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
+            return SLANG_FAIL;
+        }
+
+        DownstreamCompileOptions options;
+        auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(getTargetFormat()));
+        options.sourceArtifacts = makeSlice(intermediateArtifact.readRef(), 1);
+
+        auto downstreamStartTime = std::chrono::high_resolution_clock::now();
+        SLANG_RETURN_ON_FAIL(compiler->compile(options, artifact.writeRef()));
+        auto downstreamElapsedTime =
+            (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 1.0e-9;
+        getSession()->addDownstreamCompileTime(downstreamElapsedTime);
+
+        outArtifact.swap(artifact);
+        return SLANG_OK;
+    }
+
     static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
     {
         switch (target)
@@ -1580,6 +1613,7 @@ namespace Slang
             case CodeGenTarget::DXBytecodeAssembly: return CodeGenTarget::DXBytecode;
             case CodeGenTarget::DXILAssembly:       return CodeGenTarget::DXIL;
             case CodeGenTarget::SPIRVAssembly:      return CodeGenTarget::SPIRV;
+            case CodeGenTarget::WGSL:               return CodeGenTarget::SPIRV;
             default:    return CodeGenTarget::None;
         }
     }
@@ -1590,6 +1624,19 @@ namespace Slang
         auto target = getTargetFormat();
         switch (target)
         {
+            case CodeGenTarget::WGSL:
+            {
+                // First compile to an intermediate target for the corresponding binary format.
+                const CodeGenTarget intermediateTarget = _getIntermediateTarget(target);
+                CodeGenContext intermediateContext(this, intermediateTarget);
+
+                ComPtr<IArtifact> intermediateArtifact;
+                SLANG_RETURN_ON_FAIL(intermediateContext._emitEntryPoints(intermediateArtifact));
+                intermediateContext.maybeDumpIntermediate(intermediateArtifact);
+                
+                SLANG_RETURN_ON_FAIL(emitWithTint(intermediateArtifact, outArtifact));
+                return SLANG_OK;
+            }
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::DXBytecodeAssembly:
             case CodeGenTarget::DXILAssembly:
@@ -1660,6 +1707,7 @@ namespace Slang
         case CodeGenTarget::ShaderSharedLibrary:
         case CodeGenTarget::HostExecutable:
         case CodeGenTarget::HostSharedLibrary:
+        case CodeGenTarget::WGSL:
             {
                 SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 
