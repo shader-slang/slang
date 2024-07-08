@@ -47,10 +47,26 @@ jobs:
           mkdir build-platform-generators
           cmake --install build --config Release --component generators --prefix build-platform-generators
 
-      - name: Change dev tools to host arch
+      - name: Change dev tools to host arch (windows)
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{matrix.platform == 'aarch64' && 'amd64_arm64' || 'amd64'}}
+
+      - name: Change dev tools to host arch
+        run: |
+          if [[ "${{matrix.os}}" == "linux" && "${{matrix.platform}}" == "aarch64" ]]; then
+            export CC=aarch64-linux-gnu-gcc
+            export CXX=aarch64-linux-gnu-g++
+          fi
+          if [ "${{matrix.platform}}" = "aarch64" ]; then
+            export CMAKE_OSX_ARCHITECTURES="-DCMAKE_OSX_ARCHITECTURES=arm64"
+          else if [ "${{matrix.platform}}" = "x64" ]; then
+            export CMAKE_OSX_ARCHITECTURES="-DCMAKE_OSX_ARCHITECTURES=x86_64"
+          fi
+
+          echo "CC=$CC" >> "$GITHUB_ENV"
+          echo "CXX=$CXX" >> "$GITHUB_ENV"
+          echo "CMAKE_OSX_ARCHITECTURES=$CMAKE_OSX_ARCHITECTURES" >> "$GITHUB_ENV"
 
       - name: Build Slang
         run: |
@@ -59,23 +75,10 @@ jobs:
               exit 1
           fi
 
-          if [[ "${{matrix.os}}" == "linux" && "${{matrix.platform}}" == "aarch64" ]]; then
-            export CC=aarch64-linux-gnu-gcc
-            export CXX=aarch64-linux-gnu-g++
-          fi
-
-          if [ "${{matrix.platform}}" = "aarch64" ]; then
-            export OSX_ARCH="-DCMAKE_OSX_ARCHITECTURES=arm64"
-          else
-            export OSX_ARCH="-DCMAKE_OSX_ARCHITECTURES=x86_64"
-          fi
-
           cmake --preset default --fresh \
             -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
             -DSLANG_ENABLE_EXAMPLES=OFF \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
-            $OSX_ARCH \
-            "$@"
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
 
           cmake --workflow --preset "${{matrix.config}}"
 
