@@ -54,7 +54,7 @@ jobs:
         with:
           arch: ${{matrix.platform == 'aarch64' && 'amd64_arm64' || 'amd64'}}
 
-      - name: Change dev tools to host arch
+      - name: Change dev tools to host arch (linux and macos)
         run: |
           if [[ "${{matrix.os}}" == "linux" && "${{matrix.platform}}" == "aarch64" ]]; then
             export CC=aarch64-linux-gnu-gcc
