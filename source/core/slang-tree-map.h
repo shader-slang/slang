@@ -440,7 +440,7 @@ namespace Slang
 
         TreeMapNode end()
         {
-            return getNodeRef(m_largestNode);
+            return getInvalidNode();
         }
     };
 
