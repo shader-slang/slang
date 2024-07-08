@@ -17,9 +17,11 @@ jobs:
           - {os: linux, runs-on: ubuntu-20.04, compiler: gcc}
           - {os: windows, runs-on: windows-latest, compiler: cl}
           - {os: macos, runs-on: macos-latest, compiler: clang}
-          # - {platform: aarch64, build-slang-llvm: false}
-          # - {platform: aarch64, build-slang-llvm: false}
+
           - {build-slang-llvm: false}
+          - {os: linux, platform: x86_64, build-slang-llvm: true}
+          - {os: windows, platform: x86_64, build-slang-llvm: true}
+          - {os: macos, platform: aarch64, build-slang-llvm: true}
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
