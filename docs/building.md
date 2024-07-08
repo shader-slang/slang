@@ -150,3 +150,29 @@ cmake \
 cmake --workflow --preset release
 ```
 
+### Example cross compiling with MSVC to windows-aarch64
+
+One option is to build using the ninja generator, which requires providing the
+native and cross environments via `vcvarsall.bat`
+
+```bash
+vcvarsall.bat
+cmake --workflow --preset generators --fresh
+mkdir generators
+cmake --install build --prefix generators --component generators
+vsvarsall.bat x64_arm64
+cmake --preset default --fresh -DSLANG_GENERATORS_PATH=generators/bin
+cmake --workflow --preset release
+```
+
+Another option is to build using the Visual Studio generator which can find
+this automatically
+
+```
+cmake --preset vs2022 # or --preset vs2019
+cmake --build --preset generators # to build from the CLI
+cmake --install build --prefix generators --component generators
+rm -rf build # The Visual Studio generator will complain if this is left over from a previous build
+cmake --preset vs2022 --fresh -A arm64 -DSLANG_GENERATORS_PATH=generators/bin
+cmake --build --preset release
+```
