@@ -59,10 +59,10 @@ jobs:
 
       - name: Build Slang
         run: |
-          if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" ]]; then
-            echo "Please see ci.yml for the steps to make debug builds work on Windows" &>2
-            exit 1
-          endif
+          if [[ "${{ matrix.os }}" == "windows" && "${{ matrix.config }}" != "release" ]]; then
+              echo "Please see ci.yml for the steps to make debug builds work on Windows" >&2
+              exit 1
+          fi
 
           config(){
             cmake --preset default --fresh \
