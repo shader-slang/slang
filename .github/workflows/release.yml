@@ -81,10 +81,8 @@ jobs:
               else
                 config
               fi
-            windows*)
-              config
-            macos*)
-              if [ "${{matrix.platform}}" == "aarch64" ]; then
+            windows*) config
+            macos*) if [ "${{matrix.platform}}" == "aarch64" ]; then
                 config -DCMAKE_OSX_ARCHITECTURES=arm64
               else
                 config -DCMAKE_OSX_ARCHITECTURES=x86_64
