@@ -11,6 +11,8 @@ inputs:
     required: true
   config:
     required: true
+  build-llvm:
+    required: true
 runs:
   using: composite
   steps:
@@ -60,16 +62,17 @@ runs:
     # Try to restore a LLVM install, and build it otherwise
     - uses: actions/cache/restore@v3
       id: cache-llvm
+      if: inputs.build-llvm == 'true'
       with:
         path: ${{ github.workspace }}/build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
         key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
     - name: Build LLVM
-      if: steps.cache-llvm.outputs.cache-hit != 'true'
+      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
       run: ./external/build-llvm.sh --install-prefix "${{ github.workspace }}/build/llvm-project-install"
     - uses: actions/cache/save@v3
-      if: steps.cache-llvm.outputs.cache-hit != 'true'
+      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       with:
         path: ${{ github.workspace }}/build/llvm-project-install
         key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
@@ -89,8 +92,10 @@ runs:
     - name: Set environment variable for CMake
       shell: bash
       run: |
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+        if [ "${{inputs.build-llvm}}" == "true" ]; then
+          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+        fi
 
         # Set CMake to use sccache if it's available
         if command -v sccache; then
