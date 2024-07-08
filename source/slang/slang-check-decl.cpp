@@ -5218,7 +5218,7 @@ namespace Slang
             if (!diffMemberType)
                 continue;
 
-            // Pull up the derivative member name from the atribute
+            // Pull up the derivative member name from the attribute
             auto derivMemberName = derivativeAttr->memberDeclRef->declRef.getName();
 
             // Construct reference exprs to the member's corresponding fields in each parameter.
