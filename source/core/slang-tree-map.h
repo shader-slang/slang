@@ -20,7 +20,6 @@ namespace Slang
             Red = 2,
         };
 
-        template<typename T>
         class TreeMapNode
         {
             // Context
@@ -46,12 +45,12 @@ namespace Slang
             {
             }
 
-            static inline TreeMapNode<T> makeInvalidNode()
+            static inline TreeMapNode makeInvalidNode()
             {
                 return {};
             }
 
-            TreeMapNode<T>& getNextLargestParentNode()
+            TreeMapNode& getNextLargestParentNode()
             {
                 // We have do not have a 'parent', we are the largest node.
                 auto parent = getParentNodeRef();
@@ -76,7 +75,7 @@ namespace Slang
                 m_nodeColor = color;
             }
 
-            TreeMapNode<T>& getSiblingNodeRef(bool& isThisNodeALeftChild)
+            TreeMapNode& getSiblingNodeRef(bool& isThisNodeALeftChild)
             {
                 auto parent = getParentNodeRef();
                 if (*this == parent.getLeftNodeRef())
@@ -93,12 +92,12 @@ namespace Slang
                 return m_parentNodeIndex;
             }
 
-            TreeMapNode<T>& getParentNodeRef()
+            TreeMapNode& getParentNodeRef()
             {
                 return m_treeMap->getNodeRef(m_parentNodeIndex);
             }
 
-            TreeMapNode<T> getParentNode()
+            TreeMapNode getParentNode()
             {
                 return m_treeMap->getNodeRef(m_parentNodeIndex);
             }
@@ -113,12 +112,12 @@ namespace Slang
                 return m_leftNodeIndex;
             }
 
-            TreeMapNode<T> getLeftNode()
+            TreeMapNode getLeftNode()
             {
                 return m_treeMap->getNodeRef(m_leftNodeIndex);
             }
 
-            TreeMapNode<T>& getLeftNodeRef()
+            TreeMapNode& getLeftNodeRef()
             {
                 return m_treeMap->getNodeRef(m_leftNodeIndex);
             }
@@ -133,12 +132,12 @@ namespace Slang
                 return m_rightNodeIndex;
             }
 
-            TreeMapNode<T> getRightNode()
+            TreeMapNode getRightNode()
             {
                 return m_treeMap->getNodeRef(m_rightNodeIndex);
             }
 
-            TreeMapNode<T>& getRightNodeRef()
+            TreeMapNode& getRightNodeRef()
             {
                 return m_treeMap->getNodeRef(m_rightNodeIndex);
             }
@@ -153,7 +152,7 @@ namespace Slang
                 return m_dataIndex;
             }
 
-            TreeMapNode<T>& operator++()
+            TreeMapNode& operator++()
             {
                 // Next largest node if available
                 if (auto rightNode = getRightNodeRef())
@@ -167,13 +166,13 @@ namespace Slang
                 return *this;
             }
 
-            bool operator==(const TreeMapNode<T>& other) const
+            bool operator==(const TreeMapNode& other) const
             {
                 return other.m_treeMap == this->m_treeMap
                     && other.m_dataIndex == this->m_dataIndex;
             }
 
-            bool operator!=(const TreeMapNode<T>& other) const
+            bool operator!=(const TreeMapNode& other) const
             {
                 return !(*this == other);
             }
@@ -190,7 +189,7 @@ namespace Slang
         };
 
         // Node storage
-        List<TreeMapNode<T>> m_nodes;
+        List<TreeMapNode> m_nodes;
 
         // Storage of data TreeMapNode point to
         List<T> m_data;
@@ -201,8 +200,8 @@ namespace Slang
         Index m_largestNode = kInvalidIndex;
 
         // Cached invalid node
-        static inline TreeMapNode<T> invalidNode = TreeMapNode<T>::makeInvalidNode();
-        static inline TreeMapNode<T>& getInvalidNode()
+        static inline TreeMapNode invalidNode = TreeMapNode::makeInvalidNode();
+        static inline TreeMapNode& getInvalidNode()
         {
             return invalidNode;
         }
@@ -213,11 +212,11 @@ namespace Slang
             return m_data[dataIndex];
         }
 
-        TreeMapNode<T>& getNodeRef(Index nodeIndex)
+        TreeMapNode& getNodeRef(Index nodeIndex)
         {
             if (nodeIndex == kInvalidIndex)
             {
-                SLANG_ASSERT(TreeMap<T>::getInvalidNode() == TreeMapNode<T>::makeInvalidNode());
+                SLANG_ASSERT(TreeMap<T>::getInvalidNode() == TreeMapNode::makeInvalidNode());
                 return TreeMap<T>::getInvalidNode();
             }
             SLANG_ASSERT(nodeIndex > -1 && nodeIndex < m_nodes.getCount());
@@ -228,7 +227,7 @@ namespace Slang
         {
             Index newDataIndex = m_data.getCount();
             m_data.add(obj);
-            TreeMapNode<T> newNode = TreeMapNode<T>( this, newDataIndex, parentNodeIndex, kInvalidIndex, kInvalidIndex, nodeColor);
+            TreeMapNode newNode = TreeMapNode( this, newDataIndex, parentNodeIndex, kInvalidIndex, kInvalidIndex, nodeColor);
             Index nodeIndex = m_nodes.getCount();
             m_nodes.add(newNode);
             return nodeIndex;
@@ -350,7 +349,7 @@ namespace Slang
         // all existing pointers by resizing the backing-list.
         void _add(T&& obj, Index currentNodeIndex, int addNewNodeInfo)
         {
-            TreeMapNode<T>& currentNode = getNodeRef(currentNodeIndex);
+            TreeMapNode& currentNode = getNodeRef(currentNodeIndex);
             // Don't duplicate an already existing node
             if (obj == *currentNode)
                 return;
@@ -397,7 +396,7 @@ namespace Slang
         }
 
         // BST element search implementation
-        bool _contains(const T& obj, TreeMapNode<T>& currentNode)
+        bool _contains(const T& obj, TreeMapNode& currentNode)
         {
             if (!currentNode)
                 return false;
@@ -436,12 +435,12 @@ namespace Slang
         }
         
         // Iterator is not stable if elements are added
-        TreeMapNode<T> begin()
+        TreeMapNode begin()
         {
             return getNodeRef(m_smallestNode);
         }
 
-        TreeMapNode<T> end()
+        TreeMapNode end()
         {
             return getNodeRef(m_largestNode);
         }
