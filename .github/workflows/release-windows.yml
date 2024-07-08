@@ -80,6 +80,8 @@ jobs:
           7z a "$binArchive" bin\*\*\slangc.exe
           7z a "$binArchive" bin\*\*\slangd.exe
           7z a "$binArchive" docs\*.md
+          7z a "$binArchive" README.md
+          7z a "$binArchive" LICENSE
 
           $srcArchive = "slang-$slangVersion-source.zip"
           echo "SLANG_SOURCE_ARCHIVE=$srcArchive" >> $env:GITHUB_OUTPUT

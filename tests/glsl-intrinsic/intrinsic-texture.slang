@@ -1,13 +1,13 @@
 //TEST:SIMPLE(filecheck=HLSL): -allow-glsl -stage compute  -entry computeMain -target hlsl -DHLSL
 //TEST:SIMPLE(filecheck=HLSL): -allow-glsl -stage fragment -entry fragMain -target hlsl -DHLSL
-//TEST:SIMPLE(filecheck=GLSL): -allow-glsl -stage compute  -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=GLSL): -allow-glsl -stage fragment -entry fragMain -target glsl
-//TEST:SIMPLE(filecheck=SPIR): -allow-glsl -stage compute  -entry computeMain -target spirv
-//TEST:SIMPLE(filecheck=SPIR): -allow-glsl -stage fragment -entry fragMain -target spirv
-//TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage compute  -entry computeMain -target cuda
-//TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage fragment -entry fragMain -target cuda
+//TEST:SIMPLE(filecheck=GLSL): -allow-glsl -stage compute  -entry computeMain -target glsl -DGLSL
+//TEST:SIMPLE(filecheck=GLSL): -allow-glsl -stage fragment -entry fragMain -target glsl -DGLSL
+//TEST:SIMPLE(filecheck=SPIR): -allow-glsl -stage compute  -entry computeMain -target spirv -DSPIRV
+//TEST:SIMPLE(filecheck=SPIR): -allow-glsl -stage fragment -entry fragMain -target spirv -DSPIRV
+//TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage compute  -entry computeMain -target cuda -DCUDA
+//TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage fragment -entry fragMain -target cuda -DCUDA
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type -xslang -DSPIRV
 
 // TODO: This test revealed a few problems for a path from GLSL to HLSL
 //T-EST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -allow-glsl -use-dxil -output-using-type -profile cs_6_6 -xslang -DHLSL
@@ -1433,7 +1433,15 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         ;
 }
 
-[require(cpp_cuda_glsl_hlsl_spirv,compute,fragment)]
+#if defined(HLSL)
+[require(hlsl, sm_5_1, compute_fragment)]
+#elif defined(GLSL)
+[require(glsl, sm_5_1, compute_fragment)]
+#elif defined(SPIRV)
+[require(spirv, sm_5_1, compute_fragment)]
+#elif defined(CUDA)
+[require(cuda, sm_5_1, compute_fragment)]
+#endif
 __extern_cpp void TEST_main()
 {
     // GLSL: void main(
