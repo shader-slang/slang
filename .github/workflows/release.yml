@@ -49,7 +49,6 @@ jobs:
 
           cmake --preset default --fresh \
             -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/TC-linux-aarch64.cmake \
             -DSLANG_ENABLE_EXAMPLES=OFF
           cmake --workflow --preset "${{matrix.config}}"
 
