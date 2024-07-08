@@ -53,11 +53,6 @@ jobs:
         with:
           arch: ${{matrix.platform == 'aarch64' && 'amd64_arm64' || 'amd64'}}
 
-      - name: Install cross tools on Ubuntu
-        if: ${{matrix.runs-on == 'ubuntu-20.04' && matrix.platform == 'aarch64'}}
-        run: |
-          sudo apt-get install -y crossbuild-essential-arm64
-
       - name: Build Slang
         run: |
           if [[ "${{ matrix.os }}" == "windows" && "${{ matrix.config }}" != "release" ]]; then

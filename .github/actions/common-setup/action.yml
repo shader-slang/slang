@@ -32,6 +32,11 @@ runs:
           esac
         fi
 
+        # Install cross tools on Ubuntu
+        if [[ "${{inputs.os}}" == "linux" && "${{inputs.platform}}" == "aarch64" ]]; then
+          sudo apt-get install -y crossbuild-essential-arm64
+        fi
+
         # Set compiler
         CC=${{inputs.compiler}}
         CXX=${{inputs.compiler}}
