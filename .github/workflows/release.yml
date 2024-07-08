@@ -59,14 +59,10 @@ jobs:
               exit 1
           fi
 
-          case "${{ matrix.os }}" in
-            linux*)
-              if [ "${{matrix.platform}}" = "aarch64" ]; then
-                export CC=aarch64-linux-gnu-gcc
-                export CXX=aarch64-linux-gnu-g++
-              fi
-              ;;
-          esac
+          if [[ "${{matrix.os}}" == "linux" && "${{matrix.platform}}" == "aarch64" ]]; then
+            export CC=aarch64-linux-gnu-gcc
+            export CXX=aarch64-linux-gnu-g++
+          fi
 
           if [ "${{matrix.platform}}" = "aarch64" ]; then
             export OSX_ARCH="-DCMAKE_OSX_ARCHITECTURES=arm64"
