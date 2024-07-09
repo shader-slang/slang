@@ -22,8 +22,12 @@ jobs:
           - {os: linux, platform: x86_64, build-slang-llvm: true}
           - {os: windows, platform: x86_64, build-slang-llvm: true}
           - {os: macos, platform: aarch64, build-slang-llvm: true}
+
+          - {os: linux, image: null}
+          - {os: linux, platform: x86_64, image: slangdeveloper/centos7-gcc9}
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
+    image: ${{ matrix.image || '' }}
 
     defaults:
       run:
