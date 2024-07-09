@@ -325,15 +325,15 @@ struct WitnessLookupLoweringContext
         return resultValue;
     }
 
-    void rewriteCallSite(IRCall* call, IRInst* dispatchFunc, IRInst* witnessTableInst)
+    void rewriteCallSite(IRCall* call, IRInst* dispatchFunc, IRInst* initialExistentialObject)
     {
         SLANG_RELEASE_ASSERT(call->getArgCount() != 0);
         call->setOperand(0, dispatchFunc);
         IRBuilder builder(call);
         builder.setInsertBefore(call);
-        auto interfaceType = as<IRWitnessTableType>(witnessTableInst->getDataType())->getConformanceType();
+        auto witnessTable = builder.emitExtractExistentialWitnessTable(initialExistentialObject);
         auto newExistentialObject = builder.emitMakeExistential(
-            (IRType*)interfaceType, call->getOperand(1), witnessTableInst);
+            initialExistentialObject->getDataType(), call->getOperand(1), witnessTable);
         call->setOperand(1, newExistentialObject);
     }
 
@@ -349,7 +349,7 @@ struct WitnessLookupLoweringContext
         if (!dispatchFunc)
             return false;
         bool changed = false;
-        //auto existentialObject = extractInst->getOperand(0);
+        auto existentialObject = extractInst->getOperand(0);
 
         IRBuilder builder(lookupInst);
         builder.setInsertBefore(lookupInst);
@@ -376,14 +376,14 @@ struct WitnessLookupLoweringContext
                             if (auto call = as<IRCall>(specializeUse->getUser()))
                             {
                                 changed = true;
-                                rewriteCallSite(call, newSpecialize, witnessTableOperand);
+                                rewriteCallSite(call, newSpecialize, existentialObject);
                             }
                         });
                 }
                 else if (auto call = as<IRCall>(use->getUser()))
                 {
                     changed = true;
-                    rewriteCallSite(call, dispatchFunc, witnessTableOperand);
+                    rewriteCallSite(call, dispatchFunc, existentialObject);
                 }
             });
         return changed;
