@@ -141,21 +141,12 @@ jobs:
           cp slang-macos-dist.zip "slang-macos-dist-${{matrix.platform}}.zip"
           echo "SLANG_NOTARIZED_DIST=slang-macos-dist-${{matrix.platform}}.zip" >> $GITHUB_OUTPUT
 
-      - name: File check
-        run: |
-          find build/dist-release ! -iname '*.md' ! -iname '*.h' -type f | xargs file
-          if [ "${{matrix.os}}" = "macos" ]; then
-            find build/dist-release ! -iname '*.md' ! -iname '*.h' -type f |
-              xargs codesign --verify --verbose=2 ||
-              echo "code signing failed"
-          fi
-
       - name: Package Slang
         id: package
         run: |
           # For the release, also generate a tar.gz file
-          cpack --preset release -G ZIP
-          cpack --preset release -G TGZ
+          cpack --preset "$config" -G ZIP
+          cpack --preset "$config" -G TGZ
 
           triggering_ref=${{ github.ref_name }}
           version=${triggering_ref#v}
@@ -168,6 +159,16 @@ jobs:
 
           mv "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> $GITHUB_OUTPUT
+
+      - name: File check
+        run: |
+          find "build/dist-$config" ! -iname '*.md' ! -iname '*.h' -type f | xargs file
+          if [ "${{matrix.os}}" = "macos" ]; then
+            find "build/dist-$config" ! -iname '*.md' ! -iname '*.h' -type f |
+              xargs codesign --verify --verbose=2 ||
+              echo "code signing failed"
+          fi
+
       - name: UploadBinary
         uses: softprops/action-gh-release@v1
         with:
