@@ -40,6 +40,7 @@ jobs:
             wget https://www.kernel.org/pub/software/scm/git/git-2.9.3.tar.gz
             tar xzf git-2.9.3.tar.gz
             cd git-2.9.3
+            mkdir -p /usr/local/git
             make prefix=/usr/local/git all -j$(nproc)
             make prefix=/usr/local/git install -j$(nproc)
             export PATH=$PATH:/usr/local/git/bin
