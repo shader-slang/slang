@@ -59,10 +59,10 @@ jobs:
           version=${triggering_ref#v}
           base=$(pwd)/slang-${version}-linux-x86_64-glibc-2.17
 
-          mv "$(pwd)/build/dist-${config}/slang.zip" "${base}.zip"
+          mv "$(pwd)/build/dist-release/slang.zip" "${base}.zip"
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> $GITHUB_OUTPUT
 
-          mv "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
+          mv "$(pwd)/build/dist-release/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> $GITHUB_OUTPUT
 
       - name: File check
