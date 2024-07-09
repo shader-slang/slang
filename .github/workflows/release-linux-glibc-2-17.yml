@@ -22,6 +22,8 @@ jobs:
           run: |
             source /opt/rh/devtoolset-9/enable
 
+            yum install -y python3
+
             wget https://cmake.org/files/v3.30/cmake-3.30.0.tar.gz
             yum install -y openssl-devel
             tar zxvf cmake-3.*
