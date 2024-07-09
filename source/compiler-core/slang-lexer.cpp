@@ -173,38 +173,49 @@ namespace Slang
 
     // Look ahead one code point, dealing with complications like
     // escaped newlines.
-    static int _peek(Lexer* lexer)
+    static int _peek(Lexer* lexer, int offset = 0)
     {
-        // Look at the next raw byte, and decide what to do
-        int c = _peekRaw(lexer);
+        int pos = 0;
+        int c = kEOF;
 
-        if(c == '\\')
+        do
         {
-            // We might have a backslash-escaped newline.
-            // Look at the next byte (if any) to see.
-            //
-            // Note(tfoley): We are assuming a null-terminated input here,
-            // so that we can safely look at the next byte without issue.
-            int d = lexer->m_cursor[1];
-            switch (d)
+            if (lexer->m_cursor + pos == lexer->m_end)
+                return kEOF;
+
+            c = lexer->m_cursor[pos++];
+
+            if (c == '\\')
             {
-            case '\r': case '\n':
+                // We might have a backslash-escaped newline.
+                // Look at the next byte (if any) to see.
+                //
+                // Note(tfoley): We are assuming a null-terminated input here,
+                // so that we can safely look at the next byte without issue.
+                int d = lexer->m_cursor[pos++];
+                switch (d)
+                {
+                case '\r': case '\n':
                 {
                     // The newline was escaped, so return the code point after *that*
 
-                    int e = lexer->m_cursor[2];
+                    int e = lexer->m_cursor[pos++];
                     if ((d ^ e) == ('\r' ^ '\n'))
-                        return lexer->m_cursor[3];
-                    return e;
+                        c = lexer->m_cursor[pos++];
+                    else
+                        c = e;
+                    break;
                 }
 
-            default:
-                break;
+                default:
+                    break;
+                }
             }
-        }
-        // TODO: handle UTF-8 encoding for non-ASCII code points here
+            // TODO: handle UTF-8 encoding for non-ASCII code points here
 
-        // Default case is to just hand along the byte we read as an ASCII code point.
+            // Default case is to just hand along the byte we read as an ASCII code point.
+        } while (offset--);
+
         return c;
     }
 
@@ -494,10 +505,19 @@ namespace Slang
 
         if( _peek(lexer) == '.' )
         {
-            tokenType = TokenType::FloatingPointLiteral;
+            switch (_peek(lexer, 1))
+            {
+                // 123.xxxx or 123.rrrr
+            case 'x':
+            case 'r':
+                break;
 
-            _advance(lexer);
-            _lexDigits(lexer, base);
+            default:
+                tokenType = TokenType::FloatingPointLiteral;
+
+                _advance(lexer);
+                _lexDigits(lexer, base);
+            }
         }
 
         if( _maybeLexNumberExponent(lexer, base))
@@ -1089,8 +1109,16 @@ namespace Slang
                     return _maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
 
                 case '.':
-                    _advance(lexer);
-                    return _lexNumberAfterDecimalPoint(lexer, 10);
+                    switch (_peek(lexer, 1))
+                    {
+                        // 0.xxxx or 0.rrrr
+                    case 'x':
+                    case 'r':
+                        return _maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
+                    default:
+                        _advance(lexer);
+                        return _lexNumberAfterDecimalPoint(lexer, 10);
+                    }
 
                 case 'x': case 'X':
                     _advance(lexer);
