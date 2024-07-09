@@ -1,6 +1,6 @@
 #include "slang-ir-metal-legalize.h"
 
-#include "../core/slang-tree-map.h"
+#include <set>
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
@@ -958,7 +958,7 @@ namespace Slang
             }
         }
 
-        UInt _returnNonOverlappingAttributeIndex(TreeSet<UInt>& usedSemanticIndex)
+        UInt _returnNonOverlappingAttributeIndex(std::set<UInt>& usedSemanticIndex)
         {
             // Find first unused semantic index of equal semantic type 
             // to fill any gaps in user set semantic bindings
@@ -971,7 +971,7 @@ namespace Slang
                 }
                 prev = i;
             }
-            usedSemanticIndex.add(prev + 1);
+            usedSemanticIndex.insert(prev + 1);
             return prev + 1;
         }
 
@@ -1066,16 +1066,13 @@ namespace Slang
             IRBuilder builder(this->m_module);
 
             List<IRSemanticDecoration*> overlappingSemanticsDecor;
-            Dictionary<UnownedStringSlice, TreeSet<UInt>> usedSemanticIndexSemanticDecor;
-            usedSemanticIndexSemanticDecor.reserve(2);
+            Dictionary<UnownedStringSlice, std::set<UInt, std::less<UInt>>> usedSemanticIndexSemanticDecor;
 
             List<AttributeParentPair<IRVarOffsetAttr>> overlappingVarOffset;
-            Dictionary<UInt, TreeSet<UInt>> usedSemanticIndexVarOffset;
-            usedSemanticIndexVarOffset.reserve(2);
-
+            Dictionary<UInt, std::set<UInt, std::less<UInt>>> usedSemanticIndexVarOffset;
+            
             List<AttributeParentPair<IRUserSemanticAttr>> overlappingUserSemantic;
-            Dictionary<UnownedStringSlice, TreeSet<UInt>> usedSemanticIndexUserSemantic;
-            usedSemanticIndexUserSemantic.reserve(2);
+            Dictionary<UnownedStringSlice, std::set<UInt, std::less<UInt> >> usedSemanticIndexUserSemantic;
 
             // We store a map from old `IRLayoutDecoration*` to new `IRLayoutDecoration*` since when legalizing
             // we may destroy and remake a `IRLayoutDecoration*`
@@ -1113,10 +1110,10 @@ namespace Slang
                         semanticDecoration = newDecoration;
                     }
                     auto& semanticUse = usedSemanticIndexSemanticDecor[semanticDecoration->getSemanticName()];
-                    if (semanticUse.contains(semanticDecoration->getSemanticIndex()))
+                    if (semanticUse.find(semanticDecoration->getSemanticIndex()) != semanticUse.end())
                         overlappingSemanticsDecor.add(semanticDecoration);
                     else
-                        semanticUse.add(semanticDecoration->getSemanticIndex());
+                        semanticUse.insert(semanticDecoration->getSemanticIndex());
                 }
                 if (auto layoutDecor = key->findDecoration<IRLayoutDecoration>())
                 {
@@ -1129,18 +1126,18 @@ namespace Slang
                         if (auto offset = as<IRVarOffsetAttr>(attr))
                         {
                             auto& semanticUse = usedSemanticIndexVarOffset[offset->getResourceKind()];
-                            if (semanticUse.contains(offset->getOffset()))
+                            if (semanticUse.find(offset->getOffset()) != semanticUse.end())
                                 overlappingVarOffset.add({ layoutDecor, offset });
                             else
-                                semanticUse.add(offset->getOffset());
+                                semanticUse.insert(offset->getOffset());
                         }
                         else if (auto userSemantic = as<IRUserSemanticAttr>(attr))
                         {
                             auto& semanticUse = usedSemanticIndexUserSemantic[userSemantic->getName()];
-                            if (semanticUse.contains(userSemantic->getIndex()))
+                            if (semanticUse.find(userSemantic->getIndex()) != semanticUse.end())
                                 overlappingUserSemantic.add({ layoutDecor, userSemantic });
                             else
-                                semanticUse.add(userSemantic->getIndex());
+                                semanticUse.insert(userSemantic->getIndex());
                         }
                     }
                 }
