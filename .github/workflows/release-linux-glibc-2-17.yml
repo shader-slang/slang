@@ -37,13 +37,12 @@ jobs:
             cmake --preset default --fresh -DCMAKE_BUILD_TYPE=Release -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DSLANG_EMBED_STDLIB=1 -G 'Unix Makefiles'
             cmake --build --preset release -j$(nproc)
 
+            cpack --preset "$config" -G ZIP
+            cpack --preset "$config" -G TGZ
+
       - name: Package Slang
         id: package
         run: |
-          # For the release, also generate a tar.gz file
-          cpack --preset "$config" -G ZIP
-          cpack --preset "$config" -G TGZ
-
           triggering_ref=${{ github.ref_name }}
           version=${triggering_ref#v}
           base=$(pwd)/slang-${version}-linux-x86_64-glibc-2.17
