@@ -34,7 +34,7 @@ float3 unconditional(int mode)
 int conditional()
 {
     int k;
-    //CHK-DAG: error 41016: use of uninitialized variable 'k'
+    //CHK-DAG: warning 41016: use of uninitialized variable 'k'
     return (k > 0);
 }
 
@@ -43,7 +43,7 @@ int use_undefined_value(int k)
 {
     int x;
     x += k;
-    //CHK-DAG: error 41016: use of uninitialized variable 'x'
+    //CHK-DAG: warning 41016: use of uninitialized variable 'x'
     return x;
 }
 
@@ -52,7 +52,7 @@ __generic<T>
 T generic_undefined_return()
 {
     T x;
-    //CHK-DAG: error 41016: use of uninitialized variable 'x'
+    //CHK-DAG: warning 41016: use of uninitialized variable 'x'
     return x;
 }
 
@@ -60,7 +60,7 @@ T generic_undefined_return()
 float undefined_array()
 {
     float array[2];
-    //CHK-DAG: error 41016: use of uninitialized variable 'array'
+    //CHK-DAG: warning 41016: use of uninitialized variable 'array'
     return array[0];
 }
 
@@ -145,13 +145,13 @@ float structs()
 
     float result = inputData.value;
 
-    //CHK-DAG: error 41016: use of uninitialized variable 'undefVar'
+    //CHK-DAG: warning 41016: use of uninitialized variable 'undefVar'
     result += undefVar;
 
-    //CHK-DAG: error 41016: use of uninitialized variable 'undefData'
+    //CHK-DAG: warning 41016: use of uninitialized variable 'undefData'
     result += undefData.value;
 
-    //CHK-DAG: error 41016: use of uninitialized variable 'nestedData'
+    //CHK-DAG: warning 41016: use of uninitialized variable 'nestedData'
     result += nestedData.data.value;
 
     return result;
@@ -213,7 +213,7 @@ float use_later_writte()
 // Using before assigning
 float regular_undefined_use(out float3 v)
 {
-    //CHK-DAG: error 41015: use of uninitialized out parameter 'v'
+    //CHK-DAG: warning 41015: use of uninitialized out parameter 'v'
     float r = v.x + 1.0;
     
     //CHK-DAG: warning 41018: returning without initializing out parameter 'v'
@@ -257,7 +257,7 @@ void control_flow_defined(bool b, out float y)
     return;
 }
 
-//CHK-NOT: error 41015
-//CHK-NOT: error 41016
+//CHK-NOT: warning 41015
+//CHK-NOT: warning 41016
 //CHK-NOT: warning 41017
 //CHK-NOT: warning 41018
