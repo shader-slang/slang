@@ -127,34 +127,20 @@ namespace Slang
         return false;
     }
 
-    static List<IRInst*> getConcernableUsers(IRInst* inst)
-    {
-        List<IRInst*> users;
-        for (auto use = inst->firstUse; use; use = use->nextUse)
-        {
-            IRInst* user = use->getUser();
-            // Meta instructions only use the argument type
-            if (!isMetaOp(user))
-                users.add(user);
-        }
-
-        return users;
-    }
-
     static List<IRInst*> getAliasableInstructions(IRInst* inst)
     {
         List<IRInst*> addresses;
 
-        auto users = getConcernableUsers(inst);
-
         addresses.add(inst);
-        for (auto user : users)
+        for (auto use = inst->firstUse; use; use = use->nextUse)
         {
-            if (isAliasable(user))
-            {
-                auto instAddresses = getAliasableInstructions(user);
-                addresses.addRange(instAddresses);
-            }
+            IRInst* user = use->getUser();
+
+            // Meta instructions only use the argument type
+            if (isMetaOp(user) || !isAliasable(user))
+                continue;
+
+            addresses.addRange(getAliasableInstructions(user));
         }
 
         return addresses;
