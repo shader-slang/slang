@@ -2344,11 +2344,18 @@ ${{{{
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
+${{{{
+                if (!isStatus)
+                {
+}}}}
         case metal:
             return __texture_gather$(cmp)<T>($(getTexture),$(getSampler) location $(compareArg) $(glslComponent));
         case glsl:
         case spirv:
             return __texture_gather$(cmp)<T>(this,$(samplerStateParam) location $(compareArg) $(glslComponent));
+${{{{
+                } // if(!isStatus)
+}}}}
         }
     }
     [ForceInline]
@@ -2359,11 +2366,18 @@ ${{{{
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
+${{{{
+                if (!isStatus)
+                {
+}}}}
         case metal:
             return __texture_gather$(cmp)_offset<T>($(getTexture),$(getSampler) location $(compareArg), offset $(glslComponent));
         case glsl:
         case spirv:
             return __texture_gather$(cmp)_offset<T>(this,$(samplerStateParam) location $(compareArg), offset $(glslComponent));
+${{{{
+                } // if(!isStatus)
+}}}}
         }
     }
     [ForceInline]
@@ -2379,9 +2393,16 @@ ${{{{
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
+${{{{
+                if (!isStatus)
+                {
+}}}}
         case glsl:
         case spirv:
             return __texture_gather$(cmp)_offsets<T>(this,$(samplerStateParam) location $(compareArg), offset1,offset2,offset3,offset4 $(glslComponent));
+${{{{
+                } // if(!isStatus)
+}}}}
         }
     }
 ${{{{
