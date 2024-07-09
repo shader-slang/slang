@@ -66,7 +66,7 @@ runs:
         echo "lib_dir=$lib_dir" >> "$GITHUB_ENV"
 
     # Try to restore a LLVM install, and build it otherwise
-    - uses: actions/cache/restore@v3
+    - uses: actions/cache/restore@v4
       id: cache-llvm
       if: inputs.build-llvm == 'true'
       with:
@@ -77,7 +77,7 @@ runs:
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
       run: ./external/build-llvm.sh --install-prefix "${{ github.workspace }}/build/llvm-project-install"
-    - uses: actions/cache/save@v3
+    - uses: actions/cache/save@v4
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       with:
         path: ${{ github.workspace }}/build/llvm-project-install
