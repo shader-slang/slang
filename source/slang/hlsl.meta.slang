@@ -8902,25 +8902,31 @@ ${{{{
 }}}}
 
 ${{{{
-struct AtomicOperationInfo
+struct InternalAtomicOperationInfo
 {
     const char* slangSuffix;
     const char* cudaSuffix;
     const char* glslSuffix;
     const char* hlslSuffix;
     const char* metalSuffix;
+    const char* spirvFloatSuffix;
+    const char* spirvUIntSuffix;
+    const char* spirvIntSuffix;
+
+    const char* assertExpr;
 };
 
-AtomicOperationInfo atomicOperationInfo[6] = {
-        { "add", "Add", "Add", "Add", "add" },
-        { "and", "And", "And", "And", "and" },
-        { "max", "Max", "Max", "Max", "max" },
-        { "min", "Min", "Min", "Min", "min" },
-        { "or", "Or", "Or", "Or", "or" },
-        { "xor", "Xor", "Xor", "Xor", "xor" }
-    };
+InternalAtomicOperationInfo internalAtomicOperationInfo[7] = {
+    { "add", "Add", "Add", "Add", "fetch_add", "FAddEXT", "IAdd", "IAdd", "true" },
+    { "and", "And", "And", "And", "fetch_and", "And", "And", "And", "!__isFloat<T>()" },
+    { "max", "Max", "Max", "Max", "fetch_max", "FMaxEXT", "UMax", "SMax", "true" },
+    { "min", "Min", "Min", "Min", "fetch_min", "FMinEXT", "UMin", "SMin", "true" },
+    { "or", "Or", "Or", "Or", "fetch_or", "Or", "Or", "Or", "!__isFloat<T>()" },
+    { "xor", "Xor", "Xor", "Xor", "fetch_xor", "Xor", "Xor", "Xor", "!__isFloat<T>()" },
+    { "exchange", "Exch", "Exchange", "Exchange", "exchange", "Exchange", "Exchange", "Exchange", "!__isFloat<T>()" },
+};
 
-for (AtomicOperationInfo atomicOp : atomicOperationInfo)
+for (InternalAtomicOperationInfo atomicOp : internalAtomicOperationInfo)
 {
 }}}}
     __generic<AtomicType, T>
@@ -8928,7 +8934,8 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(metal)]
     void __metalInterlocked_$(atomicOp.slangSuffix)(AtomicType dest, T value)
     {
-        __intrinsic_asm "atomic_fetch_$(atomicOp.metalSuffix)_explicit($0, $1, memory_order_relaxed)";
+        static_assert($(atomicOp.assertExpr), "Unable to use float with Atomic$(atomicOp.slangSuffix)"); 
+        __intrinsic_asm "atomic_$(atomicOp.metalSuffix)_explicit($0, $1, memory_order_relaxed)";
     }
 
     __generic<AtomicType, T>
@@ -8936,7 +8943,8 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(metal)]
     void __metalInterlocked_$(atomicOp.slangSuffix)(AtomicType dest, T value, out T original_value)
     {
-        __intrinsic_asm "((*($2)) = (atomic_fetch_$(atomicOp.metalSuffix)_explicit($0, $1, memory_order_relaxed)))";
+        static_assert($(atomicOp.assertExpr), "Unable to use float with Atomic$(atomicOp.slangSuffix)"); 
+        __intrinsic_asm "((*($2)) = (atomic_$(atomicOp.metalSuffix)_explicit($0, $1, memory_order_relaxed)))";
     }
 
     __generic<T>
@@ -8944,6 +8952,7 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(cuda)]
     void __cudaInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value)
     {
+        static_assert($(atomicOp.assertExpr), "Unable to use float with Atomic$(atomicOp.slangSuffix)"); 
         __intrinsic_asm "atomic$(atomicOp.cudaSuffix)((int*)$0, $1)";
     }
 
@@ -8952,6 +8961,7 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(cuda)]
     void __cudaInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value, out T original_value)
     {
+        static_assert($(atomicOp.assertExpr), "Unable to use float with Atomic$(atomicOp.slangSuffix)"); 
         __intrinsic_asm "(*$2 = atomic$(atomicOp.cudaSuffix)((int*)$0, $1))";
     }
 
@@ -8960,6 +8970,7 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(glsl)]
     void __glslInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value)
     {
+        static_assert($(atomicOp.assertExpr), "Unable to use float with Atomic$(atomicOp.slangSuffix)"); 
         __intrinsic_asm "$atomic$(atomicOp.glslSuffix)($A, $1)";
     }
 
@@ -8968,6 +8979,7 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(glsl)]
     void __glslInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value, out T original_value)
     {
+        static_assert($(atomicOp.assertExpr), "Unable to use float with Atomic$(atomicOp.slangSuffix)"); 
         __intrinsic_asm "($2 = $atomic$(atomicOp.glslSuffix)($A, $1))";
     }
 
@@ -8976,6 +8988,7 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(hlsl)]
     void __hlslInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value)
     {
+        static_assert($(atomicOp.assertExpr), "Unable to use float with Atomic$(atomicOp.slangSuffix)"); 
         __intrinsic_asm "Interlocked$(atomicOp.hlslSuffix)";
     }
 
@@ -8984,73 +8997,74 @@ for (AtomicOperationInfo atomicOp : atomicOperationInfo)
     [require(hlsl)]
     void __hlslInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value, out T original_value)
     {
+        static_assert($(atomicOp.assertExpr), "Unable to use float with Atomic$(atomicOp.slangSuffix)"); 
         __intrinsic_asm "Interlocked$(atomicOp.hlslSuffix)";
     }
+
+    __generic<T>
+    [ForceInline]
+    [require(spirv)]
+    void __spirvInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value)
+    {
+        static_assert($(atomicOp.assertExpr), "Unable to use float with Atomic$(atomicOp.slangSuffix)"); 
+        if (__isFloat<T>())
+        {
+            spirv_asm
+            {
+                result:$$T = OpAtomic$(atomicOp.spirvFloatSuffix) &dest Device None $value
+            };
+        }
+        else if (__isUnsignedInt<T>())
+        {
+            spirv_asm
+            {
+                result:$$T = OpAtomic$(atomicOp.spirvUIntSuffix) &dest Device None $value
+            };
+        }
+        else if (__isInt<T>())
+        {
+            spirv_asm
+            {
+                result:$$T = OpAtomic$(atomicOp.spirvIntSuffix) &dest Device None $value
+            };
+        }
+    }
+
+    __generic<T>
+    [ForceInline]
+    [require(spirv)]
+    void __spirvInterlocked_$(atomicOp.slangSuffix)(__ref T dest, T value, out T original_value)
+    {
+        static_assert($(atomicOp.assertExpr), "Unable to use float with Atomic$(atomicOp.slangSuffix)"); 
+        if (__isFloat<T>())
+        {
+            spirv_asm
+            {
+                %original:$$T = OpAtomic$(atomicOp.spirvFloatSuffix) &dest Device None $value;
+                OpStore &original_value %original
+            };
+        }
+        else if (__isUnsignedInt<T>())
+        {
+            spirv_asm
+            {
+                %original:$$T = OpAtomic$(atomicOp.spirvUIntSuffix) &dest Device None $value;
+                OpStore &original_value %original
+            };
+        }
+        else if (__isInt<T>())
+        {
+            spirv_asm
+            {
+                %original:$$T = OpAtomic$(atomicOp.spirvIntSuffix) &dest Device None $value;
+                OpStore &original_value %original
+            };
+        }
+    }
+
 ${{{{
 } // fetchAndModify
 }}}}
-
-__generic<AtomicType, T>
-[ForceInline]
-[require(metal)]
-void __metalInterlocked_exchange(AtomicType dest, T value)
-{
-    __intrinsic_asm "(($[0])(atomic_exchange_explicit($0, $1, memory_order_relaxed)))";
-}
-
-__generic<AtomicType, T>
-[ForceInline]
-[require(metal)]
-void __metalInterlocked_exchange(AtomicType dest, T value, out T original_value)
-{
-    __intrinsic_asm "((*($2)) = (($[0])(atomic_exchange_explicit($0, $1, memory_order_relaxed))))", T;
-}
-
-__generic<T>
-[ForceInline]
-[require(cuda)]
-void __cudaInterlocked_exchange(__ref T dest, T value)
-{
-    __intrinsic_asm "atomicExch($0, $1)";
-}
-__generic<T>
-[ForceInline]
-[require(cuda)]
-void __cudaInterlocked_exchange(__ref T dest, T value, out T original_value)
-{
-    __intrinsic_asm "(*$2 = atomicExch($0, $1))";
-}
-
-__generic<T>
-[ForceInline]
-[require(glsl)]
-void __glslInterlocked_exchange(__ref T dest, T value)
-{
-    __intrinsic_asm "$atomicExchange($0, $1)";
-}
-__generic<T>
-[ForceInline]
-[require(glsl)]
-void __glslInterlocked_exchange(__ref T dest, T value, out T original_value)
-{
-    __intrinsic_asm "($2 = $atomicExchange($0, $1))";
-}
-
-__generic<T>
-[ForceInline]
-[require(hlsl)]
-void __hlslInterlocked_exchange(__ref T dest, T value)
-{
-    __intrinsic_asm "InterlockedExchange";
-}
-__generic<T>
-[ForceInline]
-[require(hlsl)]
-void __hlslInterlocked_exchange(__ref T dest, T value, out T original_value)
-{
-    __intrinsic_asm "InterlockedExchange";
-}
-
 
 __generic<AtomicType, T>
 [ForceInline]
@@ -9120,6 +9134,29 @@ void __hlslInterlocked_compare_exchange(__ref T dest, T compare_value, T value, 
 
 __generic<T>
 [ForceInline]
+[require(spirv)]
+void __spirvInterlocked_compare_exchange(__ref T dest, __ref T compare_value, T value)
+{
+    spirv_asm
+    {
+        %result:$$T = OpAtomicCompareExchange &dest Device None None $value $compare_value;
+    };
+}
+
+__generic<T>
+[ForceInline]
+[require(spirv)]
+void __spirvInterlocked_compare_exchange(__ref T dest, T compare_value, T value, out T original_value)
+{
+    spirv_asm
+    {
+        %original:$$T = OpAtomicCompareExchange &dest Device None None $value $compare_value;
+        OpStore &original_value %original
+    };
+}
+
+__generic<T>
+[ForceInline]
 [require(hlsl)]
 void __hlslInterlocked_compare_exchange_float_bitwise(__ref T dest, T compare_value, T value)
 {
@@ -9134,390 +9171,292 @@ void __hlslInterlocked_compare_exchange_float_bitwise(__ref T dest, T compare_va
     __intrinsic_asm "InterlockedCompareExchangeFloatBitwise";
 }
 
+${{{{
+// Generates code for:
+// InterlockedAdd, InterlockedAnd, InterlockedOr, InterlockedXor,
+// InterlockedMin, InterlockedMax, InterlockedExchange
+struct SlangAtomicOperationInfo
+{
+    const char* slangCallSuffix;
+    const char* internalCallSuffix;
+};
+
+SlangAtomicOperationInfo slangAtomicOperationInfo[7] = {
+    { "Add", "add" },
+    { "And", "and" },
+    { "Or", "or" },
+    { "Xor", "xor" },
+    { "Max", "max" },
+    { "Min", "min" },
+    { "Exchange", "exchange" },
+};
+
+for (SlangAtomicOperationInfo atomicOp : slangAtomicOperationInfo)
+{
+    for(const char* T : {"int", "uint"})
+    {
+}}}}
+
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAdd(__ref  int dest,  int value)
+void Interlocked$(atomicOp.slangCallSuffix)(__ref $(T) dest,  $(T) value)
 {
     static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
     __target_switch
     {
-    case hlsl: __hlslInterlocked_add(dest, value);
-    case cuda: __cudaInterlocked_add(dest, value);
-    case glsl: __glslInterlocked_add(dest, value);
+    case hlsl: __hlslInterlocked_$(atomicOp.internalCallSuffix)(dest, value);
+    case cuda: __cudaInterlocked_$(atomicOp.internalCallSuffix)(dest, value);
+    case glsl: __glslInterlocked_$(atomicOp.internalCallSuffix)(dest, value);
+    case spirv: __spirvInterlocked_$(atomicOp.internalCallSuffix)(dest, value);
     case metal:
         if (__isTextureAccess(dest))
         {
             if(__isTextureArrayAccess(dest))
             {
-                __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int, 4>(value));
+                __metalImageInterlocked_$(atomicOp.internalCallSuffix)(__extractTextureFromTextureAccess(dest), 
+                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<$(T), 4>(value));
             }
             else
             {
-                __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int, 4>(value));
+                __metalImageInterlocked_$(atomicOp.internalCallSuffix)(__extractTextureFromTextureAccess(dest), 
+                    __extractCoordFromTextureAccess(dest), vector<$(T), 4>(value));
             }
         }
         else
         {
-            __metalInterlocked_add(__getMetalAtomicRef(dest), value);
+            __metalInterlocked_$(atomicOp.internalCallSuffix)(__getMetalAtomicRef(dest), value);
         }
         return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$int = OpAtomicIAdd &dest Device None $value 
-        };
     }
 }
 
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAdd(__ref uint dest, uint value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_add(dest, value);
-    case cuda: __cudaInterlocked_add(dest, value);
-    case glsl: __glslInterlocked_add(dest, value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-            else
-            {
-                __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-        else
-            __metalInterlocked_add(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$uint = OpAtomicIAdd &dest Device None $value 
-        };
-    }
-}
-
-[ForceInline]
-void InterlockedAdd(__ref uint dest, int value)
-{
-    InterlockedAdd(dest, (uint)value);
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAdd(__ref int dest, int value, out int original_value)
+void Interlocked$(atomicOp.slangCallSuffix)(__ref $(T) dest, $(T) value, out $(T) original_value)
 {
     static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to a scalar texture or non-texture");
     __target_switch
     {
-    case hlsl: __hlslInterlocked_add(dest, value, original_value);
-    case cuda: __cudaInterlocked_add(dest, value, original_value);
-    case glsl: __glslInterlocked_add(dest, value, original_value);
+    case hlsl: __hlslInterlocked_$(atomicOp.internalCallSuffix)(dest, value, original_value);
+    case cuda: __cudaInterlocked_$(atomicOp.internalCallSuffix)(dest, value, original_value);
+    case glsl: __glslInterlocked_$(atomicOp.internalCallSuffix)(dest, value, original_value);
+    case spirv: __spirvInterlocked_$(atomicOp.internalCallSuffix)(dest, value, original_value);
     case metal:
         if (__isTextureAccess(dest))
             if(__isTextureArrayAccess(dest))
             {
-                __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
+                __metalImageInterlocked_$(atomicOp.internalCallSuffix)(__extractTextureFromTextureAccess(dest), 
+                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<$(T),4>(value), original_value);
             }
             else
             {
-                __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
+                __metalImageInterlocked_$(atomicOp.internalCallSuffix)(__extractTextureFromTextureAccess(dest), 
+                    __extractCoordFromTextureAccess(dest), vector<$(T),4>(value), original_value);
             }
         else
-            __metalInterlocked_add(__getMetalAtomicRef(dest), value, original_value);
+            __metalInterlocked_$(atomicOp.internalCallSuffix)(__getMetalAtomicRef(dest), value, original_value);
         return;
-    case spirv:
-        spirv_asm
-        {
-            %original:$$int = OpAtomicIAdd &dest Device None $value;
-            OpStore &original_value %original
-        };
     }
 }
+
+${{{{
+    } // for(const char* T : {"int64_t", "uint64_t"})
+}}}}
 
 [ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
+void Interlocked$(atomicOp.slangCallSuffix)(__ref uint dest, int value)
 {
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_add(dest, value, original_value);
-    case cuda: __cudaInterlocked_add(dest, value, original_value);
-    case glsl: __glslInterlocked_add(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_add(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_add(__getMetalAtomicRef(dest), value, original_value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %original:$$uint = OpAtomicIAdd &dest Device None $value;
-            OpStore &original_value %original
-        };
-    }
+    Interlocked$(atomicOp.slangCallSuffix)(dest, (uint)value);
 }
 
+${{{{
+} // for (SlangAtomicOperationInfo atomicOp : slangAtomicOperationInfo)
+}}}}
+
+${{{{
+for(const char* T : {"int64_t", "uint64_t"})
+{
+}}}}
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAdd(__ref  int64_t dest,  int64_t value)
-{
-    
+void InterlockedAdd(__ref $(T) dest, $(T) value)
+{   
     __target_switch
     {
-    case hlsl: __intrinsic_asm "InterlockedAdd";
-    case cuda: __intrinsic_asm "atomicAdd((uint64_t*)$0, $1)";
+    case hlsl: __hlslInterlocked_add(dest, value);
+    case cuda: __cudaInterlocked_add(dest, value);
     case glsl:
         __requireGLSLExtension("GL_EXT_shader_atomic_int64");
-        __intrinsic_asm "$atomicAdd($A, $1)";
+        __glslInterlocked_add(dest, value);
     case spirv:
         spirv_asm
         {
             OpCapability Int64Atomics;
-            result:$$int64_t = OpAtomicIAdd &dest Device None $value;
+            result:$$$(T) = OpAtomicIAdd &dest Device None $value;
         };
     }
 }
 
 [ForceInline]
-void InterlockedAdd(__ref  int64_t dest,  int64_t value, out  int64_t original_value)
+void InterlockedAdd(__ref $(T) dest, $(T) value, out $(T) original_value)
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "InterlockedAdd";
-    case cuda: __intrinsic_asm "atomicAdd((uint64_t*)$0, $1)";
+    case hlsl: __hlslInterlocked_add(dest, value, original_value);
+    case cuda: __cudaInterlocked_add(dest, value, original_value);
     case glsl:
         __requireGLSLExtension("GL_EXT_shader_atomic_int64");
-        __intrinsic_asm "$atomicAdd($A, $1)";
+        __glslInterlocked_add(dest, value, original_value);
     case spirv:
         spirv_asm
         {
             OpCapability Int64Atomics;
-            %origin:$$int64_t = OpAtomicIAdd &dest Device None $value;
+            %origin:$$$(T) = OpAtomicIAdd &dest Device None $value;
             OpStore &original_value %origin
         };
     }
 }
 
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAdd(__ref uint64_t dest, uint64_t value)
+void InterlockedAnd(__ref $(T) dest, $(T) value)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedAdd";
-    case cuda: __intrinsic_asm "atomicAdd($0, $1)";
-    case glsl:
-        __requireGLSLExtension("GL_EXT_shader_atomic_int64");
-        __intrinsic_asm "$atomicAdd($A, $1)";
-    case spirv:
-        spirv_asm
-        {
-            OpCapability Int64Atomics;
-            result:$$uint64_t = OpAtomicIAdd &dest Device None $value;
-        };
-    }
-}
-
-[ForceInline]
-void InterlockedAdd(__ref uint64_t dest, uint64_t value, out uint64_t original_value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedAdd";
-    case cuda: __intrinsic_asm "atomicAdd($0, $1)";
-    case glsl:
-        __requireGLSLExtension("GL_EXT_shader_atomic_int64");
-        __intrinsic_asm "$atomicAdd($A, $1)";
-    case spirv:
-        spirv_asm
-        {
-            OpCapability Int64Atomics;
-            %origin:$$uint64_t = OpAtomicIAdd &dest Device None $value;
-            OpStore &original_value %origin
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAnd(__ref int dest, int value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
     __target_switch
     {
     case hlsl: __hlslInterlocked_and(dest, value);
-    case cuda: __cudaInterlocked_and(dest, value);
-    case glsl: __glslInterlocked_and(dest, value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value));
-            }
-            else
-            {
-                __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value));
-            }
-        else
-            __metalInterlocked_and(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$int = OpAtomicAnd &dest Device None $value;
-        };
     }
 }
 
 [ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAnd(__ref uint dest, uint value)
+void InterlockedAnd(__ref $(T) dest, $(T) value, out $(T) original_value)
 {
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_and(dest, value);
-    case cuda: __cudaInterlocked_and(dest, value);
-    case glsl: __glslInterlocked_and(dest, value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-            else
-            {
-                __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-        else
-            __metalInterlocked_and(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$uint = OpAtomicAnd &dest Device None $value;
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAnd(__ref int dest, int value, out int original_value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
     __target_switch
     {
     case hlsl: __hlslInterlocked_and(dest, value, original_value);
-    case cuda: __cudaInterlocked_and(dest, value, original_value);
-    case glsl: __glslInterlocked_and(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_and(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %original:$$int = OpAtomicAnd &dest Device None $value;
-            OpStore &original_value %original
-        };
     }
 }
 
 [ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedAnd(__ref uint dest, uint value, out uint original_value)
+void InterlockedCompareExchange(__ref $(T) dest, $(T) compare_value, $(T) value)
 {
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
     __target_switch
     {
-    case hlsl: __hlslInterlocked_and(dest, value, original_value);
-    case cuda: __cudaInterlocked_and(dest, value, original_value);
-    case glsl: __glslInterlocked_and(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_and(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_and(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %original:$$uint = OpAtomicAnd &dest Device None $value;
-            OpStore &original_value %original
-        };
+    case hlsl: __hlslInterlocked_compare_exchange(dest, compare_value, value);
     }
 }
 
 [ForceInline]
-void InterlockedAnd(__ref  uint64_t dest,  uint64_t value)
+void InterlockedCompareExchange(__ref $(T) dest, $(T) compare_value, $(T) value, out $(T) original_value)
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "InterlockedAnd";
+    case hlsl: __hlslInterlocked_compare_exchange(dest, compare_value, value, original_value);
     }
 }
 
 [ForceInline]
-void InterlockedAnd(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
+void InterlockedCompareStore(__ref $(T) dest, $(T) compare_value, $(T) value);
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "InterlockedAnd";
+    case hlsl: __intrinsic_asm "InterlockedCompareStore";
     }
 }
+
+[ForceInline]
+void InterlockedExchange(__ref $(T) dest, $(T) value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedExchange";
+    }
+}
+
+[ForceInline]
+void InterlockedExchange(__ref $(T) dest, $(T) value, out $(T) original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedExchange";
+    }
+}
+
+[ForceInline]
+void InterlockedMax(__ref $(T) dest, $(T) value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMax";
+    }
+}
+
+[ForceInline]
+void InterlockedMax(__ref $(T) dest, $(T) value, out $(T) original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMax";
+    }
+}
+
+[ForceInline]
+void InterlockedMin(__ref $(T) dest, $(T) value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMin";
+    }
+}
+
+[ForceInline]
+void InterlockedMin(__ref $(T) dest, $(T) value, out $(T) original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMin";
+    }
+}
+
+[ForceInline]
+void InterlockedOr(__ref  $(T) dest,  $(T) value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedOr";
+    }
+}
+
+[ForceInline]
+void InterlockedOr(__ref $(T) dest, $(T) value, out $(T) original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedOr";
+    }
+}
+
+[ForceInline]
+void InterlockedXor(__ref $(T) dest, $(T) value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedXor";
+    }
+}
+
+[ForceInline]
+void InterlockedXor(__ref $(T) dest, $(T) value, out $(T) original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedXor";
+    }
+}
+
+${{{{
+} // for(const char* T : {"int64_t", "uint64_t"})
+}}}}
 
 [ForceInline]
 __glsl_version(430)
@@ -9530,6 +9469,7 @@ void InterlockedCompareExchange(__ref int dest, int compare_value, int value, ou
     case hlsl: __hlslInterlocked_compare_exchange(dest, compare_value, value, original_value);
     case glsl: __glslInterlocked_compare_exchange(dest, compare_value, value, original_value);
     case cuda: __cudaInterlocked_compare_exchange(dest, compare_value, value, original_value);
+    case spirv: __spirvInterlocked_compare_exchange(dest, compare_value, value, original_value);
     case metal:
         if (__isTextureAccess(dest))
         {
@@ -9550,12 +9490,6 @@ void InterlockedCompareExchange(__ref int dest, int compare_value, int value, ou
             __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
         }
         return;
-    case spirv:
-        spirv_asm
-        {
-            %original:$$int = OpAtomicCompareExchange &dest Device None None $value $compare_value;
-            OpStore &original_value %original
-        };
     }
 }
 
@@ -9570,6 +9504,7 @@ void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value,
     case hlsl: __hlslInterlocked_compare_exchange(dest, compare_value, value, original_value);
     case cuda: __cudaInterlocked_compare_exchange(dest, compare_value, value, original_value);
     case glsl: __glslInterlocked_compare_exchange(dest, compare_value, value, original_value);
+    case spirv: __spirvInterlocked_compare_exchange(dest, compare_value, value, original_value);
     case metal:
         if (__isTextureAccess(dest))
         {
@@ -9590,12 +9525,6 @@ void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value,
             __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value, original_value);
         }
         return;
-    case spirv:
-        spirv_asm
-        {
-            %original:$$uint = OpAtomicCompareExchange &dest Device None None $value $compare_value;
-            OpStore &original_value %original
-        };
     }
 }
 
@@ -9626,31 +9555,6 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
         return;
     }
 }
-
-${{{{
-for (const char* T : {"int64_t", "uint64_t"})
-{
-}}}}
-    [ForceInline]
-    void InterlockedCompareExchange(__ref $(T) dest, $(T) compare_value, $(T) value)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm "InterlockedCompareExchange";
-        }
-    }
-
-    [ForceInline]
-    void InterlockedCompareExchange(__ref $(T) dest, $(T) compare_value, $(T) value, out $(T) original_value)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm "InterlockedCompareExchange";
-        }
-    }
-${{{{
-} // T
-}}}}
 
 [ForceInline]
 __glsl_version(430)
@@ -9697,93 +9601,6 @@ void InterlockedCompareStoreFloatBitwise(__ref  float dest,  float compare_value
     }
 }
 
-[ForceInline]
-void InterlockedCompareStore(__ref int64_t dest, int64_t compare_value, int64_t value);
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedCompareStore";
-    }
-}
-
-[ForceInline]
-void InterlockedCompareStore(__ref uint64_t dest, uint64_t compare_value, uint64_t value);
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedCompareStore";
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_exchange(dest, value, original_value);
-    case cuda: __cudaInterlocked_exchange(dest, value, original_value);
-    case glsl: __glslInterlocked_exchange(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_exchange(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_exchange(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %r:$$int = OpAtomicExchange &dest Device None $value;
-            OpStore &original_value %r
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedExchange(__ref uint dest, uint value, out uint original_value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_exchange(dest, value, original_value);
-    case glsl: __glslInterlocked_exchange(dest, value, original_value);
-    case cuda: __cudaInterlocked_exchange(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_exchange(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_exchange(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_exchange(__getMetalAtomicRef(dest), value, original_value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %r:$$uint = OpAtomicExchange &dest Device None $value;
-            OpStore &original_value %r
-        };
-    }
-}
 
 [ForceInline]
 void InterlockedExchange(__ref  float dest,  float value)
@@ -9813,701 +9630,6 @@ void InterlockedExchange(__ref  float dest,  float value, out  float original_va
     }
 }
 
-[ForceInline]
-void InterlockedExchange(__ref  int64_t dest,  int64_t value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedExchange";
-    }
-}
-
-[ForceInline]
-void InterlockedExchange(__ref  int64_t dest,  int64_t value, out  int64_t original_value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedExchange";
-    }
-}
-
-[ForceInline]
-void InterlockedExchange(__ref  uint64_t dest,  uint64_t value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedExchange";
-    }
-}
-
-[ForceInline]
-void InterlockedExchange(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedExchange";
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedMax(__ref  int dest,  int value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_max(dest, value);
-    case glsl: __glslInterlocked_max(dest, value);
-    case cuda: __cudaInterlocked_max(dest, value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value));
-            }
-            else
-            {
-                __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value));
-            }
-        else
-            __metalInterlocked_max(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$int = OpAtomicSMax &dest Device None $value;
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedMax(__ref uint dest, uint value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_max(dest, value);
-    case glsl: __glslInterlocked_max(dest, value);
-    case cuda: __cudaInterlocked_max(dest, value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-            else
-            {
-                __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-        else
-            __metalInterlocked_max(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$uint = OpAtomicUMax &dest Device None $value;
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedMax(__ref  int dest,  int value, out  int original_value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_max(dest, value, original_value);
-    case glsl: __glslInterlocked_max(dest, value, original_value);
-    case cuda:__cudaInterlocked_max(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %v:$$int = OpAtomicSMax &dest Device None $value;
-            OpStore &original_value %v
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedMax(__ref uint dest, uint value, out uint original_value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_max(dest, value, original_value);
-    case glsl: __glslInterlocked_max(dest, value, original_value);
-    case cuda: __cudaInterlocked_max(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_max(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_max(__getMetalAtomicRef(dest), value, original_value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %v:$$uint = OpAtomicUMax &dest Device None $value;
-            OpStore &original_value %v
-        };
-    }
-}
-
-[ForceInline]
-void InterlockedMax(__ref  int64_t dest,  int64_t value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedMax";
-    }
-}
-
-[ForceInline]
-void InterlockedMax(__ref  int64_t dest,  int64_t value, out  int64_t original_value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedMax";
-    }
-}
-
-[ForceInline]
-void InterlockedMax(__ref  uint64_t dest,  uint64_t value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedMax";
-    }
-}
-
-[ForceInline]
-void InterlockedMax(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedMax";
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedMin(__ref  int dest,  int value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_min(dest, value);
-    case glsl: __glslInterlocked_min(dest, value);
-    case cuda: __cudaInterlocked_min(dest, value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value));
-            }
-            else
-            {
-                __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value));
-            }
-        else
-            __metalInterlocked_min(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$int = OpAtomicSMin &dest Device None $value;
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedMin(__ref uint dest, uint value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_min(dest, value);
-    case glsl: __glslInterlocked_min(dest, value);
-    case cuda: __cudaInterlocked_min(dest, value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-            else
-            {
-                __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-        else
-            __metalInterlocked_min(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$uint = OpAtomicUMin &dest Device None $value;
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedMin(__ref  int dest,  int value, out  int original_value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_min(dest, value, original_value);
-    case glsl: __glslInterlocked_min(dest, value, original_value);
-    case cuda: __cudaInterlocked_min(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %v:$$int = OpAtomicSMin &dest Device None $value;
-            OpStore &original_value %v
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedMin(__ref uint dest, uint value, out uint original_value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_min(dest, value, original_value);
-    case glsl: __glslInterlocked_min(dest, value, original_value);
-    case cuda: __cudaInterlocked_min(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_min(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_min(__getMetalAtomicRef(dest), value, original_value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %v:$$uint = OpAtomicUMin &dest Device None $value;
-            OpStore &original_value %v
-        };
-    }
-}
-
-[ForceInline]
-void InterlockedMin(__ref  int64_t dest,  int64_t value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedMin";
-    }
-}
-
-[ForceInline]
-void InterlockedMin(__ref  int64_t dest,  int64_t value, out  int64_t original_value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedMin";
-    }
-}
-
-[ForceInline]
-void InterlockedMin(__ref  uint64_t dest,  uint64_t value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedMin";
-    }
-}
-
-[ForceInline]
-void InterlockedMin(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedMin";
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedOr(__ref  int dest,  int value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_or(dest, value);
-    case cuda: __cudaInterlocked_or(dest, value);
-    case glsl: __glslInterlocked_or(dest, value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value));
-            }
-            else
-            {
-                __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value));
-            }
-        else
-            __metalInterlocked_or(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$int = OpAtomicOr &dest Device None $value;
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedOr(__ref uint dest, uint value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_or(dest, value);
-    case cuda: __cudaInterlocked_or(dest, value);
-    case glsl: __glslInterlocked_or(dest, value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-            else
-            {
-                __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-        else
-            __metalInterlocked_or(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$uint = OpAtomicOr &dest Device None $value;
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedOr(__ref  int dest,  int value, out  int original_value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-     __target_switch
-    {
-    case hlsl: __hlslInterlocked_or(dest, value, original_value);
-    case glsl: __glslInterlocked_or(dest, value, original_value);
-    case cuda: __cudaInterlocked_or(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %original:$$int = OpAtomicOr &dest Device None $value;
-            OpStore &original_value %original
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedOr(__ref uint dest, uint value, out uint original_value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-     __target_switch
-    {
-    case hlsl: __hlslInterlocked_or(dest, value, original_value);
-    case glsl: __glslInterlocked_or(dest, value, original_value);
-    case cuda: __cudaInterlocked_or(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_or(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_or(__getMetalAtomicRef(dest), value, original_value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %original:$$uint = OpAtomicOr &dest Device None $value;
-            OpStore &original_value %original
-        };
-    }
-}
-
-[ForceInline]
-void InterlockedOr(__ref  uint64_t dest,  uint64_t value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedOr";
-    }
-}
-
-[ForceInline]
-void InterlockedOr(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedOr";
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedXor(__ref  int dest,  int value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_xor(dest, value);
-    case cuda: __cudaInterlocked_xor(dest, value);
-    case glsl: __glslInterlocked_xor(dest, value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value));
-            }
-            else
-            {
-                __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value));
-            }
-        else
-            __metalInterlocked_xor(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$int = OpAtomicXor &dest Device None $value;
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedXor(__ref uint dest, uint value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-    __target_switch
-    {
-    case hlsl: __hlslInterlocked_xor(dest, value);
-    case cuda: __cudaInterlocked_xor(dest, value);
-    case glsl: __glslInterlocked_xor(dest, value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-            else
-            {
-                __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value));
-            }
-        else
-            __metalInterlocked_xor(__getMetalAtomicRef(dest), value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            result:$$uint = OpAtomicXor &dest Device None $value;
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedXor(__ref  int dest,  int value, out  int original_value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-     __target_switch
-    {
-    case hlsl: __hlslInterlocked_xor(dest, value, original_value);
-    case glsl: __glslInterlocked_xor(dest, value, original_value);
-    case cuda: __cudaInterlocked_xor(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<int,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_xor(__getMetalAtomicRef(dest), value, original_value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %original:$$int = OpAtomicXor &dest Device None $value;
-            OpStore &original_value %original
-        };
-    }
-}
-
-[ForceInline]
-__glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
-void InterlockedXor(__ref uint dest, uint value, out uint original_value)
-{
-    static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
-     __target_switch
-    {
-    case hlsl: __hlslInterlocked_xor(dest, value, original_value);
-    case glsl: __glslInterlocked_xor(dest, value, original_value);
-    case cuda: __cudaInterlocked_xor(dest, value, original_value);
-    case metal:
-        if (__isTextureAccess(dest))
-            if(__isTextureArrayAccess(dest))
-            {
-                __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-            else
-            {
-                __metalImageInterlocked_xor(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vector<uint,4>(value), original_value);
-            }
-        else
-            __metalInterlocked_xor(__getMetalAtomicRef(dest), value, original_value);
-        return;
-    case spirv:
-        spirv_asm
-        {
-            %original:$$uint = OpAtomicXor &dest Device None $value;
-            OpStore &original_value %original
-        };
-    }
-}
-
-[ForceInline]
-void InterlockedXor(__ref  uint64_t dest,  uint64_t value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedXor";
-    }
-}
-
-[ForceInline]
-void InterlockedXor(__ref  uint64_t dest,  uint64_t value, out  uint64_t original_value)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "InterlockedXor";
-    }
-}
 
 
 // Is floating-point value finite?
