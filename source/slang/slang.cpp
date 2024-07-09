@@ -3669,8 +3669,14 @@ RefPtr<Module> Linkage::findOrImportModule(
 
 
     // Look for a precompiled module first, if not exist, load from source.
-    for (int checkBinaryModule = 1; checkBinaryModule >= 0; checkBinaryModule--)
+    bool shouldCheckBinaryModuleSettings[2] = { true, false };
+
+    for (auto checkBinaryModule : shouldCheckBinaryModuleSettings)
     {
+        // When in language server, we always prefer to use source module if it is available.
+        if (isInLanguageServer())
+            checkBinaryModule = !checkBinaryModule;
+
         // Try without translating `_` to `-` first, if that fails, try translating.
         for (int translateUnderScore = 0; translateUnderScore <= 1; translateUnderScore++)
         {

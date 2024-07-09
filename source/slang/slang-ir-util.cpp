@@ -23,6 +23,13 @@ IRType* getVectorElementType(IRType* type)
     return type;
 }
 
+IRType* getMatrixElementType(IRType* type)
+{
+    if (auto matrixType = as<IRMatrixType>(type))
+        return matrixType->getElementType();
+    return type;
+}
+
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType)
 {
     Dictionary<IRInst*, IRInst*> result;
