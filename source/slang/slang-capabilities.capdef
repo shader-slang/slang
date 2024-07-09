@@ -349,6 +349,7 @@ alias GL_EXT_ray_query = _GL_EXT_ray_query | spvRayQueryKHR;
 alias GL_EXT_ray_tracing = _GL_EXT_ray_tracing | spvRayTracingKHR;
 alias GL_EXT_ray_tracing_position_fetch_ray_tracing = _GL_EXT_ray_tracing_position_fetch | spvRayTracingPositionFetchKHR;
 alias GL_EXT_ray_tracing_position_fetch_ray_query = _GL_EXT_ray_tracing_position_fetch | spvRayQueryPositionFetchKHR;
+alias GL_EXT_ray_tracing_position_fetch = GL_EXT_ray_tracing_position_fetch_ray_tracing + GL_EXT_ray_tracing_position_fetch_ray_query;
 alias GL_EXT_samplerless_texture_functions = _GL_EXT_samplerless_texture_functions | _spirv_1_0;
 alias GL_EXT_shader_atomic_float = _GL_EXT_shader_atomic_float | spvAtomicFloat32AddEXT + spvAtomicFloat32MinMaxEXT;
 alias GL_EXT_shader_atomic_float_min_max = _GL_EXT_shader_atomic_float_min_max | spvAtomicFloat32MinMaxEXT + spvAtomicFloat16MinMaxEXT;
