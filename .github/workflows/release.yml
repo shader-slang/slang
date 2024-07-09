@@ -30,7 +30,7 @@ jobs:
           - {os: linux-glibc-2.17, platform: aarch64}
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
-    image: ${{ matrix.image || '' }}
+    container: ${{ matrix.image || '' }}
 
     defaults:
       run:
