@@ -13,14 +13,6 @@ jobs:
           submodules: 'true'
           fetch-depth: '0'
 
-      - run: |
-          cmake \
-            --preset default --fresh \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
-            -DSLANG_EMBED_STDLIB=1 \
-            -G 'Unix Makefiles'
-
       # build the binary in docker image
       - name: Run the build process with Docker
         uses: addnab/docker-run-action@v3
@@ -30,11 +22,18 @@ jobs:
           run: |
             source /opt/rh/devtoolset-9/enable
 
+            wget https://cmake.org/files/v3.30/cmake-3.30.0.tar.gz
+            yum install -y openssl-devel
+            tar zxvf cmake-3.*
+            cd cmake-3.*
+            ./bootstrap --prefix=/usr/local
+            make -j$(nproc)
+            make install
+
             cd /home/app
             git config --global --add safe.directory /home/app
-
-            cd build
-            make -j$(nproc)
+            cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DSLANG_EMBED_STDLIB=1 -G 'Unix Makefiles'
+            cmake --build --preset release -j
 
       - name: Package Slang
         id: package
