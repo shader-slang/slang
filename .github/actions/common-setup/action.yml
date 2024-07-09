@@ -61,7 +61,6 @@ runs:
         bin_dir=$(pwd)/build/$Config/bin
         lib_dir=$(pwd)/build/$Config/lib
         echo "config=$config" >> "$GITHUB_ENV"
-        echo "Config=$Config" >> "$GITHUB_ENV"
         echo "bin_dir=$bin_dir" >> "$GITHUB_ENV"
         echo "lib_dir=$lib_dir" >> "$GITHUB_ENV"
 

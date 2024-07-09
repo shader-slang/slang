@@ -118,17 +118,17 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ${KEYCHAIN_PASSWORD} $KEYCHAIN_PATH
 
           signedFiles
-          find "build/$Config/{bin,lib}" -type f -perm +111 \
+          find "${bin_dir}" "${lib_dir}" -type f -perm +111 \
             | xargs codesign --force --options runtime -s "${IDENTITY_ID}" -v
 
           binaries=(
-            "build/${Config}/lib/libslang.dylib"
-            "build/${Config}/lib/libslang-rt.dylib"
-            "build/${Config}/lib/libslang-glslang.dylib"
-            "build/${Config}/lib/libslang-llvm.dylib"
-            "build/${Config}/lib/libgfx.dylib"
-            "build/${Config}/bin/slangd"
-            "build/${Config}/bin/slangc"
+            "${lib_dir}/libslang.dylib"
+            "${lib_dir}/libslang-rt.dylib"
+            "${lib_dir}/libslang-glslang.dylib"
+            "${lib_dir}/libslang-llvm.dylib"
+            "${lib_dir}/libgfx.dylib"
+            "${bin_dir}/slangd"
+            "${bin_dir}/slangc"
           )
           for b in "${binaries[@]}"; do
             if [[ -f "$b" ]]; then
