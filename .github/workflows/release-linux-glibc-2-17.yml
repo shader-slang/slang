@@ -34,8 +34,8 @@ jobs:
 
             cd /home/app
             git config --global --add safe.directory /home/app
-            cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DSLANG_EMBED_STDLIB=1 -G 'Unix Makefiles'
-            cmake --build --preset release -j
+            cmake --preset default --fresh -DCMAKE_BUILD_TYPE=Release -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DSLANG_EMBED_STDLIB=1 -G 'Unix Makefiles'
+            cmake --build --preset release -j$(nproc)
 
       - name: Package Slang
         id: package
