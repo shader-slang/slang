@@ -349,7 +349,6 @@
     <ClInclude Include="..\..\..\source\core\slang-test-tool-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-text-io.h" />
     <ClInclude Include="..\..\..\source\core\slang-token-reader.h" />
-    <ClInclude Include="..\..\..\source\core\slang-tree-map.h" />
     <ClInclude Include="..\..\..\source\core\slang-type-convert-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-type-text-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-type-traits.h" />
@@ -405,7 +404,6 @@
     <ClCompile Include="..\..\..\source\core\slang-test-tool-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-text-io.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-token-reader.cpp" />
-    <ClCompile Include="..\..\..\source\core\slang-tree-map.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-type-convert-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-type-text-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-uint-set.cpp" />
