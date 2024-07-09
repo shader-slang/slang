@@ -1823,6 +1823,7 @@ namespace Slang
     static ConstructorDecl* _createCtor(SemanticsDeclVisitorBase* visitor, ASTBuilder* m_astBuilder, AggTypeDecl* decl)
     {
         auto ctor = m_astBuilder->create<ConstructorDecl>();
+        addModifier(ctor, m_astBuilder->create<SynthesizedModifier>());
         auto ctorName = visitor->getName("$init");
         ctor->ownedScope = m_astBuilder->create<Scope>();
         ctor->ownedScope->containerDecl = ctor;
