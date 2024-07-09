@@ -37,8 +37,8 @@ jobs:
             cmake --preset default --fresh -DCMAKE_BUILD_TYPE=Release -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DSLANG_EMBED_STDLIB=1 -G 'Unix Makefiles'
             cmake --build --preset release -j$(nproc)
 
-            cpack --preset "$config" -G ZIP
-            cpack --preset "$config" -G TGZ
+            cpack --preset release -G ZIP
+            cpack --preset release -G TGZ
 
       - name: Package Slang
         id: package
