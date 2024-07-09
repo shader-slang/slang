@@ -20,14 +20,16 @@ jobs:
           image: slangdeveloper/centos7-gcc9
           options: -v ${{ github.workspace }}:/home/app -v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt
           run: |
+            source /opt/rh/devtoolset-9/enable
+
             wget https://cmake.org/files/v3.30/cmake-3.30.0.tar.gz
+            yum install -y openssl-devel
             tar zxvf cmake-3.*
             cd cmake-3.*
             ./bootstrap --prefix=/usr/local
             make -j$(nproc)
             make install
 
-            source /opt/rh/devtoolset-9/enable
             cd /home/app
             git config --global --add safe.directory /home/app
             cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DSLANG_EMBED_STDLIB=1 -G 'Unix Makefiles'
