@@ -89,7 +89,7 @@ jobs:
           cmake --build --preset "${{matrix.config}}"
 
       - name: Sign and notarize binaries
-        if: matrix.os == 'macos'
+        if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')
         id: notarize
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
