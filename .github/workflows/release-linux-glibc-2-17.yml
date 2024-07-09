@@ -55,7 +55,7 @@ jobs:
 
       - name: File check
         run: |
-          find "build/dist-$config" ! -iname '*.md' ! -iname '*.h' -type f | xargs file
+          find "build/dist-release" ! -iname '*.md' ! -iname '*.h' -type f | xargs file
 
       - name: UploadBinary
         uses: softprops/action-gh-release@v1
