@@ -77,6 +77,9 @@ bool isComInterfaceType(IRType* type);
 // If `type` is a vector, returns its element type. Otherwise, return `type`.
 IRType* getVectorElementType(IRType* type);
 
+// If `type` is a matrix, returns its element type. Otherwise, return `type`.
+IRType* getMatrixElementType(IRType* type);
+
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
 
