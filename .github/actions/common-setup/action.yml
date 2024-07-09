@@ -33,7 +33,7 @@ runs:
         fi
 
         # Install cross tools on Ubuntu
-        if [[ "${{inputs.os}}" == "linux" && "${{inputs.platform}}" == "aarch64" ]]; then
+        if [[ "${{inputs.os}}" == linux* && "${{inputs.platform}}" == "aarch64" ]]; then
           sudo apt-get install -y crossbuild-essential-arm64
         fi
 
@@ -44,7 +44,7 @@ runs:
         CXX=${CXX/gcc/g++}
         CXX=${CXX/clang/clang++}
         # Correct gcc version on older ubuntu
-        if [ "${{inputs.os}}" == "linux" ]; then
+        if [[ "${{inputs.os}}" == linux* ]]; then
           gcc_version=$(gcc -dumpversion | cut -d'.' -f1)
           if [ "$gcc_version" -lt 10 ]; then
             CC=${CC/gcc/gcc-10}

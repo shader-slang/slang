@@ -9,22 +9,25 @@ jobs:
   release:
     strategy:
       matrix:
-        os: [linux, macos, windows]
+        os: [linux, linux-glibc-2.17, macos, windows]
         config: [release]
         platform: [x86_64, aarch64]
         test-category: [smoke]
         include:
           - {os: linux, runs-on: ubuntu-20.04, compiler: gcc}
+          - {os: linux-glibc-2.17, runs-on: ubuntu-20.04, compiler: gcc}
           - {os: windows, runs-on: windows-latest, compiler: cl}
           - {os: macos, runs-on: macos-latest, compiler: clang}
 
           - {build-slang-llvm: false}
           - {os: linux, platform: x86_64, build-slang-llvm: true}
+          - {os: linux-glibc-2.17, platform: x86_64, build-slang-llvm: true}
           - {os: windows, platform: x86_64, build-slang-llvm: true}
           - {os: macos, platform: aarch64, build-slang-llvm: true}
 
-          - {os: linux, image: null}
-          - {os: linux, platform: x86_64, image: slangdeveloper/centos7-gcc9}
+          - {os: linux-glibc-2.17, platform: x86_64, image: slangdeveloper/centos7-gcc9}
+        exclude:
+          - {os: linux-glibc-2.17, platform: aarch64}
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
     image: ${{ matrix.image || '' }}
@@ -60,7 +63,7 @@ jobs:
 
       - name: Change dev tools to host arch (linux and macos)
         run: |
-          if [[ "${{matrix.os}}" == "linux" && "${{matrix.platform}}" == "aarch64" ]]; then
+          if [[ "${{matrix.os}}" == linux*  && "${{matrix.platform}}" == "aarch64" ]]; then
             export CC=aarch64-linux-gnu-gcc
             export CXX=aarch64-linux-gnu-g++
           fi
