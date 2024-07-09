@@ -342,9 +342,9 @@ struct WitnessLookupLoweringContext
         auto witnessTableOperand = lookupInst->getWitnessTable();
         if (!as<IRWitnessTableType>(witnessTableOperand->getDataType()))
             return false;
-        //auto extractInst = as<IRExtractExistentialWitnessTable>(witnessTableOperand);
-        //if (!extractInst)
-        //    return false;
+        auto extractInst = as<IRExtractExistentialWitnessTable>(witnessTableOperand);
+        if (!extractInst)
+            return false;
         auto dispatchFunc = findOrCreateDispatchFunc(lookupInst);
         if (!dispatchFunc)
             return false;
