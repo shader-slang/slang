@@ -111,6 +111,19 @@ namespace Slang
         if (as<IRInterfaceType>(type))
             return true;
 
+        // For pointers, check the value type (primarily for globals)
+        if (auto ptr = as<IRPtrType>(type))
+            return canIgnoreType(ptr->getValueType());
+
+        // In the case of specializations, check returned type
+        if (auto spec = as<IRSpecialize>(type)) {
+            IRInst* base = spec->getBase();
+            IRGeneric* generic = as<IRGeneric>(base);
+            IRInst* inner = findInnerMostGenericReturnVal(generic);
+            IRType* innerType = as<IRType>(inner);
+            return canIgnoreType(innerType);
+        }
+
         return false;
     }
 
@@ -289,7 +302,7 @@ namespace Slang
                 sink->diagnose(load,
                         as <IRReturn> (load)
                         ? Diagnostics::returningWithUninitializedOut
-                        : Diagnostics::usingUninitializedValue,
+                        : Diagnostics::usingUninitializedOut,
                         param);
             }
         }
@@ -308,9 +321,7 @@ namespace Slang
             for (auto load : loads)
             {
                 sink->diagnose(load,
-                        as <IRReturn> (load)
-                        ? Diagnostics::returningWithUninitializedValue
-                        : Diagnostics::usingUninitializedValue,
+                        Diagnostics::usingUninitializedVariable,
                         inst);
             }
         }
@@ -319,12 +330,17 @@ namespace Slang
     static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sink)
     {
         IRType* type = variable->getFullType();
-        IRRateQualifiedType* rq = as<IRRateQualifiedType>(type);
-        if (!rq || !as<IRGroupSharedRate>(rq->getRate()))
+        if (canIgnoreType(type))
+            return;
+
+        // Check for semantic decorations
+        // (e.g. globals like gl_GlobalInvocationID)
+        if (variable->findDecoration<IRSemanticDecoration>())
             return;
 
         // Check for initialization blocks
-        for (auto inst : variable->getChildren()) {
+        for (auto inst : variable->getChildren())
+        {
             if (as<IRBlock>(inst))
                 return;
         }
@@ -334,8 +350,10 @@ namespace Slang
         List<IRInst*> stores;
         List<IRInst*> loads;
 
-        for (auto alias : addresses) {
-            for (auto use = alias->firstUse; use; use = use->nextUse) {
+        for (auto alias : addresses)
+        {
+            for (auto use = alias->firstUse; use; use = use->nextUse)
+            {
                 IRInst* user = use->getUser();
                 collectLoadStore(stores, loads, user);
 
@@ -346,9 +364,10 @@ namespace Slang
             }
         }
 
-        for (auto load : loads) {
+        for (auto load : loads)
+        {
             sink->diagnose(load,
-                Diagnostics::usingUninitializedValue,
+                Diagnostics::usingUninitializedGlobalVariable,
                 variable);
         }
     }
