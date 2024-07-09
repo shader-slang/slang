@@ -340,8 +340,6 @@ struct WitnessLookupLoweringContext
     bool processWitnessLookup(IRLookupWitnessMethod* lookupInst)
     {
         auto witnessTableOperand = lookupInst->getWitnessTable();
-        if (!as<IRWitnessTableType>(witnessTableOperand->getDataType()))
-            return false;
         auto extractInst = as<IRExtractExistentialWitnessTable>(witnessTableOperand);
         if (!extractInst)
             return false;

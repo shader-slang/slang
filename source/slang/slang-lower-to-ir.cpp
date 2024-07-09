@@ -10427,11 +10427,6 @@ LoweredValInfo emitDeclRef(
             return lowerType(context, thisTypeSubst->getWitness()->getSub());
         }
 
-        if ( as<AssocTypeDecl>(decl) )
-        {
-            // For associated types, the lookup
-        }
-
         if(isInterfaceRequirement(decl))
         {
             // If we reach here, somebody is trying to look up an interface
