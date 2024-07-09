@@ -5,7 +5,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
-//CHECK: Atomic must be applied to scalar texture or non-texture
+//CHECK: Atomic must be applied to a scalar texture or non-texture
 
 RWBuffer<uint2> outputBuffer;
 
