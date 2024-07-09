@@ -116,7 +116,8 @@ namespace Slang
             return canIgnoreType(ptr->getValueType());
 
         // In the case of specializations, check returned type
-        if (auto spec = as<IRSpecialize>(type)) {
+        if (auto spec = as<IRSpecialize>(type))
+        {
             IRInst* base = spec->getBase();
             IRGeneric* generic = as<IRGeneric>(base);
             IRInst* inner = findInnerMostGenericReturnVal(generic);
