@@ -113,6 +113,6 @@ float f(uint id, float x)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    outputBuffer[0] = f(dispatchThreadID.x, 1.0); // A.calc, expect 12
-    outputBuffer[1] = f(dispatchThreadID.x + 1, 1.5); // B.calc, expect 18
+    outputBuffer[0] = f(dispatchThreadID.x, 1.0); // A.calc, expect 2
+    outputBuffer[1] = f(dispatchThreadID.x + 1, 1.5); // B.calc, expect 13.5
 }
