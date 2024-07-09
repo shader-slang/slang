@@ -20172,3 +20172,23 @@ uint2 clock2x32ARB()
         };
     }
 }
+
+__glsl_version(450)
+__glsl_extension(GL_ARB_shader_clock)
+__glsl_extension(GL_ARB_gpu_shader_int64)
+__target_intrinsic(glsl, clockARB)
+[require(glsl_spirv, GL_ARB_shader_clock64)]
+uint64_t clockARB()
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "clockARB";
+    case spirv:
+        const uint32_t scopeId_subgroup = 3;
+        return spirv_asm {
+            OpCapability ShaderClockKHR;
+            OpExtension "SPV_KHR_shader_clock";
+            result:$$uint64_t = OpReadClockKHR $scopeId_subgroup;
+        };
+    }
+}
