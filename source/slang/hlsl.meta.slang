@@ -8923,7 +8923,7 @@ InternalAtomicOperationInfo internalAtomicOperationInfo[7] = {
     { "min", "Min", "Min", "Min", "fetch_min", "FMinEXT", "UMin", "SMin", "true" },
     { "or", "Or", "Or", "Or", "fetch_or", "Or", "Or", "Or", "!__isFloat<T>()" },
     { "xor", "Xor", "Xor", "Xor", "fetch_xor", "Xor", "Xor", "Xor", "!__isFloat<T>()" },
-    { "exchange", "Exch", "Exchange", "Exchange", "exchange", "Exchange", "Exchange", "Exchange", "!__isFloat<T>()" },
+    { "exchange", "Exch", "Exchange", "Exchange", "exchange", "Exchange", "Exchange", "Exchange", "true" },
 };
 
 for (InternalAtomicOperationInfo atomicOp : internalAtomicOperationInfo)
