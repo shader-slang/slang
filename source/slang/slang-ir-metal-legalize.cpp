@@ -958,7 +958,7 @@ namespace Slang
             }
         }
 
-        UInt _returnNonOverlappingAttributeIndex(TreeMap<UInt>& usedSemanticIndex)
+        UInt _returnNonOverlappingAttributeIndex(TreeSet<UInt>& usedSemanticIndex)
         {
             // Find first unused semantic index of equal semantic type 
             // to fill any gaps in user set semantic bindings
@@ -1066,15 +1066,15 @@ namespace Slang
             IRBuilder builder(this->m_module);
 
             List<IRSemanticDecoration*> overlappingSemanticsDecor;
-            Dictionary<UnownedStringSlice, TreeMap<UInt>> usedSemanticIndexSemanticDecor;
+            Dictionary<UnownedStringSlice, TreeSet<UInt>> usedSemanticIndexSemanticDecor;
             usedSemanticIndexSemanticDecor.reserve(2);
 
             List<AttributeParentPair<IRVarOffsetAttr>> overlappingVarOffset;
-            Dictionary<UInt, TreeMap<UInt>> usedSemanticIndexVarOffset;
+            Dictionary<UInt, TreeSet<UInt>> usedSemanticIndexVarOffset;
             usedSemanticIndexVarOffset.reserve(2);
 
             List<AttributeParentPair<IRUserSemanticAttr>> overlappingUserSemantic;
-            Dictionary<UnownedStringSlice, TreeMap<UInt>> usedSemanticIndexUserSemantic;
+            Dictionary<UnownedStringSlice, TreeSet<UInt>> usedSemanticIndexUserSemantic;
             usedSemanticIndexUserSemantic.reserve(2);
 
             // We store a map from old `IRLayoutDecoration*` to new `IRLayoutDecoration*` since when legalizing

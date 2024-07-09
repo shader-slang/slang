@@ -8,9 +8,9 @@
 namespace Slang
 {
 
-    // Array-backed Red-black Tree Map.
+    // Array-backed Red-black TreeSet.
     template<typename T>
-    class TreeMap
+    class TreeSet
     {
         static constexpr Index kInvalidIndex = -1;
 
@@ -20,11 +20,11 @@ namespace Slang
             Red = 2,
         };
 
-        class TreeMapNode
+        class TreeSetNode
         {
-            // Index of the data this node links to TreeMap->m_data
+            // Index of the data this node links to TreeSet->m_data
             Index m_dataIndex = kInvalidIndex;
-            // Index of nodes this node has a relationship. Indices relate to TreeMap->m_nodes
+            // Index of nodes this node has a relationship. Indices relate to TreeSet->m_nodes
             Index m_parentNodeIndex = kInvalidIndex;
             Index m_leftNodeIndex = kInvalidIndex;
             Index m_rightNodeIndex = kInvalidIndex;
@@ -32,41 +32,41 @@ namespace Slang
             NodeColor m_nodeColor = NodeColor::Black;
 
         public:
-            TreeMapNode()
+            TreeSetNode()
             {
             }
 
-            TreeMapNode(Index dataIndex, Index parentNodeIndex,
+            TreeSetNode(Index dataIndex, Index parentNodeIndex,
                 Index leftNodeIndex, Index rightNodeIndex, NodeColor nodeColor)
                 : m_dataIndex(dataIndex), m_parentNodeIndex(parentNodeIndex),
                 m_leftNodeIndex(leftNodeIndex), m_rightNodeIndex(rightNodeIndex), m_nodeColor(nodeColor)
             {
             }
 
-            static inline TreeMapNode makeInvalidNode()
+            static inline TreeSetNode makeInvalidNode()
             {
                 return {};
             }
 
-            // Assumes this is the same TreeMap context
-            bool operator==(const TreeMapNode& other) const
+            // Assumes this is the same TreeSet context
+            bool operator==(const TreeSetNode& other) const
             {
                 return other.m_dataIndex == this->m_dataIndex;
             }
 
-            bool operator!=(const TreeMapNode& other) const
+            bool operator!=(const TreeSetNode& other) const
             {
                 return !(other == *this);
             }
 
             explicit operator bool() const
-            {// this->operator!=
-                return TreeMap<T>::getInvalidNode() != *this;
+            {
+                return TreeSet<T>::getInvalidNode() != *this;
             }
 
-            TreeMapNode& getNextLargestParentNode(TreeMap<T>* context)
+            TreeSetNode& getNextLargestParentNode(TreeSet<T>* context)
             {
-                // We have do not have a 'parent', we are the largest node.
+                // We do not have a 'parent', we are the largest node.
                 auto& parent = getParentNodeRef(context);
                 if (!parent)
                     return parent;
@@ -78,7 +78,7 @@ namespace Slang
                 else
                     return parent.getNextLargestParentNode(context);
             }
-            TreeMapNode& getNextLargestNode(TreeMap<T>* context)
+            TreeSetNode& getNextLargestNode(TreeSet<T>* context)
             {
                 // Next largest node if available
                 if (auto rightNode = getRightNodeRef(context))
@@ -102,7 +102,7 @@ namespace Slang
                 m_nodeColor = color;
             }
 
-            TreeMapNode& getSiblingNodeRef(TreeMap<T>* context, bool& isThisNodeALeftChild)
+            TreeSetNode& getSiblingNodeRef(TreeSet<T>* context, bool& isThisNodeALeftChild)
             {
                 auto parent = getParentNodeRef(context);
                 if (*this == parent.getLeftNodeRef(context))
@@ -119,12 +119,12 @@ namespace Slang
                 return m_parentNodeIndex;
             }
 
-            TreeMapNode& getParentNodeRef(TreeMap<T>* context)
+            TreeSetNode& getParentNodeRef(TreeSet<T>* context)
             {
                 return context->getNodeRef(m_parentNodeIndex);
             }
 
-            TreeMapNode getParentNode(TreeMap<T>* context)
+            TreeSetNode getParentNode(TreeSet<T>* context)
             {
                 return context->getNodeRef(m_parentNodeIndex);
             }
@@ -139,7 +139,7 @@ namespace Slang
                 return m_leftNodeIndex;
             }
 
-            TreeMapNode& getLeftNodeRef(TreeMap<T>* context)
+            TreeSetNode& getLeftNodeRef(TreeSet<T>* context)
             {
                 return context->getNodeRef(m_leftNodeIndex);
             }
@@ -154,7 +154,7 @@ namespace Slang
                 return m_rightNodeIndex;
             }
 
-            TreeMapNode& getRightNodeRef(TreeMap<T>* context)
+            TreeSetNode& getRightNodeRef(TreeSet<T>* context)
             {
                 return context->getNodeRef(m_rightNodeIndex);
             }
@@ -169,7 +169,7 @@ namespace Slang
                 return m_dataIndex;
             }
 
-            T getData(TreeMap<T>* context)
+            T getData(TreeSet<T>* context)
             {
                 return context->getData(getDataIndex());
             }
@@ -177,11 +177,11 @@ namespace Slang
 
         struct Iterator
         {
-            TreeMap* m_context;
-            TreeMapNode m_currentNode;
+            TreeSet* m_context;
+            TreeSetNode m_currentNode;
 
 
-            Iterator(TreeMap* context, TreeMapNode currentNode) : m_context(context), m_currentNode(currentNode)
+            Iterator(TreeSet* context, TreeSetNode currentNode) : m_context(context), m_currentNode(currentNode)
             {
             }
             
@@ -204,7 +204,7 @@ namespace Slang
 
             explicit operator bool() const
             {
-                return m_currentNode != TreeMap<T>::getInvalidNode();
+                return m_currentNode != TreeSet<T>::getInvalidNode();
             }
 
             T& operator*()
@@ -214,9 +214,9 @@ namespace Slang
         };
 
         // Node storage
-        List<TreeMapNode> m_nodes;
+        List<TreeSetNode> m_nodes;
 
-        // Storage of data TreeMapNode point to
+        // Storage of data TreeSetNode point to
         List<T> m_data;
         
         // These indices act as 'pointers' into m_nodes.
@@ -225,8 +225,8 @@ namespace Slang
         Index m_largestNode = kInvalidIndex;
 
         // Cached invalid node
-        static inline TreeMapNode invalidNode = TreeMapNode::makeInvalidNode();
-        static inline TreeMapNode& getInvalidNode()
+        static inline TreeSetNode invalidNode = TreeSetNode::makeInvalidNode();
+        static inline TreeSetNode& getInvalidNode()
         {
             return invalidNode;
         }
@@ -237,12 +237,12 @@ namespace Slang
             return m_data[dataIndex];
         }
 
-        TreeMapNode& getNodeRef(Index nodeIndex)
+        TreeSetNode& getNodeRef(Index nodeIndex)
         {
             if (nodeIndex == kInvalidIndex)
             {
-                SLANG_ASSERT(TreeMap<T>::getInvalidNode() == TreeMapNode::makeInvalidNode());
-                return TreeMap<T>::getInvalidNode();
+                SLANG_ASSERT(TreeSet<T>::getInvalidNode() == TreeSetNode::makeInvalidNode());
+                return TreeSet<T>::getInvalidNode();
             }
             SLANG_ASSERT(nodeIndex > -1 && nodeIndex < m_nodes.getCount());
             return m_nodes[nodeIndex];
@@ -252,7 +252,7 @@ namespace Slang
         {
             Index newDataIndex = m_data.getCount();
             m_data.add(obj);
-            TreeMapNode newNode = TreeMapNode(newDataIndex, parentNodeIndex, kInvalidIndex, kInvalidIndex, nodeColor);
+            TreeSetNode newNode = TreeSetNode(newDataIndex, parentNodeIndex, kInvalidIndex, kInvalidIndex, nodeColor);
             Index nodeIndex = m_nodes.getCount();
             m_nodes.add(newNode);
             return nodeIndex;
@@ -372,7 +372,7 @@ namespace Slang
         // all existing pointers by resizing the backing-list.
         void _add(T&& obj, Index currentNodeIndex, int addNewNodeInfo)
         {
-            TreeMapNode& currentNode = getNodeRef(currentNodeIndex);
+            TreeSetNode& currentNode = getNodeRef(currentNodeIndex);
             // Don't duplicate an already existing node
             if (obj == currentNode.getData(this))
                 return;
@@ -419,7 +419,7 @@ namespace Slang
         }
 
         // BST element search implementation
-        bool _contains(const T& obj, TreeMapNode& currentNode)
+        bool _contains(const T& obj, TreeSetNode& currentNode)
         {
             if (!currentNode)
                 return false;

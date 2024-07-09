@@ -23,7 +23,7 @@ void legalizeEntryPointVaryingParamsForCUDA(
     DiagnosticSink*         sink);
 
 
-// TODO: Once `slang-ir-metal-legalize.cpp` is merged with 
+// (#4375) Once `slang-ir-metal-legalize.cpp` is merged with 
 // `slang-ir-legalize-varying-params.cpp`, move the following
 // below into `slang-ir-legalize-varying-params.cpp` as well
 
