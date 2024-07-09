@@ -2403,7 +2403,7 @@ struct SPIRVEmitContext
         // For now we aren't handling function declarations;
         // we expect to deal only with fully linked modules.
         //
-        SLANG_UNUSED(irFunc);
+        m_sink->diagnose(irFunc, Diagnostics::internalCompilerError);
         SLANG_UNEXPECTED("function declaration in SPIR-V emit");
         UNREACHABLE_RETURN(nullptr);
     }
@@ -5194,9 +5194,36 @@ struct SPIRVEmitContext
     {
         const auto fromTypeV = inst->getOperand(0)->getDataType();
         const auto toTypeV = inst->getDataType();
-        SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
-        const auto fromType = getVectorElementType(fromTypeV);
-        const auto toType = getVectorElementType(toTypeV);
+
+        IRType* fromType = nullptr;
+        IRType* toType = nullptr;
+
+        if (as<IRVectorType>(fromTypeV) || as<IRVectorType>(toTypeV))
+        {
+            fromType = getVectorElementType(fromTypeV);
+            toType = getVectorElementType(toTypeV);
+        }
+        else if (as<IRMatrixType>(fromTypeV) || as<IRMatrixType>(toTypeV))
+        {
+            fromType = getMatrixElementType(fromTypeV);
+            toType = getMatrixElementType(toTypeV);
+        }
+        else
+        {
+            fromType = fromTypeV;
+            toType = toTypeV;
+        }
+
+        // We'd better give some diagnostics to at least point out which line in the shader is wrong, so
+        // it can help the user or developers to locate the issue easier.
+        if (!isFloatingType(fromType)) {
+            m_sink->diagnose(inst, Diagnostics::internalCompilerError);
+        }
+
+        if (!isFloatingType(toType)) {
+            m_sink->diagnose(inst, Diagnostics::internalCompilerError);
+        }
+
         SLANG_ASSERT(isFloatingType(fromType));
         SLANG_ASSERT(isFloatingType(toType));
         SLANG_ASSERT(!isTypeEqual(fromType, toType));

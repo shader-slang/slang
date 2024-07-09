@@ -150,6 +150,8 @@ namespace Slang
                 continue;
             if (!nameLoc.loc.isValid())
                 continue;
+            if (child->hasModifier<SynthesizedModifier>() || child->hasModifier<ToBeSynthesizedModifier>())
+                continue;
             auto humaneLoc = srcManager->getHumaneLoc(nameLoc.loc, SourceLocType::Actual);
             if (humaneLoc.line == 0)
                 continue;

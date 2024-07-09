@@ -169,9 +169,7 @@ public:
             switch (addr->getOp())
             {
             case kIROp_Var:
-            case kIROp_GlobalVar:
             case kIROp_Param:
-            case kIROp_GlobalParam:
                 return isDifferentiableType(diffTypeContext, addr->getDataType());
             case kIROp_FieldAddress:
                 if (!as<IRFieldAddress>(addr)->getField() ||

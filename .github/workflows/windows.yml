@@ -62,6 +62,8 @@ jobs:
           bin/**/slangc
           bin/**/slangd
           docs/*.md
+          README.md
+          LICENSE          
     - name: test
       run: |
         $slangTestBinDir = ".\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\";
