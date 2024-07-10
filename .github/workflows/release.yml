@@ -155,9 +155,9 @@ jobs:
           cpack --preset "$config" -G TGZ
           triggering_ref=${{ github.ref_name }}
           base=slang-${triggering_ref#v}-${{matrix.os}}-${{matrix.platform}}
-          mv --verbose "$(pwd)/build/dist-${config}/slang.zip" "${base}.zip"
+          mv "$(pwd)/build/dist-${config}/slang.zip" "${base}.zip"
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> $GITHUB_OUTPUT
-          mv --verbose "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
+          mv "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> $GITHUB_OUTPUT
 
       - name: File check
