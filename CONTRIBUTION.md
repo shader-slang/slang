@@ -111,7 +111,7 @@ Make your changes and ensure to follow our [Design Decisions](docs/design/README
 ### Testing
 Test your changes thoroughly to ensure they do not introduce new issues. This is done by building and running a "slang-test" from the repository root directory. For more details about "slang-test", please refer to a [Documentation on testing](tools/slang-test/README.md).
 
-> Note: One of the options for `slang-test.exe` is `-api`, and it takes an additional keyword to specify which API to test. When the option is `-api all-cpu`, as an example, it means it tests all APIs except CUDA. The minus sign (-) after `all` means "exclude" and you can "include" with plus sign (+) like `-api gl+dx11`.
+> Note: One of the options for `slang-test.exe` is `-api`, and it takes an additional keyword to specify which API to test. When the option is `-api all-cpu`, as an example, it means it tests all APIs except CPU. The minus sign (-) after `all` means "exclude" and you can "include" with plus sign (+) like `-api gl+dx11`.
 
 If you are familiar with Workflow/Actions in github, you can check [Our Workflows](.github/workflows). "Test Slang" section in [ci.yml](.github/workflows/ci.yml) is where "slang-test" runs.
 
