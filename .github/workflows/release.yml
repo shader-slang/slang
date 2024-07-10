@@ -61,7 +61,7 @@ jobs:
 
       - name: Change dev tools to host arch (linux and macos)
         run: |
-          if [[ "${{matrix.os}}" == linux*  && "${{matrix.platform}}" == "aarch64" ]]; then
+          if [[ "${{inputs.os}}" == linux* && "${{inputs.platform}}" == "aarch64" && "$(uname -m)" != "aarch64" ]]; then
             export CC=aarch64-linux-gnu-gcc
             export CXX=aarch64-linux-gnu-g++
           fi

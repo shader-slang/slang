@@ -33,7 +33,7 @@ runs:
         fi
 
         # Install cross tools on Ubuntu
-        if [[ "${{inputs.os}}" == linux* && "${{inputs.platform}}" == "aarch64" ]]; then
+        if [[ "${{inputs.os}}" == linux* && "${{inputs.platform}}" == "aarch64" && "$(uname -m)" != "aarch64" ]]; then
           sudo apt-get install -y crossbuild-essential-arm64
         fi
 
