@@ -152,16 +152,10 @@ jobs:
           # For the release, also generate a tar.gz file
           cpack --preset "$config" -G ZIP
           cpack --preset "$config" -G TGZ
-
           triggering_ref=${{ github.ref_name }}
-          version=${triggering_ref#v}
-          os_name=${{ matrix.os }}
-          arch_name=${{ matrix.platform }}
-          base=$(pwd)/slang-${version}-${os_name}-${arch_name}
-
+          base=$(pwd)/slang-${triggering_ref#v}-${{matrix.os}}-${{matrix.platform}}
           mv "$(pwd)/build/dist-${config}/slang.zip" "${base}.zip"
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> $GITHUB_OUTPUT
-
           mv "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> $GITHUB_OUTPUT
 
