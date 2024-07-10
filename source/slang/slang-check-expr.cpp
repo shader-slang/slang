@@ -638,7 +638,12 @@ namespace Slang
                     auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                     typeDef->nameAndLoc.name = item.declRef.getName();
                     typeDef->parentDecl = parent;
-                    typeDef->type.type = subType;
+
+                    // Compute the decl's type as if it is referred to from itself. This is important because
+                    // subType may have substitutions from the context it is used in, while this synthesis step
+                    // is local to the decl.
+                    // 
+                    typeDef->type.type = calcThisType(subType->getDeclRef().getDecl()->getDefaultDeclRef());
                     
                     synthesizedDecl = parent;
 
