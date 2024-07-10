@@ -113,6 +113,7 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-cpu ||
               failed=1
+            which spirv-val
             $bin_dir/slang-test \
               -use-test-server \
               -server-count 8 \
