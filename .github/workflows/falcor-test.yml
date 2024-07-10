@@ -15,13 +15,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        os: [windows]
+        config: [release]
+        compiler: [cl]
+        platform: [x86_64]
         include:
           # Self-hosted falcor tests
-          - os: windows
-            compiler: cl
-            platform: x86_64
-            config: release
-            warnings-as-errors: false
+          - warnings-as-errors: false
             test-category: full
             full-gpu-tests: false
             runs-on: [Windows, self-hosted, falcor]
