@@ -108,7 +108,7 @@ cmake_arguments_for_slang=(
   # Requirements for Slang
   -DLLVM_ENABLE_PROJECTS=clang
   "-DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64"
-  -DLLVM_BUILD_TOOLS=1
+  -DLLVM_BUILD_TOOLS=0
 )
 build_dir=$source_dir/build
 mkdir -p "$build_dir"
