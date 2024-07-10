@@ -317,7 +317,7 @@ def _GL_ARB_sparse_texture_clamp : _GL_ARB_sparse_texture2;
 def _GL_ARB_texture_gather : _GLSL_130;
 def _GL_ARB_texture_query_levels : _GLSL_130;
 def _GL_ARB_shader_clock : _GLSL_450;
-def _GL_ARB_gpu_shader_int64 : _GLSL_450;
+def _GL_ARB_gpu_shader_int64 : _GLSL_400;
 
 def _GL_KHR_memory_scope_semantics : _GLSL_420;
 def _GL_KHR_shader_subgroup_arithmetic : _GLSL_140;

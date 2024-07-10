@@ -20156,7 +20156,6 @@ struct ConstBufferPointer
 
 __glsl_version(450)
 __glsl_extension(GL_ARB_shader_clock)
-__target_intrinsic(glsl, clock2x32ARB)
 [require(glsl_spirv, GL_ARB_shader_clock)]
 uint2 clock2x32ARB()
 {
@@ -20176,7 +20175,6 @@ uint2 clock2x32ARB()
 __glsl_version(450)
 __glsl_extension(GL_ARB_shader_clock)
 __glsl_extension(GL_ARB_gpu_shader_int64)
-__target_intrinsic(glsl, clockARB)
 [require(glsl_spirv, GL_ARB_shader_clock64)]
 uint64_t clockARB()
 {
