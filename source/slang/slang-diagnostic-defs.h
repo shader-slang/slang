@@ -361,6 +361,8 @@ DIAGNOSTIC(30098, Error, nonStaticMemberFunctionNotAllowedAsDiffOperand, "non-st
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
 
 DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
+DIAGNOSTIC(30102, Error, differentiableMemberShouldHaveCorrespondingFieldInDiffType, "differentiable member '$0' should have a corresponding field in '$1'. Use [DerivativeMember($1.<field-name>)] or mark as no_diff")
+
 
 // Include
 DIAGNOSTIC(30500, Error, includedFileMissingImplementing, "missing 'implementing' declaration in the included source file '$0'.")
@@ -598,7 +600,7 @@ DIAGNOSTIC(39999, Error, unableToFindSymbolInModule, "unable to find the mangled
 
 DIAGNOSTIC(39999, Error, overloadedParameterToHigherOrderFunction, "passing overloaded functions to higher order functions is not supported")
 
-// 38xxx 
+// 38xxx
 
 DIAGNOSTIC(38000, Error, entryPointFunctionNotFound, "no function found matching entry point name '$0'")
 DIAGNOSTIC(38001, Error, ambiguousEntryPoint, "more than one function matches entry point name '$0'")
@@ -706,6 +708,7 @@ DIAGNOSTIC(40002, Error, invalidBindingValue, "binding location '$0' is out of v
 DIAGNOSTIC(40003, Error, bindingExceedsLimit, "binding location '$0' assigned to component '$1' exceeds maximum limit.")
 DIAGNOSTIC(40004, Error, bindingAlreadyOccupiedByModule, "DescriptorSet ID '$0' is already occupied by module instance '$1'.")
 DIAGNOSTIC(40005, Error, topLevelModuleUsedWithoutSpecifyingBinding, "top level module '$0' is being used without specifying binding location. Use [Binding: \"index\"] attribute to provide a binding location.")
+DIAGNOSTIC(40006, Error, unimplementedSystemValueSemantic, "unknown system-value semantic '$0'")
 
 
 DIAGNOSTIC(49999, Error, unknownSystemValueSemantic, "unknown system-value semantic '$0'")
@@ -735,9 +738,11 @@ DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'vo
 DIAGNOSTIC(41011, Error, profileIncompatibleWithTargetSwitch, "__target_switch has no compatable target with current profile '$0'")
 DIAGNOSTIC(41012, Warning, profileImplicitlyUpgraded, "user set `profile` had an implicit upgrade applied to it, atoms added: '$0'")
 DIAGNOSTIC(41012, Error, profileImplicitlyUpgradedRestrictive, "user set `profile` had an implicit upgrade applied to it, atoms added: '$0'")
-DIAGNOSTIC(41015, Error, usingUninitializedValue, "use of uninitialized value '$0'")
-DIAGNOSTIC(41016, Warning, returningWithUninitializedOut, "returning without initializing out parameter '$0'")
-DIAGNOSTIC(41017, Warning, returningWithPartiallyUninitializedOut, "returning without fully initializing out parameter '$0'")
+DIAGNOSTIC(41015, Warning, usingUninitializedOut, "use of uninitialized out parameter '$0'")
+DIAGNOSTIC(41016, Warning, usingUninitializedVariable, "use of uninitialized variable '$0'")
+DIAGNOSTIC(41017, Warning, usingUninitializedGlobalVariable, "use of uninitialized global variable '$0'")
+DIAGNOSTIC(41018, Warning, returningWithUninitializedOut, "returning without initializing out parameter '$0'")
+DIAGNOSTIC(41019, Warning, returningWithPartiallyUninitializedOut, "returning without fully initializing out parameter '$0'")
 
 DIAGNOSTIC(41011, Error, typeDoesNotFitAnyValueSize, "type '$0' does not fit in the size required by its conforming interface.")
 DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
@@ -845,9 +850,8 @@ DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid param
 DIAGNOSTIC(55200, Error, unsupportedBuiltinType, "'$0' is not a supported builtin type for the target.")
 DIAGNOSTIC(55201, Error, unsupportedRecursion, "recursion detected in call to '$0', but the current code generation target does not allow recursion.")
 DIAGNOSTIC(55202, Error, systemValueAttributeNotSupported, "system value semantic '$0' is not supported for the current target.")
-DIAGNOSTIC(55203, Error, systemValueTypeIncompatible, "system value semantic '$0' should have type '$1' or convertible to type '$1'.")
+DIAGNOSTIC(55203, Error, systemValueTypeIncompatible, "system value semantic '$0' should have type '$1' or be convertible to type '$1'.")
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
-
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
