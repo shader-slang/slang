@@ -19,19 +19,14 @@ jobs:
       - name: Run the build process with Docker
         uses: addnab/docker-run-action@v3
         with:
-            image: slangdeveloper/centos7-gcc9
+            image: slangdeveloper/centos7-gcc9:cmake
             options: -v ${{ github.workspace }}:/home/app -v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt
             run: |
               source /opt/rh/devtoolset-9/enable
               cd /home/app
               git config --global --add safe.directory /home/app
-              export CC=gcc
-              export CONFIGURATION=release
-              export ARCH=x64
-              export TARGETARCH=x64
-              export TARGETARCH=x64
-              export GLIBC_COMPATIBLE=1
-              /bin/bash ./github_build.sh
+              /cmake-3.30.0-linux-x86_64/bin/cmake --preset default
+              /cmake-3.30.0-linux-x86_64/bin/cmake --build --preset release
 
       - name: CreatePackages
         id: build
@@ -46,9 +41,9 @@ jobs:
             export SLANG_BINARY_ARCHIVE=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}-glibc-2.17.zip
             export SLANG_BINARY_ARCHIVE_TAR=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}-glibc-2.17.tar.gz
             echo "creating zip"
-            zip -r ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc bin/*/*/slangd bin/*/*/libslang.so bin/*/*/libslang-glslang.so bin/*/*/libgfx.so bin/*/*/libslang-llvm.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
+            zip -r ${SLANG_BINARY_ARCHIVE} build/Release/bin/slangc build/Release/bin/slangd build/Release/lib/libslang.so build/Release/lib/libslang-glslang.so build/Release/lib/libgfx.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
             echo "creating tar"
-            tar -czf ${SLANG_BINARY_ARCHIVE_TAR} bin/*/*/slangc bin/*/*/slangd bin/*/*/libslang.so bin/*/*/libslang-glslang.so bin/*/*/libgfx.so bin/*/*/libslang-llvm.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
+            tar -czf ${SLANG_BINARY_ARCHIVE_TAR} build/Release/bin/slangc build/Release/bin/slangd build/Release/lib/libslang.so build/Release/lib/libslang-glslang.so build/Release/lib/libgfx.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
             echo "SLANG_BINARY_ARCHIVE=${SLANG_BINARY_ARCHIVE}" >> $GITHUB_OUTPUT
             echo "SLANG_BINARY_ARCHIVE_TAR=${SLANG_BINARY_ARCHIVE_TAR}" >> $GITHUB_OUTPUT
       - name: UploadBinary
