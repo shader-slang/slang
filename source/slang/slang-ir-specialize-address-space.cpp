@@ -313,7 +313,10 @@ namespace Slang
         {
             auto rate = inst->getRate();
             if (!rate)
+            {
                 inst->setFullType(dataType);
+                return;
+            }
             
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
