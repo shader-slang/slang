@@ -28,11 +28,13 @@ namespace Slang
         return false;
     }
 
-    // Casting to IRUndefined is currently vacuous
-    // (e.g. any IRInst can be cast to IRUndefined)
     static bool isUndefinedValue(IRInst* inst)
     {
-        return (inst->m_op == kIROp_undefined);
+        // Also consider var since it does not
+        // automatically mean it will be initialized
+        // (at least not as the user may have intended)
+        return (inst->m_op == kIROp_undefined)
+            || (inst->m_op == kIROp_Var);
     }
 
     static bool isUndefinedParam(IRParam* param)
@@ -98,8 +100,19 @@ namespace Slang
         return false;
     }
 
+    static IRInst* resolveSpecialization(IRSpecialize* spec)
+    {
+        IRInst* base = spec->getBase();
+        IRGeneric* generic = as<IRGeneric>(base);
+        return findInnerMostGenericReturnVal(generic);
+    }
+
     static bool canIgnoreType(IRType* type)
     {
+        // In case specialization returns a function instead
+        if (!type)
+            return true;
+
         if (as<IRVoidType>(type))
             return true;
 
@@ -118,9 +131,7 @@ namespace Slang
         // In the case of specializations, check returned type
         if (auto spec = as<IRSpecialize>(type))
         {
-            IRInst* base = spec->getBase();
-            IRGeneric* generic = as<IRGeneric>(base);
-            IRInst* inner = findInnerMostGenericReturnVal(generic);
+            IRInst* inner = resolveSpecialization(spec);
             IRType* innerType = as<IRType>(inner);
             return canIgnoreType(innerType);
         }
@@ -146,8 +157,42 @@ namespace Slang
 
         return addresses;
     }
+    
+    static void checkCallUsage(List<IRInst*>& stores, List<IRInst*>& loads, IRCall* call, IRInst* inst)
+    {
+        IRInst* callee = call->getCallee();
+        IRFunc* ftn = nullptr;
+        if (auto spec = as<IRSpecialize>(callee))
+            ftn = as<IRFunc>(resolveSpecialization(spec));
+        else
+            ftn = as<IRFunc>(callee);
 
-    static void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user)
+        if (!ftn)
+            return;
+
+        // Find the argument index so we can fetch the type
+        int index = 0;
+
+        auto args = call->getArgsList();
+        for (int i = 0; i < args.getCount(); i++)
+        {
+            if (args[i] == inst)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        // Consider it as a store if its passed
+        // as an out/inout parameter
+        IRType* type = ftn->getParamType(index);
+        if (as<IROutType>(type) || as<IRInOutType>(type))
+            stores.add(call);
+        else
+            loads.add(call);
+    }
+
+    static void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user, IRInst* inst)
     {
         // Meta intrinsics (which evaluate on type) do nothing
         if (isMetaOp(user))
@@ -163,13 +208,19 @@ namespace Slang
         case kIROp_unconditionalBranch:
             // TODO: Ignore branches for now
             return;
+        
+        case kIROp_Call:
+            // Function calls can be either
+            // stores or loads depending on
+            // whether the callee takes it
+            // in as a out parameter or not
+            return checkCallUsage(stores, loads, as<IRCall>(user), inst);
 
         // These instructions will store data...
         case kIROp_Store:
         case kIROp_SwizzledStore:
             // TODO: for calls, should make check that the
             // function is passing as an out param
-        case kIROp_Call:
         case kIROp_SPIRVAsm:
         case kIROp_GenericAsm:
             // For now assume that __intrinsic_asm blocks will do the right thing...
@@ -225,7 +276,7 @@ namespace Slang
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
                 IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user);
+                collectLoadStore(stores, loads, user, inst);
             }
         }
 
@@ -257,7 +308,7 @@ namespace Slang
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
                 IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user);
+                collectLoadStore(stores, loads, user, inst);
             }
         }
 
@@ -331,7 +382,7 @@ namespace Slang
             if (as<IRBlock>(inst))
                 return;
         }
-
+        
         auto addresses = getAliasableInstructions(variable);
         
         List<IRInst*> stores;
@@ -342,12 +393,14 @@ namespace Slang
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
                 IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user);
+                collectLoadStore(stores, loads, user, variable);
 
                 // Disregard if there is at least one store,
                 // since we cannot tell what the control flow is
                 if (stores.getCount())
                     return;
+
+                // TODO: see if we can do better here (another kind of reachability check?)
             }
         }
 
