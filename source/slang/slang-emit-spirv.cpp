@@ -5190,6 +5190,32 @@ struct SPIRVEmitContext
         SLANG_UNREACHABLE(__func__);
     }
 
+    SpvInst* emitFloatCastForMatrix(SpvInstParent* parent, IRFloatCast* inst, IRMatrixType* fromTypeM, IRMatrixType* toTypeM)
+    {
+        // Because there is no spirv instruction to convert matrix to matrix, we need to convert it row by row.
+        auto rowCount = getIntVal(fromTypeM->getRowCount());
+        auto colCount = getIntVal(fromTypeM->getColumnCount());
+
+        IRBuilder builder(m_irModule);
+        // Get from and to type of the row vector
+        auto fromTypeV = builder.getVectorType(fromTypeM->getElementType(), colCount);
+        auto toVectorV = builder.getVectorType(toTypeM->getElementType(), colCount);
+
+        List<SpvInst*> rowVectorsConverted;
+        // convert each row vector to toType.
+        for (uint32_t i = 0; i < rowCount; i++)
+        {
+            auto rowVector = emitOpCompositeExtract(parent, nullptr, fromTypeV,
+                    inst->getOperand(0), makeArray(SpvLiteralInteger::from32(i)));
+
+            auto rowVectorConverted = emitOpFConvert(parent, nullptr, toVectorV, rowVector);
+            rowVectorsConverted.add(rowVectorConverted);
+        }
+
+        // construct a matrix from the converted row vectors.
+        return emitCompositeConstruct(parent, inst, toTypeM, rowVectorsConverted);
+    }
+
     SpvInst* emitFloatCast(SpvInstParent* parent, IRFloatCast* inst)
     {
         const auto fromTypeV = inst->getOperand(0)->getDataType();
@@ -5198,6 +5224,7 @@ struct SPIRVEmitContext
         IRType* fromType = nullptr;
         IRType* toType = nullptr;
 
+        bool isMatrixCast = false;
         if (as<IRVectorType>(fromTypeV) || as<IRVectorType>(toTypeV))
         {
             fromType = getVectorElementType(fromTypeV);
@@ -5207,6 +5234,7 @@ struct SPIRVEmitContext
         {
             fromType = getMatrixElementType(fromTypeV);
             toType = getMatrixElementType(toTypeV);
+            isMatrixCast = true;
         }
         else
         {
@@ -5227,6 +5255,11 @@ struct SPIRVEmitContext
         SLANG_ASSERT(isFloatingType(fromType));
         SLANG_ASSERT(isFloatingType(toType));
         SLANG_ASSERT(!isTypeEqual(fromType, toType));
+
+        if (isMatrixCast)
+        {
+            return emitFloatCastForMatrix(parent, inst, as<IRMatrixType>(fromTypeV), as<IRMatrixType>(toTypeV));
+        }
 
         return emitOpFConvert(parent, inst, toTypeV, inst->getOperand(0));
     }
