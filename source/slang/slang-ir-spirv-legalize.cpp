@@ -22,6 +22,7 @@
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-buffer-element-type.h"
+#include "slang-ir-specialize-address-space.h"
 
 namespace Slang
 {
@@ -1034,6 +1035,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
         else
         {
+            // If we reach here, we have determined that all arguments passed as a pointer
+            // are actual memory objects, so they can be passed in as-is.
+            // We still need to make sure the callee is specialized to the address-space
+            // of the arguments, this is done in a separate specialization pass.
+
             translatePtrResultType(inst);
         }
     }
@@ -2230,6 +2236,38 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    struct SpirvAddressSpaceAssigner : InitialAddressSpaceAssigner
+    {
+        virtual bool tryAssignAddressSpace(IRInst* inst, AddressSpace& outAddressSpace) override
+        {
+            SLANG_UNUSED(inst);
+            // Don't assign address space to additional insts, since we should have
+            // already assigned address space to them in earlier stages of legalization.
+            outAddressSpace = AddressSpace::Generic;
+            return false;
+        }
+
+        virtual AddressSpace getAddressSpaceFromVarType(IRInst* type) override
+        {
+            if (auto ptrType = as<IRPtrTypeBase>(type))
+            {
+                if (ptrType->hasAddressSpace())
+                    return (AddressSpace)ptrType->getAddressSpace();
+            }
+            return AddressSpace::Generic;
+        }
+
+        virtual AddressSpace getLeafInstAddressSpace(IRInst* inst) override
+        {
+            // Don't assign address space to additional insts, since we should have
+            // already assigned address space to them in earlier stages of legalization.
+            auto type = unwrapAttributedType(inst->getDataType());
+            if (!type)
+                return AddressSpace::Generic;
+            return getAddressSpaceFromVarType(type);
+        }
+    };
+
     void processModule()
     {
         determineSpirvVersion();
@@ -2332,6 +2370,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // the type for IRVar, and use IRPtrType to dedicate pointers in user code, so we can
         // safely lower the pointer load stores early together with other buffer types.
         lowerBufferElementTypeToStorageType(m_sharedContext->m_targetProgram, m_module, true);
+
+        // Specalize address space for all pointers.
+        SpirvAddressSpaceAssigner addressSpaceAssigner;
+        specializeAddressSpace(m_module, &addressSpaceAssigner);
     }
 
     void updateFunctionTypes()

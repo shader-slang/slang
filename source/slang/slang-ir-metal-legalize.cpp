@@ -1666,6 +1666,72 @@ namespace Slang
         }
     }
 
+    struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
+    {
+        virtual bool tryAssignAddressSpace(IRInst* inst, AddressSpace& outAddressSpace) override
+        {
+            switch (inst->getOp())
+            {
+            case kIROp_Var:
+                outAddressSpace = AddressSpace::ThreadLocal;
+                return true;
+            case kIROp_RWStructuredBufferGetElementPtr:
+                outAddressSpace = AddressSpace::Global;
+                return true;
+            default:
+                return false;
+            }
+        }
+
+        virtual AddressSpace getAddressSpaceFromVarType(IRInst* type) override
+        {
+            if (as<IRUniformParameterGroupType>(type))
+            {
+                return AddressSpace::Uniform;
+            }
+            if (as<IRByteAddressBufferTypeBase>(type))
+            {
+                return AddressSpace::Global;
+            }
+            if (as<IRHLSLStructuredBufferTypeBase>(type))
+            {
+                return AddressSpace::Global;
+            }
+            if (as<IRGLSLShaderStorageBufferType>(type))
+            {
+                return AddressSpace::Global;
+            }
+            if (auto ptrType = as<IRPtrTypeBase>(type))
+            {
+                if (ptrType->hasAddressSpace())
+                    return (AddressSpace)ptrType->getAddressSpace();
+                return AddressSpace::Global;
+            }
+            return AddressSpace::Generic;
+        }
+
+        virtual AddressSpace getLeafInstAddressSpace(IRInst* inst) override
+        {
+            if (as<IRGroupSharedRate>(inst->getRate()))
+                return AddressSpace::GroupShared;
+            switch (inst->getOp())
+            {
+            case kIROp_RWStructuredBufferGetElementPtr:
+                return AddressSpace::Global;
+            case kIROp_Var:
+                if (as<IRBlock>(inst->getParent()))
+                    return AddressSpace::ThreadLocal;
+                break;
+            default:
+                break;
+            }
+            auto type = unwrapAttributedType(inst->getDataType());
+            if (!type)
+                return AddressSpace::Generic;
+            return getAddressSpaceFromVarType(type);
+        }
+    };
+
     void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
     {
         List<EntryPointInfo> entryPoints;
@@ -1689,7 +1755,8 @@ namespace Slang
             context.legalizeEntryPointForMetal(entryPoint);
         context.removeSemanticLayoutsFromLegalizedStructs();
 
-        specializeAddressSpace(module);
+        MetalAddressSpaceAssigner metalAddressSpaceAssigner;
+        specializeAddressSpace(module, &metalAddressSpaceAssigner);
     }
 
 }
