@@ -17,12 +17,11 @@ jobs:
         compiler: [gcc, clang, cl]
         platform: [x86_64, aarch64]
         exclude:
-          # or os/config combinations
-          # - { os: macos, config: debug }
           # Default to x64, but aarch64 on osx
           - { os: linux, platform: aarch64 }
           - { os: windows, platform: aarch64 }
           - { os: macos, platform: x86_64 }
+          # Unused compiler configs
           - { os: linux, compiler: clang }
           - { os: linux, compiler: cl }
           - { os: windows, compiler: gcc }
@@ -31,16 +30,16 @@ jobs:
           - { os: macos, compiler: cl }
         include:
           - { os: linux, runs-on: ubuntu-20.04 }
-          - { os: windows, runs-on: windows-latest }
           - { os: macos, runs-on: macos-latest }
+          - { os: windows, runs-on: windows-latest }
+          # When to have warnings
+          - warnings-as-errors: false
+          - { compiler: cl, warnings-as-errors true }
           # Set a test category depending on the config, smoke by default,
           # quick or full conditionally otherwise
           - test-category: smoke
           - { os: windows, test-category: quick }
           - { config: release, test-category: full }
-          # Only CL has werror
-          - warnings-as-errors: false
-          - { compiler: cl, warnings-as-errors: true }
           # default not full gpu tests
           - full-gpu-tests: false
           # Self-hosted aarch64 build
