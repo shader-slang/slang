@@ -19,11 +19,6 @@ Note that just as with output code, the reflection object (and all other objects
 Unlike the other data, there is no easy way to save the reflection data for later user (we do not currently implement serialization for reflection data).
 Applications are encouraged to extract whatever information they need before destroying the compilation request.
 
-For convenience (since the reflection API surface area is large), the Slang API provides a C++ wrapper interface around the reflection API, and this document will show code examples using those wrappers:
-
-```c++
-slang::ShaderReflection* shaderReflection = slang::ShaderReflection::get(request);
-```
 
 ## Program Reflection
 
@@ -202,4 +197,31 @@ In the case of a compute shader entry point, you can also query the user-specifi
 ```c++
 SlangUInt threadGroupSize[3];
 entryPoint->getComputeThreadGruopSize(3, &threadGroupSize[0]);
+```
+
+## Function Reflection
+
+The `slang::FunctionReflection` type provides methods to query information about a function, such as the return type, parameters and user-defined attributes. You can obtain a `FunctionReflection` object from an `IEntryPoint` with `IEntryPoint::getFunctionReflection`, which will provide more details on the entry point function.
+
+In addition to entry points, you can also query for ordinary functions with the `ShaderReflection::findFunctionByName` method:
+
+```c++
+auto funcReflection = program->getLayout()->findFunctionByName("ordinaryFunc");
+
+// Get return type.
+slang::TypeReflection* returnType = funcReflection->getReturnType();
+
+// Get parameter count.
+unsigned int paramCount = funcReflection->getParameterCount();
+
+// Get Parameter.
+slang::VariableReflection* param0 = funcReflection->getParameter(0);
+const char* param0Name = param0->getName();
+slang::TypeReflection* param0Type = param0->getType();
+
+// Get user defined attributes on the function.
+unsigned int attribCount = funcReflection->getUserAttributeCount();
+slang::UserAttribute* attrib = funcReflection->getUserAttributeByIndex(0);
+const char* attribName = attrib->getName();
+
 ```

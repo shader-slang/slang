@@ -304,4 +304,10 @@ namespace SlangCapture
 
         return res;
     }
+
+    SLANG_NO_THROW slang::FunctionReflection* EntryPointCapture::getFunctionReflection()
+    {
+        return m_actualEntryPoint->getFunctionReflection();
+    }
+
 }

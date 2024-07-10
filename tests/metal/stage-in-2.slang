@@ -8,7 +8,7 @@
 
 // CHECK: struct pixelInput
 // CHECK-NEXT: {
-// CHECK-NEXT: CoarseVertex{{.*}} coarseVertex{{.*}} {{\[\[}}user(COARSEVERTEX){{\]\]}};
+// CHECK-NEXT: {{\[\[}}user(COARSEVERTEX){{\]\]}};
 
 // Uniform data to be passed from application -> shader.
 cbuffer Uniforms

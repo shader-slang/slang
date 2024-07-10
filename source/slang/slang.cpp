@@ -2229,6 +2229,55 @@ Type* ComponentType::getTypeFromString(
     return type;
 }
 
+DeclRef<Decl> ComponentType::findDeclFromString(
+    String const& name,
+    DiagnosticSink* sink)
+{
+    // If we've looked up this type name before,
+   // then we can re-use it.
+   //
+    DeclRef<Decl> result;
+    if (m_decls.tryGetValue(name, result))
+        return result;
+
+
+    // TODO(JS): For now just used the linkages ASTBuilder to keep on scope
+    //
+    // The parseTermString uses the linkage ASTBuilder for it's parsing.
+    //
+    // It might be possible to just create a temporary ASTBuilder - the worry though is
+    // that the parsing sets a member variable in AST node to one of these scopes, and then
+    // it become a dangling pointer. So for now we go with the linkages.
+    auto astBuilder = getLinkage()->getASTBuilder();
+
+    // Otherwise, we need to start looking in
+    // the modules that were directly or
+    // indirectly referenced.
+    //
+    Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
+
+    auto linkage = getLinkage();
+
+    SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+
+    Expr* expr = linkage->parseTermString(name, scope);
+
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        nullptr,
+        sink);
+    SemanticsVisitor visitor(&sharedSemanticsContext);
+
+    auto checkedExpr = visitor.CheckExpr(expr);
+    if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
+    {
+        result = declRefExpr->declRef;
+    }
+
+    m_decls[name] = result;
+    return result;
+}
+
 static void collectExportedConstantInContainer(
     Dictionary<String, IntVal*>& dict,
     ASTBuilder* builder,
@@ -4074,7 +4123,6 @@ RefPtr<EntryPoint> Module::findEntryPointByName(UnownedStringSlice const& name)
 
     return nullptr;
 }
-
 
 RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
     UnownedStringSlice const& name,
