@@ -15,16 +15,8 @@ namespace Slang
         SLANG_ASSERT(storeInst);
         
         builder.setInsertBefore(storeInst);
-        IRImageSubscript* imageSubscript = nullptr;
         auto getElementPtr = as<IRGetElementPtr>(storeInst->getOperand(0));
-        if(getElementPtr)
-        {
-            imageSubscript = as<IRImageSubscript>(getElementPtr->getBase());
-        }
-        else
-        {
-            imageSubscript = as<IRImageSubscript>(storeInst->getOperand(0));
-        }
+        IRImageSubscript* imageSubscript = as<IRImageSubscript>(getRootAddr(storeInst->getOperand(0)));
         SLANG_ASSERT(imageSubscript);
         SLANG_ASSERT(imageSubscript->getImage());
         IRTextureType* textureType = as<IRTextureType>(imageSubscript->getImage()->getFullType());
@@ -190,10 +182,9 @@ namespace Slang
                     {
                     case kIROp_Store:
                     case kIROp_SwizzledStore:
-                        if (getRootAddr(inst->getOperand(0))->getOp() == kIROp_ImageSubscript)
-                        {
+                        if (as<IRImageSubscript>(getRootAddr(inst->getOperand(0))))
                             legalizeStore(target, builder, inst, sink);
-                        }
+                        continue;
                     }
                 }   
             }
