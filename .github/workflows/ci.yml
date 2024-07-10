@@ -90,7 +90,7 @@ jobs:
             # Configure, pointing to our just-generated slang-llvm archive
             cmake --preset default --fresh \
               -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
-              -DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-slang-llvm.zip \
+              -DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}
             cmake --workflow --preset "${{matrix.config}}"
           else
