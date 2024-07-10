@@ -20,6 +20,8 @@ jobs:
           image: slangdeveloper/centos7-gcc9:cmake
           options: -v ${{ github.workspace }}:/home/app -v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt
           run: |
+            export PATH=$PATH:/cmake-3.30.0-linux-x86_64/bin/
+
             source /opt/rh/devtoolset-9/enable
 
             cd /home/app
