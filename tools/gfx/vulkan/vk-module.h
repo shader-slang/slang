@@ -10,7 +10,9 @@
 #elif SLANG_APPLE_FAMILY
 #   define VK_USE_PLATFORM_METAL_EXT 1
 #else
-#   define VK_USE_PLATFORM_XLIB_KHR 1
+#   if SLANG_ENABLE_XLIB
+#       define VK_USE_PLATFORM_XLIB_KHR 1
+#   endif
 #endif
 
 #define VK_NO_PROTOTYPES
