@@ -66,7 +66,7 @@ namespace SlangCapture
             uint32_t compilerOptionEntryCount,
             slang::CompilerOptionEntry* compilerOptionEntries,
             ISlangBlob** outDiagnostics = nullptr) override;
-
+        virtual SLANG_NO_THROW slang::FunctionReflection* SLANG_MCALL getFunctionReflection() override;
         slang::IEntryPoint* getActualEntryPoint() const { return m_actualEntryPoint; }
     private:
         Slang::ComPtr<slang::IEntryPoint>   m_actualEntryPoint;
