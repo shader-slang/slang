@@ -135,11 +135,11 @@ macro(slang_llvm_binary_url_option version filename)
     )
 endmacro()
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-    slang_llvm_binary_url_option("v13.x-42" "slang-llvm-13.x-42-win64.zip")
+    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-13.x-43-win64.zip")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    slang_llvm_binary_url_option("v13.x-42" "slang-llvm-v13.x-42-macosx-x86_64-release.zip")
+    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-v13.x-43-macosx-x86_64-release.zip")
 else()
-    slang_llvm_binary_url_option("v13.x-42" "slang-llvm-v13.x-42-linux-x86_64-release.zip")
+    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-v13.x-43-linux-x86_64-release.zip")
 endif()
 
 #
@@ -474,13 +474,15 @@ if(SLANG_ENABLE_GFX)
             core
             imgui
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+            "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
+            "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
             ${CMAKE_DL_LIBS}
         LINK_WITH_FRAMEWORK
             Foundation
             Cocoa
             QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
-            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
         INCLUDE_FROM_PRIVATE gfx
         INCLUDE_DIRECTORIES_PUBLIC tools/platform
         EXPORT_MACRO_PREFIX SLANG_PLATFORM
@@ -549,15 +551,6 @@ if(SLANG_ENABLE_GFX)
         INCLUDE_DIRECTORIES_PUBLIC tools
         FOLDER gfx
     )
-endif()
-
-#
-# Installing any documentation
-#
-
-file(GLOB_RECURSE docs CONFIGURE_DEPENDS docs/*.md)
-if(docs)
-    install(FILES ${docs} DESTINATION ${CMAKE_INSTALL_DOCDIR})
 endif()
 
 #
@@ -796,4 +789,18 @@ endif()
 #
 # Packaging
 #
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE ON)
+install(FILES
+  "${slang_SOURCE_DIR}/README.md"
+  "${slang_SOURCE_DIR}/LICENSE"
+  DESTINATION .
+  COMPONENT metadata
+  EXCLUDE_FROM_ALL
+)
+install(DIRECTORY
+  "${slang_SOURCE_DIR}/docs/"
+  DESTINATION share/doc/slang
+)
+
 include(CPack)
