@@ -4905,7 +4905,7 @@ struct SPIRVEmitContext
         const SpvWord baseId = getID(ensureInst(base));
 
         // We might replace resultType with a different storage class equivalent
-        auto resultType = as<IRPtrTypeBase>(inst->getFullType());
+        auto resultType = as<IRPtrTypeBase>(inst->getDataType());
         SLANG_ASSERT(resultType);
 
         if(const auto basePtrType = as<IRPtrTypeBase>(base->getDataType()))
