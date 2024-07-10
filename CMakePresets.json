@@ -105,6 +105,7 @@
       "inherits": "release",
       "configurePreset": "default",
       "variables": {
+        "CPACK_PACKAGE_FILE_NAME": "slang-generators",
         "CPACK_COMPONENTS_ALL": "generators"
       }
     },
@@ -113,6 +114,7 @@
       "inherits": "release",
       "configurePreset": "slang-llvm",
       "variables": {
+        "CPACK_PACKAGE_FILE_NAME": "slang-llvm",
         "CPACK_COMPONENTS_ALL": "slang-llvm"
       }
     }

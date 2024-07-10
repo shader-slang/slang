@@ -1,4 +1,4 @@
-name: CI (CMake)
+name: CI
 
 on:
   push:
@@ -12,60 +12,54 @@ jobs:
   build:
     strategy:
       matrix:
-        # Until we switch to CMake fully, just run something minimal
+        os: [linux, macos, windows]
+        config: [debug, release]
+        compiler: [gcc, clang, cl]
+        platform: [x86_64, aarch64]
+        exclude:
+          # Default to x64, but aarch64 on osx
+          - { os: linux, platform: aarch64 }
+          - { os: windows, platform: aarch64 }
+          - { os: macos, platform: x86_64 }
+          # Unused compiler configs
+          - { os: linux, compiler: clang }
+          - { os: linux, compiler: cl }
+          - { os: windows, compiler: gcc }
+          - { os: windows, compiler: clang }
+          - { os: macos, compiler: gcc }
+          - { os: macos, compiler: cl }
         include:
+          - { os: linux, runs-on: ubuntu-20.04 }
+          - { os: macos, runs-on: macos-latest }
+          - { os: windows, runs-on: windows-latest }
+          # When to have warnings
+          - warnings-as-errors: false
+          - { compiler: cl, warnings-as-errors true }
+          # Set a test category depending on the config, smoke by default,
+          # quick or full conditionally otherwise
+          - test-category: smoke
+          - { os: windows, test-category: quick }
+          - { config: release, test-category: full }
+          # default not full gpu tests
+          - full-gpu-tests: false
+          # Self-hosted aarch64 build
           - os: linux
             compiler: gcc
-            platform: x64
-            config: debug
-            warnings-as-errors: true
+            platform: aarch64
+            config: release
+            warnings-as-errors: false
             test-category: smoke
             full-gpu-tests: false
-            runs-on: ubuntu-20.04
-        # os: [linux, macos, windows]
-        # compiler: ['gcc', 'clang', 'cl']
-        # config: ['debug', 'release']
-        # platform: ['x64']
-        # full-gpu-tests: [false]
-        # exclude:
-        #   # Exclude invalid or undesired os/compiler
-        #   - { os: linux, compiler: cl }
-        #   - { os: macos, compiler: cl }
-        #   - { os: macos, compiler: gcc }
-        #   - { os: windows, compiler: gcc }
-        #   - { os: windows, compiler: clang }
-        #   # or os/config combinations
-        #   - { os: macos, config: debug }
-        # include:
-        #   - { os: linux, runs-on: ubuntu-20.04 }
-        #   - { os: windows, runs-on: windows-latest }
-        #   - { os: macos, runs-on: macos-latest }
-        #   # Set a test category depending on the config, smoke by default,
-        #   # quick or full conditionally otherwise
-        #   - test-category: smoke
-        #   - { os: windows, test-category: quick }
-        #   - { config: release, test-category: full }
-        #   # Only CL has werror
-        #   - warnings-as-errors: false
-        #   - { compiler: cl, warnings-as-errors: true }
-        #   # Self-hosted aarch64 build
-        #   - os: linux
-        #     compiler: gcc
-        #     platform: aarch64
-        #     config: release
-        #     warnings-as-errors: false
-        #     test-category: smoke
-        #     full-gpu-tests: false
-        #     runs-on: [self-hosted, Linux, ARM64]
-        #   # Self-hosted full gpu build
-        #   - os: windows
-        #     compiler: cl
-        #     platform: x64
-        #     config: release
-        #     warnings-as-errors: false
-        #     test-category: full
-        #     full-gpu-tests: true
-        #     runs-on: [Windows, self-hosted]
+            runs-on: [self-hosted, Linux, ARM64]
+          # Self-hosted full gpu build
+          - os: windows
+            compiler: cl
+            platform: x86_64
+            config: release
+            warnings-as-errors: false
+            test-category: full
+            full-gpu-tests: true
+            runs-on: [Windows, self-hosted]
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -82,10 +76,10 @@ jobs:
         uses: ./.github/actions/common-setup
         with:
           os: ${{matrix.os}}
-          runs-on: ${{matrix.runs-on}}
           compiler: ${{matrix.compiler}}
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
+          build-llvm: true
       - name: Build Slang
         run: |
           if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" ]]; then
@@ -96,8 +90,7 @@ jobs:
             # Configure, pointing to our just-generated slang-llvm archive
             cmake --preset default --fresh \
               -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
-              -DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-slang-llvm.zip \
-              -DSLANG_ENABLE_EXAMPLES=OFF \
+              -DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}
             cmake --workflow --preset "${{matrix.config}}"
           else
@@ -105,13 +98,13 @@ jobs:
             # cache in the setup phase
             cmake --preset default --fresh \
               -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-              -DSLANG_ENABLE_EXAMPLES=OFF \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}
             cmake --workflow --preset "${{matrix.config}}"
           fi
       - name: Test Slang
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
+          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           failed=0
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
             $bin_dir/slang-test \
@@ -123,7 +116,7 @@ jobs:
             $bin_dir/slang-test \
               -use-test-server \
               -server-count 8 \
-              -emit-spirv-directly \
+              -emit-spirv-via-glsl \
               -api vk \
               -category ${{ matrix.test-category }} \
               -expected-failure-list tests/expected-failure.txt ||
@@ -142,4 +135,4 @@ jobs:
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           # The install directory used in the packaging step
-          path: build/dist-${{matrix.config}}/**/slang/*
+          path: build/dist-${{matrix.config}}/**/ZIP/slang/*
