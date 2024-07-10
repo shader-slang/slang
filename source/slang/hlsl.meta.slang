@@ -20229,3 +20229,22 @@ struct ConstBufferPointer
         }
     }
 }
+
+__glsl_version(450)
+__glsl_extension(GL_ARB_shader_clock)
+__target_intrinsic(glsl, clock2x32ARB)
+[require(glsl_spirv, GL_ARB_shader_clock)]
+uint2 clock2x32ARB()
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "clock2x32ARB";
+    case spirv:
+        const uint32_t scopeId_subgroup = 3;
+        return spirv_asm {
+        OpCapability ShaderClockKHR;
+        OpExtension "SPV_KHR_shader_clock";
+        result:$$uint2 = OpReadClockKHR $scopeId_subgroup;
+        };
+    }
+}
