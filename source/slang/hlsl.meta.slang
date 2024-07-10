@@ -2328,55 +2328,88 @@ ${{{{
         {
             auto componentName = componentNames[componentId];
             auto glslComponent = (isCmp ? "" :glslComponentNames[componentId == 0 ? 0 : componentId - 1]);
-    }}}}
+    
+            for (bool isStatus : { false, true })
+            {
+                const char* statusDecl = isStatus ? ", out uint status" : "";
+                const char* statusInit = isStatus ? " status = 0;\n" : "";
+                const char* statusCapWithMetal = isStatus ? "hlsl" : "glsl_hlsl_metal_spirv";
+                const char* statusCapWithoutMetal = isStatus ? "hlsl" : "glsl_hlsl_spirv";
+}}}}
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_gather)]
-    vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam))
+    [require($(statusCapWithMetal), texture_gather)]
+    vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam) $(statusDecl))
     {
+        $(statusInit)
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
+${{{{
+                if (!isStatus)
+                {
+}}}}
         case metal:
             return __texture_gather$(cmp)<T>($(getTexture),$(getSampler) location $(compareArg) $(glslComponent));
         case glsl:
         case spirv:
             return __texture_gather$(cmp)<T>(this,$(samplerStateParam) location $(compareArg) $(glslComponent));
+${{{{
+                } // if(!isStatus)
+}}}}
         }
     }
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_gather)]
-    vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam), constexpr vector<int, Shape.planeDimensions> offset)
+    [require($(statusCapWithMetal), texture_gather)]
+    vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam), constexpr vector<int, Shape.planeDimensions> offset $(statusDecl))
     {
+        $(statusInit)
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
+${{{{
+                if (!isStatus)
+                {
+}}}}
         case metal:
             return __texture_gather$(cmp)_offset<T>($(getTexture),$(getSampler) location $(compareArg), offset $(glslComponent));
         case glsl:
         case spirv:
             return __texture_gather$(cmp)_offset<T>(this,$(samplerStateParam) location $(compareArg), offset $(glslComponent));
+${{{{
+                } // if(!isStatus)
+}}}}
         }
     }
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_gather)]
+    [require($(statusCapWithoutMetal), texture_gather)]
     vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam),
         constexpr vector<int, Shape.planeDimensions> offset1,
         constexpr vector<int, Shape.planeDimensions> offset2,
         constexpr vector<int, Shape.planeDimensions> offset3,
-        constexpr vector<int, Shape.planeDimensions> offset4)
+        constexpr vector<int, Shape.planeDimensions> offset4
+        $(statusDecl))
     {
+        $(statusInit)
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
+${{{{
+                if (!isStatus)
+                {
+}}}}
         case glsl:
         case spirv:
             return __texture_gather$(cmp)_offsets<T>(this,$(samplerStateParam) location $(compareArg), offset1,offset2,offset3,offset4 $(glslComponent));
+${{{{
+                } // if(!isStatus)
+}}}}
         }
     }
-    ${{{{
+${{{{
+            } // for (isStatus)
         } // for (componentId)
     } // for (isCmp)
-    }}}}
+}}}}
 } // end extension for gather
 
 ${{{{
