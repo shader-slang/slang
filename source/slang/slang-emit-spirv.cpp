@@ -6060,8 +6060,13 @@ struct SPIRVEmitContext
                             case SpvOpExtension:
                                 return getSection(SpvLogicalSectionID::Extensions);
                             case SpvOpExecutionMode:
+                            case SpvOpExecutionModeId:
                                 return getSection(SpvLogicalSectionID::ExecutionModes);
                             case SpvOpDecorate:
+                            case SpvOpDecorateId:
+                            case SpvOpDecorateString:
+                            case SpvOpMemberDecorate:
+                            case SpvOpMemberDecorateString:
                                 return getSection(SpvLogicalSectionID::Annotations);
                             default:
                                 return defaultParent;
