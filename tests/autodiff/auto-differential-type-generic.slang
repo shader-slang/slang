@@ -17,10 +17,7 @@ struct Feature: IDifferentiable
     float vals[C];
 }
 
-/*
- * An implementation of a CxC linear layer that is designed to be
- * used 'inline' within a larger kernel. 
- */
+
 struct Linear<let C : int>
 {
     typedef Feature<C> Input;
