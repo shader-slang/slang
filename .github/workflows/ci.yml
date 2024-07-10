@@ -79,6 +79,7 @@ jobs:
           compiler: ${{matrix.compiler}}
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
+          build-llvm: true
       - name: Build Slang
         run: |
           if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" ]]; then
