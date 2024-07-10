@@ -18,6 +18,8 @@ runs:
   steps:
     - name: Set up MSVC dev tools on Windows
       uses: ilammy/msvc-dev-cmd@v1
+      with:
+        sdk: "10.0.19041.0"
 
     - shell: bash
       run: |

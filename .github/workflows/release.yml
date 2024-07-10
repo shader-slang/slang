@@ -58,6 +58,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{matrix.platform == 'aarch64' && 'amd64_arm64' || 'amd64'}}
+          sdk: "10.0.19041.0"
 
       - name: Change dev tools to host arch (linux and macos)
         run: |
