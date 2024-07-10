@@ -123,10 +123,6 @@ jobs:
 
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ${KEYCHAIN_PASSWORD} $KEYCHAIN_PATH
 
-          signedFiles
-          find "${bin_dir}" "${lib_dir}" -type f -perm +111 \
-            | xargs codesign --force --options runtime -s "${IDENTITY_ID}" -v
-
           binaries=(
             "${lib_dir}/libslang.dylib"
             "${lib_dir}/libslang-rt.dylib"
