@@ -2603,7 +2603,24 @@ SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflec
     case SLANG_MODIFIER_SHARED:
         modifier = var->findModifier<HLSLEffectSharedModifier>();
         break;
-
+    case SLANG_MODIFIER_CONST:
+        modifier = var->findModifier<ConstModifier>();
+        break;
+    case SLANG_MODIFIER_NO_DIFF:
+        modifier = var->findModifier<NoDiffModifier>();
+        break;
+    case SLANG_MODIFIER_STATIC:
+        modifier = var->findModifier<HLSLStaticModifier>();
+        break;
+    case SLANG_MODIFIER_EXPORT:
+        modifier = var->findModifier<HLSLExportModifier>();
+        break;
+    case SLANG_MODIFIER_EXTERN:
+        modifier = var->findModifier<ExternModifier>();
+        break;
+    case SLANG_MODIFIER_DIFFERENTIABLE:
+        modifier = var->findModifier<DifferentiableAttribute>();
+        break;
     default:
         return nullptr;
     }
@@ -2819,7 +2836,7 @@ SLANG_API unsigned int spReflectionFunction_GetParameterCount(SlangReflectionFun
     return (unsigned int)func->getParameters().getCount();
 }
 
-SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameterByIndex(SlangReflectionFunction* inFunc, unsigned int index)
+SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameter(SlangReflectionFunction* inFunc, unsigned int index)
 {
     auto func = convert(inFunc);
     if (!func) return nullptr;

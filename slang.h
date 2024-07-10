@@ -2385,6 +2385,12 @@ extern "C"
     enum SlangModifierID : SlangModifierIDIntegral
     {
         SLANG_MODIFIER_SHARED,
+        SLANG_MODIFIER_NO_DIFF,
+        SLANG_MODIFIER_STATIC,
+        SLANG_MODIFIER_CONST,
+        SLANG_MODIFIER_EXPORT,
+        SLANG_MODIFIER_EXTERN,
+        SLANG_MODIFIER_DIFFERENTIABLE,
     };
 
     // User Attribute
@@ -2518,7 +2524,7 @@ extern "C"
     SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflectionVariable* var, SlangModifierID modifierID);
     SLANG_API unsigned int spReflectionVariable_GetUserAttributeCount(SlangReflectionVariable* var);
     SLANG_API SlangReflectionUserAttribute* spReflectionVariable_GetUserAttribute(SlangReflectionVariable* var, unsigned int index);
-    SLANG_API SlangReflectionUserAttribute* spReflectionVariable_FindUserAttributeByName(SlangReflectionVariable* var, SlangSession * session, char const* name);
+    SLANG_API SlangReflectionUserAttribute* spReflectionVariable_FindUserAttributeByName(SlangReflectionVariable* var, SlangSession * globalSession, char const* name);
 
     // Variable Layout Reflection
 
@@ -2538,9 +2544,9 @@ extern "C"
     SLANG_API char const* spReflectionFunction_GetName(SlangReflectionFunction* func);
     SLANG_API unsigned int spReflectionFunction_GetUserAttributeCount(SlangReflectionFunction* func);
     SLANG_API SlangReflectionUserAttribute* spReflectionFunction_GetUserAttribute(SlangReflectionFunction* func, unsigned int index);
-    SLANG_API SlangReflectionUserAttribute* spReflectionFunction_FindUserAttributeByName(SlangReflectionFunction* func, SlangSession* session, char const* name);
+    SLANG_API SlangReflectionUserAttribute* spReflectionFunction_FindUserAttributeByName(SlangReflectionFunction* func, SlangSession* globalSession, char const* name);
     SLANG_API unsigned int spReflectionFunction_GetParameterCount(SlangReflectionFunction* func);
-    SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameterByIndex(SlangReflectionFunction* func, unsigned index);
+    SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameter(SlangReflectionFunction* func, unsigned index);
     SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* func);
 
     /** Get the stage that a variable belongs to (if any).
@@ -3278,6 +3284,12 @@ namespace slang
         enum ID : SlangModifierIDIntegral
         {
             Shared = SLANG_MODIFIER_SHARED,
+            NoDiff = SLANG_MODIFIER_NO_DIFF,
+            Static = SLANG_MODIFIER_STATIC,
+            Const = SLANG_MODIFIER_CONST,
+            Export = SLANG_MODIFIER_EXPORT,
+            Extern = SLANG_MODIFIER_EXTERN,
+            Differentiable = SLANG_MODIFIER_DIFFERENTIABLE,
         };
     };
 
@@ -3306,9 +3318,9 @@ namespace slang
         {
             return (UserAttribute*)spReflectionVariable_GetUserAttribute((SlangReflectionVariable*)this, index);
         }
-        UserAttribute* findUserAttributeByName(SlangSession* session, char const* name)
+        UserAttribute* findUserAttributeByName(SlangSession* globalSession, char const* name)
         {
-            return (UserAttribute*)spReflectionVariable_FindUserAttributeByName((SlangReflectionVariable*)this, session, name);
+            return (UserAttribute*)spReflectionVariable_FindUserAttributeByName((SlangReflectionVariable*)this, globalSession, name);
         }
     };
 
@@ -3413,9 +3425,9 @@ namespace slang
             return spReflectionFunction_GetParameterCount((SlangReflectionFunction*)this);
         }
 
-        VariableReflection* getParameter(unsigned int index)
+        VariableReflection* getParameterByIndex(unsigned int index)
         {
-            return (VariableReflection*)spReflectionFunction_GetParameterByIndex((SlangReflectionFunction*)this, index);
+            return (VariableReflection*)spReflectionFunction_GetParameter((SlangReflectionFunction*)this, index);
         }
 
         unsigned int getUserAttributeCount()
@@ -3426,9 +3438,14 @@ namespace slang
         {
             return (UserAttribute*)spReflectionVariable_GetUserAttribute((SlangReflectionVariable*)this, index);
         }
-        UserAttribute* findUserAttributeByName(SlangSession* session, char const* name)
+        UserAttribute* findUserAttributeByName(SlangSession* globalSession, char const* name)
         {
-            return (UserAttribute*)spReflectionVariable_FindUserAttributeByName((SlangReflectionVariable*)this, session, name);
+            return (UserAttribute*)spReflectionVariable_FindUserAttributeByName((SlangReflectionVariable*)this, globalSession, name);
+        }
+
+        Modifier* findModifier(Modifier::ID id)
+        {
+            return (Modifier*)spReflectionVariable_FindModifier((SlangReflectionVariable*)this, (SlangModifierID)id);
         }
     };
 

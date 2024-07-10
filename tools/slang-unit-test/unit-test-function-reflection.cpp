@@ -29,7 +29,8 @@ SLANG_UNIT_TEST(functionReflection)
         struct MyFuncPropertyAttribute {int v;}
 
         [MyFuncProperty(1024)]
-        float ordinaryFunc(float x, int y) { return x + y; }
+        [Differentiable]
+        float ordinaryFunc(no_diff float x, int y) { return x + y; }
 
         float4 fragMain(float4 pos:SV_Position) : SV_Position
         {
@@ -62,19 +63,22 @@ SLANG_UNIT_TEST(functionReflection)
     SLANG_CHECK(entryPointFuncReflection != nullptr);
     SLANG_CHECK(UnownedStringSlice(entryPointFuncReflection->getName()) == "fragMain");
     SLANG_CHECK(entryPointFuncReflection->getParameterCount() == 1);
-    SLANG_CHECK(UnownedStringSlice(entryPointFuncReflection->getParameter(0)->getName()) == "pos");
-    SLANG_CHECK(getTypeFullName(entryPointFuncReflection->getParameter(0)->getType()) == "vector<float,4>");
+    SLANG_CHECK(UnownedStringSlice(entryPointFuncReflection->getParameterByIndex(0)->getName()) == "pos");
+    SLANG_CHECK(getTypeFullName(entryPointFuncReflection->getParameterByIndex(0)->getType()) == "vector<float,4>");
 
     auto funcReflection = module->getLayout()->findFunctionByName("ordinaryFunc");
     SLANG_CHECK(funcReflection != nullptr);
 
+    SLANG_CHECK(funcReflection->findModifier(slang::Modifier::Differentiable) != nullptr);
     SLANG_CHECK(getTypeFullName(funcReflection->getReturnType()) == "float");
     SLANG_CHECK(UnownedStringSlice(funcReflection->getName()) == "ordinaryFunc");
     SLANG_CHECK(funcReflection->getParameterCount() == 2);
-    SLANG_CHECK(UnownedStringSlice(funcReflection->getParameter(0)->getName()) == "x");
-    SLANG_CHECK(getTypeFullName(funcReflection->getParameter(0)->getType()) == "float");
-    SLANG_CHECK(UnownedStringSlice(funcReflection->getParameter(1)->getName()) == "y");
-    SLANG_CHECK(getTypeFullName(funcReflection->getParameter(1)->getType()) == "int");
+    SLANG_CHECK(UnownedStringSlice(funcReflection->getParameterByIndex(0)->getName()) == "x");
+    SLANG_CHECK(getTypeFullName(funcReflection->getParameterByIndex(0)->getType()) == "float");
+    SLANG_CHECK(funcReflection->getParameterByIndex(0)->findModifier(slang::Modifier::NoDiff) != nullptr);
+
+    SLANG_CHECK(UnownedStringSlice(funcReflection->getParameterByIndex(1)->getName()) == "y");
+    SLANG_CHECK(getTypeFullName(funcReflection->getParameterByIndex(1)->getType()) == "int");
 
     SLANG_CHECK(funcReflection->getUserAttributeCount() == 1);
     auto userAttribute = funcReflection->getUserAttributeByIndex(0);
