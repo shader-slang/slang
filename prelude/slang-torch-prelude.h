@@ -107,6 +107,10 @@ TensorView make_tensor_view(torch::Tensor val, const char* name, torch::ScalarTy
         elementSize = 2;
         res.data = (uint8_t*)val.data_ptr<torch::BFloat16>();
         break;
+    case torch::kFloat16:
+        elementSize = 2;
+        res.data = (uint8_t*)val.data_ptr<at::Half>();
+        break;
     case torch::kInt16:
         elementSize = 2;
         res.data = (uint8_t*)val.data_ptr<int16_t>();
