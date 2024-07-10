@@ -14,6 +14,7 @@ jobs:
       matrix:
         os: [linux, macos, windows]
         config: [debug, release]
+        compiler: [gcc, clang, cl]
         platform: [x86_64, aarch64]
         exclude:
           # or os/config combinations
@@ -22,10 +23,16 @@ jobs:
           - { os: linux, platform: aarch64 }
           - { os: windows, platform: aarch64 }
           - { os: macos, platform: x86_64 }
+          - { os: linux, compiler: clang }
+          - { os: linux, compiler: cl }
+          - { os: windows, compiler: gcc }
+          - { os: windows, compiler: clang }
+          - { os: macos, compiler: gcc }
+          - { os: macos, compiler: cl }
         include:
-          - { os: linux, runs-on: ubuntu-20.04, compiler: gcc }
-          - { os: windows, runs-on: windows-latest, compiler: cl }
-          - { os: macos, runs-on: macos-latest, compiler: clang }
+          - { os: linux, runs-on: ubuntu-20.04 }
+          - { os: windows, runs-on: windows-latest }
+          - { os: macos, runs-on: macos-latest }
           # Set a test category depending on the config, smoke by default,
           # quick or full conditionally otherwise
           - test-category: smoke
