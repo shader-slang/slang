@@ -1393,6 +1393,9 @@ namespace Slang
         // Helper function to check if a struct can be used as its own differential type.
         bool canStructBeUsedAsSelfDifferentialType(AggTypeDecl *aggTypeDecl);
         void markSelfDifferentialMembersOfType(AggTypeDecl *parent, Type* type);
+
+        void checkDerivativeMemberAttributeReferences(
+            VarDeclBase* varDecl, DerivativeMemberAttribute* derivativeMemberAttr);
         
     public:
 
@@ -1810,6 +1813,10 @@ namespace Slang
             DeclRef<FunctionDeclBase> requirementDeclRef,
             RefPtr<WitnessTable> witnessTable,
             BuiltinRequirementKind requirementKind);
+
+            /// Check references from`[DerivativeMember(...)]` attributes on members of the agg-decl.
+            /// this is typically deferred until after types are ready for reference.
+        void checkDifferentiableMembersInType(AggTypeDecl* decl);
 
         struct DifferentiableMemberInfo
         {
