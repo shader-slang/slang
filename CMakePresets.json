@@ -35,16 +35,8 @@
       "generator": "Visual Studio 17 2022"
     },
     {
-      "name": "single-component",
-      "inherits": "default",
-      "description": "configure to package a single component",
-      "cacheVariables": {
-        "CPACK_ARCHIVE_COMPONENT_INSTALL": "ON"
-      }
-    },
-    {
       "name": "slang-llvm",
-      "inherits": "single-component",
+      "inherits": "default",
       "description": "Build slang-llvm from the system LLVM",
       "cacheVariables": {
         "SLANG_SLANG_LLVM_FLAVOR": "USE_SYSTEM_LLVM"
@@ -65,7 +57,7 @@
     {
       "name": "generators",
       "inherits": "release",
-      "configurePreset": "single-component",
+      "configurePreset": "default",
       "targets": [
         "all-generators"
       ]
@@ -88,7 +80,8 @@
         "ZIP"
       ],
       "variables": {
-        "CPACK_PACKAGE_FILE_NAME": "slang"
+        "CPACK_PACKAGE_FILE_NAME": "slang",
+        "CPACK_COMPONENTS_ALL": "Unspecified;metadata"
       }
     },
     {
@@ -110,7 +103,7 @@
     {
       "name": "generators",
       "inherits": "release",
-      "configurePreset": "single-component",
+      "configurePreset": "default",
       "variables": {
         "CPACK_COMPONENTS_ALL": "generators"
       }
@@ -164,7 +157,7 @@
       "steps": [
         {
           "type": "configure",
-          "name": "single-component"
+          "name": "default"
         },
         {
           "type": "build",
