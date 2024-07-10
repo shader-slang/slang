@@ -158,7 +158,7 @@ struct AssociatedTypeLookupSpecializationContext
         builder.setInsertBefore(inst);
         auto witnessTableArg = inst->getWitnessTable();
         auto callInst = builder.emitCallInst(
-            builder.getWitnessTableIDType(interfaceType), func, witnessTableArg);
+            func->getResultType(), func, witnessTableArg);
         inst->replaceUsesWith(callInst);
         inst->removeAndDeallocate();
     }
