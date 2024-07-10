@@ -17,39 +17,15 @@ jobs:
       - name: Run the build process with Docker
         uses: addnab/docker-run-action@v3
         with:
-          image: slangdeveloper/centos7-gcc9
+          image: slangdeveloper/centos7-gcc9:cmake
           options: -v ${{ github.workspace }}:/home/app -v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt
           run: |
             source /opt/rh/devtoolset-9/enable
 
-            yum install -y python3
-
-            wget https://cmake.org/files/v3.30/cmake-3.30.0.tar.gz
-            yum install -y openssl-devel
-            tar zxvf cmake-3.*
-            cd cmake-3.*
-            ./bootstrap --prefix=/usr/local
-            make -j$(nproc)
-            make install
-
-            cd ..
-            yum remove git -y
-            yum install curl-devel expat-devel gettext-devel openssl-devel zlib-devel wget -y
-            yum install gcc perl-ExtUtils-MakeMaker -y
-            cd /usr/src
-            wget https://www.kernel.org/pub/software/scm/git/git-2.9.3.tar.gz
-            tar xzf git-2.9.3.tar.gz
-            cd git-2.9.3
-            mkdir -p /usr/local/git
-            make prefix=/usr/local/git all -j$(nproc)
-            make prefix=/usr/local/git install -j$(nproc)
-            export PATH=$PATH:/usr/local/git/bin
-
             cd /home/app
             git config --global --add safe.directory /home/app
-            cmake --preset default --fresh -DCMAKE_BUILD_TYPE=Release -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DSLANG_EMBED_STDLIB=1 -G 'Unix Makefiles'
-            cmake --build --preset release -j$(nproc)
-
+            cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DSLANG_EMBED_STDLIB=1
+            cmake --build --preset release
             cpack --preset release -G ZIP
             cpack --preset release -G TGZ
 
