@@ -318,6 +318,7 @@ def _GL_ARB_texture_gather : _GLSL_130;
 def _GL_ARB_texture_query_levels : _GLSL_130;
 def _GL_ARB_shader_clock : _GLSL_450;
 def _GL_ARB_gpu_shader_int64 : _GLSL_400;
+def _GL_ARB_shader_clock64 : _GL_ARB_shader_clock + _GL_ARB_gpu_shader_int64;
 
 def _GL_KHR_memory_scope_semantics : _GLSL_420;
 def _GL_KHR_shader_subgroup_arithmetic : _GLSL_140;
@@ -374,7 +375,7 @@ alias GL_ARB_sparse_texture_clamp = _GL_ARB_sparse_texture_clamp | spvSparseResi
 alias GL_ARB_texture_gather = _GL_ARB_texture_gather | spvImageGatherExtended | metal;
 alias GL_ARB_texture_query_levels = _GL_ARB_texture_query_levels | spvImageQuery | metal;
 alias GL_ARB_shader_clock = _GL_ARB_shader_clock | spvShaderClockKHR;
-alias GL_ARB_shader_clock64 = _GL_ARB_shader_clock + _GL_ARB_gpu_shader_int64 | spvShaderClockKHR;
+alias GL_ARB_shader_clock64 = _GL_ARB_shader_clock64 | spvShaderClockKHR;
 alias GL_ARB_gpu_shader_int64 = _GL_ARB_gpu_shader_int64;
 
 alias GL_KHR_memory_scope_semantics = _GL_KHR_memory_scope_semantics | _spirv_1_0;
