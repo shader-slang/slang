@@ -10288,7 +10288,7 @@ static void _addFlattenedTupleArgs(
 
 bool isAbstractWitnessTable(IRInst* inst)
 {
-    if (as<IRThisTypeWitness>(inst))
+    if (as<IRThisTypeWitness>(inst) || as<IRInterfaceRequirementEntry>(inst))
         return true;
     if (auto lookup = as<IRLookupWitnessMethod>(inst))
         return isAbstractWitnessTable(lookup->getWitnessTable());

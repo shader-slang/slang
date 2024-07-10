@@ -3279,14 +3279,15 @@ void legalizeEntryPointForGLSL(
     context.sink = codeGenContext->getSink();
     context.glslExtensionTracker = glslExtensionTracker;
 
-    // We require that the entry-point function has no uses,
+    // We require that the entry-point function has no calls,
     // because otherwise we'd invalidate the signature
     // at all existing call sites.
     //
     // TODO: the right thing to do here is to split any
     // function that both gets called as an entry point
     // and as an ordinary function.
-    SLANG_ASSERT(!func->firstUse);
+    for (auto use = func->firstUse; use; use = use->nextUse)
+        SLANG_ASSERT(use->getUser()->getOp() != kIROp_Call);
 
     // Require SPIRV version based on the stage.
     switch (stage)
