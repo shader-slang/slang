@@ -476,7 +476,7 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
     
     if (targetDesc.payload == ArtifactDesc::Payload::MetalAIR)
     {
-        cmdLine.addArg("-std=macos-metal2.3");
+        cmdLine.addArg("-std=metal3.1");
     }
 
     // Our generated code very often casts between dissimilar types with the

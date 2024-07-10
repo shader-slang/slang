@@ -613,3 +613,28 @@ __file_decl
     }
 }
 ```
+
+User Defined Attributes (Experimental)
+-------------------
+
+In addition to many system defined attributes, users can define their own custom attribute types to be used in the `[UserDefinedAttribute(args...)]` syntax. The following example shows how to define a custom attribute type.
+
+```csharp
+[__AttributeUsage(_AttributeTargets.Var)]
+struct MaxValueAttribute
+{
+    int value;
+    string description;
+};
+
+[MaxValue(12, "the scale factor")]
+uniform int scaleFactor;
+```
+
+In the above code, the `MaxValueAttribute` struct type is decorated with the `[__AttributeUsage]` attribute, which informs that `MaxValueAttribute` type should be interpreted as a definiton for a user-defined attribute, `[MaxValue]`, that can be used to decorate all variables or fields. The members of the struct defines the argument list for the attribute.
+
+The `scaleFactor` uniform parameter is declared with the user defined `[MaxValue]` attribute, providing two arguments for `value` and `description`.
+
+The `_AttributeTargets` enum is used to restrict the type of decls the attribute can apply. Possible values of `_AttributeTargets` can be `Function`, `Param`, `Struct` or `Var`.
+
+The usage of user-defined attributes can be queried via Slang's reflection API through `TypeReflection` or `VariableReflection`'s `getUserAttributeCount`, `getUserAttributeByIndex` and `findUserAttributeByName` methods. 
