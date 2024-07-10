@@ -8902,6 +8902,30 @@ ${{{{
 }}}}
 
 ${{{{
+
+// Generated functions:
+
+// atomicAdd, InterlockedAdd, atomic_fetch_add_explicit, OpAtomicIAdd, OpAtomicFAddEXT
+// __cudaInterlocked_add, __glslInterlocked_add, __hlslInterlocked_add, __metalInterlocked_add, __spirvInterlocked_add
+
+// atomicAnd, InterlockedAnd, atomic_fetch_and_explicit, OpAtomicAnd
+// __cudaInterlocked_and, __glslInterlocked_and, __hlslInterlocked_and, __metalInterlocked_and, __spirvInterlocked_and
+
+// atomicMax, InterlockedMax, atomic_fetch_max_explicit, OpAtomicUMax, OpAtomicSMax, OpAtomicFMaxEXT
+// __cudaInterlocked_max, __glslInterlocked_max, __hlslInterlocked_max, __metalInterlocked_max, __spirvInterlocked_max
+
+// atomicMin, InterlockedMin, atomic_fetch_min_explicit, OpAtomicUMin, OpAtomicSMin, OpAtomicFMinEXT
+// __cudaInterlocked_min, __glslInterlocked_min, __hlslInterlocked_min, __metalInterlocked_min, __spirvInterlocked_min
+
+// atomicOr, InterlockedOr, atomic_fetch_or_explicit, OpAtomicOr
+// __cudaInterlocked_or, __glslInterlocked_or, __hlslInterlocked_or, __metalInterlocked_or, __spirvInterlocked_or
+
+// atomicXor, InterlockedXor, atomic_fetch_xor_explicit, OpAtomicXor
+// __cudaInterlocked_xor, __glslInterlocked_xor, __hlslInterlocked_xor, __metalInterlocked_xor, __spirvInterlocked_xor
+
+// atomicExchange, atomicExch, InterlockedExchange, atomic_exchange_explicit, OpAtomicExchange
+// __cudaInterlocked_exchange, __glslInterlocked_exchange, __hlslInterlocked_exchange, __metalInterlocked_exchange, __spirvInterlocked_exchange
+
 struct InternalAtomicOperationInfo
 {
     const char* slangSuffix;
@@ -9174,7 +9198,7 @@ void __hlslInterlocked_compare_exchange_float_bitwise(__ref T dest, T compare_va
 ${{{{
 // Generates code for:
 // InterlockedAdd, InterlockedAnd, InterlockedOr, InterlockedXor,
-// InterlockedMin, InterlockedMax, InterlockedExchange
+// InterlockedMax, InterlockedMin, InterlockedExchange
 struct SlangAtomicOperationInfo
 {
     const char* slangCallSuffix;
