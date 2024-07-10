@@ -81,7 +81,7 @@
       ],
       "variables": {
         "CPACK_PACKAGE_FILE_NAME": "slang",
-        "CPACK_COMPONENTS_ALL": "Unspecified;metadata"
+        "CPACK_COMPONENTS_ALL": "Unspecified;metadata;slang-llvm"
       }
     },
     {

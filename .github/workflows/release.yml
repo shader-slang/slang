@@ -154,7 +154,7 @@ jobs:
           cpack --preset "$config" -G ZIP
           cpack --preset "$config" -G TGZ
           triggering_ref=${{ github.ref_name }}
-          base=$(pwd)/slang-${triggering_ref#v}-${{matrix.os}}-${{matrix.platform}}
+          base=slang-${triggering_ref#v}-${{matrix.os}}-${{matrix.platform}}
           mv "$(pwd)/build/dist-${config}/slang.zip" "${base}.zip"
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> $GITHUB_OUTPUT
           mv "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
