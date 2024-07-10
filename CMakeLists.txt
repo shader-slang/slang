@@ -85,6 +85,7 @@ option(SLANG_EMBED_STDLIB_SOURCE "Embed stdlib source in the binary" ON)
 option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
+option(SLANG_ENABLE_IR_BREAK_ALLOC, "Enable _debugUID on IR allocation)
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
 option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)

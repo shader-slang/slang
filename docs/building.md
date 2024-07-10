@@ -64,7 +64,7 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 | `SLANG_EMBED_STDLIB_SOURCE`       | `TRUE`           | Embed stdlib source in the binary                                  |
 | `SLANG_ENABLE_ASAN`               | `FALSE`          | Enable ASAN (address sanitizer)                                    |
 | `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`          | Enable full IR validation (SLOW!)                                  |
-| `SLANG_ENABLE_IR_BREAK_ALLOC`     | `FALSE`          | SLANG_ENABLE_IR_BREAK_ALLOC                                        |
+| `SLANG_ENABLE_IR_BREAK_ALLOC`     | `FALSE`          | Enable IR BreakAlloc functionality for debugging.                  |
 | `SLANG_ENABLE_GFX`                | `TRUE`           | Enable gfx targets                                                 |
 | `SLANG_ENABLE_SLANGD`             | `TRUE`           | Enable language server target                                      |
 | `SLANG_ENABLE_SLANGC`             | `TRUE`           | Enable standalone compiler target                                  |
