@@ -4399,7 +4399,7 @@ public:
     }
 
 //    void addLayoutDecoration(IRInst* value, Layout* layout);
-    void addLayoutDecoration(IRInst* value, IRLayout* layout);
+    IRLayoutDecoration* addLayoutDecoration(IRInst* value, IRLayout* layout);
 
 //    IRLayout* getLayout(Layout* astLayout);
 
@@ -4519,9 +4519,9 @@ public:
         addDecoration(value, kIROp_ForceUnrollDecoration, getIntValue(getIntType(), iters));
     }
 
-    void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)
+    IRSemanticDecoration* addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)
     {
-        addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index));
+        return as<IRSemanticDecoration>(addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index)));
     }
 
     void addRequireSPIRVDescriptorIndexingExtensionDecoration(IRInst* value)
