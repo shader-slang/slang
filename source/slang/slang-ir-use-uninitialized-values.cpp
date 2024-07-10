@@ -160,15 +160,36 @@ namespace Slang
     
     static void checkCallUsage(List<IRInst*>& stores, List<IRInst*>& loads, IRCall* call, IRInst* inst)
     {
+        //printf("problematic instruction:\n");
+        //inst->dump();
+        //printf("used in call here:\n");
+        //call->dump();
         IRInst* callee = call->getCallee();
+        //printf("callee:\n");
+        //callee->dump();
+
+        // Resolve the actual function
         IRFunc* ftn = nullptr;
         if (auto spec = as<IRSpecialize>(callee))
             ftn = as<IRFunc>(resolveSpecialization(spec));
+        else if (auto fwd = as<IRForwardDifferentiate>(callee))
+            ftn = as<IRFunc>(fwd->getBaseFn());
+        else if (auto rev = as<IRBackwardDifferentiate>(callee))
+            ftn = as<IRFunc>(rev->getBaseFn());
         else
             ftn = as<IRFunc>(callee);
 
-        if (!ftn)
+        //printf("spec ? %p\n", as<IRSpecialize>(callee));
+        //printf("fwd  ? %p\n", as<IRForwardDifferentiate>(callee));
+        //printf("bwd  ? %p\n", as<IRBackwardDifferentiate>(callee));
+
+        if (!ftn) {
+            //printf("not a function...\n");
             return;
+        }
+
+        //printf("function is:\n");
+        //ftn->dump();
 
         // Find the argument index so we can fetch the type
         int index = 0;
@@ -358,6 +379,10 @@ namespace Slang
             auto loads = getUnresolvedVariableLoads(reachability, inst);
             for (auto load : loads)
             {
+                //printf("problematic variable:\n");
+                //inst->dump();
+                //printf("used here:\n");
+                //load->dump();
                 sink->diagnose(load,
                         Diagnostics::usingUninitializedVariable,
                         inst);

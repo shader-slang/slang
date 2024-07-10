@@ -3,6 +3,11 @@
 public struct MxWeights<let TBsdfCount : int>
 {
     public float3 weights[TBsdfCount];
+
+    public __init()
+    {
+        weights[0] = float3(0.0f);
+    }
 }
 
 public interface IMxLayeredMaterialData
