@@ -276,7 +276,7 @@ namespace Slang
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
                 IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user, inst);
+                collectLoadStore(stores, loads, user, alias);
             }
         }
 
@@ -308,7 +308,7 @@ namespace Slang
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
                 IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user, inst);
+                collectLoadStore(stores, loads, user, alias);
             }
         }
 
@@ -393,7 +393,7 @@ namespace Slang
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
                 IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user, variable);
+                collectLoadStore(stores, loads, user, alias);
 
                 // Disregard if there is at least one store,
                 // since we cannot tell what the control flow is

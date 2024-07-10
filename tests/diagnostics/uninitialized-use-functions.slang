@@ -82,4 +82,13 @@ void ok_generic_use()
     ordinary_generic(x);
 }
 
+// Check proper handling of aliases passed
+void f()
+{
+    int3 dim;
+
+    // Should have no warnings
+    out_test(1, dim.x);
+}
+
 //CHK-NOT: warning 41016
