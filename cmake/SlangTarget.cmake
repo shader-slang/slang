@@ -301,12 +301,12 @@ function(slang_add_target dir type)
     set_property(
         TARGET ${target}
         APPEND
-        PROPERTY BUILD_RPATH "${ORIGIN}/../${library_subdir}"
+        PROPERTY BUILD_RPATH "${ORIGIN}/../${library_subdir};${ORIGIN}"
     )
     set_property(
         TARGET ${target}
         APPEND
-        PROPERTY INSTALL_RPATH "${ORIGIN}/../${library_subdir}"
+        PROPERTY INSTALL_RPATH "${ORIGIN}/../${library_subdir};${ORIGIN}"
     )
 
     # On the same topic, give everything a dylib suffix on Mac OS
