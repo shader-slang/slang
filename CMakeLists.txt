@@ -4,12 +4,13 @@ cmake_minimum_required(VERSION 3.25)
 # from git describe
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(GitVersion)
-get_git_version(SLANG_VERSION "${CMAKE_CURRENT_LIST_DIR}")
+get_git_version(SLANG_VERSION_NUMERIC SLANG_VERSION_FULL "${CMAKE_CURRENT_LIST_DIR}")
 
 #
 # Our project
 #
-project(slang VERSION "${SLANG_VERSION}" LANGUAGES)
+project(slang VERSION "${SLANG_VERSION_NUMERIC}" LANGUAGES)
+set(PROJECT_VERSION "${SLANG_VERSION_FULL}")
 
 #
 # Global CMake options

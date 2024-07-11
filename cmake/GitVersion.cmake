@@ -1,9 +1,10 @@
 find_package(Git)
 
 # Extract a version from the latest tag matching something like v1.2.3.4
-function(get_git_version var dir)
+function(get_git_version var_numeric var dir)
     if(NOT DEFINED ${var})
-        set(version "0.0")
+        set(version_numeric "0.0.0")
+        set(version "0.0.0-unknown")
         if(GIT_EXECUTABLE)
             set(command
                 "${GIT_EXECUTABLE}"
@@ -26,12 +27,13 @@ function(get_git_version var dir)
                     WARNING
                     "Getting ${var} failed: ${command} returned ${result}"
                 )
-            elseif("${version_out}" MATCHES "^v([0-9]+(\.[0-9]+)*).*")
+            elseif("${version_out}" MATCHES "^v(([0-9]+(\.[0-9]+)*).*)")
                 set(version "${CMAKE_MATCH_1}")
+                set(version_numeric "${CMAKE_MATCH_2}")
             else()
                 message(
                     WARNING
-                    "Couldn't parse numeric version (like v1.2.3) from ${version_out}"
+                    "Couldn't parse version (like v1.2.3 or v1.2.3-foo) from ${version_out}"
                 )
             endif()
         else()
@@ -42,6 +44,11 @@ function(get_git_version var dir)
         endif()
     endif()
 
+    set(${var_numeric}
+        ${version_numeric}
+        CACHE STRING
+        "The project version numeric part, detected using git if available"
+    )
     set(${var}
         ${version}
         CACHE STRING
