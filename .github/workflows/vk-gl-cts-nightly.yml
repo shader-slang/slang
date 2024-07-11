@@ -22,6 +22,7 @@ jobs:
             test-category: full
             full-gpu-tests: false
             runs-on: [Windows, self-hosted]
+    runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 180
     defaults:
       run:
