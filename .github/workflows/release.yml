@@ -134,6 +134,7 @@ jobs:
           )
           for b in "${binaries[@]}"; do
             if [[ -f "$b" ]]; then
+              /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} "$b" -v
               7z a "slang-macos-dist.zip" "$b"
             fi
           done
