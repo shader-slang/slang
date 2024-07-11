@@ -212,6 +212,7 @@ slang_add_target(
         slang-reflect-headers
         slang-lookup-tables
         SPIRV-Headers
+    INCLUDE_DIRECTORIES_PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
     FOLDER generators
 )
 target_compile_definitions(
