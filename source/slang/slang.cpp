@@ -47,7 +47,7 @@
 
 #include "slang-check-impl.h"
 
-#include "../../slang-tag-version.h"
+#include "slang-tag-version.h"
 
 #include <sys/stat.h>
 
@@ -124,7 +124,7 @@ namespace Slang {
 
 const char* getBuildTagString()
 {
-    if (UnownedStringSlice(SLANG_TAG_VERSION) == "unknown")
+    if (UnownedStringSlice(SLANG_TAG_VERSION) == "0.0.0-unknown")
     {
         // If the tag is unknown, then we will try to get the timestamp of the shared library
         // and use that as the version string, so that we can at least return something
