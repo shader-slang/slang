@@ -34,7 +34,7 @@ git clone https://github.com/shader-slang/slang --recursive
 
 For a Ninja based build system (all platforms) run:
 ```bash
-cmake --preset default # or --preset dev
+cmake --preset default
 cmake --build --preset release # or --preset debug
 ```
 
