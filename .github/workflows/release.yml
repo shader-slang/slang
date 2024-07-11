@@ -138,6 +138,7 @@ jobs:
             fi
           done
 
+          timeout 1000 gon ./extras/macos-notarize.json
           cp slang-macos-dist.zip "slang-macos-dist-${{matrix.platform}}.zip"
           echo "SLANG_NOTARIZED_DIST=slang-macos-dist-${{matrix.platform}}.zip" >> $GITHUB_OUTPUT
 
