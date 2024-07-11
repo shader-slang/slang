@@ -1,19 +1,24 @@
-//TEST:SIMPLE(filecheck=CHECK1): -target glsl
-//TEST:SIMPLE(filecheck=CHECK2): -target spirv
-//TEST:SIMPLE(filecheck=CHECK3): -target spirv -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=GLSL): -target glsl
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -emit-spirv-via-glsl
 
+// GLSL: GL_ARB_shader_clock : require
+// GLSL: GL_ARB_gpu_shader_int64 : require
 
-// CHECK1: GL_ARB_shader_clock : require
-// CHECK2: OpCapability ShaderClockKHR
-// CHECK2: OpExtension "SPV_KHR_shader_clock"
+//SPIRV: OpCapability ShaderClockKHR
+//SPIRV: OpExtension "SPV_KHR_shader_clock"
 RWStructuredBuffer<float> output;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 id: SV_DispatchThreadID)
 {
+    //GLSL: clock2x32ARB
+    //SPIRV: OpReadClockKHR %v2uint %uint_3
     output[0] = clock2x32ARB().x;
-    // CHECK1: clock2x32ARB
-    // CHECK2: OpReadClockKHR %v2uint %uint_3
-    // CHECK3: OpReadClockKHR %v2uint %uint_3
+
+    //GLSL: clockARB
+    //SPIRV: OpReadClockKHR %ulong %uint_3
+    uint64_t c = clockARB();
+    output[1] = c;
 }
