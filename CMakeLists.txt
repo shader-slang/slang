@@ -11,6 +11,7 @@ get_git_version(SLANG_VERSION_NUMERIC SLANG_VERSION_FULL "${CMAKE_CURRENT_LIST_D
 #
 project(slang VERSION "${SLANG_VERSION_NUMERIC}" LANGUAGES)
 set(PROJECT_VERSION "${SLANG_VERSION_FULL}")
+configure_file(slang-tag-version.h.in slang-tag-version.h)
 
 #
 # Global CMake options

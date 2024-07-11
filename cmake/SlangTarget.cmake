@@ -60,6 +60,7 @@ function(slang_add_target dir type)
         INCLUDE_FROM_PRIVATE
         # Any include directories other targets need to use this target
         INCLUDE_DIRECTORIES_PUBLIC
+        INCLUDE_DIRECTORIES_PRIVATE
         # Add a dependency on the new target to the specified targets
         REQUIRED_BY
         # Add a dependency to the new target on the specified targets
@@ -232,6 +233,13 @@ function(slang_add_target dir type)
         target_include_directories(
             ${target}
             PUBLIC "$<BUILD_INTERFACE:${inc_abs}>"
+        )
+    endforeach()
+    foreach(inc ${ARG_INCLUDE_DIRECTORIES_PRIVATE})
+        get_filename_component(inc_abs ${inc} ABSOLUTE)
+        target_include_directories(
+            ${target}
+            PRIVATE "$<BUILD_INTERFACE:${inc_abs}>"
         )
     endforeach()
 

@@ -11,7 +11,6 @@ function(get_git_version var_numeric var dir)
                 -C
                 "${dir}"
                 describe
-                --abbrev=0
                 --tags
                 --match
                 v*
@@ -27,7 +26,7 @@ function(get_git_version var_numeric var dir)
                     WARNING
                     "Getting ${var} failed: ${command} returned ${result}"
                 )
-            elseif("${version_out}" MATCHES "^v(([0-9]+(\.[0-9]+)*).*)")
+            elseif("${version_out}" MATCHES "^v(([0-9]+(\\.[0-9]+)*).*)")
                 set(version "${CMAKE_MATCH_1}")
                 set(version_numeric "${CMAKE_MATCH_2}")
             else()
