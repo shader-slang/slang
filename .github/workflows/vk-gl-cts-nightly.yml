@@ -47,7 +47,7 @@ jobs:
           -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
           -DSLANG_ENABLE_CUDA=1 \
           -DSLANG_ENABLE_EXAMPLES=0 \
-          -DSLANG_ENABLE_GFX=0 \
+          -DSLANG_ENABLE_GFX=1 \
           -DSLANG_ENABLE_TESTS=1
         cmake --workflow --preset "${{matrix.config}}"
     - uses: robinraju/release-downloader@v1.7
