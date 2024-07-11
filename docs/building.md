@@ -40,10 +40,12 @@ cmake --build --preset release # or --preset debug
 
 For Visual Studio run:
 ```bash
-cmake --preset vs2022 # or --preset vs2019
+cmake --preset vs2022 # or 'vs2019' or `vs2022-dev`
 start devenv ./build/slang.sln # to optionally open the project in Visual Studio
 cmake --build --preset release # to build from the CLI
 ```
+
+The `vs2022-dev` preset turns on features that makes debugging easy.
 
 ## Testing
 
