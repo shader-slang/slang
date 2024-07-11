@@ -174,7 +174,3 @@ jobs:
             ${{ steps.notarize.outputs.SLANG_NOTARIZED_DIST }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Notarize
-        run : |
-          timeout 1000 gon ./extras/macos-notarize.json
