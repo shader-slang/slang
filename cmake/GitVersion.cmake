@@ -19,19 +19,19 @@ function(get_git_version var dir)
                 COMMAND ${command}
                 RESULT_VARIABLE result
                 OUTPUT_STRIP_TRAILING_WHITESPACE
-                OUTPUT_VARIABLE version
+                OUTPUT_VARIABLE version_out
             )
             if(NOT result EQUAL 0)
                 message(
                     WARNING
                     "Getting ${var} failed: ${command} returned ${result}"
                 )
-            elseif("${version}" MATCHES "^v([0-9]+(\.[0-9]+)*).*")
+            elseif("${version_out}" MATCHES "^v([0-9]+(\.[0-9]+)*).*")
                 set(version "${CMAKE_MATCH_1}")
             else()
                 message(
                     WARNING
-                    "Couldn't parse numeric version (like v1.2.3) from ${version}"
+                    "Couldn't parse numeric version (like v1.2.3) from ${version_out}"
                 )
             endif()
         else()
