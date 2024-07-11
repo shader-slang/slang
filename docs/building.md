@@ -45,10 +45,7 @@ start devenv ./build/slang.sln # to optionally open the project in Visual Studio
 cmake --build --preset release # to build from the CLI
 ```
 
-The `vs2022` preset generates Visual Studio 2022 solution and project files,
-and the `vs2019` preset generates Visual Studio 2019 solution and project files.
-
-The `dev` or `vs2022-dev` preset also turns on features that makes debugging easy.
+The `vs2022-dev` preset turns on features that makes debugging easy.
 
 ## Testing
 

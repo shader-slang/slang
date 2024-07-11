@@ -16,14 +16,6 @@
       }
     },
     {
-      "name": "dev",
-      "inherits": "default",
-      "description": "Development build with debug assisting features",
-      "cacheVariables": {
-        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
-      }
-    },
-    {
       "name": "msvc-base",
       "hidden": true,
       "inherits": "default",
@@ -66,7 +58,7 @@
   "buildPresets": [
     {
       "name": "debug",
-      "configurePreset": "dev",
+      "configurePreset": "default",
       "configuration": "Debug"
     },
     {
@@ -145,7 +137,7 @@
       "steps": [
         {
           "type": "configure",
-          "name": "dev"
+          "name": "default"
         },
         {
           "type": "build",
