@@ -2,7 +2,7 @@
 #include <string>
 #include <sstream>
 #include <thread>
-#include "../capture-utility.h"
+#include "../util/capture-utility.h"
 #include "capture-manager.h"
 
 namespace SlangCapture

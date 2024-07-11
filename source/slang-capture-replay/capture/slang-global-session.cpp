@@ -2,7 +2,7 @@
 #include "slang-session.h"
 #include "slang-filesystem.h"
 #include "../../slang/slang-compiler.h"
-#include "../capture-utility.h"
+#include "../util/capture-utility.h"
 
 namespace SlangCapture
 {

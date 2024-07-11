@@ -161,6 +161,11 @@ set(SLANG_LOOKUP_GENERATOR_OUTPUT_DIR
 set(SLANG_LOOKUP_GENERATED_SOURCE
     "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.cpp"
 )
+set(SLANG_CAPATURE_REPLAY_SYSTEM
+    "${slang_SOURCE_DIR}/source/slang-capture-replay/capture"
+    "${slang_SOURCE_DIR}/source/slang-capture-replay/util"
+)
+
 add_custom_command(
     OUTPUT ${SLANG_LOOKUP_GENERATED_SOURCE}
     COMMAND

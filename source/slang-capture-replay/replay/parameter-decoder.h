@@ -1,9 +1,12 @@
+#ifndef PARAMETER_DECODER_H
+#define PARAMETER_DECODER_H
+
 #include <cinttypes>
 #include <cstring>
 #include <cstdlib>
 #include <vector>
-#include "../capture-format.h"
-#include "../capture-utility.h"
+#include "../util/capture-format.h"
+#include "../util/capture-utility.h"
 #include "../../../slang.h"
 
 namespace SlangCapture
@@ -185,3 +188,5 @@ namespace SlangCapture
         }
     };
 } // namespace SlangCapture
+
+#endif // PARAMETER_DECODER_H

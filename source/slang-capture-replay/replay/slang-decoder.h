@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <unordered_map>
-#include "../capture-format.h"
+#include "../util/capture-format.h"
 #include "decoder-consumer.h"
 
 namespace SlangCapture

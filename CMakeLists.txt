@@ -98,6 +98,7 @@ option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
 option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang wrapper target" ON)
 option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
+option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
 
 enum_option(
     SLANG_LIB_TYPE
@@ -768,6 +769,20 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
     if(SLANG_ENABLE_AFTERMATH)
         example(examples/nv-aftermath-example WIN32_EXECUTABLE)
     endif()
+endif()
+
+#
+# slang-replay tool for replaying the capture files
+#
+if (SLANG_ENABLE_REPLAYER)
+    slang_add_target(
+        tools/slang-replay
+        EXECUTABLE
+        EXTRA_SOURCE_DIRS source/slang-capture-replay/replay source/slang-capture-replay/util
+        LINK_WITH_PRIVATE core compiler-core slang
+        INCLUDE_DIRECTORIES_PUBLIC source/slang-capture-replay
+        FOLDER test
+    )
 endif()
 
 #

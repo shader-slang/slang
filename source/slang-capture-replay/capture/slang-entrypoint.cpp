@@ -1,4 +1,4 @@
-#include "../capture-utility.h"
+#include "../util/capture-utility.h"
 #include "slang-entrypoint.h"
 
 namespace SlangCapture

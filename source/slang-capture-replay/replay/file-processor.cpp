@@ -1,5 +1,5 @@
 #include "file-processor.h"
-#include "../capture-utility.h"
+#include "../util/capture-utility.h"
 #include "parameter-decoder.h"
 
 namespace SlangCapture
