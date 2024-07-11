@@ -134,12 +134,11 @@ jobs:
           )
           for b in "${binaries[@]}"; do
             if [[ -f "$b" ]]; then
-              7z a "slang-macos-dist.zip" "${existing_files[@]}"
+              7z a "slang-macos-dist.zip" "$b"
             fi
           done
 
           timeout 1000 gon ./extras/macos-notarize.json
-
           cp slang-macos-dist.zip "slang-macos-dist-${{matrix.platform}}.zip"
           echo "SLANG_NOTARIZED_DIST=slang-macos-dist-${{matrix.platform}}.zip" >> $GITHUB_OUTPUT
 
@@ -175,3 +174,7 @@ jobs:
             ${{ steps.notarize.outputs.SLANG_NOTARIZED_DIST }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notarize
+        run : |
+          timeout 1000 gon ./extras/macos-notarize.json
