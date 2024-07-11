@@ -47,7 +47,7 @@
 
 #include "slang-check-impl.h"
 
-#include "../../slang-tag-version.h"
+#include "slang-tag-version.h"
 
 #include <sys/stat.h>
 
