@@ -65,6 +65,8 @@ function(slang_add_target dir type)
         REQUIRED_BY
         # Add a dependency to the new target on the specified targets
         REQUIRES
+        # Add a dependency to the new target on the specified targets if they exist
+        OPTIONAL_REQUIRES
         # Globs for any headers to install
         PUBLIC_HEADERS
     )
@@ -277,6 +279,12 @@ function(slang_add_target dir type)
     if(DEFINED ARG_REQUIRES)
         add_dependencies(${target} ${ARG_REQUIRES})
     endif()
+
+    foreach(required ${ARG_OPTIONAL_REQUIRES})
+        if(TARGET ${required})
+            add_dependencies(${target} ${required})
+        endif()
+    endforeach()
 
     #
     # Other preprocessor defines

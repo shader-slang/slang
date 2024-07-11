@@ -95,7 +95,7 @@ option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
 option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
 option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang wrapper target" ON)
-option(SLANG_ENABLE_TESTS "Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT" ON)
+option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 
 enum_option(
@@ -558,7 +558,7 @@ endif()
 #
 # The test executables and runtime-loaded modules
 #
-if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENABLE_SLANGRT)
+if(SLANG_ENABLE_TESTS)
     slang_add_target(
         tools/test-server
         EXECUTABLE
@@ -582,28 +582,19 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENA
         REQUIRES
             # Shared libraries dlopened by slang-test
             slang-reflection-test
-            render-test
             slang-unit-test
-            gfx-unit-test
             # Used by some tests when they run
             slangd
-            slang-rt
-            gfx
             test-server
             test-process
+        OPTIONAL_REQUIRES
+            gfx
+            slang-rt
+            slang-glslang
+            slang-llvm
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
-    if(TARGET slang-glslang)
-        # Only add a dependency here if slang-glslang exists
-        add_dependencies(slang-test slang-glslang)
-    endif()
-    if(TARGET slang-llvm)
-        # Only add a dependency here if slang-llvm exists
-        # Pending https://gitlab.kitware.com/cmake/cmake/-/issues/19467 to be able
-        # to use a generator expression in REQUIRES just above.
-        add_dependencies(slang-test slang-llvm)
-    endif()
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
         PROPERTY VS_STARTUP_PROJECT slang-test
@@ -618,16 +609,40 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENA
     )
 
     # These are libraries loaded at runtime from the test executable:
-    slang_add_target(
-        tools/gfx-unit-test
-        MODULE
-        EXCLUDE_FROM_ALL
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-        USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE core slang unit-test gfx gfx-util platform
-        OUTPUT_NAME gfx-unit-test-tool
-        FOLDER test/tools
-    )
+    if(SLANG_ENABLE_GFX)
+        slang_add_target(
+            tools/gfx-unit-test
+            MODULE
+            EXCLUDE_FROM_ALL
+            EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+            USE_FEWER_WARNINGS
+            LINK_WITH_PRIVATE core slang unit-test gfx gfx-util platform
+            OUTPUT_NAME gfx-unit-test-tool
+            REQUIRED_BY slang-test
+            FOLDER test/tools
+        )
+        slang_add_target(
+            tools/render-test
+            MODULE
+            EXCLUDE_FROM_ALL
+            EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+            USE_FEWER_WARNINGS
+            LINK_WITH_PRIVATE
+                core
+                compiler-core
+                slang
+                gfx
+                gfx-util
+                platform
+                $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+            EXTRA_COMPILE_DEFINITIONS_PRIVATE
+                $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
+                $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
+            OUTPUT_NAME render-test-tool
+            REQUIRED_BY slang-test
+            FOLDER test/tools
+        )
+    endif()
     slang_add_target(
         tools/slang-unit-test
         MODULE
@@ -646,26 +661,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENA
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE core slang Threads::Threads
         OUTPUT_NAME slang-reflection-test-tool
-        FOLDER test/tools
-    )
-    slang_add_target(
-        tools/render-test
-        MODULE
-        EXCLUDE_FROM_ALL
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-        USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE
-            core
-            compiler-core
-            slang
-            gfx
-            gfx-util
-            platform
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
-            $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
-        OUTPUT_NAME render-test-tool
         FOLDER test/tools
     )
 
