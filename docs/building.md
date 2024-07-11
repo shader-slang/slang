@@ -34,16 +34,21 @@ git clone https://github.com/shader-slang/slang --recursive
 
 For a Ninja based build system (all platforms) run:
 ```bash
-cmake --preset default
+cmake --preset default # or --preset dev
 cmake --build --preset release # or --preset debug
 ```
 
 For Visual Studio run:
 ```bash
-cmake --preset vs2022 # or --preset vs2019
+cmake --preset vs2022 # or 'vs2019' or `vs2022-dev`
 start devenv ./build/slang.sln # to optionally open the project in Visual Studio
 cmake --build --preset release # to build from the CLI
 ```
+
+The `vs2022` preset generates Visual Studio 2022 solution and project files,
+and the `vs2019` preset generates Visual Studio 2019 solution and project files.
+
+The `dev` or `vs2022-dev` preset also turns on features that makes debugging easy.
 
 ## Testing
 

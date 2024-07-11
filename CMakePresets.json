@@ -16,6 +16,14 @@
       }
     },
     {
+      "name": "dev",
+      "inherits": "default",
+      "description": "Development build with debug assisting features",
+      "cacheVariables": {
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
+      }
+    },
+    {
       "name": "msvc-base",
       "hidden": true,
       "inherits": "default",
@@ -38,6 +46,15 @@
       "generator": "Visual Studio 17 2022"
     },
     {
+      "name": "vs2022-dev",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2022 project with debug assisting features",
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
+      }
+    },
+    {
       "name": "slang-llvm",
       "inherits": "default",
       "description": "Build slang-llvm from the system LLVM",
@@ -49,7 +66,7 @@
   "buildPresets": [
     {
       "name": "debug",
-      "configurePreset": "default",
+      "configurePreset": "dev",
       "configuration": "Debug"
     },
     {
@@ -128,7 +145,7 @@
       "steps": [
         {
           "type": "configure",
-          "name": "default"
+          "name": "dev"
         },
         {
           "type": "build",
