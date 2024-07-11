@@ -160,36 +160,34 @@ namespace Slang
     
     static void checkCallUsage(List<IRInst*>& stores, List<IRInst*>& loads, IRCall* call, IRInst* inst)
     {
+        IRInst* callee = call->getCallee();
+
         //printf("problematic instruction:\n");
         //inst->dump();
         //printf("used in call here:\n");
         //call->dump();
-        IRInst* callee = call->getCallee();
         //printf("callee:\n");
         //callee->dump();
 
         // Resolve the actual function
         IRFunc* ftn = nullptr;
+        IRFuncType* ftype = nullptr;
         if (auto spec = as<IRSpecialize>(callee))
             ftn = as<IRFunc>(resolveSpecialization(spec));
         else if (auto fwd = as<IRForwardDifferentiate>(callee))
             ftn = as<IRFunc>(fwd->getBaseFn());
         else if (auto rev = as<IRBackwardDifferentiate>(callee))
             ftn = as<IRFunc>(rev->getBaseFn());
+        else if (auto wit = as<IRLookupWitnessMethod>(callee))
+            ftype = as<IRFuncType>(callee->getFullType());
         else
             ftn = as<IRFunc>(callee);
 
         //printf("spec ? %p\n", as<IRSpecialize>(callee));
         //printf("fwd  ? %p\n", as<IRForwardDifferentiate>(callee));
         //printf("bwd  ? %p\n", as<IRBackwardDifferentiate>(callee));
-
-        if (!ftn) {
-            //printf("not a function...\n");
-            return;
-        }
-
-        //printf("function is:\n");
-        //ftn->dump();
+        //printf("wit  ? %p\n", as<IRLookupWitnessMethod>(callee));
+        //printf("ftn  ? %p\n", as<IRFunc>(callee));
 
         // Find the argument index so we can fetch the type
         int index = 0;
@@ -204,9 +202,17 @@ namespace Slang
             }
         }
 
+        if (ftn)
+            ftype = as<IRFuncType>(ftn->getFullType());
+        //else
+        //    return;
+
+        if (!ftype)
+            return;
+
         // Consider it as a store if its passed
         // as an out/inout parameter
-        IRType* type = ftn->getParamType(index);
+        IRType* type = ftype->getParamType(index);
         if (as<IROutType>(type) || as<IRInOutType>(type))
             stores.add(call);
         else

@@ -14,8 +14,8 @@ interface IFoo
 
 struct FooPair<T : IFoo> : IFoo
 {
-    T a;
-    T.Bar b;
+    T a = T();
+    T.Bar b = T.Bar();
 
     typealias Bar = FooPair<T.Bar>;
 };
