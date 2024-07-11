@@ -146,6 +146,7 @@ jobs:
       - name: Package Slang
         id: package
         run: |
+          cp "${lib_dir}/*" "${bin_dir}/""
           # For the release, also generate a tar.gz file
           cpack --preset "$config" -G ZIP
           cpack --preset "$config" -G TGZ
