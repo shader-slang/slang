@@ -20,7 +20,7 @@ struct Impl : IFoo
 
 struct GenType<T : IFoo>
 {
-    T obj;
+    T obj = T();
     int doThing()
     {
         IAssoc soc = obj.getValue(); // "boxing" into an existential

@@ -10,7 +10,9 @@ struct A<let I : int>
 
 struct B<let U : uint>
 {
-    A<U> a;
+    // TODO: recursive check for non-empty fields
+    // e.g. struct of non-empty structs
+    A<U> a = A<U>();
 };
 
 int foo<let I : int>(A<I> a)
