@@ -136,7 +136,11 @@ jobs:
             if [[ -f "$b" ]]; then
               echo "Signing binary '$b'..."
               /usr/bin/codesign --force --options runtime -s "${IDENTITY_ID}" "$b" -v
+              echo "checksum(0) '$b':"
+              shasum -a 256 "$b"
               7z a "slang-macos-dist.zip" "$b"
+              echo "checksum(1) '$b':"
+              shasum -a 256 "$b"
             fi
           done
 
@@ -157,6 +161,10 @@ jobs:
           mv "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
 
+          mkdir ./ttmp
+          unzip "${base}.zip" -d ./ttmp
+          echo "packed checksum slangd:"
+          shasum -a 256 "./tmp/bin/slangd"
       - name: File check
         run: |
           find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
