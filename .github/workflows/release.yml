@@ -165,6 +165,21 @@ jobs:
           unzip "${base}.zip" -d ./ttmp
           echo "packed checksum slangd:"
           shasum -a 256 "./ttmp/bin/slangd"
+
+          echo "checksum slangd after pack:"
+          shasum -a 256 "build/Release/bin/slangd"
+
+          /bin/cp -rf build/Release/bin/* ./ttmp/bin/
+          /bin/cp -rf build/Release/lib/* ./ttmp/lib/
+          echo "checksum slangd (overwrite):"
+          shasum -a 256 "./ttmp/bin/slangd"
+          rm ${base}.zip
+          rm ${base}.tar.gz
+          cd ./ttmp
+
+          7z a ../${base}.zip .
+          7z a -tgzip ../${base}.tar.gz .
+
       - name: File check
         run: |
           find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
