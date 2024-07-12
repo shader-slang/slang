@@ -9,12 +9,12 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-struct idefault1 : IDefaultInitializableType
+struct idefault1 : IDefaultInitializable
 {
     uint data;
 };
 
-struct idefault2_base : IDefaultInitializableType
+struct idefault2_base : IDefaultInitializable
 {
     uint data1;
 };
@@ -23,7 +23,7 @@ struct idefault2 : idefault2_base
     uint data2 = 1;
 };
 
-interface idefault3_base : IDefaultInitializableType
+interface idefault3_base : IDefaultInitializable
 {
 };
 struct idefault3 : idefault3_base
@@ -36,11 +36,11 @@ struct idefault4
     uint data;
 };
 
-extension idefault4 : IDefaultInitializableType
+extension idefault4 : IDefaultInitializable
 {
 }
 
-struct idefault5_base : IDefaultInitializableType
+struct idefault5_base : IDefaultInitializable
 {
     uint data1;
 };

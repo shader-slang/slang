@@ -10,7 +10,7 @@
 RWStructuredBuffer<int> outputBuffer;
 
 __generic<T>
-struct idefault1 : IDefaultInitializableType
+struct idefault1 : IDefaultInitializable
 {
     vector<T,4> data;
 };
