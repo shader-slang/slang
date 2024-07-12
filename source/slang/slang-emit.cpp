@@ -292,6 +292,7 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
     case kIROp_MakeDifferentialPairUserCode:
+    case kIROp_DerivativeMemberDecoration:
         result.autodiff = true;
         break;
     case kIROp_VerticesType:
