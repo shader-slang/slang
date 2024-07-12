@@ -164,7 +164,7 @@ jobs:
           mkdir ./ttmp
           unzip "${base}.zip" -d ./ttmp
           echo "packed checksum slangd:"
-          shasum -a 256 "./tmp/bin/slangd"
+          shasum -a 256 "./ttmp/bin/slangd"
       - name: File check
         run: |
           find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
