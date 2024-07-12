@@ -211,9 +211,13 @@ namespace Slang
             return;
 
         // Consider it as a store if its passed
-        // as an out/inout parameter
+        // as an out/inout/ref parameter
         IRType* type = ftype->getParamType(index);
-        if (as<IROutType>(type) || as<IRInOutType>(type))
+        //printf("passed type:\n");
+        //printf("out: %p\n", as<IROutType>(type));
+        //printf("inout: %p\n", as<IRInOutType>(type));
+        //printf("ref: %p\n", as<IRRefType>(type));
+        if (as<IROutType>(type) || as<IRInOutType>(type) || as<IRRefType>(type))
             stores.add(call);
         else
             loads.add(call);
@@ -263,6 +267,11 @@ namespace Slang
         case kIROp_MakeExistential:
         case kIROp_MakeExistentialWithRTTI:
             // For specializing generic structs
+            stores.add(user);
+            break;
+        
+        // Miscellaenous cases
+        case kIROp_ManagedPtrAttach:
             stores.add(user);
             break;
 

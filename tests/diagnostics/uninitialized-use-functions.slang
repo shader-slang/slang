@@ -14,6 +14,12 @@ void inout_test(inout int x, int tmp)
     x = tmp;
 }
 
+// __ref parameters should also be fine
+void ref_test(__ref int x, int tmp)
+{
+    x = tmp;
+}
+
 void undefined_function_use()
 {
     int x;
@@ -46,6 +52,19 @@ void inout_function_use()
 
     // Acts as a write
     inout_test(x, tmp);
+
+    // Rest are fine now
+    out_test(x, tmp);
+    inout_test(tmp, x);
+}
+
+void ref_function_use()
+{
+    int x;
+    int tmp = 1;
+
+    // Acts as a write
+    ref_test(x, tmp);
 
     // Rest are fine now
     out_test(x, tmp);
