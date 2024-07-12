@@ -43,4 +43,11 @@ namespace SlangCapture
         }
         return readByte;
     }
+
+    template class StructDecoder<slang::SessionDesc>;
+    template class StructDecoder<slang::PreprocessorMacroDesc>;
+    template class StructDecoder<slang::CompilerOptionEntry>;
+    template class StructDecoder<slang::CompilerOptionValue>;
+    template class StructDecoder<slang::TargetDesc>;
+    template class StructDecoder<slang::SpecializationArg>;
 }

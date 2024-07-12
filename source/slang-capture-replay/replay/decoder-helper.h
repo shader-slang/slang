@@ -103,14 +103,6 @@ namespace SlangCapture {
     };
 
     using StringDecoder = PointerDecoder<char*>;
-
-    template class StructDecoder<slang::SessionDesc>;
-    template class StructDecoder<slang::PreprocessorMacroDesc>;
-    template class StructDecoder<slang::CompilerOptionEntry>;
-    template class StructDecoder<slang::CompilerOptionValue>;
-    template class StructDecoder<slang::TargetDesc>;
-    template class StructDecoder<slang::SpecializationArg>;
-
 } // namespace SlangCapture
 
 #endif // SLANG_CAPTURE_DECODER_HELPER_H
