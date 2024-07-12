@@ -383,6 +383,70 @@ int caller()
 }
 ```
 
+---
+layout: user-guide
+permalink: /user-guide/convenience-features-if-let
+---
+## `if_let` syntax
+Slang supports `if (let ...)` syntax to simplify the code when checking the type of a value. The syntax is similar to Rust's
+`if let` syntax, the variable defined by `let` must be an `Optional<T>` type, for example:
+
+```csharp
+interface IFoo
+{
+    void foo();
+}
+
+struct MyImpl1 : IFoo
+{
+    void foo() { printf("MyImpl1");}
+}
+
+struct MyImpl2 : IFoo
+{
+    void foo() { printf("MyImpl2");}
+}
+
+struct MyImpl3 : IFoo
+{
+    void foo() { printf("MyImpl3");}
+}
+
+void test(IFoo foo)
+{
+    // This syntax will be desugared to the following:
+    // {
+    //      Optional<MyImpl1> $OptVar = foo as MyImpl1;
+    //      if ($OptVar.hasValue)
+    //      {
+    //          MyImpl1 t = $OptVar.value;
+    //          t.foo();
+    //      }
+    //      else if ...
+    // }
+    if (let t = foo as MyImpl1) // t is of type MyImpl1
+    {
+        t.foo();
+    }
+    else if (let t = foo as MyImpl2) // t is of type MyImpl2
+    {
+        t.foo();
+    }
+    else
+        printf("fail");
+}
+
+void main()
+{
+    MyImpl1 v1;
+    test(v1);
+
+    MyImpl2 v2;
+    test(v2);
+}
+
+```
+
 ## `reinterpret<T>` operation
 
 Sometimes it is useful to reinterpret the bits of one type as another type, for example:
