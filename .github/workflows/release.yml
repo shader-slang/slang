@@ -176,18 +176,12 @@ jobs:
           rm ${base}.zip
           rm ${base}.tar.gz
           cd ./ttmp
-
           7z a ../${base}.zip .
-          7z a -tgzip ../${base}.tar.gz .
-
+          tar -czvf ../${base}.tar.gz .
+          cd ../
       - name: File check
         run: |
           find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
-          if [ "${{matrix.os}}" = "macos" ]; then
-            find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f |
-              xargs -0 codesign --verify --verbose=2 ||
-              echo "code signing failed"
-          fi
 
       - name: UploadBinary
         uses: softprops/action-gh-release@v1
