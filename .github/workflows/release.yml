@@ -136,11 +136,7 @@ jobs:
             if [[ -f "$b" ]]; then
               echo "Signing binary '$b'..."
               /usr/bin/codesign --force --options runtime -s "${IDENTITY_ID}" "$b" -v
-              echo "checksum(0) '$b':"
-              shasum -a 256 "$b"
               7z a "slang-macos-dist.zip" "$b"
-              echo "checksum(1) '$b':"
-              shasum -a 256 "$b"
             fi
           done
 
@@ -161,24 +157,22 @@ jobs:
           mv "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
 
-          mkdir ./ttmp
-          unzip "${base}.zip" -d ./ttmp
-          echo "packed checksum slangd:"
-          shasum -a 256 "./ttmp/bin/slangd"
+          # For some reason, the binaries packed by cpack for macos is modified
+          # by cpack and considered damanged by macos. For now we workaround this
+          # by repacking all the binaries into the release package.
+          if [[ "${{ matrix.os }}"  == "macos" ]]; then
+            mkdir ./ttmp
+            unzip "${base}.zip" -d ./ttmp
 
-          echo "checksum slangd after pack:"
-          shasum -a 256 "build/Release/bin/slangd"
-
-          /bin/cp -rf build/Release/bin/* ./ttmp/bin/
-          /bin/cp -rf build/Release/lib/* ./ttmp/lib/
-          echo "checksum slangd (overwrite):"
-          shasum -a 256 "./ttmp/bin/slangd"
-          rm ${base}.zip
-          rm ${base}.tar.gz
-          cd ./ttmp
-          7z a ../${base}.zip .
-          tar -czvf ../${base}.tar.gz .
-          cd ../
+            /bin/cp -rf build/Release/bin/* ./ttmp/bin/
+            /bin/cp -rf build/Release/lib/* ./ttmp/lib/
+            rm ${base}.zip
+            rm ${base}.tar.gz
+            cd ./ttmp
+            7z a ../${base}.zip .
+            tar -czvf ../${base}.tar.gz .
+            cd ../
+          fi
       - name: File check
         run: |
           find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
