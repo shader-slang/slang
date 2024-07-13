@@ -383,10 +383,6 @@ int caller()
 }
 ```
 
----
-layout: user-guide
-permalink: /user-guide/convenience-features-if-let
----
 ## `if_let` syntax
 Slang supports `if (let ...)` syntax to simplify the code when checking the type of a value. The syntax is similar to Rust's
 `if let` syntax, the variable defined by `let` must be an `Optional<T>` type, for example:

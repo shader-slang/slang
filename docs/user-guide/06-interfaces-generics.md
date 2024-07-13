@@ -679,7 +679,7 @@ T compute<T>(T a1, T a2)
 
 Since `as` operator returns a `Optional<T>` type, it can also be used in the `if` predicate to test if an object can be
 casted to a specific type, once the cast test is successful, the object can be used in the `if` block as the casted type
-without the need to retrieve the `Optional<T>::value` property, see  [if-let syntax](convenience-features-if-let) for more
+without the need to retrieve the `Optional<T>::value` property, see  [if-let syntax](convenience-features.html#if_let-syntax) for more
 details.
 
 Extensions to Interfaces
