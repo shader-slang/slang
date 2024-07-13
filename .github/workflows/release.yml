@@ -134,6 +134,7 @@ jobs:
           )
           for b in "${binaries[@]}"; do
             if [[ -f "$b" ]]; then
+              echo "Signing binary '$b'..."
               /usr/bin/codesign --force --options runtime -s "${IDENTITY_ID}" "$b" -v
               7z a "slang-macos-dist.zip" "$b"
             fi
@@ -156,14 +157,25 @@ jobs:
           mv "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
 
+          # For some reason, the binaries packed by cpack for macos is modified
+          # by cpack and considered damanged by macos. For now we workaround this
+          # by repacking all the binaries into the release package.
+          if [[ "${{ matrix.os }}"  == "macos" ]]; then
+            mkdir ./ttmp
+            unzip "${base}.zip" -d ./ttmp
+
+            /bin/cp -rf build/Release/bin/* ./ttmp/bin/
+            /bin/cp -rf build/Release/lib/* ./ttmp/lib/
+            rm ${base}.zip
+            rm ${base}.tar.gz
+            cd ./ttmp
+            7z a ../${base}.zip .
+            tar -czvf ../${base}.tar.gz .
+            cd ../
+          fi
       - name: File check
         run: |
           find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
-          if [ "${{matrix.os}}" = "macos" ]; then
-            find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f |
-              xargs -0 codesign --verify --verbose=2 ||
-              echo "code signing failed"
-          fi
 
       - name: UploadBinary
         uses: softprops/action-gh-release@v1
