@@ -412,8 +412,8 @@ void test(IFoo foo)
 {
     // This syntax will be desugared to the following:
     // {
-    //      Optional<MyImpl1> $OptVar = foo as MyImpl1;
-    //      if ($OptVar.hasValue)
+    //      Optional<MyImpl1> optVar = foo as MyImpl1;
+    //      if (optVar.hasValue)
     //      {
     //          MyImpl1 t = $OptVar.value;
     //          t.foo();
