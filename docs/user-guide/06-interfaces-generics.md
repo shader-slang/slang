@@ -709,7 +709,7 @@ void test(IFoo foo)
     //      Optional<MyImpl1> optVar = foo as MyImpl1;
     //      if (optVar.hasValue)
     //      {
-    //          MyImpl1 t = $OptVar.value;
+    //          MyImpl1 t = optVar.value;
     //          t.foo();
     //      }
     //      else if ...

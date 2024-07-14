@@ -384,7 +384,7 @@ int caller()
 ```
 
 ## `if_let` syntax
-Slang supports `if (let ...)` syntax to simplify the code when checking the type of a value. The syntax is similar to Rust's
+Slang supports `if (let name = expr)` syntax to simplify the code when working with `Optional<T>` value. The syntax is similar to Rust's
 `if let` syntax, the value expression must be an `Optional<T>` type, for example:
 
 ```csharp
