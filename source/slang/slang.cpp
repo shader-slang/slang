@@ -239,7 +239,7 @@ void Session::_initCodeGenTransitionMap()
 
     // For C and C++ we default to use the 'genericCCpp' compiler
     {
-        const CodeGenTarget sources[] = { CodeGenTarget::CSource, CodeGenTarget::CPPSource };
+        const CodeGenTarget sources[] = { CodeGenTarget::CSource, CodeGenTarget::CPPSource, CodeGenTarget::CPPHeader };
         for (auto source : sources)
         {
             // We *don't* add a default for host callable, as we will determine what is suitable depending on what
@@ -945,6 +945,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         }
         break;
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         if (targetProfile.getFamily() != ProfileFamily::METAL)
@@ -1767,6 +1768,7 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
 
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::PyTorchCppBinding:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::ShaderSharedLibrary:
@@ -1777,11 +1779,13 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
 
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
         atoms.add(CapabilityName::cuda);
         break;
 
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         atoms.add(CapabilityName::metal);

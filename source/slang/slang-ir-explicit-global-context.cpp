@@ -67,7 +67,7 @@ struct IntroduceExplicitGlobalContextPass
                     // this is represented as a variable with the `@GroupShared`
                     // rate on its type.
                     //
-                    if( m_target == CodeGenTarget::CUDASource )
+                    if( m_target == CodeGenTarget::CUDASource || m_target == CodeGenTarget::CUDAHeader )
                     {
                         if( as<IRGroupSharedRate>(globalVar->getRate()) )
                             continue;
@@ -117,7 +117,7 @@ struct IntroduceExplicitGlobalContextPass
                     // For CUDA output, we want to leave the global uniform
                     // parameter where it is, because it will translate to
                     // a global `__constant__` variable.
-                    if(m_target == CodeGenTarget::CUDASource)
+                    if(m_target == CodeGenTarget::CUDASource || m_target == CodeGenTarget::CUDAHeader )
                         continue;
 
                     m_globalParams.add(globalParam);
@@ -150,7 +150,7 @@ struct IntroduceExplicitGlobalContextPass
         // it is responsible for introducing the explicit entry-point
         // parameter that is used for passing in the global param(s).
         //
-        if( m_target != CodeGenTarget::CPPSource )
+        if( m_target != CodeGenTarget::CPPSource && m_target != CodeGenTarget::CPPHeader )
         {
             if (m_globalParams.getCount() == 0 && m_globalVars.getCount() == 0)
             {
@@ -165,6 +165,7 @@ struct IntroduceExplicitGlobalContextPass
         // type with a name hint of `KernelContext`.
         //
         m_contextStructType = builder.createStructType();
+        builder.addExternCppDecoration(m_contextStructType, UnownedStringSlice("KernelContext"));
         builder.addNameHintDecoration(m_contextStructType, UnownedTerminatedStringSlice("KernelContext"));
 
         // The context will usually be passed around by pointer,
@@ -278,6 +279,7 @@ struct IntroduceExplicitGlobalContextPass
         // Clone all original decorations to the new struct key.
         IRCloneEnv cloneEnv;
         cloneInstDecorationsAndChildren(&cloneEnv, m_module, originalInst, key);
+        builder.addExternCppDecoration(key, originalInst->findDecoration<IRNameHintDecoration>()->getName());
 
         // We end by making note of the key that was created
         // for the instruction, so that we can use the key
@@ -326,7 +328,7 @@ struct IntroduceExplicitGlobalContextPass
             entryPointParam->insertBefore(firstOrdinary);
         }
 
-        if (m_target == CodeGenTarget::CPPSource && m_globalParams.getCount() == 0)
+        if ((m_target == CodeGenTarget::CPPSource || m_target == CodeGenTarget::CPPHeader) && m_globalParams.getCount() == 0)
         {
             // The nature of our current ABI for entry points on CPU
             // means that we need an explicit parameter to be *declared*

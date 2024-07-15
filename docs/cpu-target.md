@@ -47,6 +47,7 @@ In the API the `SlangCompileTarget`s are
 ```
 SLANG_C_SOURCE             ///< The C language
 SLANG_CPP_SOURCE           ///< The C++ language
+SLANG_CPP_HEADER           ///< The C++ language (header)
 SLANG_HOST_CPP_SOURCE,     ///< C++ code for `host` style 
 ```        
    
@@ -54,6 +55,7 @@ Using the `-target` command line option
 
 * C_SOURCE: c
 * CPP_SOURCE: cpp,c++,cxx
+* CPP_HEADER: hpp,h++,hxx
 * HOST_CPP_SOURCE: host-cpp,host-c++,host-cxx
 
 Note! Output of C source is not currently supported.

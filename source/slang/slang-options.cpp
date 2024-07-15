@@ -2777,9 +2777,11 @@ SlangResult OptionsParser::_parse(
         (m_rawTargets[0].format == CodeGenTarget::HostCPPSource ||
             m_rawTargets[0].format == CodeGenTarget::PyTorchCppBinding ||
             m_rawTargets[0].format == CodeGenTarget::CUDASource ||
+            m_rawTargets[0].format == CodeGenTarget::CUDAHeader ||
             m_rawTargets[0].format == CodeGenTarget::SPIRV ||
             m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
             m_rawTargets[0].format == CodeGenTarget::Metal ||
+            m_rawTargets[0].format == CodeGenTarget::MetalHeader ||
             m_rawTargets[0].format == CodeGenTarget::MetalLib ||
             m_rawTargets[0].format == CodeGenTarget::MetalLibAssembly ||
             ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind == ArtifactKind::HostCallable))
@@ -2840,8 +2842,10 @@ SlangResult OptionsParser::_parse(
                     switch (outputFormat)
                     {
                     case CodeGenTarget::CPPSource:
+                    case CodeGenTarget::CPPHeader:
                     case CodeGenTarget::PTX:
                     case CodeGenTarget::CUDASource:
+                    case CodeGenTarget::CUDAHeader:
 
                     case CodeGenTarget::HostHostCallable:
                     case CodeGenTarget::ShaderHostCallable:
@@ -2853,6 +2857,7 @@ SlangResult OptionsParser::_parse(
                     case CodeGenTarget::MetalLib:
                     case CodeGenTarget::MetalLibAssembly:
                     case CodeGenTarget::Metal:
+                    case CodeGenTarget::MetalHeader:
                         rawOutput.isWholeProgram = true;
                         break;
                     case CodeGenTarget::SPIRV:
