@@ -1,7 +1,7 @@
 // slang-ir-operator-shift-overflow.cpp
 #include "slang-ir-operator-shift-overflow.h"
 
-#include "../../slang.h"
+#include <slang.h>
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"

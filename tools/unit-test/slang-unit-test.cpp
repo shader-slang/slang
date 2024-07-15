@@ -1,5 +1,5 @@
 #include "slang-unit-test.h"
-#include "slang.h"
+#include <slang.h>
 #include "source/core/slang-basic.h"
 
 struct SlangUnitTest

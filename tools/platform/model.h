@@ -1,9 +1,9 @@
 // model.h
 #pragma once
 
-#include "slang-gfx.h"
+#include <slang-gfx.h>
 #include "vector-math.h"
-#include "slang-com-ptr.h"
+#include <slang-com-ptr.h>
 #include <vector>
 #include <string>
 

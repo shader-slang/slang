@@ -1,5 +1,5 @@
 #include "vulkan-api.h"
-#include "slang.h"
+#include <slang.h>
 
 #include <stdlib.h>
 #include <stdio.h>

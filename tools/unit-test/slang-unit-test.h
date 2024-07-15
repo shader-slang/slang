@@ -1,6 +1,6 @@
 #pragma once
 
-#include "slang.h"
+#include <slang.h>
 #include "source/core/slang-render-api-util.h"
 
 enum class TestResult

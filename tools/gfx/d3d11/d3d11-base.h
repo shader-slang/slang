@@ -10,7 +10,7 @@
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 
-#include "slang-com-ptr.h"
+#include <slang-com-ptr.h>
 #include "../flag-combiner.h"
 
 #pragma push_macro("WIN32_LEAN_AND_MEAN")

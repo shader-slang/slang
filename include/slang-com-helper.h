@@ -4,7 +4,7 @@
 /** \file slang-com-helper.h
 */
 
-#include "slang.h"
+#include <slang.h>
 #include <atomic>
 
 /* !!!!!!!!!!!!!!!!!!!!! Macros to help checking SlangResult !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/

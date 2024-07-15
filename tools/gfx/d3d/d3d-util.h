@@ -3,15 +3,15 @@
 
 #include <stdint.h>
 
-#include "slang-com-helper.h"
+#include <slang-com-helper.h>
 
-#include "slang-com-ptr.h"
+#include <slang-com-ptr.h>
 #include "core/slang-basic.h"
 #include "core/slang-platform.h"
 
 #include "../flag-combiner.h"
 
-#include "slang-gfx.h"
+#include <slang-gfx.h>
 
 #include <d3dcommon.h>
 #include <dxgiformat.h>

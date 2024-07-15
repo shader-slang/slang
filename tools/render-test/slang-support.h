@@ -1,7 +1,7 @@
 // slang-support.h
 #pragma once
 
-#include "slang-gfx.h"
+#include <slang-gfx.h>
 
 #include <slang.h>
 

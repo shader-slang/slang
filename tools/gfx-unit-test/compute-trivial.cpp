@@ -1,6 +1,6 @@
 #include "tools/unit-test/slang-unit-test.h"
 
-#include "slang-gfx.h"
+#include <slang-gfx.h>
 #include "gfx-test-util.h"
 #include "tools/gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"

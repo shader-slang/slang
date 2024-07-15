@@ -9,7 +9,7 @@
 #include "examples/hello-world/vulkan-api.h"
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-stream.h"
-#include "slang-gfx.h"
+#include <slang-gfx.h>
 #include <chrono>
 
 #if SLANG_WINDOWS_FAMILY

@@ -1,6 +1,6 @@
 #include "d3d12-posix-synchapi.h"
 
-#include "slang.h"
+#include <slang.h>
 
 #if SLANG_LINUX_FAMILY
 

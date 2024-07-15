@@ -4,11 +4,11 @@
 // Slang shaders and the `gfx` graphics API.
 
 #include <slang.h>
-#include "slang-gfx.h"
+#include <slang-gfx.h>
 #include "gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"
 #include "tools/platform/vector-math.h"
-#include "slang-com-ptr.h"
+#include <slang-com-ptr.h>
 #include "source/core/slang-basic.h"
 #include "examples/example-base/example-base.h"
 

@@ -5,7 +5,7 @@
 #include "core/slang-token-reader.h"
 #include "core/slang-type-text-util.h"
 
-#include "slang-gfx.h"
+#include <slang-gfx.h>
 
 namespace renderer_test
 {

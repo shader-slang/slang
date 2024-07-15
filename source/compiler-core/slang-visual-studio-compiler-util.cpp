@@ -2,7 +2,7 @@
 #include "slang-visual-studio-compiler-util.h"
 
 #include "../core/slang-common.h"
-#include "../../slang-com-helper.h"
+#include <slang-com-helper.h>
 #include "../core/slang-string-util.h"
 #include "../core/slang-string-slice-pool.h"
 

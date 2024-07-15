@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
-#include "../../slang.h"
+#include <slang-com-helper.h>
+#include <slang-com-ptr.h>
+#include <slang.h>
 #include "../core/slang-basic.h"
 #include "../core/slang-com-object.h"
 #include "../compiler-core/slang-language-server-protocol.h"

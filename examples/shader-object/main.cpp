@@ -12,7 +12,7 @@
 #include <slang-com-ptr.h>
 using Slang::ComPtr;
 
-#include "slang-gfx.h"
+#include <slang-gfx.h>
 #include "gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"
 #include "examples/example-base/example-base.h"

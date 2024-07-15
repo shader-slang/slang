@@ -2,8 +2,8 @@
 #define SLANG_FILE_SYSTEM_H
 
 #include "../core/slang-com-object.h"
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
+#include <slang-com-helper.h>
+#include <slang-com-ptr.h>
 #include "capture-manager.h"
 
 namespace SlangCapture

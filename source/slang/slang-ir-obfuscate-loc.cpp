@@ -1,7 +1,7 @@
 // slang-ir-obfuscate-loc.cpp
 #include "slang-ir-obfuscate-loc.h"
 
-#include "../../slang.h"
+#include <slang.h>
 
 #include "../core/slang-random-generator.h"
 #include "../core/slang-stable-hash.h"

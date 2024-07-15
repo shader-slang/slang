@@ -1,7 +1,7 @@
 // d3d12-helper-functions.h
 #pragma once
 
-#include "slang-gfx.h"
+#include <slang-gfx.h>
 #include "d3d12-base.h"
 #include "d3d12-shader-object-layout.h"
 #include "d3d12-submitter.h"

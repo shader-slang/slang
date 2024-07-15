@@ -1,6 +1,6 @@
 #pragma once
 
-#include "slang-gfx.h"
+#include <slang-gfx.h>
 #include "core/slang-basic.h"
 #include <dxgi1_4.h>
 #include "../renderer-shared.h"

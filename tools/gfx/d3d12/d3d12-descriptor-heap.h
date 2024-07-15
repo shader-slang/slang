@@ -4,7 +4,7 @@
 #include <dxgi.h>
 #include <d3d12.h>
 
-#include "slang-com-ptr.h"
+#include <slang-com-ptr.h>
 #include "core/slang-virtual-object-pool.h"
 #include "core/slang-short-list.h"
 #include "core/slang-basic.h"

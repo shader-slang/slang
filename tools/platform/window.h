@@ -1,7 +1,7 @@
 // window.h
 #pragma once
 
-#include "slang-com-ptr.h"
+#include <slang-com-ptr.h>
 #include "source/core/slang-basic.h"
 #include "source/core/slang-func-ptr.h"
 

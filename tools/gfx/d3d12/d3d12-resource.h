@@ -14,7 +14,7 @@
 #include <dxgi1_4.h>
 #include <d3d12.h>
 
-#include "slang-com-ptr.h"
+#include <slang-com-ptr.h>
 #include "../d3d/d3d-util.h"
 
 namespace gfx {

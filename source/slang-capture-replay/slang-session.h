@@ -1,9 +1,9 @@
 #ifndef SLANG_SESSION_H
 #define SLANG_SESSION_H
 
-#include "../../slang-com-ptr.h"
-#include "../../slang.h"
-#include "../../slang-com-helper.h"
+#include <slang-com-ptr.h>
+#include <slang.h>
+#include <slang-com-helper.h>
 #include "../core/slang-smart-pointer.h"
 #include "../core/slang-dictionary.h"
 #include "../slang/slang-compiler.h"

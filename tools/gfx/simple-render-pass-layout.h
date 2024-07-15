@@ -5,7 +5,7 @@
 // desc value. Used by targets that does not expose an API object for the render pass
 // concept.
 
-#include "slang-gfx.h"
+#include <slang-gfx.h>
 #include "core/slang-com-object.h"
 #include "core/slang-basic.h"
 
