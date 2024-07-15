@@ -9,22 +9,16 @@ interface IAssoc
 interface IFoo
 {
     associatedtype Assoc : IAssoc;
-    
-    __init();
-
     Assoc getValue();
 }
 
 struct Impl : IFoo
 {
     struct Assoc : IAssoc { int getInner() { return 1; } }
-    
-    __init() {}
-
     Assoc getValue() { Assoc r; return r; }
 }
 
-struct GenType<T : IFoo>
+struct GenType<T : IFoo> : IDefaultInitializable
 {
     T obj;
     int doThing()

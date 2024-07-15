@@ -107,7 +107,9 @@ namespace Slang
         return findInnerMostGenericReturnVal(generic);
     }
 
-    static bool canIgnoreType(IRType* type)
+    // The `upper` field contains the struct that the type is
+    // is contained in. It is used to check for empty structs.
+    static bool canIgnoreType(IRType* type, IRType* upper)
     {
         // In case specialization returns a function instead
         if (!type)
@@ -121,7 +123,11 @@ namespace Slang
         {
             int count = 0;
             for (auto field : str->getFields())
-                count += !canIgnoreType(field->getFieldType());
+            {
+                IRType* ftype = field->getFieldType();
+                count += !canIgnoreType(ftype, type);
+            }
+
             return (count == 0);
         }
 
@@ -131,14 +137,19 @@ namespace Slang
 
         // For pointers, check the value type (primarily for globals)
         if (auto ptr = as<IRPtrType>(type))
-            return canIgnoreType(ptr->getValueType());
+        {
+            // Avoid the recursive step if its a
+            // recursive structure like a linked list
+            IRType* ptype = ptr->getValueType();
+            return (ptype != upper) && canIgnoreType(ptype, upper);
+        }
 
         // In the case of specializations, check returned type
         if (auto spec = as<IRSpecialize>(type))
         {
             IRInst* inner = resolveSpecialization(spec);
             IRType* innerType = as<IRType>(inner);
-            return canIgnoreType(innerType);
+            return canIgnoreType(innerType, upper);
         }
 
         return false;
@@ -372,7 +383,7 @@ namespace Slang
                 continue;
 
             IRType* type = inst->getFullType();
-            if (canIgnoreType(type))
+            if (canIgnoreType(type, nullptr))
                continue;
 
             auto loads = getUnresolvedVariableLoads(reachability, inst);
@@ -388,7 +399,7 @@ namespace Slang
     static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sink)
     {
         IRType* type = variable->getFullType();
-        if (canIgnoreType(type))
+        if (canIgnoreType(type, nullptr))
             return;
 
         // Check for semantic decorations

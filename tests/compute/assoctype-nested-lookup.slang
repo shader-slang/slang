@@ -12,10 +12,10 @@ interface IFoo
 };
 
 
-struct FooPair<T : IFoo> : IFoo
+struct FooPair<T : IFoo> : IFoo, IDefaultInitializable
 {
-    T a = T();
-    T.Bar b = T.Bar();
+    T a;
+    T.Bar b;
 
     typealias Bar = FooPair<T.Bar>;
 };
