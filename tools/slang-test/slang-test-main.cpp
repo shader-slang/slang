@@ -1629,6 +1629,17 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     String modulePath = Path::combine(
         Path::getParentDirectory(Path::getExecutablePath()), Path::getFileNameWithoutExt(filePath));
 
+    // String testRoot
+    // for(;;)
+    // {
+    //     String testRoot = Path::getParentDirectory(filePath);
+    //     if (testRoot == "")
+    //     {
+    //         break;
+    //     }
+    // }
+    // printf("test folder = %s\n", testRoot.begin());
+
     String moduleExePath;
     {
         StringBuilder buf;
@@ -1651,6 +1662,8 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     args.add(moduleExePath);
     args.add("-target");
     args.add("exe");
+    args.add("-Xgenericcpp");
+    args.add("-I./include");
     for (auto arg : args)
     {
         // If unescaping is needed, do it
