@@ -4193,13 +4193,19 @@ ${{{{
     __cuda_sm_version(2.0)
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda_float1)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm "($3 = NvInterlockedAddFp32($0, $1, $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<float>($1), $2))";
+        case metal:
+            {
+                let buf = __getEquivalentStructuredBuffer<float>(this);
+                __metalInterlocked_add(__getMetalAtomicRef(buf[byteAddress / 4]), valueToAdd, originalValue);
+                return;
+            }
         case glsl:
         case spirv:
             {
@@ -4264,13 +4270,19 @@ ${{{{
     [__requiresNVAPI]
     [ForceInline]
     __cuda_sm_version(2.0)
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda_float1)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm "(NvInterlockedAddFp32($0, $1, $2))";
         case cuda: __intrinsic_asm "atomicAdd($0._getPtrAt<float>($1), $2)";
+        case metal:
+            {
+                let buf = __getEquivalentStructuredBuffer<float>(this);
+                __metalInterlocked_add(__getMetalAtomicRef(buf[byteAddress / 4]), valueToAdd);
+                return;
+            }
         case glsl:
         case spirv:
             {
@@ -4763,6 +4775,8 @@ ${{{{
         case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedAdd";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_add(__getMetalAtomicRef(buf[dest / 4]), value, original_value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAdd(buf[dest / 4], value, original_value);
@@ -4781,6 +4795,8 @@ ${{{{
         case cuda: __intrinsic_asm "atomicAdd($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedAdd";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_add(__getMetalAtomicRef(buf[dest / 4]), value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAdd(buf[dest / 4], value);
@@ -4800,6 +4816,8 @@ ${{{{
         case cuda: __intrinsic_asm "(*$3 = atomicAnd($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedAnd";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_and(__getMetalAtomicRef(buf[dest / 4]), value, original_value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAnd(buf[dest / 4], value, original_value);
@@ -4818,6 +4836,8 @@ ${{{{
         case cuda: __intrinsic_asm "atomicAnd($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedAnd";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_and(__getMetalAtomicRef(buf[dest / 4]), value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAnd(buf[dest / 4], value);
@@ -4838,6 +4858,8 @@ ${{{{
         case cuda: __intrinsic_asm "(*$4 = atomicCAS($0._getPtrAt<uint32_t>($1), $2, $3))";
         case hlsl: __intrinsic_asm ".InterlockedCompareExchange";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_compare_exchange(__getMetalAtomicRef(buf[dest / 4]), compare_value, value, original_value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedCompareExchange(buf[dest / 4], compare_value, value, original_value);
@@ -4875,6 +4897,8 @@ ${{{{
         case cuda: __intrinsic_asm "(*$3 = atomicExch($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedExchange";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_exchange(__getMetalAtomicRef(buf[dest / 4]), value, original_value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedExchange(buf[dest / 4], value, original_value);
@@ -4894,6 +4918,8 @@ ${{{{
         case cuda: __intrinsic_asm "(*$3 = atomicMax($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedMax";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_max(__getMetalAtomicRef(buf[dest / 4]), value, original_value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMax(buf[dest / 4], value, original_value);
@@ -4912,6 +4938,8 @@ ${{{{
         case cuda: __intrinsic_asm "atomicMax($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedMax";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_max(__getMetalAtomicRef(buf[dest / 4]), value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMax(buf[dest / 4], value);
@@ -4931,6 +4959,8 @@ ${{{{
         case cuda: __intrinsic_asm "(*$3 = atomicMin($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedMin";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_min(__getMetalAtomicRef(buf[dest / 4]), value, original_value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMin(buf[dest / 4], value, original_value);
@@ -4949,6 +4979,8 @@ ${{{{
         case cuda: __intrinsic_asm "atomicMin($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedMin";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_min(__getMetalAtomicRef(buf[dest / 4]), value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMin(buf[dest / 4], value);
@@ -4968,6 +5000,8 @@ ${{{{
         case cuda: __intrinsic_asm "(*$3 = atomicOr($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedOr";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_or(__getMetalAtomicRef(buf[dest / 4]), value, original_value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedOr(buf[dest / 4], value, original_value);
@@ -4986,6 +5020,8 @@ ${{{{
         case cuda: __intrinsic_asm "atomicOr($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedOr";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_or(__getMetalAtomicRef(buf[dest / 4]), value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedOr(buf[dest / 4], value);
@@ -5005,6 +5041,8 @@ ${{{{
         case cuda: __intrinsic_asm "(*$3 = atomicXor($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedXor";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_xor(__getMetalAtomicRef(buf[dest / 4]), value, original_value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedXor(buf[dest / 4], value, original_value);
@@ -5023,6 +5061,8 @@ ${{{{
         case cuda: __intrinsic_asm "atomicXor($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedXor";
         case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_xor(__getMetalAtomicRef(buf[dest / 4]), value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedXor(buf[dest / 4], value);
@@ -9254,7 +9294,7 @@ for (SlangAtomicOperationInfo atomicOp : slangAtomicOperationInfo)
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
 void Interlocked$(atomicOp.slangCallSuffix)(__ref $(T) dest,  $(T) value)
 {
     static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
@@ -9288,7 +9328,7 @@ void Interlocked$(atomicOp.slangCallSuffix)(__ref $(T) dest,  $(T) value)
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
 void Interlocked$(atomicOp.slangCallSuffix)(__ref $(T) dest, $(T) value, out $(T) original_value)
 {
     static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to a scalar texture or non-texture");
@@ -9335,7 +9375,7 @@ for(const char* T : {"int64_t", "uint64_t"})
 {
 }}}}
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_metal)]
 void InterlockedAdd(__ref $(T) dest, $(T) value)
 {   
     __target_switch
@@ -9515,7 +9555,7 @@ ${{{{
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
 void InterlockedCompareExchange(__ref int dest, int compare_value, int value, out int original_value)
 {
     static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
@@ -9550,7 +9590,7 @@ void InterlockedCompareExchange(__ref int dest, int compare_value, int value, ou
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
 void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value, out uint original_value)
 {
     static_assert(__isTextureScalarAccess(dest) || !__isTextureAccess(dest), "Atomic must be applied to scalar texture or non-texture");
@@ -9613,7 +9653,7 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_metal)]
 void InterlockedCompareStore(__ref int dest,  int compare_value,  int value)
 {
     __target_switch
@@ -9631,7 +9671,7 @@ void InterlockedCompareStore(__ref int dest,  int compare_value,  int value)
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda)]
+[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_metal)]
 void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value)
 {
     __target_switch
@@ -20006,7 +20046,7 @@ extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite)
     [__requiresNVAPI]
     [ForceInline]
     __glsl_extension(GL_EXT_shader_atomic_float)
-    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda_float1)]
+    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
     void InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value, out float originalValue)
     {
         __target_switch

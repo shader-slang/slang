@@ -1206,6 +1206,11 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
+        // Run DCE now since we may have duplicate globals by-now which 
+        // 'moveGlobalVarInitializationToEntryPoints' will add extra copies to.
+        // These extra copies on a duplicate are an issue because the extra 'uses'
+        // will stop DCE from removing duplicate globals.
+        eliminateDeadCode(irModule, deadCodeEliminationOptions);
         moveGlobalVarInitializationToEntryPoints(irModule);
         introduceExplicitGlobalContext(irModule, target);
         if(target == CodeGenTarget::CPPSource)
