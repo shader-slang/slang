@@ -117,8 +117,13 @@ namespace Slang
             return true;
 
         // For structs, ignore if its empty
-        if (as<IRStructType>(type))
-            return (type->getFirstChild() == nullptr);
+        if (auto str = as<IRStructType>(type))
+        {
+            int count = 0;
+            for (auto field : str->getFields())
+                count += !canIgnoreType(field->getFieldType());
+            return (count == 0);
+        }
 
         // Nothing to initialize for a pure interface
         if (as<IRInterfaceType>(type))
@@ -162,13 +167,6 @@ namespace Slang
     {
         IRInst* callee = call->getCallee();
 
-        //printf("problematic instruction:\n");
-        //inst->dump();
-        //printf("used in call here:\n");
-        //call->dump();
-        //printf("callee:\n");
-        //callee->dump();
-
         // Resolve the actual function
         IRFunc* ftn = nullptr;
         IRFuncType* ftype = nullptr;
@@ -182,12 +180,6 @@ namespace Slang
             ftype = as<IRFuncType>(callee->getFullType());
         else
             ftn = as<IRFunc>(callee);
-
-        //printf("spec ? %p\n", as<IRSpecialize>(callee));
-        //printf("fwd  ? %p\n", as<IRForwardDifferentiate>(callee));
-        //printf("bwd  ? %p\n", as<IRBackwardDifferentiate>(callee));
-        //printf("wit  ? %p\n", as<IRLookupWitnessMethod>(callee));
-        //printf("ftn  ? %p\n", as<IRFunc>(callee));
 
         // Find the argument index so we can fetch the type
         int index = 0;
@@ -204,8 +196,6 @@ namespace Slang
 
         if (ftn)
             ftype = as<IRFuncType>(ftn->getFullType());
-        //else
-        //    return;
 
         if (!ftype)
             return;
@@ -213,10 +203,6 @@ namespace Slang
         // Consider it as a store if its passed
         // as an out/inout/ref parameter
         IRType* type = ftype->getParamType(index);
-        //printf("passed type:\n");
-        //printf("out: %p\n", as<IROutType>(type));
-        //printf("inout: %p\n", as<IRInOutType>(type));
-        //printf("ref: %p\n", as<IRRefType>(type));
         if (as<IROutType>(type) || as<IRInOutType>(type) || as<IRRefType>(type))
             stores.add(call);
         else
@@ -250,8 +236,6 @@ namespace Slang
         // These instructions will store data...
         case kIROp_Store:
         case kIROp_SwizzledStore:
-            // TODO: for calls, should make check that the
-            // function is passing as an out param
         case kIROp_SPIRVAsm:
         case kIROp_GenericAsm:
             // For now assume that __intrinsic_asm blocks will do the right thing...
@@ -394,10 +378,6 @@ namespace Slang
             auto loads = getUnresolvedVariableLoads(reachability, inst);
             for (auto load : loads)
             {
-                //printf("problematic variable:\n");
-                //inst->dump();
-                //printf("used here:\n");
-                //load->dump();
                 sink->diagnose(load,
                         Diagnostics::usingUninitializedVariable,
                         inst);
