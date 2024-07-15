@@ -308,7 +308,7 @@ namespace Slang
         {
             StringBuilder sb;
             const String path = getStdlibPath();
-            #include <slang.h>
+            #include "core.meta.slang.h"
             coreLibraryCode = StringBlob::moveCreate(sb);
         }
 #endif
@@ -322,7 +322,7 @@ namespace Slang
         {
             const String path = getStdlibPath();
             StringBuilder sb;
-            #include <slang.h>
+            #include "hlsl.meta.slang.h"
             hlslLibraryCode = StringBlob::moveCreate(sb);
         }
 #endif
@@ -336,7 +336,7 @@ namespace Slang
         {
             const String path = getStdlibPath();
             StringBuilder sb;
-            #include <slang.h>
+            #include "diff.meta.slang.h"
             autodiffLibraryCode = StringBlob::moveCreate(sb);
         }
 #endif
@@ -349,7 +349,7 @@ namespace Slang
         {
             const String path = getStdlibPath();
             StringBuilder sb;
-#include <slang.h>
+            #include "glsl.meta.slang.h"
             glslLibraryCode = StringBlob::moveCreate(sb);
         }
         return glslLibraryCode;
