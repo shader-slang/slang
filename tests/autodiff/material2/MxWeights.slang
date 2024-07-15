@@ -6,7 +6,8 @@ public struct MxWeights<let TBsdfCount : int>
 
     public __init()
     {
-        weights[0] = float3(0.0f);
+        for (int i = 0; i < TBsdfCount; i++)
+            weights[i] = float3(0.0f);
     }
 }
 

@@ -28,7 +28,7 @@ namespace Slang
         return false;
     }
 
-    static bool isUndefinedValue(IRInst* inst)
+    static bool isUninitializedValue(IRInst* inst)
     {
         // Also consider var since it does not
         // automatically mean it will be initialized
@@ -384,7 +384,7 @@ namespace Slang
         // Check ordinary instructions
         for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->getNextInst())
         {
-            if (!isUndefinedValue(inst))
+            if (!isUninitializedValue(inst))
                 continue;
 
             IRType* type = inst->getFullType();

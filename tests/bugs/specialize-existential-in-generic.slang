@@ -9,18 +9,24 @@ interface IAssoc
 interface IFoo
 {
     associatedtype Assoc : IAssoc;
+    
+    __init();
+
     Assoc getValue();
 }
 
 struct Impl : IFoo
 {
     struct Assoc : IAssoc { int getInner() { return 1; } }
+    
+    __init() {}
+
     Assoc getValue() { Assoc r; return r; }
 }
 
 struct GenType<T : IFoo>
 {
-    T obj = T();
+    T obj;
     int doThing()
     {
         IAssoc soc = obj.getValue(); // "boxing" into an existential
