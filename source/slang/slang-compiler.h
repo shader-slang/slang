@@ -282,6 +282,11 @@ namespace Slang
         HashSet<SourceFile*> m_fileSet;
     };
 
+    struct ISlangInternal : public ISlangUnknown
+    {
+        SLANG_COM_INTERFACE(0xd6b767eb, 0xd786, 0x4343, { 0x2a, 0x8c, 0x6d, 0xa0, 0x3d, 0x5a, 0xb4, 0x4a })
+    };
+
     class EntryPoint;
 
     class ComponentType;
@@ -1475,6 +1480,8 @@ namespace Slang
             SlangInt32 index) override;
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
+
+        virtual slang::DeclReflection* getModuleReflection() SLANG_OVERRIDE;
 
         void setDigest(SHA1::Digest const& digest) { m_digest = digest; }
         SHA1::Digest computeDigest();
@@ -3076,12 +3083,13 @@ namespace Slang
         Dictionary<Pair, PassThroughMode> m_map;
     };
 
-    class Session : public RefObject, public slang::IGlobalSession
+    class Session : public RefObject, public slang::IGlobalSession, public Slang::ISlangInternal
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
 
-        ISlangUnknown* getInterface(const Guid& guid);
+        SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
+        SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
+        SLANG_REF_OBJECT_IUNKNOWN_RELEASE
 
         // slang::IGlobalSession 
         SLANG_NO_THROW SlangResult SLANG_MCALL createSession(slang::SessionDesc const&  desc, slang::ISession** outSession) override;
@@ -3289,7 +3297,9 @@ SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(Session* session)
 
 SLANG_FORCE_INLINE Session* asInternal(slang::IGlobalSession* session)
 {
-    return static_cast<Session*>(session);
+    Slang::ISlangInternal* internalSession = nullptr;
+    session->queryInterface(SLANG_IID_PPV_ARGS(&internalSession));
+    return static_cast<Session*>(internalSession);
 }
 
 SLANG_FORCE_INLINE slang::ISession* asExternal(Linkage* linkage)

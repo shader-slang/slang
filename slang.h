@@ -2107,6 +2107,7 @@ extern "C"
     typedef struct SlangEntryPoint SlangEntryPoint;
     typedef struct SlangEntryPointLayout SlangEntryPointLayout;
 
+    typedef struct SlangReflectionDecl              SlangReflectionDecl;
     typedef struct SlangReflectionModifier          SlangReflectionModifier;
     typedef struct SlangReflectionType              SlangReflectionType;
     typedef struct SlangReflectionTypeLayout        SlangReflectionTypeLayout;
@@ -2172,6 +2173,18 @@ extern "C"
         SLANG_SCALAR_TYPE_UINT16,
         SLANG_SCALAR_TYPE_INTPTR,
         SLANG_SCALAR_TYPE_UINTPTR
+    };
+
+    // abstract decl reflection
+    typedef unsigned int SlangDeclKindIntegral;
+    enum SlangDeclKind : SlangDeclKindIntegral
+    {
+        SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION,
+        SLANG_DECL_KIND_STRUCT,
+        SLANG_DECL_KIND_FUNC,
+        SLANG_DECL_KIND_MODULE,
+        SLANG_DECL_KIND_GENERIC,
+        SLANG_DECL_KIND_VARIABLE
     };
 
 #ifndef SLANG_RESOURCE_SHAPE
@@ -2552,6 +2565,15 @@ extern "C"
     SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameter(SlangReflectionFunction* func, unsigned index);
     SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* func);
 
+    // Abstract Decl Reflection
+
+    SLANG_API unsigned int spReflectionDecl_getChildrenCount(SlangReflectionDecl* parentDecl);
+    SLANG_API SlangReflectionDecl* spReflectionDecl_getChild(SlangReflectionDecl* parentDecl, unsigned int index);
+    SLANG_API SlangDeclKind spReflectionDecl_getKind(SlangReflectionDecl* decl);
+    SLANG_API SlangReflectionFunction* spReflectionDecl_castToFunction(SlangReflectionDecl* decl);
+    SLANG_API SlangReflectionVariable* spReflectionDecl_castToVariable(SlangReflectionDecl* decl);
+    SLANG_API SlangReflectionType* spReflection_getTypeFromDecl(SlangSession* session, SlangReflectionDecl* decl);
+
     /** Get the stage that a variable belongs to (if any).
 
     A variable "belongs" to a specific stage when it is a varying input/output
@@ -2693,6 +2715,7 @@ SLANG_API slang::ISession* spReflection_GetSession(SlangReflection* reflection);
 namespace slang
 {
     struct BufferReflection;
+    struct DeclReflection;
     struct TypeLayoutReflection;
     struct TypeReflection;
     struct VariableLayoutReflection;
@@ -3670,6 +3693,123 @@ namespace slang
         {
             return (VariableLayoutReflection*) spReflection_getGlobalParamsVarLayout((SlangReflection*) this);
         }
+    };
+
+    
+    struct DeclReflection
+    {
+        enum class Kind
+        {   
+            Unsupported = SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION,
+            Struct = SLANG_DECL_KIND_STRUCT,
+            Func = SLANG_DECL_KIND_FUNC,
+            Module = SLANG_DECL_KIND_MODULE,
+            Generic = SLANG_DECL_KIND_GENERIC,
+            Variable = SLANG_DECL_KIND_VARIABLE,
+        };
+
+        Kind getKind()
+        {
+            return (Kind)spReflectionDecl_getKind((SlangReflectionDecl*)this);
+        }
+
+        unsigned int getChildrenCount()
+        {
+            return spReflectionDecl_getChildrenCount((SlangReflectionDecl*)this);
+        }
+
+        DeclReflection* getChild(unsigned int index)
+        {
+            return (DeclReflection*)spReflectionDecl_getChild((SlangReflectionDecl*)this, index);
+        }
+
+        TypeReflection* getType(SlangSession* session)
+        {
+            return (TypeReflection*)spReflection_getTypeFromDecl(session, (SlangReflectionDecl*)this);
+        }
+
+        VariableReflection* asVariable()
+        {
+            return (VariableReflection*)spReflectionDecl_castToVariable((SlangReflectionDecl*)this);
+        }
+
+        FunctionReflection* asFunction()
+        {
+            return (FunctionReflection*)spReflectionDecl_castToFunction((SlangReflectionDecl*)this);
+        }
+
+        template <Kind K>
+        struct FilteredList
+        {
+            unsigned int count;
+            DeclReflection* parent;
+
+            template <Kind K>
+            struct FilteredIterator
+            {
+                DeclReflection* parent;
+                unsigned int count;
+                unsigned int index;
+
+                DeclReflection* operator*() { return parent->getChild(index); }
+                void operator++() 
+                { 
+                    index++;
+                    while (index < count && !(parent->getChild(index)->getKind() == K))
+                    {
+                        index++;
+                    }
+                }
+                bool operator!=(FilteredIterator const& other) { return index != other.index; }
+            };
+
+            // begin/end for range-based for that checks the kind
+            FilteredIterator<K> begin() 
+            { 
+                // Find the first child of the right kind
+                unsigned int index = 0;
+                while (index < count && !(parent->getChild(index)->getKind() == K))
+                {
+                    index++;
+                }
+                return FilteredIterator<K>{parent, count, index}; 
+            }
+            
+            FilteredIterator<K> end() { return FilteredIterator<K>{parent, count, count}; }
+        };
+        
+        template <Kind K>
+        FilteredList<K> getChildrenOfKind()
+        {
+            return FilteredList<K>{ getChildrenCount(), (DeclReflection*)this };
+        }
+
+        struct IteratedList
+        {
+            unsigned int count;
+            DeclReflection* parent;
+
+            struct Iterator
+            {
+                DeclReflection* parent;
+                unsigned int count;
+                unsigned int index;
+
+                DeclReflection* operator*() { return parent->getChild(index); }
+                void operator++() { index++; }
+                bool operator!=(Iterator const& other) { return index != other.index; }
+            };
+
+            // begin/end for range-based for that checks the kind
+            IteratedList::Iterator begin() { return IteratedList::Iterator{ parent, count, 0 }; }
+            IteratedList::Iterator end() { return IteratedList::Iterator{ parent, count, count }; } 
+        };
+
+        IteratedList getChildren()
+        {
+            return IteratedList{ getChildrenCount(), (DeclReflection*)this };
+        }
+
     };
 
     typedef uint32_t CompileStdLibFlags;
@@ -5132,6 +5272,8 @@ namespace slang
         /// Get the path to a file this module depends on.
         virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
             SlangInt32 index) = 0;
+
+        virtual SLANG_NO_THROW DeclReflection* SLANG_MCALL getModuleReflection() = 0;
     };
     
     #define SLANG_UUID_IModule IModule::getTypeGuid()

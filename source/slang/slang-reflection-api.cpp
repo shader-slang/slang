@@ -2843,6 +2843,98 @@ SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameter(SlangReflec
     return convert(as<Decl>(func->getParameters()[index]));
 }
 
+// Abstract decl reflection
+
+SLANG_API unsigned int spReflectionDecl_getChildrenCount(SlangReflectionDecl* parentDecl)
+{
+    Decl* decl = (Decl*)parentDecl;
+    if (as<ContainerDecl>(decl))
+    {
+        return (unsigned int)as<ContainerDecl>(decl)->members.getCount();
+    }
+    
+    return 0;
+}
+
+SLANG_API SlangReflectionDecl* spReflectionDecl_getChild(SlangReflectionDecl* parentDecl, unsigned int index)
+{
+    Decl* decl = (Decl*)parentDecl;
+    if (auto containerDecl = as<ContainerDecl>(decl))
+    {
+        if (containerDecl->members.getCount() > index)
+            return (SlangReflectionDecl*)containerDecl->members[index];
+    }
+
+    return nullptr;
+}
+
+SLANG_API SlangDeclKind spReflectionDecl_getKind(SlangReflectionDecl* decl)
+{
+    Decl* slangDecl = (Decl*)decl;
+    if (as<StructDecl>(slangDecl))
+    {
+        return SLANG_DECL_KIND_STRUCT;
+    }
+    else if (as<VarDeclBase>(slangDecl))
+    {
+        return SLANG_DECL_KIND_VARIABLE;
+    }
+    else if (as<GenericDecl>(slangDecl))
+    {
+        return SLANG_DECL_KIND_GENERIC;
+    }
+    else if (as<FunctionDeclBase>(slangDecl))
+    {
+        return SLANG_DECL_KIND_FUNC;
+    }
+    else if (as<ModuleDecl>(slangDecl))
+    {
+        return SLANG_DECL_KIND_MODULE;
+    }
+    else
+        return SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION;
+}
+
+SLANG_API SlangReflectionFunction* spReflectionDecl_castToFunction(SlangReflectionDecl* decl)
+{
+    Decl* slangDecl = (Decl*) decl;
+    if (auto funcDecl = as<FunctionDeclBase>(slangDecl))
+    {
+        return convert(funcDecl);
+    }
+
+    // Improper cast
+    return nullptr;
+}
+
+SLANG_API SlangReflectionVariable* spReflectionDecl_castToVariable(SlangReflectionDecl* decl)
+{
+    Decl* slangDecl = (Decl*) decl;
+    if (auto varDecl = as<VarDeclBase>(slangDecl))
+    {
+        return (SlangReflectionVariable*) varDecl;
+    }
+
+    // Improper cast
+    return nullptr;
+
+}
+
+SLANG_API SlangReflectionType* spReflection_getTypeFromDecl(SlangSession* session, SlangReflectionDecl* decl)
+{
+    Decl* slangDecl = (Decl*)decl;
+    auto slangSession = asInternal(session);
+
+    ASTBuilder* builder = slangSession->getGlobalASTBuilder();
+    if (auto type = DeclRefType::create(builder, slangDecl->getDefaultDeclRef()))
+    {
+        return convert(type);
+    }
+
+    // Couldn't create a type from the decl
+    return nullptr;
+}
+
 // Shader Parameter Reflection
 
 SLANG_API unsigned spReflectionParameter_GetBindingIndex(SlangReflectionParameter* inVarLayout)

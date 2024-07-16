@@ -546,11 +546,24 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
     return SLANG_OK;
 }
 
-ISlangUnknown* Session::getInterface(const Guid& guid)
+SLANG_NO_THROW SlangResult SLANG_MCALL Session::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    if(guid == ISlangUnknown::getTypeGuid() || guid == IGlobalSession::getTypeGuid())
-        return asExternal(this);
-    return nullptr;
+    if (uuid == ISlangInternal::getTypeGuid())
+    {
+        // Special case to cast directly into internal type
+        // NOTE! No addref(!)
+        *outObject = static_cast<ISlangInternal*>(this);
+        return SLANG_OK;
+    }
+
+    if (uuid == ISlangUnknown::getTypeGuid() && uuid == IGlobalSession::getTypeGuid())
+    {
+        addReference();
+        *outObject = static_cast<slang::IGlobalSession*>(this);
+        return SLANG_OK;
+    }
+
+    return SLANG_E_NO_INTERFACE;
 }
 
 static size_t _getStructureSize(const uint8_t* src)
@@ -4068,6 +4081,11 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 void Module::buildHash(DigestBuilder<SHA1>& builder)
 {
     builder.append(computeDigest());
+}
+
+slang::DeclReflection* Module::getModuleReflection()
+{
+    return (slang::DeclReflection*)m_moduleDecl;
 }
 
 SHA1::Digest Module::computeDigest()
