@@ -10,7 +10,7 @@ struct PadLadenStruct
 };
 
 // This is to check if the last half can be inserted 'inside' the spare padding of a. It should not be
-struct StructWithArray
+struct StructWithArray : IDefaultInitializable
 {
     PadLadenStruct a[1];
     uint8_t b;
