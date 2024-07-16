@@ -145,6 +145,26 @@ struct SPIRVOptimizationDiagnostic
     std::string message;
 };
 
+// Validate the given SPIRV-ASM instructions.
+extern "C"
+#ifdef _MSC_VER
+_declspec(dllexport)
+#else
+__attribute__((__visibility__("default")))
+#endif
+bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
+{
+    spv_target_env target_env = SPV_ENV_VULKAN_1_3;
+
+    spvtools::ValidatorOptions options;
+    options.SetScalarBlockLayout(true);
+
+    spvtools::SpirvTools tools(target_env);
+    //tools.SetMessageConsumer(spvtools::utils::CLIMessageConsumer);
+
+    return tools.Validate(contents, contentsSize, options);
+}
+
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
 static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_CompileRequest_1_2& request, std::vector<SPIRVOptimizationDiagnostic>& outDiags, std::vector<unsigned int>& ioSpirv)
