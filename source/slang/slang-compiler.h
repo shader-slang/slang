@@ -1755,6 +1755,8 @@ namespace Slang
     /// Are we generating code for a CUDA API (CUDA / OptiX)?
     bool isCUDATarget(TargetRequest* targetReq);
 
+    // Are we generating code for a CPU target
+    bool isCPUTarget(TargetRequest* targetReq);
 
         /// A request to generate output in some target format.
     class TargetRequest : public RefObject
