@@ -32,9 +32,11 @@ jobs:
           - { os: linux, runs-on: ubuntu-20.04 }
           - { os: macos, runs-on: macos-latest }
           - { os: windows, runs-on: windows-latest }
-          # When to have warnings
-          - warnings-as-errors: true
-          - { compiler: cl, warnings-as-errors true }
+          # Warnings are treated as errors by default.
+          # But we may want to disable it temporarily.
+          - { os: linux, warnings-as-errors: true }
+          - { os: macos, warnings-as-errors: true }
+          - { os: windows, warnings-as-errors: true }
           # Set a test category depending on the config, smoke by default,
           # quick or full conditionally otherwise
           - test-category: smoke
@@ -47,7 +49,6 @@ jobs:
             config: release
             compiler: gcc
             platform: aarch64
-            warnings-as-errors: true
             test-category: smoke
             full-gpu-tests: false
             runs-on: [self-hosted, Linux, ARM64]
@@ -56,7 +57,6 @@ jobs:
             config: release
             compiler: cl
             platform: x86_64
-            warnings-as-errors: true
             test-category: full
             full-gpu-tests: true
             runs-on: [Windows, self-hosted]
