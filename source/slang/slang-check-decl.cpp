@@ -6163,7 +6163,7 @@ namespace Slang
 
             if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize) && !isFromStdLib(decl))
             {
-                // Force add IDefaultInitializableType to any struct missing (transitively) `IDefaultInitializableType`.
+                // Force add IDefaultInitializable to any struct missing (transitively) `IDefaultInitializable`.
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
                 if(!isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType, IsSubTypeOptions::NotReadyForLookup))
                 {

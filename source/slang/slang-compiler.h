@@ -416,6 +416,10 @@ namespace Slang
             String const&   typeStr,
             DiagnosticSink* sink);
 
+        DeclRef<Decl> findDeclFromString(
+            String const& name,
+            DiagnosticSink* sink);
+
         Dictionary<String, IntVal*>& getMangledNameToIntValMap();
         ConstantIntVal* tryFoldIntVal(IntVal* intVal);
 
@@ -559,6 +563,9 @@ namespace Slang
         // TODO: Remove this. Type lookup should only be supported on `Module`s.
         //
         Dictionary<String, Type*> m_types;
+
+        // Any decls looked up dynamically using `findDeclFromString`.
+        Dictionary<String, DeclRef<Decl>> m_decls;
 
         Scope* m_lookupScope = nullptr;
         std::unique_ptr<Dictionary<String, IntVal*>> m_mapMangledNameToIntVal;
@@ -1042,6 +1049,10 @@ namespace Slang
             List<ExpandedSpecializationArg> existentialSpecializationArgs;
         };
 
+        SLANG_NO_THROW slang::FunctionReflection* SLANG_MCALL getFunctionReflection() SLANG_OVERRIDE
+        {
+            return (slang::FunctionReflection*)m_funcDeclRef.getDecl();
+        }
     protected:
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
 

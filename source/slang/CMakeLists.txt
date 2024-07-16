@@ -212,6 +212,7 @@ slang_add_target(
         slang-reflect-headers
         slang-lookup-tables
         SPIRV-Headers
+    INCLUDE_DIRECTORIES_PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
     FOLDER generators
 )
 target_compile_definitions(
@@ -249,6 +250,7 @@ target_include_directories(
 #
 # Slang itself
 #
+configure_file(${slang_SOURCE_DIR}/slang-tag-version.h.in slang-version-header/slang-tag-version.h)
 slang_add_target(
     .
     ${SLANG_LIB_TYPE}
@@ -266,9 +268,10 @@ slang_add_target(
     # slang.h is in the project root, so include that directory in the interface
     # for slang
     INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}
+    INCLUDE_DIRECTORIES_PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
     EXPORT_MACRO_PREFIX SLANG
     INSTALL
-    PUBLIC_HEADERS ${slang_SOURCE_DIR}/slang*.h
+    PUBLIC_HEADERS ${slang_SOURCE_DIR}/slang*.h ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/*.h
 )
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

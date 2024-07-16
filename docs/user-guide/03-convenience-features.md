@@ -383,6 +383,23 @@ int caller()
 }
 ```
 
+## `if_let` syntax
+Slang supports `if (let name = expr)` syntax to simplify the code when working with `Optional<T>` value. The syntax is similar to Rust's
+`if let` syntax, the value expression must be an `Optional<T>` type, for example:
+
+```csharp
+Optional<int> getOptInt() { ... }
+
+void test()
+{
+    if (let x = getOptInt())
+    {
+          // if we are here, `getOptInt` returns a value `int`.
+          // and `x` represents the `int` value.
+    }
+}
+```
+
 ## `reinterpret<T>` operation
 
 Sometimes it is useful to reinterpret the bits of one type as another type, for example:
@@ -613,3 +630,28 @@ __file_decl
     }
 }
 ```
+
+User Defined Attributes (Experimental)
+-------------------
+
+In addition to many system defined attributes, users can define their own custom attribute types to be used in the `[UserDefinedAttribute(args...)]` syntax. The following example shows how to define a custom attribute type.
+
+```csharp
+[__AttributeUsage(_AttributeTargets.Var)]
+struct MaxValueAttribute
+{
+    int value;
+    string description;
+};
+
+[MaxValue(12, "the scale factor")]
+uniform int scaleFactor;
+```
+
+In the above code, the `MaxValueAttribute` struct type is decorated with the `[__AttributeUsage]` attribute, which informs that `MaxValueAttribute` type should be interpreted as a definiton for a user-defined attribute, `[MaxValue]`, that can be used to decorate all variables or fields. The members of the struct defines the argument list for the attribute.
+
+The `scaleFactor` uniform parameter is declared with the user defined `[MaxValue]` attribute, providing two arguments for `value` and `description`.
+
+The `_AttributeTargets` enum is used to restrict the type of decls the attribute can apply. Possible values of `_AttributeTargets` can be `Function`, `Param`, `Struct` or `Var`.
+
+The usage of user-defined attributes can be queried via Slang's reflection API through `TypeReflection` or `VariableReflection`'s `getUserAttributeCount`, `getUserAttributeByIndex` and `findUserAttributeByName` methods. 

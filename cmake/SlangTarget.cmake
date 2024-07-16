@@ -60,10 +60,13 @@ function(slang_add_target dir type)
         INCLUDE_FROM_PRIVATE
         # Any include directories other targets need to use this target
         INCLUDE_DIRECTORIES_PUBLIC
+        INCLUDE_DIRECTORIES_PRIVATE
         # Add a dependency on the new target to the specified targets
         REQUIRED_BY
         # Add a dependency to the new target on the specified targets
         REQUIRES
+        # Add a dependency to the new target on the specified targets if they exist
+        OPTIONAL_REQUIRES
         # Globs for any headers to install
         PUBLIC_HEADERS
     )
@@ -234,6 +237,13 @@ function(slang_add_target dir type)
             PUBLIC "$<BUILD_INTERFACE:${inc_abs}>"
         )
     endforeach()
+    foreach(inc ${ARG_INCLUDE_DIRECTORIES_PRIVATE})
+        get_filename_component(inc_abs ${inc} ABSOLUTE)
+        target_include_directories(
+            ${target}
+            PRIVATE "$<BUILD_INTERFACE:${inc_abs}>"
+        )
+    endforeach()
 
     #
     # Set up export macros
@@ -270,6 +280,12 @@ function(slang_add_target dir type)
         add_dependencies(${target} ${ARG_REQUIRES})
     endif()
 
+    foreach(required ${ARG_OPTIONAL_REQUIRES})
+        if(TARGET ${required})
+            add_dependencies(${target} ${required})
+        endif()
+    endforeach()
+
     #
     # Other preprocessor defines
     #
@@ -301,12 +317,12 @@ function(slang_add_target dir type)
     set_property(
         TARGET ${target}
         APPEND
-        PROPERTY BUILD_RPATH "${ORIGIN}/../${library_subdir}"
+        PROPERTY BUILD_RPATH "${ORIGIN}/../${library_subdir};${ORIGIN}"
     )
     set_property(
         TARGET ${target}
         APPEND
-        PROPERTY INSTALL_RPATH "${ORIGIN}/../${library_subdir}"
+        PROPERTY INSTALL_RPATH "${ORIGIN}/../${library_subdir};${ORIGIN}"
     )
 
     # On the same topic, give everything a dylib suffix on Mac OS

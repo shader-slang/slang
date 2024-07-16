@@ -10,7 +10,10 @@
       "name": "default",
       "description": "Default build using Ninja Multi-Config generator",
       "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/build"
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+      }
     },
     {
       "name": "msvc-base",
@@ -33,6 +36,15 @@
       "inherits": "msvc-base",
       "description": "Visual Studio 2022 project",
       "generator": "Visual Studio 17 2022"
+    },
+    {
+      "name": "vs2022-dev",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2022 project with debug assisting features",
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
+      }
     },
     {
       "name": "slang-llvm",

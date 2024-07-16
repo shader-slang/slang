@@ -40,10 +40,12 @@ cmake --build --preset release # or --preset debug
 
 For Visual Studio run:
 ```bash
-cmake --preset vs2022 # or --preset vs2019
+cmake --preset vs2022 # or 'vs2019' or `vs2022-dev`
 start devenv ./build/slang.sln # to optionally open the project in Visual Studio
 cmake --build --preset release # to build from the CLI
 ```
+
+The `vs2022-dev` preset turns on features that makes debugging easy.
 
 ## Testing
 
@@ -64,6 +66,7 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 | `SLANG_EMBED_STDLIB_SOURCE`       | `TRUE`           | Embed stdlib source in the binary                                  |
 | `SLANG_ENABLE_ASAN`               | `FALSE`          | Enable ASAN (address sanitizer)                                    |
 | `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`          | Enable full IR validation (SLOW!)                                  |
+| `SLANG_ENABLE_IR_BREAK_ALLOC`     | `FALSE`          | Enable IR BreakAlloc functionality for debugging.                  |
 | `SLANG_ENABLE_GFX`                | `TRUE`           | Enable gfx targets                                                 |
 | `SLANG_ENABLE_SLANGD`             | `TRUE`           | Enable language server target                                      |
 | `SLANG_ENABLE_SLANGC`             | `TRUE`           | Enable standalone compiler target                                  |

@@ -39,14 +39,14 @@ jobs:
           base=$(pwd)/slang-${version}-linux-x86_64-glibc-2.17
 
           sudo mv "$(pwd)/build/dist-release/slang.zip" "${base}.zip"
-          echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> $GITHUB_OUTPUT
+          echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
 
           sudo mv "$(pwd)/build/dist-release/slang.tar.gz" "${base}.tar.gz"
-          echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> $GITHUB_OUTPUT
+          echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
 
       - name: File check
         run: |
-          find "build/dist-release" ! -iname '*.md' ! -iname '*.h' -type f | xargs file
+          find "build/dist-release" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
 
       - name: UploadBinary
         uses: softprops/action-gh-release@v1
