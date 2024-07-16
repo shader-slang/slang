@@ -4867,7 +4867,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void InterlockedCompareStore(
         UINT dest,
         UINT compare_value,
@@ -4878,6 +4878,9 @@ ${{{{
         case glsl: __intrinsic_asm "atomicCompSwap($0._data[$1/4], $2, $3)";
         case cuda: __intrinsic_asm "atomicCAS($0._getPtrAt<uint32_t>($1), $2, $3)";
         case hlsl: __intrinsic_asm ".InterlockedCompareStore";
+        case metal:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __metalInterlocked_compare_exchange(__getMetalAtomicRef(buf[dest / 4]), compare_value, value);
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedCompareStore(buf[dest / 4], compare_value, value);
@@ -9653,7 +9656,7 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_metal)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
 void InterlockedCompareStore(__ref int dest,  int compare_value,  int value)
 {
     __target_switch
@@ -9666,12 +9669,32 @@ void InterlockedCompareStore(__ref int dest,  int compare_value,  int value)
         {
             result:$$int = OpAtomicCompareExchange &dest Device None None $value $compare_value;
         };
+    case metal:
+        if (__isTextureAccess(dest))
+        {
+            vector<uint, 4> vec_compare_value = vector<uint, 4>(compare_value);
+            if(__isTextureArrayAccess(dest))
+            {
+                __metalImageInterlocked_compare_exchange(__extractTextureFromTextureAccess(dest), 
+                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vec_compare_value, vector<uint, 4>(value));
+            }
+            else
+            {
+                __metalImageInterlocked_compare_exchange(__extractTextureFromTextureAccess(dest), 
+                    __extractCoordFromTextureAccess(dest), vec_compare_value, vector<uint, 4>(value));
+            }
+        }
+        else
+        {
+            __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value);
+        }
+        return;
     }
 }
 
 [ForceInline]
 __glsl_version(430)
-[require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_metal)]
+[require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
 void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value)
 {
     __target_switch
@@ -9684,6 +9707,26 @@ void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value)
         {
             result:$$uint = OpAtomicCompareExchange &dest Device None None $value $compare_value;
         };
+    case metal:
+        if (__isTextureAccess(dest))
+        {
+            vector<uint, 4> vec_compare_value = vector<uint, 4>(compare_value);
+            if(__isTextureArrayAccess(dest))
+            {
+                __metalImageInterlocked_compare_exchange(__extractTextureFromTextureAccess(dest), 
+                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vec_compare_value, vector<uint, 4>(value));
+            }
+            else
+            {
+                __metalImageInterlocked_compare_exchange(__extractTextureFromTextureAccess(dest), 
+                    __extractCoordFromTextureAccess(dest), vec_compare_value, vector<uint, 4>(value));
+            }
+        }
+        else
+        {
+            __metalInterlocked_compare_exchange(__getMetalAtomicRef(dest), compare_value, value);
+        }
+        return;
     }
 }
 
