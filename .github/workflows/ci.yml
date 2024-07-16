@@ -113,20 +113,28 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-cpu ||
               failed=1
-            "$bin_dir/slang-test" \
-              -use-test-server \
-              -server-count 8 \
-              -emit-spirv-via-glsl \
-              -api vk \
-              -category ${{ matrix.test-category }} \
-              -expected-failure-list tests/expected-failure.txt ||
-              failed=1
           else
             "$bin_dir/slang-test" \
               -use-test-server \
-              -api all-dx12 \
               -category ${{ matrix.test-category }} \
+              -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt ||
+              failed=1
+          fi
+          exit $failed
+      - name: Test Slang spirv-via-glsl
+        run: |
+          export SLANG_RUN_SPIRV_VALIDATION=1
+          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          failed=0
+          if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
+            "$bin_dir/slang-test" \
+              -use-test-server \
+              -server-count 8 \
+              -category ${{ matrix.test-category }} \
+              -emit-spirv-via-glsl \
+              -api vk \
+              -expected-failure-list tests/expected-failure.txt ||
               failed=1
           fi
           exit $failed
