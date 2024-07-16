@@ -44,7 +44,7 @@ namespace SlangCapture
     enum ApiCallId : uint32_t
     {
         InvalidCallId                                        = 0x00000000,
-        ICreateGlobalSession                                 = makeApiCallId(GlobalFunction, 0x0000),
+        CreateGlobalSession                                 = makeApiCallId(GlobalFunction, 0x0000),
         IGlobalSession_createSession                         = makeApiCallId(Class_IGlobalSession, 0x0001),
         IGlobalSession_findProfile                           = makeApiCallId(Class_IGlobalSession, 0x0002),
         IGlobalSession_setDownstreamCompilerPath             = makeApiCallId(Class_IGlobalSession, 0x0003),

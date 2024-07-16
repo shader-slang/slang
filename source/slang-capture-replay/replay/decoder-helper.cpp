@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <vector>
 #include "decoder-helper.h"
 #include "parameter-decoder.h"
@@ -13,7 +14,14 @@ namespace SlangCapture
     void* DecoderAllocatorSingleton::allocate(size_t size)
     {
         void* data = calloc(1, size);
-        m_allocations.push_back(data);
+
+        if (!data)
+        {
+            slangCaptureLog(LogLevel::Error, "Failed to allocate memory\n");
+            std::abort();
+        }
+
+        m_allocations.add(data);
         return data;
     }
 

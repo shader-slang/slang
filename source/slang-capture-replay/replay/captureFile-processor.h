@@ -8,10 +8,10 @@
 
 namespace SlangCapture
 {
-    class FileProcessor
+    class CaptureFileProcessor
     {
     public:
-        FileProcessor(const std::string& filePath);
+        CaptureFileProcessor(const std::string& filePath);
         bool processNextBlock();
         bool processHeader(FunctionHeader& header);
         bool processTailer(FunctionTailer& tailer);

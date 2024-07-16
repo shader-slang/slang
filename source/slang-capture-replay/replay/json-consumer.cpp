@@ -2,7 +2,7 @@
 
 namespace SlangCapture
 {
-    void JsonConsumer::ICreateGlobalSession(ObjectID objectId, const uint8_t* parameterBuffer, int64_t bufferSize)
+    void JsonConsumer::CreateGlobalSession(ObjectID objectId, const uint8_t* parameterBuffer, int64_t bufferSize)
     {
     }
 

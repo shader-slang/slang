@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include "../util/capture-format.h"
 #include "decoder-consumer.h"
+#include "../../core/slang-list.h"
 
 namespace SlangCapture
 {
@@ -37,7 +38,7 @@ namespace SlangCapture
         bool processICompositeComponentTypeMethods(ApiCallId callId, ObjectID objectId, ParameterBlock const& parameterBlock);
         bool processITypeConformanceMethods(ApiCallId callId, ObjectID objectId, ParameterBlock const& parameterBlock);
 
-		bool ICreateGlobalSession(ObjectID objectId, ParameterBlock const& parameterBlock);
+		bool CreateGlobalSession(ObjectID objectId, ParameterBlock const& parameterBlock);
 		bool IGlobalSession_createSession(ObjectID objectId, ParameterBlock const& parameterBlock);
 		void IGlobalSession_findProfile(ObjectID objectId, ParameterBlock const& parameterBlock);
 		void IGlobalSession_setDownstreamCompilerPath(ObjectID objectId, ParameterBlock const& parameterBlock);
@@ -147,7 +148,7 @@ namespace SlangCapture
 		void ITypeConformance_linkWithOptions(ObjectID objectId, ParameterBlock const& parameterBlock);
 
 	private:
-		std::vector<IDecoderConsumer*> m_consumers;
+		Slang::List<IDecoderConsumer*> m_consumers;
     };
 }
 #endif // SLANG_DECODER_H

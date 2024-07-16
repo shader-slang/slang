@@ -43,8 +43,8 @@ namespace SlangCapture
         default:
             slangCaptureLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId);
             break;
-        case ApiCallId::ICreateGlobalSession:
-            ICreateGlobalSession(objectId, parameterBlock);
+        case ApiCallId::CreateGlobalSession:
+            CreateGlobalSession(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_createSession:
             IGlobalSession_createSession(objectId, parameterBlock);
@@ -415,7 +415,7 @@ namespace SlangCapture
     }
 
 
-    bool SlangDecoder::ICreateGlobalSession(ObjectID objectId, ParameterBlock const& parameterBlock)
+    bool SlangDecoder::CreateGlobalSession(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         return false;
     }

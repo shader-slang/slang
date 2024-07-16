@@ -7,7 +7,7 @@
 #include <vector>
 #include "../util/capture-format.h"
 #include "../util/capture-utility.h"
-#include "../../../slang.h"
+#include "slang.h"
 #include "decoder-helper.h"
 
 namespace SlangCapture

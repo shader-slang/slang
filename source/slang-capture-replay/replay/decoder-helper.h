@@ -2,9 +2,10 @@
 #define SLANG_CAPTURE_DECODER_HELPER_H
 
 #include <stdint.h>
-#include "../../../slang.h"
-#include "../../../slang-com-helper.h"
+#include "slang.h"
+#include "slang-com-helper.h"
 #include "../util/capture-format.h"
+#include "../../core/slang-list.h"
 
 namespace SlangCapture {
 
@@ -17,7 +18,7 @@ namespace SlangCapture {
         ~DecoderAllocatorSingleton();
     private:
         DecoderAllocatorSingleton() = default;
-        std::vector<void*> m_allocations;
+        Slang::List<void*> m_allocations;
     };
 
     class DecoderBase

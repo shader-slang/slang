@@ -18,7 +18,7 @@ namespace SlangCapture
         // We will use the address of the global session as the filename for the capture manager
         // to make it unique for each global session.
         // capture slang::createGlobalSession
-        ParameterEncoder* encoder = m_captureManager->beginMethodCapture(ApiCallId::ICreateGlobalSession, g_globalFunctionHandle);
+        ParameterEncoder* encoder = m_captureManager->beginMethodCapture(ApiCallId::CreateGlobalSession, g_globalFunctionHandle);
         encoder->encodeAddress(m_actualGlobalSession);
         m_captureManager->endMethodCapture();
     }

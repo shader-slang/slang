@@ -1,10 +1,10 @@
-#include "file-processor.h"
+#include "captureFile-processor.h"
 #include "../util/capture-utility.h"
 #include "parameter-decoder.h"
 
 namespace SlangCapture
 {
-    FileProcessor::FileProcessor(const std::string& filename)
+    CaptureFileProcessor::CaptureFileProcessor(const std::string& filename)
     {
         Slang::String path(filename.c_str());
         Slang::FileMode fileMode = Slang::FileMode::Open;
@@ -21,7 +21,7 @@ namespace SlangCapture
         }
     }
 
-    bool FileProcessor::processNextBlock()
+    bool CaptureFileProcessor::processNextBlock()
     {
         FunctionHeader header {};
         if (!processHeader(header))
@@ -84,7 +84,7 @@ namespace SlangCapture
         return ret;
     }
 
-    bool FileProcessor::processHeader(FunctionHeader& header)
+    bool CaptureFileProcessor::processHeader(FunctionHeader& header)
     {
         size_t readBytes = 0;
         SlangResult res = m_inputStream.read(&header, sizeof(FunctionHeader), readBytes);
@@ -102,7 +102,7 @@ namespace SlangCapture
         return true;
     }
 
-    bool FileProcessor::processTailer(FunctionTailer& tailer)
+    bool CaptureFileProcessor::processTailer(FunctionTailer& tailer)
     {
         size_t readBytes = 0;
         SlangResult res = m_inputStream.read(&tailer, sizeof(FunctionTailer), readBytes);
@@ -120,12 +120,12 @@ namespace SlangCapture
         return true;
     }
 
-    bool FileProcessor::processMethod(FunctionHeader const& header, const uint8_t* parameterBuffer, int64_t bufferSize)
+    bool CaptureFileProcessor::processMethod(FunctionHeader const& header, const uint8_t* parameterBuffer, int64_t bufferSize)
     {
         return false;
     }
 
-    bool FileProcessor::processFunction(FunctionHeader const& header, const uint8_t* parameterBuffer, int64_t bufferSize)
+    bool CaptureFileProcessor::processFunction(FunctionHeader const& header, const uint8_t* parameterBuffer, int64_t bufferSize)
     {
         return false;
     }
