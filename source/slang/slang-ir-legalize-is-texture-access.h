@@ -7,5 +7,5 @@ namespace Slang
 {
     class DiagnosticSink;
 
-    void legalizeIsTextureAccess(IRModule* module);
+    void legalizeIsTextureAccess(IRModule* module, DiagnosticSink* sink);
 }
