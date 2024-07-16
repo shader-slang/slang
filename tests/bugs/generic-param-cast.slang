@@ -8,7 +8,7 @@ struct A<let I : int>
     int f() { return I; }
 };
 
-struct B<let U : uint>
+struct B<let U : uint> : IDefaultInitializable
 {
     A<U> a;
 };
