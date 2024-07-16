@@ -25,8 +25,8 @@ struct EmptyS : IEmptyS
 struct Empty<TT : IEmptyS> : IInterface
 {
     typedef TT T;
-    TT value;
-    float a;
+    TT value = TT();
+    float a = 0;
     TT getT()
     {
         return value;

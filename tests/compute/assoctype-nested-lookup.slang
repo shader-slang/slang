@@ -12,7 +12,7 @@ interface IFoo : IDefaultInitializable
 };
 
 
-struct FooPair<T : IFoo> : IFoo
+struct FooPair<T : IFoo> : IFoo, IDefaultInitializable
 {
     T a;
     T.Bar b;

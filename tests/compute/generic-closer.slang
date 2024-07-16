@@ -13,7 +13,7 @@ struct Gen0 : IGetter
 };
 struct Gen1<TGetter : IGetter> : IGetter
 {
-    TGetter g;
+    TGetter g = TGetter();
     int get() { return g.get(); }
 };
 
