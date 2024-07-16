@@ -92,8 +92,11 @@ struct ByteAddressBufferLegalizationContext
         // Get the equivalent structured buffer for the buffer.
         if( auto structuredBuffer = getEquivalentStructuredBuffer(elementType, buffer) )
         {
-            if(buffer != structuredBuffer)
+            if (buffer != structuredBuffer)
+            {
                 buffer->replaceUsesWith(structuredBuffer);
+                buffer->removeAndDeallocate();
+            }
             // We want to replace the the inst, with the equivalent structured buffer reference
             inst->replaceUsesWith(structuredBuffer);
             // Once replaced we don't need anymore
