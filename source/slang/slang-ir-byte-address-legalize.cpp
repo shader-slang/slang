@@ -92,6 +92,8 @@ struct ByteAddressBufferLegalizationContext
         // Get the equivalent structured buffer for the buffer.
         if( auto structuredBuffer = getEquivalentStructuredBuffer(elementType, buffer) )
         {
+            if(buffer != structuredBuffer)
+                buffer->replaceUsesWith(structuredBuffer);
             // We want to replace the the inst, with the equivalent structured buffer reference
             inst->replaceUsesWith(structuredBuffer);
             // Once replaced we don't need anymore
@@ -791,6 +793,8 @@ struct ByteAddressBufferLegalizationContext
         {
             return nullptr;
         }
+        if (as<IRHLSLStructuredBufferTypeBase>(byteAddressBuffer->getDataType()))
+            return byteAddressBuffer;
         // The simple case for replacement is when the byte-address buffer to
         // be replaced is a global shader parameter. That path will get its
         // own routine.

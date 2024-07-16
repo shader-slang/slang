@@ -9672,16 +9672,16 @@ void InterlockedCompareStore(__ref int dest,  int compare_value,  int value)
     case metal:
         if (__isTextureAccess(dest))
         {
-            vector<uint, 4> vec_compare_value = vector<uint, 4>(compare_value);
+            vector<int, 4> vec_compare_value = vector<int, 4>(compare_value);
             if(__isTextureArrayAccess(dest))
             {
                 __metalImageInterlocked_compare_exchange(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vec_compare_value, vector<uint, 4>(value));
+                    __extractCoordFromTextureAccess(dest), __extractArrayCoordFromTextureAccess(dest), vec_compare_value, vector<int, 4>(value));
             }
             else
             {
                 __metalImageInterlocked_compare_exchange(__extractTextureFromTextureAccess(dest), 
-                    __extractCoordFromTextureAccess(dest), vec_compare_value, vector<uint, 4>(value));
+                    __extractCoordFromTextureAccess(dest), vec_compare_value, vector<int, 4>(value));
             }
         }
         else
