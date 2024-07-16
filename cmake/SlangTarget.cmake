@@ -49,9 +49,10 @@ function(slang_add_target dir type)
         EXPLICIT_SOURCE
         # Additional directories from which to glob source
         EXTRA_SOURCE_DIRS
-        # Additional compile definitions
+        # Additional compile definitions and options
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
         EXTRA_COMPILE_DEFINITIONS_PUBLIC
+        EXTRA_COMPILE_OPTIONS_PRIVATE
         # Targets with which to link privately
         LINK_WITH_PRIVATE
         # Frameworks with which to link privately
@@ -287,7 +288,7 @@ function(slang_add_target dir type)
     endforeach()
 
     #
-    # Other preprocessor defines
+    # Other preprocessor defines and options
     #
     if(ARG_EXTRA_COMPILE_DEFINITIONS_PRIVATE)
         target_compile_definitions(
@@ -299,6 +300,12 @@ function(slang_add_target dir type)
         target_compile_definitions(
             ${target}
             PUBLIC ${ARG_EXTRA_COMPILE_DEFINITIONS_PUBLIC}
+        )
+    endif()
+    if(ARG_EXTRA_COMPILE_OPTIONS_PRIVATE)
+        target_compile_options(
+            ${target}
+            PRIVATE ${ARG_EXTRA_COMPILE_OPTIONS_PRIVATE}
         )
     endif()
 
