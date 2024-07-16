@@ -47,7 +47,7 @@ struct AssocImpl : IAssoc
 
 int testAdd2<T:IAssoc>(T assoc)
 {
-    T.AT obj;
+    T.AT obj = T.AT();
     return obj.addf(1, 1);
 }
 
