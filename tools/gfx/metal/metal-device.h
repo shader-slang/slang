@@ -135,8 +135,6 @@ public:
     NS::SharedPtr<MTL::Device> m_device;
     NS::SharedPtr<MTL::CommandQueue> m_commandQueue;
 
-    //DescriptorSetAllocator descriptorSetAllocator;
-
     uint32_t m_queueAllocCount;
 
     // A list to hold objects that may have a strong back reference to the device
@@ -150,8 +148,6 @@ public:
     // worrying the `ShaderProgramImpl` object getting destroyed after the completion of
     // `DeviceImpl::~DeviceImpl()'.
     ChunkedList<RefPtr<RefObject>, 1024> m_deviceObjectsWithPotentialBackReferences;
-
-    //RefPtr<FramebufferImpl> m_emptyFramebuffer;
 };
 
 } // namespace metal
