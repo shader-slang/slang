@@ -1079,6 +1079,10 @@ Result linkAndOptimizeIR(
         }
 
         legalizeByteAddressBufferOps(session, targetProgram, irModule, codeGenContext->getSink(), byteAddressBufferOptions);
+        // We need an early DCE pass with metal to remove any replaced globalParams, else Metal will insert operations to
+        // which prevent DCE to clean up these unneeded globalParams.
+        if(isMetalTarget(targetRequest))
+            eliminateDeadCode(irModule, deadCodeEliminationOptions);
     }
 
     // For CUDA targets only, we will need to turn operations
