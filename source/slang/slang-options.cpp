@@ -1609,9 +1609,11 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
 
         setProfile(this->getCurrentTarget(), profile);
 
-        // Note: stating a profile with a stage should not set the stage of the compiled entryPoint since:
-        // 1. EntryPointAttr->stage has priority to determine stage compiled with
-        // 2. Adding a stage here will force compatability mode to compile code assuming entrypoint named "main"
+        auto stage = profile.getStage();
+        if (stage != Stage::Unknown)
+        {
+            setStage(getCurrentEntryPoint(), stage);
+        }
     }
 
     // Any additional capability tokens will be assumed to represent `CapabilityAtom`s.

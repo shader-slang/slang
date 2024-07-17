@@ -1,12 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK_ERROR): -target spirv -profile vs_6_0
-//TEST:SIMPLE(filecheck=CHECK_ERROR): -target spirv -profile ps_6_0
 //TEST:SIMPLE(filecheck=CHECK_ERROR): -target spirv -entry psmain -profile vs_6_0
 //TEST:SIMPLE(filecheck=CHECK_ERROR): -target spirv -entry vsmain -profile ps_6_0
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry vsmain -profile vs_6_0
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -profile sm_6_0
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -profile vs_6_0 -ignore-capabilities
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -profile ps_6_0 -ignore-capabilities
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry psmain -profile vs_6_0 -ignore-capabilities
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry vsmain -profile ps_6_0 -ignore-capabilities
 
