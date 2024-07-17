@@ -1,9 +1,9 @@
 // main.cpp
 #include <string>
 
-#include <slang.h>
+#include "slang.h"
 
-#include <slang-com-ptr.h>
+#include "slang-com-ptr.h"
 using Slang::ComPtr;
 
 #include "gpu-printing.h"

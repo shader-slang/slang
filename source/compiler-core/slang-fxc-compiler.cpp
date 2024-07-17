@@ -4,7 +4,7 @@
 #if SLANG_ENABLE_DXBC_SUPPORT
 
 #include "../core/slang-common.h"
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "../core/slang-blob.h"
 

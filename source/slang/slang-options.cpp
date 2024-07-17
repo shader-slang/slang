@@ -5,7 +5,7 @@
 
 #include "slang-options.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 #include "slang-compiler.h"
 #include "slang-profile.h"

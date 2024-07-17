@@ -1,9 +1,9 @@
 #ifndef SLANG_COMPILER_CORE_TEST_PROTOCOL_H
 #define SLANG_COMPILER_CORE_TEST_PROTOCOL_H
 
-#include "../../slang.h"
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
+#include "slang.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
 
 #include "../core/slang-rtti-info.h"
 #include "slang-json-value.h"
