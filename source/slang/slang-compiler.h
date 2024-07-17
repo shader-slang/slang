@@ -1052,7 +1052,7 @@ namespace Slang
 
         SLANG_NO_THROW slang::FunctionReflection* SLANG_MCALL getFunctionReflection() SLANG_OVERRIDE
         {
-            return (slang::FunctionReflection*)m_funcDeclRef.getDecl();
+            return (slang::FunctionReflection*)m_funcDeclRef.declRefBase;
         }
     protected:
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;

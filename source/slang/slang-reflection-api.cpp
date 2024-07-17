@@ -65,14 +65,15 @@ static inline SlangReflectionVariable* convert(Decl* var)
     return (SlangReflectionVariable*) var;
 }
 
-static inline FunctionDeclBase* convert(SlangReflectionFunction* func)
+static inline DeclRef<FunctionDeclBase> convert(SlangReflectionFunction* func)
 {
-    return (FunctionDeclBase*)func;
+    DeclRefBase* declBase = (DeclRefBase*)func;
+    return DeclRef<FunctionDeclBase>(declBase);
 }
 
-static inline SlangReflectionFunction* convert(FunctionDeclBase* func)
+static inline SlangReflectionFunction* convert(DeclRef<FunctionDeclBase> func)
 {
-    return (SlangReflectionFunction*)func;
+    return (SlangReflectionFunction*)func.declRefBase;
 }
 
 static inline VarLayout* convert(SlangReflectionVariableLayout* var)
@@ -773,7 +774,7 @@ SLANG_API SlangReflectionFunction* spReflection_FindFunctionByName(SlangReflecti
     {
         auto result = program->findDeclFromString(name, &sink);
         if (auto funcDeclRef = result.as<FunctionDeclBase>())
-            return (SlangReflectionFunction*)funcDeclRef.getDecl();
+            return convert(funcDeclRef);
     }
     catch (...)
     {
@@ -2621,6 +2622,9 @@ SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflec
     case SLANG_MODIFIER_DIFFERENTIABLE:
         modifier = var->findModifier<DifferentiableAttribute>();
         break;
+    case SLANG_MODIFIER_MUTATING:
+        modifier = var->findModifier<MutatingAttribute>();
+        break;
     default:
         return nullptr;
     }
@@ -2645,6 +2649,15 @@ SLANG_API SlangReflectionUserAttribute* spReflectionVariable_FindUserAttributeBy
     auto varDecl = convert(inVar);
     if (!varDecl) return 0;
     return findUserAttributeByName(asInternal(session), varDecl, name);
+}
+
+SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar)
+{
+    auto decl = convert(inVar);
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        return varDecl->initExpr != nullptr;
+    }
 }
 
 // Variable Layout Reflection
@@ -2793,11 +2806,18 @@ SLANG_API SlangStage spReflectionVariableLayout_getStage(
 
 // Function Reflection
 
+SLANG_API SlangReflectionDecl* spReflectionFunction_asDecl(SlangReflectionFunction* inFunc)
+{
+    auto func = convert(inFunc);
+    if (!func) return nullptr;
+    return (SlangReflectionDecl*)func.getDecl();
+}
+
 SLANG_API char const* spReflectionFunction_GetName(SlangReflectionFunction* inFunc)
 {
     auto func = convert(inFunc);
     if (!func) return nullptr;
-    return getText(func->getName()).getBuffer();
+    return getText(func.getDecl()->getName()).getBuffer();
 }
 
 SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* inFunc)
@@ -2805,42 +2825,54 @@ SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectio
     auto func = convert(inFunc);
     if (!func) return nullptr;
 
-    return convert(func->returnType.type);
+    auto rawType = func.getDecl()->returnType.type;
+    auto astBuilder = rawType->getASTBuilderForReflection();
+
+    return convert(rawType->substitute(astBuilder, SubstitutionSet(func.declRefBase));
+}
+
+SLANG_API SlangReflectionModifier* spReflectionFunction_FindModifier(SlangReflectionFunction* inFunc, SlangModifierID modifierID)
+{
+    auto funcDeclRef = convert(inFunc);
+    auto varRefl = convert(funcDeclRef.getDecl());
+    if (!varRefl) return nullptr;
+
+    return spReflectionVariable_FindModifier(varRefl, modifierID);
 }
 
 SLANG_API unsigned int spReflectionFunction_GetUserAttributeCount(SlangReflectionFunction* inFunc)
 {
     auto func = convert(inFunc);
     if (!func) return 0;
-    return getUserAttributeCount(func);
+    return getUserAttributeCount(func.getDecl());
 }
 
 SLANG_API SlangReflectionUserAttribute* spReflectionFunction_GetUserAttribute(SlangReflectionFunction* inFunc, unsigned int index)
 {
     auto func = convert(inFunc);
     if (!func) return nullptr;
-    return getUserAttributeByIndex(func, index);
+    return getUserAttributeByIndex(func.getDecl(), index);
 }
 
 SLANG_API SlangReflectionUserAttribute* spReflectionFunction_FindUserAttributeByName(SlangReflectionFunction* inFunc, SlangSession* session, char const* name)
 {
     auto func = convert(inFunc);
     if (!func) return nullptr;
-    return findUserAttributeByName(asInternal(session), func, name);
+    return findUserAttributeByName(asInternal(session), func.getDecl(), name);
 }
 
 SLANG_API unsigned int spReflectionFunction_GetParameterCount(SlangReflectionFunction* inFunc)
 {
     auto func = convert(inFunc);
     if (!func) return 0;
-    return (unsigned int)func->getParameters().getCount();
+    return (unsigned int)func.getDecl()->getParameters().getCount();
 }
 
 SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameter(SlangReflectionFunction* inFunc, unsigned int index)
 {
     auto func = convert(inFunc);
     if (!func) return nullptr;
-    return convert(as<Decl>(func->getParameters()[index]));
+    return convert(as<Decl>(func.getDecl()->getParameters()[index]));
 }
 
 // Abstract decl reflection
@@ -2900,7 +2932,7 @@ SLANG_API SlangReflectionFunction* spReflectionDecl_castToFunction(SlangReflecti
     Decl* slangDecl = (Decl*) decl;
     if (auto funcDecl = as<FunctionDeclBase>(slangDecl))
     {
-        return convert(funcDecl);
+        return convert(DeclRef<FunctionDeclBase>(funcDecl->getDefaultDeclRef()));
     }
 
     // Improper cast
@@ -2998,7 +3030,7 @@ SLANG_API SlangReflectionFunction* spReflectionEntryPoint_GetFunction(SlangRefle
     auto entryPointLayout = convert(inEntryPoint);
     if (entryPointLayout)
     {
-        return (SlangReflectionFunction*)entryPointLayout->entryPoint.getDecl();
+        return convert(entryPointLayout->entryPoint);
     }
     return nullptr;
 }
