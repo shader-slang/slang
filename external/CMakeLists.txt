@@ -14,7 +14,7 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
 endif()
 
 # Miniz
-add_subdirectory(miniz EXCLUDE_FROM_ALL)
+add_subdirectory(miniz EXCLUDE_FROM_ALL SYSTEM)
 set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
 # Work around https://github.com/richgel999/miniz/pull/292
 get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
@@ -25,17 +25,17 @@ endif()
 
 # LZ4
 set(LZ4_BUNDLED_MODE ON)
-add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL)
+add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL SYSTEM)
 
 # Vulkan headers
-add_subdirectory(vulkan EXCLUDE_FROM_ALL)
+add_subdirectory(vulkan EXCLUDE_FROM_ALL SYSTEM)
 
 # metal-cpp headers
 add_library(metal-cpp INTERFACE)
 target_include_directories(metal-cpp INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-cpp")
 
 # SPIRV-Headers
-add_subdirectory(spirv-headers EXCLUDE_FROM_ALL)
+add_subdirectory(spirv-headers EXCLUDE_FROM_ALL SYSTEM)
 
 if(SLANG_ENABLE_SLANG_GLSLANG)
     # SPIRV-Tools
@@ -43,13 +43,13 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     set(SPIRV_WERROR OFF)
     set(SPIRV_HEADER_DIR "${CMAKE_CURRENT_LIST_DIR}/spirv-headers/")
     set(SPIRV_SKIP_TESTS ON)
-    add_subdirectory(spirv-tools EXCLUDE_FROM_ALL)
+    add_subdirectory(spirv-tools EXCLUDE_FROM_ALL SYSTEM)
 
     # glslang
     set(SKIP_GLSLANG_INSTALL ON)
     set(ENABLE_OPT ON)
     set(ENABLE_PCH OFF)
-    add_subdirectory(glslang EXCLUDE_FROM_ALL)
+    add_subdirectory(glslang EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
 # imgui
