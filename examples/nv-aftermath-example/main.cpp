@@ -1,6 +1,6 @@
 // main.cpp
 
-#include <slang.h>
+#include "slang.h"
 #include "slang-gfx.h"
 #include "gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"

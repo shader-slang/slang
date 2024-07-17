@@ -5,7 +5,7 @@
 #include "source/core/slang-basic.h"
 #include "tools/platform/vector-math.h"
 #include "tools/platform/window.h"
-#include <slang.h>
+#include "slang.h"
 
 using namespace gfx;
 using namespace Slang;
