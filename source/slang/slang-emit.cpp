@@ -911,7 +911,7 @@ Result linkAndOptimizeIR(
     legalizeVectorTypes(irModule, sink);
 
     // Legalize `__isTextureAccess` and related.
-    legalizeIsTextureAccess(irModule);
+    legalizeIsTextureAccess(irModule, sink);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,

@@ -18,7 +18,7 @@ struct A : I
 
 struct B : I
 {
-    float2 f2;
+    float2 f2 = float2(0.0f);
 };
 
 func test<T : I>(T t) -> int
