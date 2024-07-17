@@ -1,7 +1,7 @@
 
 #include "slang-render-api-util.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 #include "slang-list.h"
 #include "slang-string-util.h"

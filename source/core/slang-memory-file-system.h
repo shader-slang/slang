@@ -3,7 +3,7 @@
 
 #include "slang-basic.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 #include "slang-com-object.h"
 
 namespace Slang

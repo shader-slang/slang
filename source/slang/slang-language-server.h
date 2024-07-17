@@ -1,6 +1,6 @@
 #pragma once
 #include <chrono>
-#include "../../slang.h"
+#include "slang.h"
 #include "../core/slang-range.h"
 #include "../compiler-core/slang-json-rpc.h"
 #include "../compiler-core/slang-json-rpc-connection.h"

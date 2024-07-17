@@ -5,9 +5,9 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/FileCheck/FileCheck.h>
 
-#include <slang.h>
-#include <slang-com-helper.h>
-#include <slang-com-ptr.h>
+#include "slang.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
 #include <core/slang-com-object.h>
 #include <tools/slang-test/filecheck.h>
 

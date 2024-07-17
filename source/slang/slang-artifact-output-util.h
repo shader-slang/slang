@@ -6,7 +6,7 @@
 #include "../compiler-core/slang-artifact.h"
 #include "../compiler-core/slang-diagnostic-sink.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 
 namespace Slang
 {
