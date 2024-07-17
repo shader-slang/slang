@@ -14,7 +14,7 @@
 // its header. We have set up the build options for this project
 // so that it is as simple as:
 //
-#include <slang.h>
+#include "slang.h"
 //
 // Other build setups are possible, and Slang doesn't assume that
 // its include directory must be added to your global include

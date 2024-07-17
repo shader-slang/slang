@@ -6,7 +6,7 @@
 #include "../../source/core/slang-stable-hash.h"
 #include "../../source/core/slang-file-system.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 using namespace Slang;
 

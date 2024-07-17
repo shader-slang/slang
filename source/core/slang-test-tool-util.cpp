@@ -1,7 +1,7 @@
 
 #include "slang-test-tool-util.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "slang-io.h"
 #include "slang-string-util.h"

@@ -24,7 +24,7 @@ slang_add_target(
     EXPLICIT_SOURCE ${SLANG_PRELUDE_SOURCE}
     EXCLUDE_FROM_ALL
     TARGET_NAME prelude
-    INCLUDE_DIRECTORIES_PUBLIC ${CMAKE_CURRENT_LIST_DIR}
+    INCLUDE_DIRECTORIES_PUBLIC ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/../include
     PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/slang*.h
     # It's an object library, so the install step only installs the headers
     INSTALL

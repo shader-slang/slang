@@ -4,7 +4,7 @@
 
 // Has definition of CharSlice 
 #include "slang-artifact.h"
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 
 #include "../core/slang-memory-arena.h"
 
