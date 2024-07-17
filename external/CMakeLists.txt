@@ -8,6 +8,11 @@ if(NOT CMAKE_MESSAGE_LOG_LEVEL)
     set(CMAKE_MESSAGE_LOG_LEVEL NOTICE)
 endif()
 
+# Similarly, disable warnings for external projects
+if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
+    add_compile_options(-w)
+endif()
+
 # Miniz
 add_subdirectory(miniz EXCLUDE_FROM_ALL)
 set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -21,12 +26,6 @@ endif()
 # LZ4
 set(LZ4_BUNDLED_MODE ON)
 add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL)
-if(MSVC)
-    target_compile_options(
-        lz4_static
-        PRIVATE /wd5045 /wd4820 /wd4711 /wd6385 /wd6262
-    )
-endif()
 
 # Vulkan headers
 add_subdirectory(vulkan EXCLUDE_FROM_ALL)
