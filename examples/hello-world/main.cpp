@@ -7,8 +7,8 @@
 // The goal is to demonstrate how to use the Slang API to cross compile
 // shader code.
 //
-#include <slang.h>
-#include <slang-com-ptr.h>
+#include "slang.h"
+#include "slang-com-ptr.h"
 
 #include "vulkan-api.h"
 #include "examples/example-base/example-base.h"

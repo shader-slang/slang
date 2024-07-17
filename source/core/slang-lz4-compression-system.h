@@ -5,7 +5,7 @@
 
 #include "slang-compression-system.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 
 namespace Slang
 {

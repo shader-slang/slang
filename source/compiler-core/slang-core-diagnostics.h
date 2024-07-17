@@ -8,7 +8,7 @@
 #include "slang-diagnostic-sink.h"
 #include "slang-token.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 namespace Slang
 {

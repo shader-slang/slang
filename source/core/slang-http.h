@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_HTTP_H
 #define SLANG_CORE_HTTP_H
 
-#include "../../slang.h"
+#include "slang.h"
 
 #include "slang-string.h"
 #include "slang-list.h"
@@ -10,8 +10,8 @@
 
 #include "slang-stream.h"
 
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
 
 namespace Slang {
 

@@ -37,7 +37,7 @@ struct GenStruct<T> : IBase
 
 U.RetT test<U:IBase>(U.RetT val)
 {
-    U obj;
+    U obj = U();
     U.SubTypeT sb = obj.setVal(val);
     return obj.getVal(sb);
 }

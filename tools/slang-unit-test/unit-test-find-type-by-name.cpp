@@ -1,6 +1,6 @@
 // unit-test-find-type-by-name.cpp
 
-#include "../../slang.h"
+#include "slang.h"
 
 #include <stdio.h>
 #include <stdlib.h>

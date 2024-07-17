@@ -1,7 +1,7 @@
 #include "slang-archive-file-system.h"
 
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
 
 #include "../core/slang-castable.h"
 

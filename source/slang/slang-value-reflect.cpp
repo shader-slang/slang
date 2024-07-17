@@ -1,4 +1,4 @@
-#include "../../slang.h"
+#include "slang.h"
 
 #include "slang-value-reflect.h"
 

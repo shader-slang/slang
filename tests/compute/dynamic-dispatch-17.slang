@@ -52,7 +52,7 @@ struct FloatVal : IInterface
     float val;
     float run<Z:IReturnsZero>()
     {
-        Z z;
+        Z z = Z();
         return val + z.get();
     }
 };
@@ -62,7 +62,7 @@ struct Float4Val : IInterface
     Float4Struct val;
     float run<Z:IReturnsZero>()
     {
-        Z z;
+        Z z = Z();
         return val.val.x + val.val.y + z.get();
     }
 };

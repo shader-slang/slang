@@ -7,7 +7,7 @@
 #include "../../source/compiler-core/slang-source-loc.h"
 #include "../../source/compiler-core/slang-diagnostic-sink.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 namespace Slang
 {
