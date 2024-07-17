@@ -334,7 +334,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         MODULE
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt
-        INCLUDE_DIRECTORIES_PUBLIC include
+        INCLUDE_DIRECTORIES_PRIVATE include
         INSTALL
     )
     # Our only interface is through what we define in source/slang-glslang, in the
@@ -607,8 +607,8 @@ if(SLANG_ENABLE_TESTS)
         OBJECT
         EXCLUDE_FROM_ALL
         INCLUDE_FROM_PRIVATE slang
+        INCLUDE_DIRECTORIES_PRIVATE include
         FOLDER test
-        INCLUDE_DIRECTORIES_PUBLIC include
     )
 
     # These are libraries loaded at runtime from the test executable:
