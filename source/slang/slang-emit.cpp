@@ -1039,7 +1039,10 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
             byteAddressBufferOptions.scalarizeVectorLoadStore = true;
-            byteAddressBufferOptions.translateToStructuredBufferOps = false;
+            // We require to translate 'byteAddressBuffer' to 'structuredBuffer' fully
+            // since otherwise DCE will not fully remove 'byteAddressBuffer' uses leaving
+            // a duplicate globalParam at the same binding location of an equivlent 'StructuredBuffer'.
+            byteAddressBufferOptions.translateToStructuredBufferOps = true;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             break;
         }

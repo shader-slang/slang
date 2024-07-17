@@ -49,20 +49,6 @@ struct ByteAddressBufferLegalizationContext
         m_builder = IRBuilder(m_module);
 
         processInstRec(module->getModuleInst());
-
-        // If we have to 'getEquivalentStructuredBuffer' we should be replacing all uses of a
-        // 'ByteAddressBuffer' with a 'StructuredBuffer'. Normally GLSL/SPIRV will let DCE cleanup
-        // an unused 'ByteAddressBuffer'.
-        // In the case of Metal this does not happen due to 
-        // differences in how Metal is legalized (this causes incorrect code-gen).
-        // As a result we should explicitly cleanup the no-longer-needed 'ByteAddressBuffer'.
-        // Before we cleanup the 'ByteAddressBuffer' we need to ensure all unique 'getEquivalentStructuredBuffer'
-        // calls are handled since they might be for different element-types.
-        for (auto bufferToReplace : byteAddrBufferToReplace)
-        {
-            bufferToReplace.first->replaceUsesWith(getEquivalentStructuredBuffer(bufferToReplace.second, bufferToReplace.first));
-            bufferToReplace.first->removeAndDeallocate();
-        }
     }
 
     // We recursively walk the entire IR structure (except
@@ -108,8 +94,6 @@ struct ByteAddressBufferLegalizationContext
         // Get the equivalent structured buffer for the buffer.
         if( auto structuredBuffer = getEquivalentStructuredBuffer(elementType, buffer) )
         {
-            // Need a valid type already used for 'getEquivalentStructuredBuffer' call
-            byteAddrBufferToReplace[buffer] = elementType;
             // We want to replace the the inst, with the equivalent structured buffer reference
             inst->replaceUsesWith(structuredBuffer);
             // Once replaced we don't need anymore
