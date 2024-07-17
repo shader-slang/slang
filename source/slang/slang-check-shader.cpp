@@ -592,7 +592,9 @@ namespace Slang
                 if (profileStage != Stage::Unknown && profileStage != entryPointAttr->stage)
                     maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointAttr, Diagnostics::entryPointAndProfileAreIncompatible, entryPointFuncDecl, entryPointAttr->stage, targetProfile.getName());
             }
-            if (entryPointProfileStage != Stage::Unknown && entryPointProfileStage != entryPointAttr->stage)
+            if (entryPointProfileStage == Stage::Unknown)
+                entryPointProfile.setStage(entryPointAttr->stage);
+            else if (entryPointProfileStage != Stage::Unknown && entryPointProfileStage != entryPointAttr->stage)
                 maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::specifiedStageDoesntMatchAttribute, entryPointFuncDecl->getName(), entryPointProfileStage, entryPointAttr->stage);
             return true;
         }
