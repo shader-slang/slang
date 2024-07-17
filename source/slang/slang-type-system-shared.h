@@ -1,7 +1,7 @@
 #ifndef SLANG_TYPE_SYSTEM_SHARED_H
 #define SLANG_TYPE_SYSTEM_SHARED_H
 
-#include <slang.h>
+#include "slang.h"
 
 namespace Slang
 {

@@ -2,9 +2,9 @@
 // Shared header file for CPU implementation
 #pragma once
 
-#include <slang.h>
-#include <slang-com-ptr.h>
-#include <slang-com-helper.h>
+#include "slang.h"
+#include "slang-com-ptr.h"
+#include "slang-com-helper.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 

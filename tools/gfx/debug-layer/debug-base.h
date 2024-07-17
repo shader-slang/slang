@@ -1,8 +1,8 @@
 // debug-base.h
 #pragma once
 
-#include <slang-gfx.h>
-#include <slang-com-ptr.h>
+#include "slang-gfx.h"
+#include "slang-com-ptr.h"
 #include "core/slang-com-object.h"
 #include "../command-encoder-com-forward.h"
 #include "../renderer-shared.h"

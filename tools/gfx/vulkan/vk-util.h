@@ -3,7 +3,7 @@
 
 #include "core/slang-basic.h"
 #include "vk-api.h"
-#include <slang-gfx.h>
+#include "slang-gfx.h"
 
 // Macros to make testing vulkan return codes simpler
 

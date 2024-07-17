@@ -1,8 +1,8 @@
 // nvapi-util.h
 #pragma once
 
-#include <slang-com-helper.h>
-#include <slang-com-ptr.h>
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
 
 namespace gfx {
 

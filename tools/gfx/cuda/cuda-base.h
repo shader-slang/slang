@@ -8,9 +8,9 @@
 #include "core/slang-blob.h"
 #include "core/slang-std-writers.h"
 
-#include <slang.h>
-#include <slang-com-ptr.h>
-#include <slang-com-helper.h>
+#include "slang.h"
+#include "slang-com-ptr.h"
+#include "slang-com-helper.h"
 #include "../command-writer.h"
 #include "../renderer-shared.h"
 #include "../mutable-shader-object.h"

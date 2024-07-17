@@ -1,7 +1,7 @@
 #pragma once
 
-#include <slang-gfx.h>
-#include <slang-com-ptr.h>
+#include "slang-gfx.h"
+#include "slang-com-ptr.h"
 #include "core/slang-basic.h"
 #include "renderer-shared.h"
 

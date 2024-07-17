@@ -1,7 +1,7 @@
 #ifndef SLANG_COM_PTR_H
 #define SLANG_COM_PTR_H
 
-#include <slang-com-helper.h>
+#include "slang-com-helper.h"
 
 #include <assert.h>
 #include <cstddef>

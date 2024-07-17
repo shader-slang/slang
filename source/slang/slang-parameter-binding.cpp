@@ -10,7 +10,7 @@
 
 #include "slang-ir-string-hash.h"
 
-#include <slang.h>
+#include "slang.h"
 
 namespace Slang {
 

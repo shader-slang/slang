@@ -13,7 +13,7 @@
 
 #include "glslang/MachineIndependent/localintermediate.h"
 
-#include <slang.h>
+#include "slang.h"
 
 #include "spirv-tools/optimizer.hpp"
 #include "spirv-tools/libspirv.h"

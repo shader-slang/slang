@@ -32,7 +32,7 @@ Creating a GPU Device
 To start using the graphics layer, create an `IDevice` object by calling `gfxCreateDevice`. The `IDevice` interface is the main entry-point to interact with the graphics layer. It represent GPU device context where all interactions with the GPU take place.
 
 ```cpp
-#include <slang-gfx.h>
+#include "slang-gfx.h"
 
 using namespace gfx;
 

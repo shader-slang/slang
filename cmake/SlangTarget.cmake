@@ -245,13 +245,6 @@ function(slang_add_target dir type)
         )
     endforeach()
 
-    # set public include folder for all target
-    set(publicInc_abs "${PROJECT_SOURCE_DIR}/include")
-    target_include_directories(
-        ${target}
-        PUBLIC "$<BUILD_INTERFACE:${publicInc_abs}>"
-    )
-
     #
     # Set up export macros
     #

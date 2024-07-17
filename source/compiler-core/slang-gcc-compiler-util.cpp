@@ -2,7 +2,7 @@
 #include "slang-gcc-compiler-util.h"
 
 #include "../core/slang-common.h"
-#include <slang-com-helper.h>
+#include "slang-com-helper.h"
 #include "../core/slang-string-util.h"
 
 #include "../core/slang-io.h"
@@ -210,7 +210,7 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
         clang-7: error: linker command failed with exit code 1 (use -v to see invocation)*/
 
     /*  /path/slang-cpp-prelude.h:4:10: fatal error: ../slang.h: No such file or directory
-        #include <slang.h>
+        #include "slang.h"
         ^~~~~~~~~~~~
         compilation terminated.*/
 

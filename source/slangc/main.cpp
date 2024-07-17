@@ -1,6 +1,6 @@
 // main.cpp
 
-#include <slang.h>
+#include "slang.h"
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 

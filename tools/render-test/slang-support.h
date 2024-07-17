@@ -1,9 +1,9 @@
 // slang-support.h
 #pragma once
 
-#include <slang-gfx.h>
+#include "slang-gfx.h"
 
-#include <slang.h>
+#include "slang.h"
 
 #include "shader-input-layout.h"
 #include "options.h"

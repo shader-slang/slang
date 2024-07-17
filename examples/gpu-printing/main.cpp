@@ -1,13 +1,13 @@
 // main.cpp
 #include <string>
 
-#include <slang.h>
+#include "slang.h"
 
-#include <slang-com-ptr.h>
+#include "slang-com-ptr.h"
 using Slang::ComPtr;
 
 #include "gpu-printing.h"
-#include <slang-gfx.h>
+#include "slang-gfx.h"
 #include "gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"
 #include "source/core/slang-basic.h"

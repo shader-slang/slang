@@ -3,13 +3,13 @@
 // This tools reads a gfx pipeline dump file and replays the pipeline creation to trigger
 // shader compilation in the driver.
 //
-#include <slang.h>
-#include <slang-com-ptr.h>
+#include "slang.h"
+#include "slang-com-ptr.h"
 
 #include "examples/hello-world/vulkan-api.h"
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-stream.h"
-#include <slang-gfx.h>
+#include "slang-gfx.h"
 #include <chrono>
 
 #if SLANG_WINDOWS_FAMILY

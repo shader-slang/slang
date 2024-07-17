@@ -1,10 +1,10 @@
 // main.cpp
 
-#include <slang.h>
-#include <slang-gfx.h>
+#include "slang.h"
+#include "slang-gfx.h"
 #include "gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"
-#include <slang-com-ptr.h>
+#include "slang-com-ptr.h"
 #include "../../source/core/slang-io.h"
 #include "source/core/slang-basic.h"
 #include "examples/example-base/example-base.h"

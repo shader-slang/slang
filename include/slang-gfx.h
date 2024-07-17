@@ -4,8 +4,8 @@
 #include <float.h>
 #include <assert.h>
 
-#include <slang.h>
-#include <slang-com-ptr.h>
+#include "slang.h"
+#include "slang-com-ptr.h"
 
 
 #if defined(SLANG_GFX_DYNAMIC)

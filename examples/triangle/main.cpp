@@ -14,7 +14,7 @@
 // its header. We have set up the build options for this project
 // so that it is as simple as:
 //
-#include <slang.h>
+#include "slang.h"
 //
 // Other build setups are possible, and Slang doesn't assume that
 // its include directory must be added to your global include
@@ -32,10 +32,10 @@
 // with Slang may depend on an application/engine making certain
 // design choices in their abstraction layer.
 //
-#include <slang-gfx.h>
+#include "slang-gfx.h"
 #include "gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"
-#include <slang-com-ptr.h>
+#include "slang-com-ptr.h"
 #include "source/core/slang-basic.h"
 #include "examples/example-base/example-base.h"
 

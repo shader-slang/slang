@@ -16,15 +16,15 @@
 
 // We still need to include the Slang header to use the Slang API
 //
-#include <slang.h>
-#include <slang-com-helper.h>
+#include "slang.h"
+#include "slang-com-helper.h"
 
 // We will again make use of a graphics API abstraction
 // layer that implements the shader-object idiom based on Slang's
 // `ParameterBlock` and `interface` features to simplify shader specialization
 // and parameter binding.
 //
-#include <slang-gfx.h>
+#include "slang-gfx.h"
 #include "tools/gfx-util/shader-cursor.h"
 #include "tools/platform/model.h"
 #include "tools/platform/vector-math.h"

@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_COMMON_H
 #define SLANG_CORE_COMMON_H
 
-#include <slang.h>
+#include "slang.h"
 
 #include <assert.h>
 

@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <slang.h>
-#include <slang-com-helper.h>
+#include "slang.h"
+#include "slang-com-helper.h"
 
 #include "../../source/core/slang-string-escape-util.h"
 #include "../../source/core/slang-char-util.h"

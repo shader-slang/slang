@@ -21,7 +21,7 @@
 
 #include "../core/slang-file-system.h"
 
-#include <slang-com-ptr.h>
+#include "slang-com-ptr.h"
 
 #include "slang-capability.h"
 #include "slang-diagnostics.h"
@@ -35,7 +35,7 @@
 
 #include "../compiler-core/slang-artifact-representation-impl.h"
 
-#include <slang.h>
+#include "slang.h"
 
 namespace Slang
 {

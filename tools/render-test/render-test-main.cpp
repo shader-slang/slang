@@ -3,7 +3,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "options.h"
-#include <slang-gfx.h>
+#include "slang-gfx.h"
 #include "tools/gfx-util/shader-cursor.h"
 #include "slang-support.h"
 #include "png-serialize-util.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <slang.h>
+#include "slang.h"
 
 #if SLANG_LINUX_FAMILY
 

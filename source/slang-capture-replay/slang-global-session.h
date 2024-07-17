@@ -1,9 +1,9 @@
 #ifndef SLANG_GLOBAL_SESSION_H
 #define SLANG_GLOBAL_SESSION_H
 
-#include <slang-com-ptr.h>
-#include <slang.h>
-#include <slang-com-helper.h>
+#include "slang-com-ptr.h"
+#include "slang.h"
+#include "slang-com-helper.h"
 #include "../core/slang-smart-pointer.h"
 #include "capture-manager.h"
 

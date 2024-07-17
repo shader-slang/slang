@@ -11,7 +11,7 @@
 
 #include "../core/slang-io.h"
 
-#include <slang-com-ptr.h>
+#include "slang-com-ptr.h"
 
 #include "slang-artifact.h"
 #include "slang-artifact-associated.h"

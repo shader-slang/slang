@@ -11,7 +11,7 @@
 #include "../../source/compiler-core/slang-artifact-desc-util.h"
 #include "../../source/compiler-core/slang-artifact-helper.h"
 
-#include <slang-com-helper.h>
+#include "slang-com-helper.h"
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-string-escape-util.h"

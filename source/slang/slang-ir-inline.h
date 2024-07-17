@@ -1,7 +1,7 @@
 // slang-ir-inline.h
 #pragma once
 
-#include <slang-com-helper.h>
+#include "slang-com-helper.h"
 #include "core/slang-basic.h"
 
 namespace Slang

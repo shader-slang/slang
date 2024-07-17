@@ -207,7 +207,7 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
-    INCLUDE_DIRECTORIES_PUBLIC source
+    INCLUDE_DIRECTORIES_PUBLIC source include
 )
 
 if(SLANG_ENABLE_SLANGRT)
@@ -219,6 +219,7 @@ if(SLANG_ENABLE_SLANGRT)
         USE_EXTRA_WARNINGS
         LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
         EXPORT_MACRO_PREFIX SLANG_RT
+        INCLUDE_DIRECTORIES_PUBLIC include
         INSTALL
     )
 endif()
@@ -229,7 +230,6 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE core
-    INCLUDE_DIRECTORIES_PUBLIC source
 )
 if(NOT MSVC)
     # This is necessary to compile the DXC headers
@@ -334,6 +334,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         MODULE
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt
+        INCLUDE_DIRECTORIES_PUBLIC include
         INSTALL
     )
     # Our only interface is through what we define in source/slang-glslang, in the
@@ -520,7 +521,7 @@ if(SLANG_ENABLE_GFX)
         EXPORT_MACRO_PREFIX SLANG_GFX
         # slang-gfx is in this directory, anything which depends on gfx should include
         # this
-        INCLUDE_DIRECTORIES_PUBLIC .
+        INCLUDE_DIRECTORIES_PUBLIC . include
         REQUIRES copy-gfx-slang-modules
         INSTALL
         FOLDER gfx
@@ -607,6 +608,7 @@ if(SLANG_ENABLE_TESTS)
         EXCLUDE_FROM_ALL
         INCLUDE_FROM_PRIVATE slang
         FOLDER test
+        INCLUDE_DIRECTORIES_PUBLIC include
     )
 
     # These are libraries loaded at runtime from the test executable:

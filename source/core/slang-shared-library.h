@@ -1,9 +1,9 @@
 #ifndef SLANG_CORE_SHARED_LIBRARY_H
 #define SLANG_CORE_SHARED_LIBRARY_H
 
-#include <slang.h>
-#include <slang-com-helper.h>
-#include <slang-com-ptr.h>
+#include "slang.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
 
 #include "../core/slang-com-object.h"
 #include "../core/slang-io.h"

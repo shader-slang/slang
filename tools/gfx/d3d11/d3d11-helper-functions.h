@@ -1,7 +1,7 @@
 // d3d11-helper-functions.h
 #pragma once
 
-#include <slang-gfx.h>
+#include "slang-gfx.h"
 #include "d3d11-base.h"
 #include "../../../source/core/slang-list.h"
 

@@ -6,7 +6,7 @@
 
 #include "source/core/slang-writer.h"
 
-#include <slang-gfx.h>
+#include "slang-gfx.h"
 
 namespace renderer_test {
 
