@@ -24,10 +24,12 @@ To avoid confusion, we will denote mathematical functions using LaTeX italic scr
 ### Derivatives of scalar (1D) functions
 
 Consider the simplest case: a smooth scalar mathematical function that maps a real number to another real number:
+
 $$f : \mathbb{R} \to \mathbb{R}$$
 
 There are several definitions for a derivative, but we will use the definition that a derivative is the *closest linear approximation* of the output function at a given input location. 
 Concretely, given a specific input $x$, we can create a linear approximation of the function $f$ around $x$ as follows:
+
 $$ f(x + dx) \approx f(x) + Df(x) \cdot dx $$
 <!--// TODO: Add image here.-->
 
@@ -68,9 +70,11 @@ In practice, most functions tend to have multiple inputs and multiple outputs, i
 
 The definition above can be extended to higher dimensions, using the closest-linear-approximation idea. The main difference is that the derivative function represents a hyperplane rather than a line.
 
-Effectively, we want our forward-mode derivative to compute 
-$$ f(\mathbf{x} + \mathbf{dx}) \approx f(\mathbf{x}) + \left<Df(\mathbf{x}),\mathbf{dx}\right> $$
-and now, the input and its differential can be represented as a vector quantity $\mathbf{x}, \mathbf{dx} \in \mathbb{R}^N$ and the multiplier $Df(\mathbf{x})$ (also known as the *Jacobian* matrix) is a NxM matrix, and $\left<\cdot,\cdot\right>$ denotes the inner product (i.e. matrix-vector multiplication)
+Effectively, we want our forward-mode derivative to compute the following:
+
+$$ f(\mathbf{x} + \mathbf{dx}) \approx f(\mathbf{x}) + \langle Df(\mathbf{x}),\mathbf{dx}\rangle $$
+
+Here, the input and its differential can be represented as a vector quantity $\mathbf{x}, \mathbf{dx} \in \mathbb{R}^N$ and the multiplier $Df(\mathbf{x})$ (also known as the *Jacobian* matrix) is a NxM matrix, and $\left\< \cdot,\cdot \right\>$ denotes the inner product (i.e. matrix-vector multiplication)
 
 Here's an example of a Slang function taking in two inputs (N=2) and generating one output (M=1)
 
@@ -99,7 +103,7 @@ DifferentialPair<float> fwd_f(DifferentialPair<float> dpx, DifferentialPair<floa
 }
 ```
 
-Important note: the forward-mode function only needs to compute the inner product $\left<Df(\mathbf{x}),\mathbf{dx}\right>$. The Jacobian matrix itself never needs to be fully materialized. This is a key design element of automatic differentiation, one which allows it to scale to huge input/output counts.
+Important note: the forward-mode function only needs to compute the inner product $\langle Df(\mathbf{x}),\mathbf{dx} \rangle$. The Jacobian matrix itself never needs to be fully materialized. This is a key design element of automatic differentiation, one which allows it to scale to huge input/output counts.
 
 ### Building Blocks: Forward-mode derivatives compose in forward order of execution.
 
@@ -112,7 +116,7 @@ $$ h(\mathbf{x}) = f(g(\mathbf{x})) $$
 
 It's forward-mode derivative is then:
 
-$$ \left<Dh(\mathbf{x}), \mathbf{dx}\right> = \big<Df(\mathbf{x}), \left<Dg(\mathbf{x}), \mathbf{dx}\right>\big> $$
+$$ \langle Dh(\mathbf{x}), \mathbf{dx}\rangle = \big\langle Df(\mathbf{x}), \langle Dg(\mathbf{x}), \mathbf{dx}\rangle\big\rangle $$
 
 which is the forward-mode derivative of the outer function $f$ evaluated on the result of the forward-mode derivative of the inner function $g$. 
 
@@ -163,7 +167,7 @@ DifferentialPair<float> fwd_f(DifferentialPair<float> dpx, DifferentialPair<floa
 
 ### Tip: Extracting partial derivatives from a forward-mode derivative (i.e. a 'total' derivative)
 
-As we discussed above, forward-mode derivatives compute $\left<Df(\mathbf{x}),\mathbf{dx}\right>$ rather than what you may be used to seeing in a calculus course (e.g. partial derivatives like $\frac{\partial f}{\partial x}$).
+As we discussed above, forward-mode derivatives compute $\langle Df(\mathbf{x}),\mathbf{dx}\rangle$ rather than what you may be used to seeing in a calculus course (e.g. partial derivatives like $\frac{\partial f}{\partial x}$).
 
 In fact, the forward-mode derivative is simply an product of the partial derivative w.r.t each input parameter multiplied by their differential perturbations $\frac{\partial f}{\partial x} * dx + \frac{\partial f}{\partial x} * dy$. This is the reason for the alternative name: *total derivative*.
 
@@ -180,6 +184,7 @@ float df_dy = fwd_f(DifferentialPair<float>(x, 0.0), DifferentialPair<float>(y, 
 ### Tip: Testing forward-mode derivatives using the first principles of calculus (i.e. the *finite difference* method)
 
 In Calculus, partial derivatives of a function are often defined in a 'black box' manner using limits, by perturbing a single parameter by an infinitesimal amount:
+
 $$ \frac{\partial f}{\partial x} = \lim_{dx\to 0} \frac{f(x + dx) - f(x - dx)}{2 * dx} $$
 
 At the moment, we cannot leverage programming languages to compute true inifinitesimal limits, but we can replace $dx \to 0$ with a sufficiently small $\epsilon$ leading to the following 'test' to check if derivatives produced by automatic differentiation match with their true mathematical expected values.
@@ -211,10 +216,10 @@ A big problem with forward-mode derivatives is their inability to scale to great
 Machine learning pipelines often compute derivatives of a large complex pipeline with millions or even billions of input parameters, but a single output value, i.e. the *loss* or *objective* function, frequently denoted by $\mathcal{L}$.
 Computing $\frac{\partial \mathcal{L}}{\partial x_i}$ for $N$ inputs $x_i$ using the one-hot vector approach will involve invoking the forward-mode derivative function $N$ times.
 
-The reason for this limitation is that forward-mode derivatives pass derivatives from the inputs through to the outputs by computing the dot-product $\left<Df(\mathbf{x}),\mathbf{dx}\right>$. 
+The reason for this limitation is that forward-mode derivatives pass derivatives from the inputs through to the outputs by computing the dot-product $\left\< Df(\mathbf{x}),\mathbf{dx}\right\>$. 
 Instead, we employ a different approach called the reverse-mode derivative, which propagates differentials *backwards* from outputs to inputs.
 
-### Key Idea: Generate code to compute $\left<\frac{\partial \mathcal{L}}{\partial f}, Df(\mathbf{x})\right>$ rather than $\left<Df(\mathbf{x}),\mathbf{dx}\right>$
+### Key Idea: Generate code to compute $\langle \frac{\partial \mathcal{L}}{\partial f}, Df(\mathbf{x})\rangle$ rather than $\langle Df(\mathbf{x}),\mathbf{dx}\rangle$
 
 The fundamental building blocks of reverse-mode derivatives are the **left-side inner product**. That is, the product of a vector of derivatives of w.r.t outputs $\frac{\partial \mathcal{L}}{\partial f}$ with the Jacobian matrix $Df(\mathbf{x})$.
 
@@ -304,7 +309,8 @@ D\mathbf{f}(\mathbf{x}) = \begin{bmatrix}
 $$
 
 The **reverse-mode derivative**'s outputs should match the left-product of this matrix with the vector of derivatives w.r.t outputs:
-$$ \left<\frac{\partial \mathcal{L}}{\partial \mathbf{f}}, D\mathbf{f}(\mathbf{x})\right> = 
+
+$$ \left\langle \frac{\partial \mathcal{L}}{\partial \mathbf{f}}, D\mathbf{f}(\mathbf{x})\right\rangle  = 
 \begin{bmatrix}
 \frac{\partial \mathcal{L}}{\partial f_0} & \frac{\partial \mathcal{L}}{\partial f_1}
 \end{bmatrix}
@@ -316,7 +322,8 @@ $$ \left<\frac{\partial \mathcal{L}}{\partial \mathbf{f}}, D\mathbf{f}(\mathbf{x
 $$
 
 and the **forward-mode derivative**'s outputs should match the right-product of this matrix with the vector of differentials of the inputs:
-$$ \left<D\mathbf{f}(\mathbf{x}), d\mathbf{x}\right> = 
+
+$$ \langle D\mathbf{f}(\mathbf{x}), d\mathbf{x}\rangle  = 
 \begin{bmatrix} 
 2x    & 0.0 \\  
 1.0   & 1.0 \\
@@ -335,13 +342,16 @@ However, the resulting code is equivalent to the Jacobian method (mathematically
 A consequence of using the 'left-side inner product' is that derivatives of a composite function must be computed in the reverse of the order of primal computation.
 
 Here's an example of a composite function $h$ (similar to the example used in forward-mode building blocks):
+
 $$ h(\mathbf{x}) = f(g(\mathbf{x})) $$
+
 where (for brevity):
+
 $$ \mathbf{y} = g(\mathbf{x}) $$
 
 The reverse-mode derivative function for $h$ can be written as the composition of the reverse-mode derivatives of $f$ and $g$
 
-$$ \left<\frac{\partial L}{\partial h}, Dh(\mathbf{x})\right> = \left<\left<\frac{\partial L}{\partial h}, Df(\mathbf{y})\right>, Dg(\mathbf{x})\right>$$
+$$ \langle \frac{\partial L}{\partial h}, Dh(\mathbf{x})\rangle  = \langle \langle \frac{\partial L}{\partial h}, Df(\mathbf{y})\rangle , Dg(\mathbf{x})\rangle $$
 
 Note the 'backward' order here. We must first pass the derivatives through the outer function $f$, and then pass the result through the inner function $g$ to compute derivatives w.r.t inner-most inputs $\mathbf{x}$. This process of passing derivatives backwards is often referred to as *backpropagation*.
 
