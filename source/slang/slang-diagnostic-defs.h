@@ -394,7 +394,7 @@ DIAGNOSTIC(36108, Error, declHasDependenciesNotCompatibleOnTarget, "'$0' has dep
 DIAGNOSTIC(36109, Error, invalidTargetSwitchCase, "'$0' cannot be used as a target_switch case.")
 DIAGNOSTIC(36110, Error, stageIsIncompatibleWithCapabilityDefinition, "'$0' is defined for stage '$1', which is incompatible with the declared capability set '$2'.")
 DIAGNOSTIC(36111, Error, unexpectedCapability, "'$0' resolves into a disallowed `$1` Capability.")
-DIAGNOSTIC(36112, Error, entryPointAndProfileAreIncompatible, "'$0' is defined for stage '$1', which is incompatible with the declared profile '$2'.")
+DIAGNOSTIC(36112, Warning, entryPointAndProfileAreIncompatible, "'$0' is defined for stage '$1', which is incompatible with the declared profile '$2'.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")

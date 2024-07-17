@@ -581,7 +581,8 @@ namespace Slang
     {
         if (auto entryPointAttr = entryPointFuncDecl->findModifier<EntryPointAttribute>())
         {
-            // Ensure every target is specifying the same stage as an entry point
+            auto entryPointProfileStage = entryPointProfile.getStage();
+            // Ensure every target is specifying the same stage as an entry` point
             // if a profile+stage was set, else user will not be aware that their
             // code is requiring `fragment` on a `vertex` shader
             for (auto target : targets)
@@ -591,7 +592,8 @@ namespace Slang
                 if (profileStage != Stage::Unknown && profileStage != entryPointAttr->stage)
                     maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointAttr, Diagnostics::entryPointAndProfileAreIncompatible, entryPointFuncDecl, entryPointAttr->stage, targetProfile.getName());
             }
-            entryPointProfile.setStage(entryPointAttr->stage);
+            if (entryPointProfileStage != Stage::Unknown && entryPointProfileStage != entryPointAttr->stage)
+                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::specifiedStageDoesntMatchAttribute, entryPointFuncDecl->getName(), entryPointProfileStage, entryPointAttr->stage);
             return true;
         }
         return false;
