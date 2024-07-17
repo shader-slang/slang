@@ -4268,8 +4268,8 @@ namespace Slang
         }
         if (isDefaultInitializableType)
             context->parentDecl->addMember(ctorDecl);
-        else
-            _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
+        
+        _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
         
         return true;
     }

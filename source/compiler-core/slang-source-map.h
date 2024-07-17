@@ -1,7 +1,7 @@
 #ifndef SLANG_COMPILER_CORE_SOURCE_MAP_H
 #define SLANG_COMPILER_CORE_SOURCE_MAP_H
 
-#include "../../slang.h"
+#include "slang.h"
 
 #include "../core/slang-string.h"
 #include "../core/slang-list.h"

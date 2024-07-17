@@ -39,11 +39,9 @@ namespace Slang
                         if (getTextureAccess(inst))
                             inst->replaceUsesWith(builder.getBoolValue(true));
                         else
-                        {
                             inst->replaceUsesWith(builder.getBoolValue(false));
-                            functionsToSCCP.add(func);
-                        }
                         inst->removeAndDeallocate();
+                        functionsToSCCP.add(func);
                         continue;
                     case kIROp_IsTextureArrayAccess:
                     {
@@ -51,11 +49,9 @@ namespace Slang
                         if (textureAccess && as<IRTextureType>(textureAccess->getImage()->getDataType())->isArray())
                             inst->replaceUsesWith(builder.getBoolValue(true));
                         else
-                        {
                             inst->replaceUsesWith(builder.getBoolValue(false));
-                            functionsToSCCP.add(func);
-                        }
                         inst->removeAndDeallocate();
+                        functionsToSCCP.add(func);
                         continue;
                     }
                     case kIROp_IsTextureScalarAccess:
@@ -64,11 +60,9 @@ namespace Slang
                         if (textureAccess && !as<IRVectorType>(as<IRTextureType>(textureAccess->getImage()->getDataType())->getElementType()))
                             inst->replaceUsesWith(builder.getBoolValue(true));
                         else
-                        {
                             inst->replaceUsesWith(builder.getBoolValue(false));
-                            functionsToSCCP.add(func);
-                        }
                         inst->removeAndDeallocate();
+                        functionsToSCCP.add(func);
                         continue;
                     }
                     }
@@ -79,7 +73,7 @@ namespace Slang
         // and unresolved 'isTextureAccess' operations for when 'inst' is not a
         // 'IRTextureType'/`TextureAccessor`
         for (auto func : functionsToSCCP)
-            applySparseConditionalConstantPropagation(func, sink); 
+            applySparseConditionalConstantPropagation(func, sink);
     }
 }
 

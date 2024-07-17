@@ -7,7 +7,7 @@
 
 #include "slang-char-util.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 #include "slang-hash.h"
 
 namespace Slang

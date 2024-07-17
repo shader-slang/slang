@@ -3,7 +3,7 @@
 #pragma once
 
 #include "slang-syntax.h"
-#include "../../slang.h"
+#include "slang.h"
 
 namespace Slang
 {

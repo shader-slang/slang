@@ -3,7 +3,7 @@
 #define SLANG_ARTIFACT_H
 
 #include "../core/slang-basic.h"
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include <type_traits>
 

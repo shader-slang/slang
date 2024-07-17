@@ -10,7 +10,7 @@
 
 #include "../../source/compiler-core/slang-artifact-diagnostic-util.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 
 struct ParseDiagnosticUtil
 {

@@ -3,7 +3,7 @@
 #include "../core/slang-basic.h"
 #include "slang-syntax.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
