@@ -548,11 +548,10 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Session::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    if (uuid == ISlangInternal::getTypeGuid())
+    if (uuid == Session::getTypeGuid())
     {
-        // Special case to cast directly into internal type
-        // NOTE! No addref(!)
-        *outObject = static_cast<ISlangInternal*>(this);
+        addReference();
+        *outObject = static_cast<Session*>(this);
         return SLANG_OK;
     }
 

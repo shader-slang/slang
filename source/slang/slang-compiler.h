@@ -282,10 +282,6 @@ namespace Slang
         HashSet<SourceFile*> m_fileSet;
     };
 
-    struct ISlangInternal : public ISlangUnknown
-    {
-        SLANG_COM_INTERFACE(0xd6b767eb, 0xd786, 0x4343, { 0x2a, 0x8c, 0x6d, 0xa0, 0x3d, 0x5a, 0xb4, 0x4a })
-    };
 
     class EntryPoint;
 
@@ -3083,9 +3079,10 @@ namespace Slang
         Dictionary<Pair, PassThroughMode> m_map;
     };
 
-    class Session : public RefObject, public slang::IGlobalSession, public Slang::ISlangInternal
+    class Session : public RefObject, public slang::IGlobalSession
     {
     public:
+        SLANG_COM_INTERFACE(0xd6b767eb, 0xd786, 0x4343, { 0x2a, 0x8c, 0x6d, 0xa0, 0x3d, 0x5a, 0xb4, 0x4a })
 
         SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
         SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
@@ -3295,11 +3292,11 @@ SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(Session* session)
     return static_cast<slang::IGlobalSession*>(session);
 }
 
-SLANG_FORCE_INLINE Session* asInternal(slang::IGlobalSession* session)
+SLANG_FORCE_INLINE ComPtr<Session> asInternal(slang::IGlobalSession* session)
 {
-    Slang::ISlangInternal* internalSession = nullptr;
+    Slang::Session* internalSession = nullptr;
     session->queryInterface(SLANG_IID_PPV_ARGS(&internalSession));
-    return static_cast<Session*>(internalSession);
+    return ComPtr<Session>(INIT_ATTACH, static_cast<Session*>(internalSession));
 }
 
 SLANG_FORCE_INLINE slang::ISession* asExternal(Linkage* linkage)

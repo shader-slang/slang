@@ -30,10 +30,9 @@ namespace SlangCapture
 
     SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionCapture::queryInterface(SlangUUID const& uuid, void** outObject) 
     {
-        if (uuid == ISlangInternal::getTypeGuid())
+        if (uuid == Session::getTypeGuid())
         {
-            // Special case to cast directly into internal type
-            // NOTE! No addref(!)
+            // no add-ref here, the query will cause the inner session to handle the add-ref.
             this->m_actualGlobalSession->queryInterface(uuid, outObject);
             return SLANG_OK;
         }
