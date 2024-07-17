@@ -586,9 +586,10 @@ namespace Slang
             // code is requiring `fragment` on a `vertex` shader
             for (auto target : targets)
             {
-                auto profileStage = target->getOptionSet().getProfile().getStage();
+                auto targetProfile = target->getOptionSet().getProfile();
+                auto profileStage = targetProfile.getStage();
                 if (profileStage != Stage::Unknown && profileStage != entryPointAttr->stage)
-                    maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointAttr, Diagnostics::entryPointAndProfileAreIncompatible, entryPointFuncDecl, entryPointAttr->stage, entryPointProfile.getName());
+                    maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointAttr, Diagnostics::entryPointAndProfileAreIncompatible, entryPointFuncDecl, entryPointAttr->stage, targetProfile.getName());
             }
             entryPointProfile.setStage(entryPointAttr->stage);
             return true;
