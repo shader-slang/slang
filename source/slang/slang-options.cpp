@@ -696,6 +696,7 @@ struct OptionsParser
 
     RawTarget* getCurrentTarget();
     void setProfileVersion(RawTarget* rawTarget, ProfileVersion profileVersion);
+    void setProfile(RawTarget* rawTarget, Profile profile);
     void addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom);
     
     void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode);
@@ -1054,6 +1055,20 @@ void OptionsParser::setProfileVersion(RawTarget* rawTarget, ProfileVersion profi
         }
     }
     rawTarget->optionSet.setProfileVersion(profileVersion);
+}
+
+void OptionsParser::setProfile(RawTarget* rawTarget, Profile profile)
+{
+    if (rawTarget->optionSet.getProfile() != Profile::Unknown)
+    {
+        rawTarget->redundantProfileSet = true;
+
+        if (profile != rawTarget->optionSet.getProfile())
+        {
+            rawTarget->conflictingProfilesSet = true;
+        }
+    }
+    rawTarget->optionSet.setProfile(profile);
 }
 
 void OptionsParser::addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom)
@@ -1592,15 +1607,11 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
     {
         auto profile = Profile(profileID);
 
-        setProfileVersion(getCurrentTarget(), profile.getVersion());
+        setProfile(this->getCurrentTarget(), profile);
 
-        // A `-profile` option that also specifies a stage (e.g., `-profile vs_5_0`)
-        // should be treated like a composite (e.g., `-profile sm_5_0 -stage vertex`)
-        auto stage = profile.getStage();
-        if (stage != Stage::Unknown)
-        {
-            setStage(getCurrentEntryPoint(), stage);
-        }
+        // Note: stating a profile with a stage should not set the stage of the compiled entryPoint since:
+        // 1. EntryPointAttr->stage has priority to determine stage compiled with
+        // 2. Adding a stage here will force compatability mode to compile code assuming entrypoint named "main"
     }
 
     // Any additional capability tokens will be assumed to represent `CapabilityAtom`s.

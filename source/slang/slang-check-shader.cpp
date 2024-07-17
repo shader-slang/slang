@@ -577,6 +577,25 @@ namespace Slang
         }
     }
 
+    bool resolveStageOfProfileWithEntryPoint(Profile& entryPointProfile, CompilerOptionSet& optionSet, const List<RefPtr<TargetRequest>>& targets, FuncDecl* entryPointFuncDecl, DiagnosticSink* sink)
+    {
+        if (auto entryPointAttr = entryPointFuncDecl->findModifier<EntryPointAttribute>())
+        {
+            // Ensure every target is specifying the same stage as an entry point
+            // if a profile+stage was set, else user will not be aware that their
+            // code is requiring `fragment` on a `vertex` shader
+            for (auto target : targets)
+            {
+                auto profileStage = target->getOptionSet().getProfile().getStage();
+                if (profileStage != Stage::Unknown && profileStage != entryPointAttr->stage)
+                    maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointAttr, Diagnostics::entryPointAndProfileAreIncompatible, entryPointFuncDecl, entryPointAttr->stage, getStageName(profileStage));
+            }
+            entryPointProfile.setStage(entryPointAttr->stage);
+            return true;
+        }
+        return false;
+    }
+
     // Given an entry point specified via API or command line options,
     // attempt to find a matching AST declaration that implements the specified
     // entry point. If such a function is found, then validate that it actually
@@ -618,27 +637,13 @@ namespace Slang
         //
         // If the entry point specifies a stage via a `[shader("...")]` attribute,
         // then we might be able to infer a stage for the entry point request if
-        // it didn't have one, *or* issue a diagnostic if there is a mismatch.
-        //
+        // it didn't have one, *or* issue a diagnostic if there is a mismatch with the profile.
+
         auto entryPointProfile = entryPointReq->getProfile();
-        if( auto entryPointAttribute = entryPointFuncDecl->findModifier<EntryPointAttribute>() )
-        {
-            auto entryPointStage = entryPointProfile.getStage();
-            if( entryPointStage == Stage::Unknown )
-            {
-                entryPointProfile.setStage(entryPointAttribute->stage);
-            }
-            else if( entryPointAttribute->stage != entryPointStage )
-            {
-                sink->diagnose(entryPointFuncDecl, Diagnostics::specifiedStageDoesntMatchAttribute, entryPointName, entryPointStage, entryPointAttribute->stage);
-            }
-        }
-        else
-        {
-            // TODO: Should we attach a `[shader(...)]` attribute to an
-            // entry point that didn't have one, so that we can have
-            // a more uniform representation in the AST?
-        }
+        resolveStageOfProfileWithEntryPoint(entryPointProfile, linkage->m_optionSet, linkage->targets, entryPointFuncDecl, sink);
+        // TODO: Should we attach a `[shader(...)]` attribute to an
+        // entry point that didn't have one, so that we can have
+        // a more uniform representation in the AST?
 
         RefPtr<EntryPoint> entryPoint = EntryPoint::create(
             linkage,
