@@ -789,6 +789,9 @@ struct ByteAddressBufferLegalizationContext
 
     IRInst* getEquivalentStructuredBuffer(IRType* elementType, IRInst* byteAddressBuffer)
     {
+        if (this->m_options.treatGetEquivalentStructuredBufferAsGetThis)
+            return byteAddressBuffer;
+
         if (!elementType)
         {
             return nullptr;

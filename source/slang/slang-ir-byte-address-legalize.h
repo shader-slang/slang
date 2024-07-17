@@ -14,6 +14,7 @@ struct ByteAddressBufferLegalizationOptions
     bool useBitCastFromUInt = false;
     bool translateToStructuredBufferOps = false;
     bool lowerBasicTypeOps = false;
+    bool treatGetEquivalentStructuredBufferAsGetThis = false;
 };
 
     /// Legalize byte-address buffer `Load()` and `Store()` operations.

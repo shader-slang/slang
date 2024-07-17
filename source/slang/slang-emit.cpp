@@ -1039,10 +1039,8 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
             byteAddressBufferOptions.scalarizeVectorLoadStore = true;
-            // We require to translate 'byteAddressBuffer' to 'structuredBuffer' fully
-            // since otherwise DCE will not fully remove 'byteAddressBuffer' uses leaving
-            // a duplicate globalParam at the same binding location of an equivlent 'StructuredBuffer'.
-            byteAddressBufferOptions.translateToStructuredBufferOps = true;
+            byteAddressBufferOptions.treatGetEquivalentStructuredBufferAsGetThis = true;
+            byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             break;
         }
@@ -1079,10 +1077,6 @@ Result linkAndOptimizeIR(
         }
 
         legalizeByteAddressBufferOps(session, targetProgram, irModule, codeGenContext->getSink(), byteAddressBufferOptions);
-        // We need an early DCE pass with metal to remove any replaced globalParams, else Metal will insert operations to
-        // which prevent DCE to clean up these unneeded globalParams.
-        if(isMetalTarget(targetRequest))
-            eliminateDeadCode(irModule, deadCodeEliminationOptions);
     }
 
     // For CUDA targets only, we will need to turn operations
