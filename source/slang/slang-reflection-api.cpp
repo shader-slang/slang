@@ -2658,6 +2658,8 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
     {
         return varDecl->initExpr != nullptr;
     }
+    
+    return false;
 }
 
 // Variable Layout Reflection
@@ -2828,7 +2830,7 @@ SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectio
     auto rawType = func.getDecl()->returnType.type;
     auto astBuilder = rawType->getASTBuilderForReflection();
 
-    return convert(rawType->substitute(astBuilder, SubstitutionSet(func.declRefBase));
+    return convert((Type*)rawType->substitute(astBuilder, SubstitutionSet(func.declRefBase)));
 }
 
 SLANG_API SlangReflectionModifier* spReflectionFunction_FindModifier(SlangReflectionFunction* inFunc, SlangModifierID modifierID)
