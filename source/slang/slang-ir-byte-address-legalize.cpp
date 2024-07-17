@@ -92,6 +92,11 @@ struct ByteAddressBufferLegalizationContext
         // Get the equivalent structured buffer for the buffer.
         if( auto structuredBuffer = getEquivalentStructuredBuffer(elementType, buffer) )
         {
+            // If we have to 'getEquivalentStructuredBuffer' we should be replacing all uses of a
+            // 'ByteAddressBuffer' with a 'StructuredBuffer'. Normally GLSL/SPIRV will let DCE cleanup
+            // an unused 'ByteAddressBuffer', in the case of Metal this does not happen due to 
+            // differences in how Metal is legalized (this causes incorrect code-gen).
+            //As a result we should explicitly cleanup the no-longer-needed 'ByteAddressBuffer'.
             if (buffer != structuredBuffer)
             {
                 buffer->replaceUsesWith(structuredBuffer);
