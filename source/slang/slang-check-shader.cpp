@@ -588,7 +588,7 @@ namespace Slang
             {
                 auto profileStage = target->getOptionSet().getProfile().getStage();
                 if (profileStage != Stage::Unknown && profileStage != entryPointAttr->stage)
-                    maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointAttr, Diagnostics::entryPointAndProfileAreIncompatible, entryPointFuncDecl, entryPointAttr->stage, getStageName(profileStage));
+                    maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointAttr, Diagnostics::entryPointAndProfileAreIncompatible, entryPointFuncDecl, entryPointAttr->stage, entryPointProfile.getName());
             }
             entryPointProfile.setStage(entryPointAttr->stage);
             return true;
