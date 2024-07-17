@@ -3744,7 +3744,6 @@ namespace slang
             unsigned int count;
             DeclReflection* parent;
 
-            template <Kind K>
             struct FilteredIterator
             {
                 DeclReflection* parent;
@@ -3764,7 +3763,7 @@ namespace slang
             };
 
             // begin/end for range-based for that checks the kind
-            FilteredIterator<K> begin() 
+            FilteredIterator begin() 
             { 
                 // Find the first child of the right kind
                 unsigned int index = 0;
@@ -3772,10 +3771,10 @@ namespace slang
                 {
                     index++;
                 }
-                return FilteredIterator<K>{parent, count, index}; 
+                return FilteredIterator{parent, count, index}; 
             }
-            
-            FilteredIterator<K> end() { return FilteredIterator<K>{parent, count, count}; }
+
+            FilteredIterator end() { return FilteredIterator{parent, count, count}; }
         };
         
         template <Kind K>
