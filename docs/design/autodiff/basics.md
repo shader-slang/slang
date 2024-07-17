@@ -351,7 +351,7 @@ $$ \mathbf{y} = g(\mathbf{x}) $$
 
 The reverse-mode derivative function for $h$ can be written as the composition of the reverse-mode derivatives of $f$ and $g$
 
-$$ \langle \frac{\partial L}{\partial h}, Dh(\mathbf{x})\rangle  = \langle \langle \frac{\partial L}{\partial h}, Df(\mathbf{y})\rangle , Dg(\mathbf{x})\rangle $$
+$$ \left\langle \frac{\partial L}{\partial h}, Dh(\mathbf{x})\right\rangle  = \left\langle \left\langle \frac{\partial L}{\partial h}, Df(\mathbf{y})\right\rangle , Dg(\mathbf{x})\right\rangle $$
 
 Note the 'backward' order here. We must first pass the derivatives through the outer function $f$, and then pass the result through the inner function $g$ to compute derivatives w.r.t inner-most inputs $\mathbf{x}$. This process of passing derivatives backwards is often referred to as *backpropagation*.
 
