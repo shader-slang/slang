@@ -737,8 +737,8 @@ DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to 
 
 DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'void' function")
 DIAGNOSTIC(41011, Error, profileIncompatibleWithTargetSwitch, "__target_switch has no compatable target with current profile '$0'")
-DIAGNOSTIC(41012, Warning, profileImplicitlyUpgraded, "user set `profile` had an implicit upgrade applied to it, atoms added: '$0'")
-DIAGNOSTIC(41012, Error, profileImplicitlyUpgradedRestrictive, "user set `profile` had an implicit upgrade applied to it, atoms added: '$0'")
+DIAGNOSTIC(41012, Warning, profileImplicitlyUpgraded, "user set profile $0 had an implicit upgrade applied to it, atoms added: '$1'")
+DIAGNOSTIC(41012, Error, profileImplicitlyUpgradedRestrictive, "user set profile $0 had an implicit upgrade applied to it, atoms added: '$1'")
 DIAGNOSTIC(41015, Warning, usingUninitializedOut, "use of uninitialized out parameter '$0'")
 DIAGNOSTIC(41016, Warning, usingUninitializedVariable, "use of uninitialized variable '$0'")
 DIAGNOSTIC(41017, Warning, usingUninitializedGlobalVariable, "use of uninitialized global variable '$0'")

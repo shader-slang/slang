@@ -51,6 +51,8 @@ namespace Slang
 struct CapabilityAtomSet : UIntSet
 {
     using UIntSet::UIntSet;
+
+    CapabilityAtomSet removeImpliedAtoms() const;
 };
 
 struct CapabilityTargetSet;

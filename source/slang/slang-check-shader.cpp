@@ -571,6 +571,7 @@ namespace Slang
                         entryPointFuncDecl->loc,
                         Diagnostics::profileImplicitlyUpgraded,
                         Diagnostics::profileImplicitlyUpgradedRestrictive,
+                        target->getOptionSet().getProfile().getName(),
                         addedAtoms.getElements<CapabilityAtom>());
                 }
             }
