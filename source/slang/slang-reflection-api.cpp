@@ -810,13 +810,13 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
 SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
     SlangReflection* reflection,
     SlangReflectionType* inType,
-    SlangLayoutRules /*rules*/)
+    SlangLayoutRules rules)
 {
     auto context = convert(reflection);
     auto type = convert(inType);
     auto targetReq = context->getTargetReq();
 
-    auto typeLayout = targetReq->getTypeLayout(type);
+    auto typeLayout = targetReq->getTypeLayout(type, (slang::LayoutRules)rules);
     return convert(typeLayout);
 }
 
@@ -1875,6 +1875,7 @@ namespace Slang
                     case LayoutResourceKind::DescriptorTableSlot:
                     case LayoutResourceKind::Uniform:
                     case LayoutResourceKind::ConstantBuffer: // for metal
+                    case LayoutResourceKind::MetalArgumentBufferElement:
                         resInfo = info;
                         break;
                     }

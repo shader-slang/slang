@@ -1785,11 +1785,27 @@ namespace Slang
         CodeGenTarget getTarget() { return optionSet.getEnumOption<CodeGenTarget>(CompilerOptionName::Target); }
 
         // TypeLayouts created on the fly by reflection API
-        Dictionary<Type*, RefPtr<TypeLayout>> typeLayouts;
+        struct TypeLayoutKey
+        {
+            Type* type;
+            slang::LayoutRules rules;
+            HashCode getHashCode() const
+            {
+                Hasher hasher;
+                hasher.hashValue(type);
+                hasher.hashValue(rules);
+                return hasher.getResult();
+            }
+            bool operator==(TypeLayoutKey other) const
+            {
+                return type == other.type && rules == other.rules;
+            }
+        };
+        Dictionary<TypeLayoutKey, RefPtr<TypeLayout>> typeLayouts;
 
-        Dictionary<Type*, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
+        Dictionary<TypeLayoutKey, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
 
-        TypeLayout* getTypeLayout(Type* type);
+        TypeLayout* getTypeLayout(Type* type, slang::LayoutRules rules);
 
         CompilerOptionSet& getOptionSet() { return optionSet; }
 

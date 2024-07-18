@@ -177,6 +177,7 @@ public:
 
     uint32_t getTotalOrdinaryDataSize() const { return m_totalOrdinaryDataSize; }
 
+    slang::TypeLayoutReflection* getParameterBlockTypeLayout();
 protected:
     Result _init(Builder const* builder);
 
@@ -190,6 +191,8 @@ protected:
     Index m_subObjectCount = 0;
     uint32_t m_totalOrdinaryDataSize = 0;
     List<SubObjectRangeInfo> m_subObjectRanges;
+    // The type layout to use when the shader object is bind as a parameter block.
+    slang::TypeLayoutReflection* m_parameterBlockTypeLayout = nullptr;
 };
 
 class RootShaderObjectLayoutImpl : public ShaderObjectLayoutImpl

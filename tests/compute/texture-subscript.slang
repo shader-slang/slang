@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute
 // Metal lacks RWTexture GFX backend support. 
 // Due to this, Metal compute test is disabled
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk -glsl
 

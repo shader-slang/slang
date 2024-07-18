@@ -1811,11 +1811,21 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     }
 }
 
-TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq, ProgramLayout* programLayout)
+TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq, ProgramLayout* programLayout, slang::LayoutRules rules)
 {
     auto astBuilder = targetReq->getLinkage()->getASTBuilder();
 
-    LayoutRulesFamilyImpl* rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq);
+    LayoutRulesFamilyImpl* rulesFamily;
+    switch (rules)
+    {
+    case slang::LayoutRules::Default:
+    default:
+        rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq);
+        break;
+    case slang::LayoutRules::MetalArgumentBufferTier2:
+        rulesFamily = &kCPULayoutRulesFamilyImpl;
+        break;
+    }
 
     TypeLayoutContext context;
     context.astBuilder = astBuilder;

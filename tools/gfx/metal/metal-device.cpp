@@ -416,7 +416,17 @@ Result DeviceImpl::createTextureResource(
     if (desc.allowedStates.contains(ResourceState::UnorderedAccess))
     {
         textureUsage |= MTL::TextureUsageShaderWrite;
-        textureUsage |= MTL::TextureUsageShaderAtomic;
+
+        // Request atomic access if the format allows it.
+        switch (desc.format)
+        {
+        case Format::R32_UINT:
+        case Format::R32_SINT:
+        case Format::R32G32_UINT:
+        case Format::R32G32_SINT:
+            textureUsage |= MTL::TextureUsageShaderAtomic;
+            break;
+        }
     }
 
     textureDesc->setMipmapLevelCount(desc.numMipLevels);

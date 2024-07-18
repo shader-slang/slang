@@ -2319,7 +2319,7 @@ extern "C"
         // The input_attachment_index subpass occupancy tracker
         SLANG_PARAMETER_CATEGORY_SUBPASS,
 
-        // Metal resource binding points.
+        // Metal tier-1 argument buffer element [[id]].
         SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
 
         // Metal [[attribute]] inputs.
@@ -2401,6 +2401,7 @@ extern "C"
     enum SlangLayoutRules : SlangLayoutRulesIntegral
     {
         SLANG_LAYOUT_RULES_DEFAULT,
+        SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2,
     };
 
     typedef SlangUInt32 SlangModifierIDIntegral;
@@ -3588,6 +3589,7 @@ namespace slang
     enum class LayoutRules : SlangLayoutRulesIntegral
     {
         Default = SLANG_LAYOUT_RULES_DEFAULT,
+        MetalArgumentBufferTier2 = SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2,
     };
 
     typedef struct ShaderReflection ProgramLayout;

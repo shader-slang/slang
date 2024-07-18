@@ -1288,7 +1288,8 @@ private:
 //
 TypeLayoutContext getInitialLayoutContextForTarget(
     TargetRequest*  targetRequest,
-    ProgramLayout*  programLayout);
+    ProgramLayout* programLayout,
+    slang::LayoutRules rules);
 
     /// Direction(s) of a varying shader parameter
 typedef unsigned int EntryPointParameterDirectionMask;
