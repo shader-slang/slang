@@ -10,7 +10,7 @@ buffer MyBlockName
 } outputBuffer;
 
 //CHECK_GLSL-DAG: hitAttributeEXT
-//CHECK_SPV-DAG: HitAttributeNV
+//CHECK_SPV-DAG: HitAttribute{{NV|KHR}}
 hitAttributeEXT vec4 hitAttr;
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -44,16 +44,16 @@ bool testVars() {
 // CHECK_SPV-DAG: InstanceId
         && gl_InstanceID != 10000
 // CHECK_GLSL-DAG: gl_InstanceCustomIndexEXT
-// CHECK_SPV-DAG: InstanceCustomIndexNV
+// CHECK_SPV-DAG: InstanceCustomIndex{{NV|KHR}}
         && gl_InstanceCustomIndexEXT != 10000
 // CHECK_GLSL-DAG: gl_GeometryIndexEXT
 // CHECK_SPV-DAG: RayGeometryIndexKHR
         && gl_GeometryIndexEXT != 10000
 // CHECK_GLSL-DAG: gl_ObjectRayOriginEXT
-// CHECK_SPV-DAG: ObjectRayOriginNV
+// CHECK_SPV-DAG: ObjectRayOrigin{{NV|KHR}}
         && gl_ObjectRayOriginEXT != vec3(99)
 // CHECK_GLSL-DAG: gl_ObjectRayDirectionEXT
-// CHECK_SPV-DAG: ObjectRayDirectionNV
+// CHECK_SPV-DAG: ObjectRayDirection{{NV|KHR}}
         && gl_ObjectRayDirectionEXT != vec3(99)
 // CHECK_GLSL-DAG: gl_ObjectToWorldEXT
 //COM: CHECK_SPV-DAG: ObjectToWorldNV
