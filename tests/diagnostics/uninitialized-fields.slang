@@ -2,70 +2,91 @@
 
 extern static const int flag;
 
-//struct None
-//{
-//    int a;
-//    int b;
-
-//    __init()
-//    {
-//        a = 0;
-//        b = 0;
-//    }
-//}
-
-//struct Simple
-//{
-//    int value;
-//    Simple *next;
-
-//    __init(int v, Simple* ptr)
-//    {
-//        value = v;
-//        //CHK-DAG: warning 41020: exiting constructor without initializing field 'next'
-//    }
-//}
-
-//struct Conditional
-//{
-//    int field;
-//    int another_field;
-
-//    __init()
-//    {
-//        field = 0;
-//        if (flag == 0)
-//            //CHK-DAG: warning 41020: exiting constructor without initializing field 'another_field'
-//            return;
-
-//        another_field = 0;
-//    }
-//};
-
-//struct Partial
-//{
-//    int inline = 0;
-//    int body = 0;
-
-//    __init(int x)
-//    {
-//        body = x;
-//    }
-//}
-
-// TODO: warning should be a bit different for here?
-struct Test
+struct None
 {
+    int a;
+    int b;
+
+    __init()
+    {
+        a = 0;
+        b = 0;
+    }
+}
+
+struct Simple
+{
+    int value;
+    Simple *next;
+
+    __init(int v, Simple* ptr)
+    {
+        value = v;
+        //CHK-DAG: warning 41020: exiting constructor without initializing field 'next'
+    }
+}
+
+struct Conditional
+{
+    int field;
+    int another_field;
+
+    __init()
+    {
+        field = 0;
+        if (flag == 0)
+            //CHK-DAG: warning 41020: exiting constructor without initializing field 'another_field'
+            return;
+
+        another_field = 0;
+    }
+};
+
+struct Partial
+{
+    int inline = 0;
+    int body = 0;
+
+    __init(int x)
+    {
+        body = x;
+    }
+}
+
+// Warnings here should be a bit different
+struct Implicit
+{
+    //CHK-DAG: warning 41021: default initializer for 'Implicit' will not initialize field 'a'
 	int a;
 	int b = 1;
+    //CHK-DAG: warning 41021: default initializer for 'Implicit' will not initialize field 'c'
 	int c;
 	int d = 1 + 1;
 }
 
-struct Normal
+struct Pass
 {
-    int x;
-    __init() { x = 0; }
+    int x = 0;
+    int y = 0;
+}
+
+struct Impl
+{
+    float x;
+
+    __init(float val)
+    {
+        x = val;
+    }
+
+    __init()
+    {
+        float val = 2.0;
+
+        // Shouldn't trigger a warning here
+        return Impl(val);
+    }
 }
 
 //CHK-NOT: warning 41020
+//CHK-NOT: warning 41021

@@ -406,11 +406,15 @@ namespace Slang
 
     static List<IRStructField*> checkFieldsFromExit(ReachabilityContext& reachability, IRReturn* ret, IRStructType* type)
     {
-        IRInst* result = traceInstOrigin(ret->getVal());
+        IRInst* origin = traceInstOrigin(ret->getVal());
+
+        // We don't want to warn on delegated construction
+        if (!isUninitializedValue(origin))
+            return {};
 
         // Now we can look for all references to fields
         List<IRStructKey*> usedKeys;
-        for (auto use = result->firstUse; use; use = use->nextUse)
+        for (auto use = origin->firstUse; use; use = use->nextUse)
         {
             IRInst* user = use->getUser();
             
@@ -422,12 +426,14 @@ namespace Slang
             usedKeys.add(as<IRStructKey>(field));
         }
 
-        // TODO: handling control flow; needs access to reachability context
         List<IRStructField*> uninitializedFields;
 
         auto fields = type->getFields();
         for (auto field : fields)
         {
+            if (canIgnoreType(field->getFieldType(), nullptr))
+                continue;
+
             if (!isFieldUsed(field, usedKeys))
                 uninitializedFields.add(field);
         }
