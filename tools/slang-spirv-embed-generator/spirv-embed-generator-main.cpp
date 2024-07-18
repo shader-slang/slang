@@ -193,8 +193,8 @@ void writeInfo(
     line("// don't even think about modifying it yourself!");
     line("//");
     line("");
-    line("#include \"../core/slang-smart-pointer.h\"");
-    line("#include \"../compiler-core/slang-spirv-core-grammar.h\"");
+    line("#include \"core/slang-smart-pointer.h\"");
+    line("#include \"compiler-core/slang-spirv-core-grammar.h\"");
     line("namespace Slang");
     line("{");
     line("using OperandKind = SPIRVCoreGrammarInfo::OperandKind;");
