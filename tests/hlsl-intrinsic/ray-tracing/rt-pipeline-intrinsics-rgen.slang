@@ -11,8 +11,8 @@
 
 // SPIRV: OpEntryPoint
 
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchIdNV
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchSizeNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchId{{NV|KHR}}
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchSize{{NV|KHR}}
 // SPIRV-DAG: OpDecorate %{{.*}} Binding 0
 // SPIRV-DAG: OpDecorate %{{.*}} DescriptorSet 0
 // SPIRV-DAG: OpDecorate %{{.*}} Binding 1

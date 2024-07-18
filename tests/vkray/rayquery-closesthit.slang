@@ -28,7 +28,7 @@ void main(
 // CHECK: OpCapability RayQueryPositionFetchKHR
 // CHECK: OpExtension "SPV_KHR_ray_query"
 // CHECK: OpExtension "SPV_KHR_ray_tracing_position_fetch"
-// CHECK: OpEntryPoint ClosestHitNV %main "main"
+// CHECK: OpEntryPoint ClosestHit{{NV|KHR}} %main "main"
 // CHECK: OpRayQueryInitializeKHR %rayQuery{{.*}}
 // CHECK: OpRayQueryGetIntersectionTriangleVertexPositionsKHR %_arr_v3float_{{u?}}int_3{{.*}} %rayQuery{{.*}} %{{u?}}int_0
 // CHECK: OpRayQueryGetIntersectionTriangleVertexPositionsKHR %_arr_v3float_{{u?}}int_3{{.*}} %rayQuery{{.*}} %{{u?}}int_1
