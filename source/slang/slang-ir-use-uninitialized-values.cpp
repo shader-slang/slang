@@ -348,8 +348,131 @@ namespace Slang
         return loads;
     }
 
+    static bool isReturnedValue(IRInst* inst)
+    {
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            IRInst* user = use->getUser();
+            if (as<IRReturn>(user))
+                return true;
+        }
+
+        return false;
+    }
+
+    static bool isInstStoredInto(IRInst* inst)
+    {
+        auto addresses = getAliasableInstructions(inst);
+        
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        for (auto alias : addresses)
+        {
+            for (auto use = alias->firstUse; use; use = use->nextUse)
+            {
+                IRInst* user = use->getUser();
+                collectLoadStore(stores, loads, user, alias);
+                if (stores.getCount())
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    static IRInst* traceInstOrigin(IRInst* inst)
+    {
+        if (auto load = as<IRLoad>(inst))
+            return traceInstOrigin(load->getPtr());
+
+        return inst;
+    }
+
+    static bool isFieldUsed(IRStructField* field, const List<IRStructKey*>& used)
+    {
+        for (auto key : used)
+        {
+            if (field->getKey() == key)
+                return true;
+        }
+
+        return false;
+    }
+
+    static List<IRStructField*> checkFieldsFromExit(IRReturn* ret, IRStructType* type)
+    {
+        IRInst* result = traceInstOrigin(ret->getVal());
+        printf("result again:\n");
+        result->dump();
+
+        // Now we can look for all references to fields
+        List<IRStructKey*> usedKeys;
+        for (auto use = result->firstUse; use; use = use->nextUse)
+        {
+            IRInst* user = use->getUser();
+            if (auto field = as<IRFieldExtract>(user))
+            {
+                // TODO: reproduce
+                printf("EXTRACT!\n");
+                field->dump();
+            }
+            else if (auto fieldAddress = as<IRFieldAddress>(user))
+            {
+                if (!isInstStoredInto(user))
+                    continue;
+
+                IRInst* field = fieldAddress->getField();
+                usedKeys.add(as<IRStructKey>(field));
+            }
+        }
+
+        // TODO: handling control flow; needs access to reachability context
+        List<IRStructField*> uninitializedFields;
+
+        auto fields = type->getFields();
+        for (auto field : fields) {
+            if (!isFieldUsed(field, usedKeys))
+                uninitializedFields.add(field);
+        }
+        
+        return uninitializedFields;
+    }
+
+    static void checkConstructor(IRFunc* func, DiagnosticSink* sink)
+    {
+        printf("checking constructor!\n");
+        func->dump();
+
+        IRStructType* stype = as<IRStructType>(func->getResultType());
+        if (!stype)
+            return;
+        
+        // Work backwards, get exit points and find sources
+        auto firstBlock = func->getFirstBlock();
+
+        for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->next)
+        {
+            auto ret = as<IRReturn>(inst);
+            if (!ret)
+                continue;
+
+            // TODO: trace specifically from ret
+            auto fields = checkFieldsFromExit(ret, stype);
+            for (auto field : fields)
+            {
+                // TODO: diagnose at the returns/end of function
+                sink->diagnose(ret,
+                        Diagnostics::constructorUninitializedField,
+                        field->getKey());
+            }
+        }
+    }
+
     static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     {
+        // Differentiable functions will generate undefined values
+        // strictly so that they can be set in a differentiable way
         if (isDifferentiableFunc(func))
             return;
 
@@ -358,6 +481,9 @@ namespace Slang
             return;
 
         ReachabilityContext reachability(func);
+
+        // Used for a further analysis and to skip usual return checks
+        bool constructor = func->findDecoration <IRConstructorDecorartion> ();
 
         // Check out parameters
         for (auto param : firstBlock->getParams())

@@ -1358,6 +1358,11 @@ struct IRSemanticDecoration : public IRDecoration
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
 };
 
+struct IRConstructorDecorartion : IRDecoration
+{
+    IR_LEAF_ISA(ConstructorDecoration)
+};
+
 struct IRPackOffsetDecoration : IRDecoration
 {
     enum
@@ -4522,6 +4527,11 @@ public:
     IRSemanticDecoration* addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)
     {
         return as<IRSemanticDecoration>(addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index)));
+    }
+
+    void addConstructorDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_ConstructorDecoration);
     }
 
     void addRequireSPIRVDescriptorIndexingExtensionDecoration(IRInst* value)
