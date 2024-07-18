@@ -360,7 +360,7 @@ namespace Slang
         return false;
     }
 
-    static bool isInstStoredInto(IRInst* inst)
+    static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* reference, IRInst* inst)
     {
         auto addresses = getAliasableInstructions(inst);
         
@@ -373,9 +373,13 @@ namespace Slang
             {
                 IRInst* user = use->getUser();
                 collectLoadStore(stores, loads, user, alias);
-                if (stores.getCount())
-                    return true;
             }
+        }
+
+        for (auto store : stores)
+        {
+            if (reachability.isInstReachable(inst, reference))
+                return true;
         }
 
         return false;
@@ -400,31 +404,22 @@ namespace Slang
         return false;
     }
 
-    static List<IRStructField*> checkFieldsFromExit(IRReturn* ret, IRStructType* type)
+    static List<IRStructField*> checkFieldsFromExit(ReachabilityContext& reachability, IRReturn* ret, IRStructType* type)
     {
         IRInst* result = traceInstOrigin(ret->getVal());
-        printf("result again:\n");
-        result->dump();
 
         // Now we can look for all references to fields
         List<IRStructKey*> usedKeys;
         for (auto use = result->firstUse; use; use = use->nextUse)
         {
             IRInst* user = use->getUser();
-            if (auto field = as<IRFieldExtract>(user))
-            {
-                // TODO: reproduce
-                printf("EXTRACT!\n");
-                field->dump();
-            }
-            else if (auto fieldAddress = as<IRFieldAddress>(user))
-            {
-                if (!isInstStoredInto(user))
-                    continue;
+            
+            auto fieldAddress = as<IRFieldAddress>(user);
+            if (!fieldAddress || !isInstStoredInto(reachability, ret, user))
+                continue;
 
-                IRInst* field = fieldAddress->getField();
-                usedKeys.add(as<IRStructKey>(field));
-            }
+            IRInst* field = fieldAddress->getField();
+            usedKeys.add(as<IRStructKey>(field));
         }
 
         // TODO: handling control flow; needs access to reachability context
@@ -439,32 +434,28 @@ namespace Slang
         return uninitializedFields;
     }
 
-    static void checkConstructor(IRFunc* func, DiagnosticSink* sink)
+    static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, DiagnosticSink* sink)
     {
-        printf("checking constructor!\n");
-        func->dump();
-
         IRStructType* stype = as<IRStructType>(func->getResultType());
         if (!stype)
             return;
         
         // Work backwards, get exit points and find sources
-        auto firstBlock = func->getFirstBlock();
-
-        for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->next)
+        for (auto block : func->getBlocks())
         {
-            auto ret = as<IRReturn>(inst);
-            if (!ret)
-                continue;
-
-            // TODO: trace specifically from ret
-            auto fields = checkFieldsFromExit(ret, stype);
-            for (auto field : fields)
+            for (auto inst = block->getFirstInst(); inst; inst = inst->next)
             {
-                // TODO: diagnose at the returns/end of function
-                sink->diagnose(ret,
+                auto ret = as<IRReturn>(inst);
+                if (!ret)
+                    continue;
+
+                auto fields = checkFieldsFromExit(reachability, ret, stype);
+                for (auto field : fields)
+                {
+                    sink->diagnose(ret,
                         Diagnostics::constructorUninitializedField,
                         field->getKey());
+                }
             }
         }
     }
