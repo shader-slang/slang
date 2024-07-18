@@ -2877,4 +2877,6 @@ namespace Slang
 
     RefPtr<EntryPoint> findAndValidateEntryPoint(
         FrontEndEntryPointRequest* entryPointReq);
+
+    bool resolveStageOfProfileWithEntryPoint(Profile& entryPointProfile, CompilerOptionSet& optionSet, const List<RefPtr<TargetRequest>>& targets, FuncDecl* entryPointFuncDecl, DiagnosticSink* sink);
 }
