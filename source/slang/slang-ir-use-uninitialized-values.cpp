@@ -188,7 +188,7 @@ namespace Slang
         else if (auto rev = as<IRBackwardDifferentiate>(callee))
             ftn = as<IRFunc>(rev->getBaseFn());
         else if (auto wit = as<IRLookupWitnessMethod>(callee))
-            ftype = as<IRFuncType>(callee->getFullType());
+            ftype = as<IRFuncType>(wit->getFullType());
         else
             ftn = as<IRFunc>(callee);
 
