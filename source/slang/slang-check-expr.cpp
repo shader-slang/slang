@@ -3759,6 +3759,15 @@ namespace Slang
                 continue;
             }
 
+            // If elementCount is already at 4 stop trying to assign a swizzle element and send an error,
+            // we cannot have more valid swizzle elements than 4.
+            if (elementCount == 4)
+            {
+                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
+                anyError = true;
+                continue;
+            }
+
             // Check if we've seen this index before
             for (int ee = 0; ee < elementCount; ee++)
             {
