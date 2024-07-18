@@ -1054,7 +1054,11 @@ void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capabilitySet)
 {
     // Firstly we will compress the printing of capabilities such that any atomSet
     // with different abstract atoms but equal non-abstract atoms will be bundled together.
-
+    if (capabilitySet.isInvalid() || capabilitySet.isEmpty())
+    {
+        sb << "{}";
+        return;
+    }
     printDiagnosticArg(sb, CompressedCapabilitySet(capabilitySet));
 }
 
