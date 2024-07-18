@@ -1704,6 +1704,22 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         PassThroughMode::SpirvOpt, codeGenContext->getSink());
     if (compiler)
     {
+        if (!codeGenContext->shouldSkipSPIRVValidation())
+        {
+            StringBuilder runSpirvValEnvVar;
+            PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"), runSpirvValEnvVar);
+            if (runSpirvValEnvVar.getUnownedSlice() == "1")
+            {
+                if (SLANG_FAILED(compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount()/4))))
+                {
+                    codeGenContext->getSink()->diagnoseWithoutSourceView(
+                        SourceLoc{},
+                        Diagnostics::spirvValidationFailed
+                    );
+                }
+            }
+        }
+
         ComPtr<IArtifact> optimizedArtifact;
         DownstreamCompileOptions downstreamOptions;
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
