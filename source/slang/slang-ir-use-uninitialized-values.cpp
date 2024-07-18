@@ -348,18 +348,6 @@ namespace Slang
         return loads;
     }
 
-    static bool isReturnedValue(IRInst* inst)
-    {
-        for (auto use = inst->firstUse; use; use = use->nextUse)
-        {
-            IRInst* user = use->getUser();
-            if (as<IRReturn>(user))
-                return true;
-        }
-
-        return false;
-    }
-
     static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* reference, IRInst* inst)
     {
         auto addresses = getAliasableInstructions(inst);
@@ -539,6 +527,10 @@ namespace Slang
                 }
             }
         }
+
+        // Separate analysis for constructors
+        if (constructor)
+            checkConstructor(func, reachability, sink);
     }
 
     static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sink)
