@@ -323,6 +323,12 @@ convention for interface methods.
 #	define SLANG_UNUSED(v) (void)v;
 #endif
 
+#if defined(__llvm__)
+#	define SLANG_MAYBE_UNUSED [[maybe_unused]]
+#else
+#	define SLANG_MAYBE_UNUSED
+#endif
+
 // Used for doing constant literals
 #ifndef SLANG_INT64
 #	define SLANG_INT64(x) (x##ll)
