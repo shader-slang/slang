@@ -83,6 +83,7 @@ namespace SlangCapture
             uint32_t compilerOptionEntryCount,
             slang::CompilerOptionEntry* compilerOptionEntries,
             ISlangBlob** outDiagnostics = nullptr) override;
+        virtual SLANG_NO_THROW slang::DeclReflection* getModuleReflection() override;
 
         slang::IModule* getActualModule() const { return m_actualModule; }
     private:
