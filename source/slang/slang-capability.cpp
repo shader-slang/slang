@@ -969,18 +969,93 @@ void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet atomSet)
     }
 }
 
+// Collection of stages which have same atom sets to compress reprisentation of atom and stage per target
+struct CompressedCapabilitySet
+{
+    /// Collection of stages which have same atom sets to compress reprisentation of atom and stage: {vertex/fragment, ... } 
+    struct StageAndAtomSet
+    {
+        CapabilityAtomSet stages;
+        CapabilityAtomSet atomsWithoutStage;
+    };
+
+    auto begin()
+    {
+        return atomSetsOfTargets.begin();
+    }
+
+    /// Compress 1 capabilitySet into a reprisentation which merges stages that share all of their atoms for printing.
+    Dictionary<CapabilityAtom, List<StageAndAtomSet>> atomSetsOfTargets;
+    CompressedCapabilitySet(const CapabilitySet& capabilitySet)
+    {
+        for (auto& atomSet : capabilitySet.getAtomSets())
+        {
+            auto target = getTargetAtomInSet(atomSet);
+            
+            auto stageInSetAtom = getStageAtomInSet(atomSet);
+            CapabilityAtomSet stageInSet;
+            stageInSet.add((UInt)stageInSetAtom);
+
+            CapabilityAtomSet atomsWithoutStage;
+            CapabilityAtomSet::calcSubtract(atomsWithoutStage, atomSet, stageInSet);
+            if (!atomSetsOfTargets.containsKey(target))
+            {
+                atomSetsOfTargets[target].add({ stageInSet, atomsWithoutStage });
+                continue;
+            }
+
+            // try to find an equivlent atom set by iterating all of the same `atomSetsOfTarget[target]` and merge these 2 together.
+            auto& atomSetsOfTarget = atomSetsOfTargets[target];
+            for (auto& i : atomSetsOfTarget)
+            {
+                if (i.atomsWithoutStage.contains(atomsWithoutStage) && atomsWithoutStage.contains(i.atomsWithoutStage))
+                {
+                    i.stages.add((UInt)stageInSetAtom);
+                }
+            }
+        }
+        for (auto& targetSets : atomSetsOfTargets)
+            for (auto& targetSet : targetSets.second)
+                targetSet.atomsWithoutStage = targetSet.atomsWithoutStage.removeImpliedAtoms();
+    }
+};
+
+void printDiagnosticArg(StringBuilder& sb, const CompressedCapabilitySet& capabilitySet)
+{
+ ////Secondly we will print our new list of atomSet's.
+    sb << "{";
+    bool firstSet = true;
+    for (auto targetSets : capabilitySet.atomSetsOfTargets)
+    {
+        if(!firstSet)
+            sb << " || ";
+        for (auto targetSet : targetSets.second)
+        {
+            bool firstStage = true;
+            for (auto stageAtom : targetSet.stages)
+            {
+                if (!firstStage)
+                    sb << "/";
+                printDiagnosticArg(sb, (CapabilityName)stageAtom);
+                firstStage = false;
+            }
+            for (auto atom : targetSet.atomsWithoutStage)
+            {
+                sb << " + ";
+                printDiagnosticArg(sb, (CapabilityName)atom);
+            }
+        }
+        firstSet = false;
+    }
+    sb << "}";
+}
+
 void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capabilitySet)
 {
-    bool isFirstSet = true;
-    for (auto& atomSet : capabilitySet.getAtomSets())
-    {
-        if (!isFirstSet)
-        {
-            sb<< " | ";
-        }
-        printDiagnosticArg(sb, atomSet);
-        isFirstSet = false;
-    }
+    // Firstly we will compress the printing of capabilities such that any atomSet
+    // with different abstract atoms but equal non-abstract atoms will be bundled together.
+
+    printDiagnosticArg(sb, CompressedCapabilitySet(capabilitySet));
 }
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom)
