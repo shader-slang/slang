@@ -1363,6 +1363,11 @@ struct IRConstructorDecorartion : IRDecoration
     IR_LEAF_ISA(ConstructorDecoration)
 };
 
+struct IRSynthesizedDecoration : IRDecoration
+{
+    IR_LEAF_ISA(SynthesizedDecoration)
+};
+
 struct IRPackOffsetDecoration : IRDecoration
 {
     enum
@@ -4532,6 +4537,11 @@ public:
     void addConstructorDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_ConstructorDecoration);
+    }
+    
+    void addSynthesizedDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_SynthesizedDecoration);
     }
 
     void addRequireSPIRVDescriptorIndexingExtensionDecoration(IRInst* value)

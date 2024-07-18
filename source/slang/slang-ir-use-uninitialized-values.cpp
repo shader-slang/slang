@@ -378,7 +378,7 @@ namespace Slang
 
         for (auto store : stores)
         {
-            if (reachability.isInstReachable(inst, reference))
+            if (reachability.isInstReachable(store, reference))
                 return true;
         }
 
@@ -426,7 +426,8 @@ namespace Slang
         List<IRStructField*> uninitializedFields;
 
         auto fields = type->getFields();
-        for (auto field : fields) {
+        for (auto field : fields)
+        {
             if (!isFieldUsed(field, usedKeys))
                 uninitializedFields.add(field);
         }
@@ -440,6 +441,29 @@ namespace Slang
         if (!stype)
             return;
         
+        auto synthesized = func->findDecoration<IRSynthesizedDecoration>();
+        
+        auto emitWarnings = [&](const List<IRStructField*>& fields, IRReturn* ret)
+        {
+            for (auto field : fields)
+            {
+                if (synthesized)
+                {
+                    sink->diagnose(field->getKey(),
+                        Diagnostics::fieldNotDefaultInitialized,
+                        stype,
+                        field->getKey());
+                }
+                else
+                {
+                    sink->diagnose(ret,
+                        Diagnostics::constructorUninitializedField,
+                        field->getKey());
+                }
+            }
+
+        };
+
         // Work backwards, get exit points and find sources
         for (auto block : func->getBlocks())
         {
@@ -450,12 +474,7 @@ namespace Slang
                     continue;
 
                 auto fields = checkFieldsFromExit(reachability, ret, stype);
-                for (auto field : fields)
-                {
-                    sink->diagnose(ret,
-                        Diagnostics::constructorUninitializedField,
-                        field->getKey());
-                }
+                emitWarnings(fields, ret);
             }
         }
     }
@@ -474,7 +493,7 @@ namespace Slang
         ReachabilityContext reachability(func);
 
         // Used for a further analysis and to skip usual return checks
-        bool constructor = func->findDecoration <IRConstructorDecorartion> ();
+        auto constructor = func->findDecoration <IRConstructorDecorartion> ();
 
         // Check out parameters
         for (auto param : firstBlock->getParams())

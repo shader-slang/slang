@@ -371,6 +371,8 @@ class FunctionDeclBase : public CallableDecl
 class ConstructorDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(ConstructorDecl)
+    
+    bool synthesized = false;
 };
 
 // A subscript operation used to index instances of a type

@@ -745,6 +745,7 @@ DIAGNOSTIC(41017, Warning, usingUninitializedGlobalVariable, "use of uninitializ
 DIAGNOSTIC(41018, Warning, returningWithUninitializedOut, "returning without initializing out parameter '$0'")
 DIAGNOSTIC(41019, Warning, returningWithPartiallyUninitializedOut, "returning without fully initializing out parameter '$0'")
 DIAGNOSTIC(41020, Warning, constructorUninitializedField, "exiting constructor without initializing field '$0'")
+DIAGNOSTIC(41020, Warning, fieldNotDefaultInitialized, "default initializer for '$0' will not initialize field '$1'")
 
 DIAGNOSTIC(41011, Error, typeDoesNotFitAnyValueSize, "type '$0' does not fit in the size required by its conforming interface.")
 DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")

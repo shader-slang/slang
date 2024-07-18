@@ -1813,6 +1813,7 @@ namespace Slang
         body->closingSourceLoc = ctor->closingSourceLoc;
         ctor->body = body;
         body->body = m_astBuilder->create<SeqStmt>();
+        ctor->synthesized = true;
         decl->addMember(ctor);
         return ctor;
     }
