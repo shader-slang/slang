@@ -11,30 +11,30 @@
 
 // SPIRV: OpEntryPoint
 
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchIdNV
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchSizeNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchId{{NV|KHR}}
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchSize{{NV|KHR}}
 // SPIRV-DAG: OpDecorate %{{.*}} Binding 0
 // SPIRV-DAG: OpDecorate %{{.*}} DescriptorSet 0
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn WorldRayOriginNV
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn WorldRayDirectionNV
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayTminNV
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayTmaxNV
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn IncomingRayFlagsNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn WorldRayOrigin{{NV|KHR}}
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn WorldRayDirection{{NV|KHR}}
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayTmin{{NV|KHR}}
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayTmax{{NV|KHR}}
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn IncomingRayFlags{{NV|KHR}}
 // SPIRV-DAG: OpDecorate %{{.*}} BuiltIn InstanceId
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn InstanceCustomIndexNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn InstanceCustomIndex{{NV|KHR}}
 // SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayGeometryIndexKHR
 // SPIRV-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn ObjectRayOriginNV
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn ObjectRayDirectionNV
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn ObjectToWorldNV
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn WorldToObjectNV
-// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn HitKindNV
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn ObjectRayOrigin{{NV|KHR}}
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn ObjectRayDirection{{NV|KHR}}
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn ObjectToWorld{{NV|KHR}}
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn WorldToObject{{NV|KHR}}
+// SPIRV-DAG: OpDecorate %{{.*}} BuiltIn HitKind{{NV|KHR}}
 
-// SPIRV-DAG: OpTypePointer IncomingRayPayloadNV
-// SPIRV-DAG: OpTypePointer RayPayloadNV
+// SPIRV-DAG: OpTypePointer IncomingRayPayload{{NV|KHR}}
+// SPIRV-DAG: OpTypePointer RayPayload{{NV|KHR}}
 // SPIRV-DAG: OpTypeAccelerationStructureKHR
-// SPIRV-DAG: OpTypePointer HitAttributeNV
-// SPIRV-DAG: OpTypePointer CallableDataNV
+// SPIRV-DAG: OpTypePointer HitAttribute{{NV|KHR}}
+// SPIRV-DAG: OpTypePointer CallableData{{NV|KHR}}
 
 // SPIRV: OpTraceRayKHR
 // SPIRV: OpTraceRayMotionNV

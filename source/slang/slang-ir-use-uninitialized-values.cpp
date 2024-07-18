@@ -188,7 +188,7 @@ namespace Slang
         else if (auto rev = as<IRBackwardDifferentiate>(callee))
             ftn = as<IRFunc>(rev->getBaseFn());
         else if (auto wit = as<IRLookupWitnessMethod>(callee))
-            ftype = as<IRFuncType>(callee->getFullType());
+            ftype = as<IRFuncType>(wit->getFullType());
         else
             ftn = as<IRFunc>(callee);
 
@@ -377,21 +377,24 @@ namespace Slang
         }
 
         // Check ordinary instructions
-        for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->getNextInst())
+        for (auto block : func->getBlocks())
         {
-            if (!isUninitializedValue(inst))
-                continue;
-
-            IRType* type = inst->getFullType();
-            if (canIgnoreType(type, nullptr))
-               continue;
-
-            auto loads = getUnresolvedVariableLoads(reachability, inst);
-            for (auto load : loads)
+            for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
             {
-                sink->diagnose(load,
+                if (!isUninitializedValue(inst))
+                    continue;
+
+                IRType* type = inst->getFullType();
+                if (canIgnoreType(type, nullptr))
+                    continue;
+
+                auto loads = getUnresolvedVariableLoads(reachability, inst);
+                for (auto load : loads)
+                {
+                    sink->diagnose(load,
                         Diagnostics::usingUninitializedVariable,
                         inst);
+                }
             }
         }
     }
