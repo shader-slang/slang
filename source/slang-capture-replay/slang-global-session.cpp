@@ -28,11 +28,23 @@ namespace SlangCapture
         m_actualGlobalSession->release();
     }
 
-    ISlangUnknown* GlobalSessionCapture::getInterface(const Guid& guid)
+    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionCapture::queryInterface(SlangUUID const& uuid, void** outObject) 
     {
-        if(guid == ISlangUnknown::getTypeGuid() || guid == IGlobalSession::getTypeGuid())
-            return asExternal(this);
-        return nullptr;
+        if (uuid == Session::getTypeGuid())
+        {
+            // no add-ref here, the query will cause the inner session to handle the add-ref.
+            this->m_actualGlobalSession->queryInterface(uuid, outObject);
+            return SLANG_OK;
+        }
+
+        if (uuid == ISlangUnknown::getTypeGuid() && uuid == IGlobalSession::getTypeGuid())
+        {
+            addReference();
+            *outObject = static_cast<slang::IGlobalSession*>(this);
+            return SLANG_OK;
+        }
+
+        return SLANG_E_NO_INTERFACE;
     }
 
     SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionCapture::createSession(slang::SessionDesc const&  desc, slang::ISession** outSession)
