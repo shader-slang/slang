@@ -1374,6 +1374,10 @@ namespace Slang
                     char buffer[] = { (char) c, 0 };
                     sink->diagnose(loc, LexerDiagnostics::illegalCharacterPrint, buffer);
                 }
+                else if(c == kEOF)
+                {
+                    sink->diagnose(loc, LexerDiagnostics::unexpectedEndOfInput);
+                }
                 else
                 {
                     // Fallback: print as hexadecimal
