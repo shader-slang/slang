@@ -18,7 +18,7 @@ jobs:
             compiler: cl
             platform: x86_64
             config: release
-            warnings-as-errors: false
+            warnings-as-errors: true
             test-category: full
             full-gpu-tests: false
             runs-on: [Windows, self-hosted]
