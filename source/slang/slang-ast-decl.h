@@ -371,8 +371,10 @@ class FunctionDeclBase : public CallableDecl
 class ConstructorDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(ConstructorDecl)
-    
-    bool synthesized = false;
+   
+    // Indicates whether the declaration was synthesized by
+    // slang and not actually provided by the user
+    bool isSynthesized = false;
 };
 
 // A subscript operation used to index instances of a type

@@ -381,14 +381,14 @@ namespace Slang
         return inst;
     }
 
-    static bool isFieldUsed(IRStructField* field, const List<IRStructKey*>& used)
+    static bool isReturnedValue(IRInst* inst)
     {
-        for (auto key : used)
+        for (auto use = inst->firstUse; use; use = use->nextUse)
         {
-            if (field->getKey() == key)
+            IRInst* user = use->getUser();
+            if (as<IRReturn>(user))
                 return true;
         }
-
         return false;
     }
 
@@ -401,7 +401,7 @@ namespace Slang
             return {};
 
         // Now we can look for all references to fields
-        List<IRStructKey*> usedKeys;
+        HashSet<IRStructKey*> usedKeys;
         for (auto use = origin->firstUse; use; use = use->nextUse)
         {
             IRInst* user = use->getUser();
@@ -422,7 +422,7 @@ namespace Slang
             if (canIgnoreType(field->getFieldType(), nullptr))
                 continue;
 
-            if (!isFieldUsed(field, usedKeys))
+            if (!usedKeys.contains(field->getKey()))
                 uninitializedFields.add(field);
         }
         
@@ -431,13 +431,17 @@ namespace Slang
 
     static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, DiagnosticSink* sink)
     {
+        auto constructor = func->findDecoration<IRConstructorDecorartion>();
+        if (!constructor)
+            return;
+
         IRStructType* stype = as<IRStructType>(func->getResultType());
         if (!stype)
             return;
+
+        bool synthesized = constructor->getSynthesizedStatus();
         
-        auto synthesized = func->findDecoration<IRSynthesizedDecoration>();
-        
-        auto emitWarnings = [&](const List<IRStructField*>& fields, IRReturn* ret)
+        auto printWarnings = [&](const List<IRStructField*>& fields, IRReturn* ret)
         {
             for (auto field : fields)
             {
@@ -468,7 +472,7 @@ namespace Slang
                     continue;
 
                 auto fields = checkFieldsFromExit(reachability, ret, stype);
-                emitWarnings(fields, ret);
+                printWarnings(fields, ret);
             }
         }
     }
@@ -514,6 +518,10 @@ namespace Slang
                 if (!isUninitializedValue(inst))
                     continue;
 
+                // This will be looked into later
+                if (constructor && isReturnedValue(inst))
+                    continue;
+
                 IRType* type = inst->getFullType();
                 if (canIgnoreType(type, nullptr))
                     continue;
@@ -529,8 +537,7 @@ namespace Slang
         }
 
         // Separate analysis for constructors
-        if (constructor)
-            checkConstructor(func, reachability, sink);
+        checkConstructor(func, reachability, sink);
     }
 
     static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sink)

@@ -1361,11 +1361,8 @@ struct IRSemanticDecoration : public IRDecoration
 struct IRConstructorDecorartion : IRDecoration
 {
     IR_LEAF_ISA(ConstructorDecoration)
-};
 
-struct IRSynthesizedDecoration : IRDecoration
-{
-    IR_LEAF_ISA(SynthesizedDecoration)
+    bool getSynthesizedStatus() { return cast<IRBoolLit>(getOperand(0))->getValue(); }
 };
 
 struct IRPackOffsetDecoration : IRDecoration
@@ -4534,14 +4531,9 @@ public:
         return as<IRSemanticDecoration>(addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index)));
     }
 
-    void addConstructorDecoration(IRInst* value)
+    void addConstructorDecoration(IRInst* value, bool synthesizedConstructor)
     {
-        addDecoration(value, kIROp_ConstructorDecoration);
-    }
-    
-    void addSynthesizedDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp_SynthesizedDecoration);
+        addDecoration(value, kIROp_ConstructorDecoration, getBoolValue(synthesizedConstructor));
     }
 
     void addRequireSPIRVDescriptorIndexingExtensionDecoration(IRInst* value)
