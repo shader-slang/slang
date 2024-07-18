@@ -5,7 +5,7 @@
 #include <string.h>
 #include "../../source/core/slang-secure-crt.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "../../source/core/slang-list.h"
 #include "../../source/core/slang-string.h"

@@ -1,6 +1,6 @@
 #include "slang-json-native.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "../core/slang-rtti-util.h"
 

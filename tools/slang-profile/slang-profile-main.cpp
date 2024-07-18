@@ -5,7 +5,7 @@
 
 #include "../../source/core/slang-process-util.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "../../source/core/slang-string-util.h"
 

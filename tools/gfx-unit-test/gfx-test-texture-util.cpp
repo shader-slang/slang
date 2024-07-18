@@ -2,7 +2,7 @@
 #include "gfx-test-util.h"
 #include "tools/unit-test/slang-unit-test.h"
 
-#include <slang-com-ptr.h>
+#include "slang-com-ptr.h"
 
 #include <stdlib.h>
 #include <stdio.h>

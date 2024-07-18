@@ -2,7 +2,7 @@
 #define SLANG_CORE_STD_WRITERS_H
 
 #include "slang-writer.h"
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 
 namespace Slang
 {

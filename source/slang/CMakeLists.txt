@@ -161,9 +161,6 @@ set(SLANG_LOOKUP_GENERATOR_OUTPUT_DIR
 set(SLANG_LOOKUP_GENERATED_SOURCE
     "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.cpp"
 )
-set(SLANG_CAPATURE_REPLAY_SYSTEM
-    "${slang_SOURCE_DIR}/source/slang-capture-replay"
-)
 add_custom_command(
     OUTPUT ${SLANG_LOOKUP_GENERATED_SOURCE}
     COMMAND
@@ -176,14 +173,36 @@ add_custom_command(
     VERBATIM
 )
 
+set(SLANG_SPIRV_CORE_SOURCE_JSON
+    "${slang_SOURCE_DIR}/external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json"
+)
+set(SLANG_SPIRV_CORE_GRAMMAR_SOURCE
+    "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-spirv-core-grammar-embed.cpp"
+)
+add_custom_command(
+    OUTPUT ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
+    COMMAND
+        ${CMAKE_COMMAND} -E make_directory ${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}
+    COMMAND
+        slang-spirv-embed-generator
+        ${SLANG_SPIRV_CORE_SOURCE_JSON}
+        ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
+    DEPENDS ${SLANG_SPIRV_CORE_SOURCE_JSON} slang-spirv-embed-generator
+    VERBATIM
+)
+
 slang_add_target(
     slang-lookup-tables
     OBJECT
     USE_EXTRA_WARNINGS
-    EXPLICIT_SOURCE ${SLANG_LOOKUP_GENERATED_SOURCE}
+    EXPLICIT_SOURCE ${SLANG_LOOKUP_GENERATED_SOURCE} ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
     LINK_WITH_PRIVATE core SPIRV-Headers
     EXCLUDE_FROM_ALL
     FOLDER generated
+)
+
+set(SLANG_CAPATURE_REPLAY_SYSTEM
+    "${slang_SOURCE_DIR}/source/slang-capture-replay"
 )
 
 #
