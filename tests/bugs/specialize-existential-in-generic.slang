@@ -18,7 +18,7 @@ struct Impl : IFoo
     Assoc getValue() { Assoc r; return r; }
 }
 
-struct GenType<T : IFoo>
+struct GenType<T : IFoo> : IDefaultInitializable
 {
     T obj;
     int doThing()

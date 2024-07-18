@@ -1,9 +1,9 @@
 #ifndef SLANG_COMPILER_CORE_JSON_NATIVE_H
 #define SLANG_COMPILER_CORE_JSON_NATIVE_H
 
-#include "../../slang.h"
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
+#include "slang.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
 
 #include "slang-json-value.h"
 

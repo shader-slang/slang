@@ -2,7 +2,7 @@
 #define SLANG_PROFILE_H_INCLUDED
 
 #include "../core/slang-basic.h"
-#include "../../slang.h"
+#include "slang.h"
 #include "slang-capability.h"
 
 namespace Slang

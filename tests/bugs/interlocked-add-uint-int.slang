@@ -1,4 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -profile glsl_450 -stage compute -entry MainCs -line-directive-mode none
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -profile glsl_450 -stage compute -entry MainCs -line-directive-mode none -minimum-slang-optimization
+
 //CHECK: {{.*}} OpAtomicIAdd
 RWBuffer<uint> g_InterlockTest;
 

@@ -3,7 +3,7 @@
 #include "slang-io.h"
 #include "slang-exception.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "slang-string-util.h"
 #include "slang-char-util.h"

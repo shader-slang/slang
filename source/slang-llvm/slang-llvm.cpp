@@ -57,9 +57,9 @@
 
 // Slang
 
-#include <slang.h>
-#include <slang-com-helper.h>
-#include <slang-com-ptr.h>
+#include "slang.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
 
 #include <core/slang-list.h>
 #include <core/slang-string.h>
@@ -121,7 +121,7 @@ using namespace llvm::orc;
 
 using namespace Slang;
 
-class LLVMDownstreamCompiler : public IDownstreamCompiler, ComBaseObject
+class LLVMDownstreamCompiler : public ComBaseObject, public IDownstreamCompiler
 {
 public:
     typedef ComBaseObject Super;
@@ -139,6 +139,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE { SLANG_UNUSED(contents); SLANG_UNUSED(contentsSize); return SLANG_FAIL; }
 
     LLVMDownstreamCompiler():
         m_desc(SLANG_PASS_THROUGH_LLVM, SemanticVersion(LLVM_VERSION_MAJOR, LLVM_VERSION_MINOR, LLVM_VERSION_PATCH))

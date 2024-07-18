@@ -349,7 +349,7 @@ namespace Slang
         {
             const String path = getStdlibPath();
             StringBuilder sb;
-#include "glsl.meta.slang.h"
+            #include "glsl.meta.slang.h"
             glslLibraryCode = StringBlob::moveCreate(sb);
         }
         return glslLibraryCode;

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
-#include "../../slang.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
+#include "slang.h"
 
 #include "../../source/core/slang-rtti-info.h"
 #include "../../source/compiler-core/slang-json-value.h"

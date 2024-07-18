@@ -147,5 +147,6 @@ inline void glslang_CompileRequest_1_2::set(const glslang_CompileRequest_1_1& in
 typedef int (*glslang_CompileFunc_1_0)(glslang_CompileRequest_1_0* request);
 typedef int (*glslang_CompileFunc_1_1)(glslang_CompileRequest_1_1* request);
 typedef int (*glslang_CompileFunc_1_2)(glslang_CompileRequest_1_2* request);
+typedef bool (*glslang_ValidateSPIRVFunc)(const uint32_t* contents, int contentsSize);
 
 #endif

@@ -10,8 +10,8 @@
 // This example uses the Slang C/C++ API, alonmg with its optional type
 // for managing COM-style reference-counted pointers.
 //
-#include <slang.h>
-#include <slang-com-ptr.h>
+#include "slang.h"
+#include "slang-com-ptr.h"
 using Slang::ComPtr;
 
 // This example uses a graphics API abstraction layer that is implemented inside

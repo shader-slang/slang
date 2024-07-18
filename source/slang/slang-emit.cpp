@@ -911,7 +911,7 @@ Result linkAndOptimizeIR(
     legalizeVectorTypes(irModule, sink);
 
     // Legalize `__isTextureAccess` and related.
-    legalizeIsTextureAccess(irModule);
+    legalizeIsTextureAccess(irModule, sink);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
@@ -1704,6 +1704,22 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         PassThroughMode::SpirvOpt, codeGenContext->getSink());
     if (compiler)
     {
+        if (!codeGenContext->shouldSkipSPIRVValidation())
+        {
+            StringBuilder runSpirvValEnvVar;
+            PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"), runSpirvValEnvVar);
+            if (runSpirvValEnvVar.getUnownedSlice() == "1")
+            {
+                if (SLANG_FAILED(compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount()/4))))
+                {
+                    codeGenContext->getSink()->diagnoseWithoutSourceView(
+                        SourceLoc{},
+                        Diagnostics::spirvValidationFailed
+                    );
+                }
+            }
+        }
+
         ComPtr<IArtifact> optimizedArtifact;
         DownstreamCompileOptions downstreamOptions;
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);

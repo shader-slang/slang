@@ -61,6 +61,7 @@ function(slang_add_target dir type)
         INCLUDE_FROM_PRIVATE
         # Any include directories other targets need to use this target
         INCLUDE_DIRECTORIES_PUBLIC
+        # Any include directories this target only needs
         INCLUDE_DIRECTORIES_PRIVATE
         # Add a dependency on the new target to the specified targets
         REQUIRED_BY

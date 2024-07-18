@@ -15,7 +15,7 @@ namespace metal
 class ShaderProgramImpl : public ShaderProgramBase
 {
 public:
-    BreakableReference<DeviceImpl> m_device;
+    DeviceImpl* m_device;
     RefPtr<RootShaderObjectLayoutImpl> m_rootObjectLayout;
 
     struct Module

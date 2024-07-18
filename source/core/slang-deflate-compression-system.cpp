@@ -1,7 +1,7 @@
 #include "slang-deflate-compression-system.h"
 
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
 
 // We don't want compress #define to clash 
 #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES 1

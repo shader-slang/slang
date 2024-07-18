@@ -2,7 +2,7 @@
 #include "slang-glslang-compiler.h"
 
 #include "../core/slang-common.h"
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "../core/slang-blob.h"
 
@@ -48,6 +48,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
 
         /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -61,6 +62,7 @@ protected:
     glslang_CompileFunc_1_0 m_compile_1_0 = nullptr; 
     glslang_CompileFunc_1_1 m_compile_1_1 = nullptr; 
     glslang_CompileFunc_1_2 m_compile_1_2 = nullptr;
+    glslang_ValidateSPIRVFunc m_validate = nullptr;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 
@@ -72,6 +74,7 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_compile_1_0 = (glslang_CompileFunc_1_0)library->findFuncByName("glslang_compile");
     m_compile_1_1 = (glslang_CompileFunc_1_1)library->findFuncByName("glslang_compile_1_1");
     m_compile_1_2 = (glslang_CompileFunc_1_2)library->findFuncByName("glslang_compile_1_2");
+    m_validate = (glslang_ValidateSPIRVFunc)library->findFuncByName("glslang_validateSPIRV");
 
 
     if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr)
@@ -279,6 +282,20 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& inOptions, 
 
     *outArtifact = artifact.detach();
     return SLANG_OK;
+}
+
+SlangResult GlslangDownstreamCompiler::validate(const uint32_t* contents, int contentsSize)
+{
+    if (m_validate == nullptr)
+    {
+        return SLANG_FAIL;
+    }
+
+    if (m_validate(contents, contentsSize))
+    {
+        return SLANG_OK;
+    }
+    return SLANG_FAIL;
 }
 
 bool GlslangDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
