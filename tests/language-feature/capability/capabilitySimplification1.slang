@@ -2,9 +2,9 @@
 //TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS): -target glsl -emit-spirv-directly -entry computeMain -stage compute  -profile sm_5_0 -ignore-capabilities
 
 
-// CHECK_IGNORE_CAPS-NOT: warning 41012
+// CHECK_IGNORE_CAPS-NOT: error 36107
 
-// CHECK: warning 41012
+// CHECK: error 36107
 // CHECK-NOT: sm_6_0
 // CHECK-NOT: sm_6_3
 // CHECK-NOT: sm_6_4
