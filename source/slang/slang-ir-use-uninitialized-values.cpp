@@ -377,21 +377,24 @@ namespace Slang
         }
 
         // Check ordinary instructions
-        for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->getNextInst())
+        for (auto block : func->getBlocks())
         {
-            if (!isUninitializedValue(inst))
-                continue;
-
-            IRType* type = inst->getFullType();
-            if (canIgnoreType(type, nullptr))
-               continue;
-
-            auto loads = getUnresolvedVariableLoads(reachability, inst);
-            for (auto load : loads)
+            for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
             {
-                sink->diagnose(load,
+                if (!isUninitializedValue(inst))
+                    continue;
+
+                IRType* type = inst->getFullType();
+                if (canIgnoreType(type, nullptr))
+                    continue;
+
+                auto loads = getUnresolvedVariableLoads(reachability, inst);
+                for (auto load : loads)
+                {
+                    sink->diagnose(load,
                         Diagnostics::usingUninitializedVariable,
                         inst);
+                }
             }
         }
     }
