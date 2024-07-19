@@ -9,7 +9,7 @@
 // CHECK: capabilitySimplification1.slang(21): note: see using of 'WaveMultiPrefixProduct'
 // CHECK-NOT: see using of 'WaveMultiPrefixProduct'
 // CHECK: {{.*}}.meta.slang({{.*}}): note: see definition of 'WaveMultiPrefixProduct'
-// CHECK: {{.*}}.meta.slang({{.*}}): note: see definition of 'require'
+// CHECK: {{.*}}.meta.slang({{.*}}): note: see declaration of 'require'
 
 void nestedSafeCall()
 {

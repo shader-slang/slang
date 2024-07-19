@@ -10727,7 +10727,7 @@ namespace Slang
         // Check if 'require' modifier is causing the problematic capability, if so, print that 'require' as a part of the problem
         if (auto requireCapabilityAttribute = declWithRef.referencedDecl->findModifier<RequireCapabilityAttribute>())
             if (!requireCapabilityAttribute->capabilitySet.implies(setToFind))
-                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, requireCapabilityAttribute->loc, Diagnostics::seeDefinitionOf, requireCapabilityAttribute);
+                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, requireCapabilityAttribute->loc, Diagnostics::seeDeclarationOf, requireCapabilityAttribute);
     }
 
     void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, HashSet<Decl*>& printedDecls)

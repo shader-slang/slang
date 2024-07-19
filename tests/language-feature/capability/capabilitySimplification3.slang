@@ -8,6 +8,7 @@
 // CHECK: capabilitySimplification3.slang(15): note: see using of 'WaveMultiPrefixProduct'
 // CHECK-NOT: see using of 'WaveMultiPrefixProduct'
 // CHECK: {{.*}}.meta.slang({{.*}}): note: see definition of 'WaveMultiPrefixProduct'
+// CHECK: {{.*}}.meta.slang({{.*}}): note: see declaration of 'require'
 
 [numthreads(1,1,1)]
 void computeMain()
