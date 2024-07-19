@@ -167,7 +167,7 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
 
 //CapabilityAtomSet
 
-CapabilityAtomSet CapabilityAtomSet::removeImpliedAtoms() const
+CapabilityAtomSet CapabilityAtomSet::newSetWithoutImpliedAtoms() const
 {
     // plan is to add all atoms which is impled (=>) another atom.
     // Implying an atom appears in the form of atom1=>atom2 or atom2=>atom1.
@@ -959,7 +959,7 @@ UnownedStringSlice capabilityNameToStringWithoutPrefix(CapabilityName capability
 void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet atomSet)
 {
     bool isFirst = true;
-    for (auto atom : atomSet.removeImpliedAtoms())
+    for (auto atom : atomSet.newSetWithoutImpliedAtoms())
     {
         CapabilityName formattedAtom = (CapabilityName)atom;
         if (!isFirst)
@@ -1016,7 +1016,7 @@ struct CompressedCapabilitySet
         }
         for (auto& targetSets : atomSetsOfTargets)
             for (auto& targetSet : targetSets.second)
-                targetSet.atomsWithoutStage = targetSet.atomsWithoutStage.removeImpliedAtoms();
+                targetSet.atomsWithoutStage = targetSet.atomsWithoutStage.newSetWithoutImpliedAtoms();
     }
 };
 
@@ -1077,7 +1077,7 @@ void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)
     CapabilityAtomSet set;
     for (auto i : list)
         set.add((UInt)i);
-    printDiagnosticArg(sb, set.removeImpliedAtoms());
+    printDiagnosticArg(sb, set.newSetWithoutImpliedAtoms());
 }
 
 

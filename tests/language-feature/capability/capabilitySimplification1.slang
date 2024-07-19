@@ -5,14 +5,30 @@
 // CHECK_IGNORE_CAPS-NOT: error 36107
 
 // CHECK: error 36107
-// CHECK-NOT: sm_6_0
-// CHECK-NOT: sm_6_3
-// CHECK-NOT: sm_6_4
-// CHECK-SAME: vertex{{.*}}/{{.*}}fragment
-// CHECK-SAME: sm_6_5
+// CHECK-SAME: entrypoint 'computeMain' does not support compilation target 'glsl' with stage 'compute'
+// CHECK: capabilitySimplification1.slang(21): note: see using of 'WaveMultiPrefixProduct'
+// CHECK-NOT: see using of 'WaveMultiPrefixProduct'
+// CHECK: {{.*}}.meta.slang({{.*}}): note: see definition of 'WaveMultiPrefixProduct'
+// CHECK: {{.*}}.meta.slang({{.*}}): note: see definition of 'require'
+
+void nestedSafeCall()
+{
+    AllMemoryBarrier();
+}
+
+void nestedBadCall()
+{
+    WaveMultiPrefixProduct(1, 0);
+}
+
+void nestedCall()
+{
+    nestedSafeCall();
+    nestedBadCall();
+}
 
 [numthreads(1,1,1)]
 void computeMain()
 {
-    WaveMultiPrefixProduct(1, 0);
+    nestedCall();
 }

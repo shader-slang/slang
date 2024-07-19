@@ -521,26 +521,15 @@ namespace Slang
             targetCaps.join(stageCapabilitySet);
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
-                maybeDiagnose(sink, linkage->m_optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
+                // Incompatable means we don't support a set of abstract atoms.
+                // Diagnose that we lack support for 'stage' and 'target' atoms with our provided entry-point
+                auto compileTarget = target->getTargetCaps().getCompileTarget();
+                auto stageTarget = stageCapabilitySet.getTargetStage();
+                maybeDiagnose(sink, linkage->m_optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, compileTarget, stageTarget);
                 
-                // Find out what exactly is incompatible and print out a trace of provenance to
-                // help user diagnose their code.
-                // TODO: provedence should have a way to filter out for provenance that are missing X capabilitySet from their caps, else in big functions we get junk errors
-                // This is specifically a problem for when a function is missing a target but otherwise has identical capabilities.
-                
-                const auto interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getAtomSets();
-                const auto compileCaps = targetCaps.getAtomSets();
-                if (compileCaps && interredCapConjunctions)
-                {
-                    for (auto inferredAtom : *interredCapConjunctions.begin())
-                    {
-                        CapabilityAtom inferredAtomFormatted = asAtom(inferredAtom);
-                        if (!compileCaps->contains((UInt)inferredAtom))
-                        {
-                            diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtomFormatted);
-                        }
-                    }
-                }
+                // Find out what is incompatible (ancestor missing a super set of 'target+stage')
+                CapabilitySet failedSet({ (CapabilityName)compileTarget, (CapabilityName)stageTarget });
+                diagnoseMissingCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, failedSet);
             }
             else
             {
@@ -571,6 +560,7 @@ namespace Slang
                         entryPointFuncDecl->loc,
                         Diagnostics::profileImplicitlyUpgraded,
                         Diagnostics::profileImplicitlyUpgradedRestrictive,
+                        entryPointFuncDecl,
                         target->getOptionSet().getProfile().getName(),
                         addedAtoms.getElements<CapabilityAtom>());
                 }
