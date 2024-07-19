@@ -421,6 +421,7 @@ Result DeviceImpl::createTextureResource(
     }
     if (desc.allowedStates.contains(ResourceState::UnorderedAccess))
     {
+        textureUsage |= MTL::TextureUsageShaderRead;
         textureUsage |= MTL::TextureUsageShaderWrite;
 
         // Request atomic access if the format allows it.
