@@ -44,6 +44,7 @@ void test()
 // METAL: .atomic_fetch_xor
 // METAL: .atomic_exchange
 // METAL: .atomic_compare_exchange_weak
+// METAL: .atomic_compare_exchange_weak
 
 // METAL: .atomic_fetch_add
 // METAL: .atomic_fetch_and
@@ -59,6 +60,7 @@ void test()
 // METAL: .atomic_fetch_xor
 // METAL: .atomic_exchange
 // METAL: .atomic_compare_exchange_weak
+// METAL: .atomic_compare_exchange_weak
 	InterlockedAdd(intBuffer[0], valInt);
 	InterlockedAnd(intBuffer[0], valInt);
 	InterlockedMax(intBuffer[0], valInt);
@@ -73,6 +75,7 @@ void test()
 	InterlockedXor(intBuffer[0], valInt, originalValueInt);
 	InterlockedExchange(intBuffer[0], valInt, originalValueInt);
 	InterlockedCompareExchange(intBuffer[0], valInt, compareValueInt, originalValueInt);
+	InterlockedCompareStore(intBuffer[0], valUInt, compareValueUInt);
 
 	InterlockedAdd(uintBuffer[0], valUInt);
 	InterlockedAnd(uintBuffer[0], valUInt);
@@ -88,6 +91,7 @@ void test()
 	InterlockedXor(uintBuffer[0], valUInt, originalValueUInt);
 	InterlockedExchange(uintBuffer[0], valUInt, originalValueUInt);
 	InterlockedCompareExchange(uintBuffer[0], valUInt, compareValueUInt, originalValueUInt);
+	InterlockedCompareStore(uintBuffer[0], valUInt, compareValueUInt);
 }
 
 [numthreads(1, 1, 1)]

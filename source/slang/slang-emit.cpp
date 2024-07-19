@@ -1039,6 +1039,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
             byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            byteAddressBufferOptions.treatGetEquivalentStructuredBufferAsGetThis = true;
             byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             break;
@@ -1135,6 +1136,8 @@ Result linkAndOptimizeIR(
     }
     break;
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
     {
         legalizeIRForMetal(irModule, sink);
     }
