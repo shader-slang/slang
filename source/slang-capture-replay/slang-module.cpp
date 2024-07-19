@@ -27,6 +27,14 @@ namespace SlangCapture
             return nullptr;
     }
 
+    SLANG_NO_THROW slang::DeclReflection* ModuleCapture::getModuleReflection()
+    {
+        // No need to capture this call as it is just a query.
+        slangCaptureLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+        slang::DeclReflection* res = (slang::DeclReflection*)m_actualModule->getModuleReflection();
+        return res;
+    }
+
     SLANG_NO_THROW SlangResult ModuleCapture::findEntryPointByName(
         char const*     name,
         slang::IEntryPoint**   outEntryPoint)

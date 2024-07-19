@@ -46,10 +46,10 @@ void main()
 	}
 }
 
-// CHECK: OpEntryPoint IntersectionNV %main "main"
-// CHECK: OpDecorate %[[rayTMin:[a-zA-Z0-9_]+]] BuiltIn RayTminNV
+// CHECK: OpEntryPoint Intersection{{NV|KHR}} %main "main"
+// CHECK: OpDecorate %{{[a-zA-Z0-9_]+}} BuiltIn RayTmin{{NV|KHR}}
 
-// CHECK-DAG: %[[ATTR:[A-Za-z0-9_]+]] = OpVariable %_ptr_HitAttributeNV_SphereHitAttributes{{.*}} HitAttributeNV
+// CHECK-DAG: %[[ATTR:[A-Za-z0-9_]+]] = OpVariable %_ptr_HitAttribute{{NV|KHR}}_SphereHitAttributes{{.*}} HitAttribute{{NV|KHR}}
 // CHECK-DAG: %[[VAL:[A-Za-z0-9_]+]] = Op{{.+}} %SphereHitAttributes{{.*}} {{.*}}
 // CHECK-DAG: OpStore %[[ATTR]] %[[VAL]]
 

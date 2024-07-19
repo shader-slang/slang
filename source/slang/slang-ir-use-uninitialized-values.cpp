@@ -188,7 +188,7 @@ namespace Slang
         else if (auto rev = as<IRBackwardDifferentiate>(callee))
             ftn = as<IRFunc>(rev->getBaseFn());
         else if (auto wit = as<IRLookupWitnessMethod>(callee))
-            ftype = as<IRFuncType>(callee->getFullType());
+            ftype = as<IRFuncType>(wit->getFullType());
         else
             ftn = as<IRFunc>(callee);
 
@@ -348,8 +348,140 @@ namespace Slang
         return loads;
     }
 
+    static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* reference, IRInst* inst)
+    {
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        for (auto alias : getAliasableInstructions(inst))
+        {
+            for (auto use = alias->firstUse; use; use = use->nextUse)
+            {
+                IRInst* user = use->getUser();
+                collectLoadStore(stores, loads, user, alias);
+            }
+        }
+
+        for (auto store : stores)
+        {
+            if (reachability.isInstReachable(store, reference))
+                return true;
+        }
+
+        return false;
+    }
+
+    static IRInst* traceInstOrigin(IRInst* inst)
+    {
+        if (auto load = as<IRLoad>(inst))
+            return traceInstOrigin(load->getPtr());
+
+        return inst;
+    }
+
+    static bool isReturnedValue(IRInst* inst)
+    {
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            IRInst* user = use->getUser();
+            if (as<IRReturn>(user))
+                return true;
+        }
+        return false;
+    }
+
+    static List<IRStructField*> checkFieldsFromExit(ReachabilityContext& reachability, IRReturn* ret, IRStructType* type)
+    {
+        IRInst* origin = traceInstOrigin(ret->getVal());
+
+        // We don't want to warn on delegated construction
+        if (!isUninitializedValue(origin))
+            return {};
+
+        // Now we can look for all references to fields
+        HashSet<IRStructKey*> usedKeys;
+        for (auto use = origin->firstUse; use; use = use->nextUse)
+        {
+            IRInst* user = use->getUser();
+            
+            auto fieldAddress = as<IRFieldAddress>(user);
+            if (!fieldAddress || !isInstStoredInto(reachability, ret, user))
+                continue;
+
+            IRInst* field = fieldAddress->getField();
+            usedKeys.add(as<IRStructKey>(field));
+        }
+
+        List<IRStructField*> uninitializedFields;
+
+        auto fields = type->getFields();
+        for (auto field : fields)
+        {
+            if (canIgnoreType(field->getFieldType(), nullptr))
+                continue;
+
+            if (!usedKeys.contains(field->getKey()))
+                uninitializedFields.add(field);
+        }
+        
+        return uninitializedFields;
+    }
+
+    static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, DiagnosticSink* sink)
+    {
+        auto constructor = func->findDecoration<IRConstructorDecorartion>();
+        if (!constructor)
+            return;
+
+        IRStructType* stype = as<IRStructType>(func->getResultType());
+        if (!stype)
+            return;
+
+        // Don't bother giving warnings if its not being used
+        bool synthesized = constructor->getSynthesizedStatus();
+        if (synthesized && !func->firstUse)
+            return;
+        
+        auto printWarnings = [&](const List<IRStructField*>& fields, IRReturn* ret)
+        {
+            for (auto field : fields)
+            {
+                if (synthesized)
+                {
+                    sink->diagnose(field->getKey(),
+                        Diagnostics::fieldNotDefaultInitialized,
+                        stype,
+                        field->getKey());
+                }
+                else
+                {
+                    sink->diagnose(ret,
+                        Diagnostics::constructorUninitializedField,
+                        field->getKey());
+                }
+            }
+
+        };
+
+        // Work backwards, get exit points and find sources
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst = block->getFirstInst(); inst; inst = inst->next)
+            {
+                auto ret = as<IRReturn>(inst);
+                if (!ret)
+                    continue;
+
+                auto fields = checkFieldsFromExit(reachability, ret, stype);
+                printWarnings(fields, ret);
+            }
+        }
+    }
+
     static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     {
+        // Differentiable functions will generate undefined values
+        // strictly so that they can be set in a differentiable way
         if (isDifferentiableFunc(func))
             return;
 
@@ -358,6 +490,9 @@ namespace Slang
             return;
 
         ReachabilityContext reachability(func);
+
+        // Used for a further analysis and to skip usual return checks
+        auto constructor = func->findDecoration <IRConstructorDecorartion> ();
 
         // Check out parameters
         for (auto param : firstBlock->getParams())
@@ -377,23 +512,33 @@ namespace Slang
         }
 
         // Check ordinary instructions
-        for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->getNextInst())
+        for (auto block : func->getBlocks())
         {
-            if (!isUninitializedValue(inst))
-                continue;
-
-            IRType* type = inst->getFullType();
-            if (canIgnoreType(type, nullptr))
-               continue;
-
-            auto loads = getUnresolvedVariableLoads(reachability, inst);
-            for (auto load : loads)
+            for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
             {
-                sink->diagnose(load,
+                if (!isUninitializedValue(inst))
+                    continue;
+
+                // This will be looked into later
+                if (constructor && isReturnedValue(inst))
+                    continue;
+
+                IRType* type = inst->getFullType();
+                if (canIgnoreType(type, nullptr))
+                    continue;
+
+                auto loads = getUnresolvedVariableLoads(reachability, inst);
+                for (auto load : loads)
+                {
+                    sink->diagnose(load,
                         Diagnostics::usingUninitializedVariable,
                         inst);
+                }
             }
         }
+
+        // Separate analysis for constructors
+        checkConstructor(func, reachability, sink);
     }
 
     static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sink)

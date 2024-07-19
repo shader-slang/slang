@@ -31,5 +31,6 @@ DIAGNOSTIC(10004, Error, endOfFileInLiteral, "end of file in literal")
 DIAGNOSTIC(10005, Error, newlineInLiteral, "newline in literal")
 DIAGNOSTIC(10010, Error, quoteCannotBeDelimiter, "'\"' encountered before '(' in raw string literal. '\"' cannot be a part of a delimiter.")
 
+DIAGNOSTIC(10011, Error, unexpectedEndOfInput, "unexpected end of input")
 
 #undef DIAGNOSTIC

@@ -1813,6 +1813,7 @@ namespace Slang
         body->closingSourceLoc = ctor->closingSourceLoc;
         ctor->body = body;
         body->body = m_astBuilder->create<SeqStmt>();
+        ctor->isSynthesized = true;
         decl->addMember(ctor);
         return ctor;
     }
@@ -10489,7 +10490,7 @@ namespace Slang
                 auto stageCaps = CapabilitySet(Profile(entryPointAttr->stage).getCapabilityName());
                 if (declaredCaps.isIncompatibleWith(stageCaps))
                 {
-                    maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
+                    maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, funcDecl->loc, Diagnostics::stageIsIncompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
                 }
                 else
                 {
