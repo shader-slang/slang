@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -emit-spirv-directly
-// CHECK: OpEntryPoint
+// CHECK: error 30052
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1,1,1)]
