@@ -34,6 +34,7 @@ void test()
 // METAL: .atomic_fetch_xor
 // METAL: .atomic_exchange
 // METAL: .atomic_compare_exchange_weak
+// METAL: .atomic_compare_exchange_weak
 
 // METAL: .atomic_fetch_add
 // METAL: .atomic_fetch_and
@@ -49,6 +50,7 @@ void test()
 // METAL: .atomic_fetch_xor
 // METAL: .atomic_exchange
 // METAL: .atomic_compare_exchange_weak
+// METAL: .atomic_compare_exchange_weak
 	InterlockedAdd(intTexture1D[0], valInt);
 	InterlockedAnd(intTexture1D[0], valInt);
 	InterlockedMax(intTexture1D[0], valInt);
@@ -63,6 +65,7 @@ void test()
 	InterlockedXor(intTexture1D[0], valInt, originalValueInt);
 	InterlockedExchange(intTexture1D[0], valInt, originalValueInt);
 	InterlockedCompareExchange(intTexture1D[0], valInt, compareValueInt, originalValueInt);
+	InterlockedCompareStore(intTexture1D[0], valUInt, compareValueUInt);
 
 	InterlockedAdd(uintTexture1D[0], valUInt);
 	InterlockedAnd(uintTexture1D[0], valUInt);
@@ -78,6 +81,7 @@ void test()
 	InterlockedXor(uintTexture1D[0], valUInt, originalValueUInt);
 	InterlockedExchange(uintTexture1D[0], valUInt, originalValueUInt);
 	InterlockedCompareExchange(uintTexture1D[0], valUInt, compareValueUInt, originalValueUInt);
+	InterlockedCompareStore(uintTexture1D[0], valUInt, compareValueUInt);
 
     // Texture1DArray
 // METAL: .atomic_fetch_add
@@ -94,6 +98,7 @@ void test()
 // METAL: .atomic_fetch_xor
 // METAL: .atomic_exchange
 // METAL: .atomic_compare_exchange_weak
+// METAL: .atomic_compare_exchange_weak
 
 // METAL: .atomic_fetch_add
 // METAL: .atomic_fetch_and
@@ -109,6 +114,7 @@ void test()
 // METAL: .atomic_fetch_xor
 // METAL: .atomic_exchange
 // METAL: .atomic_compare_exchange_weak
+// METAL: .atomic_compare_exchange_weak
 	InterlockedAdd(intTexture1DArray[0], valInt);
 	InterlockedAnd(intTexture1DArray[0], valInt);
 	InterlockedMax(intTexture1DArray[0], valInt);
@@ -122,7 +128,8 @@ void test()
 	InterlockedOr(intTexture1DArray[0], valInt, originalValueInt);
 	InterlockedXor(intTexture1DArray[0], valInt, originalValueInt);
 	InterlockedExchange(intTexture1DArray[0], valInt, originalValueInt);
-	InterlockedCompareExchange(intTexture1DArray[0], valInt, compareValueInt, originalValueInt);
+	InterlockedCompareExchange(intTexture1DArray[0], valInt, compareValueInt, originalValueUInt);
+	InterlockedCompareStore(intTexture1DArray[0], valUInt, compareValueUInt);
 
 	InterlockedAdd(uintTexture1DArray[0], valUInt);
 	InterlockedAnd(uintTexture1DArray[0], valUInt);
@@ -138,6 +145,7 @@ void test()
 	InterlockedXor(uintTexture1DArray[0], valUInt, originalValueUInt);
 	InterlockedExchange(uintTexture1DArray[0], valUInt, originalValueUInt);
 	InterlockedCompareExchange(uintTexture1DArray[0], valUInt, compareValueUInt, originalValueUInt);
+	InterlockedCompareStore(uintTexture1DArray[0], valUInt, compareValueUInt);
 }
 
 [numthreads(1, 1, 1)]
