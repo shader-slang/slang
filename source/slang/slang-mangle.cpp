@@ -547,17 +547,27 @@ namespace Slang
 
             for(auto paramDeclRef : parameters)
             {
-                // "out"/"inout" and "in" modifier makes big difference in the spirv code generation,
-                // because "out"/"inout" parameter will be passed by pointer. Therefore, we need to
+                // parameter modifier makes big difference in the spirv code generation, for example
+                // "out"/"inout" parameter will be passed by pointer. Therefore, we need to
                 // distinguish them in the mangled name to avoid name collision.
-                if(paramDeclRef.getDecl()->hasModifier<OutModifier>() ||
-                   paramDeclRef.getDecl()->hasModifier<InOutModifier>())
+                ParameterDirection paramDirection = getParameterDirection(paramDeclRef.getDecl());
+                switch (paramDirection)
                 {
+                case kParameterDirection_Ref:
+                    emitRaw(context, "ref");
+                    break;
+                case kParameterDirection_ConstRef:
+                    emitRaw(context, "constref");
+                    break;
+                case kParameterDirection_Out:
                     emitRaw(context, "out");
-                }
-                else
-                {
+                    break;
+                case kParameterDirection_InOut:
+                    emitRaw(context, "inout");
+                    break;
+                default:
                     emitRaw(context, "in");
+                    break;
                 }
                 emitType(context, getType(context->astBuilder, paramDeclRef));
             }
