@@ -12,10 +12,10 @@ buffer MyBlockName
 bool testVars() {
     return true
 // CHECK_GLSL-DAG: gl_HitTEXT
-// CHECK_SPV-DAG: RayTmaxNV
+// CHECK_SPV-DAG: RayTmax{{NV|KHR}}
         && gl_HitTEXT != 99.0f
 // CHECK_GLSL-DAG: gl_HitKindEXT
-// CHECK_SPV-DAG: HitKindNV
+// CHECK_SPV-DAG: HitKind{{NV|KHR}}
         && gl_HitKindEXT != 0xFFFFFFFF
         ;    
 }
