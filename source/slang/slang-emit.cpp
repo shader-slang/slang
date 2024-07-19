@@ -1267,15 +1267,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.meshOutput)
         legalizeMeshOutputTypes(irModule);
 
-    if (options.shouldLegalizeExistentialAndResourceTypes)
-    {
-        if (!isMetalTarget(targetRequest))
-        {
-            // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
-            // a simple storage type that has target independent layout based on the kind of buffer resource.
-            lowerBufferElementTypeToStorageType(targetProgram, irModule);
-        }
-    }
+    lowerBufferElementTypeToStorageType(targetProgram, irModule);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
