@@ -350,12 +350,10 @@ namespace Slang
 
     static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* reference, IRInst* inst)
     {
-        auto addresses = getAliasableInstructions(inst);
-        
         List<IRInst*> stores;
         List<IRInst*> loads;
 
-        for (auto alias : addresses)
+        for (auto alias : getAliasableInstructions(inst))
         {
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
@@ -439,7 +437,10 @@ namespace Slang
         if (!stype)
             return;
 
+        // Don't bother giving warnings if its not being used
         bool synthesized = constructor->getSynthesizedStatus();
+        if (synthesized && !func->firstUse)
+            return;
         
         auto printWarnings = [&](const List<IRStructField*>& fields, IRReturn* ret)
         {

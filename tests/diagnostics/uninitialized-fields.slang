@@ -57,11 +57,27 @@ struct Partial
 struct Implicit
 {
     //CHK-DAG: warning 41021: default initializer for 'Implicit' will not initialize field 'a'
-	int a;
-	int b = 1;
+    int a;
+    int b = 1;
     //CHK-DAG: warning 41021: default initializer for 'Implicit' will not initialize field 'c'
-	int c;
-	int d = 1 + 1;
+    int c;
+    int d = 1 + 1;
+}
+
+int using_implicit(int x)
+{
+    Implicit impl;
+    impl.a = x;
+    return impl.c;
+}
+
+struct UnusedImplicit
+{
+    // Shouldn't warn here, since its never used
+    int a;
+    int b = 1;
+    int c;
+    int d = 1 + 1;
 }
 
 struct Pass
