@@ -554,19 +554,24 @@ namespace Slang
                 switch (paramDirection)
                 {
                 case kParameterDirection_Ref:
-                    emitRaw(context, "ref");
+                    emitRaw(context, "r_");
                     break;
                 case kParameterDirection_ConstRef:
-                    emitRaw(context, "constref");
+                    emitRaw(context, "c_");
                     break;
                 case kParameterDirection_Out:
-                    emitRaw(context, "out");
+                    emitRaw(context, "o_");
                     break;
                 case kParameterDirection_InOut:
-                    emitRaw(context, "inout");
+                    emitRaw(context, "io_");
+                    break;
+                case kParameterDirection_In:
+                    emitRaw(context, "i_");
                     break;
                 default:
-                    emitRaw(context, "in");
+                    StringBuilder errMsg;
+                    errMsg << "Unknown parameter direction: " << paramDirection;
+                    SLANG_ABORT_COMPILATION(errMsg.toString().begin());
                     break;
                 }
                 emitType(context, getType(context->astBuilder, paramDeclRef));
