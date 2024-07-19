@@ -88,6 +88,16 @@ protected:
         DeviceImpl* device,
         ShaderObjectLayoutImpl* layout);
 
+    BufferResourceImpl* _ensureArgumentBufferUpToDate(
+        DeviceImpl* device,
+        ShaderObjectLayoutImpl* layout);
+
+    void writeOrdinaryDataIntoArgumentBuffer(
+        slang::TypeLayoutReflection* argumentBufferTypeLayout,
+        slang::TypeLayoutReflection* defaultTypeLayout,
+        uint8_t* argumentBuffer,
+        uint8_t* srcData);
+
     /// Bind the buffer for ordinary/uniform data, if needed
     ///
     /// The `ioOffset` parameter will be updated to reflect the constant buffer
@@ -101,6 +111,12 @@ protected:
 public:
     /// Bind this object as if it was declared as a `ConstantBuffer<T>` in Slang
     Result bindAsConstantBuffer(
+        BindingContext* context,
+        BindingOffset const& inOffset,
+        ShaderObjectLayoutImpl* layout);
+
+    /// Bind this object as if it was declared as a `ParameterBlock<T>` in Slang
+    Result bindAsParameterBlock(
         BindingContext* context,
         BindingOffset const& inOffset,
         ShaderObjectLayoutImpl* layout);
@@ -137,7 +153,12 @@ public:
     /// Created on demand with `_createOrdinaryDataBufferIfNeeded()`
     RefPtr<BufferResourceImpl> m_ordinaryDataBuffer;
 
+    /// Argument buffer created on demand to bind as a parameter block.
+    RefPtr<BufferResourceImpl> m_argumentBuffer;
+
+
     bool m_isConstantBufferDirty = true;
+    bool m_isArgumentBufferDirty = true;
 };
 
 class MutableShaderObjectImpl

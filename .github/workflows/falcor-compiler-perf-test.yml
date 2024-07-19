@@ -23,7 +23,7 @@ jobs:
         platform: [x86_64]
         include:
           # Self-hosted falcor tests
-          - warnings-as-errors: false
+          - warnings-as-errors: true
             test-category: full
             full-gpu-tests: false
             runs-on: [Windows, self-hosted, perf]

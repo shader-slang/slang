@@ -3743,9 +3743,8 @@ namespace Slang
             case 'w': case 'a': elementIndex = 3; break;
             default:
                 // An invalid character in the swizzle is an error
-                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 anyError = true;
-                continue;
+                break;
             }
 
             // TODO(tfoley): GLSL requires that all component names
@@ -3754,9 +3753,16 @@ namespace Slang
             // Make sure the index is in range for the source type
             if (elementIndex >= limitElement)
             {
-                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 anyError = true;
-                continue;
+                break;
+            }
+
+            // If elementCount is already at 4 stop trying to assign a swizzle element and send an error,
+            // we cannot have more valid swizzle elements than 4.
+            if (elementCount >= 4)
+            {
+                anyError = true;
+                break;
             }
 
             // Check if we've seen this index before
@@ -3778,6 +3784,7 @@ namespace Slang
 
         if (anyError)
         {
+            getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
             return CreateErrorExpr(memberRefExpr);
         }
         else if (elementCount == 1)

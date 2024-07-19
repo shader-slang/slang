@@ -219,6 +219,16 @@ SlangResult ShaderObjectLayoutImpl::Builder::build(ShaderObjectLayoutImpl** outL
     return SLANG_OK;
 }
 
+slang::TypeLayoutReflection* ShaderObjectLayoutImpl::getParameterBlockTypeLayout()
+{
+    if (!m_parameterBlockTypeLayout)
+    {
+        m_parameterBlockTypeLayout = m_slangSession->getTypeLayout(
+            m_elementTypeLayout->getType(), 0, slang::LayoutRules::MetalArgumentBufferTier2);
+    }
+    return m_parameterBlockTypeLayout;
+}
+
 Result ShaderObjectLayoutImpl::createForElementType(
     RendererBase* renderer,
     slang::ISession* session,

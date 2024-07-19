@@ -137,6 +137,8 @@ public:
 
     uint32_t m_queueAllocCount;
 
+    bool m_hasArgumentBufferTier2 = false;
+
     // A list to hold objects that may have a strong back reference to the device
     // instance. Because of the pipeline cache in `RendererBase`, there could be a reference
     // cycle among `DeviceImpl`->`PipelineStateImpl`->`ShaderProgramImpl`->`DeviceImpl`.
