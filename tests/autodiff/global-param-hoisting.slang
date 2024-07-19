@@ -7,7 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-slang -compute -mtl -output-using-type
+//TEST(compute):COMPARE_COMPUTE:-slang -compute -mtl -output-using-type -render-features argument-buffer-tier-2
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

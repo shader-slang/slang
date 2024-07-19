@@ -70,6 +70,12 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
 
     m_device = NS::TransferPtr(MTL::CreateSystemDefaultDevice());
     m_commandQueue = NS::TransferPtr(m_device->newCommandQueue(64));
+    m_hasArgumentBufferTier2 = m_device->argumentBuffersSupport() >= MTL::ArgumentBuffersTier2;
+
+    if (m_hasArgumentBufferTier2)
+    {
+        m_features.add("argument-buffer-tier-2");
+    }
 
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,

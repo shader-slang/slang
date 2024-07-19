@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 //TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):out,name outputBuffer
 //TEST_INPUT:type_conformance A:IFoo=0

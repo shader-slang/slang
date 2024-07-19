@@ -473,6 +473,9 @@ Result ShaderObjectImpl::bindAsParameterBlock(
     BindingOffset const& inOffset,
     ShaderObjectLayoutImpl* layout)
 {
+    if (!context->device->m_hasArgumentBufferTier2)
+        return SLANG_FAIL;
+    
     auto argumentBuffer = _ensureArgumentBufferUpToDate(context->device, layout);
 
     if (m_argumentBuffer)
@@ -591,7 +594,7 @@ Result ShaderObjectImpl::bindAsValue(
                 // Unsurprisingly, we bind each object in the range as
                 // a constant buffer.
                 //
-                subObject->bindAsConstantBuffer(context, objOffset, subObjectLayout);
+                SLANG_RETURN_ON_FAIL(subObject->bindAsConstantBuffer(context, objOffset, subObjectLayout));
 
                 objOffset += rangeStride;
             }
@@ -603,7 +606,7 @@ Result ShaderObjectImpl::bindAsValue(
             for (Index i = 0; i < count; ++i)
             {
                 auto subObject = m_objects[subObjectIndex + i];
-                subObject->bindAsParameterBlock(context, objOffset, subObjectLayout);
+                SLANG_RETURN_ON_FAIL(subObject->bindAsParameterBlock(context, objOffset, subObjectLayout));
                 objOffset += rangeStride;
             }
         }
