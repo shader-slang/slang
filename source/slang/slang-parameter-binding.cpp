@@ -3892,7 +3892,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     }
 
     // Try to find rules based on the selected code-generation target
-    auto layoutContext = getInitialLayoutContextForTarget(targetReq, programLayout);
+    auto layoutContext = getInitialLayoutContextForTarget(targetReq, programLayout, slang::LayoutRules::Default);
 
     // If there was no target, or there are no rules for the target,
     // then bail out here.

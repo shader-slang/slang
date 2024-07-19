@@ -70,6 +70,12 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
 
     m_device = NS::TransferPtr(MTL::CreateSystemDefaultDevice());
     m_commandQueue = NS::TransferPtr(m_device->newCommandQueue(64));
+    m_hasArgumentBufferTier2 = m_device->argumentBuffersSupport() >= MTL::ArgumentBuffersTier2;
+
+    if (m_hasArgumentBufferTier2)
+    {
+        m_features.add("argument-buffer-tier-2");
+    }
 
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
@@ -415,8 +421,19 @@ Result DeviceImpl::createTextureResource(
     }
     if (desc.allowedStates.contains(ResourceState::UnorderedAccess))
     {
+        textureUsage |= MTL::TextureUsageShaderRead;
         textureUsage |= MTL::TextureUsageShaderWrite;
-        textureUsage |= MTL::TextureUsageShaderAtomic;
+
+        // Request atomic access if the format allows it.
+        switch (desc.format)
+        {
+        case Format::R32_UINT:
+        case Format::R32_SINT:
+        case Format::R32G32_UINT:
+        case Format::R32G32_SINT:
+            textureUsage |= MTL::TextureUsageShaderAtomic;
+            break;
+        }
     }
 
     textureDesc->setMipmapLevelCount(desc.numMipLevels);
