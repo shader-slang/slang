@@ -254,15 +254,16 @@ convention for interface methods.
 
 // GCC Specific
 #if SLANG_GCC_FAMILY
-
 #	define SLANG_NO_INLINE __attribute__((noinline))
 #	define SLANG_FORCE_INLINE inline __attribute__((always_inline))
 #   define SLANG_BREAKPOINT(id) __builtin_trap();
 #	define SLANG_ALIGN_OF(T)	__alignof__(T)
+#endif // SLANG_GCC_FAMILY
 
+#if SLANG_GCC_FAMILY || defined(__clang__)
 // Use the builtin directly so we don't need to have an include of stddef.h
 #   define SLANG_OFFSET_OF(T, ELEMENT) __builtin_offsetof(T, ELEMENT) 
-#endif // SLANG_GCC_FAMILY
+#endif
 
 #ifndef SLANG_OFFSET_OF
 #   define SLANG_OFFSET_OF(T, ELEMENT) (size_t(&((T*)1)->ELEMENT) - 1)
@@ -288,10 +289,6 @@ convention for interface methods.
 
 #ifndef SLANG_COMPILE_TIME_ASSERT
 #   define SLANG_COMPILE_TIME_ASSERT(x) static_assert(x)
-#endif
-
-#ifndef SLANG_OFFSET_OF
-#	define SLANG_OFFSET_OF(X, Y) offsetof(X, Y)
 #endif
 
 #ifndef SLANG_BREAKPOINT
