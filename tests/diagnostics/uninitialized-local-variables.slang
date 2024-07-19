@@ -148,4 +148,30 @@ float structs()
     return result;
 }
 
+// Warnings even in nested scopes
+float nested_scopes(int x, inout float p)
+{
+    if (x == 0)
+    {
+        float y;
+        //CHK-DAG: warning 41016: use of uninitialized variable 'y'
+        return y;
+    }
+    else if (x == 1)
+    {
+        float y;
+        //CHK-DAG: warning 41016: use of uninitialized variable 'y'
+        p = y + 1;
+
+        if (x == 2)
+        {
+            float z;
+            //CHK-DAG: warning 41016: use of uninitialized variable 'z'
+            p += z;
+        }
+    }
+
+    return 1.0;
+}
+
 //CHK-NOT: warning 41016
