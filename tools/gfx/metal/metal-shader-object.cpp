@@ -337,7 +337,7 @@ void ShaderObjectImpl::writeOrdinaryDataIntoArgumentBuffer(
     {
         switch (defaultTypeLayout->getCategoryByIndex(0))
         {
-        case SLANG_PARAMETER_CATEGORY_UNIFORM:
+        case slang::ParameterCategory::Uniform:
             // Just copy the uniform data
             memcpy(argumentBuffer, srcData, defaultTypeLayout->getSize());
             break;
