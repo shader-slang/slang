@@ -19,8 +19,8 @@ void main(in out MaterialPayload ioPayload)
 // CHECK-DAG: OpCapability RayTracingKHR
 // CHECK-DAG: OpExtension "SPV_KHR_ray_tracing"
 // CHECK: OpEntryPoint
-// CHECK-DAG: OpTypePointer IncomingCallableDataNV
-// CHECK-DAG: OpTypePointer IncomingCallableDataNV
-// CHECK-DAG: OpTypePointer IncomingCallableDataNV
+// CHECK-DAG: OpTypePointer IncomingCallableData{{NV|KHR}}
+// CHECK-DAG: OpTypePointer IncomingCallableData{{NV|KHR}}
+// CHECK-DAG: OpTypePointer IncomingCallableData{{NV|KHR}}
 // CHECK-DAG: %{{.*}} = OpAccessChain %{{.*}} %{{.*}} %{{.*}}
 // CHECK-DAG: %{{.*}} = OpAccessChain %{{.*}} %{{.*}} %{{.*}}

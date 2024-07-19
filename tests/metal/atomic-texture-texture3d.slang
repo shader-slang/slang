@@ -30,6 +30,7 @@ void test()
 // METAL: .atomic_fetch_xor
 // METAL: .atomic_exchange
 // METAL: .atomic_compare_exchange_weak
+// METAL: .atomic_compare_exchange_weak
 
 // METAL: .atomic_fetch_add
 // METAL: .atomic_fetch_and
@@ -45,6 +46,7 @@ void test()
 // METAL: .atomic_fetch_xor
 // METAL: .atomic_exchange
 // METAL: .atomic_compare_exchange_weak
+// METAL: .atomic_compare_exchange_weak
     InterlockedAdd(intTexture3D[0], valInt);
 	InterlockedAnd(intTexture3D[0], valInt);
 	InterlockedMax(intTexture3D[0], valInt);
@@ -59,6 +61,7 @@ void test()
 	InterlockedXor(intTexture3D[0], valInt, originalValueInt);
 	InterlockedExchange(intTexture3D[0], valInt, originalValueInt);
 	InterlockedCompareExchange(intTexture3D[0], valInt, compareValueInt, originalValueInt);
+    InterlockedCompareStore(intTexture3D[0], valUInt, compareValueUInt);
 
 	InterlockedAdd(uintTexture3D[0], valUInt);
 	InterlockedAnd(uintTexture3D[0], valUInt);
@@ -74,6 +77,7 @@ void test()
 	InterlockedXor(uintTexture3D[0], valUInt, originalValueUInt);
 	InterlockedExchange(uintTexture3D[0], valUInt, originalValueUInt);
 	InterlockedCompareExchange(uintTexture3D[0], valUInt, compareValueUInt, originalValueUInt);
+    InterlockedCompareStore(uintTexture3D[0], valUInt, compareValueUInt);
 
 }
 

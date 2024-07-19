@@ -10,7 +10,7 @@ buffer MyBlockName
 } outputBuffer;
 
 // CHECK_GLSL-DAG: rayPayloadInEXT
-// CHECK_SPV-DAG: IncomingRayPayloadNV
+// CHECK_SPV-DAG: IncomingRayPayload{{NV|KHR}}
 layout(location = 2) rayPayloadInEXT vec4 payload;
 // CHECK_GLSL-DAG: hitObjectAttributeNV
 // CHECK_SPV-DAG: HitObjectAttributeNV
@@ -33,19 +33,19 @@ bool testVars() {
 // spirv checked with CHECK_SPV-DAG-N
         && gl_LaunchSizeEXT != uint3(99)
 // CHECK_GLSL-DAG: gl_WorldRayOriginEXT
-// CHECK_SPV-DAG: WorldRayOriginNV
+// CHECK_SPV-DAG: WorldRayOrigin{{NV|KHR}}
         && gl_WorldRayOriginEXT != vec3(99)
 // CHECK_GLSL-DAG: gl_WorldRayDirectionEXT
-// CHECK_SPV-DAG: WorldRayDirectionNV
+// CHECK_SPV-DAG: WorldRayDirection{{NV|KHR}}
         && gl_WorldRayDirectionEXT != vec3(99)
 // CHECK_GLSL-DAG: gl_RayTminEXT
-// CHECK_SPV-DAG: RayTminNV
+// CHECK_SPV-DAG: RayTmin{{NV|KHR}}
         && gl_RayTminEXT != 99.0f
 // CHECK_GLSL-DAG: gl_RayTmaxEXT
-// CHECK_SPV-DAG: RayTmaxNV
+// CHECK_SPV-DAG: RayTmax{{NV|KHR}}
         && gl_RayTmaxEXT != 99.0f
 // CHECK_GLSL-DAG: gl_IncomingRayFlagsEXT
-// CHECK_SPV-DAG: IncomingRayFlagsNV
+// CHECK_SPV-DAG: IncomingRayFlags{{NV|KHR}}
         && gl_IncomingRayFlagsEXT != 0xFFFFFFFF
 // CHECK_GLSL-DAG: gl_CurrentRayTimeNV
 // CHECK_SPV-DAG: CurrentRayTimeNV

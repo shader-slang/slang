@@ -11,8 +11,8 @@
 // SPIRV: OpEntryPoint MeshEXT %main
 
 // SPIRV-DAG: OpExecutionMode %main OutputVertices 3
-// SPIRV-DAG: OpExecutionMode %main OutputPrimitivesNV 1
-// SPIRV-DAG: OpExecutionMode %main OutputTrianglesNV
+// SPIRV-DAG: OpExecutionMode %main OutputPrimitives{{NV|EXT}} 1
+// SPIRV-DAG: OpExecutionMode %main OutputTriangles{{NV|EXT}}
 
 // SPIRV: OpSetMeshOutputsEXT
 
