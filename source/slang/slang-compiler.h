@@ -282,6 +282,7 @@ namespace Slang
         HashSet<SourceFile*> m_fileSet;
     };
 
+
     class EntryPoint;
 
     class ComponentType;
@@ -1051,7 +1052,7 @@ namespace Slang
 
         SLANG_NO_THROW slang::FunctionReflection* SLANG_MCALL getFunctionReflection() SLANG_OVERRIDE
         {
-            return (slang::FunctionReflection*)m_funcDeclRef.getDecl();
+            return (slang::FunctionReflection*)m_funcDeclRef.declRefBase;
         }
     protected:
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
@@ -1475,6 +1476,8 @@ namespace Slang
             SlangInt32 index) override;
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
+
+        virtual slang::DeclReflection* getModuleReflection() SLANG_OVERRIDE;
 
         void setDigest(SHA1::Digest const& digest) { m_digest = digest; }
         SHA1::Digest computeDigest();
@@ -3081,9 +3084,11 @@ namespace Slang
     class Session : public RefObject, public slang::IGlobalSession
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_INTERFACE(0xd6b767eb, 0xd786, 0x4343, { 0x2a, 0x8c, 0x6d, 0xa0, 0x3d, 0x5a, 0xb4, 0x4a })
 
-        ISlangUnknown* getInterface(const Guid& guid);
+        SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
+        SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
+        SLANG_REF_OBJECT_IUNKNOWN_RELEASE
 
         // slang::IGlobalSession 
         SLANG_NO_THROW SlangResult SLANG_MCALL createSession(slang::SessionDesc const&  desc, slang::ISession** outSession) override;
@@ -3289,9 +3294,11 @@ SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(Session* session)
     return static_cast<slang::IGlobalSession*>(session);
 }
 
-SLANG_FORCE_INLINE Session* asInternal(slang::IGlobalSession* session)
+SLANG_FORCE_INLINE ComPtr<Session> asInternal(slang::IGlobalSession* session)
 {
-    return static_cast<Session*>(session);
+    Slang::Session* internalSession = nullptr;
+    session->queryInterface(SLANG_IID_PPV_ARGS(&internalSession));
+    return ComPtr<Session>(INIT_ATTACH, static_cast<Session*>(internalSession));
 }
 
 SLANG_FORCE_INLINE slang::ISession* asExternal(Linkage* linkage)

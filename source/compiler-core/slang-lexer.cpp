@@ -185,7 +185,7 @@ namespace Slang
 
             c = lexer->m_cursor[pos++];
 
-            if (c == '\\')
+            while (c == '\\')
             {
                 // We might have a backslash-escaped newline.
                 // Look at the next byte (if any) to see.
@@ -198,18 +198,21 @@ namespace Slang
                 case '\r': case '\n':
                 {
                     // The newline was escaped, so return the code point after *that*
-
                     int e = lexer->m_cursor[pos++];
                     if ((d ^ e) == ('\r' ^ '\n'))
                         c = lexer->m_cursor[pos++];
                     else
                         c = e;
-                    break;
+                    continue;
                 }
 
                 default:
                     break;
                 }
+
+                // Only continue this while loop in the case where we consumed
+                // some newlines
+                break;
             }
             // TODO: handle UTF-8 encoding for non-ASCII code points here
 
@@ -1373,6 +1376,10 @@ namespace Slang
                 {
                     char buffer[] = { (char) c, 0 };
                     sink->diagnose(loc, LexerDiagnostics::illegalCharacterPrint, buffer);
+                }
+                else if(c == kEOF)
+                {
+                    sink->diagnose(loc, LexerDiagnostics::unexpectedEndOfInput);
                 }
                 else
                 {
