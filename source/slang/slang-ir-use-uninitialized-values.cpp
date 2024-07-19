@@ -28,11 +28,13 @@ namespace Slang
         return false;
     }
 
-    // Casting to IRUndefined is currently vacuous
-    // (e.g. any IRInst can be cast to IRUndefined)
-    static bool isUndefinedValue(IRInst* inst)
+    static bool isUninitializedValue(IRInst* inst)
     {
-        return (inst->m_op == kIROp_undefined);
+        // Also consider var since it does not
+        // automatically mean it will be initialized
+        // (at least not as the user may have intended)
+        return (inst->m_op == kIROp_undefined)
+            || (inst->m_op == kIROp_Var);
     }
 
     static bool isUndefinedParam(IRParam* param)
@@ -98,14 +100,36 @@ namespace Slang
         return false;
     }
 
-    static bool canIgnoreType(IRType* type)
+    static IRInst* resolveSpecialization(IRSpecialize* spec)
     {
+        IRInst* base = spec->getBase();
+        IRGeneric* generic = as<IRGeneric>(base);
+        return findInnerMostGenericReturnVal(generic);
+    }
+
+    // The `upper` field contains the struct that the type is
+    // is contained in. It is used to check for empty structs.
+    static bool canIgnoreType(IRType* type, IRType* upper)
+    {
+        // In case specialization returns a function instead
+        if (!type)
+            return true;
+
         if (as<IRVoidType>(type))
             return true;
 
         // For structs, ignore if its empty
-        if (as<IRStructType>(type))
-            return (type->getFirstChild() == nullptr);
+        if (auto str = as<IRStructType>(type))
+        {
+            int count = 0;
+            for (auto field : str->getFields())
+            {
+                IRType* ftype = field->getFieldType();
+                count += !canIgnoreType(ftype, type);
+            }
+
+            return (count == 0);
+        }
 
         // Nothing to initialize for a pure interface
         if (as<IRInterfaceType>(type))
@@ -113,16 +137,19 @@ namespace Slang
 
         // For pointers, check the value type (primarily for globals)
         if (auto ptr = as<IRPtrType>(type))
-            return canIgnoreType(ptr->getValueType());
+        {
+            // Avoid the recursive step if its a
+            // recursive structure like a linked list
+            IRType* ptype = ptr->getValueType();
+            return (ptype != upper) && canIgnoreType(ptype, upper);
+        }
 
         // In the case of specializations, check returned type
         if (auto spec = as<IRSpecialize>(type))
         {
-            IRInst* base = spec->getBase();
-            IRGeneric* generic = as<IRGeneric>(base);
-            IRInst* inner = findInnerMostGenericReturnVal(generic);
+            IRInst* inner = resolveSpecialization(spec);
             IRType* innerType = as<IRType>(inner);
-            return canIgnoreType(innerType);
+            return canIgnoreType(innerType, upper);
         }
 
         return false;
@@ -146,8 +173,54 @@ namespace Slang
 
         return addresses;
     }
+    
+    static void checkCallUsage(List<IRInst*>& stores, List<IRInst*>& loads, IRCall* call, IRInst* inst)
+    {
+        IRInst* callee = call->getCallee();
 
-    static void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user)
+        // Resolve the actual function
+        IRFunc* ftn = nullptr;
+        IRFuncType* ftype = nullptr;
+        if (auto spec = as<IRSpecialize>(callee))
+            ftn = as<IRFunc>(resolveSpecialization(spec));
+        else if (auto fwd = as<IRForwardDifferentiate>(callee))
+            ftn = as<IRFunc>(fwd->getBaseFn());
+        else if (auto rev = as<IRBackwardDifferentiate>(callee))
+            ftn = as<IRFunc>(rev->getBaseFn());
+        else if (auto wit = as<IRLookupWitnessMethod>(callee))
+            ftype = as<IRFuncType>(wit->getFullType());
+        else
+            ftn = as<IRFunc>(callee);
+
+        // Find the argument index so we can fetch the type
+        int index = 0;
+
+        auto args = call->getArgsList();
+        for (int i = 0; i < args.getCount(); i++)
+        {
+            if (args[i] == inst)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (ftn)
+            ftype = as<IRFuncType>(ftn->getFullType());
+
+        if (!ftype)
+            return;
+
+        // Consider it as a store if its passed
+        // as an out/inout/ref parameter
+        IRType* type = ftype->getParamType(index);
+        if (as<IROutType>(type) || as<IRInOutType>(type) || as<IRRefType>(type))
+            stores.add(call);
+        else
+            loads.add(call);
+    }
+
+    static void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user, IRInst* inst)
     {
         // Meta intrinsics (which evaluate on type) do nothing
         if (isMetaOp(user))
@@ -163,13 +236,17 @@ namespace Slang
         case kIROp_unconditionalBranch:
             // TODO: Ignore branches for now
             return;
+        
+        case kIROp_Call:
+            // Function calls can be either
+            // stores or loads depending on
+            // whether the callee takes it
+            // in as a out parameter or not
+            return checkCallUsage(stores, loads, as<IRCall>(user), inst);
 
         // These instructions will store data...
         case kIROp_Store:
         case kIROp_SwizzledStore:
-            // TODO: for calls, should make check that the
-            // function is passing as an out param
-        case kIROp_Call:
         case kIROp_SPIRVAsm:
         case kIROp_GenericAsm:
             // For now assume that __intrinsic_asm blocks will do the right thing...
@@ -185,6 +262,11 @@ namespace Slang
         case kIROp_MakeExistential:
         case kIROp_MakeExistentialWithRTTI:
             // For specializing generic structs
+            stores.add(user);
+            break;
+        
+        // Miscellaenous cases
+        case kIROp_ManagedPtrAttach:
             stores.add(user);
             break;
 
@@ -225,7 +307,7 @@ namespace Slang
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
                 IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user);
+                collectLoadStore(stores, loads, user, alias);
             }
         }
 
@@ -257,7 +339,7 @@ namespace Slang
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
                 IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user);
+                collectLoadStore(stores, loads, user, alias);
             }
         }
 
@@ -266,8 +348,140 @@ namespace Slang
         return loads;
     }
 
+    static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* reference, IRInst* inst)
+    {
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        for (auto alias : getAliasableInstructions(inst))
+        {
+            for (auto use = alias->firstUse; use; use = use->nextUse)
+            {
+                IRInst* user = use->getUser();
+                collectLoadStore(stores, loads, user, alias);
+            }
+        }
+
+        for (auto store : stores)
+        {
+            if (reachability.isInstReachable(store, reference))
+                return true;
+        }
+
+        return false;
+    }
+
+    static IRInst* traceInstOrigin(IRInst* inst)
+    {
+        if (auto load = as<IRLoad>(inst))
+            return traceInstOrigin(load->getPtr());
+
+        return inst;
+    }
+
+    static bool isReturnedValue(IRInst* inst)
+    {
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            IRInst* user = use->getUser();
+            if (as<IRReturn>(user))
+                return true;
+        }
+        return false;
+    }
+
+    static List<IRStructField*> checkFieldsFromExit(ReachabilityContext& reachability, IRReturn* ret, IRStructType* type)
+    {
+        IRInst* origin = traceInstOrigin(ret->getVal());
+
+        // We don't want to warn on delegated construction
+        if (!isUninitializedValue(origin))
+            return {};
+
+        // Now we can look for all references to fields
+        HashSet<IRStructKey*> usedKeys;
+        for (auto use = origin->firstUse; use; use = use->nextUse)
+        {
+            IRInst* user = use->getUser();
+            
+            auto fieldAddress = as<IRFieldAddress>(user);
+            if (!fieldAddress || !isInstStoredInto(reachability, ret, user))
+                continue;
+
+            IRInst* field = fieldAddress->getField();
+            usedKeys.add(as<IRStructKey>(field));
+        }
+
+        List<IRStructField*> uninitializedFields;
+
+        auto fields = type->getFields();
+        for (auto field : fields)
+        {
+            if (canIgnoreType(field->getFieldType(), nullptr))
+                continue;
+
+            if (!usedKeys.contains(field->getKey()))
+                uninitializedFields.add(field);
+        }
+        
+        return uninitializedFields;
+    }
+
+    static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, DiagnosticSink* sink)
+    {
+        auto constructor = func->findDecoration<IRConstructorDecorartion>();
+        if (!constructor)
+            return;
+
+        IRStructType* stype = as<IRStructType>(func->getResultType());
+        if (!stype)
+            return;
+
+        // Don't bother giving warnings if its not being used
+        bool synthesized = constructor->getSynthesizedStatus();
+        if (synthesized && !func->firstUse)
+            return;
+        
+        auto printWarnings = [&](const List<IRStructField*>& fields, IRReturn* ret)
+        {
+            for (auto field : fields)
+            {
+                if (synthesized)
+                {
+                    sink->diagnose(field->getKey(),
+                        Diagnostics::fieldNotDefaultInitialized,
+                        stype,
+                        field->getKey());
+                }
+                else
+                {
+                    sink->diagnose(ret,
+                        Diagnostics::constructorUninitializedField,
+                        field->getKey());
+                }
+            }
+
+        };
+
+        // Work backwards, get exit points and find sources
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst = block->getFirstInst(); inst; inst = inst->next)
+            {
+                auto ret = as<IRReturn>(inst);
+                if (!ret)
+                    continue;
+
+                auto fields = checkFieldsFromExit(reachability, ret, stype);
+                printWarnings(fields, ret);
+            }
+        }
+    }
+
     static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     {
+        // Differentiable functions will generate undefined values
+        // strictly so that they can be set in a differentiable way
         if (isDifferentiableFunc(func))
             return;
 
@@ -276,6 +490,9 @@ namespace Slang
             return;
 
         ReachabilityContext reachability(func);
+
+        // Used for a further analysis and to skip usual return checks
+        auto constructor = func->findDecoration <IRConstructorDecorartion> ();
 
         // Check out parameters
         for (auto param : firstBlock->getParams())
@@ -295,29 +512,39 @@ namespace Slang
         }
 
         // Check ordinary instructions
-        for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->getNextInst())
+        for (auto block : func->getBlocks())
         {
-            if (!isUndefinedValue(inst))
-                continue;
-
-            IRType* type = inst->getFullType();
-            if (canIgnoreType(type))
-               continue;
-
-            auto loads = getUnresolvedVariableLoads(reachability, inst);
-            for (auto load : loads)
+            for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
             {
-                sink->diagnose(load,
+                if (!isUninitializedValue(inst))
+                    continue;
+
+                // This will be looked into later
+                if (constructor && isReturnedValue(inst))
+                    continue;
+
+                IRType* type = inst->getFullType();
+                if (canIgnoreType(type, nullptr))
+                    continue;
+
+                auto loads = getUnresolvedVariableLoads(reachability, inst);
+                for (auto load : loads)
+                {
+                    sink->diagnose(load,
                         Diagnostics::usingUninitializedVariable,
                         inst);
+                }
             }
         }
+
+        // Separate analysis for constructors
+        checkConstructor(func, reachability, sink);
     }
 
     static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sink)
     {
         IRType* type = variable->getFullType();
-        if (canIgnoreType(type))
+        if (canIgnoreType(type, nullptr))
             return;
 
         // Check for semantic decorations
@@ -331,7 +558,7 @@ namespace Slang
             if (as<IRBlock>(inst))
                 return;
         }
-
+        
         auto addresses = getAliasableInstructions(variable);
         
         List<IRInst*> stores;
@@ -342,12 +569,14 @@ namespace Slang
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
                 IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user);
+                collectLoadStore(stores, loads, user, alias);
 
                 // Disregard if there is at least one store,
                 // since we cannot tell what the control flow is
                 if (stores.getCount())
                     return;
+
+                // TODO: see if we can do better here (another kind of reachability check?)
             }
         }
 

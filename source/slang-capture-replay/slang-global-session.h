@@ -1,9 +1,9 @@
 #ifndef SLANG_GLOBAL_SESSION_H
 #define SLANG_GLOBAL_SESSION_H
 
-#include "../../slang-com-ptr.h"
-#include "../../slang.h"
-#include "../../slang-com-helper.h"
+#include "slang-com-ptr.h"
+#include "slang.h"
+#include "slang-com-helper.h"
 #include "../core/slang-smart-pointer.h"
 #include "capture-manager.h"
 
@@ -17,9 +17,10 @@ namespace SlangCapture
             explicit GlobalSessionCapture(slang::IGlobalSession* session);
             virtual ~GlobalSessionCapture();
 
-            SLANG_REF_OBJECT_IUNKNOWN_ALL
+            SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
+            SLANG_REF_OBJECT_IUNKNOWN_RELEASE
 
-            ISlangUnknown* getInterface(const Guid& guid);
+            SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
 
             // slang::IGlobalSession
             SLANG_NO_THROW SlangResult SLANG_MCALL createSession(slang::SessionDesc const&  desc, slang::ISession** outSession) override;

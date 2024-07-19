@@ -1,9 +1,9 @@
 #ifndef SLANG_MODULE_H
 #define SLANG_MODULE_H
 
-#include "../../slang-com-ptr.h"
-#include "../../slang.h"
-#include "../../slang-com-helper.h"
+#include "slang-com-ptr.h"
+#include "slang.h"
+#include "slang-com-helper.h"
 #include "../core/slang-smart-pointer.h"
 #include "../slang/slang-compiler.h"
 #include "slang-entrypoint.h"
@@ -83,6 +83,7 @@ namespace SlangCapture
             uint32_t compilerOptionEntryCount,
             slang::CompilerOptionEntry* compilerOptionEntries,
             ISlangBlob** outDiagnostics = nullptr) override;
+        virtual SLANG_NO_THROW slang::DeclReflection* getModuleReflection() override;
 
         slang::IModule* getActualModule() const { return m_actualModule; }
     private:

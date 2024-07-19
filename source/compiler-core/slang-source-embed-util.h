@@ -6,7 +6,7 @@
 #include "slang-artifact.h"
 #include "slang-diagnostic-sink.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 
 #include "../core/slang-name-value.h"
 

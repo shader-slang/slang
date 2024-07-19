@@ -16,7 +16,7 @@
 
 // We still need to include the Slang header to use the Slang API
 //
-#include <slang.h>
+#include "slang.h"
 #include "slang-com-helper.h"
 
 // We will again make use of a graphics API abstraction

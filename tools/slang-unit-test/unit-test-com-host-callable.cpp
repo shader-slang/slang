@@ -7,9 +7,9 @@
 
 #include "tools/unit-test/slang-unit-test.h"
 
-#include "../../slang.h"
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
+#include "slang.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
 
 #include "../../source/core/slang-list.h"
 

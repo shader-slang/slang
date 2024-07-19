@@ -207,7 +207,7 @@ public:
         public:
             operator bool() const
             {
-                return atomSetNode->has_value();
+                return (atomSetNode) ? atomSetNode->has_value() : false;
             }
             const CapabilityAtomSet& operator*() const
             {

@@ -3,7 +3,7 @@
 // This file implements an example of hardware ray-tracing using
 // Slang shaders and the `gfx` graphics API.
 
-#include <slang.h>
+#include "slang.h"
 #include "slang-gfx.h"
 #include "gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"

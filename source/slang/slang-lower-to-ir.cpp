@@ -1,7 +1,7 @@
 // lower.cpp
 #include "slang-lower-to-ir.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 #include "../core/slang-random-generator.h"
 #include "../core/slang-hash.h"
@@ -9692,6 +9692,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         subContext->irBuilder->emitStore(thisVar, allocatedObj);
                     }
                 }
+
+                // Used for diagnostics
+                getBuilder()->addConstructorDecoration(irFunc, constructorDecl->isSynthesized);
             }
 
             // We lower whatever statement was stored on the declaration

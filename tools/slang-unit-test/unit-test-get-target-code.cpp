@@ -1,12 +1,12 @@
 // unit-test-translation-unit-import.cpp
 
-#include "../../slang.h"
+#include "slang.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "tools/unit-test/slang-unit-test.h"
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process.h"
 

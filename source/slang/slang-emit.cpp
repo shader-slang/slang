@@ -914,7 +914,7 @@ Result linkAndOptimizeIR(
     legalizeVectorTypes(irModule, sink);
 
     // Legalize `__isTextureAccess` and related.
-    legalizeIsTextureAccess(irModule);
+    legalizeIsTextureAccess(irModule, sink);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
@@ -1042,6 +1042,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
             byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            byteAddressBufferOptions.treatGetEquivalentStructuredBufferAsGetThis = true;
             byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             break;
@@ -1138,6 +1139,8 @@ Result linkAndOptimizeIR(
     }
     break;
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
     {
         legalizeIRForMetal(irModule, sink);
     }
@@ -1270,15 +1273,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.meshOutput)
         legalizeMeshOutputTypes(irModule);
 
-    if (options.shouldLegalizeExistentialAndResourceTypes)
-    {
-        if (!isMetalTarget(targetRequest))
-        {
-            // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
-            // a simple storage type that has target independent layout based on the kind of buffer resource.
-            lowerBufferElementTypeToStorageType(targetProgram, irModule);
-        }
-    }
+    lowerBufferElementTypeToStorageType(targetProgram, irModule);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
@@ -1707,6 +1702,22 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         PassThroughMode::SpirvOpt, codeGenContext->getSink());
     if (compiler)
     {
+        if (!codeGenContext->shouldSkipSPIRVValidation())
+        {
+            StringBuilder runSpirvValEnvVar;
+            PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"), runSpirvValEnvVar);
+            if (runSpirvValEnvVar.getUnownedSlice() == "1")
+            {
+                if (SLANG_FAILED(compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount()/4))))
+                {
+                    codeGenContext->getSink()->diagnoseWithoutSourceView(
+                        SourceLoc{},
+                        Diagnostics::spirvValidationFailed
+                    );
+                }
+            }
+        }
+
         ComPtr<IArtifact> optimizedArtifact;
         DownstreamCompileOptions downstreamOptions;
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);

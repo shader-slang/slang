@@ -11,7 +11,7 @@
 
 #include "../core/slang-io.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 
 #include "slang-artifact.h"
 #include "slang-artifact-associated.h"
@@ -309,6 +309,8 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) = 0;
         /// Get the version of this compiler
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) = 0;
+        /// Validate and return the result
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL validate(const uint32_t* contents, int contentsSize) = 0;
 
         /// True if underlying compiler uses file system to communicate source
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() = 0;
@@ -327,6 +329,7 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE { SLANG_UNUSED(from); SLANG_UNUSED(to); return false; } 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) SLANG_OVERRIDE { *outVersionString = nullptr; return SLANG_FAIL; }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE { SLANG_UNUSED(contents); SLANG_UNUSED(contentsSize); return SLANG_FAIL; }
 
     DownstreamCompilerBase(const Desc& desc):
         m_desc(desc)

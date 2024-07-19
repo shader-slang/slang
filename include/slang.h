@@ -326,6 +326,12 @@ convention for interface methods.
 #	define SLANG_UNUSED(v) (void)v;
 #endif
 
+#if defined(__llvm__)
+#	define SLANG_MAYBE_UNUSED [[maybe_unused]]
+#else
+#	define SLANG_MAYBE_UNUSED
+#endif
+
 // Used for doing constant literals
 #ifndef SLANG_INT64
 #	define SLANG_INT64(x) (x##ll)
@@ -2107,6 +2113,7 @@ extern "C"
     typedef struct SlangEntryPoint SlangEntryPoint;
     typedef struct SlangEntryPointLayout SlangEntryPointLayout;
 
+    typedef struct SlangReflectionDecl              SlangReflectionDecl;
     typedef struct SlangReflectionModifier          SlangReflectionModifier;
     typedef struct SlangReflectionType              SlangReflectionType;
     typedef struct SlangReflectionTypeLayout        SlangReflectionTypeLayout;
@@ -2172,6 +2179,18 @@ extern "C"
         SLANG_SCALAR_TYPE_UINT16,
         SLANG_SCALAR_TYPE_INTPTR,
         SLANG_SCALAR_TYPE_UINTPTR
+    };
+
+    // abstract decl reflection
+    typedef unsigned int SlangDeclKindIntegral;
+    enum SlangDeclKind : SlangDeclKindIntegral
+    {
+        SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION,
+        SLANG_DECL_KIND_STRUCT,
+        SLANG_DECL_KIND_FUNC,
+        SLANG_DECL_KIND_MODULE,
+        SLANG_DECL_KIND_GENERIC,
+        SLANG_DECL_KIND_VARIABLE
     };
 
 #ifndef SLANG_RESOURCE_SHAPE
@@ -2394,6 +2413,7 @@ extern "C"
         SLANG_MODIFIER_EXPORT,
         SLANG_MODIFIER_EXTERN,
         SLANG_MODIFIER_DIFFERENTIABLE,
+        SLANG_MODIFIER_MUTATING
     };
 
     // User Attribute
@@ -2528,6 +2548,7 @@ extern "C"
     SLANG_API unsigned int spReflectionVariable_GetUserAttributeCount(SlangReflectionVariable* var);
     SLANG_API SlangReflectionUserAttribute* spReflectionVariable_GetUserAttribute(SlangReflectionVariable* var, unsigned int index);
     SLANG_API SlangReflectionUserAttribute* spReflectionVariable_FindUserAttributeByName(SlangReflectionVariable* var, SlangSession * globalSession, char const* name);
+    SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar);
 
     // Variable Layout Reflection
 
@@ -2544,13 +2565,25 @@ extern "C"
 
     // Function Reflection
 
+    SLANG_API SlangReflectionDecl* spReflectionFunction_asDecl(SlangReflectionFunction* func);
     SLANG_API char const* spReflectionFunction_GetName(SlangReflectionFunction* func);
+    SLANG_API SlangReflectionModifier* spReflectionFunction_FindModifier(SlangReflectionFunction* var, SlangModifierID modifierID);
     SLANG_API unsigned int spReflectionFunction_GetUserAttributeCount(SlangReflectionFunction* func);
     SLANG_API SlangReflectionUserAttribute* spReflectionFunction_GetUserAttribute(SlangReflectionFunction* func, unsigned int index);
     SLANG_API SlangReflectionUserAttribute* spReflectionFunction_FindUserAttributeByName(SlangReflectionFunction* func, SlangSession* globalSession, char const* name);
     SLANG_API unsigned int spReflectionFunction_GetParameterCount(SlangReflectionFunction* func);
     SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameter(SlangReflectionFunction* func, unsigned index);
     SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* func);
+
+    // Abstract Decl Reflection
+
+    SLANG_API unsigned int spReflectionDecl_getChildrenCount(SlangReflectionDecl* parentDecl);
+    SLANG_API SlangReflectionDecl* spReflectionDecl_getChild(SlangReflectionDecl* parentDecl, unsigned int index);
+    SLANG_API SlangDeclKind spReflectionDecl_getKind(SlangReflectionDecl* decl);
+    SLANG_API SlangReflectionFunction* spReflectionDecl_castToFunction(SlangReflectionDecl* decl);
+    SLANG_API SlangReflectionVariable* spReflectionDecl_castToVariable(SlangReflectionDecl* decl);
+    SLANG_API SlangReflectionType* spReflection_getTypeFromDecl(SlangSession* session, SlangReflectionDecl* decl);
+    
 
     /** Get the stage that a variable belongs to (if any).
 
@@ -2693,6 +2726,7 @@ SLANG_API slang::ISession* spReflection_GetSession(SlangReflection* reflection);
 namespace slang
 {
     struct BufferReflection;
+    struct DeclReflection;
     struct TypeLayoutReflection;
     struct TypeReflection;
     struct VariableLayoutReflection;
@@ -3293,6 +3327,7 @@ namespace slang
             Export = SLANG_MODIFIER_EXPORT,
             Extern = SLANG_MODIFIER_EXTERN,
             Differentiable = SLANG_MODIFIER_DIFFERENTIABLE,
+            Mutating = SLANG_MODIFIER_MUTATING
         };
     };
 
@@ -3324,6 +3359,11 @@ namespace slang
         UserAttribute* findUserAttributeByName(SlangSession* globalSession, char const* name)
         {
             return (UserAttribute*)spReflectionVariable_FindUserAttributeByName((SlangReflectionVariable*)this, globalSession, name);
+        }
+
+        bool hasDefaultValue()
+        {
+            return spReflectionVariable_HasDefaultValue((SlangReflectionVariable*)this);
         }
     };
 
@@ -3435,20 +3475,20 @@ namespace slang
 
         unsigned int getUserAttributeCount()
         {
-            return spReflectionVariable_GetUserAttributeCount((SlangReflectionVariable*)this);
+            return spReflectionFunction_GetUserAttributeCount((SlangReflectionFunction*)this);
         }
         UserAttribute* getUserAttributeByIndex(unsigned int index)
         {
-            return (UserAttribute*)spReflectionVariable_GetUserAttribute((SlangReflectionVariable*)this, index);
+            return (UserAttribute*)spReflectionFunction_GetUserAttribute((SlangReflectionFunction*)this, index);
         }
         UserAttribute* findUserAttributeByName(SlangSession* globalSession, char const* name)
         {
-            return (UserAttribute*)spReflectionVariable_FindUserAttributeByName((SlangReflectionVariable*)this, globalSession, name);
+            return (UserAttribute*)spReflectionFunction_FindUserAttributeByName((SlangReflectionFunction*)this, globalSession, name);
         }
 
         Modifier* findModifier(Modifier::ID id)
         {
-            return (Modifier*)spReflectionVariable_FindModifier((SlangReflectionVariable*)this, (SlangModifierID)id);
+            return (Modifier*)spReflectionFunction_FindModifier((SlangReflectionFunction*)this, (SlangModifierID)id);
         }
     };
 
@@ -3670,6 +3710,122 @@ namespace slang
         {
             return (VariableLayoutReflection*) spReflection_getGlobalParamsVarLayout((SlangReflection*) this);
         }
+    };
+
+    
+    struct DeclReflection
+    {
+        enum class Kind
+        {   
+            Unsupported = SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION,
+            Struct = SLANG_DECL_KIND_STRUCT,
+            Func = SLANG_DECL_KIND_FUNC,
+            Module = SLANG_DECL_KIND_MODULE,
+            Generic = SLANG_DECL_KIND_GENERIC,
+            Variable = SLANG_DECL_KIND_VARIABLE,
+        };
+
+        Kind getKind()
+        {
+            return (Kind)spReflectionDecl_getKind((SlangReflectionDecl*)this);
+        }
+
+        unsigned int getChildrenCount()
+        {
+            return spReflectionDecl_getChildrenCount((SlangReflectionDecl*)this);
+        }
+
+        DeclReflection* getChild(unsigned int index)
+        {
+            return (DeclReflection*)spReflectionDecl_getChild((SlangReflectionDecl*)this, index);
+        }
+
+        TypeReflection* getType(SlangSession* session)
+        {
+            return (TypeReflection*)spReflection_getTypeFromDecl(session, (SlangReflectionDecl*)this);
+        }
+
+        VariableReflection* asVariable()
+        {
+            return (VariableReflection*)spReflectionDecl_castToVariable((SlangReflectionDecl*)this);
+        }
+
+        FunctionReflection* asFunction()
+        {
+            return (FunctionReflection*)spReflectionDecl_castToFunction((SlangReflectionDecl*)this);
+        }
+
+        template <Kind K>
+        struct FilteredList
+        {
+            unsigned int count;
+            DeclReflection* parent;
+
+            struct FilteredIterator
+            {
+                DeclReflection* parent;
+                unsigned int count;
+                unsigned int index;
+
+                DeclReflection* operator*() { return parent->getChild(index); }
+                void operator++() 
+                { 
+                    index++;
+                    while (index < count && !(parent->getChild(index)->getKind() == K))
+                    {
+                        index++;
+                    }
+                }
+                bool operator!=(FilteredIterator const& other) { return index != other.index; }
+            };
+
+            // begin/end for range-based for that checks the kind
+            FilteredIterator begin() 
+            { 
+                // Find the first child of the right kind
+                unsigned int index = 0;
+                while (index < count && !(parent->getChild(index)->getKind() == K))
+                {
+                    index++;
+                }
+                return FilteredIterator{parent, count, index}; 
+            }
+
+            FilteredIterator end() { return FilteredIterator{parent, count, count}; }
+        };
+        
+        template <Kind K>
+        FilteredList<K> getChildrenOfKind()
+        {
+            return FilteredList<K>{ getChildrenCount(), (DeclReflection*)this };
+        }
+
+        struct IteratedList
+        {
+            unsigned int count;
+            DeclReflection* parent;
+
+            struct Iterator
+            {
+                DeclReflection* parent;
+                unsigned int count;
+                unsigned int index;
+
+                DeclReflection* operator*() { return parent->getChild(index); }
+                void operator++() { index++; }
+                bool operator!=(Iterator const& other) { return index != other.index; }
+            };
+
+            // begin/end for range-based for that checks the kind
+            IteratedList::Iterator begin() { return IteratedList::Iterator{ parent, count, 0 }; }
+            IteratedList::Iterator end() { return IteratedList::Iterator{ parent, count, count }; } 
+        };
+
+        IteratedList getChildren()
+        {
+            return IteratedList{ getChildrenCount(), (DeclReflection*)this };
+        }
+
     };
 
     typedef uint32_t CompileStdLibFlags;
@@ -5132,6 +5288,8 @@ namespace slang
         /// Get the path to a file this module depends on.
         virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
             SlangInt32 index) = 0;
+
+        virtual SLANG_NO_THROW DeclReflection* SLANG_MCALL getModuleReflection() = 0;
     };
     
     #define SLANG_UUID_IModule IModule::getTypeGuid()

@@ -1,14 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK): -target spirv
 
-// TODO:
-// * warn potentially uninitialized variables (control flow)
-// * warn partially uninitialized variables (structs, arrays, etc.)
-// * warn uninitialized fields in constructors
-
-///////////////////////////////////
-// Uninitialized local variables //
-///////////////////////////////////
-
 // Should not warn here (unconditionalBranch)
 float3 unconditional(int mode)
 {
@@ -157,107 +148,30 @@ float structs()
     return result;
 }
 
-////////////////////////////////////
-// Uninitialized global variables //
-////////////////////////////////////
-
-// Using groupshared variables
-groupshared float4 gsConstexpr = float4(1.0f);
-groupshared float4 gsUndefined;
-
-// OK
-float use_constexpr_initialized_gs()
+// Warnings even in nested scopes
+float nested_scopes(int x, inout float p)
 {
-    return gsConstexpr.x;
-}
-
-float use_undefined_gs()
-{
-    //CHK-DAG: warning 41017: use of uninitialized global variable 'gsUndefined'
-    return gsUndefined.x;
-}
-
-// Using static variables
-static const float cexprInitialized = 1.0f;
-static float writtenNever;
-static float writtenLater;
-
-// OK
-float use_initialized_static()
-{
-    return cexprInitialized;
-}
-
-// Should detect this and treat it as a store
-void write_to_later()
-{
-    writtenLater = 1.0f;
-}
-
-float use_never_written()
-{
-    //CHK-DAG: warning 41017: use of uninitialized global variable 'writtenNever'
-    return writtenNever;
-}
-
-// OK because of prior store
-float use_later_writte()
-{
-    return writtenLater;
-}
-
-//////////////////////////////////
-// Uninitialized out parameters //
-//////////////////////////////////
-
-// Using before assigning
-float regular_undefined_use(out float3 v)
-{
-    //CHK-DAG: warning 41015: use of uninitialized out parameter 'v'
-    float r = v.x + 1.0;
-    
-    //CHK-DAG: warning 41018: returning without initializing out parameter 'v'
-    return r;
-}
-
-// Returning before assigning
-float returning_undefined_use(out float x)
-{
-    //CHK-DAG: warning 41018: returning without initializing out parameter 'x'
-    return 0;
-}
-
-// Implicit, still returning before assigning
-void implicit_undefined_use(out float x) 
-{
-    //CHK-DAG: warning 41018: returning without initializing out parameter 'x'
-}
-
-// Warn on potential return paths
-void control_flow_undefined(bool b, out float y)
-{
-    if(b)
+    if (x == 0)
     {
-        //CHK-DAG: warning 41018: returning without initializing out parameter 'y'
-        return;
+        float y;
+        //CHK-DAG: warning 41016: use of uninitialized variable 'y'
+        return y;
     }
-    y = 0;
-    return;
-}
-
-// No warnings if all paths are fine
-void control_flow_defined(bool b, out float y)
-{
-    if(b)
+    else if (x == 1)
     {
-        unused(y);
-        return;
+        float y;
+        //CHK-DAG: warning 41016: use of uninitialized variable 'y'
+        p = y + 1;
+
+        if (x == 2)
+        {
+            float z;
+            //CHK-DAG: warning 41016: use of uninitialized variable 'z'
+            p += z;
+        }
     }
-    y = 0;
-    return;
+
+    return 1.0;
 }
 
-//CHK-NOT: warning 41015
 //CHK-NOT: warning 41016
-//CHK-NOT: warning 41017
-//CHK-NOT: warning 41018

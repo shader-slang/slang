@@ -1,6 +1,6 @@
 #include "slang-shared-library.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 
 #include "slang-io.h"
 #include "slang-string-util.h"

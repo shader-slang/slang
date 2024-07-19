@@ -2,7 +2,7 @@
 #include "slang-nvrtc-compiler.h"
 
 #include "../core/slang-common.h"
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "../core/slang-blob.h"
 

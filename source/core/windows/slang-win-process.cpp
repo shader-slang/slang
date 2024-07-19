@@ -6,7 +6,7 @@
 #include "../slang-string-util.h"
 #include "../slang-process-util.h"
 
-#include "../../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #ifdef _WIN32
 // TODO: We could try to avoid including this at all, but it would

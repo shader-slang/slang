@@ -8,7 +8,7 @@
 #include "slang-parameter-binding.h"
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-varying-params.h"
-#include "slang-ir-simplify-cfg.h"
+#include "slang-ir-sccp.h"
 
 namespace Slang
 {
@@ -17,9 +17,9 @@ namespace Slang
         return as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
     }
 
-    void legalizeIsTextureAccess(IRModule* module)
+    void legalizeIsTextureAccess(IRModule* module, DiagnosticSink* sink)
     {
-        HashSet<IRFunc*> functionsToSimplifyCFG;
+        HashSet<IRFunc*> functionsToSCCP;
         IRBuilder builder(module);
         for (auto globalInst : module->getModuleInst()->getChildren())
         {
@@ -39,11 +39,9 @@ namespace Slang
                         if (getTextureAccess(inst))
                             inst->replaceUsesWith(builder.getBoolValue(true));
                         else
-                        {
                             inst->replaceUsesWith(builder.getBoolValue(false));
-                            functionsToSimplifyCFG.add(func);
-                        }
                         inst->removeAndDeallocate();
+                        functionsToSCCP.add(func);
                         continue;
                     case kIROp_IsTextureArrayAccess:
                     {
@@ -51,11 +49,9 @@ namespace Slang
                         if (textureAccess && as<IRTextureType>(textureAccess->getImage()->getDataType())->isArray())
                             inst->replaceUsesWith(builder.getBoolValue(true));
                         else
-                        {
                             inst->replaceUsesWith(builder.getBoolValue(false));
-                            functionsToSimplifyCFG.add(func);
-                        }
                         inst->removeAndDeallocate();
+                        functionsToSCCP.add(func);
                         continue;
                     }
                     case kIROp_IsTextureScalarAccess:
@@ -64,21 +60,20 @@ namespace Slang
                         if (textureAccess && !as<IRVectorType>(as<IRTextureType>(textureAccess->getImage()->getDataType())->getElementType()))
                             inst->replaceUsesWith(builder.getBoolValue(true));
                         else
-                        {
                             inst->replaceUsesWith(builder.getBoolValue(false));
-                            functionsToSimplifyCFG.add(func);
-                        }
                         inst->removeAndDeallocate();
+                        functionsToSCCP.add(func);
                         continue;
                     }
                     }
                 }   
             }
         }
-        // Requires a simplifyCFG to ensure Slang does not evaluate 'IRTextureType' code path for 
-        // 'inst' for when 'inst' is not a 'IRTextureType'/TextureAccessor
-        for(auto func : functionsToSimplifyCFG)
-            simplifyCFG(func, CFGSimplificationOptions::getFast());
+        // Requires a SCCP to ensure Slang does not evaluate 'IRTextureType' code path
+        // and unresolved 'isTextureAccess' operations for when 'inst' is not a
+        // 'IRTextureType'/`TextureAccessor`
+        for (auto func : functionsToSCCP)
+            applySparseConditionalConstantPropagation(func, sink);
     }
 }
 

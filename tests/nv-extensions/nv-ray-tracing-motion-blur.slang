@@ -119,7 +119,7 @@ void main()
     outputImage[launchID] = float4(color, 1.0);
 }
 
-// CHECK_SPV: %{{.*}} = OpVariable %_ptr_RayPayload{{(NV)?}}_ReflectionRay{{.*}} RayPayload
+// CHECK_SPV: %{{.*}} = OpVariable %_ptr_RayPayload{{NV|KHR}}_ReflectionRay{{.*}} RayPayload
 // CHECK_SPV: OpTraceRayMotionNV
 // CHECK_SPV: OpTraceRayKHR
 
