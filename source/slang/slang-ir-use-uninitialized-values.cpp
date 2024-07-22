@@ -378,7 +378,7 @@ namespace Slang
         return loads;
     }
     
-    static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* inst)
+    static bool isInstStoredInto(IRInst* inst)
     {
         List<IRInst*> stores;
         List<IRInst*> loads;
@@ -540,10 +540,17 @@ namespace Slang
         }
     }
 
-    static void checkAsInOutParameter(ReachabilityContext& reachability, IRParam* param, DiagnosticSink* sink)
+    static void checkAsInOutParameter(ReachabilityContext& reachability, IRFunc* func, IRParam* param, DiagnosticSink* sink)
     {
-        if (isInstStoredInto(reachability, param))
+        if (isInstStoredInto(param))
             return;
+
+        // If the inout is used for the sake of interface conformance, let it be
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            if (as<IRWitnessTableEntry>(use->getUser()))
+                return;
+        }
 
         sink->diagnose(param, Diagnostics::inOutNeverStoredInto, param);
     }
@@ -577,7 +584,7 @@ namespace Slang
             if (checkType == CheckAsOut)
                 checkAsOutParameter(reachability, func, param, sink);
             if (checkType == CheckAsInOut)
-                checkAsInOutParameter(reachability, param, sink);
+                checkAsInOutParameter(reachability, func, param, sink);
         }
 
         // Check ordinary instructions
