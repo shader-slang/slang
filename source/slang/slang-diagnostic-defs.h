@@ -395,6 +395,7 @@ DIAGNOSTIC(36109, Error, invalidTargetSwitchCase, "'$0' cannot be used as a targ
 DIAGNOSTIC(36110, Error, stageIsIncompatibleWithCapabilityDefinition, "'$0' is defined for stage '$1', which is incompatible with the declared capability set '$2'.")
 DIAGNOSTIC(36111, Error, unexpectedCapability, "'$0' resolves into a disallowed `$1` Capability.")
 DIAGNOSTIC(36112, Warning, entryPointAndProfileAreIncompatible, "'$0' is defined for stage '$1', which is incompatible with the declared profile '$2'.")
+DIAGNOSTIC(36113, Warning, usingInternalCapabilityName, "'$0' resolves into a '_Internal' `_$1' Capability, use '$1' instead.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")

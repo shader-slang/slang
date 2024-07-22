@@ -124,6 +124,12 @@ CapabilityName findCapabilityName(UnownedStringSlice const& name)
     return result;
 }
 
+bool isInternalCapabilityName(CapabilityName name)
+{
+    SLANG_ASSERT(_getInfo(name).name != nullptr);
+    return _getInfo(name).name[0] == '_';
+}
+
 CapabilityAtom getLatestSpirvAtom()
 {
     static CapabilityAtom result = CapabilityAtom::Invalid;
@@ -897,6 +903,17 @@ void CapabilitySet::addSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& ot
     }
 }
 
+void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom)
+{
+    printDiagnosticArg(sb, (CapabilityName)atom);
+}
+
+void printDiagnosticArg(StringBuilder& sb, CapabilityName name)
+{
+    SLANG_ASSERT(_getInfo(name).name != nullptr);
+    sb << ((_getInfo(name).name[0] == '_') ? &_getInfo(name).name[1] : &_getInfo(name).name[0]);
+}
+
 void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
 {
     bool isFirstSet = true;
@@ -914,24 +931,11 @@ void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
             {
                 sb << " + ";
             }
-            auto name = capabilityNameToString((CapabilityName)formattedAtom);
-            if (name.startsWith("_"))
-                name = name.tail(1);
-            sb << name;
+            printDiagnosticArg(sb, formattedAtom);
             isFirst = false;
         }
         isFirstSet = false;
     }
-}
-
-void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom)
-{
-    printDiagnosticArg(sb, (CapabilityName)atom);
-}
-
-void printDiagnosticArg(StringBuilder& sb, CapabilityName name)
-{
-    sb << _getInfo(name).name;
 }
 
 void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)

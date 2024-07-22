@@ -322,6 +322,9 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base);
     /// Find a capability atom with the given `name`, or return CapabilityAtom::Invalid.
 CapabilityName findCapabilityName(UnownedStringSlice const& name);
 
+    /// Check if 'name' is an '_Internal' or 'External' capability.
+bool isInternalCapabilityName(CapabilityName name);
+
 CapabilityAtom getLatestSpirvAtom();
 CapabilityAtom getLatestMetalAtom();
 

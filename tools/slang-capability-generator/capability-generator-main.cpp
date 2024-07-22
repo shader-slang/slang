@@ -258,6 +258,39 @@ struct CapabilityDefParser
         return SLANG_OK;
     }
 
+    void validateInternalAtomExternalAtomPair()
+    {
+        // All `_Internal` atoms must have an `External` atom. 
+        // `External` atoms do not require to have an `_Internal` atom.
+        // The following behavior ensures that if we error with 'atom' instead of 
+        // '_atom' a user may add the 'atom' capability to solve their error. This is
+        // important because '_Internal' will only be for 1 target, 'External' will alias
+        // to more than 1 target. We need to ensure users avoid 'Internal' when possible.
+
+        Dictionary<String, List<RefPtr<CapabilityDef>>> nameToInternalAndExternalAtom;
+        for(auto i : m_defs)
+        {
+            // 'abstract' atoms are not reported to a user and are ignored
+            if (i->flavor == CapabilityFlavor::Abstract)
+                continue;
+
+            // Try to pack `_atom` and `atom` into the same per key List
+            String name = i->name;
+            if(i->name.startsWith("_"))
+                name = name.subString(1, name.getLength()-1);
+            nameToInternalAndExternalAtom[name].add(i);
+        }
+        for(auto i : nameToInternalAndExternalAtom)
+        {
+            SLANG_ASSERT(i.second.getCount() <= 2);
+            if(i.second.getCount() != 2)
+            {
+                // If we only have a '_Internal' atom inside our name list there is a missing 'External' atom
+                if(i.second[0]->name.startsWith("_"))
+                    m_sink->diagnose(i.second[0]->sourceLoc, Diagnostics::missingExternalInternalAtomPair, i.second[0]->name);
+            }
+        }
+    }
     SlangResult parseDefs()
     {
         auto tokens = m_lexer->lexAllSemanticTokens();
@@ -337,6 +370,7 @@ struct CapabilityDefParser
 
             def->sourceLoc = nameToken.loc;
         }
+        validateInternalAtomExternalAtomPair();
         return SLANG_OK;
     }
 };

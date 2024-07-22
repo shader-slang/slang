@@ -56,4 +56,5 @@ DIAGNOSTIC(20003, Error, undefinedIdentifier, "undefined identifier \"$0\".")
 DIAGNOSTIC(20004, Error, redefinition, "capability redefinition: '$0'.")
 DIAGNOSTIC(20005, Error, unionWithSameKeyAtomButNotSubset, "unioning ('|') capability sets which have incompatible atoms but compatible 'key atoms', this: '$0', other: '$1'")
 DIAGNOSTIC(20006, Error, invalidJoinInGenerator, "joining ('+') capability sets which have incompatible 'key atoms'")
+DIAGNOSTIC(20007, Error, missingExternalInternalAtomPair, "All internal '_atom' require a corresponding external 'atom' atom meant for user's use. Offending atom: $0")
 #undef DIAGNOSTIC
