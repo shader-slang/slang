@@ -11,7 +11,12 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-single-return.h"
 #include "slang-glsl-extension-tracker.h"
+
+#ifdef SLANG_EXTERNAL_SPIRV_HEADER
+#include <spirv/unified1/spirv.h>
+#else
 #include "../../external/spirv-headers/include/spirv/unified1/spirv.h"
+#endif
 
 namespace Slang
 {

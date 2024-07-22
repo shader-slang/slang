@@ -105,6 +105,14 @@ option(EXTERNAL_VULKAN_HEADERS "Build using external Vulkan headers" OFF)
 option(EXTERNAL_SPIRV_HEADERS "Build using external SPIR-V headers" OFF)
 option(EXTERNAL_UNORDERED_DENSE "Build using external unordered dense" OFF)
 
+if (${EXTERNAL_LZ4})
+    add_compile_definitions(SLANG_EXTERNAL_LZ4_HEADER)
+endif()
+
+if (${EXTERNAL_SPIRV_HEADERS})
+    add_compile_definitions(SLANG_EXTERNAL_SPIRV_HEADER)
+endif()
+
 if (${EXTERNAL_UNORDERED_DENSE})
     add_compile_definitions(SLANG_EXTERNAL_UNORDERED_DENSE_HEADER)
 endif()

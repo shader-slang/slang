@@ -4,7 +4,13 @@
 #include "../core/slang-string.h"
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-dictionary.h"
+
+#ifdef SLANG_EXTERNAL_SPIRV_HEADER
+#include <spirv/unified1/spirv.h>
+#else
 #include "../../external/spirv-headers/include/spirv/unified1/spirv.h"
+#endif
+
 #include <optional>
 
 namespace Slang
