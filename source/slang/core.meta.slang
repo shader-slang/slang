@@ -2748,8 +2748,16 @@ attribute_syntax [payload] : PayloadAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
 
+enum SideEffects
+{
+    /// Causes a warning if the method is detected to have side-effects
+    Warn = 0,
+
+    /// Suppresses the warning
+    Allow = 1
+};
 __attributeTarget(FunctionDeclBase)
-attribute_syntax [PreferRecompute] : PreferRecomputeAttribute;
+attribute_syntax[PreferRecompute(behavior: SideEffects = SideEffects.Warn)] : PreferRecomputeAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;

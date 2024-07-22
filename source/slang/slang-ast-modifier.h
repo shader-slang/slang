@@ -1272,6 +1272,14 @@ class PyExportAttribute : public Attribute
 class PreferRecomputeAttribute : public Attribute
 {
     SLANG_AST_CLASS(PreferRecomputeAttribute)
+    
+    enum SideEffectBehavior
+    {
+        Default = 0,
+        HasSideEffects = 1
+    };
+
+    SideEffectBehavior sideEffectBehavior;
 };
 
 class PreferCheckpointAttribute : public Attribute
