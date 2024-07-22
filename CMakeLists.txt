@@ -98,14 +98,15 @@ option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
 option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang wrapper target" ON)
 option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
-option(SLANG_ENABLE_CORE_TOOLS "Enable core tools of slang" ON)
-option(SLANG_ENABLE_BOOTSTRAP "Enable slang bootstrap" ON)
 
 option(EXTERNAL_MINIZ "Build using external Miniz library" OFF)
 option(EXTERNAL_LZ4 "Build using external LZ4 library" OFF)
 option(EXTERNAL_VULKAN_HEADERS "Build using external Vulkan headers" OFF)
 option(EXTERNAL_SPIRV_HEADERS "Build using external SPIR-V headers" OFF)
 option(EXTERNAL_UNORDERED_DENSE "Build using external unordered dense" OFF)
+
+option(SLANG_SPIRV_HEADERS_INCLUDE_DIR "Provide an external path for the SPIR-V headers and grammar files")
+mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
 
 if (${EXTERNAL_LZ4})
     add_compile_definitions(SLANG_EXTERNAL_LZ4_HEADER)
@@ -309,23 +310,19 @@ function(generator dir)
     endif()
 endfunction()
 
-if (SLANG_ENABLE_CORE_TOOLS)
-	generator(tools/slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
-	generator(tools/slang-embed)
-	generator(tools/slang-generate USE_FEWER_WARNINGS)
-	generator(tools/slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
-	generator(tools/slang-capability-generator LINK_WITH_PRIVATE compiler-core)
-	generator(tools/slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
-endif()
+generator(tools/slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
+generator(tools/slang-embed)
+generator(tools/slang-generate USE_FEWER_WARNINGS)
+generator(tools/slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
+generator(tools/slang-capability-generator LINK_WITH_PRIVATE compiler-core)
+generator(tools/slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
 
-if (SLANG_ENABLE_BOOTSTRAP)
-	generator(
-		source/slangc
-		TARGET_NAME slang-bootstrap
-		USE_FEWER_WARNINGS
-		LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib slang-capability-lookup slang-lookup-tables Threads::Threads
-	)
-endif()
+generator(
+	source/slangc
+	TARGET_NAME slang-bootstrap
+	USE_FEWER_WARNINGS
+	LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib slang-capability-lookup slang-lookup-tables Threads::Threads
+)
 
 #
 # The compiler itself
