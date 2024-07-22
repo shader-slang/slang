@@ -103,6 +103,11 @@ option(EXTERNAL_MINIZ "Build using external Miniz library" OFF)
 option(EXTERNAL_LZ4 "Build using external LZ4 library" OFF)
 option(EXTERNAL_VULKAN_HEADERS "Build using external Vulkan headers" OFF)
 option(EXTERNAL_SPIRV_HEADERS "Build using external SPIR-V headers" OFF)
+option(EXTERNAL_UNORDERED_DENSE "Build using external unordered dense" OFF)
+
+if (${EXTERNAL_UNORDERED_DENSE})
+    add_compile_definitions(SLANG_EXTERNAL_UNORDERED_DENSE_HEADER)
+endif()
 
 enum_option(
     SLANG_LIB_TYPE
