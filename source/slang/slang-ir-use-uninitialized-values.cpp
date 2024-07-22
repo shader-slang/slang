@@ -5,6 +5,13 @@
 
 namespace Slang
 {
+    struct DiagnosticsContext
+    {
+        IRFunc* func;
+        ReachabilityContext* reachability;
+        DiagnosticSink* sink;
+    };
+
     static bool isMetaOp(IRInst* inst)
     {
         switch (inst->getOp())
@@ -307,14 +314,14 @@ namespace Slang
         }
     }
 
-    static void cancelLoads(ReachabilityContext &reachability, const List<IRInst*>& stores, List<IRInst*>& loads)
+    static void cancelLoads(ReachabilityContext* reachability, const List<IRInst*>& stores, List<IRInst*>& loads)
     {
         // Remove all loads which are reachable from stores
         for (auto store : stores)
         {
             for (Index i = 0; i < loads.getCount(); )
             {
-                if (reachability.isInstReachable(store, loads[i]))
+                if (reachability->isInstReachable(store, loads[i]))
                     loads.fastRemoveAt(i);
                 else
                     i++;
@@ -322,7 +329,7 @@ namespace Slang
         }
     }
 
-    static List<IRInst*> getUnresolvedParamLoads(ReachabilityContext &reachability, IRFunc* func, IRInst* inst)
+    static List<IRInst*> getUnresolvedParamLoads(ReachabilityContext* reachability, IRFunc* func, IRInst* inst)
     {
         // Collect all aliasable addresses
         auto addresses = getAliasableInstructions(inst);
@@ -356,7 +363,7 @@ namespace Slang
         return loads;
     }
 
-    static List<IRInst*> getUnresolvedVariableLoads(ReachabilityContext &reachability, IRInst* inst)
+    static List<IRInst*> getUnresolvedVariableLoads(ReachabilityContext* reachability, IRInst* inst)
     {
         auto addresses = getAliasableInstructions(inst);
 
@@ -397,7 +404,7 @@ namespace Slang
         return false;
     }
 
-    static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* reference, IRInst* inst)
+    static bool isInstStoredInto(ReachabilityContext* reachability, IRInst* reference, IRInst* inst)
     {
         List<IRInst*> stores;
         List<IRInst*> loads;
@@ -413,7 +420,7 @@ namespace Slang
 
         for (auto store : stores)
         {
-            if (reachability.isInstReachable(store, reference))
+            if (reachability->isInstReachable(store, reference))
                 return true;
         }
 
@@ -439,7 +446,7 @@ namespace Slang
         return false;
     }
 
-    static List<IRStructField*> checkFieldsFromExit(ReachabilityContext& reachability, IRReturn* ret, IRStructType* type)
+    static List<IRStructField*> checkFieldsFromExit(ReachabilityContext* reachability, IRReturn* ret, IRStructType* type)
     {
         IRInst* origin = traceInstOrigin(ret->getVal());
 
@@ -476,19 +483,19 @@ namespace Slang
         return uninitializedFields;
     }
 
-    static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, DiagnosticSink* sink)
+    static void checkConstructor(DiagnosticsContext context)
     {
-        auto constructor = func->findDecoration<IRConstructorDecorartion>();
+        auto constructor = context.func->findDecoration<IRConstructorDecorartion>();
         if (!constructor)
             return;
 
-        IRStructType* stype = as<IRStructType>(func->getResultType());
+        IRStructType* stype = as<IRStructType>(context.func->getResultType());
         if (!stype)
             return;
 
         // Don't bother giving warnings if its not being used
         bool synthesized = constructor->getSynthesizedStatus();
-        if (synthesized && !func->firstUse)
+        if (synthesized && !context.func->firstUse)
             return;
         
         auto printWarnings = [&](const List<IRStructField*>& fields, IRReturn* ret)
@@ -497,14 +504,14 @@ namespace Slang
             {
                 if (synthesized)
                 {
-                    sink->diagnose(field->getKey(),
+                    context.sink->diagnose(field->getKey(),
                         Diagnostics::fieldNotDefaultInitialized,
                         stype,
                         field->getKey());
                 }
                 else
                 {
-                    sink->diagnose(ret,
+                    context.sink->diagnose(ret,
                         Diagnostics::constructorUninitializedField,
                         field->getKey());
                 }
@@ -513,7 +520,7 @@ namespace Slang
         };
 
         // Work backwards, get exit points and find sources
-        for (auto block : func->getBlocks())
+        for (auto block : context.func->getBlocks())
         {
             for (auto inst = block->getFirstInst(); inst; inst = inst->next)
             {
@@ -521,18 +528,18 @@ namespace Slang
                 if (!ret)
                     continue;
 
-                auto fields = checkFieldsFromExit(reachability, ret, stype);
+                auto fields = checkFieldsFromExit(context.reachability, ret, stype);
                 printWarnings(fields, ret);
             }
         }
     }
 
-    static void checkAsOutParameter(ReachabilityContext& reachability, IRFunc* func, IRParam* param, DiagnosticSink* sink)
+    static void checkAsOutParameter(DiagnosticsContext context, IRParam* param)
     {
-        auto loads = getUnresolvedParamLoads(reachability, func, param);
+        auto loads = getUnresolvedParamLoads(context.reachability, context.func, param);
         for (auto load : loads)
         {
-            sink->diagnose(load,
+            context.sink->diagnose(load,
                     as <IRReturn> (load)
                     ? Diagnostics::returningWithUninitializedOut
                     : Diagnostics::usingUninitializedOut,
@@ -540,19 +547,19 @@ namespace Slang
         }
     }
 
-    static void checkAsInOutParameter(ReachabilityContext& reachability, IRFunc* func, IRParam* param, DiagnosticSink* sink)
+    static void checkAsInOutParameter(DiagnosticsContext context, IRParam* param)
     {
         if (isInstStoredInto(param))
             return;
 
         // If the inout is used for the sake of interface conformance, let it be
-        for (auto use = func->firstUse; use; use = use->nextUse)
+        for (auto use = context.func->firstUse; use; use = use->nextUse)
         {
             if (as<IRWitnessTableEntry>(use->getUser()))
                 return;
         }
 
-        sink->diagnose(param, Diagnostics::inOutNeverStoredInto, param);
+        context.sink->diagnose(param, Diagnostics::inOutNeverStoredInto, param);
     }
 
     static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
@@ -568,6 +575,12 @@ namespace Slang
 
         ReachabilityContext reachability(func);
 
+        // Necessary data to do checks
+        DiagnosticsContext context;
+        context.func = func;
+        context.reachability = &reachability;
+        context.sink = sink;
+
         // Used for a further analysis and to skip usual return checks
         auto constructor = func->findDecoration<IRConstructorDecorartion>();
         
@@ -582,9 +595,9 @@ namespace Slang
         {
             auto checkType = isPotentiallyUnintended(param, stage, index++);
             if (checkType == CheckAsOut)
-                checkAsOutParameter(reachability, func, param, sink);
+                checkAsOutParameter(context, param);
             if (checkType == CheckAsInOut)
-                checkAsInOutParameter(reachability, func, param, sink);
+                checkAsInOutParameter(context, param);
         }
 
         // Check ordinary instructions
@@ -603,7 +616,7 @@ namespace Slang
                 if (canIgnoreType(type, nullptr))
                     continue;
 
-                auto loads = getUnresolvedVariableLoads(reachability, inst);
+                auto loads = getUnresolvedVariableLoads(context.reachability, inst);
                 for (auto load : loads)
                 {
                     sink->diagnose(load,
@@ -614,7 +627,7 @@ namespace Slang
         }
 
         // Separate analysis for constructors
-        checkConstructor(func, reachability, sink);
+        checkConstructor(context);
     }
 
     static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sink)
