@@ -98,6 +98,8 @@ option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
 option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang wrapper target" ON)
 option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
+option(SLANG_ENABLE_CORE_TOOLS "Enable core tools of slang" ON)
+option(SLANG_ENABLE_BOOTSTRAP "Enable slang bootstrap" ON)
 
 option(EXTERNAL_MINIZ "Build using external Miniz library" OFF)
 option(EXTERNAL_LZ4 "Build using external LZ4 library" OFF)
@@ -306,18 +308,24 @@ function(generator dir)
         )
     endif()
 endfunction()
-generator(tools/slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
-generator(tools/slang-embed)
-generator(tools/slang-generate USE_FEWER_WARNINGS)
-generator(tools/slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
-generator(tools/slang-capability-generator LINK_WITH_PRIVATE compiler-core)
-generator(tools/slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
-generator(
-    source/slangc
-    TARGET_NAME slang-bootstrap
-    USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib slang-capability-lookup slang-lookup-tables Threads::Threads
-)
+
+if (SLANG_ENABLE_CORE_TOOLS)
+	generator(tools/slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
+	generator(tools/slang-embed)
+	generator(tools/slang-generate USE_FEWER_WARNINGS)
+	generator(tools/slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
+	generator(tools/slang-capability-generator LINK_WITH_PRIVATE compiler-core)
+	generator(tools/slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
+endif()
+
+if (SLANG_ENABLE_BOOTSTRAP)
+	generator(
+		source/slangc
+		TARGET_NAME slang-bootstrap
+		USE_FEWER_WARNINGS
+		LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib slang-capability-lookup slang-lookup-tables Threads::Threads
+	)
+endif()
 
 #
 # The compiler itself
