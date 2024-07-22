@@ -2,7 +2,7 @@
 
 namespace SlangRecord
 {
-    void ReplayConsumer::CreateGlobalSession(ObjectID objectId, const uint8_t* parameterBuffer, int64_t bufferSize)
+    void ReplayConsumer::CreateGlobalSession(ObjectID outGlobalSessionId)
     {
     }
 

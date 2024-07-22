@@ -10,7 +10,7 @@ namespace SlangRecord
     class ReplayConsumer : public IDecoderConsumer
     {
     public:
-        virtual void CreateGlobalSession(ObjectID objectId, const uint8_t* parameterBuffer, int64_t bufferSize) = 0;
+        virtual void CreateGlobalSession(ObjectID outGlobalSessionId) = 0;
         virtual void IGlobalSession_createSession(ObjectID objectId, slang::SessionDesc const&  desc, ObjectID outSessionId) = 0;
         virtual void IGlobalSession_findProfile(ObjectID objectId, char const* name) = 0;
         virtual void IGlobalSession_setDownstreamCompilerPath(ObjectID objectId, SlangPassThrough passThrough, char const* path) = 0;

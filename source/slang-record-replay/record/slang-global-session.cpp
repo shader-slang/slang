@@ -18,9 +18,15 @@ namespace SlangRecord
         // We will use the address of the global session as the filename for the record manager
         // to make it unique for each global session.
         // record slang::createGlobalSession
-        ParameterRecorder* recorder = m_recordManager->beginMethodRecord(ApiCallId::CreateGlobalSession, g_globalFunctionHandle);
+
+        ParameterRecorder* recorder{};
+        {
+            m_recordManager->beginMethodRecord(ApiCallId::CreateGlobalSession, g_globalFunctionHandle);
+            recorder = m_recordManager->endMethodRecord();
+        }
+
         recorder->recordAddress(m_actualGlobalSession);
-        m_recordManager->endMethodRecord();
+        m_recordManager->endMethodRecordAppendOutput();
     }
 
     GlobalSessionRecorder::~GlobalSessionRecorder()

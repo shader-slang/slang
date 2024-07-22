@@ -1,6 +1,7 @@
 #include "slang-filesystem.h"
 #include "../util/record-utility.h"
 #include "output-stream.h"
+#include <cstdlib>
 
 namespace SlangRecord
 {
@@ -51,6 +52,21 @@ namespace SlangRecord
         {
             std::filesystem::path filePath = m_recordManager->getRecordFileDirectory();
             filePath = filePath / path;
+
+            if (!std::filesystem::exists(filePath.parent_path()))
+            {
+                slangRecordLog(LogLevel::Debug, "Create directory: %s to save captured shader file: %s\n",
+                    filePath.parent_path().string().c_str(), filePath.filename().string().c_str());
+
+                std::error_code ec;
+                // std::filesystem::create_directories can create the directory recursively.
+                if (!std::filesystem::create_directories(filePath.parent_path(), ec))
+                {
+                    slangRecordLog(LogLevel::Error, "Fail to create directory: %s, error (%d): %s\n",
+                        filePath.parent_path().string().c_str(), ec.value(), ec.message().c_str());
+                    return SLANG_FAIL;
+                }
+            }
 
             FileOutputStream fileStream(filePath.string().c_str());
 
