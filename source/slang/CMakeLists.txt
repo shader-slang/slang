@@ -161,9 +161,9 @@ set(SLANG_LOOKUP_GENERATOR_OUTPUT_DIR
 set(SLANG_LOOKUP_GENERATED_SOURCE
     "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.cpp"
 )
-set(SLANG_CAPATURE_REPLAY_SYSTEM
-    "${slang_SOURCE_DIR}/source/slang-capture-replay/capture"
-    "${slang_SOURCE_DIR}/source/slang-capture-replay/util"
+set(SLANG_RECORD_REPLAY_SYSTEM
+    "${slang_SOURCE_DIR}/source/slang-record-replay/record"
+    "${slang_SOURCE_DIR}/source/slang-record-replay/util"
 )
 
 add_custom_command(
@@ -206,10 +206,6 @@ slang_add_target(
     FOLDER generated
 )
 
-set(SLANG_CAPTURE_REPLAY_SYSTEM
-    "${slang_SOURCE_DIR}/source/slang-capture-replay"
-)
-
 #
 # Generate an embeddable stdlib
 #
@@ -248,7 +244,7 @@ configure_file(${slang_SOURCE_DIR}/slang-tag-version.h.in slang-version-header/s
 #
 
 set(slang_common_args
-    EXTRA_SOURCE_DIRS ${SLANG_CAPTURE_REPLAY_SYSTEM}
+    EXTRA_SOURCE_DIRS ${SLANG_RECORD_REPLAY_SYSTEM}
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE
         core

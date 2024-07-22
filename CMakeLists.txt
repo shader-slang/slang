@@ -772,15 +772,15 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
 endif()
 
 #
-# slang-replay tool for replaying the capture files
+# slang-replay tool for replaying the record files
 #
 if (SLANG_ENABLE_REPLAYER)
     slang_add_target(
         tools/slang-replay
         EXECUTABLE
-        EXTRA_SOURCE_DIRS source/slang-capture-replay/replay source/slang-capture-replay/util
+        EXTRA_SOURCE_DIRS source/slang-record-replay/replay source/slang-record-replay/util
         LINK_WITH_PRIVATE core compiler-core slang
-        INCLUDE_DIRECTORIES_PUBLIC source/slang-capture-replay
+        INCLUDE_DIRECTORIES_PUBLIC source/slang-record-replay
         FOLDER test
     )
 endif()
