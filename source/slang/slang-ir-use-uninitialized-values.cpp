@@ -44,7 +44,7 @@ namespace Slang
         CheckAsInOut
     };
 
-    static ParameterCheckType isPotentiallyUninitialized(IRParam* param, Stage stage)
+    static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, int index)
     {
         IRType* type = param->getFullType();
         if (auto out = as<IROutType>(type))
@@ -67,13 +67,27 @@ namespace Slang
 
             return CheckAsOut;
         }
-        else if (as<IRInOutType>(type))
+        else if (auto inout = as<IRInOutType>(type))
         {
-            // In HLSL the payload (#0) is required to be `inout`
-            bool requiresPayload = !(stage == Stage::AnyHit || stage == Stage::ClosestHit);
-            return (param->getPrevParam() || requiresPayload)
-                ? CheckAsInOut
-                : Never;
+            // TODO: some way to check if the method
+            // is actually used for autodiff
+            if (as<IRDifferentialPairUserCodeType>(inout->getValueType()))
+                return Never;
+
+            switch (stage)
+            {
+            case Stage::AnyHit:
+            case Stage::ClosestHit:
+                // In HLSL the payload is required to be `inout`
+                return (index == 0) ? Never : CheckAsInOut;
+            case Stage::Geometry:
+                // Second parameter is the triangle stream
+                return (index == 1) ? Never : CheckAsInOut;
+            default:
+                break;
+            }
+
+            return CheckAsInOut;
         }
 
         return Never;
@@ -556,9 +570,10 @@ namespace Slang
             stage = entry->getProfile().getStage();
 
         // Check out parameters
+        int index = 0;
         for (auto param : firstBlock->getParams())
         {
-            auto checkType = isPotentiallyUninitialized(param, stage);
+            auto checkType = isPotentiallyUnintended(param, stage, index++);
             if (checkType == CheckAsOut)
                 checkAsOutParameter(reachability, func, param, sink);
             if (checkType == CheckAsInOut)

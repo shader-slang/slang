@@ -5,20 +5,22 @@
 interface IFoo
 {
     [mutating]
-    int bar(inout int y);
+    int bar(int y);
 }
 
 struct Val : IFoo
 {
     int x;
 
+    [mutating]
     int bar(int y)
     {
-        return x + y;
+        x += y;
+        return x;
     }
 }
 
-int test<T:IFoo>(inout T f, inout int y)
+int test<T:IFoo>(inout T f, int y)
 {
     return f.bar(y);
 }
