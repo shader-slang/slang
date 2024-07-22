@@ -14,34 +14,42 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
 endif()
 
 # Miniz
-add_subdirectory(miniz EXCLUDE_FROM_ALL SYSTEM)
-set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
+if (NOT ${EXTERNAL_MINIZ})
+	add_subdirectory(miniz EXCLUDE_FROM_ALL SYSTEM)
+	set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
 # Work around https://github.com/richgel999/miniz/pull/292
-get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
-if(MSVC AND miniz_c_launcher MATCHES "ccache")
-    set_property(TARGET miniz PROPERTY C_COMPILER_LAUNCHER)
-    set_property(TARGET miniz PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
+	get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
+	if(MSVC AND miniz_c_launcher MATCHES "ccache")
+	set_property(TARGET miniz PROPERTY C_COMPILER_LAUNCHER)
+	set_property(TARGET miniz PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
+	endif()
 endif()
 
 # LZ4
-set(LZ4_BUNDLED_MODE ON)
-add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL SYSTEM)
-if(MSVC)
-    target_compile_options(
-        lz4_static
-        PRIVATE /wd5045 /wd4820 /wd4711 /wd6385 /wd6262
-    )
+if (NOT ${EXTERNAL_LZ4})
+	set(LZ4_BUNDLED_MODE ON)
+	add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL SYSTEM)
+	if(MSVC)
+		target_compile_options(
+			lz4_static
+			PRIVATE /wd5045 /wd4820 /wd4711 /wd6385 /wd6262
+		)
+	endif()
 endif()
 
 # Vulkan headers
-add_subdirectory(vulkan EXCLUDE_FROM_ALL SYSTEM)
+if (NOT ${EXTERNAL_VULKAN_HEADERS})
+	add_subdirectory(vulkan EXCLUDE_FROM_ALL SYSTEM)
+endif()
 
 # metal-cpp headers
 add_library(metal-cpp INTERFACE)
 target_include_directories(metal-cpp INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-cpp")
 
 # SPIRV-Headers
-add_subdirectory(spirv-headers EXCLUDE_FROM_ALL SYSTEM)
+if (NOT ${EXTERNAL_SPIRV_HEADERS})
+	add_subdirectory(spirv-headers EXCLUDE_FROM_ALL SYSTEM)
+endif()
 
 if(SLANG_ENABLE_SLANG_GLSLANG)
     # SPIRV-Tools

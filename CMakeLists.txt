@@ -99,6 +99,11 @@ option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang w
 option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 
+option(EXTERNAL_MINIZ "Build using external Miniz library" OFF)
+option(EXTERNAL_LZ4 "Build using external LZ4 library" OFF)
+option(EXTERNAL_VULKAN_HEADERS "Build using external Vulkan headers" OFF)
+option(EXTERNAL_SPIRV_HEADERS "Build using external SPIR-V headers" OFF)
+
 enum_option(
     SLANG_LIB_TYPE
     # Default
