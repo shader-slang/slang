@@ -890,12 +890,12 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>
     {
         if (!def)
         {
-            sbCpp << R"(    { "Invalid", CapabilityNameFlavor::Concrete, CapabilityName::Invalid, 0, {nullptr, 0} },)" << "\n";
+            sbCpp << R"(    { UnownedStringSlice::fromLiteral("Invalid"), CapabilityNameFlavor::Concrete, CapabilityName::Invalid, 0, {nullptr, 0} },)" << "\n";
             continue;
         }
 
         // name.
-        sbCpp << "    { \"" << def->name << "\", ";
+        sbCpp << "    { UnownedStringSlice::fromLiteral(\"" << def->name << "\"), ";
 
         // flavor.
         switch (def->flavor)
