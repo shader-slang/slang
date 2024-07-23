@@ -171,6 +171,57 @@ bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
     return false;
 }
 
+//CapabilityAtomSet
+
+CapabilityAtomSet CapabilityAtomSet::newSetWithoutImpliedAtoms() const
+{
+    // plan is to add all atoms which is impled (=>) another atom.
+    // Implying an atom appears in the form of atom1=>atom2 or atom2=>atom1.
+    Dictionary<CapabilityAtom, bool> candidateForSimplifiedList;
+    CapabilityAtomSet simplifiedSet;
+    for (auto atom1UInt : *this)
+    {
+        CapabilityAtom atom1 = (CapabilityAtom)atom1UInt;
+        if (!candidateForSimplifiedList.addIfNotExists(atom1, true)
+            && candidateForSimplifiedList[atom1] == false)
+            continue;
+
+        for (auto atom2UInt : *this)
+        {
+            if (atom1UInt == atom2UInt)
+                continue;
+
+            CapabilityAtom atom2 = (CapabilityAtom)atom2UInt;
+            if (!candidateForSimplifiedList.addIfNotExists(atom2, true)
+                && candidateForSimplifiedList[atom2] == false)
+                continue;
+
+            auto atomInfo1 = _getInfo(atom1).canonicalRepresentation;
+            auto atomInfo2 = _getInfo(atom2).canonicalRepresentation;
+            for (auto atomSet1 : atomInfo1)
+            {
+                for (auto atomSet2 : atomInfo2)
+                {
+                    if (atomSet1->contains(*atomSet2))
+                    {
+                        candidateForSimplifiedList[atom2] = false;
+                        continue;
+                    }
+                    else if (atomSet2->contains(*atomSet1))
+                    {
+                        candidateForSimplifiedList[atom1] = false;
+                        continue;
+                    }
+                }
+            }
+        }
+    }
+    for (auto i : candidateForSimplifiedList)
+        if(i.second)
+            simplifiedSet.add((UInt)i.first);
+    return simplifiedSet;
+}
+
 //// CapabiltySet
 
 CapabilityAtom getTargetAtomInSet(const CapabilityAtomSet& atomSet)
@@ -903,6 +954,120 @@ void CapabilitySet::addSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& ot
     }
 }
 
+UnownedStringSlice capabilityNameToStringWithoutPrefix(CapabilityName capabilityName)
+{
+    auto name = capabilityNameToString(capabilityName);
+    if (name.startsWith("_"))
+        return name.tail(1);
+    return name;
+}
+
+void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet atomSet)
+{
+    bool isFirst = true;
+    for (auto atom : atomSet.newSetWithoutImpliedAtoms())
+    {
+        CapabilityName formattedAtom = (CapabilityName)atom;
+        if (!isFirst)
+            sb << " + ";
+        printDiagnosticArg(sb, formattedAtom);
+        isFirst = false;
+    }
+}
+
+// Collection of stages which have same atom sets to compress reprisentation of atom and stage per target
+struct CompressedCapabilitySet
+{
+    /// Collection of stages which have same atom sets to compress reprisentation of atom and stage: {vertex/fragment, ... } 
+    struct StageAndAtomSet
+    {
+        CapabilityAtomSet stages;
+        CapabilityAtomSet atomsWithoutStage;
+    };
+
+    auto begin()
+    {
+        return atomSetsOfTargets.begin();
+    }
+
+    /// Compress 1 capabilitySet into a reprisentation which merges stages that share all of their atoms for printing.
+    Dictionary<CapabilityAtom, List<StageAndAtomSet>> atomSetsOfTargets;
+    CompressedCapabilitySet(const CapabilitySet& capabilitySet)
+    {
+        for (auto& atomSet : capabilitySet.getAtomSets())
+        {
+            auto target = getTargetAtomInSet(atomSet);
+            
+            auto stageInSetAtom = getStageAtomInSet(atomSet);
+            CapabilityAtomSet stageInSet;
+            stageInSet.add((UInt)stageInSetAtom);
+
+            CapabilityAtomSet atomsWithoutStage;
+            CapabilityAtomSet::calcSubtract(atomsWithoutStage, atomSet, stageInSet);
+            if (!atomSetsOfTargets.containsKey(target))
+            {
+                atomSetsOfTargets[target].add({ stageInSet, atomsWithoutStage });
+                continue;
+            }
+
+            // try to find an equivlent atom set by iterating all of the same `atomSetsOfTarget[target]` and merge these 2 together.
+            auto& atomSetsOfTarget = atomSetsOfTargets[target];
+            for (auto& i : atomSetsOfTarget)
+            {
+                if (i.atomsWithoutStage.contains(atomsWithoutStage) && atomsWithoutStage.contains(i.atomsWithoutStage))
+                {
+                    i.stages.add((UInt)stageInSetAtom);
+                }
+            }
+        }
+        for (auto& targetSets : atomSetsOfTargets)
+            for (auto& targetSet : targetSets.second)
+                targetSet.atomsWithoutStage = targetSet.atomsWithoutStage.newSetWithoutImpliedAtoms();
+    }
+};
+
+void printDiagnosticArg(StringBuilder& sb, const CompressedCapabilitySet& capabilitySet)
+{
+ ////Secondly we will print our new list of atomSet's.
+    sb << "{";
+    bool firstSet = true;
+    for (auto targetSets : capabilitySet.atomSetsOfTargets)
+    {
+        if(!firstSet)
+            sb << " || ";
+        for (auto targetSet : targetSets.second)
+        {
+            bool firstStage = true;
+            for (auto stageAtom : targetSet.stages)
+            {
+                if (!firstStage)
+                    sb << "/";
+                printDiagnosticArg(sb, (CapabilityName)stageAtom);
+                firstStage = false;
+            }
+            for (auto atom : targetSet.atomsWithoutStage)
+            {
+                sb << " + ";
+                printDiagnosticArg(sb, (CapabilityName)atom);
+            }
+        }
+        firstSet = false;
+    }
+    sb << "}";
+}
+
+void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capabilitySet)
+{
+    // Firstly we will compress the printing of capabilities such that any atomSet
+    // with different abstract atoms but equal non-abstract atoms will be bundled together.
+    if (capabilitySet.isInvalid() || capabilitySet.isEmpty())
+    {
+        sb << "{}";
+        return;
+    }
+    printDiagnosticArg(sb, CompressedCapabilitySet(capabilitySet));
+}
+
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom)
 {
     printDiagnosticArg(sb, (CapabilityName)atom);
@@ -910,45 +1075,15 @@ void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom)
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name)
 {
-    SLANG_ASSERT(_getInfo(name).name != nullptr);
-    sb << ((_getInfo(name).name.startsWith("_")) ? _getInfo(name).name.tail(1) : _getInfo(name).name);
-}
-
-void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
-{
-    bool isFirstSet = true;
-    for (auto& set : capSet.getAtomSets())
-    {
-        if (!isFirstSet)
-        {
-            sb<< " | ";
-        }
-        bool isFirst = true;
-        for (auto atom : set)
-        {
-            CapabilityName formattedAtom = (CapabilityName)atom;
-            if (!isFirst)
-            {
-                sb << " + ";
-            }
-            printDiagnosticArg(sb, formattedAtom);
-            isFirst = false;
-        }
-        isFirstSet = false;
-    }
+    sb << capabilityNameToStringWithoutPrefix(name);
 }
 
 void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)
 {
-    sb << "{";
-    auto count = list.getCount();
-    for(Index i = 0; i < count; i++)
-    {
-        printDiagnosticArg(sb, list[i]);
-        if (i + 1 != count)
-            sb << ", ";
-    }
-    sb << "}";
+    CapabilityAtomSet set;
+    for (auto i : list)
+        set.add((UInt)i);
+    printDiagnosticArg(sb, set.newSetWithoutImpliedAtoms());
 }
 
 
