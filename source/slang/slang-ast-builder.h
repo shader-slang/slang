@@ -336,7 +336,7 @@ public:
             case ASTNodeType::ThisTypeDecl:
             case ASTNodeType::ExtensionDecl:
             case ASTNodeType::AssocTypeDecl:
-                return getLookupDeclRef(lookupDeclRef->getLookupSource(), lookupDeclRef->getWitness(), memberDecl).as<T>();
+                return getLookupDeclRef(lookupDeclRef->getLookupSource(), lookupDeclRef->getWitness(), memberDecl).template as<T>();
             default:
                 break;
             }
