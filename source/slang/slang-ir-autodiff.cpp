@@ -1976,7 +1976,7 @@ void checkAutodiffPatterns(
     enum SideEffectBehavior
     {
         Warn = 0,
-        Ignore = 1,
+        Allow = 1,
     };
 
     // For now, we have only 1 check to see if methods that have side-effects 
@@ -1993,7 +1993,7 @@ void checkAutodiffPatterns(
                 auto preferRecomputeDecor = func->findDecoration<IRPreferRecomputeDecoration>();
                 auto sideEffectBehavior = as<IRIntLit>(preferRecomputeDecor->getOperand(0))->getValue();
 
-                if (sideEffectBehavior == SideEffectBehavior::Ignore)
+                if (sideEffectBehavior == SideEffectBehavior::Allow)
                     continue;
 
                 // Find function name. (don't diagnose on nameless functions)

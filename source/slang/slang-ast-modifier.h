@@ -1275,8 +1275,8 @@ class PreferRecomputeAttribute : public Attribute
     
     enum SideEffectBehavior
     {
-        Default = 0,
-        HasSideEffects = 1
+        Warn = 0,
+        Allow = 1
     };
 
     SideEffectBehavior sideEffectBehavior;
