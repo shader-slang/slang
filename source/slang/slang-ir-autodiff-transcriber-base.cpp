@@ -1079,6 +1079,20 @@ IRInst* getActualInstToTranscribe(IRInst* inst)
     return inst;
 }
 
+void handleNameHint(IRBuilder* builder, IRInst* primal, IRInst* diff)
+{
+    // Ignore types that already have a name hint.
+    if (as<IRType>(diff) && diff->findDecoration<IRNameHintDecoration>())
+        return;
+
+    if (auto nameHint = primal->findDecoration<IRNameHintDecoration>())
+    {
+        StringBuilder sb;
+        sb << "s_diff_" << nameHint->getName();
+        builder->addNameHintDecoration(diff, sb.getUnownedSlice());
+    }
+}
+
 IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst)
 {
     // If a differential instruction is already mapped for 
@@ -1124,12 +1138,7 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
                 break;
             default:
                 // Generate name hint for the inst.
-                if (auto primalNameHint = primalInst->findDecoration<IRNameHintDecoration>())
-                {
-                    StringBuilder sb;
-                    sb << "s_diff_" << primalNameHint->getName();
-                    builder->addNameHintDecoration(pair.differential, sb.getUnownedSlice());
-                }
+                handleNameHint(builder, pair.primal, pair.differential);
 
                 // Automatically tag the primal and differential results
                 // if they haven't already been handled by the 
