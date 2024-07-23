@@ -1,7 +1,6 @@
 // slang-ir-spirv-legalize.cpp
 #include "slang-ir-spirv-legalize.h"
 
-#include "slang-ir-augment-global-ptr-types.h"
 #include "slang-ir-glsl-legalize.h"
 
 #include "slang-ir-clone.h"
