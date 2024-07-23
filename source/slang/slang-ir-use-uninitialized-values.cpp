@@ -137,6 +137,29 @@ namespace Slang
         return false;
     }
 
+    static bool hasGenericAsm(IRBlock* block)
+    {
+        for (auto inst = block->getFirstInst(); inst; inst = inst->next)
+        {
+            if (as<IRGenericAsm>(inst))
+                return true;
+        }
+
+        return false;
+    }
+
+    static bool hasWritePath(IRTargetSwitch* tswitch)
+    {
+        for (int i = 0; i < tswitch->getCaseCount(); i++)
+        {
+            IRBlock* b = tswitch->getCaseBlock(i);
+            if (hasGenericAsm(b))
+                return true;
+        }
+
+        return false;
+    }
+
     static IRInst* resolveSpecialization(IRSpecialize* spec)
     {
         IRInst* base = spec->getBase();
@@ -296,6 +319,14 @@ namespace Slang
             stores.add(user->getParent());
             break;
 
+        case kIROp_TargetSwitch:
+            if (hasWritePath(as<IRTargetSwitch>(user)))
+                stores.add(user);
+            else
+                loads.add(user);
+
+            break;
+
         case kIROp_MakeExistential:
         case kIROp_MakeExistentialWithRTTI:
             // For specializing generic structs
@@ -399,6 +430,17 @@ namespace Slang
                 if (stores.getCount())
                     return true;
             }
+        }
+
+        IRBlock* block = as<IRBlock>(inst->getParent());
+        if (!block)
+            return false;
+
+        for (auto inst = block->getFirstInst(); inst; inst = inst->next)
+        {
+            auto targetSwitch = as<IRTargetSwitch>(inst);
+            if (targetSwitch && hasWritePath(targetSwitch))
+                return true;
         }
 
         return false;
