@@ -818,5 +818,9 @@ install(DIRECTORY
   "${slang_SOURCE_DIR}/docs/"
   DESTINATION share/doc/slang
 )
+install(DIRECTORY
+  "${slang_SOURCE_DIR}/include"
+  DESTINATION .
+)
 
 include(CPack)
