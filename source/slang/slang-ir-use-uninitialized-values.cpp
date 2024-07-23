@@ -222,7 +222,7 @@ namespace Slang
 
     static void collectTargetSwitchCases(List<IRInst*>& stores, IRTargetSwitch* tswitch)
     {
-        for (int i = 0; i < tswitch->getCaseCount(); i++)
+        for (Slang::UInt i = 0; i < tswitch->getCaseCount(); i++)
         {
             IRBlock* block = tswitch->getCaseBlock(i);
             for (auto inst = block->getFirstInst(); inst; inst = inst->next)

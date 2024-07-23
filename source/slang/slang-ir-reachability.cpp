@@ -74,7 +74,7 @@ namespace Slang
         // Target switches; treat as reachable from its cases
         if (auto tswitch = as<IRTargetSwitch>(inst2))
         {
-            for (int i = 0; i < tswitch->getCaseCount(); i++)
+            for (Slang::UInt i = 0; i < tswitch->getCaseCount(); i++)
             {
                 IRBlock* block = tswitch->getCaseBlock(i);
                 if (isWithinBlock(block, inst1))
