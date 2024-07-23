@@ -354,7 +354,7 @@ namespace Slang
 
         virtual void processReferencedDecl(Decl* decl) = 0;
 
-        virtual void processDeclModifiers(Decl* decl) = 0;
+        virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) = 0;
 
         void dispatchIfNotNull(Stmt* stmt)
         {
@@ -464,7 +464,9 @@ namespace Slang
         {
             dispatchIfNotNull(expr->type.type);
             dispatchIfNotNull(expr->declRef.declRefBase);
-            processDeclModifiers(expr->declRef.getDecl());
+
+            // Pass down the callee location
+            processDeclModifiers(expr->declRef.getDecl(), expr->loc);
         }
         void visitStaticMemberExpr(StaticMemberExpr* expr)
         {
@@ -10228,15 +10230,8 @@ namespace Slang
             decl = visitor->getParentFuncOfVisitor();
         if (referencedDecl && decl)
         {
-            for (auto& capSet : nodeCaps.getAtomSets())
-            {
-                auto elements = capSet.getElements<CapabilityAtom>();
-                decl->capabilityRequirementProvenance.reserve(decl->capabilityRequirementProvenance.getCount()+elements.getCount());
-                for (auto atom : elements)
-                {
-                    decl->capabilityRequirementProvenance.addIfNotExists(atom, DeclReferenceWithLoc{ referencedDecl, referenceLoc });
-                }
-            }
+            // Here we store a childDecl that added/removed capabilities from a parentDecl
+            decl->capabilityRequirementProvenance.add(DeclReferenceWithLoc{ referencedDecl, referenceLoc });
         }
     };
 
@@ -10267,10 +10262,10 @@ namespace Slang
                 loc = Base::sourceLocStack.getLast();
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
         }
-        virtual void processDeclModifiers(Decl* decl) override
+        virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
         {
             if (decl)
-                handleProcessFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+                handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
         }
         void visitDiscardStmt(DiscardStmt* stmt)
         {
@@ -10694,18 +10689,62 @@ namespace Slang
         return false;
     }
 
-    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl)
+    void diagnoseMissingCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilitySet& setToFind)
     {
-        HashSet<Decl*> printedDecls;
+        HashSet<Decl*> checkedDecls;
+        DeclReferenceWithLoc declWithRef;
+        declWithRef.referencedDecl = decl;
+        declWithRef.referenceLoc = (decl) ? decl->loc : SourceLoc();
+        bool bottomOfProvenanceStack = false;
+        // Find the bottom of the atom provenance stack which fails to contain `setToFind`
+        while(!bottomOfProvenanceStack && declWithRef.referencedDecl)
+        {
+            bottomOfProvenanceStack = true;
+            for(auto& i : declWithRef.referencedDecl->capabilityRequirementProvenance)
+            {
+                if (checkedDecls.contains(i.referencedDecl))
+                    continue;
+                checkedDecls.add(i.referencedDecl);
+                
+                if(!i.referencedDecl->inferredCapabilityRequirements.implies(setToFind))
+                {
+                    // We found a source of the incompatible capability, follow this 
+                    // element inside the provenance stack until we are at the bottom
+                    declWithRef = i;
+                    bottomOfProvenanceStack = false;
+                    break;
+                }
+            }
+        }
+
+        if (!declWithRef.referencedDecl)
+            return;
+        
+        // Diagnose the use-site
+        maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, declWithRef.referenceLoc, Diagnostics::seeUsingOf, declWithRef.referencedDecl);
+        // Diagnose the definition as the problem
+        maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, declWithRef.referencedDecl->loc, Diagnostics::seeDefinitionOf, declWithRef.referencedDecl);
+
+        // If we find a 'require' modifier, this is contributing to the overall capability incompatibility.
+        // We should hint to the user that this declaration is problematic.
+        if (auto requireCapabilityAttribute = declWithRef.referencedDecl->findModifier<RequireCapabilityAttribute>())
+            maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, requireCapabilityAttribute->loc, Diagnostics::seeDeclarationOf, requireCapabilityAttribute);
+    }
+
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, HashSet<Decl*>& printedDecls)
+    {
         auto thisModule = getModuleDecl(decl);
         Decl* declToPrint = decl;
         while (declToPrint)
         {
+            Decl* previousDecl = declToPrint;
             printedDecls.add(declToPrint);
-            if (auto provenance = declToPrint->capabilityRequirementProvenance.tryGetValue(atomToFind))
+            for(auto& provenance : declToPrint->capabilityRequirementProvenance)
             {
-                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, provenance->referenceLoc, Diagnostics::seeUsingOf, provenance->referencedDecl);
-                declToPrint = provenance->referencedDecl;
+                if (!provenance.referencedDecl->inferredCapabilityRequirements.implies(atomToFind))
+                    continue;
+                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, provenance.referenceLoc, Diagnostics::seeUsingOf, provenance.referencedDecl);
+                declToPrint = provenance.referencedDecl;
                 if (printedDecls.contains(declToPrint))
                     break;
                 if (declToPrint->findModifier<RequireCapabilityAttribute>())
@@ -10718,12 +10757,10 @@ namespace Slang
                 if (getDeclVisibility(declToPrint) == DeclVisibility::Public)
                     break;
             }
-            else
-            {
+            if (previousDecl == declToPrint)
                 break;
-            }
         }
-        if (declToPrint && !optionallyNeverPrintDecl)
+        if (declToPrint)
         {
             maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
         }
@@ -10763,10 +10800,11 @@ namespace Slang
                 CapabilityAtomSet targetsNotUsedSet;
                 CapabilityAtomSet::calcSubtract(targetsNotUsedSet, getAtomSetOfTargets(), failedAtomSet);
                 
+                HashSet<Decl*> printedDecls;
                 for (auto atom : targetsNotUsedSet)
                 {
                     CapabilityAtom formattedAtom = asAtom(atom);
-                    diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, true);
+                    diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, printedDecls);
                 }
                 return;
             }
@@ -10786,12 +10824,14 @@ namespace Slang
 
         // We will produce all failed atoms. This is important since provenance of multiple atoms
         // can come from multiple referenced items in a function body.
-        for (auto i : failedAtomsInsideAvailableSet)
+        HashSet<Decl*> printedDecls;
+        auto simplifiedFailedAtomsSet = failedAtomsInsideAvailableSet.newSetWithoutImpliedAtoms();
+        for (auto i : simplifiedFailedAtomsSet)
         {
             CapabilityAtom formattedAtom = asAtom(i);
             maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, decl->loc, diagnosticInfo, decl, formattedAtom);
             // Print provenances.
-            diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom);
+            diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, printedDecls);
         }
     }
 
