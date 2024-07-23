@@ -5,8 +5,8 @@
 #include "slang-repro.h"
 
 #include "../core/slang-shared-library.h"
-#include "../slang-capture-replay/slang-global-session.h"
-#include "../slang-capture-replay/capture_utility.h"
+#include "../slang-record-replay/record/slang-global-session.h"
+#include "../slang-record-replay/util/record-utility.h"
 
 // implementation of C interface
 
@@ -119,11 +119,11 @@ SLANG_API SlangResult slang_createGlobalSession(
     }
 
     // Check if the SLANG_CAPTURE_ENABLE_ENV is enabled
-    if (SlangCapture::isCaptureLayerEnabled())
+    if (SlangRecord::isRecordLayerEnabled())
     {
-        SlangCapture::GlobalSessionCapture* globalSessionCapture =
-            new SlangCapture::GlobalSessionCapture(globalSession.detach());
-        Slang::ComPtr<SlangCapture::GlobalSessionCapture> result(globalSessionCapture);
+        SlangRecord::GlobalSessionRecorder* globalSessionRecorder =
+            new SlangRecord::GlobalSessionRecorder(globalSession.detach());
+        Slang::ComPtr<SlangRecord::GlobalSessionRecorder> result(globalSessionRecorder);
         *outGlobalSession = result.detach();
     }
     else
