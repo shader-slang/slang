@@ -4980,7 +4980,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         case LoweredValInfo::Flavor::Ptr:
             return LoweredValInfo::ptr(
                 builder->emitElementAddress(
-                    context->irBuilder->getPtrType(type),
                     baseVal.val,
                     indexVal));
 

@@ -2846,7 +2846,7 @@ namespace Slang
     IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRInst* addressSpace)
     {
         IRInst* operands[] = { valueType, addressSpace };
-        return (IRPtrType*)getType(op, 2, operands);
+        return (IRPtrType*)getType(op, addressSpace ? 2 : 1, operands);
     }
 
     IRTextureTypeBase* IRBuilder::getTextureType(IRType* elementType, IRInst* shape, IRInst* isArray, IRInst* isMS, IRInst* sampleCount, IRInst* access, IRInst* isShadow, IRInst* isCombined, IRInst* format)
@@ -4886,11 +4886,30 @@ namespace Slang
         return inst;
     }
 
+    IRType* maybePropagateAddressSpace(IRBuilder* builder, IRInst* basePtr, IRType* type)
+    {
+        if (auto basePtrType = as<IRPtrTypeBase>(basePtr->getDataType()))
+        {
+            if (auto resultPtrType = as<IRPtrTypeBase>(type))
+            {
+                if (basePtrType->getAddressSpace() != resultPtrType->getAddressSpace())
+                {
+                    type = builder->getPtrType(
+                        resultPtrType->getOp(), resultPtrType->getValueType(), basePtrType->getAddressSpace());
+                }
+            }
+        }
+        return type;
+    }
+
     IRInst* IRBuilder::emitFieldAddress(
         IRType* type,
         IRInst* base,
         IRInst* field)
     {
+        // Propagate pointer address space if it is available on base.
+        type = maybePropagateAddressSpace(this, base, type);
+
         auto inst = createInst<IRFieldAddress>(
             this,
             kIROp_FieldAddress,
@@ -4987,6 +5006,9 @@ namespace Slang
         IRInst*    basePtr,
         IRInst*    index)
     {
+        // Propagate pointer address space if it is available on base.
+        type = maybePropagateAddressSpace(this, basePtr, type);
+
         auto inst = createInst<IRFieldAddress>(
             this,
             kIROp_GetElementPtr,
@@ -5033,7 +5055,7 @@ namespace Slang
         auto inst = createInst<IRGetElementPtr>(
             this,
             kIROp_GetElementPtr,
-            getPtrType(type),
+            getPtrType(kIROp_PtrType, type, basePtrType->getAddressSpace()),
             basePtr,
             index);
 
@@ -5063,7 +5085,7 @@ namespace Slang
                     }
                 }
                 SLANG_RELEASE_ASSERT(resultType);
-                basePtr = emitFieldAddress(getPtrType(resultType), basePtr, structKey);
+                basePtr = emitFieldAddress(getPtrType(kIROp_PtrType, resultType, basePtrType->getAddressSpace()), basePtr, structKey);
             }
             else
             {
