@@ -1,4 +1,5 @@
 #include "slang-ir-reachability.h"
+#include "slang-ir-insts.h"
 
 namespace Slang
 {
@@ -54,6 +55,35 @@ namespace Slang
         }
 
     }
+    
+    bool ReachabilityContext::isInstReachable(IRInst* inst1, IRInst* inst2)
+    {
+        // If inst1 and inst2 are in the same block,
+        // we test if inst2 appears after inst1.
+        if (inst1->getParent() == inst2->getParent())
+        {
+            for (auto inst = inst1->getNextInst(); inst; inst = inst->getNextInst())
+            {
+                if (inst == inst2)
+                    return true;
+            }
+        }
+
+        // Special cases
+
+        // Target switches; treat as reachable from its cases
+        if (auto tswitch = as<IRTargetSwitch>(inst2))
+        {
+            for (int i = 0; i < tswitch->getCaseCount(); i++)
+            {
+                IRBlock* block = tswitch->getCaseBlock(i);
+                if (isWithinBlock(block, inst1))
+                    return true;
+            }
+        }
+
+        return isBlockReachable(as<IRBlock>(inst1->getParent()), as<IRBlock>(inst2->getParent()));
+    }
 
     bool ReachabilityContext::isBlockReachable(IRBlock* from, IRBlock* to)
     {
@@ -64,5 +94,16 @@ namespace Slang
         if (!fromId || !toId)
             return true;
         return sourceBlocks[*toId].contains(*fromId);
+    }
+
+    bool ReachabilityContext::isWithinBlock(IRBlock* block, IRInst* tinst)
+    {
+        for (auto inst = block->getFirstInst(); inst; inst = inst->next)
+        {
+            if (inst == tinst)
+                return true;
+        }
+
+        return false;
     }
 }

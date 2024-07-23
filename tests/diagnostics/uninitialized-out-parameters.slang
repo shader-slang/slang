@@ -47,5 +47,24 @@ void control_flow_defined(bool b, out float y)
     return;
 }
 
+void instrincs_defined(float x, out float exp)
+{
+    __intrinsic_asm "frexp";
+}
+
+void target_switching_undefined(float x, out float exp)
+{
+    //CHK-DAG: warning 41018: returning without initializing out parameter 'exp'
+    __target_switch {}
+}
+
+void target_switching_defined(float x, out float exp)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "frexp";
+    }
+}
+
 //CHK-NOT: warning 41015
 //CHK-NOT: warning 41018
