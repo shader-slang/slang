@@ -39,17 +39,6 @@ struct  IRModule;
 struct  IRStructField;
 struct  IRStructKey;
 
-enum class AddressSpace
-{
-    Generic = 0x7fffffff,
-    ThreadLocal = 1,
-    Global = 2,
-    GroupShared = 3,
-    Uniform = 4,
-    // specific address space for payload data in metal
-    MetalObjectData = 5,
-};
-
 typedef unsigned int IROpFlags;
 enum : IROpFlags
 {
@@ -1709,11 +1698,11 @@ struct IRPtrTypeBase : IRType
 {
     IRType* getValueType() { return (IRType*)getOperand(0); }
 
-    bool hasAddressSpace() { return getOperandCount() > 1; }
+    bool hasAddressSpace() { return getOperandCount() > 1 && getAddressSpace() != AddressSpace::Generic; }
 
-    IRIntegerValue getAddressSpace()
+    AddressSpace getAddressSpace()
     {
-        return getOperandCount() > 1 ? static_cast<IRIntLit*>(getOperand(1))->getValue() : -1;
+        return getOperandCount() > 1 ? (AddressSpace)static_cast<IRIntLit*>(getOperand(1))->getValue() : AddressSpace::Generic;
     }
 
     IR_PARENT_ISA(PtrTypeBase)

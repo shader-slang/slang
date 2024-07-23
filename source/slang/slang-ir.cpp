@@ -2813,9 +2813,9 @@ namespace Slang
         return (IRInOutType*) getPtrType(kIROp_InOutType, valueType);
     }
 
-    IRRefType* IRBuilder::getRefType(IRType* valueType)
+    IRRefType* IRBuilder::getRefType(IRType* valueType, AddressSpace addrSpace)
     {
-        return (IRRefType*) getPtrType(kIROp_RefType, valueType);
+        return (IRRefType*) getPtrType(kIROp_RefType, valueType, addrSpace);
     }
 
     IRConstRefType* IRBuilder::getConstRefType(IRType* valueType)
@@ -2840,7 +2840,12 @@ namespace Slang
 
     IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace)
     {
-        IRInst* operands[] = {valueType, getIntValue(getIntType(), addressSpace)};
+        return (IRPtrType*)getPtrType(op, valueType, getIntValue(getUInt64Type(), addressSpace));
+    }
+
+    IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRInst* addressSpace)
+    {
+        IRInst* operands[] = { valueType, addressSpace };
         return (IRPtrType*)getType(op, 2, operands);
     }
 

@@ -578,7 +578,7 @@ namespace Slang
                 {
                     if (auto ptrType = as<IRPtrType>(globalInst))
                     {
-                        if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+                        if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
                             elementType = ptrType->getValueType();
                     }
                 }

@@ -352,6 +352,60 @@ Type* NativeRefType::getValueType()
     return as<Type>(_getGenericTypeArg(this, 0));
 }
 
+Val* PtrTypeBase::getAddressSpace()
+{
+    return _getGenericTypeArg(this, 1);
+}
+
+void maybePrintAddrSpaceOperand(StringBuilder& out, Val* addrSpaceVal)
+{
+    AddressSpace addrSpace = AddressSpace::Generic;
+
+    if (auto cintVal = as<ConstantIntVal>(addrSpaceVal))
+    {
+        addrSpace = (AddressSpace)(cintVal->getValue());
+    }
+    switch (addrSpace)
+    {
+    case AddressSpace::Generic:
+        break;
+    case AddressSpace::UserPointer:
+        out << toSlice(", user_ptr");
+        break;
+    case AddressSpace::GroupShared:
+        out << toSlice(", groupshared");
+        break;
+    case AddressSpace::Global:
+        out << toSlice(", global");
+        break;
+    case AddressSpace::ThreadLocal:
+        out << toSlice(", threadlocal");
+        break;
+    case AddressSpace::Uniform:
+        out << toSlice(", uniform");
+        break;
+    default:
+        break;
+    }
+}
+
+void PtrType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("Ptr<") << getValueType();
+    auto addressSpaceVal = getAddressSpace();
+    maybePrintAddrSpaceOperand(out, addressSpaceVal);
+    out << toSlice(">");
+}
+
+void RefType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("Ref<") << getValueType();
+    auto addressSpaceVal = getAddressSpace();
+    maybePrintAddrSpaceOperand(out, addressSpaceVal);
+    out << toSlice(">");
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamedExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void NamedExpressionType::_toTextOverride(StringBuilder& out)
