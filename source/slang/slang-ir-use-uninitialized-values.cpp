@@ -342,10 +342,8 @@ namespace Slang
             }
 
             auto t = b->getTerminator();
-            if (as<IRUnreachable>(t) || as<IRGenericAsm>(t))
-                continue;
-
-            loads.add(b->getTerminator());
+            if (as<IRTargetSwitch>(t) || as<IRReturn>(t))
+                loads.add(t);
         }
 
         cancelLoads(reachability, stores, loads);
