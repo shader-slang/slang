@@ -5376,7 +5376,7 @@ namespace Slang
             // we need to form a new proper decl ref to the parent extension decl
             // with the correct specialization arguments.
             //
-            if (auto outerGeneric = GetOuterGeneric(context->parentDecl))
+            if (GetOuterGeneric(context->parentDecl))
             {
 
                 auto extDeclRef = applyExtensionToType(parentExtDecl, context->conformingType);
@@ -5387,10 +5387,9 @@ namespace Slang
         {
             synthesizedWitnessDeclRef = m_astBuilder->getMemberDeclRef(substSet.declRef, witnessDecl);
         }
+        if (!synthesizedWitnessDeclRef)
+            synthesizedWitnessDeclRef = m_astBuilder->getDirectDeclRef(witnessDecl));
         witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(synthesizedWitnessDeclRef));
-        return true;
-
-        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(m_astBuilder->getDirectDeclRef(synFunc)));
         return true;
     }
 
