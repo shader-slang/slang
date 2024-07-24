@@ -1806,9 +1806,15 @@ struct SPIRVEmitContext
     // set or binding.
     static inline bool isBindingAllowed(SpvStorageClass storageClass)
     {
-        return  (storageClass == SpvStorageClassUniformConstant) ||
-                (storageClass == SpvStorageClassStorageBuffer) ||
-                (storageClass == SpvStorageClassUniform);
+        switch(storageClass)
+        {
+        case SpvStorageClassUniformConstant:
+        case SpvStorageClassUniform:
+        case SpvStorageClassStorageBuffer:
+            return true;
+        default:
+            return false;
+        }
     }
 
     SpvCapability getImageFormatCapability(SpvImageFormat format)
@@ -2220,15 +2226,16 @@ struct SPIRVEmitContext
             case LayoutResourceKind::UnorderedAccess:
             case LayoutResourceKind::SamplerState:
             case LayoutResourceKind::DescriptorTableSlot:
-                if (isBindingDecorationAllowed)
-                {
-                    emitOpDecorateBinding(
-                        getSection(SpvLogicalSectionID::Annotations),
-                        nullptr,
-                        varInst,
-                        SpvLiteralInteger::from32(int32_t(index)));
-                }
-                if (!isDescirptorSetDecorated && isBindingDecorationAllowed)
+                if (!isBindingDecorationAllowed)
+                    break;
+
+                emitOpDecorateBinding(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    varInst,
+                    SpvLiteralInteger::from32(int32_t(index)));
+
+                if (!isDescirptorSetDecorated)
                 {
                     if (space)
                     {
