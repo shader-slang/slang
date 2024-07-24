@@ -756,7 +756,7 @@ extension bool : IRangedValue
     [__unsafeForceInlineEarly]
     __init(T v)
     {
-        return __slang_noop_cast<T.__Tag>(v) != __slang_noop_cast<T.__Tag>(0);
+        return __slang_noop_cast<T.__Tag>(v) != __intCast<T.__Tag>(0);
     }
 
     static const bool maxValue = true;
