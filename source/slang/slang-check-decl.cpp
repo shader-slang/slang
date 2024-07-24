@@ -5388,7 +5388,7 @@ namespace Slang
             synthesizedWitnessDeclRef = m_astBuilder->getMemberDeclRef(substSet.declRef, witnessDecl);
         }
         if (!synthesizedWitnessDeclRef)
-            synthesizedWitnessDeclRef = m_astBuilder->getDirectDeclRef(witnessDecl));
+            synthesizedWitnessDeclRef = m_astBuilder->getDirectDeclRef(witnessDecl);
         witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(synthesizedWitnessDeclRef));
         return true;
     }
