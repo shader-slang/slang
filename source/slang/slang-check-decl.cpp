@@ -1605,8 +1605,6 @@ namespace Slang
                     matrixType->getColumnCount(),
                     getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
                 varDecl->type.type = newMatrixType;
-                if (varDecl->initExpr)
-                    varDecl->initExpr = coerce(CoercionSite::Initializer, varDecl->type, varDecl->initExpr);
             }
         }
 
