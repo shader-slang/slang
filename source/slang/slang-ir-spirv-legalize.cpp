@@ -661,10 +661,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
                 needLoad = false;
             }
-            else if (auto ptrInnerType = as<IRPtrType>(innerType))
-            {
-                innerType = innerType;
-            }
 
             auto innerElementType = innerType;
             if (arrayType)
