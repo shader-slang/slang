@@ -677,8 +677,10 @@ T compute<T>(T a1, T a2)
 // compute(3, 1) == 2
 ```
 
-`as` operator can also be used in the `if` predicate to test if an object can be casted to a specific type, once the cast test is successful,
-the object can be used in the `if` block as the casted type without the need to retrieve the `Optional<T>::value` property:
+Since `as` operator returns a `Optional<T>` type, it can also be used in the `if` predicate to test if an object can be
+casted to a specific type, once the cast test is successful, the object can be used in the `if` block as the casted type
+without the need to retrieve the `Optional<T>::value` property, for example:
+
 ```csharp
 interface IFoo
 {
@@ -704,10 +706,10 @@ void test(IFoo foo)
 {
     // This syntax will be desugared to the following:
     // {
-    //      Optional<MyImpl1> $OptVar = foo as MyImpl1;
-    //      if ($OptVar.hasValue)
+    //      Optional<MyImpl1> optVar = foo as MyImpl1;
+    //      if (optVar.hasValue)
     //      {
-    //          MyImpl1 t = $OptVar.value;
+    //          MyImpl1 t = optVar.value;
     //          t.foo();
     //      }
     //      else if ...
@@ -734,6 +736,8 @@ void main()
 }
 
 ```
+See  [if-let syntax](convenience-features.html#if_let-syntax) for more details.
+
 
 Extensions to Interfaces
 -----------------------------

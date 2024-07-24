@@ -90,7 +90,7 @@ namespace Slang
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
 
-        void checkDerivativeMemberAttribute(VarDeclBase* varDecl, DerivativeMemberAttribute* attr);
+        void checkDerivativeMemberAttributeParent(VarDeclBase* varDecl, DerivativeMemberAttribute* attr);
         void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
         void checkMeshOutputDecl(VarDeclBase* varDecl);
 
@@ -354,7 +354,7 @@ namespace Slang
 
         virtual void processReferencedDecl(Decl* decl) = 0;
 
-        virtual void processDeclModifiers(Decl* decl) = 0;
+        virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) = 0;
 
         void dispatchIfNotNull(Stmt* stmt)
         {
@@ -464,7 +464,9 @@ namespace Slang
         {
             dispatchIfNotNull(expr->type.type);
             dispatchIfNotNull(expr->declRef.declRefBase);
-            processDeclModifiers(expr->declRef.getDecl());
+
+            // Pass down the callee location
+            processDeclModifiers(expr->declRef.getDecl(), expr->loc);
         }
         void visitStaticMemberExpr(StaticMemberExpr* expr)
         {
@@ -1461,7 +1463,7 @@ namespace Slang
         structDecl->buildMemberDictionary();
     }
 
-    void SemanticsDeclHeaderVisitor::checkDerivativeMemberAttribute(
+    void SemanticsDeclHeaderVisitor::checkDerivativeMemberAttributeParent(
         VarDeclBase* varDecl, DerivativeMemberAttribute* derivativeMemberAttr)
     {
         auto memberType = checkProperType(getLinkage(), varDecl->type, getSink());
@@ -1479,43 +1481,12 @@ namespace Slang
                 derivativeMemberAttributeCanOnlyBeUsedOnMembers);
         }
         auto diffThisType = getDifferentialType(m_astBuilder, thisType, derivativeMemberAttr->loc);
-        if (!thisType)
+        if (!diffThisType)
         {
             getSink()->diagnose(
                 derivativeMemberAttr,
                 Diagnostics::invalidUseOfDerivativeMemberAttributeParentTypeIsNotDifferentiable);
         }
-        SLANG_ASSERT(derivativeMemberAttr->args.getCount() == 1);
-        auto checkedExpr = dispatchExpr(derivativeMemberAttr->args[0], allowStaticReferenceToNonStaticMember());
-        if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
-        {
-            derivativeMemberAttr->memberDeclRef = declRefExpr;
-            if (!diffType->equals(declRefExpr->type))
-            {
-                getSink()->diagnose(derivativeMemberAttr, Diagnostics::typeMismatch, diffType, declRefExpr->type);
-            }
-            if (!varDecl->parentDecl)
-            {
-                getSink()->diagnose(derivativeMemberAttr, Diagnostics::attributeNotApplicable, diffType, declRefExpr->type);
-            }
-            if (auto memberExpr = as<StaticMemberExpr>(declRefExpr))
-            {
-                auto baseExprType = memberExpr->baseExpression->type.type;
-                if (auto typeType = as<TypeType>(baseExprType))
-                {
-                    if (diffThisType->equals(typeType->getType()))
-                    {
-                        return;
-                    }
-                }
-
-            }
-        }
-        getSink()->diagnose(
-            derivativeMemberAttr,
-            Diagnostics::
-            derivativeMemberAttributeMustNameAMemberInExpectedDifferentialType,
-            diffThisType);
     }
 
     void SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* extensionExternMemberModifier)
@@ -1634,8 +1605,6 @@ namespace Slang
                     matrixType->getColumnCount(),
                     getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
                 varDecl->type.type = newMatrixType;
-                if (varDecl->initExpr)
-                    varDecl->initExpr = coerce(CoercionSite::Initializer, varDecl->type, varDecl->initExpr);
             }
         }
 
@@ -1751,7 +1720,7 @@ namespace Slang
         // Check modifiers that can't be checked earlier during modifier checking stage.
         if (auto derivativeMemberAttr = varDecl->findModifier<DerivativeMemberAttribute>())
         {
-            checkDerivativeMemberAttribute(varDecl, derivativeMemberAttr);
+            checkDerivativeMemberAttributeParent(varDecl, derivativeMemberAttr);
         }
         if (auto extensionExternAttr = varDecl->findModifier<ExtensionExternVarModifier>())
         {
@@ -1823,6 +1792,7 @@ namespace Slang
     static ConstructorDecl* _createCtor(SemanticsDeclVisitorBase* visitor, ASTBuilder* m_astBuilder, AggTypeDecl* decl)
     {
         auto ctor = m_astBuilder->create<ConstructorDecl>();
+        addModifier(ctor, m_astBuilder->create<SynthesizedModifier>());
         auto ctorName = visitor->getName("$init");
         ctor->ownedScope = m_astBuilder->create<Scope>();
         ctor->ownedScope->containerDecl = ctor;
@@ -1843,6 +1813,7 @@ namespace Slang
         body->closingSourceLoc = ctor->closingSourceLoc;
         ctor->body = body;
         body->body = m_astBuilder->create<SeqStmt>();
+        ctor->isSynthesized = true;
         decl->addMember(ctor);
         return ctor;
     }
@@ -2066,10 +2037,11 @@ namespace Slang
                 if (overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
                 {
                     getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
-                    return;
                 }
-
-                getSink()->diagnose(varDecl, Diagnostics::ambiguousDefaultInitializerForType, type);
+                else
+                {
+                    getSink()->diagnose(varDecl, Diagnostics::ambiguousDefaultInitializerForType, type);
+                }
             }
             else if(overloadContext.bestCandidate)
             {
@@ -2082,16 +2054,17 @@ namespace Slang
                 if (overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
                 {
                     getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
-                    return;
                 }
-
-                // If we had a single best candidate *and* it was applicable,
-                // then we use it to construct a new initial-value expression
-                // for the variable, that will be used for all downstream
-                // code generation.
-                //
-                varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
-                getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{ *overloadContext.bestCandidate, 0});
+                else
+                {
+                    // If we had a single best candidate *and* it was applicable,
+                    // then we use it to construct a new initial-value expression
+                    // for the variable, that will be used for all downstream
+                    // code generation.
+                    //
+                    varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+                    getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{*overloadContext.bestCandidate, 0});
+                }
             }
         }
 
@@ -2587,18 +2560,84 @@ namespace Slang
             auto requirementDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(BuiltinRequirementKind::DifferentialType);
             if (!inheritanceDecl->witnessTable->getRequirementDictionary().tryGetValue(requirementDecl, witnessValue))
                 return;            
-            // A type used as differential type must have itself as its own differential type.
+            
             if (witnessValue.getFlavor() != RequirementWitness::Flavor::val)
                 return;
             auto differentialType = as<DeclRefType>(witnessValue.getVal());
             if (!differentialType)
                 return;
+
+            // Check that the type used as differential type must have itself as its own differential type.
             auto diffDiffType = tryGetDifferentialType(m_astBuilder, differentialType);
             if (!differentialType->equals(diffDiffType))
             {
                 SourceLoc sourceLoc = differentialType->getDeclRef().getDecl()->loc;
-                getSink()->diagnose(inheritanceDecl, Diagnostics::differentialTypeShouldServeAsItsOwnDifferentialType, differentialType, diffDiffType);
+                getSink()->diagnose(
+                    inheritanceDecl,
+                    Diagnostics::differentialTypeShouldServeAsItsOwnDifferentialType,
+                    differentialType,
+                    diffDiffType);
                 getSink()->diagnose(sourceLoc, Diagnostics::seeDefinitionOf, differentialType);
+            }
+
+            // Check that all [DerivativeMember(...)] attributes have their references checked.
+            for (auto member : inheritanceDecl->parentDecl->getMembersOfType<VarDeclBase>())
+            {
+                if (member->findModifier<NoDiffModifier>())
+                    continue;
+                auto derivativeMemberAttr = member->findModifier<DerivativeMemberAttribute>();
+                if (!derivativeMemberAttr)
+                    continue;
+                checkDerivativeMemberAttributeReferences(member, derivativeMemberAttr);
+            }
+
+            // Check that either the differential type is the same as the base type, or all fields of the base type that are differentiable 
+            // have a corresponding field in the differential type through the [DerivativeMember(...)] attribute.
+            //
+            // We only need to check the fields of the base type that are differentiable.
+            auto baseDecl = as<AggTypeDecl>(inheritanceDecl->parentDecl);
+            if (!baseDecl)
+                return;
+
+            auto thisType = calcThisType(getDefaultDeclRef(baseDecl));
+
+            bool typeIsSelfDifferential = thisType->equals(differentialType);
+
+            for (auto member : baseDecl->getMembersOfType<VarDeclBase>())
+            {
+                if (member->findModifier<NoDiffModifier>())
+                    continue;
+                auto diffType = tryGetDifferentialType(m_astBuilder, member->type.type);
+                if (!diffType)
+                    continue;
+
+                if (member->findModifier<DerivativeMemberAttribute>())
+                    continue;
+                else if (!typeIsSelfDifferential)
+                    getSink()->diagnose(
+                        member,
+                        Diagnostics::differentiableMemberShouldHaveCorrespondingFieldInDiffType,
+                        member->nameAndLoc.name,
+                        differentialType);
+                else
+                {
+                    // If the type is its own differential type, we can infer the differential
+                    // members from the original type.
+                    //
+                    // Add a derivative member attribute referencing itself.
+                    //
+                    auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
+                    auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
+                    fieldLookupExpr->type.type = diffType;
+                    auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+                    baseTypeExpr->base.type = differentialType;
+                    auto baseTypeType = m_astBuilder->getOrCreate<TypeType>(differentialType);
+                    baseTypeExpr->type.type = baseTypeType;
+                    fieldLookupExpr->baseExpression = baseTypeExpr;
+                    fieldLookupExpr->declRef = makeDeclRef(member);
+                    derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
+                    addModifier(member, derivativeMemberModifier);
+                }
             }
         }
     };
@@ -4232,8 +4271,8 @@ namespace Slang
         }
         if (isDefaultInitializableType)
             context->parentDecl->addMember(ctorDecl);
-        else
-            _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
+        
+        _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
         
         return true;
     }
@@ -5173,6 +5212,7 @@ namespace Slang
             auto derivativeAttr = member->findModifier<DerivativeMemberAttribute>();
             if (!derivativeAttr)
                 continue;
+
             auto varMember = as<VarDeclBase>(member);
             if (!varMember)
                 continue;
@@ -5181,6 +5221,9 @@ namespace Slang
             auto diffMemberType = tryGetDifferentialType(m_astBuilder, memberType);
             if (!diffMemberType)
                 continue;
+
+            // Pull up the derivative member name from the attribute
+            auto derivMemberName = derivativeAttr->memberDeclRef->declRef.getName();
 
             // Construct reference exprs to the member's corresponding fields in each parameter.
             List<Expr*> paramFields;
@@ -5194,9 +5237,9 @@ namespace Slang
                     {
                         auto memberExpr = m_astBuilder->create<MemberExpr>();
                         memberExpr->baseExpression = arg;
-                        // TODO: we should probably fetch the name from `[DerivativeMember]` if `arg` is
-                        // Differential type.
-                        memberExpr->name = varMember->getName();
+
+                        memberExpr->name = derivMemberName;
+                        
                         paramFields.add(memberExpr);
                         inductiveArgMask.add(true);
                     }
@@ -5218,9 +5261,8 @@ namespace Slang
                         {
                             auto memberExpr = m_astBuilder->create<MemberExpr>();
                             memberExpr->baseExpression = arg;
-                            // TODO: we should probably fetch the name from `[DerivativeMember]` if `arg` is
-                            // Differential type.
-                            memberExpr->name = varMember->getName();
+
+                            memberExpr->name = derivMemberName;
                             paramFields.add(memberExpr);
                             inductiveArgMask.add(true);
 
@@ -5235,9 +5277,7 @@ namespace Slang
             }
 
             // Invoke the method for the field and assign the value to resultVar.
-            // TODO: we should probably fetch the name from `[DerivativeMember]` if `resultVarExpr`
-            // is Differential type.
-            auto leftVal = synth.emitMemberExpr(resultVarExpr, varMember->getName());
+            auto leftVal = synth.emitMemberExpr(resultVarExpr, derivMemberName);
             if (!_synthesizeMemberAssignMemberHelper(
                 synth,
                 requirementDeclRef.getName(),
@@ -5854,6 +5894,17 @@ namespace Slang
         }
     }
 
+    void SemanticsVisitor::checkDifferentiableMembersInType(AggTypeDecl* decl)
+    {
+        for (auto member : decl->getMembersOfType<VarDeclBase>())
+        {
+            if (auto derivativeAttr = member->findModifier<DerivativeMemberAttribute>())
+            {
+                checkDerivativeMemberAttributeReferences(member, derivativeAttr);
+            }
+        }
+    }
+
     void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
     {
         // After we've checked members, we need to go through
@@ -5891,6 +5942,16 @@ namespace Slang
             auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();
             for (auto inheritanceDecl : inheritanceDecls)
             {
+                // Special handling for when we check for conformance against `IDifferentiable`
+                // We will reference-checking for the [DerivativeMember(DiffType.member)]
+                // attributes here, since they have to be performed after types can be referenced
+                // and before conformance checking, where this information can be used to synthesize
+                // member methods (such as `dzero`, `dadd`, etc..)
+                //
+                if (inheritanceDecl->getSup().type->equals(
+                        astBuilder->getDifferentiableInterfaceType()))
+                    checkDifferentiableMembersInType(decl);
+
                 checkConformance(type, inheritanceDecl, decl);
             }
 
@@ -6105,7 +6166,7 @@ namespace Slang
 
             if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize) && !isFromStdLib(decl))
             {
-                // Force add IDefaultInitializableType to any struct missing (transitively) `IDefaultInitializableType`.
+                // Force add IDefaultInitializable to any struct missing (transitively) `IDefaultInitializable`.
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
                 if(!isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType, IsSubTypeOptions::NotReadyForLookup))
                 {
@@ -10169,15 +10230,8 @@ namespace Slang
             decl = visitor->getParentFuncOfVisitor();
         if (referencedDecl && decl)
         {
-            for (auto& capSet : nodeCaps.getAtomSets())
-            {
-                auto elements = capSet.getElements<CapabilityAtom>();
-                decl->capabilityRequirementProvenance.reserve(decl->capabilityRequirementProvenance.getCount()+elements.getCount());
-                for (auto atom : elements)
-                {
-                    decl->capabilityRequirementProvenance.addIfNotExists(atom, DeclReferenceWithLoc{ referencedDecl, referenceLoc });
-                }
-            }
+            // Here we store a childDecl that added/removed capabilities from a parentDecl
+            decl->capabilityRequirementProvenance.add(DeclReferenceWithLoc{ referencedDecl, referenceLoc });
         }
     };
 
@@ -10208,10 +10262,10 @@ namespace Slang
                 loc = Base::sourceLocStack.getLast();
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
         }
-        virtual void processDeclModifiers(Decl* decl) override
+        virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
         {
             if (decl)
-                handleProcessFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+                handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
         }
         void visitDiscardStmt(DiscardStmt* stmt)
         {
@@ -10431,7 +10485,7 @@ namespace Slang
                 auto stageCaps = CapabilitySet(Profile(entryPointAttr->stage).getCapabilityName());
                 if (declaredCaps.isIncompatibleWith(stageCaps))
                 {
-                    maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
+                    maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, funcDecl->loc, Diagnostics::stageIsIncompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
                 }
                 else
                 {
@@ -10635,18 +10689,62 @@ namespace Slang
         return false;
     }
 
-    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl)
+    void diagnoseMissingCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilitySet& setToFind)
     {
-        HashSet<Decl*> printedDecls;
+        HashSet<Decl*> checkedDecls;
+        DeclReferenceWithLoc declWithRef;
+        declWithRef.referencedDecl = decl;
+        declWithRef.referenceLoc = (decl) ? decl->loc : SourceLoc();
+        bool bottomOfProvenanceStack = false;
+        // Find the bottom of the atom provenance stack which fails to contain `setToFind`
+        while(!bottomOfProvenanceStack && declWithRef.referencedDecl)
+        {
+            bottomOfProvenanceStack = true;
+            for(auto& i : declWithRef.referencedDecl->capabilityRequirementProvenance)
+            {
+                if (checkedDecls.contains(i.referencedDecl))
+                    continue;
+                checkedDecls.add(i.referencedDecl);
+                
+                if(!i.referencedDecl->inferredCapabilityRequirements.implies(setToFind))
+                {
+                    // We found a source of the incompatible capability, follow this 
+                    // element inside the provenance stack until we are at the bottom
+                    declWithRef = i;
+                    bottomOfProvenanceStack = false;
+                    break;
+                }
+            }
+        }
+
+        if (!declWithRef.referencedDecl)
+            return;
+        
+        // Diagnose the use-site
+        maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, declWithRef.referenceLoc, Diagnostics::seeUsingOf, declWithRef.referencedDecl);
+        // Diagnose the definition as the problem
+        maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, declWithRef.referencedDecl->loc, Diagnostics::seeDefinitionOf, declWithRef.referencedDecl);
+
+        // If we find a 'require' modifier, this is contributing to the overall capability incompatibility.
+        // We should hint to the user that this declaration is problematic.
+        if (auto requireCapabilityAttribute = declWithRef.referencedDecl->findModifier<RequireCapabilityAttribute>())
+            maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, requireCapabilityAttribute->loc, Diagnostics::seeDeclarationOf, requireCapabilityAttribute);
+    }
+
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, HashSet<Decl*>& printedDecls)
+    {
         auto thisModule = getModuleDecl(decl);
         Decl* declToPrint = decl;
         while (declToPrint)
         {
+            Decl* previousDecl = declToPrint;
             printedDecls.add(declToPrint);
-            if (auto provenance = declToPrint->capabilityRequirementProvenance.tryGetValue(atomToFind))
+            for(auto& provenance : declToPrint->capabilityRequirementProvenance)
             {
-                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, provenance->referenceLoc, Diagnostics::seeUsingOf, provenance->referencedDecl);
-                declToPrint = provenance->referencedDecl;
+                if (!provenance.referencedDecl->inferredCapabilityRequirements.implies(atomToFind))
+                    continue;
+                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, provenance.referenceLoc, Diagnostics::seeUsingOf, provenance.referencedDecl);
+                declToPrint = provenance.referencedDecl;
                 if (printedDecls.contains(declToPrint))
                     break;
                 if (declToPrint->findModifier<RequireCapabilityAttribute>())
@@ -10659,12 +10757,10 @@ namespace Slang
                 if (getDeclVisibility(declToPrint) == DeclVisibility::Public)
                     break;
             }
-            else
-            {
+            if (previousDecl == declToPrint)
                 break;
-            }
         }
-        if (declToPrint && !optionallyNeverPrintDecl)
+        if (declToPrint)
         {
             maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
         }
@@ -10704,10 +10800,11 @@ namespace Slang
                 CapabilityAtomSet targetsNotUsedSet;
                 CapabilityAtomSet::calcSubtract(targetsNotUsedSet, getAtomSetOfTargets(), failedAtomSet);
                 
+                HashSet<Decl*> printedDecls;
                 for (auto atom : targetsNotUsedSet)
                 {
                     CapabilityAtom formattedAtom = asAtom(atom);
-                    diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, true);
+                    diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, printedDecls);
                 }
                 return;
             }
@@ -10727,12 +10824,14 @@ namespace Slang
 
         // We will produce all failed atoms. This is important since provenance of multiple atoms
         // can come from multiple referenced items in a function body.
-        for (auto i : failedAtomsInsideAvailableSet)
+        HashSet<Decl*> printedDecls;
+        auto simplifiedFailedAtomsSet = failedAtomsInsideAvailableSet.newSetWithoutImpliedAtoms();
+        for (auto i : simplifiedFailedAtomsSet)
         {
             CapabilityAtom formattedAtom = asAtom(i);
             maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, decl->loc, diagnosticInfo, decl, formattedAtom);
             // Print provenances.
-            diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom);
+            diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, printedDecls);
         }
     }
 

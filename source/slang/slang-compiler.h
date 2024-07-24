@@ -21,7 +21,7 @@
 
 #include "../core/slang-file-system.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 
 #include "slang-capability.h"
 #include "slang-diagnostics.h"
@@ -35,7 +35,7 @@
 
 #include "../compiler-core/slang-artifact-representation-impl.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 namespace Slang
 {
@@ -282,6 +282,7 @@ namespace Slang
         HashSet<SourceFile*> m_fileSet;
     };
 
+
     class EntryPoint;
 
     class ComponentType;
@@ -414,6 +415,10 @@ namespace Slang
             ///
         Type* getTypeFromString(
             String const&   typeStr,
+            DiagnosticSink* sink);
+
+        DeclRef<Decl> findDeclFromString(
+            String const& name,
             DiagnosticSink* sink);
 
         Dictionary<String, IntVal*>& getMangledNameToIntValMap();
@@ -559,6 +564,9 @@ namespace Slang
         // TODO: Remove this. Type lookup should only be supported on `Module`s.
         //
         Dictionary<String, Type*> m_types;
+
+        // Any decls looked up dynamically using `findDeclFromString`.
+        Dictionary<String, DeclRef<Decl>> m_decls;
 
         Scope* m_lookupScope = nullptr;
         std::unique_ptr<Dictionary<String, IntVal*>> m_mapMangledNameToIntVal;
@@ -1042,6 +1050,10 @@ namespace Slang
             List<ExpandedSpecializationArg> existentialSpecializationArgs;
         };
 
+        SLANG_NO_THROW slang::FunctionReflection* SLANG_MCALL getFunctionReflection() SLANG_OVERRIDE
+        {
+            return (slang::FunctionReflection*)m_funcDeclRef.declRefBase;
+        }
     protected:
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
 
@@ -1465,6 +1477,8 @@ namespace Slang
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
+        virtual slang::DeclReflection* getModuleReflection() SLANG_OVERRIDE;
+
         void setDigest(SHA1::Digest const& digest) { m_digest = digest; }
         SHA1::Digest computeDigest();
 
@@ -1755,6 +1769,8 @@ namespace Slang
     /// Are we generating code for a CUDA API (CUDA / OptiX)?
     bool isCUDATarget(TargetRequest* targetReq);
 
+    // Are we generating code for a CPU target
+    bool isCPUTarget(TargetRequest* targetReq);
 
         /// A request to generate output in some target format.
     class TargetRequest : public RefObject
@@ -1771,11 +1787,27 @@ namespace Slang
         CodeGenTarget getTarget() { return optionSet.getEnumOption<CodeGenTarget>(CompilerOptionName::Target); }
 
         // TypeLayouts created on the fly by reflection API
-        Dictionary<Type*, RefPtr<TypeLayout>> typeLayouts;
+        struct TypeLayoutKey
+        {
+            Type* type;
+            slang::LayoutRules rules;
+            HashCode getHashCode() const
+            {
+                Hasher hasher;
+                hasher.hashValue(type);
+                hasher.hashValue(rules);
+                return hasher.getResult();
+            }
+            bool operator==(TypeLayoutKey other) const
+            {
+                return type == other.type && rules == other.rules;
+            }
+        };
+        Dictionary<TypeLayoutKey, RefPtr<TypeLayout>> typeLayouts;
 
-        Dictionary<Type*, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
+        Dictionary<TypeLayoutKey, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
 
-        TypeLayout* getTypeLayout(Type* type);
+        TypeLayout* getTypeLayout(Type* type, slang::LayoutRules rules);
 
         CompilerOptionSet& getOptionSet() { return optionSet; }
 
@@ -3068,9 +3100,11 @@ namespace Slang
     class Session : public RefObject, public slang::IGlobalSession
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_INTERFACE(0xd6b767eb, 0xd786, 0x4343, { 0x2a, 0x8c, 0x6d, 0xa0, 0x3d, 0x5a, 0xb4, 0x4a })
 
-        ISlangUnknown* getInterface(const Guid& guid);
+        SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
+        SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
+        SLANG_REF_OBJECT_IUNKNOWN_RELEASE
 
         // slang::IGlobalSession 
         SLANG_NO_THROW SlangResult SLANG_MCALL createSession(slang::SessionDesc const&  desc, slang::ISession** outSession) override;
@@ -3276,9 +3310,11 @@ SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(Session* session)
     return static_cast<slang::IGlobalSession*>(session);
 }
 
-SLANG_FORCE_INLINE Session* asInternal(slang::IGlobalSession* session)
+SLANG_FORCE_INLINE ComPtr<Session> asInternal(slang::IGlobalSession* session)
 {
-    return static_cast<Session*>(session);
+    Slang::Session* internalSession = nullptr;
+    session->queryInterface(SLANG_IID_PPV_ARGS(&internalSession));
+    return ComPtr<Session>(INIT_ATTACH, static_cast<Session*>(internalSession));
 }
 
 SLANG_FORCE_INLINE slang::ISession* asExternal(Linkage* linkage)

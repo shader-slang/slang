@@ -9,8 +9,7 @@
 //TEST(compute):COMPARE_COMPUTE: -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
-
-
+//TEST(compute):COMPARE_COMPUTE: -metal -shaderobj
 
 struct Signs
 {

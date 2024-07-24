@@ -3279,14 +3279,15 @@ void legalizeEntryPointForGLSL(
     context.sink = codeGenContext->getSink();
     context.glslExtensionTracker = glslExtensionTracker;
 
-    // We require that the entry-point function has no uses,
+    // We require that the entry-point function has no calls,
     // because otherwise we'd invalidate the signature
     // at all existing call sites.
     //
     // TODO: the right thing to do here is to split any
     // function that both gets called as an entry point
     // and as an ordinary function.
-    SLANG_ASSERT(!func->firstUse);
+    for (auto use = func->firstUse; use; use = use->nextUse)
+        SLANG_ASSERT(use->getUser()->getOp() != kIROp_Call);
 
     // Require SPIRV version based on the stage.
     switch (stage)
@@ -3613,6 +3614,100 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
             }
         }
     });
+}
+
+void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
+{
+    List<IRGlobalParam*> toRemove;
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto param = as<IRGlobalParam>(inst);
+
+        if (!param)
+            continue;
+
+        // We are only interested in parameters involving `DynamicResource`, or arrays of it.
+        auto arrayType = as<IRArrayTypeBase>(param->getDataType());
+        auto type = arrayType ? arrayType->getElementType() : param->getDataType();
+
+        if (!as<IRDynamicResourceType>(type))
+            continue;
+
+        Dictionary<IRType*, IRGlobalParam*> aliasedParams;
+        IRBuilder builder(module);
+
+        auto getAliasedParam = [&](IRType* type)
+        {
+            IRGlobalParam* newParam;
+
+            if (!aliasedParams.tryGetValue(type, newParam))
+            {
+                newParam = builder.createGlobalParam(type);
+
+                for (auto decoration : param->getDecorations())
+                    cloneDecoration(decoration, newParam);
+
+                aliasedParams[type] = newParam;
+            }
+            return newParam;
+        };
+
+        // Try to rewrite all uses leading to `CastDynamicResource`.
+        // Later, we will diagnose an error if the parameter still has uses.
+        traverseUsers(param, [&](IRInst* user)
+        {
+            if (user->getOp() == kIROp_CastDynamicResource && !arrayType)
+            {
+                builder.setInsertBefore(user);
+
+                user->replaceUsesWith(getAliasedParam(user->getDataType()));
+                user->removeAndDeallocate();
+            }
+            else if (user->getOp() == kIROp_GetElement && arrayType)
+            {
+                traverseUsers(user, [&](IRInst* elementUser)
+                {
+                    if (elementUser->getOp() == kIROp_CastDynamicResource)
+                    {
+                        builder.setInsertBefore(elementUser);
+
+                        auto paramType = builder.getArrayTypeBase(
+                            arrayType->getOp(),
+                            elementUser->getDataType(),
+                            arrayType->getElementCount());
+
+                        auto newAccess = builder.emitElementExtract(
+                            paramType->getElementType(),
+                            getAliasedParam(paramType),
+                            user->getOperand(1));
+
+                        elementUser->replaceUsesWith(newAccess);
+                        elementUser->removeAndDeallocate();
+                    }
+                });
+
+                if (!user->hasUses())
+                {
+                    user->removeAndDeallocate();
+                }
+            }
+        });
+        toRemove.add(param);
+    }
+
+    // Remove unused parameters later to avoid invalidating iterator.
+    for (auto param : toRemove)
+    {
+        if (!param->hasUses())
+        {
+            param->removeAndDeallocate();
+        }
+        else
+        {
+            context->getSink()->diagnose(param->firstUse->getUser(), Diagnostics::ambiguousReference, param);
+        }
+    }
 }
 
 } // namespace Slang

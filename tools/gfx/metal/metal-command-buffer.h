@@ -28,10 +28,10 @@ public:
     RootShaderObjectImpl m_rootObject;
     // RefPtr<MutableRootShaderObjectImpl> m_mutableRootShaderObject;
 
-    ResourceCommandEncoder* m_resourceCommandEncoder = nullptr;
-    ComputeCommandEncoder* m_computeCommandEncoder = nullptr;
-    RenderCommandEncoder* m_renderCommandEncoder = nullptr;
-    RayTracingCommandEncoder* m_rayTracingCommandEncoder = nullptr;
+    RefPtr<ResourceCommandEncoder> m_resourceCommandEncoder = nullptr;
+    RefPtr<ComputeCommandEncoder> m_computeCommandEncoder = nullptr;
+    RefPtr<RenderCommandEncoder> m_renderCommandEncoder = nullptr;
+    RefPtr<RayTracingCommandEncoder> m_rayTracingCommandEncoder = nullptr;
 
     NS::SharedPtr<MTL::RenderCommandEncoder> m_metalRenderCommandEncoder;
     NS::SharedPtr<MTL::ComputeCommandEncoder> m_metalComputeCommandEncoder;

@@ -7,66 +7,30 @@
 
 namespace Slang
 {
-    struct AddressSpaceContext
+    struct AddressSpaceContext : public AddressSpaceSpecializationContext
     {
         IRModule* module;
 
         Dictionary<IRInst*, AddressSpace> mapInstToAddrSpace;
+        InitialAddressSpaceAssigner* addrSpaceAssigner;
 
-        AddressSpaceContext(IRModule* inModule)
+        AddressSpaceContext(IRModule* inModule, InitialAddressSpaceAssigner* inAddrSpaceAssigner)
             : module(inModule)
+            , addrSpaceAssigner(inAddrSpaceAssigner)
         {
         }
 
         AddressSpace getAddressSpaceFromVarType(IRInst* type)
         {
-            if (as<IRUniformParameterGroupType>(type))
-            {
-                return AddressSpace::Uniform;
-            }
-            if (as<IRByteAddressBufferTypeBase>(type))
-            {
-                return AddressSpace::Global;
-            }
-            if (as<IRHLSLStructuredBufferTypeBase>(type))
-            {
-                return AddressSpace::Global;
-            }
-            if (as<IRGLSLShaderStorageBufferType>(type))
-            {
-                return AddressSpace::Global;
-            }
-            if (auto ptrType = as<IRPtrTypeBase>(type))
-            {
-                if (ptrType->hasAddressSpace())
-                    return (AddressSpace)ptrType->getAddressSpace();
-                return AddressSpace::Global;
-            }
-            return AddressSpace::Generic;
+            return addrSpaceAssigner->getAddressSpaceFromVarType(type);
         }
 
         AddressSpace getLeafInstAddressSpace(IRInst* inst)
         {
-            if (as<IRGroupSharedRate>(inst->getRate()))
-                return AddressSpace::GroupShared;
-            switch (inst->getOp())
-            {
-            case kIROp_RWStructuredBufferGetElementPtr:
-                return AddressSpace::Global;
-            case kIROp_Var:
-                if (as<IRBlock>(inst->getParent()))
-                    return AddressSpace::ThreadLocal;
-                break;
-            default:
-                break;
-            }
-            auto type = unwrapAttributedType(inst->getDataType());
-            if (!type)
-                return AddressSpace::Generic;
-            return getAddressSpaceFromVarType(type);
+            return addrSpaceAssigner->getLeafInstAddressSpace(inst);
         }
 
-        AddressSpace getAddrSpace(IRInst* inst)
+        AddressSpace getAddrSpace(IRInst* inst) override
         {
             auto addrSpace = mapInstToAddrSpace.tryGetValue(inst);
             if (addrSpace)
@@ -186,20 +150,29 @@ namespace Slang
                             continue;
                         }
 
+                        // If the inst already has a pointer type with explicit address space, then use it.
+                        if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+                        {
+                            if (ptrType->hasAddressSpace())
+                            {
+                                mapInstToAddrSpace[inst] = (AddressSpace)ptrType->getAddressSpace();
+                                continue;
+                            }
+                        }
+
+                        // Otherwise, try to assign an address space based on the instruction type.
                         switch (inst->getOp())
                         {
                         case kIROp_Var:
-                        {
-                            // All local variables should be in the thread-local address space.
-                            mapInstToAddrSpace[inst] = AddressSpace::ThreadLocal;
-                            changed = true;
-                            break;
-                        }
                         case kIROp_RWStructuredBufferGetElementPtr:
                         {
-                            // The address space of the result of RWStructuredBufferGetElementPtr is always global.
-                            mapInstToAddrSpace[inst] = AddressSpace::Global;
-                            changed = true;
+                            // The address space of these insts should be assigned by the initial address space assigner.
+                            AddressSpace addrSpace = AddressSpace::Generic;
+                            if (addrSpaceAssigner->tryAssignAddressSpace(inst, addrSpace))
+                            {
+                                mapInstToAddrSpace[inst] = addrSpace;
+                                changed = true;
+                            }
                             break;
                         }
                         case kIROp_GetElementPtr:
@@ -340,7 +313,10 @@ namespace Slang
         {
             auto rate = inst->getRate();
             if (!rate)
+            {
                 inst->setFullType(dataType);
+                return;
+            }
             
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
@@ -405,9 +381,9 @@ namespace Slang
         }
     };
 
-    void specializeAddressSpace(IRModule* module)
+    void specializeAddressSpace(IRModule* module, InitialAddressSpaceAssigner* addrSpaceAssigner)
     {
-        AddressSpaceContext context(module);
+        AddressSpaceContext context(module, addrSpaceAssigner);
         context.processModule();
     }
 }

@@ -207,6 +207,12 @@ union Union64
     double d;
 };
 
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float make_float(T val)
+{
+    return (float)val;
+}
+
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_fmod(float x, float y)
 {
     return ::fmodf(x, y);
@@ -391,6 +397,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL bool1 make_bool1(bool x) { return bool1{ x };
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool2 make_bool2(bool x, bool y) { return bool2{ x, y }; }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool3 make_bool3(bool x, bool y, bool z) { return bool3{ x, y, z }; }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool4 make_bool4(bool x, bool y, bool z, bool w) { return bool4{ x, y, z, w }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool2 make_bool2(bool x) { return bool2{ x, x }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool3 make_bool3(bool x) { return bool3{ x, x, x }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool4 make_bool4(bool x) { return bool4{ x, x, x, x }; }
 
 #if SLANG_CUDA_RTC
 #define SLANG_MAKE_VECTOR_FROM_SCALAR(T) \

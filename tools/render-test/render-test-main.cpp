@@ -1545,6 +1545,7 @@ int main(int argc, char**  argv)
     SlangResult res = innerMain(stdWriters, session, argc, argv);
     spDestroySession(session);
 
+    slang::shutdown();
 	return (int)TestToolUtil::getReturnCode(res);
 }
 

@@ -1246,6 +1246,8 @@ bool isIllegalGLSLParameterType(IRType* type)
         return true;
     if (as<IRHLSLStreamOutputType>(type))
         return true;
+    if (as<IRDynamicResourceType>(type))
+        return true;
     return false;
 }
 

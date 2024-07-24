@@ -11,7 +11,8 @@
 
 struct S
 {
-    float v;    
+    float v;
+    __init() { v = 0; }
 }
 
 struct S1a : S

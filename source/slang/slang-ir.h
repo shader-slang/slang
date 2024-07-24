@@ -41,7 +41,7 @@ struct  IRStructKey;
 
 enum class AddressSpace
 {
-    Generic = 0,
+    Generic = 0x7fffffff,
     ThreadLocal = 1,
     Global = 2,
     GroupShared = 3,
@@ -1562,6 +1562,7 @@ SIMPLE_IR_TYPE(TextureBufferType, UniformParameterGroupType)
 SIMPLE_IR_TYPE(GLSLInputParameterGroupType, VaryingParameterGroupType)
 SIMPLE_IR_TYPE(GLSLOutputParameterGroupType, VaryingParameterGroupType)
 SIMPLE_IR_TYPE(ParameterBlockType, UniformParameterGroupType)
+SIMPLE_IR_TYPE(DynamicResourceType, Type)
 
 struct IRGLSLShaderStorageBufferType : IRBuiltinGenericType
 {

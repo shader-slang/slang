@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute
 // Metal lacks RWTexture GFX backend support. 
 // Due to this, Metal compute test is disabled
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk -glsl
 
@@ -28,18 +28,22 @@ RWStructuredBuffer<uint> outputBuffer;
 [numthreads(1,1,1)]
 void computeMain()
 {
-    outputTexture1D[0].xz = int2(1,2).xx;
-    outputTexture1D[1].x = int2(3,4).y;
-
-    outputTexture2D[0].xz = int2(1,2).xx;
-    outputTexture2D[int2(0, 1)].x = int2(3,4).y;
-
-    outputTexture3D[0].xz = int2(1,2).xx;
-    outputTexture3D[int3(0, 0, 1)].x = int2(3,4).y;
-
-    outputTexture2DArray[0].xz = int2(1,2);
-    outputTexture2DArray[int3(0, 0, 1)].xz = int2(3,4);
-
+    outputTexture1D[0].xz = int2(1, 2).xx;
+    AllMemoryBarrier();
+    outputTexture1D[1].x = int2(3, 4).y;
+    AllMemoryBarrier();
+    outputTexture2D[0].xz = int2(1, 2).xx;
+    AllMemoryBarrier();
+    outputTexture2D[int2(0, 1)].x = int2(3, 4).y;
+    AllMemoryBarrier();
+    outputTexture3D[0].xz = int2(1, 2).xx;
+    AllMemoryBarrier();
+    outputTexture3D[int3(0, 0, 1)].x = int2(3, 4).y;
+    AllMemoryBarrier();
+    outputTexture2DArray[0].xz = int2(1, 2);
+    AllMemoryBarrier();
+    outputTexture2DArray[int3(0, 0, 1)].xz = int2(3, 4);
+    AllMemoryBarrier();
     outputBuffer[0] = uint(true
             && all(outputTexture1D[0] == int4(1, 0, 1, 0)) == true
             && all(outputTexture1D[1] == int4(4, 0, 0, 0)) == true

@@ -11,7 +11,7 @@ static int myThree = 1+2;
 
 struct DefaultStructNoInit
 {
-    int data0;
+    int data0 = 0;
     int data1 = myTwo;
     int data2 = 2;
 };

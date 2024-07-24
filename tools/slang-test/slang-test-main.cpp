@@ -11,7 +11,7 @@
 #include "../../source/compiler-core/slang-artifact-desc-util.h"
 #include "../../source/compiler-core/slang-artifact-helper.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-string-escape-util.h"
@@ -1629,6 +1629,17 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     String modulePath = Path::combine(
         Path::getParentDirectory(Path::getExecutablePath()), Path::getFileNameWithoutExt(filePath));
 
+    // String testRoot
+    // for(;;)
+    // {
+    //     String testRoot = Path::getParentDirectory(filePath);
+    //     if (testRoot == "")
+    //     {
+    //         break;
+    //     }
+    // }
+    // printf("test folder = %s\n", testRoot.begin());
+
     String moduleExePath;
     {
         StringBuilder buf;
@@ -1651,6 +1662,8 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     args.add(moduleExePath);
     args.add("-target");
     args.add("exe");
+    args.add("-Xgenericcpp");
+    args.add("-I./include");
     for (auto arg : args)
     {
         // If unescaping is needed, do it
@@ -4605,7 +4618,7 @@ int main(int argc, char** argv)
 {
     const SlangResult res = innerMain(argc, argv);
 
-    Slang::RttiInfo::deallocateAll();
+    slang::shutdown();
 
 #ifdef _MSC_VER
     _CrtDumpMemoryLeaks();

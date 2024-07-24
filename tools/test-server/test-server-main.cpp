@@ -6,7 +6,7 @@
 
 #include "../../source/core/slang-secure-crt.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "../../source/core/slang-string.h"
 #include "../../source/core/slang-io.h"
@@ -563,7 +563,7 @@ SlangResult _execute(int argc, const char* const* argv)
     TestServer server;
     SLANG_RETURN_ON_FAIL(server.init(argc, argv));
     SLANG_RETURN_ON_FAIL(server.execute());
-
+    slang::shutdown();
     return SLANG_OK;
 }
 

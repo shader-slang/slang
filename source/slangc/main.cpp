@@ -1,6 +1,6 @@
 // main.cpp
 
-#include "../../slang.h"
+#include "slang.h"
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
@@ -104,7 +104,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobal
     SlangResult res = _compile(compileRequest, argc, argv);
     // Now that we are done, clean up after ourselves
     spDestroyCompileRequest(compileRequest);
-
+    
     return res;
 }
 
@@ -112,6 +112,7 @@ int MAIN(int argc, char** argv)
 {
     auto stdWriters = StdWriters::initDefaultSingleton();
     SlangResult res = innerMain(stdWriters, nullptr, argc, argv);
+    slang::shutdown();
     return (int)TestToolUtil::getReturnCode(res);
 }
 

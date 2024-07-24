@@ -1,8 +1,6 @@
 Slang
 =====
-![Linux Build Status](https://github.com/shader-slang/slang/actions/workflows/linux.yml/badge.svg)
-![Windows Build Status](https://github.com/shader-slang/slang/actions/workflows/windows.yml/badge.svg)
-![macOS Build Status](https://github.com/shader-slang/slang/actions/workflows/macos.yml/badge.svg)
+![CI Status](https://github.com/shader-slang/slang/actions/workflows/ci.yml/badge.svg?branch=master)
 ![CTS Status](https://github.com/shader-slang/slang/actions/workflows/vk-gl-cts-nightly.yml/badge.svg)
 
 Slang is a shading language that makes it easier to build and maintain large shader codebases in a modular and extensible fashion, while also maintaining the highest possible performance on modern GPUs and graphics APIs.
@@ -15,7 +13,7 @@ The Slang system is designed to provide developers of real-time graphics applica
 
 * Slang is backwards-compatible with most existing HLSL code. It is possible to start taking advantage of Slang's benefits without rewriting or porting your shader codebase.
 
-* The Slang compiler can generate code for a wide variety of targets and APIs: D3D12, Vulkan, D3D11, OpenGL, CUDA, and CPU. Slang code can be broadly portable, but still take advantage of the unique features of each platform.
+* The Slang compiler can generate code for a wide variety of targets and APIs: D3D12, Vulkan, Metal, D3D11, OpenGL, CUDA, and CPU. Slang code can be broadly portable, but still take advantage of the unique features of each platform. For textual targets such as Metal Shading Language(MSL) and CUDA, Slang generates readable code that preserves the original identifier names and the type + call structure for ease of debugging.
 
 * [Automatic differentiation](https://shader-slang.com/slang/user-guide/autodiff.html) as a first-class language feature. Slang can automatically generate both forward and backward derivative propagation code for complex functions that involve arbitrary control flow and dynamic dispatch. This allows users to easily make existing rendering codebases differentiable, or to use Slang as the kernel language in a PyTorch driven machine learning framework via [`slangtorch`](https://shader-slang.com/slang/user-guide/a1-02-slangpy.html).
 
@@ -75,12 +73,12 @@ Limitations and Support
 ### Platform support
 |   Windows       |     Linux      |    MacOS     |
 |:---------------:|:--------------:|:------------:|
-|   supported     |   supported    | unofficial   |
+|   supported     |   supported    |  supported   |
 
 ### Target support
-|   Direct3D 11   |  Direct3D 12   |     Vulkan      |         CUDA        |    OptiX    |      CPU Compute      |
-|:---------------:|:--------------:|:---------------:|:-------------------:|:-----------:|:---------------------:|
-|     HLSL        |    HLSL        |  GLSL & SPIR-V  |  C++ (compute-only) |  C++ (WIP)  |  C++ (compute-only)   |
+|   Direct3D 11   |  Direct3D 12   |     Vulkan      |                             Metal                       |         CUDA        |    OptiX    |      CPU Compute      |
+|:---------------:|:--------------:|:---------------:|:-------------------------------------------------------:|:-------------------:|:-----------:|:---------------------:|
+|     HLSL        |    HLSL        |  GLSL & SPIR-V  | Metal Shading Language (Vertex/Fragment/Compute stages) |  C++ (compute-only) |  C++ (WIP)  |  C++ (compute-only)   |
 
 *for greater detail, see the [Supported Compilation Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the [User Guide](https://shader-slang.github.io/slang/user-guide/)
 

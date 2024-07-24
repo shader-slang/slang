@@ -5,35 +5,39 @@ description: Performs setup common to all our actions
 inputs:
   os:
     required: true
-  runs-on:
-    required: true
   compiler:
     required: true
   platform:
     required: true
   config:
     required: true
+  build-llvm:
+    required: true
 runs:
   using: composite
   steps:
     - name: Set up MSVC dev tools on Windows
       uses: ilammy/msvc-dev-cmd@v1
-    - name: Set up sccache
-      uses: hendrikmuhs/ccache-action@v1.2
       with:
-        key: ${{inputs.os}}-${{inputs.compiler}}-${{inputs.platform}}-${{inputs.config}}
-        variant: sccache
-        append-timestamp: false
+        sdk: "10.0.19041.0"
+
     - shell: bash
       run: |
         # Set up system dependencies
 
         # Install Ninja
-        case "${{inputs.os}}" in
-          linux*) sudo apt-get install -y ninja-build;;
-          windows*) choco install ninja;;
-          macos*) brew install ninja;;
-        esac
+        if ! command -v ninja; then
+          case "${{inputs.os}}" in
+            linux*) sudo apt-get install -y ninja-build;;
+            windows*) choco install ninja;;
+            macos*) brew install ninja;;
+          esac
+        fi
+
+        # Install cross tools on Ubuntu
+        if [[ "${{inputs.os}}" == linux* && "${{inputs.platform}}" == "aarch64" && "$(uname -m)" != "aarch64" ]]; then
+          sudo apt-get install -y crossbuild-essential-arm64
+        fi
 
         # Set compiler
         CC=${{inputs.compiler}}
@@ -41,18 +45,17 @@ runs:
         # infer C++ compiler
         CXX=${CXX/gcc/g++}
         CXX=${CXX/clang/clang++}
-        # Correct version on older ubuntu
-        if [[ "${{inputs.runs-on}}" == ubuntu-20.04 ]]; then
-          CC=${CC/gcc/gcc-10}
-          CXX=${CXX/g++/g++-10}
+        # Correct gcc version on older ubuntu
+        if [[ "${{inputs.os}}" == linux* ]]; then
+          gcc_version=$(gcc -dumpversion | cut -d'.' -f1)
+          if [ "$gcc_version" -lt 10 ]; then
+            CC=${CC/gcc/gcc-10}
+            CXX=${CXX/g++/g++-10}
+          fi
         fi
         # Export
         echo "CC=$CC" >> "$GITHUB_ENV"
         echo "CXX=$CXX" >> "$GITHUB_ENV"
-
-        # Set CMake to use sccache
-        echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
-        echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
 
         # Some useful variables
         config=${{inputs.config}}
@@ -60,31 +63,51 @@ runs:
         bin_dir=$(pwd)/build/$Config/bin
         lib_dir=$(pwd)/build/$Config/lib
         echo "config=$config" >> "$GITHUB_ENV"
-        echo "Config=$Config" >> "$GITHUB_ENV"
         echo "bin_dir=$bin_dir" >> "$GITHUB_ENV"
         echo "lib_dir=$lib_dir" >> "$GITHUB_ENV"
 
     # Try to restore a LLVM install, and build it otherwise
-    - uses: actions/cache/restore@v3
+    - uses: actions/cache/restore@v4
       id: cache-llvm
+      if: inputs.build-llvm == 'true'
       with:
         path: ${{ github.workspace }}/build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
-        key: ${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+        key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
     - name: Build LLVM
-      if: steps.cache-llvm.outputs.cache-hit != 'true'
+      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
       run: ./external/build-llvm.sh --install-prefix "${{ github.workspace }}/build/llvm-project-install"
-    - uses: actions/cache/save@v3
-      if: steps.cache-llvm.outputs.cache-hit != 'true'
+    - uses: actions/cache/save@v4
+      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       with:
         path: ${{ github.workspace }}/build/llvm-project-install
         key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
+
+    # Run this after building llvm, it's pointless to fill the caches with
+    # infrequent llvm build products
+    - name: Set up sccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{inputs.os}}-${{inputs.compiler}}-${{inputs.platform}}-${{inputs.config}}
+        variant: sccache
+      # Opportunistically use sccache, it's not available for example on self
+      # hosted runners or ARM
+      continue-on-error: true
+
     - name: Set environment variable for CMake
       shell: bash
       run: |
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+        if [ "${{inputs.build-llvm}}" == "true" ]; then
+          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+        fi
+
+        # Set CMake to use sccache if it's available
+        if command -v sccache; then
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
+          echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
+        fi
 
     # Install swiftshader
     - uses: robinraju/release-downloader@v1.8
@@ -107,7 +130,9 @@ runs:
     # Put spirv-tools in path
     - shell: bash
       run: |
+        win_platform="${{ inputs.platform }}"
+        win_platform="${win_platform//x86_64/x64}"
         case "${{inputs.os}}" in
-          windows*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/windows-${{inputs.platform}}/bin" >> "$GITHUB_PATH";;
+          windows*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/windows-$win_platform/bin" >> "$GITHUB_PATH";;
           linux*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/$(uname -m)-linux/bin" >> "$GITHUB_PATH";;
         esac

@@ -5,7 +5,7 @@
 #include "slang-hash.h"
 #include "slang-type-traits.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 namespace Slang
 {

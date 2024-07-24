@@ -1,6 +1,6 @@
 #include "macro-writer.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "../../source/core/slang-list.h"
 #include "../../source/core/slang-string.h"
