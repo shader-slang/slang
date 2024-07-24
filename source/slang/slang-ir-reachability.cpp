@@ -74,11 +74,21 @@ namespace Slang
         // Target switches; treat as reachable from its cases
         if (auto tswitch = as<IRTargetSwitch>(inst2))
         {
+            HashSet<IRInst*> blocks;
             for (Slang::UInt i = 0; i < tswitch->getCaseCount(); i++)
+                blocks.add(tswitch->getCaseBlock(i));
+
+            IRInst* tmp = inst1->getParent();
+            while (tmp && tmp != tswitch->getParent())
             {
-                IRBlock* block = tswitch->getCaseBlock(i);
-                if (isWithinBlock(block, inst1))
+                if (blocks.contains(tmp))
                     return true;
+
+                // Branching instructions
+                if (tmp->firstUse)
+                    tmp = tmp->firstUse->getUser()->getParent();
+                else
+                    tmp = tmp->getParent();
             }
         }
 
@@ -94,16 +104,5 @@ namespace Slang
         if (!fromId || !toId)
             return true;
         return sourceBlocks[*toId].contains(*fromId);
-    }
-
-    bool ReachabilityContext::isWithinBlock(IRBlock* block, IRInst* tinst)
-    {
-        for (auto inst = block->getFirstInst(); inst; inst = inst->next)
-        {
-            if (inst == tinst)
-                return true;
-        }
-
-        return false;
     }
 }

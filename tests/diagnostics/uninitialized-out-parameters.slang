@@ -47,11 +47,13 @@ void control_flow_defined(bool b, out float y)
     return;
 }
 
+// Specialized handling for intrinsic asm
 void instrincs_defined(float x, out float exp)
 {
     __intrinsic_asm "frexp";
 }
 
+// Specialized handling for target switches
 void target_switching_undefined(float x, out float exp)
 {
     //CHK-DAG: warning 41018: returning without initializing out parameter 'exp'
@@ -63,6 +65,28 @@ void target_switching_defined(float x, out float exp)
     __target_switch
     {
     case glsl: __intrinsic_asm "frexp";
+    }
+}
+
+void target_switching_blocks(uint x, out half v)
+{
+    __target_switch
+    {
+    case hlsl:
+        if ((x & 2) == 0)
+            v = half(1);
+        else
+            v = half(1);
+        return;
+    case glsl:
+    case spirv:
+        {
+            if ((x & 2) == 0)
+                v = half(1);
+            else
+                v = half(1);
+            return;
+        }
     }
 }
 

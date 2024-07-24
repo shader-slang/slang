@@ -18,7 +18,6 @@ struct ReachabilityContext
 
     bool isInstReachable(IRInst* inst1, IRInst* inst2);
     bool isBlockReachable(IRBlock* from, IRBlock* to);
-    bool isWithinBlock(IRBlock* block, IRInst* tinst);
 };
 
 }
