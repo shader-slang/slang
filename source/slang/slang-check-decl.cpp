@@ -5684,8 +5684,7 @@ namespace Slang
         // purpose of signature matching (and similarly for associated types).
         //
         auto thisTypeDeclRef = m_astBuilder->getLookupDeclRef(
-            subTypeConformsToSuperInterfaceWitness, superInterfaceDeclRef.getDecl()->getThisTypeDecl())
-            .as<InterfaceDecl>();
+            subTypeConformsToSuperInterfaceWitness, superInterfaceDeclRef.getDecl()->getThisTypeDecl());
 
         bool result = true;
 
@@ -5727,7 +5726,7 @@ namespace Slang
                 subType,
                 superInterfaceType,
                 inheritanceDecl,
-                thisTypeDeclRef,
+                superInterfaceDeclRef,
                 requiredMemberDeclRef,
                 witnessTable,
                 subTypeConformsToSuperInterfaceWitness);
@@ -5746,7 +5745,7 @@ namespace Slang
                 subType,
                 superInterfaceType,
                 inheritanceDecl,
-                thisTypeDeclRef,
+                superInterfaceDeclRef,
                 requiredMemberDeclRef,
                 witnessTable,
                 subTypeConformsToSuperInterfaceWitness);
@@ -5798,7 +5797,7 @@ namespace Slang
                     subType,
                     superInterfaceType,
                     inheritanceDecl,
-                    thisTypeDeclRef,
+                    superInterfaceDeclRef,
                     requiredInheritanceDeclRef,
                     witnessTable,
                     subTypeConformsToSuperInterfaceWitness);
