@@ -5031,9 +5031,20 @@ namespace Slang
         IRInst* basePtr,
         IRInst* index)
     {
+        AddressSpace addrSpace = AddressSpace::Generic;
+        IRInst* valueType = nullptr;
+        auto basePtrType = unwrapAttributedType(basePtr->getDataType());
+        if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
+        {
+            addrSpace = ptrType->getAddressSpace();
+            valueType = ptrType->getValueType();
+        }
+        else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
+        {
+            valueType = ptrLikeType->getElementType();
+        }
         IRType* type = nullptr;
-        auto basePtrType = as<IRPtrTypeBase>(basePtr->getDataType());
-        auto valueType = unwrapAttributedType(basePtrType->getValueType());
+        valueType = unwrapAttributedType(valueType);
         if (auto arrayType = as<IRArrayTypeBase>(valueType))
         {
             type = arrayType->getElementType();
@@ -5055,7 +5066,7 @@ namespace Slang
         auto inst = createInst<IRGetElementPtr>(
             this,
             kIROp_GetElementPtr,
-            getPtrType(kIROp_PtrType, type, basePtrType->getAddressSpace()),
+            getPtrType(kIROp_PtrType, type, addrSpace),
             basePtr,
             index);
 
