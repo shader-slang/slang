@@ -134,5 +134,7 @@ cmake --install "$build_dir" --prefix "$install_prefix" --config "$config"
 
 msg "##########################################################"
 msg "LLVM installed in $install_prefix"
-msg "Please add $install_prefix to CMAKE_PREFIX_PATH"
 msg "##########################################################"
+msg "Please make CMake aware of the install directory thusly:"
+echo "LLVM_DIR=$install_prefix"
+echo "Clang_DIR=$install_prefix"

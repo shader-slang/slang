@@ -122,12 +122,25 @@ There are several options for getting llvm-support:
 To build only a standalone slang-llvm, you can run:
 
 ```bash
-cmake --workflow --preset slang-llvm
+cmake --workflow --preset slang-llvm -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM
 ```
 
 This will generate `build/dist-release/slang-slang-llvm.zip` containing the
 library. This, of course, uses the system LLVM to build slang-llvm, otherwise
 it would just be a convoluted way to download a prebuilt binary.
+
+For example, to build a Release slang-llvm and use that for all builds on
+Windows you can do:
+
+```bash
+cmake --workflow --preset slang-llvm -DSLANG_SLANG_LLVM_FLAVOR=BUILD_LLVM
+cp build/dist-release/slang-llvm.zip .
+rm -rf build
+cmake --preset vs2022 \
+  --fresh \
+  -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
+  -DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/slang-llvm.zip
+```
 
 ### Cross compiling
 

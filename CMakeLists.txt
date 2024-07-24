@@ -127,6 +127,8 @@ enum_option(
     "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default for Windows)"
     USE_SYSTEM_LLVM
     "Build slang-llvm using system-provided LLVM and Clang binaries (default for non-Windows hosts)"
+    BUILD_LLVM
+    "Build a suitable llvm and use that"
     DISABLE
     "Do not build llvm or fetch slang-llvm"
 )
@@ -193,6 +195,52 @@ find_package(Threads REQUIRED)
 if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
     find_package(LLVM 13.0 REQUIRED CONFIG)
     find_package(Clang REQUIRED CONFIG)
+elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM")
+    # Default to a Release build of LLVM, unless we're explicitly told otherwise
+    if(CMAKE_BUILD_TYPE)
+        set(slang_llvm_build_type_default ${CMAKE_BUILD_TYPE})
+    else()
+        set(slang_llvm_build_type_default Release)
+    endif()
+    set(SLANG_LLVM_BUILD_TYPE ${slang_llvm_build_type_default} CACHE STRING "The CMAKE_BUILD_TYPE to use when building LLVM")
+    if(CMAKE_SYSTEM_NAME MATCHES "Windows" AND NOT CMAKE_BUILD_TYPE MATCHES SLANG_LLVM_BUILD_TYPE)
+        message(
+            WARNING
+            "Building LLVM with an ${SLANG_LLVM_BUILD_TYPE} configuration "
+            "with a mismatched or unspecified CMAKE_BUILD_TYPE for the Slang "
+            "build. This may lead to problems linking slang-llvm on Windows, "
+            "where incompatible runtime libraries may be used."
+        )
+    endif()
+
+    # Try and find LLVM already, assume that the build type matches
+    find_package(LLVM 13.0 CONFIG PATHS ${CMAKE_CURRENT_BINARY_DIR}/llvm-install NO_DEFAULT_PATH)
+    find_package(Clang CONFIG PATHS ${CMAKE_CURRENT_BINARY_DIR}/llvm-install NO_DEFAULT_PATH)
+    if(LLVM_FOUND AND Clang_FOUND)
+        message(STATUS "Not building LLVM (already found in ${CMAKE_CURRENT_BINARY_DIR}/llvm-install)")
+    else()
+        message(STATUS "Building LLVM using external/build-llvm.sh")
+        execute_process(
+            COMMAND bash external/build-llvm.sh
+                --install-prefix "${CMAKE_CURRENT_BINARY_DIR}/llvm-install"
+                --config "${SLANG_LLVM_BUILD_TYPE}"
+                --source-dir "${CMAKE_CURRENT_BINARY_DIR}/llvm-source"
+                --
+                -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
+                -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+                -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+                -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
+            RESULT_VARIABLE build_llvm_result
+        )
+        if(build_llvm_result)
+            message(FATAL_ERROR "Failed to build LLVM")
+        else()
+            find_package(LLVM 13.0 REQUIRED CONFIG PATHS ${CMAKE_CURRENT_BINARY_DIR}/llvm-install NO_DEFAULT_PATH)
+            find_package(Clang REQUIRED CONFIG PATHS ${CMAKE_CURRENT_BINARY_DIR}/llvm-install NO_DEFAULT_PATH)
+        endif()
+    endif()
 endif()
 
 add_subdirectory(external)
@@ -413,7 +461,8 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
         PROPERTY IMPORTED_LOCATION ${slang_llvm_dest_object}
     )
     install(PROGRAMS ${slang_llvm_dest_object} DESTINATION ${module_subdir})
-elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
+elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM" OR
+       SLANG_SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM")
     llvm_target_from_components(llvm-dep filecheck native orcjit)
     clang_target_from_libs(
         clang-dep
@@ -457,7 +506,7 @@ if(SLANG_ENABLE_PREBUILT_BINARIES)
         add_custom_target(
             copy-prebuilt-binaries ALL
             COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${prebuilt_binaries}
                 ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}
             VERBATIM
