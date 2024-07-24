@@ -1791,6 +1791,32 @@ struct SPIRVEmitContext
         }
     }
 
+    static SpvStorageClass getSpvStorageClass(IRPtrTypeBase* ptrType)
+    {
+        SpvStorageClass storageClass = SpvStorageClassFunction;
+        if (ptrType && ptrType->hasAddressSpace())
+        {
+            storageClass = (SpvStorageClass)ptrType->getAddressSpace();
+        }
+        return storageClass;
+    }
+
+    // https://registry.khronos.org/vulkan/specs/1.3/html/chap37.html#VUID-StandaloneSpirv-DescriptorSet-06491
+    // Only UniformConstant, Uniform or StorageBuffer storage class are allowed to be decorated with descriptor
+    // set or binding.
+    static inline bool isBindingAllowed(SpvStorageClass storageClass)
+    {
+        switch(storageClass)
+        {
+        case SpvStorageClassUniformConstant:
+        case SpvStorageClassUniform:
+        case SpvStorageClassStorageBuffer:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     SpvCapability getImageFormatCapability(SpvImageFormat format)
     {
         switch (format)
@@ -2137,6 +2163,10 @@ struct SPIRVEmitContext
 
     void emitVarLayout(IRInst* var, SpvInst* varInst, IRVarLayout* layout)
     {
+        auto dataType = as<IRPtrTypeBase>(var->getDataType());
+        SpvStorageClass storageClass = getSpvStorageClass(dataType);
+
+        bool isBindingDecorationAllowed = isBindingAllowed(storageClass);
         bool needDefaultSetBindingDecoration = false;
         bool hasExplicitSetBinding = false;
         bool isDescirptorSetDecorated = false;
@@ -2196,11 +2226,15 @@ struct SPIRVEmitContext
             case LayoutResourceKind::UnorderedAccess:
             case LayoutResourceKind::SamplerState:
             case LayoutResourceKind::DescriptorTableSlot:
+                if (!isBindingDecorationAllowed)
+                    break;
+
                 emitOpDecorateBinding(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
                     SpvLiteralInteger::from32(int32_t(index)));
+
                 if (!isDescirptorSetDecorated)
                 {
                     if (space)
@@ -2219,7 +2253,7 @@ struct SPIRVEmitContext
                 }
                 break;
             case LayoutResourceKind::RegisterSpace:
-                if (!isDescirptorSetDecorated)
+                if (!isDescirptorSetDecorated && isBindingDecorationAllowed)
                 {
                     emitOpDecorateDescriptorSet(
                         getSection(SpvLogicalSectionID::Annotations),
@@ -4344,11 +4378,8 @@ struct SPIRVEmitContext
     {
         auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
         SLANG_ASSERT(ptrType);
-        SpvStorageClass storageClass = SpvStorageClassFunction;
-        if (ptrType->hasAddressSpace())
-        {
-            storageClass = (SpvStorageClass)ptrType->getAddressSpace();
-        }
+        SpvStorageClass storageClass = getSpvStorageClass(ptrType);
+
         auto varSpvInst = emitOpVariable(parent, inst, inst->getFullType(), storageClass);
         maybeEmitName(varSpvInst, inst);
         maybeEmitPointerDecoration(varSpvInst, inst);
