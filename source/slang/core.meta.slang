@@ -75,7 +75,7 @@ syntax snorm : SNormModifier;
 syntax __extern_cpp : ExternCppModifier;
 
 __magic_type(DefaultInitializableType)
-interface IDefaultInitializableType
+interface IDefaultInitializable
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::DefaultInitializableConstructor))
     __init();
@@ -2255,6 +2255,51 @@ bool and(bool v0, bool v1)
     return __and(v0, v1);
 }
 
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+__intrinsic_op($(kIROp_And))
+vector<bool, N> and<let N : int>(vector<bool, N> v0, vector<bool, N> v1);
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+vector<bool, N> and<let N : int>(bool b, vector<bool, N> v)
+{
+    return and(vector<bool, N>(b), v);
+}
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+vector<bool, N> and<let N : int>(vector<bool, N> v, bool b)
+{
+    return and(v, vector<bool, N>(b));
+}
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+bool or(bool v0, bool v1)
+{
+    return __or(v0, v1);
+}
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+__intrinsic_op($(kIROp_Or))
+vector<bool, N> or<let N : int>(vector<bool, N> v0, vector<bool, N> v1);
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+vector<bool, N> or<let N : int>(bool b, vector<bool, N> v)
+{
+    return or(vector<bool, N>(b), v);
+}
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+vector<bool, N> or<let N : int>(vector<bool, N> v, bool b)
+{
+    return or(v, vector<bool, N>(b));
+}
+
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
@@ -2474,6 +2519,9 @@ attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [vk_spirv_instruction(op : int, set : String = "")]     : SPIRVInstructionOpAttribute;
+
+__attributeTarget(VarDeclBase)
+attribute_syntax [vk_input_attachment_index(location : int)] : GLSLInputAttachmentIndexLayoutAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [spv_target_env_1_3] : SPIRVTargetEnv13Attribute;

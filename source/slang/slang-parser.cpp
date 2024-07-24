@@ -5349,9 +5349,9 @@ namespace Slang
         {
             statement = ParseExpressionStatement();
         }
-        else if (LookAheadToken(TokenType::Identifier))
+        else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
         {
-            if (LookAheadToken(TokenType::Colon, 1))
+            if (LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Colon, 1))
             {
                 // An identifier followed by an ":" is a label.
                 return parseLabelStatement();
@@ -8061,7 +8061,7 @@ namespace Slang
         GLSLLayoutLocalSizeAttribute* numThreadsAttrib = nullptr;
         GLSLLayoutDerivativeGroupQuadAttribute* derivativeGroupQuadAttrib = nullptr;
         GLSLLayoutDerivativeGroupLinearAttribute* derivativeGroupLinearAttrib = nullptr; 
-
+        GLSLInputAttachmentIndexLayoutAttribute* inputAttachmentIndexLayoutAttribute = nullptr;
         ImageFormat format;
 
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupBegin>());
@@ -8115,6 +8115,17 @@ namespace Slang
             {
                 derivativeGroupLinearAttrib = parser->astBuilder->create<GLSLLayoutDerivativeGroupLinearAttribute>();
             }
+            else if (nameText == "input_attachment_index")
+            {
+                inputAttachmentIndexLayoutAttribute = parser->astBuilder->create<GLSLInputAttachmentIndexLayoutAttribute>();
+                if (AdvanceIf(parser, TokenType::OpAssign))
+                {
+                    auto token = parser->ReadToken(TokenType::IntegerLiteral);
+                    auto intVal = getIntegerLiteralValue(token);
+                    inputAttachmentIndexLayoutAttribute->location = intVal;
+                }
+
+            }
             else if (nameText == "binding" ||
                 nameText == "set")
             {
@@ -8165,7 +8176,6 @@ namespace Slang
                 CASE(scalar, GLSLScalarModifier)
                 CASE(offset, GLSLOffsetLayoutAttribute)
                 CASE(location, GLSLLocationLayoutModifier) 
-                CASE(input_attachment_index, GLSLInputAttachmentIndexLayoutModifier)
                 {
                     modifier = parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
                 }
@@ -8227,6 +8237,8 @@ namespace Slang
             listBuilder.add(derivativeGroupQuadAttrib);
         if(derivativeGroupLinearAttrib)
             listBuilder.add(derivativeGroupLinearAttrib);
+        if(inputAttachmentIndexLayoutAttribute)
+            listBuilder.add(inputAttachmentIndexLayoutAttribute);
 
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupEnd>());
 

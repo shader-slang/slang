@@ -2,7 +2,7 @@
 #ifndef SLANG_CORE_PLATFORM_H
 #define SLANG_CORE_PLATFORM_H
 
-#include "../../slang.h"
+#include "slang.h"
 #include "../core/slang-string.h"
 
 namespace Slang

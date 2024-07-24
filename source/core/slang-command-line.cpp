@@ -7,7 +7,7 @@
 #include "slang-string-escape-util.h"
 #include "slang-string-util.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 namespace Slang {
 

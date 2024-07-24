@@ -14,6 +14,11 @@ struct ByteAddressBufferLegalizationOptions
     bool useBitCastFromUInt = false;
     bool translateToStructuredBufferOps = false;
     bool lowerBasicTypeOps = false;
+
+    /// Causes all calls to `getEquivlentStructuredBuffer` to return a `ByteAddressBuffer` (this) instead of a `StructuredBuffer`.
+    /// This option is used for targets that do not distinctly define `ByteAddressBuffer`/`StructuredBuffer` and introduce
+    /// operations which prevent DCE from destroying old definitions of `ByteAddressBuffer` after variable replacement.
+    bool treatGetEquivalentStructuredBufferAsGetThis = false;
 };
 
     /// Legalize byte-address buffer `Load()` and `Store()` operations.

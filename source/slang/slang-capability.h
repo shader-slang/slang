@@ -51,6 +51,8 @@ namespace Slang
 struct CapabilityAtomSet : UIntSet
 {
     using UIntSet::UIntSet;
+
+    CapabilityAtomSet newSetWithoutImpliedAtoms() const;
 };
 
 struct CapabilityTargetSet;
@@ -207,7 +209,7 @@ public:
         public:
             operator bool() const
             {
-                return atomSetNode->has_value();
+                return (atomSetNode) ? atomSetNode->has_value() : false;
             }
             const CapabilityAtomSet& operator*() const
             {
@@ -300,6 +302,22 @@ public:
     /// Add spirv version capabilities from 'spirv CapabilityTargetSet' as glsl_spirv version capability in 'glsl CapabilityTargetSet'
     void addSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& other);
 
+    /// Gets the first valid compile-target found in the CapabilitySet
+    CapabilityAtom getCompileTarget()
+    {
+        if(isEmpty() || isInvalid())
+            return CapabilityAtom::Invalid;
+        return (*m_targetSets.begin()).first;
+    }
+
+    /// Gets the first valid stage found in the CapabilitySet
+    CapabilityAtom getTargetStage()
+    {
+        if(isEmpty() || isInvalid())
+            return CapabilityAtom::Invalid;
+        return (*(*m_targetSets.begin()).second.shaderStageSets.begin()).first;
+    }
+
 private:
     /// underlying data of CapabilitySet.
     CapabilityTargetSets m_targetSets{};
@@ -352,6 +370,8 @@ const CapabilityAtomSet& getAtomSetOfTargets();
 const CapabilityAtomSet& getAtomSetOfStages();
 
 bool hasTargetAtom(const CapabilityAtomSet& setIn, CapabilityAtom& targetAtom);
+
+void freeCapabilityDefs();
 
 //#define UNIT_TEST_CAPABILITIES
 #ifdef UNIT_TEST_CAPABILITIES

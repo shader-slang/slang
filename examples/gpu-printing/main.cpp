@@ -1,19 +1,21 @@
 // main.cpp
+#include <string>
 
-#include <slang.h>
+#include "slang.h"
 
-#include <slang-com-ptr.h>
+#include "slang-com-ptr.h"
 using Slang::ComPtr;
 
+#include "gpu-printing.h"
 #include "slang-gfx.h"
 #include "gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"
 #include "source/core/slang-basic.h"
+#include "examples/example-base/example-base.h"
+
 using namespace gfx;
 
-#include <string>
-
-#include "gpu-printing.h"
+static const ExampleResources resourceBase("gpu-printing");
 
 ComPtr<slang::ISession> createSlangSession(gfx::IDevice* device)
 {
@@ -87,11 +89,16 @@ Result execute()
     Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
     if(SLANG_FAILED(res)) return res;
 
+    Slang::String path = resourceBase.resolveResource("kernels.slang");
+
     gSlangSession = createSlangSession(gDevice);
-    gSlangModule = compileShaderModuleFromFile(gSlangSession, "kernels.slang");
+    gSlangModule = compileShaderModuleFromFile(gSlangSession, path.getBuffer());
+    if(!gSlangModule)
+        return SLANG_FAIL;
 
     gProgram = loadComputeProgram(gSlangModule, "computeMain");
-    if(!gProgram) return SLANG_FAIL;
+    if(!gProgram)
+        return SLANG_FAIL;
 
     ComputePipelineStateDesc desc;
     desc.program = gProgram;

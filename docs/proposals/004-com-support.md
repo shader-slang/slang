@@ -7,7 +7,7 @@ The Slang language and compiler should provide some first-class features to make
 Status
 ------
 
-In discussion.
+Implemented.
 
 Background
 ----------

@@ -126,7 +126,7 @@ public property uint3 gl_NumWorkGroups {
 public property uint3 gl_WorkGroupSize
 {
     [__unsafeForceInlineEarly]
-    [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+    [require(compute)]
     get
     {
         return WorkgroupSize();
@@ -1402,15 +1402,7 @@ __generic<let N:int>
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public vector<uint,N> bitCount(vector<uint,N> value)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitCount";
-    case spirv: return spirv_asm {
-        result:$$vector<uint,N> = OpBitCount $value
-    };
-    default:
-        VECTOR_MAP_UNARY(uint, N, countbits, value);
-    }
+    return countbits(value);
 }
 
 [__readNone] 
@@ -1878,7 +1870,7 @@ public ivec3 textureSize(Sampler2DMSArray<vector<T,N>,sampleCount> sampler)
 
 __generic<T, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylod)]
+[require(glsl_hlsl_metal_spirv, texture_querylod)]
 public vec2 textureQueryLod(__TextureImpl<
         T,
         __Shape1D,
@@ -1898,6 +1890,7 @@ public vec2 textureQueryLod(__TextureImpl<
         __intrinsic_asm "textureQueryLod";
     case spirv:
         return spirv_asm {
+            OpCapability ImageQuery;
             result:$$float2 = OpImageQueryLod $sampler $p
         };
     default:
@@ -1910,7 +1903,7 @@ public vec2 textureQueryLod(__TextureImpl<
 
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylod)]
+[require(glsl_hlsl_metal_spirv, texture_querylod)]
 public vec2 textureQueryLod(__TextureImpl<
         T,
         Shape,
@@ -1930,6 +1923,7 @@ public vec2 textureQueryLod(__TextureImpl<
         __intrinsic_asm "textureQueryLod";
     case spirv:
         return spirv_asm {
+            OpCapability ImageQuery;
             result:$$float2 = OpImageQueryLod $sampler $p
         };
     default:
@@ -1946,7 +1940,7 @@ public vec2 textureQueryLod(__TextureImpl<
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(Sampler1D<vector<T,N>> sampler)
 {
     int width;
@@ -1957,7 +1951,7 @@ public int textureQueryLevels(Sampler1D<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(Sampler2D<vector<T,N>> sampler)
 {
     vector<int,2> dim;
@@ -1968,7 +1962,7 @@ public int textureQueryLevels(Sampler2D<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(Sampler3D<vector<T,N>> sampler)
 {
     vector<int,3> dim;
@@ -1979,7 +1973,7 @@ public int textureQueryLevels(Sampler3D<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(SamplerCube<vector<T,N>> sampler)
 {
     vector<int,2> dim;
@@ -1990,7 +1984,7 @@ public int textureQueryLevels(SamplerCube<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(Sampler1DArray<vector<T,N>> sampler)
 {
     vector<int,2> dim;
@@ -2001,7 +1995,7 @@ public int textureQueryLevels(Sampler1DArray<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(Sampler2DArray<vector<T,N>> sampler)
 {
     vector<int,3> dim;
@@ -2012,7 +2006,7 @@ public int textureQueryLevels(Sampler2DArray<vector<T,N>> sampler)
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(SamplerCubeArray<vector<T,N>> sampler)
 {
     vector<int,3> dim;
@@ -2022,7 +2016,7 @@ public int textureQueryLevels(SamplerCubeArray<vector<T,N>> sampler)
 }
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(sampler1DShadow sampler)
 {
     int dim;
@@ -2032,7 +2026,7 @@ public int textureQueryLevels(sampler1DShadow sampler)
 }
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(sampler2DShadow sampler)
 {
     vector<int,2> dim;
@@ -2042,7 +2036,7 @@ public int textureQueryLevels(sampler2DShadow sampler)
 }
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(samplerCubeShadow sampler)
 {
     vector<int,2> dim;
@@ -2052,7 +2046,7 @@ public int textureQueryLevels(samplerCubeShadow sampler)
 }
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(sampler1DArrayShadow sampler)
 {
     vector<int,2> dim;
@@ -2062,7 +2056,7 @@ public int textureQueryLevels(sampler1DArrayShadow sampler)
 }
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(sampler2DArrayShadow sampler)
 {
     vector<int,3> dim;
@@ -2072,7 +2066,7 @@ public int textureQueryLevels(sampler2DArrayShadow sampler)
 }
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, texture_querylevels)]
+[require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
 public int textureQueryLevels(samplerCubeArrayShadow sampler)
 {
     vector<int,3> dim;
@@ -9564,20 +9558,7 @@ ${{{{
     [require(glsl_hlsl_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,0> subpass)
     {
-        __target_switch
-        {
-        case hlsl: return subpass.SubpassLoad();
-        case glsl: __intrinsic_asm "subpassLoad($0)";
-        case spirv:
-        {
-            let zeroVec = ivec2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $subpass $zeroVec
-            };
-        }
-        }
+        return subpass.SubpassLoad();
     }
     __generic<T>
     [__NoSideEffect]
@@ -9585,20 +9566,7 @@ ${{{{
     [require(glsl_hlsl_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,1> subpass, int sample)
     {
-        __target_switch
-        {
-        case hlsl: return subpass.SubpassLoad(sample);
-        case glsl: __intrinsic_asm "subpassLoad($0, $1)";
-        case spirv:
-        {
-            let zeroVec = ivec2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $subpass $zeroVec Sample $sample
-            };
-        }
-        }
+        return subpass.SubpassLoad(sample);
     }
 
 /// Section 8.19. Shader Invocation Group Functions

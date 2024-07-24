@@ -638,7 +638,12 @@ namespace Slang
                     auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                     typeDef->nameAndLoc.name = item.declRef.getName();
                     typeDef->parentDecl = parent;
-                    typeDef->type.type = subType;
+
+                    // Compute the decl's type as if it is referred to from itself. This is important because
+                    // subType may have substitutions from the context it is used in, while this synthesis step
+                    // is local to the decl.
+                    // 
+                    typeDef->type.type = calcThisType(subType->getDeclRef().getDecl()->getDefaultDeclRef());
                     
                     synthesizedDecl = parent;
 
@@ -1211,6 +1216,57 @@ namespace Slang
             derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
             addModifier(member, derivativeMemberModifier);
         }
+    }
+
+    void SemanticsVisitor::checkDerivativeMemberAttributeReferences(
+            VarDeclBase* varDecl, DerivativeMemberAttribute* derivativeMemberAttr)
+    {
+        if (derivativeMemberAttr->memberDeclRef)
+        {
+            // Already checked! This usually happens if this attribute is synthesized by the compiler.
+            return;
+        }
+        
+        SLANG_ASSERT(derivativeMemberAttr->args.getCount() == 1);
+        auto checkedExpr = dispatchExpr(derivativeMemberAttr->args[0], allowStaticReferenceToNonStaticMember());
+        
+        auto memberType = varDecl->type.type; // All types must be fully checked by now.
+        auto diffType = getDifferentialType(m_astBuilder, memberType, varDecl->loc);
+        auto thisType = calcThisType(makeDeclRef(varDecl->parentDecl));
+        if (!thisType) return; // Diagnostic should have been emitted previously.
+        
+        auto diffThisType = getDifferentialType(m_astBuilder, thisType, derivativeMemberAttr->loc);
+        if (!diffThisType) return; // Diagnostic should have been emitted previously.
+
+        if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
+        {
+            derivativeMemberAttr->memberDeclRef = declRefExpr;
+            if (!diffType->equals(declRefExpr->type))
+            {
+                getSink()->diagnose(derivativeMemberAttr, Diagnostics::typeMismatch, diffType, declRefExpr->type);
+            }
+            if (!varDecl->parentDecl)
+            {
+                getSink()->diagnose(derivativeMemberAttr, Diagnostics::attributeNotApplicable, diffType, declRefExpr->type);
+            }
+            if (auto memberExpr = as<StaticMemberExpr>(declRefExpr))
+            {
+                auto baseExprType = memberExpr->baseExpression->type.type;
+                if (auto typeType = as<TypeType>(baseExprType))
+                {
+                    if (diffThisType->equals(typeType->getType()))
+                    {
+                        return;
+                    }
+                }
+
+            }
+        }
+        getSink()->diagnose(
+            derivativeMemberAttr,
+            Diagnostics::
+            derivativeMemberAttributeMustNameAMemberInExpectedDifferentialType,
+            diffThisType);
     }
 
     Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc)
@@ -3687,9 +3743,8 @@ namespace Slang
             case 'w': case 'a': elementIndex = 3; break;
             default:
                 // An invalid character in the swizzle is an error
-                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 anyError = true;
-                continue;
+                break;
             }
 
             // TODO(tfoley): GLSL requires that all component names
@@ -3698,9 +3753,16 @@ namespace Slang
             // Make sure the index is in range for the source type
             if (elementIndex >= limitElement)
             {
-                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 anyError = true;
-                continue;
+                break;
+            }
+
+            // If elementCount is already at 4 stop trying to assign a swizzle element and send an error,
+            // we cannot have more valid swizzle elements than 4.
+            if (elementCount >= 4)
+            {
+                anyError = true;
+                break;
             }
 
             // Check if we've seen this index before
@@ -3722,6 +3784,7 @@ namespace Slang
 
         if (anyError)
         {
+            getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
             return CreateErrorExpr(memberRefExpr);
         }
         else if (elementCount == 1)
@@ -4176,6 +4239,10 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
     {
+        // If we are assigned a type, expr has already been legalized
+        if(expr->type)
+            return expr;
+        
         // When faced with an initializer list, we first just check the sub-expressions blindly.
         // Actually making them conform to a desired type will wait for when we know the desired
         // type based on context.

@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <slang.h>
-#include <slang-com-helper.h>
+#include "slang.h"
+#include "slang-com-helper.h"
 
 #include "../../source/core/slang-string-escape-util.h"
 #include "../../source/core/slang-char-util.h"
@@ -1450,6 +1450,6 @@ int main(
     
     SlangResult res = innerMain(stdWriters, session, argc, argv);
     spDestroySession(session);
-
+    slang::shutdown();
     return SLANG_FAILED(res) ? 1 : 0;
 }

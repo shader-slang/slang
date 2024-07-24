@@ -316,6 +316,9 @@ def _GL_ARB_sparse_texture2 : _GL_ARB_sparse_texture;
 def _GL_ARB_sparse_texture_clamp : _GL_ARB_sparse_texture2;
 def _GL_ARB_texture_gather : _GLSL_130;
 def _GL_ARB_texture_query_levels : _GLSL_130;
+def _GL_ARB_shader_clock : _GLSL_450;
+def _GL_ARB_gpu_shader_int64 : _GLSL_400;
+def _GL_ARB_shader_clock64 : _GL_ARB_shader_clock + _GL_ARB_gpu_shader_int64;
 
 def _GL_KHR_memory_scope_semantics : _GLSL_420;
 def _GL_KHR_shader_subgroup_arithmetic : _GLSL_140;
@@ -349,6 +352,7 @@ alias GL_EXT_ray_query = _GL_EXT_ray_query | spvRayQueryKHR;
 alias GL_EXT_ray_tracing = _GL_EXT_ray_tracing | spvRayTracingKHR;
 alias GL_EXT_ray_tracing_position_fetch_ray_tracing = _GL_EXT_ray_tracing_position_fetch | spvRayTracingPositionFetchKHR;
 alias GL_EXT_ray_tracing_position_fetch_ray_query = _GL_EXT_ray_tracing_position_fetch | spvRayQueryPositionFetchKHR;
+alias GL_EXT_ray_tracing_position_fetch = GL_EXT_ray_tracing_position_fetch_ray_tracing + GL_EXT_ray_tracing_position_fetch_ray_query;
 alias GL_EXT_samplerless_texture_functions = _GL_EXT_samplerless_texture_functions | _spirv_1_0;
 alias GL_EXT_shader_atomic_float = _GL_EXT_shader_atomic_float | spvAtomicFloat32AddEXT + spvAtomicFloat32MinMaxEXT;
 alias GL_EXT_shader_atomic_float_min_max = _GL_EXT_shader_atomic_float_min_max | spvAtomicFloat32MinMaxEXT + spvAtomicFloat16MinMaxEXT;
@@ -370,6 +374,9 @@ alias GL_ARB_shader_texture_image_samples = _GL_ARB_shader_texture_image_samples
 alias GL_ARB_sparse_texture_clamp = _GL_ARB_sparse_texture_clamp | spvSparseResidency;
 alias GL_ARB_texture_gather = _GL_ARB_texture_gather | spvImageGatherExtended | metal;
 alias GL_ARB_texture_query_levels = _GL_ARB_texture_query_levels | spvImageQuery | metal;
+alias GL_ARB_shader_clock = _GL_ARB_shader_clock | spvShaderClockKHR;
+alias GL_ARB_shader_clock64 = _GL_ARB_shader_clock64 | spvShaderClockKHR;
+alias GL_ARB_gpu_shader_int64 = _GL_ARB_gpu_shader_int64;
 
 alias GL_KHR_memory_scope_semantics = _GL_KHR_memory_scope_semantics | _spirv_1_0;
 alias GL_KHR_shader_subgroup_arithmetic = _GL_KHR_shader_subgroup_arithmetic | spvGroupNonUniformArithmetic;
@@ -401,7 +408,7 @@ alias rayquery = GL_EXT_ray_query | _sm_6_3;
 alias raytracing_motionblur =  raytracing + motionblur | cuda;
 alias ser_motion = ser + motionblur;
 alias shaderclock = GL_EXT_shader_realtime_clock | hlsl_nvapi | cpp | cuda;
-alias meshshading_internal = GL_EXT_mesh_shader | _sm_6_5;
+alias meshshading_internal = GL_EXT_mesh_shader | _sm_6_5 | metal;
 alias meshshading = amplification_mesh + meshshading_internal;
 alias fragmentshaderinterlock = _GL_ARB_fragment_shader_interlock | hlsl_nvapi | spvFragmentShaderPixelInterlockEXT;
 alias atomic64 = GL_EXT_shader_atomic_int64 | _sm_6_6 | cpp | cuda;
@@ -410,7 +417,7 @@ alias atomicfloat2 = GL_EXT_shader_atomic_float2 | _sm_6_6 + hlsl_nvapi | cpp | 
 alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
 alias shadermemorycontrol = glsl | _spirv_1_0 | _sm_5_0;
 alias shadermemorycontrol_compute = raytracingstages_compute + shadermemorycontrol;
-alias subpass = fragment + any_gfx_target;
+alias subpass = fragment + _sm_6_0 | fragment + any_gfx_target;
 alias waveprefix = _sm_6_5 | _cuda_sm_7_0 | GL_KHR_shader_subgroup_arithmetic;
 alias bufferreference = GL_EXT_buffer_reference;
 alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmetic_types_int64;
@@ -447,7 +454,7 @@ alias sm_4_0_version = _sm_4_0
              ;
 alias sm_4_0 = sm_4_0_version
              | SPV_GOOGLE_user_type + spvMinLod
-             | GL_ARB_sparse_texture_clamp + GL_EXT_samplerless_texture_functions + GL_EXT_texture_query_lod + GL_EXT_texture_shadow_lod + GL_EXT_debug_printf
+             | GL_ARB_sparse_texture_clamp + GL_EXT_samplerless_texture_functions + GL_EXT_texture_query_lod + GL_EXT_texture_shadow_lod + GL_EXT_debug_printf + GL_ARB_shader_image_size
              ;
 
 alias sm_4_1_version = _sm_4_1
@@ -458,6 +465,7 @@ alias sm_4_1_version = _sm_4_1
              | cpp
              ;
 alias sm_4_1 = sm_4_1_version
+             | GL_ARB_texture_gather + GL_ARB_texture_query_levels + GL_ARB_shader_texture_image_samples
              // previous
              | sm_4_0
              ;
@@ -737,6 +745,9 @@ alias consumestructuredbuffer = sm_5_0_version;
 alias fragmentprocessing = fragment + _sm_5_0
                          | fragment + glsl_spirv
                          | raytracingstages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
+                         | fragment + metal
+                         | fragment + cpp
+                         | fragment + cuda
                          ;
 alias fragmentprocessing_derivativecontrol = fragment + _sm_5_0
                                            | fragment + GL_ARB_derivative_control
@@ -758,15 +769,15 @@ alias texture_sm_4_1_samplerless = texture_sm_4_1
 // supposedly works on only limited stages, support all stages for now
 alias texture_sm_4_1_compute_fragment = texture_sm_4_1;
 alias texture_sm_4_0_fragment = texture_sm_4_0;
-alias texture_sm_4_1_clamp_fragment = texture_sm_4_0_fragment + GL_ARB_sparse_texture_clamp;
+alias texture_sm_4_1_clamp_fragment = texture_sm_4_0_fragment | GL_ARB_sparse_texture_clamp;
 alias texture_sm_4_1_vertex_fragment_geometry = texture_sm_4_1;
-alias texture_gather = texture_sm_4_1_vertex_fragment_geometry + GL_ARB_texture_gather;
-alias image_samples = texture_sm_4_1_compute_fragment + GL_ARB_shader_texture_image_samples;
-alias image_size = texture_sm_4_1_compute_fragment + GL_ARB_shader_image_size;
-alias texture_size = texture_sm_4_1 + GL_ARB_shader_image_size;
-alias texture_querylod = texture_sm_4_1 + GL_EXT_texture_query_lod;
-alias texture_querylevels = texture_sm_4_1 + GL_ARB_texture_query_levels;
-alias texture_shadowlod = texture_sm_4_1 + GL_EXT_texture_shadow_lod
+alias texture_gather = texture_sm_4_1_vertex_fragment_geometry | GL_ARB_texture_gather;
+alias image_samples = texture_sm_4_1_compute_fragment | GL_ARB_shader_texture_image_samples;
+alias image_size = texture_sm_4_1_compute_fragment | GL_ARB_shader_image_size;
+alias texture_size = texture_sm_4_1 | GL_ARB_shader_image_size;
+alias texture_querylod = texture_sm_4_1 | GL_EXT_texture_query_lod;
+alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
+alias texture_shadowlod = texture_sm_4_1 | GL_EXT_texture_shadow_lod
                         | texture_sm_4_1;
 
 alias atomic_glsl_float1 = GL_EXT_shader_atomic_float;
@@ -803,19 +814,19 @@ alias subgroup_basic_ballot = glsl + GL_KHR_shader_subgroup_basic + subgroup_bal
 alias subgroup_vote = GL_KHR_shader_subgroup_vote | _sm_6_0 | _cuda_sm_7_0;
 alias shaderinvocationgroup = subgroup_vote;
 alias subgroup_arithmetic = GL_KHR_shader_subgroup_arithmetic | _sm_6_0 | _cuda_sm_7_0;
-alias subgroup_shuffle = glsl + GL_KHR_shader_subgroup_shuffle | _sm_6_0 | _cuda_sm_7_0;
+alias subgroup_shuffle = GL_KHR_shader_subgroup_shuffle | _sm_6_0 | _cuda_sm_7_0;
 alias subgroup_shufflerelative = GL_KHR_shader_subgroup_shuffle_relative | _sm_6_0 | _cuda_sm_7_0;
 alias subgroup_clustered = GL_KHR_shader_subgroup_clustered | _sm_6_0 | _cuda_sm_7_0;
 alias subgroup_quad = GL_KHR_shader_subgroup_quad | _sm_6_0 | _cuda_sm_7_0;
-alias subgroup_partitioned = GL_NV_shader_subgroup_partitioned + subgroup_ballot_activemask | _sm_6_5;
+alias subgroup_partitioned = GL_NV_shader_subgroup_partitioned + subgroup_ballot_activemask | _sm_6_5 | _cuda_sm_7_0;
 
-alias atomic_glsl_hlsl_nvapi_cuda_float1 = atomic_glsl_float1 | hlsl_nvapi + _sm_4_0 | _cuda_sm_2_0;
+alias atomic_glsl_hlsl_nvapi_cuda_metal_float1 = atomic_glsl_float1 | hlsl_nvapi + _sm_4_0 | _cuda_sm_2_0 | metal;
 alias atomic_glsl_hlsl_nvapi_cuda5_int64 = atomic_glsl_int64 | hlsl_nvapi + _sm_4_0 | _cuda_sm_6_0;
 alias atomic_glsl_hlsl_nvapi_cuda6_int64 = atomic_glsl_int64 | hlsl_nvapi + _sm_4_0 | _cuda_sm_6_0;
 alias atomic_glsl_hlsl_nvapi_cuda9_int64 = atomic_glsl_int64 | hlsl_nvapi + _sm_4_0 | _cuda_sm_9_0;
 
-alias atomic_glsl_hlsl_cuda = atomic_glsl | _sm_5_0 | _cuda_sm_2_0;
-alias atomic_glsl_hlsl_cuda9_int64 = atomic_glsl_int64 | _sm_6_6 | _cuda_sm_9_0;
+alias atomic_glsl_hlsl_cuda_metal = atomic_glsl | _sm_5_0 | _cuda_sm_2_0 | metal;
+alias atomic_glsl_hlsl_cuda9_int64 = atomic_glsl_int64 | _sm_6_6 | _cuda_sm_9_0 | metal;
 
 alias helper_lane = _sm_6_0 + fragment
                    | GL_EXT_demote_to_helper_invocation + fragment

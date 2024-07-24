@@ -4,12 +4,13 @@ cmake_minimum_required(VERSION 3.25)
 # from git describe
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(GitVersion)
-get_git_version(SLANG_VERSION "${CMAKE_CURRENT_LIST_DIR}")
+get_git_version(SLANG_VERSION_NUMERIC SLANG_VERSION_FULL "${CMAKE_CURRENT_LIST_DIR}")
 
 #
 # Our project
 #
-project(slang VERSION "${SLANG_VERSION}" LANGUAGES)
+project(slang VERSION "${SLANG_VERSION_NUMERIC}" LANGUAGES)
+set(PROJECT_VERSION "${SLANG_VERSION_FULL}")
 
 #
 # Global CMake options
@@ -20,6 +21,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.25")
     cmake_policy(SET CMP0141 NEW)
 endif()
+cmake_policy(SET CMP0091 NEW)
 
 # Don't use absolute paths to the build tree in RPATH, this makes the build
 # tree relocatable
@@ -85,6 +87,7 @@ option(SLANG_EMBED_STDLIB_SOURCE "Embed stdlib source in the binary" ON)
 option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
+option(SLANG_ENABLE_IR_BREAK_ALLOC, "Enable _debugUID on IR allocation")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
 option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)
@@ -93,8 +96,9 @@ option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
 option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
 option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang wrapper target" ON)
-option(SLANG_ENABLE_TESTS "Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT" ON)
+option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
+option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
 
 enum_option(
     SLANG_LIB_TYPE
@@ -135,11 +139,11 @@ macro(slang_llvm_binary_url_option version filename)
     )
 endmacro()
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-    slang_llvm_binary_url_option("v13.x-42" "slang-llvm-13.x-42-win64.zip")
+    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-13.x-43-win64.zip")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    slang_llvm_binary_url_option("v13.x-42" "slang-llvm-v13.x-42-macosx-x86_64-release.zip")
+    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-v13.x-43-macosx-x86_64-release.zip")
 else()
-    slang_llvm_binary_url_option("v13.x-42" "slang-llvm-v13.x-42-linux-x86_64-release.zip")
+    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-v13.x-43-linux-x86_64-release.zip")
 endif()
 
 #
@@ -204,7 +208,7 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
-    INCLUDE_DIRECTORIES_PUBLIC source
+    INCLUDE_DIRECTORIES_PUBLIC source include
 )
 
 if(SLANG_ENABLE_SLANGRT)
@@ -216,6 +220,7 @@ if(SLANG_ENABLE_SLANGRT)
         USE_EXTRA_WARNINGS
         LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
         EXPORT_MACRO_PREFIX SLANG_RT
+        INCLUDE_DIRECTORIES_PUBLIC include
         INSTALL
     )
 endif()
@@ -226,7 +231,6 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE core
-    INCLUDE_DIRECTORIES_PUBLIC source
 )
 if(NOT MSVC)
     # This is necessary to compile the DXC headers
@@ -316,6 +320,7 @@ if(SLANG_ENABLE_SLANGC)
         source/slangc
         EXECUTABLE
         USE_FEWER_WARNINGS
+        DEBUG_DIR ${slang_SOURCE_DIR}
         LINK_WITH_PRIVATE core slang Threads::Threads
         INSTALL
     )
@@ -330,6 +335,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         MODULE
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt
+        INCLUDE_DIRECTORIES_PRIVATE include
         INSTALL
     )
     # Our only interface is through what we define in source/slang-glslang, in the
@@ -473,13 +479,15 @@ if(SLANG_ENABLE_GFX)
             core
             imgui
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+            "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
+            "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
             ${CMAKE_DL_LIBS}
         LINK_WITH_FRAMEWORK
             Foundation
             Cocoa
             QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
-            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
         INCLUDE_FROM_PRIVATE gfx
         INCLUDE_DIRECTORIES_PUBLIC tools/platform
         EXPORT_MACRO_PREFIX SLANG_PLATFORM
@@ -514,7 +522,7 @@ if(SLANG_ENABLE_GFX)
         EXPORT_MACRO_PREFIX SLANG_GFX
         # slang-gfx is in this directory, anything which depends on gfx should include
         # this
-        INCLUDE_DIRECTORIES_PUBLIC .
+        INCLUDE_DIRECTORIES_PUBLIC . include
         REQUIRES copy-gfx-slang-modules
         INSTALL
         FOLDER gfx
@@ -551,18 +559,9 @@ if(SLANG_ENABLE_GFX)
 endif()
 
 #
-# Installing any documentation
-#
-
-file(GLOB_RECURSE docs CONFIGURE_DEPENDS docs/*.md)
-if(docs)
-    install(FILES ${docs} DESTINATION ${CMAKE_INSTALL_DOCDIR})
-endif()
-
-#
 # The test executables and runtime-loaded modules
 #
-if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENABLE_SLANGRT)
+if(SLANG_ENABLE_TESTS)
     slang_add_target(
         tools/test-server
         EXECUTABLE
@@ -586,28 +585,19 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENA
         REQUIRES
             # Shared libraries dlopened by slang-test
             slang-reflection-test
-            render-test
             slang-unit-test
-            gfx-unit-test
             # Used by some tests when they run
             slangd
-            slang-rt
-            gfx
             test-server
             test-process
+        OPTIONAL_REQUIRES
+            gfx
+            slang-rt
+            slang-glslang
+            slang-llvm
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
-    if(TARGET slang-glslang)
-        # Only add a dependency here if slang-glslang exists
-        add_dependencies(slang-test slang-glslang)
-    endif()
-    if(TARGET slang-llvm)
-        # Only add a dependency here if slang-llvm exists
-        # Pending https://gitlab.kitware.com/cmake/cmake/-/issues/19467 to be able
-        # to use a generator expression in REQUIRES just above.
-        add_dependencies(slang-test slang-llvm)
-    endif()
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
         PROPERTY VS_STARTUP_PROJECT slang-test
@@ -618,20 +608,45 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENA
         OBJECT
         EXCLUDE_FROM_ALL
         INCLUDE_FROM_PRIVATE slang
+        INCLUDE_DIRECTORIES_PRIVATE include
         FOLDER test
     )
 
     # These are libraries loaded at runtime from the test executable:
-    slang_add_target(
-        tools/gfx-unit-test
-        MODULE
-        EXCLUDE_FROM_ALL
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-        USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE core slang unit-test gfx gfx-util platform
-        OUTPUT_NAME gfx-unit-test-tool
-        FOLDER test/tools
-    )
+    if(SLANG_ENABLE_GFX)
+        slang_add_target(
+            tools/gfx-unit-test
+            MODULE
+            EXCLUDE_FROM_ALL
+            EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+            USE_FEWER_WARNINGS
+            LINK_WITH_PRIVATE core slang unit-test gfx gfx-util platform
+            OUTPUT_NAME gfx-unit-test-tool
+            REQUIRED_BY slang-test
+            FOLDER test/tools
+        )
+        slang_add_target(
+            tools/render-test
+            MODULE
+            EXCLUDE_FROM_ALL
+            EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+            USE_FEWER_WARNINGS
+            LINK_WITH_PRIVATE
+                core
+                compiler-core
+                slang
+                gfx
+                gfx-util
+                platform
+                $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+            EXTRA_COMPILE_DEFINITIONS_PRIVATE
+                $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
+                $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
+            OUTPUT_NAME render-test-tool
+            REQUIRED_BY slang-test
+            FOLDER test/tools
+        )
+    endif()
     slang_add_target(
         tools/slang-unit-test
         MODULE
@@ -652,26 +667,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENA
         OUTPUT_NAME slang-reflection-test-tool
         FOLDER test/tools
     )
-    slang_add_target(
-        tools/render-test
-        MODULE
-        EXCLUDE_FROM_ALL
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-        USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE
-            core
-            compiler-core
-            slang
-            gfx
-            gfx-util
-            platform
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
-            $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
-        OUTPUT_NAME render-test-tool
-        FOLDER test/tools
-    )
 
     slang_add_target(
         tools/slang-profile
@@ -689,7 +684,6 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
     slang_add_target(
         examples/example-base
         STATIC
-        EXCLUDE_FROM_ALL
         LINK_WITH_PRIVATE
             core
             slang
@@ -705,15 +699,11 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
     )
     set_target_properties(all-examples PROPERTIES FOLDER examples)
     function(example dir)
-        set(debug_dir ${dir})
-        if (MSVC)
-            set(debug_dir ${CMAKE_BINARY_DIR}/${dir})
-        endif()
+        set(debug_dir ${CMAKE_BINARY_DIR}/${dir})
 
         slang_add_target(
             ${dir}
             EXECUTABLE
-            EXCLUDE_FROM_ALL
             USE_FEWER_WARNINGS
             LINK_WITH_PRIVATE
                 core
@@ -731,31 +721,32 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
             ${ARGN}
         )
 
-        if (MSVC)
-            get_filename_component(example_target ${dir} NAME)
-            file(GLOB asset_files
-                "${CMAKE_SOURCE_DIR}/${dir}/*.slang"
-                "${CMAKE_SOURCE_DIR}/${dir}/*.jpg"
-                "${CMAKE_SOURCE_DIR}/${dir}/*.obj"
-                "${CMAKE_SOURCE_DIR}/${dir}/*.mtl"
+        get_filename_component(example_target ${dir} NAME)
+        file(GLOB asset_files
+            "${CMAKE_SOURCE_DIR}/${dir}/*.slang"
+            "${CMAKE_SOURCE_DIR}/${dir}/*.jpg"
+            "${CMAKE_SOURCE_DIR}/${dir}/*.obj"
+            "${CMAKE_SOURCE_DIR}/${dir}/*.mtl"
+            "${CMAKE_SOURCE_DIR}/${dir}/*.h"
+        )
+
+        list(LENGTH asset_files asset_files_length)
+            if (asset_files_length GREATER 0)
+            set(copy_assets_target "${example_target}-copy-assets")
+
+            add_custom_target(
+                ${copy_assets_target}
+                COMMAND ${CMAKE_COMMAND} -E make_directory ${debug_dir}
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${asset_files} ${debug_dir}
+                COMMENT "Copy example assets to ${debug_dir}"
             )
 
-            list(LENGTH asset_files asset_files_length)
-                if (asset_files_length GREATER 0)
-                set(copy_assets_target "${example_target}-copy-assets")
+            set_target_properties(${copy_assets_target} PROPERTIES FOLDER "examples/copy_assets")
 
-                add_custom_target(
-                    ${copy_assets_target}
-                    COMMAND ${CMAKE_COMMAND} -E make_directory ${debug_dir}
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${asset_files} ${debug_dir}
-                    COMMENT "Copy example assets to ${debug_dir}"
-                )
+            add_dependencies(${example_target} ${copy_assets_target})
 
-                set_target_properties(${copy_assets_target} PROPERTIES FOLDER "examples/copy_assets")
-
-                add_dependencies(${example_target} ${copy_assets_target})
-
-                # Copy DirectX shader binaries so signing doesn't fail when running from Visual Studio
+            # Copy DirectX shader binaries so signing doesn't fail when running from Visual Studio
+            if (MSVC)
                 if (SLANG_ENABLE_PREBUILT_BINARIES)
                     add_dependencies(${example_target} copy-prebuilt-binaries)
                 endif()
@@ -781,6 +772,20 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
 endif()
 
 #
+# slang-replay tool for replaying the record files
+#
+if (SLANG_ENABLE_REPLAYER)
+    slang_add_target(
+        tools/slang-replay
+        EXECUTABLE
+        EXTRA_SOURCE_DIRS source/slang-record-replay/replay source/slang-record-replay/util
+        LINK_WITH_PRIVATE core compiler-core slang
+        INCLUDE_DIRECTORIES_PUBLIC source/slang-record-replay
+        FOLDER test
+    )
+endif()
+
+#
 # Testing
 #
 if(SLANG_ENABLE_TESTS)
@@ -799,4 +804,23 @@ endif()
 #
 # Packaging
 #
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE ON)
+set(CPACK_STRIP_FILES FALSE)
+install(FILES
+  "${slang_SOURCE_DIR}/README.md"
+  "${slang_SOURCE_DIR}/LICENSE"
+  DESTINATION .
+  COMPONENT metadata
+  EXCLUDE_FROM_ALL
+)
+install(DIRECTORY
+  "${slang_SOURCE_DIR}/docs/"
+  DESTINATION share/doc/slang
+)
+install(DIRECTORY
+  "${slang_SOURCE_DIR}/include"
+  DESTINATION .
+)
+
 include(CPack)

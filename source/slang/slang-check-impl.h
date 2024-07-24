@@ -1393,6 +1393,9 @@ namespace Slang
         // Helper function to check if a struct can be used as its own differential type.
         bool canStructBeUsedAsSelfDifferentialType(AggTypeDecl *aggTypeDecl);
         void markSelfDifferentialMembersOfType(AggTypeDecl *parent, Type* type);
+
+        void checkDerivativeMemberAttributeReferences(
+            VarDeclBase* varDecl, DerivativeMemberAttribute* derivativeMemberAttr);
         
     public:
 
@@ -1810,6 +1813,10 @@ namespace Slang
             DeclRef<FunctionDeclBase> requirementDeclRef,
             RefPtr<WitnessTable> witnessTable,
             BuiltinRequirementKind requirementKind);
+
+            /// Check references from`[DerivativeMember(...)]` attributes on members of the agg-decl.
+            /// this is typically deferred until after types are ready for reference.
+        void checkDifferentiableMembersInType(AggTypeDecl* decl);
 
         struct DifferentiableMemberInfo
         {
@@ -2861,7 +2868,8 @@ namespace Slang
     // texture, buffer, sampler, acceleration structure, etc.
     bool isOpaqueHandleType(Type* type);
 
-    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl = false);
+    void diagnoseMissingCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilitySet& setToFind);
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, HashSet<Decl*>& printedDecls);
 
     void _ensureAllDeclsRec(
         SemanticsDeclVisitorBase* visitor,
@@ -2870,4 +2878,6 @@ namespace Slang
 
     RefPtr<EntryPoint> findAndValidateEntryPoint(
         FrontEndEntryPointRequest* entryPointReq);
+
+    bool resolveStageOfProfileWithEntryPoint(Profile& entryPointProfile, CompilerOptionSet& optionSet, const List<RefPtr<TargetRequest>>& targets, FuncDecl* entryPointFuncDecl, DiagnosticSink* sink);
 }

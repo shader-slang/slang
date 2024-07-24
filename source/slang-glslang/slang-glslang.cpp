@@ -13,7 +13,7 @@
 
 #include "glslang/MachineIndependent/localintermediate.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 #include "spirv-tools/optimizer.hpp"
 #include "spirv-tools/libspirv.h"
@@ -144,6 +144,48 @@ struct SPIRVOptimizationDiagnostic
     spv_position_t position;
     std::string message;
 };
+
+// TODO: the actual printing should happen on the application side.
+static void validationMessageConsumer(spv_message_level_t level, const char*,
+    const spv_position_t& position, const char* message)
+{
+    switch (level)
+    {
+    case SPV_MSG_FATAL:
+    case SPV_MSG_INTERNAL_ERROR:
+    case SPV_MSG_ERROR:
+        std::cerr << "error: line " << position.index << ": " << message << std::endl;
+        break;
+    case SPV_MSG_WARNING:
+        std::cout << "warning: line " << position.index << ": " << message << std::endl;
+        break;
+    case SPV_MSG_INFO:
+        std::cout << "info: line " << position.index << ": " << message << std::endl;
+        break;
+    default:
+        break;
+    }
+}
+
+// Validate the given SPIRV-ASM instructions.
+extern "C"
+#ifdef _MSC_VER
+_declspec(dllexport)
+#else
+__attribute__((__visibility__("default")))
+#endif
+bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
+{
+    spv_target_env target_env = SPV_ENV_VULKAN_1_3;
+
+    spvtools::ValidatorOptions options;
+    options.SetScalarBlockLayout(true);
+
+    spvtools::SpirvTools tools(target_env);
+    tools.SetMessageConsumer(validationMessageConsumer);
+
+    return tools.Validate(contents, contentsSize, options);
+}
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well

@@ -38,6 +38,8 @@ struct ByteAddressBufferLegalizationContext
     IRModule* m_module;
     IRBuilder m_builder;
 
+    Dictionary<IRInst*, IRType*> byteAddrBufferToReplace;
+
     // Everything starts with a request to process a module,
     // which delegates to the central recrusive walk of the IR.
     //
@@ -787,10 +789,15 @@ struct ByteAddressBufferLegalizationContext
 
     IRInst* getEquivalentStructuredBuffer(IRType* elementType, IRInst* byteAddressBuffer)
     {
+        if (this->m_options.treatGetEquivalentStructuredBufferAsGetThis)
+            return byteAddressBuffer;
+
         if (!elementType)
         {
             return nullptr;
         }
+        if (as<IRHLSLStructuredBufferTypeBase>(byteAddressBuffer->getDataType()))
+            return byteAddressBuffer;
         // The simple case for replacement is when the byte-address buffer to
         // be replaced is a global shader parameter. That path will get its
         // own routine.

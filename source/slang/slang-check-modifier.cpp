@@ -474,6 +474,17 @@ namespace Slang
             }
             overloadRankAttr->rank = int32_t(rank->getValue());
         }
+        else if (auto inputAttachmentIndexLayoutAttribute = as<GLSLInputAttachmentIndexLayoutAttribute>(attr))
+        {
+            if (attr->args.getCount() != 1)
+                return false;
+    
+            auto location = checkConstantIntVal(attr->args[0]);
+            if(!location)
+                return false;
+
+            inputAttachmentIndexLayoutAttribute->location = location->getValue();
+        }
         else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
         {
             // This must be vk::binding or gl::binding (as specified in core.meta.slang under vk_binding/gl_binding)
@@ -921,6 +932,8 @@ namespace Slang
                 }
             }
             requireCapAttr->capabilitySet = CapabilitySet(capabilityNames);
+            if (requireCapAttr->capabilitySet.isInvalid())
+                maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, attr, Diagnostics::unexpectedCapability, attr, CapabilityName::Invalid);
         }
         else if (auto requirePreludeAttr = as<RequirePreludeAttribute>(attr))
         {
@@ -1105,7 +1118,7 @@ namespace Slang
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
-        case ASTNodeType::GLSLInputAttachmentIndexLayoutModifier:
+        case ASTNodeType::GLSLInputAttachmentIndexLayoutAttribute:
         case ASTNodeType::GLSLOffsetLayoutAttribute:
         case ASTNodeType::GLSLUnparsedLayoutModifier:
         case ASTNodeType::GLSLLayoutModifierGroupMarker:
@@ -1185,7 +1198,7 @@ namespace Slang
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
-        case ASTNodeType::GLSLInputAttachmentIndexLayoutModifier:
+        case ASTNodeType::GLSLInputAttachmentIndexLayoutAttribute:
         case ASTNodeType::GLSLOffsetLayoutAttribute:
         case ASTNodeType::GLSLUnparsedLayoutModifier:
         case ASTNodeType::GLSLLayoutModifierGroupMarker:

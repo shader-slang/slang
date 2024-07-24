@@ -41,7 +41,7 @@ struct  IRStructKey;
 
 enum class AddressSpace
 {
-    Generic = 0,
+    Generic = 0x7fffffff,
     ThreadLocal = 1,
     Global = 2,
     GroupShared = 3,

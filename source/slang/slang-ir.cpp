@@ -6267,9 +6267,9 @@ namespace Slang
         addDecoration(inst, kIROp_HighLevelDeclDecoration, ptrConst);
     }
 
-    void IRBuilder::addLayoutDecoration(IRInst* value, IRLayout* layout)
+    IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRInst* value, IRLayout* layout)
     {
-        addDecoration(value, kIROp_LayoutDecoration, layout);
+        return as<IRLayoutDecoration>(addDecoration(value, kIROp_LayoutDecoration, layout));
     }
 
     IRTypeSizeAttr* IRBuilder::getTypeSizeAttr(

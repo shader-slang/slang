@@ -11,6 +11,7 @@
 #include "../core/slang-castable.h"
 
 #include "slang-check.h"
+#include "slang-check-impl.h"
 #include "slang-compiler.h"
 
 #include "../compiler-core/slang-lexer.h"
@@ -2471,6 +2472,18 @@ namespace Slang
         return nullptr;
     }
 
+    SLANG_NO_THROW SlangInt32 SLANG_MCALL Module::getDependencyFileCount()
+    {
+        return (SlangInt32)getFileDependencies().getCount();
+    }
+
+    SLANG_NO_THROW char const* SLANG_MCALL Module::getDependencyFilePath(
+        SlangInt32 index)
+    {
+        SourceFile* sourceFile = getFileDependencies()[index];
+        return sourceFile->getPathInfo().hasFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : nullptr;
+    }
+
     void validateEntryPoint(
         EntryPoint* entryPoint,
         DiagnosticSink* sink);
@@ -2493,24 +2506,8 @@ namespace Slang
                 continue;
 
             Profile profile;
-
-            auto entryPointAttr = funcDecl->findModifier<EntryPointAttribute>();
-            if (entryPointAttr)
-            {
-                // We've discovered a valid entry point. It is a function (possibly
-                // generic) that has a `[shader(...)]` attribute to mark it as an
-                // entry point.
-                //
-                // We will now register that entry point as an `EntryPoint`
-                // with an appropriately chosen profile.
-                //
-                // The profile will only include a stage, so that the profile "family"
-                // and "version" are left unspecified. Downstream code will need
-                // to be able to handle this case.
-                //
-                profile.setStage(entryPointAttr->stage);
-            }
-            else
+            bool resolvedStageOfProfileWithEntryPoint = resolveStageOfProfileWithEntryPoint(profile, getLinkage()->m_optionSet, targets, funcDecl, sink);
+            if(!resolvedStageOfProfileWithEntryPoint)
             {
                 // If there isn't a [shader] attribute, look for a [numthreads] attribute
                 // since that implicitly means a compute shader. We'll not do this when compiling for

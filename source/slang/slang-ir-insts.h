@@ -437,11 +437,6 @@ struct IRGLSLLocationDecoration : IRDecoration
     IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
 };
 
-struct IRGLSLInputAttachmentIndexDecoration : IRDecoration
-{
-    IR_LEAF_ISA(GLSLInputAttachmentIndexDecoration)
-    IRIntLit* getIndex() { return cast<IRIntLit>(getOperand(0)); }
-};
 
 struct IRGLSLOffsetDecoration : IRDecoration
 {
@@ -1297,12 +1292,6 @@ struct IRGetSequentialID : IRInst
     IRInst* getRTTIOperand() { return getOperand(0); }
 };
 
-struct IRLookupWitnessTable : IRInst
-{
-    IRUse sourceType;
-    IRUse interfaceType;
-};
-
 /// Allocates space from local stack.
 ///
 struct IRAlloca : IRInst
@@ -1367,6 +1356,13 @@ struct IRSemanticDecoration : public IRDecoration
 
     IRIntLit* getSemanticIndexOperand() { return cast<IRIntLit>(getOperand(1)); }
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
+};
+
+struct IRConstructorDecorartion : IRDecoration
+{
+    IR_LEAF_ISA(ConstructorDecoration)
+
+    bool getSynthesizedStatus() { return cast<IRBoolLit>(getOperand(0))->getValue(); }
 };
 
 struct IRPackOffsetDecoration : IRDecoration
@@ -4410,7 +4406,7 @@ public:
     }
 
 //    void addLayoutDecoration(IRInst* value, Layout* layout);
-    void addLayoutDecoration(IRInst* value, IRLayout* layout);
+    IRLayoutDecoration* addLayoutDecoration(IRInst* value, IRLayout* layout);
 
 //    IRLayout* getLayout(Layout* astLayout);
 
@@ -4530,9 +4526,14 @@ public:
         addDecoration(value, kIROp_ForceUnrollDecoration, getIntValue(getIntType(), iters));
     }
 
-    void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)
+    IRSemanticDecoration* addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)
     {
-        addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index));
+        return as<IRSemanticDecoration>(addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index)));
+    }
+
+    void addConstructorDecoration(IRInst* value, bool synthesizedConstructor)
+    {
+        addDecoration(value, kIROp_ConstructorDecoration, getBoolValue(synthesizedConstructor));
     }
 
     void addRequireSPIRVDescriptorIndexingExtensionDecoration(IRInst* value)

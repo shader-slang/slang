@@ -12,33 +12,47 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    runs-on: [Windows, self-hosted, perf]
     timeout-minutes: 100
     continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
-        configuration: ['Release']
-        platform: ['x64']
+        os: [windows]
+        config: [release]
+        compiler: [cl]
+        platform: [x86_64]
         include:
-          - platform: x64
-            testPlatform: x64
-          - platform: x64
-            testCategory: full
+          # Self-hosted falcor tests
+          - warnings-as-errors: true
+            test-category: full
+            full-gpu-tests: false
+            runs-on: [Windows, self-hosted, perf]
+    runs-on: ${{ matrix.runs-on }}
+    defaults:
+      run:
+        shell: bash
     steps:
     - uses: actions/checkout@v3
       with:
         submodules: 'true'
         fetch-depth: '0'
-    - name: setup-msbuild
-      uses: microsoft/setup-msbuild@v1
-    - name: build
+
+    - name: Setup
+      uses: ./.github/actions/common-setup
+      with:
+        os: ${{matrix.os}}
+        compiler: ${{matrix.compiler}}
+        platform: ${{matrix.platform}}
+        config: ${{matrix.config}}
+        build-llvm: true
+
+    - name: Build Slang
       run: |
-        .\premake.bat vs2019 --arch=${{matrix.platform}} --deps=true --no-progress=true --enable-cuda=true
-
-        .\make-slang-tag-version.bat
-
-        MSBuild.exe slang.sln -v:m -m -property:Configuration=${{matrix.configuration}} -property:Platform=${{matrix.platform}} -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
+        cmake --preset default --fresh \
+          -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+          -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
+          -DSLANG_ENABLE_CUDA=1
+        cmake --workflow --preset "${{matrix.config}}"
 
     - uses: robinraju/release-downloader@v1.9
       id: download
@@ -70,8 +84,9 @@ jobs:
         extract: false
 
     - name: run falcor-compiler-perf-test
+      shell: pwsh
       run: |
         $filename = '${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
         Expand-Archive $filename -DestinationPath .\falcor-perf-test
-        $env:PATH += ";.\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}";
+        $env:PATH += ";.\build\${{matrix.config}}\bin";
         .\falcor-perf-test\bin\Release\falcor_perftest.exe

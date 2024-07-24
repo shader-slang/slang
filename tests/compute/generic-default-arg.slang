@@ -31,7 +31,7 @@ struct Impl2 : ITest
 __generic<T : ITest = Impl1>
 struct GenStruct
 {
-	T obj;
+	T obj = T();
 };
 
 int test(GenStruct gs, int val)

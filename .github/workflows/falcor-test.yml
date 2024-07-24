@@ -1,5 +1,3 @@
-# This is a basic workflow to help you get started with Actions
-
 name: Falcor Tests
 
 on:
@@ -12,27 +10,40 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    runs-on: [Windows, self-hosted, falcor]
     timeout-minutes: 100
     continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
-        configuration: ['Release']
-        platform: ['x64']
+        os: [windows]
+        config: [release]
+        compiler: [cl]
+        platform: [x86_64]
         include:
-          - platform: x64
-            testPlatform: x64
-          - platform: x64
-            testCategory: full
+          # Self-hosted falcor tests
+          - warnings-as-errors: true
+            test-category: full
+            full-gpu-tests: false
+            runs-on: [Windows, self-hosted, falcor]
+    runs-on: ${{ matrix.runs-on }}
+    defaults:
+      run:
+        shell: bash
     steps:
     - uses: actions/checkout@v3
       with:
         submodules: 'true'
         fetch-depth: '0'
-    - name: setup-msbuild
-      uses: microsoft/setup-msbuild@v1
+    - name: Setup
+      uses: ./.github/actions/common-setup
+      with:
+        os: ${{matrix.os}}
+        compiler: ${{matrix.compiler}}
+        platform: ${{matrix.platform}}
+        config: ${{matrix.config}}
+        build-llvm: true
     - name: setup-falcor
+      shell: pwsh
       run: |
         mkdir FalcorBin
         cd FalcorBin
@@ -43,25 +54,30 @@ jobs:
         Copy-Item -Path 'C:\Falcor\media_internal' -Destination '.\' -Recurse
         Copy-Item -Path 'C:\Falcor\scripts' -Destination '.\' -Recurse
         cd ..\
-    - name: build
+    - name: Build Slang
       run: |
-        .\premake.bat vs2019 --arch=${{matrix.platform}} --deps=true --no-progress=true --enable-cuda=true
-        
-        .\make-slang-tag-version.bat
-        
-        MSBuild.exe slang.sln -v:m -m -property:Configuration=${{matrix.configuration}} -property:Platform=${{matrix.platform}} -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
-
-        Copy-Item -Path '.\bin\windows-${{matrix.platform}}\${{matrix.configuration}}\*' -Destination '.\FalcorBin\build\windows-vs2022\bin\Release\' -Recurse -Exclude ("*.pdb", "gfx.dll")
+        cmake --preset default --fresh \
+          -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+          -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
+          -DSLANG_ENABLE_CUDA=1 \
+          -DSLANG_ENABLE_EXAMPLES=0 \
+          -DSLANG_ENABLE_GFX=0 \
+          -DSLANG_ENABLE_TESTS=0
+        cmake --workflow --preset "${{matrix.config}}"
+    - name: Copy Slang to Falcor
+      run: |
+        cp --verbose --recursive --target-directory ./FalcorBin/build/windows-vs2022/bin/Release build/Release/bin/*
     - name: falcor-unit-test
+      shell: pwsh
       run: |
         $ErrorActionPreference = "SilentlyContinue"
         cd .\FalcorBin\tests
         python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
         cd ../../
     - name: falcor-image-test
+      shell: pwsh
       run: |
         $ErrorActionPreference = "SilentlyContinue"
         cd .\FalcorBin\tests
         python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only
         cd ../../
-      

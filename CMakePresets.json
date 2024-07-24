@@ -10,7 +10,10 @@
       "name": "default",
       "description": "Default build using Ninja Multi-Config generator",
       "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/build"
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+      }
     },
     {
       "name": "msvc-base",
@@ -35,16 +38,17 @@
       "generator": "Visual Studio 17 2022"
     },
     {
-      "name": "single-component",
-      "inherits": "default",
-      "description": "configure to package a single component",
+      "name": "vs2022-dev",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2022 project with debug assisting features",
+      "generator": "Visual Studio 17 2022",
       "cacheVariables": {
-        "CPACK_ARCHIVE_COMPONENT_INSTALL": "ON"
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
       }
     },
     {
       "name": "slang-llvm",
-      "inherits": "single-component",
+      "inherits": "default",
       "description": "Build slang-llvm from the system LLVM",
       "cacheVariables": {
         "SLANG_SLANG_LLVM_FLAVOR": "USE_SYSTEM_LLVM"
@@ -65,7 +69,7 @@
     {
       "name": "generators",
       "inherits": "release",
-      "configurePreset": "single-component",
+      "configurePreset": "default",
       "targets": [
         "all-generators"
       ]
@@ -88,7 +92,8 @@
         "ZIP"
       ],
       "variables": {
-        "CPACK_PACKAGE_FILE_NAME": "slang"
+        "CPACK_PACKAGE_FILE_NAME": "slang",
+        "CPACK_COMPONENTS_ALL": "Unspecified;metadata;slang-llvm"
       }
     },
     {
@@ -110,8 +115,9 @@
     {
       "name": "generators",
       "inherits": "release",
-      "configurePreset": "single-component",
+      "configurePreset": "default",
       "variables": {
+        "CPACK_PACKAGE_FILE_NAME": "slang-generators",
         "CPACK_COMPONENTS_ALL": "generators"
       }
     },
@@ -120,6 +126,7 @@
       "inherits": "release",
       "configurePreset": "slang-llvm",
       "variables": {
+        "CPACK_PACKAGE_FILE_NAME": "slang-llvm",
         "CPACK_COMPONENTS_ALL": "slang-llvm"
       }
     }
@@ -164,7 +171,7 @@
       "steps": [
         {
           "type": "configure",
-          "name": "single-component"
+          "name": "default"
         },
         {
           "type": "build",

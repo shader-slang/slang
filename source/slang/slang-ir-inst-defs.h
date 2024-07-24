@@ -692,6 +692,13 @@ INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, 0)
 INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
 INST(MetalAtomicCast, MetalAtomicCast, 1, 0)
 
+INST(IsTextureAccess, IsTextureAccess, 1, 0)
+INST(IsTextureScalarAccess, IsTextureScalarAccess, 1, 0)
+INST(IsTextureArrayAccess, IsTextureArrayAccess, 1, 0)
+INST(ExtractTextureFromTextureAccess, ExtractTextureFromTextureAccess, 1, 0)
+INST(ExtractCoordFromTextureAccess, ExtractCoordFromTextureAccess, 1, 0)
+INST(ExtractArrayCoordFromTextureAccess, ExtractArrayCoordFromTextureAccess, 1, 0)
+
 INST(MakeArrayList, makeArrayList, 0, 0)
 INST(MakeTensorView, makeTensorView, 0, 0)
 INST(AllocateTorchTensor, allocTorchTensor, 0, 0)
@@ -898,7 +905,6 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(GlobalOutputDecoration, output, 0, 0)
     INST(GlobalInputDecoration, output, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
-    INST(GLSLInputAttachmentIndexDecoration, glslInputAttachmentIndex, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
@@ -923,6 +929,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST_RANGE(StageAccessDecoration, StageReadAccessDecoration, StageWriteAccessDecoration)
 
     INST(SemanticDecoration, semantic, 2, 0)
+    INST(ConstructorDecoration, constructor, 1, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
 
         // Reflection metadata for a shader parameter that provides the original type name.
