@@ -42,6 +42,10 @@ namespace Slang
         {
             data.clear();
         }
+        virtual void dispose() override
+        {
+            data = decltype(data)();
+        }
     };
 
     PerformanceProfiler* Slang::PerformanceProfiler::getProfiler()
