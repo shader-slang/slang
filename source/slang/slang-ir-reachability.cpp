@@ -3,18 +3,17 @@
 
 namespace Slang
 {
-// Computes whether block1 can reach block2.
-// A block is considered not reachable from itself unless there is a backedge in the CFG.
-
+    // Computes whether block1 can reach block2.
+    // A block is considered not reachable from itself unless there is a backedge in the CFG.
     ReachabilityContext::ReachabilityContext(IRGlobalValueWithCode* code)
     {
         int id = 0;
         for (auto block : code->getBlocks())
         {
-            mapBlockToId[block] = id;
-            id++;
+            mapBlockToId[block] = id++;
             allBlocks.add(block);
         }
+
         sourceBlocks.setCount(allBlocks.getCount());
         for (auto &srcBlock : sourceBlocks)
             srcBlock.resizeAndClear(allBlocks.getCount());
@@ -24,6 +23,7 @@ namespace Slang
 
         List<IRBlock*> workList;
         List<IRBlock*> pendingWorkList;
+
         workList.add(allBlocks[0]);
         while (workList.getCount())
         {
@@ -53,7 +53,6 @@ namespace Slang
             }
             workList.swapWith(pendingWorkList);
         }
-
     }
     
     bool ReachabilityContext::isInstReachable(IRInst* inst1, IRInst* inst2)
@@ -70,25 +69,16 @@ namespace Slang
         }
 
         // Special cases
-
-        // Target switches; treat as reachable from its cases
+        
+        // Target switches; treat as reachable from any of its cases
         if (auto tswitch = as<IRTargetSwitch>(inst2))
         {
-            HashSet<IRInst*> blocks;
+            IRBlock* upper = as<IRBlock>(inst1->getParent());
             for (Slang::UInt i = 0; i < tswitch->getCaseCount(); i++)
-                blocks.add(tswitch->getCaseBlock(i));
-
-            IRInst* tmp = inst1->getParent();
-            while (tmp && tmp != tswitch->getParent())
             {
-                if (blocks.contains(tmp))
+                IRBlock* caseBlock = tswitch->getCaseBlock(i);
+                if (caseBlock == upper || isBlockReachable(caseBlock, upper))
                     return true;
-
-                // Branching instructions
-                if (tmp->firstUse)
-                    tmp = tmp->firstUse->getUser()->getParent();
-                else
-                    tmp = tmp->getParent();
             }
         }
 
@@ -97,12 +87,17 @@ namespace Slang
 
     bool ReachabilityContext::isBlockReachable(IRBlock* from, IRBlock* to)
     {
-        if (!from) return false;
-        if (!to) return false;
+        if (!from)
+            return false;
+
+        if (!to)
+            return false;
+
         int* fromId = mapBlockToId.tryGetValue(from);
         int* toId = mapBlockToId.tryGetValue(to);
         if (!fromId || !toId)
             return true;
+
         return sourceBlocks[*toId].contains(*fromId);
     }
 }
