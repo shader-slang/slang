@@ -4618,7 +4618,7 @@ int main(int argc, char** argv)
 {
     const SlangResult res = innerMain(argc, argv);
 
-    Slang::RttiInfo::deallocateAll();
+    slang::shutdown();
 
 #ifdef _MSC_VER
     _CrtDumpMemoryLeaks();

@@ -1446,6 +1446,6 @@ int main(
     
     SlangResult res = innerMain(stdWriters, session, argc, argv);
     spDestroySession(session);
-
+    slang::shutdown();
     return SLANG_FAILED(res) ? 1 : 0;
 }
