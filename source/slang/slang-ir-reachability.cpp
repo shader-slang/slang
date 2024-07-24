@@ -55,15 +55,15 @@ namespace Slang
         }
     }
     
-    bool ReachabilityContext::isInstReachable(IRInst* inst1, IRInst* inst2)
+    bool ReachabilityContext::isInstReachable(IRInst* from, IRInst* to)
     {
         // If inst1 and inst2 are in the same block,
         // we test if inst2 appears after inst1.
-        if (inst1->getParent() == inst2->getParent())
+        if (from->getParent() == to->getParent())
         {
-            for (auto inst = inst1->getNextInst(); inst; inst = inst->getNextInst())
+            for (auto inst = from->getNextInst(); inst; inst = inst->getNextInst())
             {
-                if (inst == inst2)
+                if (inst == to)
                     return true;
             }
         }
@@ -71,9 +71,9 @@ namespace Slang
         // Special cases
         
         // Target switches; treat as reachable from any of its cases
-        if (auto tswitch = as<IRTargetSwitch>(inst2))
+        if (auto tswitch = as<IRTargetSwitch>(to))
         {
-            IRBlock* upper = as<IRBlock>(inst1->getParent());
+            IRBlock* upper = as<IRBlock>(from->getParent());
             for (Slang::UInt i = 0; i < tswitch->getCaseCount(); i++)
             {
                 IRBlock* caseBlock = tswitch->getCaseBlock(i);
@@ -82,7 +82,7 @@ namespace Slang
             }
         }
 
-        return isBlockReachable(as<IRBlock>(inst1->getParent()), as<IRBlock>(inst2->getParent()));
+        return isBlockReachable(as<IRBlock>(from->getParent()), as<IRBlock>(to->getParent()));
     }
 
     bool ReachabilityContext::isBlockReachable(IRBlock* from, IRBlock* to)

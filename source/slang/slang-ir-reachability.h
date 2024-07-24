@@ -16,7 +16,7 @@ struct ReachabilityContext
     ReachabilityContext() = default;
     ReachabilityContext(IRGlobalValueWithCode* code);
 
-    bool isInstReachable(IRInst* inst1, IRInst* inst2);
+    bool isInstReachable(IRInst* from, IRInst* to);
     bool isBlockReachable(IRBlock* from, IRBlock* to);
 };
 

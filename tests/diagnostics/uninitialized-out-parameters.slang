@@ -3,24 +3,24 @@
 // Using before assigning
 float regular_undefined_use(out float3 v)
 {
-    //CHK-DAG: warning 41015: use of uninitialized out parameter 'v'
+    //CHK-DAG: (7): warning 41015: use of uninitialized out parameter 'v'
     float r = v.x + 1.0;
     
-    //CHK-DAG: warning 41018: returning without initializing out parameter 'v'
+    //CHK-DAG: (10): warning 41018: returning without initializing out parameter 'v'
     return r;
 }
 
 // Returning before assigning
 float returning_undefined_use(out float x)
 {
-    //CHK-DAG: warning 41018: returning without initializing out parameter 'x'
+    //CHK-DAG: (17): warning 41018: returning without initializing out parameter 'x'
     return 0;
 }
 
 // Implicit, still returning before assigning
 void implicit_undefined_use(out float x) 
 {
-    //CHK-DAG: warning 41018: returning without initializing out parameter 'x'
+    //CHK-DAG: (24): warning 41018: returning without initializing out parameter 'x'
 }
 
 // Warn on potential return paths
@@ -28,7 +28,7 @@ void control_flow_undefined(bool b, out float y)
 {
     if(b)
     {
-        //CHK-DAG: warning 41018: returning without initializing out parameter 'y'
+        //CHK-DAG: (32): warning 41018: returning without initializing out parameter 'y'
         return;
     }
     y = 0;
@@ -56,7 +56,7 @@ void instrincs_defined(float x, out float exp)
 // Specialized handling for target switches
 void target_switching_undefined(float x, out float exp)
 {
-    //CHK-DAG: warning 41018: returning without initializing out parameter 'exp'
+    //CHK-DAG: (60): warning 41018: returning without initializing out parameter 'exp'
     __target_switch {}
 }
 
