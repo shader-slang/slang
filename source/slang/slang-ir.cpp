@@ -8198,6 +8198,7 @@ namespace Slang
         case kIROp_CastPtrToInt:
         case kIROp_CastIntToPtr:
         case kIROp_PtrCast:
+        case kIROp_CastDynamicResource:
         case kIROp_AllocObj:
         case kIROp_PackAnyValue:
         case kIROp_UnpackAnyValue:
@@ -8638,6 +8639,7 @@ namespace Slang
         case kIROp_CastPtrToBool:
         case kIROp_CastPtrToInt:
         case kIROp_PtrCast:
+        case kIROp_CastDynamicResource:
         case kIROp_BitAnd:
         case kIROp_BitNot:
         case kIROp_BitOr:
