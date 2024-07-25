@@ -804,11 +804,11 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>
         }
     }
     outputUIntSetGenerator("generatorOf_kAnyTargetUIntSetBuffer", anyTargetUIntSetHash, anyTargetAtomSet);
-    anyTargetUIntSetHash << "const static CapabilityAtomSet kAnyTargetUIntSetBuffer = generatorOf_kAnyTargetUIntSetBuffer();\n";
+    anyTargetUIntSetHash << "static CapabilityAtomSet kAnyTargetUIntSetBuffer = generatorOf_kAnyTargetUIntSetBuffer();\n";
     sbCpp << anyTargetUIntSetHash;
 
     outputUIntSetGenerator("generatorOf_kAnyStageUIntSetBuffer", anyStageUIntSetHash, anyStageAtomSet);
-    anyStageUIntSetHash << "const static CapabilityAtomSet kAnyStageUIntSetBuffer = generatorOf_kAnyStageUIntSetBuffer();\n";
+    anyStageUIntSetHash << "static CapabilityAtomSet kAnyStageUIntSetBuffer = generatorOf_kAnyStageUIntSetBuffer();\n";
     sbCpp << anyStageUIntSetHash;
 
     sbHeader << "\nenum {\n";
@@ -933,6 +933,14 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>
     }
     
     sbCpp << "};\n";
+
+    sbCpp
+        << "void freeCapabilityDefs()\n"
+        << "{\n"
+        << "    for (auto& cap : kCapabilityArray) { cap = CapabilityAtomSet(); }\n"
+        << "    kAnyTargetUIntSetBuffer = CapabilityAtomSet();\n"
+        << "    kAnyStageUIntSetBuffer = CapabilityAtomSet();\n"
+        << "}\n";
     return SLANG_OK;
 }
 
