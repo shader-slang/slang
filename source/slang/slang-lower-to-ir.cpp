@@ -1855,8 +1855,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto astValueType = type->getValueType();
 
         IRType* irValueType = lowerType(context, astValueType);
-
-        return getBuilder()->getPtrType(irValueType);
+        IRInst* addrSpace = nullptr;
+        if (auto astAddrSpace = type->getAddressSpace())
+        {
+            addrSpace = getSimpleVal(context, lowerVal(context, astAddrSpace));
+        }
+        else
+        {
+            addrSpace = getBuilder()->getIntValue(getBuilder()->getUInt64Type(), (IRIntegerValue)AddressSpace::Generic);
+        }
+        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, addrSpace);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)
@@ -3138,7 +3146,7 @@ void _lowerFuncDeclBaseTypeInfo(
             irParamType = builder->getInOutType(irParamType);
             break;
         case kParameterDirection_Ref:
-            irParamType = builder->getRefType(irParamType);
+            irParamType = builder->getRefType(irParamType, AddressSpace::Generic);
             break;
         case kParameterDirection_ConstRef:
             irParamType = builder->getConstRefType(irParamType);
@@ -4972,7 +4980,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         case LoweredValInfo::Flavor::Ptr:
             return LoweredValInfo::ptr(
                 builder->emitElementAddress(
-                    context->irBuilder->getPtrType(type),
                     baseVal.val,
                     indexVal));
 
