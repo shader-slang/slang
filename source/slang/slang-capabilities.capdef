@@ -758,7 +758,7 @@ alias METAL_2_4 = metallib_2_4;
 alias METAL_3_0 = metallib_3_0;
 alias METAL_3_1 = metallib_3_1;
 
-// Profiles of convience
+// Profiles of convenience
 
 alias appendstructuredbuffer = sm_5_0_version;
 alias atomic_hlsl = _sm_4_0;
