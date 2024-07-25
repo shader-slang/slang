@@ -69,20 +69,6 @@ namespace Slang
             }
         }
 
-        // Special cases
-        
-        // Target switches; treat as reachable from any of its cases
-        if (auto tswitch = as<IRTargetSwitch>(to))
-        {
-            IRBlock* upper = getBlock(from);
-            for (Slang::UInt i = 0; i < tswitch->getCaseCount(); i++)
-            {
-                IRBlock* caseBlock = tswitch->getCaseBlock(i);
-                if (caseBlock == upper || isBlockReachable(caseBlock, upper))
-                    return true;
-            }
-        }
-
         return isBlockReachable(getBlock(from), getBlock(to));
     }
 

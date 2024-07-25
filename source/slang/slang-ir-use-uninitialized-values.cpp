@@ -2,6 +2,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-reachability.h"
 #include "slang-ir.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -291,14 +292,36 @@ namespace Slang
         }
     }
 
-    static void cancelLoads(ReachabilityContext &reachability, const List<IRInst*>& stores, List<IRInst*>& loads)
+    static bool canStoreReachLoad(ReachabilityContext& reachability, IRInst* store, IRInst* load)
+    {
+        if (reachability.isInstReachable(store, load))
+            return true;
+
+        // Special cases
+        
+        // Target switches; treat as reachable from any of its cases
+        if (auto tswitch = as<IRTargetSwitch>(load))
+        {
+            IRBlock* upper = getBlock(store);
+            for (Slang::UInt i = 0; i < tswitch->getCaseCount(); i++)
+            {
+                IRBlock* caseBlock = tswitch->getCaseBlock(i);
+                if (caseBlock == upper || reachability.isBlockReachable(caseBlock, upper))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    static void cancelLoads(ReachabilityContext& reachability, const List<IRInst*>& stores, List<IRInst*>& loads)
     {
         // Remove all loads which are reachable from stores
         for (auto store : stores)
         {
             for (Index i = 0; i < loads.getCount(); )
             {
-                if (reachability.isInstReachable(store, loads[i]))
+                if (canStoreReachLoad(reachability, store, loads[i]))
                     loads.fastRemoveAt(i);
                 else
                     i++;
