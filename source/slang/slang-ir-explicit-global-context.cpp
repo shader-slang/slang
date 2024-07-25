@@ -19,6 +19,13 @@ enum class HoistableTypes : UInt
     All = 0xFFFFFFFF,
 };
 
+enum class HoistGlobalVarOptions : UInt
+{
+    PlainGlobal = 0b0,
+    SharedGlobal = 0b1,
+    All = 0xFFFFFFFF,
+};
+
 struct IntroduceExplicitGlobalContextPass
 {
     class ExplicitContextPolicy
@@ -33,9 +40,21 @@ struct IntroduceExplicitGlobalContextPass
                 hoistableTypes = HoistableTypes::GlobalVariable;
                 requiresFuncTypeCorrectionPass = true;
                 addressSpaceOfLocals = (AddressSpace)SpvStorageClassFunction;
+                hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 break;
             case CodeGenTarget::CUDASource:
                 hoistableTypes = HoistableTypes::GlobalVariable;
+
+                // One important exception is that CUDA *does* support
+                // global variables with the `__shared__` qualifer, with
+                // semantics that exactly match HLSL/Slang `groupshared`.
+                //
+                // We thus need to skip processing of global variables
+                // that were marked `groupshared`. In our current IR,
+                // this is represented as a variable with the `@GroupShared`
+                // rate on its type.
+                //
+                hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 break;
             }
         }
@@ -43,6 +62,14 @@ struct IntroduceExplicitGlobalContextPass
         bool canHoistType(HoistableTypes hoistable)
         {
             return (UInt)hoistableTypes & (UInt)hoistable;
+        }
+
+        bool canHoistGlobalVariable(IRGlobalVar* inst)
+        {
+            if (!((UInt)hoistGlobalVarOptions & (UInt)HoistGlobalVarOptions::SharedGlobal)
+                && as<IRGroupSharedRate>(inst->getRate()))
+                return false;
+            return true;
         }
 
         bool requiresFuncTypeCorrection()
@@ -56,6 +83,7 @@ struct IntroduceExplicitGlobalContextPass
         }
 
     private:
+        HoistGlobalVarOptions hoistGlobalVarOptions = HoistGlobalVarOptions::All;
         HoistableTypes hoistableTypes = HoistableTypes::All;
         bool requiresFuncTypeCorrectionPass = false;
         AddressSpace addressSpaceOfLocals = AddressSpace::ThreadLocal;
@@ -85,6 +113,11 @@ struct IntroduceExplicitGlobalContextPass
     bool canHoistType(HoistableTypes hoistable)
     {
         return m_options.canHoistType(hoistable);
+    }
+
+    bool canHoistGlobalVariable(IRGlobalVar* inst)
+    {
+        return m_options.canHoistGlobalVariable(inst);
     }
 
     enum class GlobalObjectKind
@@ -123,20 +156,8 @@ struct IntroduceExplicitGlobalContextPass
                         continue;
                     }
 
-                    // One important exception is that CUDA *does* support
-                    // global variables with the `__shared__` qualifer, with
-                    // semantics that exactly match HLSL/Slang `groupshared`.
-                    //
-                    // We thus need to skip processing of global variables
-                    // that were marked `groupshared`. In our current IR,
-                    // this is represented as a variable with the `@GroupShared`
-                    // rate on its type.
-                    //
-                    if( m_target == CodeGenTarget::CUDASource )
-                    {
-                        if( as<IRGroupSharedRate>(globalVar->getRate()) )
-                            continue;
-                    }
+                    if (!canHoistGlobalVariable(globalVar))
+                        continue;
 
                     m_globalVars.add(globalVar);
                 }
