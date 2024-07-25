@@ -407,7 +407,7 @@ void RefType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("Ref<") << getValueType();
     auto addressSpaceVal = getAddressSpace();
-    maybePrintAddrSpaceOperand(out, addressSpaceVal);
+    maybePrintAddrSpaceOperand(out, tryGetAddressSpaceValue(addressSpaceVal));
     out << toSlice(">");
 }
 
