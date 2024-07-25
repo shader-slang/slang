@@ -1024,7 +1024,6 @@ namespace Slang
                 return false;
             if (as<RefType>(toType) && !fromExpr->type.isLeftValue)
                 return false;
-            
             ConversionCost subCost = kConversionCost_GetRef;
 
             MakeRefExpr* refExpr = nullptr;
