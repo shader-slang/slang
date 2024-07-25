@@ -352,6 +352,66 @@ Type* NativeRefType::getValueType()
     return as<Type>(_getGenericTypeArg(this, 0));
 }
 
+Val* PtrTypeBase::getAddressSpace()
+{
+    return _getGenericTypeArg(this, 1);
+}
+
+AddressSpace tryGetAddressSpaceValue(Val* addrSpaceVal)
+{
+    AddressSpace addrSpace = AddressSpace::Generic;
+
+    if (auto cintVal = as<ConstantIntVal>(addrSpaceVal))
+    {
+        addrSpace = (AddressSpace)(cintVal->getValue());
+    }
+    return addrSpace;
+}
+
+void maybePrintAddrSpaceOperand(StringBuilder& out, AddressSpace addrSpace)
+{
+    switch (addrSpace)
+    {
+    case AddressSpace::Generic:
+    case AddressSpace::UserPointer:
+        break;
+    case AddressSpace::GroupShared:
+        out << toSlice(", groupshared");
+        break;
+    case AddressSpace::Global:
+        out << toSlice(", global");
+        break;
+    case AddressSpace::ThreadLocal:
+        out << toSlice(", threadlocal");
+        break;
+    case AddressSpace::Uniform:
+        out << toSlice(", uniform");
+        break;
+    default:
+        break;
+    }
+}
+
+void PtrType::_toTextOverride(StringBuilder& out)
+{
+    auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
+    if (addrSpace == AddressSpace::Generic)
+        out << toSlice("Addr<") << getValueType();
+    else
+        out << toSlice("Ptr<") << getValueType();
+    maybePrintAddrSpaceOperand(out, addrSpace);
+    out << toSlice(">");
+}
+
+void RefType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("Ref<") << getValueType();
+    auto addressSpaceVal = getAddressSpace();
+    maybePrintAddrSpaceOperand(out, tryGetAddressSpaceValue(addressSpaceVal));
+    out << toSlice(">");
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamedExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void NamedExpressionType::_toTextOverride(StringBuilder& out)
@@ -559,7 +619,7 @@ DeclRef<ThisTypeDecl> ExtractExistentialType::getThisTypeDeclRef()
         }
     SLANG_ASSERT(thisTypeDecl);
 
-    DeclRef<ThisTypeDecl> specialiedInterfaceDeclRef = getCurrentASTBuilder()->getLookupDeclRef(openedWitness, thisTypeDecl);
+    DeclRef<ThisTypeDecl> specialiedInterfaceDeclRef = getCurrentASTBuilder()->getLookupDeclRef(openedWitness, thisTypeDecl).as<ThisTypeDecl>();
 
     this->cachedThisTypeDeclRef = specialiedInterfaceDeclRef;
     return specialiedInterfaceDeclRef;

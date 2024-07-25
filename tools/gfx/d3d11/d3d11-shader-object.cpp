@@ -318,12 +318,6 @@ Result ShaderObjectImpl::bindAsConstantBuffer(
     // buffer for any "ordinary" data in `X`, and then bind the remaining
     // resources and sub-objects.
     //
-    // The one important detail to keep track of its that *if* we bind
-    // a constant buffer for ordinary data we will need to account for
-    // it in the offset we use for binding the remaining data. That
-    // detail is dealt with here by the way that `_bindOrdinaryDataBufferIfNeeded`
-    // will modify the `offset` parameter if it binds anything.
-    //
     BindingOffset offset = inOffset;
     SLANG_RETURN_ON_FAIL(_bindOrdinaryDataBufferIfNeeded(context, /*inout*/ offset, specializedLayout));
 
@@ -331,8 +325,10 @@ Result ShaderObjectImpl::bindAsConstantBuffer(
     // the rest of the state, which can use logic shared with the case
     // for interface-type sub-object ranges.
     //
-    // Note that this call will use the `offset` value that might have
-    // been modified during `_bindOrindaryDataBufferIfNeeded`.
+    // Note that this call will use the `inOffset` value instead of the offset
+    // modified by `_bindOrindaryDataBufferIfNeeded', because the indexOffset in
+    // the binding range should already take care of the offset due to the default
+    // cbuffer.
     //
     SLANG_RETURN_ON_FAIL(bindAsValue(context, inOffset, specializedLayout));
 

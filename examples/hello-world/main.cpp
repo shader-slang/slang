@@ -7,13 +7,15 @@
 // The goal is to demonstrate how to use the Slang API to cross compile
 // shader code.
 //
-#include <slang.h>
-#include <slang-com-ptr.h>
+#include "slang.h"
+#include "slang-com-ptr.h"
 
 #include "vulkan-api.h"
 #include "examples/example-base/example-base.h"
 
 using Slang::ComPtr;
+
+static const ExampleResources resourceBase("hello-world");
 
 struct HelloWorldExample
 {
@@ -137,7 +139,8 @@ int HelloWorldExample::createComputePipelineFromShader()
     slang::IModule* slangModule = nullptr;
     {
         ComPtr<slang::IBlob> diagnosticBlob;
-        slangModule = session->loadModule("hello-world", diagnosticBlob.writeRef());
+        Slang::String path = resourceBase.resolveResource("hello-world.slang");
+        slangModule = session->loadModule(path.getBuffer(), diagnosticBlob.writeRef());
         diagnoseIfNeeded(diagnosticBlob);
         if (!slangModule)
             return -1;

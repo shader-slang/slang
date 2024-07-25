@@ -23,6 +23,13 @@ IRType* getVectorElementType(IRType* type)
     return type;
 }
 
+IRType* getMatrixElementType(IRType* type)
+{
+    if (auto matrixType = as<IRMatrixType>(type))
+        return matrixType->getElementType();
+    return type;
+}
+
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType)
 {
     Dictionary<IRInst*, IRInst*> result;
@@ -1781,6 +1788,19 @@ void verifyComputeDerivativeGroupModifiers(
         if ((x * y * z) % 4 != 0)
             sink->diagnose(errorLoc, Diagnostics::derivativeGroupLinearMustBeMultiple4ForTotalThreadCount);
     }
+}
+
+int getIRVectorElementSize(IRType* type)
+{
+    if (type->getOp() != kIROp_VectorType)
+        return 1;
+    return (int)(as<IRIntLit>(as<IRVectorType>(type)->getElementCount())->value.intVal);
+}
+IRType* getIRVectorBaseType(IRType* type)
+{
+    if (type->getOp() != kIROp_VectorType)
+        return type;
+    return as<IRVectorType>(type)->getElementType();
 }
 
 }

@@ -3,7 +3,7 @@
 // This file implements an example of hardware ray-tracing using
 // Slang shaders and the `gfx` graphics API.
 
-#include <slang.h>
+#include "slang.h"
 #include "slang-gfx.h"
 #include "gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"
@@ -14,6 +14,8 @@
 
 using namespace gfx;
 using namespace Slang;
+
+static const ExampleResources resourceBase("ray-tracing");
 
 struct Uniforms
 {
@@ -161,7 +163,8 @@ gfx::Result loadShaderProgram(
     slangSession = device->getSlangSession();
 
     ComPtr<slang::IBlob> diagnosticsBlob;
-    slang::IModule* module = slangSession->loadModule("shaders", diagnosticsBlob.writeRef());
+    Slang::String path = resourceBase.resolveResource("shaders.slang");
+    slang::IModule* module = slangSession->loadModule(path.getBuffer(), diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     if(!module)
         return SLANG_FAIL;

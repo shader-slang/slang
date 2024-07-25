@@ -10,8 +10,8 @@
 // This example uses the Slang C/C++ API, alonmg with its optional type
 // for managing COM-style reference-counted pointers.
 //
-#include <slang.h>
-#include <slang-com-ptr.h>
+#include "slang.h"
+#include "slang-com-ptr.h"
 using Slang::ComPtr;
 
 // This example uses a graphics API abstraction layer that is implemented inside
@@ -27,6 +27,8 @@ using Slang::ComPtr;
 #include "source/core/slang-basic.h"
 
 #include <chrono>
+
+static const ExampleResources resourceBase("shader-toy");
 
 using namespace gfx;
 
@@ -109,7 +111,8 @@ Result loadShaderProgram(gfx::IDevice* device, ComPtr<gfx::IShaderProgram>& outS
     //      import shader_toy;
     //
     ComPtr<slang::IBlob> diagnosticsBlob;
-    slang::IModule* module = slangSession->loadModule("shader-toy", diagnosticsBlob.writeRef());
+    Slang::String shaderToyPath = resourceBase.resolveResource("shader-toy.slang");
+    slang::IModule* module = slangSession->loadModule(shaderToyPath.getBuffer(), diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     if(!module)
         return SLANG_FAIL;
@@ -197,9 +200,9 @@ Result loadShaderProgram(gfx::IDevice* device, ComPtr<gfx::IShaderProgram>& outS
     // same module, and to demonstrate that we will load a different
     // module to provide the effect type we will plug in.
     //
-    const char* effectModuleName = "example-effect";
     const char* effectTypeName = "ExampleEffect";
-    slang::IModule* effectModule = slangSession->loadModule(effectModuleName, diagnosticsBlob.writeRef());
+    Slang::String effectModulePath = resourceBase.resolveResource("example-effect.slang");
+    slang::IModule* effectModule = slangSession->loadModule(effectModulePath.getBuffer(), diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     if(!module)
         return SLANG_FAIL;

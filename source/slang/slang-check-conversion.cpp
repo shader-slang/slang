@@ -842,29 +842,32 @@ namespace Slang
         // Coercion from an initializer list is allowed for many types,
         // so we will farm that out to its own subroutine.
         //
-        if( auto fromInitializerListExpr = as<InitializerListExpr>(fromExpr))
+        if (fromExpr && as<InitializerListType>(fromExpr->type.type))
         {
-            if( !_coerceInitializerList(
-                toType,
-                outToExpr,
-                fromInitializerListExpr) )
+            if (auto fromInitializerListExpr = as<InitializerListExpr>(fromExpr))
             {
-                return false;
-            }
+                if (!_coerceInitializerList(
+                    toType,
+                    outToExpr,
+                    fromInitializerListExpr))
+                {
+                    return false;
+                }
 
-            // For now, we treat coercion from an initializer list
-            // as having  no cost, so that all conversions from initializer
-            // lists are equally valid. This is fine given where initializer
-            // lists are allowed to appear now, but might need to be made
-            // more strict if we allow for initializer lists in more
-            // places in the language (e.g., as function arguments).
-            //
-            if(outCost)
-            {
-                *outCost = kConversionCost_None;
-            }
+                // For now, we treat coercion from an initializer list
+                // as having  no cost, so that all conversions from initializer
+                // lists are equally valid. This is fine given where initializer
+                // lists are allowed to appear now, but might need to be made
+                // more strict if we allow for initializer lists in more
+                // places in the language (e.g., as function arguments).
+                //
+                if (outCost)
+                {
+                    *outCost = kConversionCost_None;
+                }
 
-            return true;
+                return true;
+            }
         }
 
         // nullptr_t can be cast into any pointer type.
@@ -1021,7 +1024,6 @@ namespace Slang
                 return false;
             if (as<RefType>(toType) && !fromExpr->type.isLeftValue)
                 return false;
-            
             ConversionCost subCost = kConversionCost_GetRef;
 
             MakeRefExpr* refExpr = nullptr;

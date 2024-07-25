@@ -1,7 +1,7 @@
 // lower.cpp
 #include "slang-lower-to-ir.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 #include "../core/slang-random-generator.h"
 #include "../core/slang-hash.h"
@@ -33,7 +33,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-lower-error-handling.h"
 #include "slang-ir-obfuscate-loc.h"
-#include "slang-ir-use-uninitialized-out-param.h"
+#include "slang-ir-use-uninitialized-values.h"
 #include "slang-ir-peephole.h"
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
@@ -1855,8 +1855,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto astValueType = type->getValueType();
 
         IRType* irValueType = lowerType(context, astValueType);
-
-        return getBuilder()->getPtrType(irValueType);
+        IRInst* addrSpace = nullptr;
+        if (auto astAddrSpace = type->getAddressSpace())
+        {
+            addrSpace = getSimpleVal(context, lowerVal(context, astAddrSpace));
+        }
+        else
+        {
+            addrSpace = getBuilder()->getIntValue(getBuilder()->getUInt64Type(), (IRIntegerValue)AddressSpace::Generic);
+        }
+        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, addrSpace);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)
@@ -2211,16 +2219,6 @@ void addVarDecorations(
         {
             builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
                 builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
-        }
-        else if (auto glslInputAttachmentMod = as<GLSLInputAttachmentIndexLayoutModifier>(mod))
-        {
-            auto subpassType = as<IRSubpassInputType>(inst->getDataType());
-
-            if (!subpassType)
-                context->getSink()->diagnose(inst, Diagnostics::InputAttachmentIndexOnlyAllowedOnSubpass);
-
-            builder->addDecoration(inst, kIROp_GLSLInputAttachmentIndexDecoration,
-                builder->getIntValue(builder->getIntType(), stringToInt(glslInputAttachmentMod->valToken.getContent())));
         }
         else if (auto glslOffsetMod = as<GLSLOffsetLayoutAttribute>(mod))
         {
@@ -3148,7 +3146,7 @@ void _lowerFuncDeclBaseTypeInfo(
             irParamType = builder->getInOutType(irParamType);
             break;
         case kParameterDirection_Ref:
-            irParamType = builder->getRefType(irParamType);
+            irParamType = builder->getRefType(irParamType, AddressSpace::Generic);
             break;
         case kParameterDirection_ConstRef:
             irParamType = builder->getConstRefType(irParamType);
@@ -4982,7 +4980,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         case LoweredValInfo::Flavor::Ptr:
             return LoweredValInfo::ptr(
                 builder->emitElementAddress(
-                    context->irBuilder->getPtrType(type),
                     baseVal.val,
                     indexVal));
 
@@ -9702,6 +9699,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         subContext->irBuilder->emitStore(thisVar, allocatedObj);
                     }
                 }
+
+                // Used for diagnostics
+                getBuilder()->addConstructorDecoration(irFunc, constructorDecl->isSynthesized);
             }
 
             // We lower whatever statement was stored on the declaration
@@ -10298,7 +10298,7 @@ static void _addFlattenedTupleArgs(
 
 bool isAbstractWitnessTable(IRInst* inst)
 {
-    if (as<IRThisTypeWitness>(inst))
+    if (as<IRThisTypeWitness>(inst) || as<IRInterfaceRequirementEntry>(inst))
         return true;
     if (auto lookup = as<IRLookupWitnessMethod>(inst))
         return isAbstractWitnessTable(lookup->getWitnessTable());
@@ -10935,8 +10935,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // call graph) based on constraints imposed by different instructions.
         propagateConstExpr(module, compileRequest->getSink());
 
-        // Check for using uninitialized out parameters.
-        checkForUsingUninitializedOutParams(module, compileRequest->getSink());
+        // Check for using uninitialized values
+        checkForUsingUninitializedValues(module, compileRequest->getSink());
         
         // TODO: give error messages if any `undefined` or
         // instructions remain.

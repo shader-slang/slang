@@ -9,7 +9,7 @@
 // strings that were specified in Slang shader code, and
 // for that it will use the Slang reflection API.
 //
-#include <slang.h>
+#include "slang.h"
 
 // We also need a way to store the data for strings that
 // were used in shader code, and we will go ahead and

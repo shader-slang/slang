@@ -258,7 +258,7 @@ struct IntroduceExplicitGlobalContextPass
         if (kind == GlobalObjectKind::GlobalVar)
         {
             auto ptrType = as<IRPtrTypeBase>(type);
-            if (ptrType->getAddressSpace() == (IRIntegerValue)AddressSpace::GroupShared)
+            if (ptrType->getAddressSpace() == AddressSpace::GroupShared)
             {
                 fieldDataType = ptrType;
                 needDereference = true;

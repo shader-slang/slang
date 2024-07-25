@@ -212,9 +212,9 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
     return Super::calcTypeName(type, target, out);
 }
 
-void CUDASourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
+void CUDASourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling, EmitLayoutSemanticOption layoutSemanticOption)
 {
-    Super::emitLayoutSemanticsImpl(inst, uniformSemanticSpelling);
+    Super::emitLayoutSemanticsImpl(inst, uniformSemanticSpelling, layoutSemanticOption);
 }
 
 void CUDASourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
@@ -738,7 +738,7 @@ void CUDASourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
 }
 
-void CUDASourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] IRIntegerValue addressSpace)
+void CUDASourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] AddressSpace addressSpace)
 {
     if (as<IRGroupSharedRate>(rate))
     {

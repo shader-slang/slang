@@ -2072,9 +2072,6 @@ bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
 
     stripNoDiffTypeAttribute(module);
 
-    // Remove auto-diff related decorations.
-    stripAutoDiffDecorations(module);
-
     // Remove keep-alive decorations from null-differential type
     // so it can be DCE'd if unused.
     // 

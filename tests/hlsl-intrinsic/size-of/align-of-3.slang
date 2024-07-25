@@ -24,7 +24,7 @@ int getParamSizeWithDirection(inout uint3 v)
     return alignof(v);
 }
 
-struct TestThis
+struct TestThis : IDefaultInitializable
 {
     int getSize()
     {

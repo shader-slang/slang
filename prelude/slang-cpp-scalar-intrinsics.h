@@ -266,7 +266,7 @@ double F64_cosh(double f);
 double F64_tanh(double f);
 double F64_log2(double f);
 double F64_log(double f);
-double F64_log10(float f);
+double F64_log10(double f);
 double F64_exp2(double f);
 double F64_exp(double f);
 double F64_abs(double f);

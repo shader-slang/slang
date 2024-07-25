@@ -437,11 +437,6 @@ struct IRGLSLLocationDecoration : IRDecoration
     IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
 };
 
-struct IRGLSLInputAttachmentIndexDecoration : IRDecoration
-{
-    IR_LEAF_ISA(GLSLInputAttachmentIndexDecoration)
-    IRIntLit* getIndex() { return cast<IRIntLit>(getOperand(0)); }
-};
 
 struct IRGLSLOffsetDecoration : IRDecoration
 {
@@ -1297,12 +1292,6 @@ struct IRGetSequentialID : IRInst
     IRInst* getRTTIOperand() { return getOperand(0); }
 };
 
-struct IRLookupWitnessTable : IRInst
-{
-    IRUse sourceType;
-    IRUse interfaceType;
-};
-
 /// Allocates space from local stack.
 ///
 struct IRAlloca : IRInst
@@ -1367,6 +1356,13 @@ struct IRSemanticDecoration : public IRDecoration
 
     IRIntLit* getSemanticIndexOperand() { return cast<IRIntLit>(getOperand(1)); }
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
+};
+
+struct IRConstructorDecorartion : IRDecoration
+{
+    IR_LEAF_ISA(ConstructorDecoration)
+
+    bool getSynthesizedStatus() { return cast<IRBoolLit>(getOperand(0))->getValue(); }
 };
 
 struct IRPackOffsetDecoration : IRDecoration
@@ -2440,6 +2436,8 @@ struct IRImageSubscript : IRInst
     IR_LEAF_ISA(ImageSubscript);
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
+    bool hasSampleCoord() { return getOperandCount() > 2 && getOperand(2) != nullptr;  }
+    IRInst* getSampleCoord() { return getOperand(2); }
 };
 
 struct IRImageLoad : IRInst
@@ -2447,6 +2445,16 @@ struct IRImageLoad : IRInst
     IR_LEAF_ISA(ImageLoad);
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
+
+    /// If GLSL/SPIR-V, Sample coord
+    /// If Metal, Array or Sample coord
+    bool hasAuxCoord1() { return getOperandCount() > 2 && getOperand(2) != nullptr; }
+    IRInst* getAuxCoord1() { return getOperand(2); }
+
+    /// If Metal, Sample coord
+    bool hasAuxCoord2() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
+    IRInst* getAuxCoord2() { return getOperand(3); }
+
 };
 
 struct IRImageStore : IRInst
@@ -2455,6 +2463,15 @@ struct IRImageStore : IRInst
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
     IRInst* getValue() { return getOperand(2); }
+
+    /// If GLSL/SPIR-V, Sample coord
+    /// If Metal, Array or Sample coord
+    bool hasAuxCoord1() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
+    IRInst* getAuxCoord1() { return getOperand(3); }
+
+    /// If Metal, Sample coord
+    bool hasAuxCoord2() { return getOperandCount() > 4 && getOperand(4) != nullptr; }
+    IRInst* getAuxCoord2() { return getOperand(4); }
 };
 // Terminators
 
@@ -3473,10 +3490,11 @@ public:
     IRPtrType*  getPtrType(IRType* valueType);
     IROutType*  getOutType(IRType* valueType);
     IRInOutType*  getInOutType(IRType* valueType);
-    IRRefType*  getRefType(IRType* valueType);
+    IRRefType*  getRefType(IRType* valueType, AddressSpace addrSpace);
     IRConstRefType* getConstRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
+    IRPtrType* getPtrType(IROp op, IRType* valueType, IRInst* addressSpace);
     IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace) { return getPtrType(op, valueType, (IRIntegerValue)addressSpace); }
     IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace) { return getPtrType(kIROp_PtrType, valueType, (IRIntegerValue)addressSpace); }
 
@@ -4048,14 +4066,11 @@ public:
 
     IRInst* emitImageLoad(
         IRType* type,
-        IRInst* image,
-        IRInst* coord);
+        ShortList<IRInst*> params);
 
     IRInst* emitImageStore(
         IRType* type,
-        IRInst* image,
-        IRInst* coord,
-        IRInst* value);
+        ShortList<IRInst*> params);
 
     IRInst* emitIsType(IRInst* value, IRInst* witness, IRInst* typeOperand, IRInst* targetWitness);
 
@@ -4392,7 +4407,7 @@ public:
     }
 
 //    void addLayoutDecoration(IRInst* value, Layout* layout);
-    void addLayoutDecoration(IRInst* value, IRLayout* layout);
+    IRLayoutDecoration* addLayoutDecoration(IRInst* value, IRLayout* layout);
 
 //    IRLayout* getLayout(Layout* astLayout);
 
@@ -4512,9 +4527,14 @@ public:
         addDecoration(value, kIROp_ForceUnrollDecoration, getIntValue(getIntType(), iters));
     }
 
-    void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)
+    IRSemanticDecoration* addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)
     {
-        addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index));
+        return as<IRSemanticDecoration>(addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index)));
+    }
+
+    void addConstructorDecoration(IRInst* value, bool synthesizedConstructor)
+    {
+        addDecoration(value, kIROp_ConstructorDecoration, getBoolValue(synthesizedConstructor));
     }
 
     void addRequireSPIRVDescriptorIndexingExtensionDecoration(IRInst* value)

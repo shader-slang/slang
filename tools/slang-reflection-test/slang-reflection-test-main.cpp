@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <slang.h>
-#include <slang-com-helper.h>
+#include "slang.h"
+#include "slang-com-helper.h"
 
 #include "../../source/core/slang-string-escape-util.h"
 #include "../../source/core/slang-char-util.h"
@@ -827,6 +827,10 @@ static void emitReflectionTypeInfoJSON(
         writer.maybeComma();
         emitReflectionNameInfoJSON(writer, type->getName());
         break;
+    case slang::TypeReflection::Kind::DynamicResource:
+        writer.maybeComma();
+        writer << "\"kind\": \"DynamicResource\"";
+        break;
     default:
         assert(!"unhandled case");
         break;
@@ -1446,6 +1450,6 @@ int main(
     
     SlangResult res = innerMain(stdWriters, session, argc, argv);
     spDestroySession(session);
-
+    slang::shutdown();
     return SLANG_FAILED(res) ? 1 : 0;
 }

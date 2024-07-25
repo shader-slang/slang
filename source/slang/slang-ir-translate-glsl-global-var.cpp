@@ -262,7 +262,10 @@ namespace Slang
             // We need to introduce a global variable and assign value to it in each entry point.
 
             if (!workgroupSizeInst->hasUses())
+            {
+                workgroupSizeInst->removeAndDeallocate();
                 return;
+            }
             builder.setInsertBefore(workgroupSizeInst);
             auto globalVar = builder.createGlobalVar(workgroupSizeInst->getFullType());
 

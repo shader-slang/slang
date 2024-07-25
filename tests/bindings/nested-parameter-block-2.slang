@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12 -use-dxil -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal -shaderobj -output-using-type -render-features argument-buffer-tier-2
 // nested-parameter-block-2.slang
 
 struct CB
@@ -37,6 +38,10 @@ ParameterBlock<MyBuffer> pb2;
 [numthreads(4,1,1)]
 void computeMain(uint3 sv_dispatchThreadID : SV_DispatchThreadID)
 {
-    // CHECK: 4
+    // CHECK: type: uint32_t
+    // CHECK-NEXT: 4
+    // CHECK-NEXT: 4
+    // CHECK-NEXT: 4
+    // CHECK-NEXT: 4
     pb2.resultBuffer[sv_dispatchThreadID.x] = scene.sceneCb.value.x + scene.data[0].x + scene.material.cb.value.x + scene.material.data[0].x;
 }

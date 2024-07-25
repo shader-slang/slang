@@ -75,7 +75,7 @@ syntax snorm : SNormModifier;
 syntax __extern_cpp : ExternCppModifier;
 
 __magic_type(DefaultInitializableType)
-interface IDefaultInitializableType
+interface IDefaultInitializable
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::DefaultInitializableConstructor))
     __init();
@@ -679,14 +679,14 @@ struct __none_t
 {
 };
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t = $( (uint64_t)AddressSpace::UserPointer)ULL>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
 {
     __generic<U>
     __intrinsic_op($(kIROp_BitCast))
-    __init(Ptr<U> ptr);
+    __init(Ptr<U, addrSpace> ptr);
 
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
@@ -703,53 +703,55 @@ struct Ptr
 };
 
 __intrinsic_op($(kIROp_Load))
-T __load<T>(Ptr<T> ptr);
+T __load<T, let addrSpace : uint64_t>(Ptr<T, addrSpace> ptr);
 
 __intrinsic_op($(kIROp_Store))
-void __store<T>(Ptr<T> ptr, T val);
+void __store<T, let addrSpace : uint64_t>(Ptr<T, addrSpace> ptr, T val);
 
 __intrinsic_op($(kIROp_GetElementPtr))
-Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
-
-__intrinsic_op($(kIROp_GetElementPtr))
-Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int64_t index);
+Ptr<T, addrSpace> __getElementPtr<T, let addrSpace : uint64_t, TIndex : __BuiltinIntegerType>(Ptr<T, addrSpace> ptr, TIndex index);
 
 __intrinsic_op($(kIROp_GetOffsetPtr))
-Ptr<T> __getOffsetPtr<T>(Ptr<T> ptr, int index);
+Ptr<T, addrSpace> __getOffsetPtr<T, let addrSpace : uint64_t, TIndex : __BuiltinIntegerType>(Ptr<T, addrSpace> ptr, TIndex index);
 
-__intrinsic_op($(kIROp_GetOffsetPtr))
-Ptr<T> __getOffsetPtr<T>(Ptr<T> ptr, int64_t index);
-
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Less))
-bool operator<(Ptr<T> p1, Ptr<T> p2);
+bool operator <(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Leq))
-bool operator<=(Ptr<T> p1, Ptr<T> p2);
+bool operator <=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Greater))
-bool operator>(Ptr<T> p1, Ptr<T> p2);
+bool operator>(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Geq))
-bool operator>=(Ptr<T> p1, Ptr<T> p2);
+bool operator >=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Neq))
-bool operator!=(Ptr<T> p1, Ptr<T> p2);
+bool operator !=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Eql))
-bool operator==(Ptr<T> p1, Ptr<T> p2);
+bool operator ==(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
 extension bool : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __implicit_conversion($(kConversionCost_PtrToBool))
     __intrinsic_op($(kIROp_CastPtrToBool))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
+
+    __generic<T : __EnumType>
+    __implicit_conversion($(kConversionCost_IntegerTruncate))
+    [__unsafeForceInlineEarly]
+    __init(T v)
+    {
+        return __slang_noop_cast<T.__Tag>(v) != __intCast<T.__Tag>(0);
+    }
 
     static const bool maxValue = true;
     static const bool minValue = false;
@@ -757,9 +759,9 @@ extension bool : IRangedValue
 
 extension uint64_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
 
     static const uint64_t maxValue = 0xFFFFFFFFFFFFFFFFULL;
     static const uint64_t minValue = 0;
@@ -767,9 +769,9 @@ extension uint64_t : IRangedValue
 
 extension int64_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
 
     static const int64_t maxValue =  0x7FFFFFFFFFFFFFFFLL;
     static const int64_t minValue = -0x8000000000000000LL;
@@ -777,9 +779,9 @@ extension int64_t : IRangedValue
 
 extension intptr_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
     static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0x7FFFFFFFFFFFFFFFz":"0x7FFFFFFFz");
     static const intptr_t minValue = $(SLANG_PROCESSOR_X86_64?"0x8000000000000000z":"0x80000000z");
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
@@ -787,9 +789,9 @@ extension intptr_t : IRangedValue
 
 extension uintptr_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
     static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFz":"0xFFFFFFFFz");
     static const uintptr_t minValue = 0z;
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
@@ -818,6 +820,8 @@ __magic_type(ConstRefType)
 __intrinsic_type($(kIROp_ConstRefType))
 struct ConstRef
 {};
+
+typealias __Addr<T> = Ptr<T, $( (uint64_t)AddressSpace::Generic)ULL>;
 
 __generic<T>
 __magic_type(OptionalType)
@@ -961,10 +965,10 @@ extension Ptr<void>
     [__unsafeForceInlineEarly]
     __init(NativeString nativeStr) { this = nativeStr.getBuffer(); }
 
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op(0)
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
 
     __generic<T>
     __intrinsic_op(0)
@@ -1210,6 +1214,31 @@ extension matrix<int16_t,R,C,L>
     __init(int value) { this = matrix<T,R,C,L>(T(value)); }
 }
 
+__intrinsic_op(makeVector)
+__generic<T, let N:int>
+vector<T,N*2> __makeVector(vector<T,N> vec1, vector<T,N> vec2);
+
+__generic<T>
+extension vector<T, 4>
+{
+    __generic<let L : int>
+    [__unsafeForceInlineEarly]
+    __init(matrix<T, 2, 2, L> value)
+    {
+        this = __makeVector(value[0], value[1]);
+    }
+}
+__generic<T, let L : int>
+extension matrix<T, 2, 2, L>
+{
+    [__unsafeForceInlineEarly]
+    __init(vector<T, 4> value)
+    {
+        this[0] = value.xy;
+        this[1] = value.zw;
+    }
+}
+
 ${{{{
 static const struct {
     char const* name;
@@ -1250,8 +1279,8 @@ for (int tt = 0; tt < kTypeCount; ++tt)
     }
 
     // Declare HLSL matrix types
-    for (int rr = 2; rr <= 4; ++rr)
-    for (int cc = 2; cc <= 4; ++cc)
+    for (int rr = 1; rr <= 4; ++rr)
+    for (int cc = 1; cc <= 4; ++cc)
     {
         sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
     }
@@ -1436,12 +1465,14 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     sb << "}\n";
 }
 
-for( int R = 2; R <= 4; ++R )
-for( int C = 2; C <= 4; ++C )
+for( int R = 1; R <= 4; ++R )
+for( int C = 1; C <= 4; ++C )
 {
     sb << "__generic<T, let L:int> __extension matrix<T, " << R << "," << C << ", L>\n{\n";
 
     // initialize from R*C scalars
+    if (R == 1 || C == 1)
+        sb << "[require(hlsl)]\n";
     sb << "__intrinsic_op(" << int(kIROp_MakeMatrix) << ") __init(";
     for( int ii = 0; ii < R; ++ii )
     for( int jj = 0; jj < C; ++jj )
@@ -1452,6 +1483,8 @@ for( int C = 2; C <= 4; ++C )
     sb << ");\n";
 
     // Initialize from R C-vectors
+    if (R == 1 || C == 1)
+        sb << "[require(hlsl)]\n";
     sb << "__intrinsic_op(" << int(kIROp_MakeMatrix) << ") __init(";
     for (int ii = 0; ii < R; ++ii)
     {
@@ -1465,6 +1498,8 @@ for( int C = 2; C <= 4; ++C )
     for( int cc = C; cc <= 4; ++cc )
     {
         if(rr == R && cc == C) continue;
+        if (R == 1 || C == 1)
+            sb << "[require(hlsl)]\n";
         sb << "__intrinsic_op(" << int(kIROp_MatrixReshape) << ") __init(matrix<T," << rr << "," << cc << ", L> value);\n";
     }
 
@@ -1589,21 +1624,28 @@ for (auto op : intrinsicUnaryOps)
 
 }}}}
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op(0)
-__prefix Ref<T> operator*(Ptr<T> value);
+[require(cpp_cuda_spirv)]
+__prefix Ref<T> operator*(Ptr<T, addrSpace> value);
 
 __generic<T>
 __intrinsic_op(0)
-__prefix Ptr<T> operator&(__ref T value);
+[require(cpp_cuda_spirv)]
+__prefix Ptr<T, $( (uint64_t)AddressSpace::UserPointer)ULL> operator&(__ref T value);
 
 __generic<T>
+__intrinsic_op(0)
+[require(cpp_cuda_spirv)]
+__Addr<T> __get_addr( __ref T value);
+
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_GetOffsetPtr))
-Ptr<T> operator+(Ptr<T> value, int64_t offset);
+Ptr<T, addrSpace> operator+(Ptr<T, addrSpace> value, int64_t offset);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 [__unsafeForceInlineEarly]
-Ptr<T> operator-(Ptr<T> value, int64_t offset)
+Ptr<T, addrSpace> operator -(Ptr<T, addrSpace> value, int64_t offset)
 {
     return __getOffsetPtr(value, -offset);
 }
@@ -1668,9 +1710,9 @@ matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C,L> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 [__unsafeForceInlineEarly]
-Ptr<T> operator$(op.name)(in out Ptr<T> value)
+Ptr<T, addrSpace> operator$(op.name)(in out Ptr<T, addrSpace> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) 1; return $(fixity.returnVal); }
 
 ${{{{
@@ -2230,6 +2272,51 @@ bool and(bool v0, bool v1)
     return __and(v0, v1);
 }
 
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+__intrinsic_op($(kIROp_And))
+vector<bool, N> and<let N : int>(vector<bool, N> v0, vector<bool, N> v1);
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+vector<bool, N> and<let N : int>(bool b, vector<bool, N> v)
+{
+    return and(vector<bool, N>(b), v);
+}
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+vector<bool, N> and<let N : int>(vector<bool, N> v, bool b)
+{
+    return and(v, vector<bool, N>(b));
+}
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+bool or(bool v0, bool v1)
+{
+    return __or(v0, v1);
+}
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+__intrinsic_op($(kIROp_Or))
+vector<bool, N> or<let N : int>(vector<bool, N> v0, vector<bool, N> v1);
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+vector<bool, N> or<let N : int>(bool b, vector<bool, N> v)
+{
+    return or(vector<bool, N>(b), v);
+}
+
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+vector<bool, N> or<let N : int>(vector<bool, N> v, bool b)
+{
+    return or(v, vector<bool, N>(b));
+}
+
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
@@ -2416,8 +2503,8 @@ __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
 
 __generic<T>
-__intrinsic_op($(kIROp_GetLegalizedSPIRVGlobalParamAddr))
-Ptr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
+__intrinsic_op( $(kIROp_GetLegalizedSPIRVGlobalParamAddr))
+__Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
@@ -2449,6 +2536,9 @@ attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [vk_spirv_instruction(op : int, set : String = "")]     : SPIRVInstructionOpAttribute;
+
+__attributeTarget(VarDeclBase)
+attribute_syntax [vk_input_attachment_index(location : int)] : GLSLInputAttachmentIndexLayoutAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [spv_target_env_1_3] : SPIRVTargetEnv13Attribute;

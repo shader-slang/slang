@@ -15,148 +15,6 @@
 
 namespace Slang
 {
-int getIRVectorElementSize(IRType* type)
-{
-    if (type->getOp() != kIROp_VectorType)
-        return 1;
-    return (int)(as<IRIntLit>(as<IRVectorType>(type)->getElementCount())->value.intVal);
-}
-IRType* getIRVectorBaseType(IRType* type)
-{
-    if (type->getOp() != kIROp_VectorType)
-        return type;
-    return as<IRVectorType>(type)->getElementType();
-}
-
-void legalizeImageSubscriptStoreForGLSL(IRBuilder& builder, IRInst* storeInst)
-{
-    builder.setInsertBefore(storeInst);
-    auto getElementPtr = as<IRGetElementPtr>(storeInst->getOperand(0));
-    IRImageSubscript* imageSubscript = nullptr;
-    if (getElementPtr)
-        imageSubscript = as<IRImageSubscript>(getElementPtr->getBase());
-    else
-        imageSubscript = as<IRImageSubscript>(storeInst->getOperand(0));
-    assert(imageSubscript);
-    auto imageElementType = cast<IRPtrTypeBase>(imageSubscript->getDataType())->getValueType();
-    auto coordType = imageSubscript->getCoord()->getDataType();
-    auto coordVectorSize = getIRVectorElementSize(coordType);
-    if (coordVectorSize != 1)
-    {
-        coordType = builder.getVectorType(
-            builder.getIntType(), builder.getIntValue(builder.getIntType(), coordVectorSize));
-    }
-    else
-    {
-        coordType = builder.getIntType();
-    }
-    auto legalizedCoord = imageSubscript->getCoord();
-    if (coordType != imageSubscript->getCoord()->getDataType())
-    {
-        legalizedCoord = builder.emitCast(coordType, legalizedCoord);
-    }
-    switch (storeInst->getOp())
-    {
-    case kIROp_Store:
-        {
-            IRInst* newValue = nullptr;
-            if (getElementPtr)
-            {
-                auto vectorBaseType = getIRVectorBaseType(imageElementType);
-                IRType* vector4Type = builder.getVectorType(vectorBaseType, 4);
-                auto originalValue = builder.emitImageLoad(vector4Type, imageSubscript->getImage(), legalizedCoord);
-                auto index = getElementPtr->getIndex();
-                newValue = builder.emitSwizzleSet(vector4Type, originalValue, storeInst->getOperand(1), 1, &index);
-            }
-            else
-            {
-                newValue = storeInst->getOperand(1);
-                if (getIRVectorElementSize(imageElementType) != 4)
-                {
-                    auto vectorBaseType = getIRVectorBaseType(imageElementType);
-                    newValue = builder.emitVectorReshape(
-                        builder.getVectorType(
-                            vectorBaseType, builder.getIntValue(builder.getIntType(), 4)),
-                        newValue);
-                }
-            }
-            auto imageStore = builder.emitImageStore(
-                builder.getVoidType(),
-                imageSubscript->getImage(),
-                legalizedCoord,
-                newValue);
-            storeInst->replaceUsesWith(imageStore);
-            storeInst->removeAndDeallocate();
-            if (!imageSubscript->hasUses())
-            {
-                imageSubscript->removeAndDeallocate();
-            }
-        }
-        break;
-    case kIROp_SwizzledStore:
-        {
-            auto swizzledStore = cast<IRSwizzledStore>(storeInst);
-            // Here we assume the imageElementType is already lowered into float4/uint4 types from any
-            // user-defined type.
-            assert(imageElementType->getOp() == kIROp_VectorType);
-            auto vectorBaseType = getIRVectorBaseType(imageElementType);
-            IRType* vector4Type = builder.getVectorType(vectorBaseType, 4);
-            auto originalValue = builder.emitImageLoad(vector4Type, imageSubscript->getImage(), legalizedCoord);
-            Array<IRInst*, 4> indices;
-            for (UInt i = 0; i < swizzledStore->getElementCount(); i++)
-            {
-                indices.add(swizzledStore->getElementIndex(i));
-            }
-            auto newValue = builder.emitSwizzleSet(
-                vector4Type,
-                originalValue,
-                swizzledStore->getSource(),
-                swizzledStore->getElementCount(),
-                indices.getBuffer());
-            auto imageStore = builder.emitImageStore(
-                builder.getVoidType(), imageSubscript->getImage(), legalizedCoord, newValue);
-            storeInst->replaceUsesWith(imageStore);
-            storeInst->removeAndDeallocate();
-            if (!imageSubscript->hasUses())
-            {
-                imageSubscript->removeAndDeallocate();
-            }
-        }
-        break;
-    default:
-        break;
-    }
-}
-
-void legalizeImageSubscriptForGLSL(IRModule* module)
-{
-    IRBuilder builder(module);
-    for (auto globalInst : module->getModuleInst()->getChildren())
-    {
-        auto func = as<IRFunc>(globalInst);
-        if (!func)
-            continue;
-        for (auto block : func->getBlocks())
-        {
-            auto inst = block->getFirstInst();
-            IRInst* next;
-            for ( ; inst; inst = next)
-            {
-                next = inst->getNextInst();
-                switch (inst->getOp())
-                {
-                case kIROp_Store:
-                case kIROp_SwizzledStore:
-                    if (getRootAddr(inst->getOperand(0))->getOp() == kIROp_ImageSubscript)
-                    {
-                        legalizeImageSubscriptStoreForGLSL(builder, inst);
-                    }
-                }
-            }   
-        }
-    }
-}
-
     //
 // Legalization of entry points for GLSL:
 //
@@ -3421,14 +3279,15 @@ void legalizeEntryPointForGLSL(
     context.sink = codeGenContext->getSink();
     context.glslExtensionTracker = glslExtensionTracker;
 
-    // We require that the entry-point function has no uses,
+    // We require that the entry-point function has no calls,
     // because otherwise we'd invalidate the signature
     // at all existing call sites.
     //
     // TODO: the right thing to do here is to split any
     // function that both gets called as an entry point
     // and as an ordinary function.
-    SLANG_ASSERT(!func->firstUse);
+    for (auto use = func->firstUse; use; use = use->nextUse)
+        SLANG_ASSERT(use->getUser()->getOp() != kIROp_Call);
 
     // Require SPIRV version based on the stage.
     switch (stage)
@@ -3755,6 +3614,100 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
             }
         }
     });
+}
+
+void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
+{
+    List<IRGlobalParam*> toRemove;
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto param = as<IRGlobalParam>(inst);
+
+        if (!param)
+            continue;
+
+        // We are only interested in parameters involving `DynamicResource`, or arrays of it.
+        auto arrayType = as<IRArrayTypeBase>(param->getDataType());
+        auto type = arrayType ? arrayType->getElementType() : param->getDataType();
+
+        if (!as<IRDynamicResourceType>(type))
+            continue;
+
+        Dictionary<IRType*, IRGlobalParam*> aliasedParams;
+        IRBuilder builder(module);
+
+        auto getAliasedParam = [&](IRType* type)
+        {
+            IRGlobalParam* newParam;
+
+            if (!aliasedParams.tryGetValue(type, newParam))
+            {
+                newParam = builder.createGlobalParam(type);
+
+                for (auto decoration : param->getDecorations())
+                    cloneDecoration(decoration, newParam);
+
+                aliasedParams[type] = newParam;
+            }
+            return newParam;
+        };
+
+        // Try to rewrite all uses leading to `CastDynamicResource`.
+        // Later, we will diagnose an error if the parameter still has uses.
+        traverseUsers(param, [&](IRInst* user)
+        {
+            if (user->getOp() == kIROp_CastDynamicResource && !arrayType)
+            {
+                builder.setInsertBefore(user);
+
+                user->replaceUsesWith(getAliasedParam(user->getDataType()));
+                user->removeAndDeallocate();
+            }
+            else if (user->getOp() == kIROp_GetElement && arrayType)
+            {
+                traverseUsers(user, [&](IRInst* elementUser)
+                {
+                    if (elementUser->getOp() == kIROp_CastDynamicResource)
+                    {
+                        builder.setInsertBefore(elementUser);
+
+                        auto paramType = builder.getArrayTypeBase(
+                            arrayType->getOp(),
+                            elementUser->getDataType(),
+                            arrayType->getElementCount());
+
+                        auto newAccess = builder.emitElementExtract(
+                            paramType->getElementType(),
+                            getAliasedParam(paramType),
+                            user->getOperand(1));
+
+                        elementUser->replaceUsesWith(newAccess);
+                        elementUser->removeAndDeallocate();
+                    }
+                });
+
+                if (!user->hasUses())
+                {
+                    user->removeAndDeallocate();
+                }
+            }
+        });
+        toRemove.add(param);
+    }
+
+    // Remove unused parameters later to avoid invalidating iterator.
+    for (auto param : toRemove)
+    {
+        if (!param->hasUses())
+        {
+            param->removeAndDeallocate();
+        }
+        else
+        {
+            context->getSink()->diagnose(param->firstUse->getUser(), Diagnostics::ambiguousReference, param);
+        }
+    }
 }
 
 } // namespace Slang

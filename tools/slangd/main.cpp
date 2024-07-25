@@ -23,5 +23,7 @@ int main(int argc, const char* const* argv)
     }
     Slang::LanguageServerStartupOptions options;
     options.parse(argc, argv);
-    return Slang::runLanguageServer(options);
+    auto result =  Slang::runLanguageServer(options);
+    slang::shutdown();
+    return result;
 }

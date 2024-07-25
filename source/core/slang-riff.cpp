@@ -1,6 +1,6 @@
 #include "slang-riff.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "slang-hex-dump-util.h"
 

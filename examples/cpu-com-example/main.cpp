@@ -2,17 +2,20 @@
 
 #include <stdio.h>
 
-#include <slang.h>
+#include "slang.h"
 
-#include <slang-com-ptr.h>
-#include <slang-com-helper.h>
+#include "slang-com-ptr.h"
+#include "slang-com-helper.h"
 
 // This includes a useful small function for setting up the prelude (described more further below).
 #include "../../source/core/slang-test-tool-util.h"
+#include "examples/example-base/example-base.h"
 
 // Slang namespace is used for elements support code (like core) which we use here
 // for ComPtr<> and TestToolUtil
 using namespace Slang;
+
+static const ExampleResources resourceBase("cpu-com-example");
 
 // For the moment we have to explicitly write the Slang COM interface in C++ code. It *MUST* match 
 // the interface in the slang source
@@ -79,7 +82,8 @@ static SlangResult _innerMain(int argc, char** argv)
     const int translationUnitIndex = request->addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, nullptr);
 
     // Set the source file for the translation unit
-    request->addTranslationUnitSourceFile(translationUnitIndex, "shader.slang");
+    Slang::String path = resourceBase.resolveResource("shader.slang");
+    request->addTranslationUnitSourceFile(translationUnitIndex, path.getBuffer());
 
     const SlangResult compileRes = request->compile();
 

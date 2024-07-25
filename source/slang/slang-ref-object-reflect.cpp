@@ -1,4 +1,4 @@
-#include "../../slang.h"
+#include "slang.h"
 
 #include "slang-ref-object-reflect.h"
 

@@ -1,7 +1,7 @@
 #ifndef SLANG_TYPE_SYSTEM_SHARED_H
 #define SLANG_TYPE_SYSTEM_SHARED_H
 
-#include "../../slang.h"
+#include "slang.h"
 
 namespace Slang
 {
@@ -58,6 +58,20 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
     const int kStdlibTextureIsShadowParameterIndex = 6;
     const int kStdlibTextureIsCombinedParameterIndex = 7;
     const int kStdlibTextureFormatParameterIndex = 8;
+
+    enum class AddressSpace : uint64_t
+    {
+        Generic = 0x7fffffff,
+        ThreadLocal = 1,
+        Global = 2,
+        GroupShared = 3,
+        Uniform = 4,
+        // specific address space for payload data in metal
+        MetalObjectData = 5,
+
+        // Default address space for a user-defined pointer
+        UserPointer = 0x100000001ULL,
+    };
 }
 
 #endif

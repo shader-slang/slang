@@ -5,10 +5,12 @@
 #include "source/core/slang-basic.h"
 #include "tools/platform/vector-math.h"
 #include "tools/platform/window.h"
-#include <slang.h>
+#include "slang.h"
 
 using namespace gfx;
 using namespace Slang;
+
+static const ExampleResources resourceBase("autodiff-texture");
 
 struct Vertex
 {
@@ -45,7 +47,8 @@ struct AutoDiffTexture : public WindowedAppBase
         slangSession = device->getSlangSession();
 
         ComPtr<slang::IBlob> diagnosticsBlob;
-        slang::IModule* module = slangSession->loadModule(fileName, diagnosticsBlob.writeRef());
+        Slang::String path = resourceBase.resolveResource(fileName);
+        slang::IModule* module = slangSession->loadModule(path.getBuffer(), diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         if (!module)
             return SLANG_FAIL;
@@ -89,7 +92,8 @@ struct AutoDiffTexture : public WindowedAppBase
         slangSession = device->getSlangSession();
 
         ComPtr<slang::IBlob> diagnosticsBlob;
-        slang::IModule* module = slangSession->loadModule(fileName, diagnosticsBlob.writeRef());
+        Slang::String path = resourceBase.resolveResource(fileName);
+        slang::IModule* module = slangSession->loadModule(path.getBuffer(), diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         if (!module)
             return SLANG_FAIL;
@@ -294,25 +298,25 @@ struct AutoDiffTexture : public WindowedAppBase
         {
             ComPtr<IShaderProgram> shaderProgram;
             SLANG_RETURN_ON_FAIL(
-                loadRenderProgram(gDevice, "train", "fragmentMain", shaderProgram.writeRef()));
+                loadRenderProgram(gDevice, "train.slang", "fragmentMain", shaderProgram.writeRef()));
             gRefPipelineState = createRenderPipelineState(inputLayout, shaderProgram);
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
             SLANG_RETURN_ON_FAIL(
-                loadRenderProgram(gDevice, "train", "diffFragmentMain", shaderProgram.writeRef()));
+                loadRenderProgram(gDevice, "train.slang", "diffFragmentMain", shaderProgram.writeRef()));
             gIterPipelineState = createRenderPipelineState(inputLayout, shaderProgram);
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
             SLANG_RETURN_ON_FAIL(
-                loadRenderProgram(gDevice, "draw-quad", "fragmentMain", shaderProgram.writeRef()));
+                loadRenderProgram(gDevice, "draw-quad.slang", "fragmentMain", shaderProgram.writeRef()));
             gDrawQuadPipelineState = createRenderPipelineState(inputLayout, shaderProgram);
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
             SLANG_RETURN_ON_FAIL(
-                loadComputeProgram(gDevice, "reconstruct", shaderProgram.writeRef()));
+                loadComputeProgram(gDevice, "reconstruct.slang", shaderProgram.writeRef()));
             gReconstructPipelineState = createComputePipelineState(shaderProgram);
         }
         {
@@ -322,16 +326,17 @@ struct AutoDiffTexture : public WindowedAppBase
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
-            SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "buildmip", shaderProgram.writeRef()));
+            SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "buildmip.slang", shaderProgram.writeRef()));
             gBuildMipPipelineState = createComputePipelineState(shaderProgram);
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
-            SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "learnmip", shaderProgram.writeRef()));
+            SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "learnmip.slang", shaderProgram.writeRef()));
             gLearnMipPipelineState = createComputePipelineState(shaderProgram);
         }
 
-        gTexView = createTextureFromFile("checkerboard.jpg", textureWidth, textureHeight);
+        Slang::String imagePath = resourceBase.resolveResource("checkerboard.jpg");
+        gTexView = createTextureFromFile(imagePath.getBuffer(), textureWidth, textureHeight);
         initMipOffsets(textureWidth, textureHeight);
 
         gfx::IBufferResource::Desc bufferDesc = {};

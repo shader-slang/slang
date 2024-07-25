@@ -16,7 +16,7 @@
 
 // We still need to include the Slang header to use the Slang API
 //
-#include <slang.h>
+#include "slang.h"
 #include "slang-com-helper.h"
 
 // We will again make use of a graphics API abstraction
@@ -39,6 +39,8 @@ using namespace gfx;
 using Slang::RefObject;
 using Slang::RefPtr;
 
+static const ExampleResources resourceBase("model-viewer");
+
 struct RendererContext
 {
     IDevice* device;
@@ -53,8 +55,13 @@ struct RendererContext
     {
         device = inDevice;
         ComPtr<ISlangBlob> diagnostic;
-        shaderModule = device->getSlangSession()->loadModule("shaders", diagnostic.writeRef());
+        Slang::String path = resourceBase.resolveResource("shaders.slang").getBuffer();
+        shaderModule = device->getSlangSession()->loadModule(
+            path.getBuffer(),
+            diagnostic.writeRef());
         diagnoseIfNeeded(diagnostic);
+        if (!shaderModule)
+            return SLANG_FAIL;
 
         // Compose the shader program for drawing models by combining the shader module
         // and entry points ("vertexMain" and "fragmentMain").
@@ -786,7 +793,8 @@ Result initialize()
     // Support for loading more interesting/complex models will be added
     // to this example over time (although model loading is *not* the focus).
     //
-    loadAndAddModel("cube.obj");
+    Slang::String path = resourceBase.resolveResource("cube.obj").getBuffer();
+    loadAndAddModel(path.getBuffer());
 
     return SLANG_OK;
 }

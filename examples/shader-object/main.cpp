@@ -8,24 +8,18 @@
 // simplifies shader specialization and parameter binding when using `interface` typed
 // shader parameters.
 //
-#include <slang.h>
-#include <slang-com-ptr.h>
+#include "slang.h"
+#include "slang-com-ptr.h"
 using Slang::ComPtr;
 
 #include "slang-gfx.h"
 #include "gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"
+#include "examples/example-base/example-base.h"
 
 using namespace gfx;
 
-// Helper function for print out diagnostic messages output by Slang compiler.
-void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
-{
-    if (diagnosticsBlob != nullptr)
-    {
-        printf("%s", (const char*)diagnosticsBlob->getBufferPointer());
-    }
-}
+static const ExampleResources resourceBase("shader-object");
 
 // Loads the shader code defined in `shader-object.slang` for use by the `gfx` layer.
 //
@@ -62,7 +56,8 @@ Result loadShaderProgram(
     //      import shader_object;
     //
     ComPtr<slang::IBlob> diagnosticsBlob;
-    slang::IModule* module = slangSession->loadModule("shader-object", diagnosticsBlob.writeRef());
+    Slang::String path = resourceBase.resolveResource("shader-object.slang");
+    slang::IModule* module = slangSession->loadModule(path.getBuffer(), diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     if(!module)
         return SLANG_FAIL;

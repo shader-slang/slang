@@ -6,8 +6,8 @@
 
 #include <stdarg.h>
 
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
 
 namespace Slang {
 
