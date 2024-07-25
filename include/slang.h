@@ -2154,6 +2154,7 @@ extern "C"
         SLANG_TYPE_KIND_SPECIALIZED,
         SLANG_TYPE_KIND_FEEDBACK,
         SLANG_TYPE_KIND_POINTER,
+        SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -2780,6 +2781,7 @@ namespace slang
             Specialized = SLANG_TYPE_KIND_SPECIALIZED,
             Feedback = SLANG_TYPE_KIND_FEEDBACK,
             Pointer = SLANG_TYPE_KIND_POINTER,
+            DynamicResource = SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
         };
 
         enum ScalarType : SlangScalarTypeIntegral
@@ -5351,6 +5353,14 @@ Returns nullptr if there isn't an embedded stdlib.
 */
 SLANG_API ISlangBlob* slang_getEmbeddedStdLib();
 
+
+/* Cleanup all global allocations used by Slang, to prevent memory leak detectors from
+ reporting them as leaks. This function should only be called after all Slang objects
+ have been released. No other Slang functions such as `createGlobalSession`
+ should be called after this function.
+ */
+SLANG_EXTERN_C SLANG_API void slang_shutdown();
+
 namespace slang
 {
     inline SlangResult createGlobalSession(
@@ -5358,6 +5368,7 @@ namespace slang
     {
         return slang_createGlobalSession(SLANG_API_VERSION, outGlobalSession);
     }
+    inline void shutdown() { slang_shutdown(); }
 }
 
 /** @see slang::ICompileRequest::getProgram

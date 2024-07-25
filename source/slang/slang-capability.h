@@ -371,6 +371,8 @@ const CapabilityAtomSet& getAtomSetOfStages();
 
 bool hasTargetAtom(const CapabilityAtomSet& setIn, CapabilityAtom& targetAtom);
 
+void freeCapabilityDefs();
+
 //#define UNIT_TEST_CAPABILITIES
 #ifdef UNIT_TEST_CAPABILITIES
 void TEST_CapabilitySet();
