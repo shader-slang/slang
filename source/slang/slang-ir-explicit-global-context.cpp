@@ -23,6 +23,7 @@ enum class HoistGlobalVarOptions : UInt
 {
     PlainGlobal = 0b0,
     SharedGlobal = 0b1,
+    RaytracingGlobal = 0b10,
     All = 0xFFFFFFFF,
 };
 
@@ -69,6 +70,26 @@ struct IntroduceExplicitGlobalContextPass
             if (!((UInt)hoistGlobalVarOptions & (UInt)HoistGlobalVarOptions::SharedGlobal)
                 && as<IRGroupSharedRate>(inst->getRate()))
                 return false;
+
+            if (!((UInt)hoistGlobalVarOptions & (UInt)HoistGlobalVarOptions::RaytracingGlobal))
+            {
+                for (auto decoration : inst->getDecorations())
+                {
+                    switch (decoration->getOp())
+                    {
+                    case kIROp_VulkanRayPayloadDecoration:
+                    case kIROp_VulkanRayPayloadInDecoration:
+                    case kIROp_VulkanCallablePayloadDecoration:
+                    case kIROp_VulkanCallablePayloadInDecoration:
+                    case kIROp_VulkanHitObjectAttributesDecoration:
+                    case kIROp_VulkanHitAttributesDecoration:
+                        return false;
+                    default:
+                        continue;
+                    };
+                }
+            }
+
             return true;
         }
 
