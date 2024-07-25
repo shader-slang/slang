@@ -706,7 +706,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             auto paramType = getParamType(astBuilder, paramDeclRef);
             if( paramDecl->findModifier<RefModifier>() )
             {
-                paramType = astBuilder->getRefType(paramType);
+                paramType = astBuilder->getRefType(paramType, AddressSpace::Generic);
             }
             else if (paramDecl->findModifier<ConstRefModifier>())
             {

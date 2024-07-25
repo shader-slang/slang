@@ -73,7 +73,6 @@ struct SimplifyForEmitContext : public InstPassBase
                 for (UInt i = 0; i < makeArray->getOperandCount(); i++)
                 {
                     auto elementAddr = builder.emitElementAddress(
-                        builder.getPtrType(arrayType->getElementType()),
                         store->getPtr(),
                         builder.getIntValue(builder.getIntType(), (IRIntegerValue)i));
                     builder.emitStore(elementAddr, makeArray->getOperand(i));
@@ -107,7 +106,6 @@ struct SimplifyForEmitContext : public InstPassBase
                 for (IRIntegerValue i = 0; i < arraySize->getValue(); i++)
                 {
                     auto elementAddr = builder.emitElementAddress(
-                        builder.getPtrType(arrayType->getElementType()),
                         store->getPtr(),
                         builder.getIntValue(builder.getIntType(), i));
                     builder.emitStore(elementAddr, makeArray->getOperand(0));
