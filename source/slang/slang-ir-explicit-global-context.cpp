@@ -12,8 +12,59 @@ namespace Slang
 // thread-group, and wrap them up in an explicit "context"
 // type that gets passed between functions.
 
+enum class HoistableTypes : UInt
+{
+    GlobalVariable = 0b1,
+    GlobalParam = 0b10,
+    All = 0xFFFFFFFF,
+};
+
 struct IntroduceExplicitGlobalContextPass
 {
+    class ExplicitContextPolicy
+    {
+    public:
+        ExplicitContextPolicy(CodeGenTarget target)
+        {
+            switch (target)
+            {
+            case CodeGenTarget::SPIRV:
+            case CodeGenTarget::SPIRVAssembly:
+                hoistableTypes = HoistableTypes::GlobalVariable;
+                requiresFuncTypeCorrectionPass = true;
+                addressSpaceOfLocals = (AddressSpace)SpvStorageClassFunction;
+                break;
+            case CodeGenTarget::CUDASource:
+                hoistableTypes = HoistableTypes::GlobalVariable;
+                break;
+            }
+        }
+
+        bool canHoistType(HoistableTypes hoistable)
+        {
+            return (UInt)hoistableTypes & (UInt)hoistable;
+        }
+
+        bool requiresFuncTypeCorrection()
+        {
+            return requiresFuncTypeCorrectionPass;
+        }
+
+        AddressSpace getAddressSpaceOfLocal()
+        {
+            return addressSpaceOfLocals;
+        }
+
+    private:
+        HoistableTypes hoistableTypes = HoistableTypes::All;
+        bool requiresFuncTypeCorrectionPass = false;
+        AddressSpace addressSpaceOfLocals = AddressSpace::ThreadLocal;
+    };
+
+    IntroduceExplicitGlobalContextPass(IRModule* module, CodeGenTarget target) : m_module(module), m_target(target), m_options(target)
+    {
+    }
+
     IRModule*       m_module = nullptr;
     CodeGenTarget   m_target = CodeGenTarget::Unknown;
 
@@ -23,6 +74,18 @@ struct IntroduceExplicitGlobalContextPass
     List<IRGlobalParam*> m_globalParams;
     List<IRGlobalVar*>  m_globalVars;
     List<IRFunc*>       m_entryPoints;
+
+    ExplicitContextPolicy m_options;
+
+    AddressSpace getAddressSpaceOfLocal()
+    {
+        return m_options.getAddressSpaceOfLocal();
+    }
+
+    bool canHoistType(HoistableTypes hoistable)
+    {
+        return m_options.canHoistType(hoistable);
+    }
 
     enum class GlobalObjectKind
     {
@@ -45,6 +108,8 @@ struct IntroduceExplicitGlobalContextPass
             {
             case kIROp_GlobalVar:
                 {
+                    if (!canHoistType(HoistableTypes::GlobalVariable))
+                        continue;
                     // A "global variable" in HLSL (and thus Slang) is actually
                     // a weird kind of thread-local variable, and so it cannot
                     // actually be lowered to a global variable on targets where
@@ -79,6 +144,8 @@ struct IntroduceExplicitGlobalContextPass
 
             case kIROp_GlobalParam:
                 {
+                    if (!canHoistType(HoistableTypes::GlobalParam))
+                        continue;
                     // Global parameters are another HLSL/Slang concept
                     // that doesn't have a parallel in langauges like C/C++.
                     //
@@ -170,7 +237,7 @@ struct IntroduceExplicitGlobalContextPass
         // The context will usually be passed around by pointer,
         // so we get and cache that pointer type up front.
         //
-        m_contextStructPtrType = builder.getPtrType(kIROp_PtrType, m_contextStructType, (IRIntegerValue)AddressSpace::ThreadLocal);
+        m_contextStructPtrType = builder.getPtrType(kIROp_PtrType, m_contextStructType, (IRIntegerValue)getAddressSpaceOfLocal());
 
 
         // The first step will be to create fields in the `KernelContext`
@@ -226,6 +293,27 @@ struct IntroduceExplicitGlobalContextPass
         for( auto globalVar : m_globalVars )
         {
             replaceUsesOfGlobalVar(globalVar);
+        }
+
+        // SPIRV requires a correct IR func-type to emit properly
+        if (m_options.requiresFuncTypeCorrection())
+        {
+            for (auto pairOfFuncs : m_mapFuncToContextPtr)
+            {
+                if (pairOfFuncs.second->getOp() == kIROp_Var)
+                    continue;
+                auto func = pairOfFuncs.first;
+                builder.setInsertBefore(func->getDataType());
+                auto paramCount = func->getParamCount();
+                List<IRType*> paramTypes;
+                paramTypes.reserve(paramCount);
+                for (auto i = 0; i < paramCount; i++)
+                    paramTypes.add(func->getParamType(i));
+                paramTypes.add(pairOfFuncs.second->getDataType());
+                auto newFuncType = builder.getFuncType(paramTypes, func->getResultType());
+
+                func->setFullType(newFuncType);
+            }
         }
     }
 
@@ -385,7 +473,7 @@ struct IntroduceExplicitGlobalContextPass
                 {
                     builder.addNameHintDecoration(var, nameDecor->getName());
                 }
-                auto ptrPtrType = builder.getPtrType(getGlobalVarPtrType(globalVar), AddressSpace::ThreadLocal);
+                auto ptrPtrType = builder.getPtrType(getGlobalVarPtrType(globalVar), getAddressSpaceOfLocal());
                 auto fieldPtr = builder.emitFieldAddress(ptrPtrType, contextVarPtr, fieldInfo.key);
                 builder.emitStore(fieldPtr, var);
             }
@@ -438,7 +526,7 @@ struct IntroduceExplicitGlobalContextPass
         {
             return builder.getPtrType(globalVar->getDataType()->getValueType(), AddressSpace::GroupShared);
         }
-        return builder.getPtrType(globalVar->getDataType()->getValueType(), AddressSpace::ThreadLocal);
+        return builder.getPtrType(globalVar->getDataType()->getValueType(), getAddressSpaceOfLocal());
     }
 
     void replaceUsesOfGlobalVar(IRGlobalVar* globalVar)
@@ -452,7 +540,7 @@ struct IntroduceExplicitGlobalContextPass
 
         auto ptrType = getGlobalVarPtrType(globalVar);
         if (fieldInfo.needDereference)
-            ptrType = builder.getPtrType(kIROp_PtrType, ptrType, AddressSpace::ThreadLocal);
+            ptrType = builder.getPtrType(kIROp_PtrType, ptrType, getAddressSpaceOfLocal());
 
         // We then iterate over the uses of the variable,
         // being careful to defend against the use/def information
@@ -628,9 +716,7 @@ void introduceExplicitGlobalContext(
     IRModule*       module,
     CodeGenTarget   target)
 {
-    IntroduceExplicitGlobalContextPass pass;
-    pass.m_module = module;
-    pass.m_target = target;
+    IntroduceExplicitGlobalContextPass pass(module, target);
     pass.processModule();
 }
 
