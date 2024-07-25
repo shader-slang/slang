@@ -751,6 +751,14 @@ extension bool : IRangedValue
     __intrinsic_op($(kIROp_CastPtrToBool))
     __init(Ptr<T> ptr);
 
+    __generic<T : __EnumType>
+    __implicit_conversion($(kConversionCost_IntegerTruncate))
+    [__unsafeForceInlineEarly]
+    __init(T v)
+    {
+        return __slang_noop_cast<T.__Tag>(v) != __intCast<T.__Tag>(0);
+    }
+
     static const bool maxValue = true;
     static const bool minValue = false;
 }
