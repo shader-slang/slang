@@ -1,9 +1,10 @@
 // slang-api.cpp
 
 #include "slang-compiler.h"
-
 #include "slang-repro.h"
-
+#include "slang-capability.h"
+#include "../core/slang-rtti-info.h"
+#include "../core/slang-performance-profiler.h"
 #include "../core/slang-shared-library.h"
 #include "../slang-record-replay/record/slang-global-session.h"
 #include "../slang-record-replay/util/record-utility.h"
@@ -137,6 +138,14 @@ SLANG_API SlangResult slang_createGlobalSession(
 #endif
 
     return SLANG_OK;
+}
+
+SLANG_API void slang_shutdown()
+{
+    Slang::PerformanceProfiler::getProfiler()->dispose();
+    Slang::SPIRVCoreGrammarInfo::freeEmbeddedGrammerInfo();
+    Slang::RttiInfo::deallocateAll();
+    Slang::freeCapabilityDefs();
 }
 
 SLANG_API SlangResult slang_createGlobalSessionWithoutStdLib(

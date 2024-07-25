@@ -1,0 +1,95 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "g_TextureHeap",
+            "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 0},
+            "type": {
+                "kind": "array",
+                "elementCount": 0,
+                "elementType": {
+                    "kind": "DynamicResource"
+                }
+            }
+        },
+        {
+            "name": "g_SamplerHeap",
+            "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 2},
+            "type": {
+                "kind": "array",
+                "elementCount": 0,
+                "elementType": {
+                    "kind": "DynamicResource"
+                }
+            }
+        },
+        {
+            "name": "g_SingleDynamicResourceA",
+            "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 0},
+            "type": {
+                "kind": "DynamicResource"
+            }
+        },
+        {
+            "name": "g_SingleDynamicResourceB",
+            "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 1},
+            "type": {
+                "kind": "DynamicResource"
+            }
+        },
+        {
+            "name": "g_SingleDynamicResourceC",
+            "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 2},
+            "type": {
+                "kind": "DynamicResource"
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "computeMain",
+            "stage:": "compute",
+            "parameters": [
+                {
+                    "name": "tid",
+                    "semanticName": "SV_DISPATCHTHREADID",
+                    "type": {
+                        "kind": "vector",
+                        "elementCount": 2,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "int32"
+                        }
+                    }
+                }
+            ],
+            "threadGroupSize": [16, 1, 1],
+            "bindings": [
+                {
+                    "name": "g_TextureHeap",
+                    "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 0}
+                },
+                {
+                    "name": "g_SamplerHeap",
+                    "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 2}
+                },
+                {
+                    "name": "g_SingleDynamicResourceA",
+                    "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 0}
+                },
+                {
+                    "name": "g_SingleDynamicResourceB",
+                    "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 1}
+                },
+                {
+                    "name": "g_SingleDynamicResourceC",
+                    "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 2}
+                }
+            ]
+        }
+    ]
+}
+}

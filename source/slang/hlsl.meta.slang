@@ -20287,6 +20287,72 @@ struct ConstBufferPointer
     }
 }
 
+//
+// HLSL-like dynamic resources
+// https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html
+//
+// For Khronos targets, `__DynamicResource` can be used to declare "untyped" global bindings as
+// usual (e.g. unsized arrays for descriptor indexing), which will then be materialized into 
+// new aliased bindings for each distinct cast type.
+//
+
+__magic_type(DynamicResourceType)
+__intrinsic_type($(kIROp_DynamicResourceType))
+struct __DynamicResource<let kind = __DynamicResourceKind.General>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    T as<T : __IDynamicResourceCastable<kind>>();
+}
+interface __IDynamicResourceCastable<let kind = __DynamicResourceKind.General>
+{
+}
+
+enum __DynamicResourceKind
+{
+    General = 0, // CBV_SRV_UAV
+    Sampler = 1
+}
+
+__generic<T, Shape : __ITextureShape, let isArray : int, let isMS : int, let sampleCount : int, let access : int, let isShadow : int, let isCombined : int, let format : int>
+extension __TextureImpl<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format> : __IDynamicResourceCastable<__DynamicResourceKind.General>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+}
+
+${{{{
+const char* kDynamicResourceCastableTypes[] = {
+    "StructuredBuffer<T, L>", "RWStructuredBuffer<T, L>",
+    "AppendStructuredBuffer<T, L>", "ConsumeStructuredBuffer<T, L>", "RasterizerOrderedStructuredBuffer<T, L>",
+    "ByteAddressBuffer", "RWByteAddressBuffer", "RasterizerOrderedByteAddressBuffer",
+
+    "SamplerState", "SamplerComparisonState",
+
+    "ConstantBuffer<T>", "TextureBuffer<T>",
+};
+
+for (auto typeName : kDynamicResourceCastableTypes) {
+    auto kind = strstr(typeName, "Sampler") ? "Sampler" : "General";
+
+    if (strstr(typeName, "StructuredBuffer<T, L>"))
+        sb << "__generic<T, L : IBufferDataLayout = DefaultDataLayout>\n";
+    else if (strstr(typeName, "Buffer<T>"))
+        sb << "__generic<T>\n";
+}}}}
+
+extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(kind)>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+}
+
+${{{{
+}
+}}}}
+
+
 __glsl_version(450)
 __glsl_extension(GL_ARB_shader_clock)
 [require(glsl_spirv, GL_ARB_shader_clock)]
