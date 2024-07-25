@@ -357,7 +357,7 @@ Val* PtrTypeBase::getAddressSpace()
     return _getGenericTypeArg(this, 1);
 }
 
-void maybePrintAddrSpaceOperand(StringBuilder& out, Val* addrSpaceVal)
+AddressSpace tryGetAddressSpaceValue(Val* addrSpaceVal)
 {
     AddressSpace addrSpace = AddressSpace::Generic;
 
@@ -365,12 +365,15 @@ void maybePrintAddrSpaceOperand(StringBuilder& out, Val* addrSpaceVal)
     {
         addrSpace = (AddressSpace)(cintVal->getValue());
     }
+    return addrSpace;
+}
+
+void maybePrintAddrSpaceOperand(StringBuilder& out, AddressSpace addrSpace)
+{
     switch (addrSpace)
     {
     case AddressSpace::Generic:
-        break;
     case AddressSpace::UserPointer:
-        out << toSlice(", user_ptr");
         break;
     case AddressSpace::GroupShared:
         out << toSlice(", groupshared");
@@ -391,9 +394,12 @@ void maybePrintAddrSpaceOperand(StringBuilder& out, Val* addrSpaceVal)
 
 void PtrType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("Ptr<") << getValueType();
-    auto addressSpaceVal = getAddressSpace();
-    maybePrintAddrSpaceOperand(out, addressSpaceVal);
+    auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
+    if (addrSpace == AddressSpace::Generic)
+        out << toSlice("Addr<") << getValueType();
+    else
+        out << toSlice("Ptr<") << getValueType();
+    maybePrintAddrSpaceOperand(out, addrSpace);
     out << toSlice(">");
 }
 
