@@ -1275,8 +1275,8 @@ for (int tt = 0; tt < kTypeCount; ++tt)
     }
 
     // Declare HLSL matrix types
-    for (int rr = 2; rr <= 4; ++rr)
-    for (int cc = 2; cc <= 4; ++cc)
+    for (int rr = 1; rr <= 4; ++rr)
+    for (int cc = 1; cc <= 4; ++cc)
     {
         sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
     }
@@ -1461,12 +1461,14 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     sb << "}\n";
 }
 
-for( int R = 2; R <= 4; ++R )
-for( int C = 2; C <= 4; ++C )
+for( int R = 1; R <= 4; ++R )
+for( int C = 1; C <= 4; ++C )
 {
     sb << "__generic<T, let L:int> __extension matrix<T, " << R << "," << C << ", L>\n{\n";
 
     // initialize from R*C scalars
+    if (R == 1 || C == 1)
+        sb << "[require(hlsl)]\n";
     sb << "__intrinsic_op(" << int(kIROp_MakeMatrix) << ") __init(";
     for( int ii = 0; ii < R; ++ii )
     for( int jj = 0; jj < C; ++jj )
@@ -1477,6 +1479,8 @@ for( int C = 2; C <= 4; ++C )
     sb << ");\n";
 
     // Initialize from R C-vectors
+    if (R == 1 || C == 1)
+        sb << "[require(hlsl)]\n";
     sb << "__intrinsic_op(" << int(kIROp_MakeMatrix) << ") __init(";
     for (int ii = 0; ii < R; ++ii)
     {
@@ -1490,6 +1494,8 @@ for( int C = 2; C <= 4; ++C )
     for( int cc = C; cc <= 4; ++cc )
     {
         if(rr == R && cc == C) continue;
+        if (R == 1 || C == 1)
+            sb << "[require(hlsl)]\n";
         sb << "__intrinsic_op(" << int(kIROp_MatrixReshape) << ") __init(matrix<T," << rr << "," << cc << ", L> value);\n";
     }
 
