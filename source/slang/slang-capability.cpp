@@ -49,7 +49,7 @@ enum class CapabilityNameFlavor : int32_t
 struct CapabilityAtomInfo
 {
     /// The API-/language-exposed name of the capability.
-    char const* name;
+    UnownedStringSlice name;
 
     /// Flavor of atom: concrete, abstract, or alias
     CapabilityNameFlavor        flavor;
@@ -85,14 +85,14 @@ void getCapabilityNames(List<UnownedStringSlice>& ioNames)
     {
         if (_getInfo(CapabilityName(i)).flavor != CapabilityNameFlavor::Abstract)
         {
-            ioNames.add(UnownedStringSlice(_getInfo(CapabilityName(i)).name));
+            ioNames.add(_getInfo(CapabilityName(i)).name);
         }
     }
 }
 
 UnownedStringSlice capabilityNameToString(CapabilityName name)
 {
-    return UnownedStringSlice(_getInfo(name).name);
+    return _getInfo(name).name;
 }
 
 bool isDirectChildOfAbstractAtom(CapabilityAtom name)
@@ -111,7 +111,7 @@ bool isTargetVersionAtom(CapabilityAtom name)
 
 bool isSpirvExtensionAtom(CapabilityAtom name)
 {
-    return UnownedStringSlice(_getInfo(name).name).startsWith("SPV_");
+    return _getInfo(name).name.startsWith("SPV_");
 }
 
 bool lookupCapabilityName(const UnownedStringSlice& str, CapabilityName& value);
@@ -122,6 +122,12 @@ CapabilityName findCapabilityName(UnownedStringSlice const& name)
     if (!lookupCapabilityName(name, result))
         return CapabilityName::Invalid;
     return result;
+}
+
+bool isInternalCapabilityName(CapabilityName name)
+{
+    SLANG_ASSERT(_getInfo(name).name != nullptr);
+    return _getInfo(name).name.startsWith("_");
 }
 
 CapabilityAtom getLatestSpirvAtom()
@@ -964,7 +970,7 @@ void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet atomSet)
         CapabilityName formattedAtom = (CapabilityName)atom;
         if (!isFirst)
             sb << " + ";
-        sb << capabilityNameToStringWithoutPrefix(formattedAtom);
+        printDiagnosticArg(sb, formattedAtom);
         isFirst = false;
     }
 }
