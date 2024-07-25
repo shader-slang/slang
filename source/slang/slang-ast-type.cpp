@@ -559,7 +559,7 @@ DeclRef<ThisTypeDecl> ExtractExistentialType::getThisTypeDeclRef()
         }
     SLANG_ASSERT(thisTypeDecl);
 
-    DeclRef<ThisTypeDecl> specialiedInterfaceDeclRef = getCurrentASTBuilder()->getLookupDeclRef(openedWitness, thisTypeDecl);
+    DeclRef<ThisTypeDecl> specialiedInterfaceDeclRef = getCurrentASTBuilder()->getLookupDeclRef(openedWitness, thisTypeDecl).as<ThisTypeDecl>();
 
     this->cachedThisTypeDeclRef = specialiedInterfaceDeclRef;
     return specialiedInterfaceDeclRef;
