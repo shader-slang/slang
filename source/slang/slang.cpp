@@ -140,7 +140,7 @@ void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
 
-    
+
     _initCodeGenTransitionMap();
 
     ::memset(m_downstreamCompilerLocators, 0, sizeof(m_downstreamCompilerLocators));
@@ -1368,7 +1368,7 @@ SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     //
     SLANG_UNUSED(rules);
 
-    auto typeLayout = target->getTypeLayout(type);
+    auto typeLayout = target->getTypeLayout(type, rules);
 
     // TODO: We currently don't have a path for capturing
     // errors that occur during layout (e.g., types that
@@ -1827,7 +1827,7 @@ CapabilitySet TargetRequest::getTargetCaps()
 }
 
 
-TypeLayout* TargetRequest::getTypeLayout(Type* type)
+TypeLayout* TargetRequest::getTypeLayout(Type* type, slang::LayoutRules rules)
 {
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
@@ -1841,13 +1841,14 @@ TypeLayout* TargetRequest::getTypeLayout(Type* type)
     // parameter instead (leaving the user to figure out how that
     // maps to the ordering via some API on the program layout).
     //
-    auto layoutContext = getInitialLayoutContextForTarget(this, nullptr);
+    auto layoutContext = getInitialLayoutContextForTarget(this, nullptr, rules);
 
     RefPtr<TypeLayout> result;
-    if (getTypeLayouts().tryGetValue(type, result))
+    auto key = TypeLayoutKey{ type, rules };
+    if (getTypeLayouts().tryGetValue(key, result))
         return result.Ptr();
     result = createTypeLayout(layoutContext, type);
-    getTypeLayouts()[type] = result;
+    getTypeLayouts()[key] = result;
     return result.Ptr();
 }
 

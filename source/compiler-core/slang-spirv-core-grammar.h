@@ -16,7 +16,8 @@ namespace Slang
     struct SPIRVCoreGrammarInfo : public RefObject
     {
         static RefPtr<SPIRVCoreGrammarInfo> loadFromJSON(SourceView& source, DiagnosticSink& sink);
-        static RefPtr<SPIRVCoreGrammarInfo> getEmbeddedVersion();
+        static RefPtr<SPIRVCoreGrammarInfo>& getEmbeddedVersion();
+        static inline void freeEmbeddedGrammerInfo() { getEmbeddedVersion() = nullptr; }
 
         template<typename K, typename T>
         struct Lookup

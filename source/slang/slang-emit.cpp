@@ -244,6 +244,7 @@ struct RequiredLoweringPassSet
     bool glslGlobalVar;
     bool glslSSBO;
     bool byteAddressBuffer;
+    bool dynamicResource;
 };
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -292,7 +293,6 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
     case kIROp_MakeDifferentialPairUserCode:
-    case kIROp_DerivativeMemberDecoration:
         result.autodiff = true;
         break;
     case kIROp_VerticesType:
@@ -347,6 +347,9 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
     case kIROp_HLSLRWByteAddressBufferType:
     case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
+        break;
+    case kIROp_DynamicResourceType:
+        result.dynamicResource = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -709,6 +712,10 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.autodiff)
         finalizeAutoDiffPass(targetProgram, irModule);
 
+    // Remove auto-diff related decorations.
+    // We may have an autodiff decoration regardless of if autodiff is being used.
+    stripAutoDiffDecorations(irModule);
+
     finalizeSpecialization(irModule);
 
     requiredLoweringPassSet = {};
@@ -1039,6 +1046,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
             byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            byteAddressBufferOptions.treatGetEquivalentStructuredBufferAsGetThis = true;
             byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             break;
@@ -1135,6 +1143,8 @@ Result linkAndOptimizeIR(
     }
     break;
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
     {
         legalizeIRForMetal(irModule, sink);
     }
@@ -1160,6 +1170,10 @@ Result linkAndOptimizeIR(
     if(isD3DTarget(targetRequest))
         legalizeNonStructParameterToStructForHLSL(irModule);
 
+    // Create aliases for all dynamic resource parameters.
+    if(requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
+        legalizeDynamicResourcesForGLSL(codeGenContext, irModule);
+    
     legalizeExtractFromTextureAccess(irModule);
 
     // Legalize `ImageSubscript` loads.
@@ -1267,15 +1281,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.meshOutput)
         legalizeMeshOutputTypes(irModule);
 
-    if (options.shouldLegalizeExistentialAndResourceTypes)
-    {
-        if (!isMetalTarget(targetRequest))
-        {
-            // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
-            // a simple storage type that has target independent layout based on the kind of buffer resource.
-            lowerBufferElementTypeToStorageType(targetProgram, irModule);
-        }
-    }
+    lowerBufferElementTypeToStorageType(targetProgram, irModule);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.

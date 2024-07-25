@@ -254,15 +254,16 @@ convention for interface methods.
 
 // GCC Specific
 #if SLANG_GCC_FAMILY
-
 #	define SLANG_NO_INLINE __attribute__((noinline))
 #	define SLANG_FORCE_INLINE inline __attribute__((always_inline))
 #   define SLANG_BREAKPOINT(id) __builtin_trap();
 #	define SLANG_ALIGN_OF(T)	__alignof__(T)
+#endif // SLANG_GCC_FAMILY
 
+#if SLANG_GCC_FAMILY || defined(__clang__)
 // Use the builtin directly so we don't need to have an include of stddef.h
 #   define SLANG_OFFSET_OF(T, ELEMENT) __builtin_offsetof(T, ELEMENT) 
-#endif // SLANG_GCC_FAMILY
+#endif
 
 #ifndef SLANG_OFFSET_OF
 #   define SLANG_OFFSET_OF(T, ELEMENT) (size_t(&((T*)1)->ELEMENT) - 1)
@@ -288,10 +289,6 @@ convention for interface methods.
 
 #ifndef SLANG_COMPILE_TIME_ASSERT
 #   define SLANG_COMPILE_TIME_ASSERT(x) static_assert(x)
-#endif
-
-#ifndef SLANG_OFFSET_OF
-#	define SLANG_OFFSET_OF(X, Y) offsetof(X, Y)
 #endif
 
 #ifndef SLANG_BREAKPOINT
@@ -324,6 +321,12 @@ convention for interface methods.
 
 #ifndef SLANG_UNUSED
 #	define SLANG_UNUSED(v) (void)v;
+#endif
+
+#if defined(__llvm__)
+#	define SLANG_MAYBE_UNUSED [[maybe_unused]]
+#else
+#	define SLANG_MAYBE_UNUSED
 #endif
 
 // Used for doing constant literals
@@ -2151,6 +2154,7 @@ extern "C"
         SLANG_TYPE_KIND_SPECIALIZED,
         SLANG_TYPE_KIND_FEEDBACK,
         SLANG_TYPE_KIND_POINTER,
+        SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -2313,7 +2317,7 @@ extern "C"
         // The input_attachment_index subpass occupancy tracker
         SLANG_PARAMETER_CATEGORY_SUBPASS,
 
-        // Metal resource binding points.
+        // Metal tier-1 argument buffer element [[id]].
         SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
 
         // Metal [[attribute]] inputs.
@@ -2395,6 +2399,7 @@ extern "C"
     enum SlangLayoutRules : SlangLayoutRulesIntegral
     {
         SLANG_LAYOUT_RULES_DEFAULT,
+        SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2,
     };
 
     typedef SlangUInt32 SlangModifierIDIntegral;
@@ -2776,6 +2781,7 @@ namespace slang
             Specialized = SLANG_TYPE_KIND_SPECIALIZED,
             Feedback = SLANG_TYPE_KIND_FEEDBACK,
             Pointer = SLANG_TYPE_KIND_POINTER,
+            DynamicResource = SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
         };
 
         enum ScalarType : SlangScalarTypeIntegral
@@ -3582,6 +3588,7 @@ namespace slang
     enum class LayoutRules : SlangLayoutRulesIntegral
     {
         Default = SLANG_LAYOUT_RULES_DEFAULT,
+        MetalArgumentBufferTier2 = SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2,
     };
 
     typedef struct ShaderReflection ProgramLayout;
@@ -5346,6 +5353,14 @@ Returns nullptr if there isn't an embedded stdlib.
 */
 SLANG_API ISlangBlob* slang_getEmbeddedStdLib();
 
+
+/* Cleanup all global allocations used by Slang, to prevent memory leak detectors from
+ reporting them as leaks. This function should only be called after all Slang objects
+ have been released. No other Slang functions such as `createGlobalSession`
+ should be called after this function.
+ */
+SLANG_EXTERN_C SLANG_API void slang_shutdown();
+
 namespace slang
 {
     inline SlangResult createGlobalSession(
@@ -5353,6 +5368,7 @@ namespace slang
     {
         return slang_createGlobalSession(SLANG_API_VERSION, outGlobalSession);
     }
+    inline void shutdown() { slang_shutdown(); }
 }
 
 /** @see slang::ICompileRequest::getProgram
