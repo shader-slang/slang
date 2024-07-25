@@ -307,7 +307,7 @@ struct IntroduceExplicitGlobalContextPass
                 auto paramCount = func->getParamCount();
                 List<IRType*> paramTypes;
                 paramTypes.reserve(paramCount);
-                for (auto i = 0; i < paramCount; i++)
+                for (UInt i = 0; i < paramCount; i++)
                     paramTypes.add(func->getParamType(i));
                 paramTypes.add(pairOfFuncs.second->getDataType());
                 auto newFuncType = builder.getFuncType(paramTypes, func->getResultType());
