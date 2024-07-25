@@ -5720,7 +5720,7 @@ namespace Slang
         {
             if(!isAssociatedTypeDecl(requiredMemberDecl.getDecl()))
                 continue;
-            auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(subTypeConformsToSuperInterfaceWitness, requiredMemberDecl.getDecl());;
+            auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(subTypeConformsToSuperInterfaceWitness, requiredMemberDecl.getDecl());
             auto requirementSatisfied = findWitnessForInterfaceRequirement(
                 context,
                 subType,
