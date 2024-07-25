@@ -1551,6 +1551,7 @@ SIMPLE_IR_TYPE(TextureBufferType, UniformParameterGroupType)
 SIMPLE_IR_TYPE(GLSLInputParameterGroupType, VaryingParameterGroupType)
 SIMPLE_IR_TYPE(GLSLOutputParameterGroupType, VaryingParameterGroupType)
 SIMPLE_IR_TYPE(ParameterBlockType, UniformParameterGroupType)
+SIMPLE_IR_TYPE(DynamicResourceType, Type)
 
 struct IRGLSLShaderStorageBufferType : IRBuiltinGenericType
 {

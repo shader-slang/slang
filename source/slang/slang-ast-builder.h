@@ -336,7 +336,7 @@ public:
             case ASTNodeType::ThisTypeDecl:
             case ASTNodeType::ExtensionDecl:
             case ASTNodeType::AssocTypeDecl:
-                return getLookupDeclRef(lookupDeclRef->getLookupSource(), lookupDeclRef->getWitness(), memberDecl);
+                return getLookupDeclRef(lookupDeclRef->getLookupSource(), lookupDeclRef->getWitness(), memberDecl).template as<T>();
             default:
                 break;
             }
@@ -396,13 +396,13 @@ public:
         return getOrCreate<GenericAppDeclRef>(innerDecl, genericDeclRef, args);
     }
 
-    LookupDeclRef* getLookupDeclRef(Type* base, SubtypeWitness* subtypeWitness, Decl* declToLookup)
+    DeclRef<Decl> getLookupDeclRef(Type* base, SubtypeWitness* subtypeWitness, Decl* declToLookup)
     {
         auto result = getOrCreate<LookupDeclRef>(declToLookup, base, subtypeWitness);
         return result;
     }
 
-    LookupDeclRef* getLookupDeclRef(SubtypeWitness* subtypeWitness, Decl* declToLookup)
+    DeclRef<Decl> getLookupDeclRef(SubtypeWitness* subtypeWitness, Decl* declToLookup)
     {
         return getLookupDeclRef(subtypeWitness->getSub(), subtypeWitness, declToLookup);
     }
