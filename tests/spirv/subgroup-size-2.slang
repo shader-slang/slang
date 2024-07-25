@@ -11,7 +11,7 @@ uint3 f() { return WorkgroupSize(); }
 [numthreads(1u, 2u, 3)]
 void compute1()
 {
-    // CHECK-DAG: %[[VAR:[A-Za-z0-9_]+]] = OpVariable %_ptr_Private_v3int Private
+    // CHECK-DAG: %[[VAR:[A-Za-z0-9_]+]] = OpTypePointer Function %v3int
     // CHECK: OpStore %[[VAR]]
 
     // CHECK-DAG: %[[CALL_RS:[A-Za-z0-9_]+]] = OpFunctionCall %v3uint %f

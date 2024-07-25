@@ -7,7 +7,10 @@
 static int gArray0[2];
 groupshared int gArray1[2];
 
-// CHECK: %array = OpFunctionParameter %_ptr_Private__arr_int_int_2
+// Note: static globals are inside a context variable
+// CHECK: OpTypeArray %int %int_2
+// CHECK: OpVariable %_ptr_Function__arr_int_int_2 Function
+
 // CHECK: %array_0 = OpFunctionParameter %_ptr_Workgroup__arr_int_int_2
 
 void modify(inout int array[2])
