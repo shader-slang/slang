@@ -17568,11 +17568,11 @@ Ref<T> __hitObjectAttributes<T>()
     return t;
 }
 [ForceInline]
-Ptr<T> __allocHitObjectAttributes<T>()
+__Addr<T> __allocHitObjectAttributes<T>()
 {
-    [__vulkanHitObjectAttributes]   
+    [__vulkanHitObjectAttributes]
     static T t;
-    return &t;
+    return __get_addr(t);
 }
 
 // Next is the custom intrinsic that will compute the hitObjectAttributes location
@@ -17840,7 +17840,7 @@ struct HitObject
         case spirv:
             {
                 // Save the attributes
-                Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+                __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
 
                 *attr = attributes;
 
@@ -17914,7 +17914,7 @@ struct HitObject
         case spirv:
         {
             // Save the attributes
-            Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+            __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
 
             *attr = attributes;
 
@@ -18004,7 +18004,7 @@ struct HitObject
         case spirv:
         {
             // Save the attributes
-            Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+            __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
             *attr = attributes;
             let origin = Ray.Origin;
             let direction = Ray.Direction;
@@ -18071,7 +18071,7 @@ struct HitObject
         case spirv:
         {
             // Save the attributes
-            Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+            __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
             *attr = attributes;
             let origin = Ray.Origin;
             let direction = Ray.Direction;
@@ -18618,7 +18618,7 @@ struct HitObject
             }
         case spirv:
             {
-                Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+                __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
                 spirv_asm 
                 {
                     OpExtension "SPV_NV_shader_invocation_reorder";

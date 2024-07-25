@@ -1719,9 +1719,13 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             {
                 if (SLANG_FAILED(compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount()/4))))
                 {
+                    String err;
+                    String dis;
+                    disassembleSPIRV(spirv, err, dis);
                     codeGenContext->getSink()->diagnoseWithoutSourceView(
                         SourceLoc{},
-                        Diagnostics::spirvValidationFailed
+                        Diagnostics::spirvValidationFailed,
+                        dis
                     );
                 }
             }

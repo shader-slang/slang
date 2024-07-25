@@ -1996,9 +1996,6 @@ struct SpecializationContext
             auto index = inst->getIndex();
 
             auto val = wrapInst->getWrappedValue();
-            auto ptrType = cast<IRPtrTypeBase>(val->getDataType());
-            auto arrayType = cast<IRArrayTypeBase>(ptrType->getValueType());
-            auto elementType = arrayType->getElementType();
 
             auto resultType = inst->getFullType();
 
@@ -2013,8 +2010,7 @@ struct SpecializationContext
                 slotOperands.add(wrapInst->getSlotOperand(ii));
             }
 
-            auto elementPtrType = builder.getPtrType(ptrType->getOp(), elementType);
-            auto newElementAddr = builder.emitElementAddress(elementPtrType, val, index);
+            auto newElementAddr = builder.emitElementAddress(val, index);
 
             auto newWrapExistentialInst = builder.emitWrapExistential(
                 resultType, newElementAddr, slotOperandCount, slotOperands.getArrayView().getBuffer());
