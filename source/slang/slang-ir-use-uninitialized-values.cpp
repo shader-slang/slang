@@ -221,19 +221,12 @@ namespace Slang
             loads.add(call);
     }
 
-    static void collectTargetSwitchCases(List<IRInst*>& stores, IRTargetSwitch* tswitch)
+    static void collectSpecialCaseInstructions(List<IRInst*>& stores, IRBlock* block)
     {
-        for (Slang::UInt i = 0; i < tswitch->getCaseCount(); i++)
+        for (auto inst = block->getFirstInst(); inst; inst = inst->next)
         {
-            IRBlock* block = tswitch->getCaseBlock(i);
-            for (auto inst = block->getFirstInst(); inst; inst = inst->next)
-            {
-                // Only worry about special cases,
-                // the rest should be taken care of
-                // at collectLoadStore
-                if (as<IRGenericAsm>(tswitch))
-                    stores.add(tswitch);
-            }
+            if (as<IRGenericAsm>(inst))
+                stores.add(inst);
         }
     }
 
@@ -355,14 +348,7 @@ namespace Slang
         // Special cases for parameters
         for (const auto& b : func->getBlocks())
         {
-            for (auto binst = b->getFirstInst(); binst; binst = binst->next)
-            {
-                if (as<IRGenericAsm>(binst))
-                    stores.add(binst);
-
-                if (auto tswitch = as<IRTargetSwitch>(binst))
-                    collectTargetSwitchCases(stores, tswitch);
-            }
+            collectSpecialCaseInstructions(stores, b);
 
             auto t = b->getTerminator();
             if (as<IRTargetSwitch>(t) || as<IRReturn>(t))
