@@ -420,6 +420,12 @@ namespace Slang
         DeclRef<Decl> findDeclFromString(
             String const& name,
             DiagnosticSink* sink);
+        
+        DeclRef<Decl> findDeclFromStringInType(
+            Type* type,
+            String const& name,
+            LookupMask mask,
+            DiagnosticSink* sink);
 
         Dictionary<String, IntVal*>& getMangledNameToIntValMap();
         ConstantIntVal* tryFoldIntVal(IntVal* intVal);

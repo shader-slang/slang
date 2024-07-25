@@ -2203,6 +2203,7 @@ namespace Slang
             case TokenType::OpEql:
             case TokenType::OpNeq:
             case TokenType::OpGreater:
+            case TokenType::EndOfFile:
             {
                 return parseGenericApp(parser, base);
             }
