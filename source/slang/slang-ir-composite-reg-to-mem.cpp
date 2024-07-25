@@ -36,7 +36,6 @@ namespace Slang
                     if (getElementUser->getOperands() == use)
                     {
                         newAddr = builder.emitElementAddress(
-                            builder.getPtrType(user->getFullType()),
                             addr,
                             getElementUser->getIndex());
                     }

@@ -137,6 +137,7 @@ alias any_gfx_target = hlsl | metal | glsl | spirv;
 alias any_cpp_target = cpp | cuda;
 
 alias cpp_cuda = cpp | cuda;
+alias cpp_cuda_spirv = cpp | cuda | spirv;
 alias cpp_cuda_glsl_spirv = cpp | cuda | glsl | spirv;
 alias cpp_cuda_glsl_hlsl = cpp | cuda | glsl | hlsl;
 alias cpp_cuda_glsl_hlsl_spirv = cpp | cuda | glsl | hlsl | spirv;

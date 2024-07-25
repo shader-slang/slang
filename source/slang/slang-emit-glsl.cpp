@@ -2638,9 +2638,9 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type");
 }
 
-void GLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace)
+void GLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace)
 {
-    if(addressSpace == SpvStorageClassTaskPayloadWorkgroupEXT)
+    if(addressSpace == (AddressSpace)SpvStorageClassTaskPayloadWorkgroupEXT)
     {
         m_writer->emit("taskPayloadSharedEXT ");
     }
