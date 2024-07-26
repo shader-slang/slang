@@ -552,6 +552,9 @@ namespace Slang
         if (variable->findDecoration<IRSemanticDecoration>())
             return;
 
+        if (variable->findDecoration<IRGlobalInputDecoration>())
+            return;
+
         // Check for initialization blocks
         for (auto inst : variable->getChildren())
         {

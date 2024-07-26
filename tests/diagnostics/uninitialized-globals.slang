@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHK): -target spirv
+//TEST:SIMPLE(filecheck=CHK): -allow-glsl -target spirv
 
 // Using groupshared variables
 groupshared float4 gsConstexpr = float4(1.0f);
@@ -12,7 +12,7 @@ float use_constexpr_initialized_gs()
 
 float use_undefined_gs()
 {
-    //CHK-DAG: warning 41017: use of uninitialized global variable 'gsUndefined'
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'gsUndefined'
     return gsUndefined.x;
 }
 
@@ -35,7 +35,7 @@ void write_to_later()
 
 float use_never_written()
 {
-    //CHK-DAG: warning 41017: use of uninitialized global variable 'writtenNever'
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'writtenNever'
     return writtenNever;
 }
 
@@ -43,6 +43,36 @@ float use_never_written()
 float use_later_writte()
 {
     return writtenLater;
+}
+
+// Should not warn here (glsl layout decoration check)
+layout(location = 0) in vec4 data;
+
+vec4 glsl_layout_in_ok()
+{
+    return data;
+}
+
+// Invalid use of layout variables
+layout(location = 1) out vec4 x;
+
+vec4 glsl_layout_out_undefined()
+{
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'x'
+    return x;
+}
+
+// OK use of layout variables
+layout(location = 2) out vec4 y;
+
+void glsl_layout_out_store(vec4 data)
+{
+    y = data;
+}
+
+vec4 glsl_layout_out_ok()
+{
+    return y;
 }
 
 //CHK-NOT: warning 41017
