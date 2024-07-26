@@ -45,7 +45,7 @@ float use_later_writte()
     return writtenLater;
 }
 
-// Should not warn here (glsl layout decoration check)
+// Varying inputs never warn
 layout(location = 0) in vec4 data;
 
 vec4 glsl_layout_in_ok()
