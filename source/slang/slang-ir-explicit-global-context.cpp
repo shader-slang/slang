@@ -61,7 +61,10 @@ struct IntroduceExplicitGlobalContextPass
                 // this is represented as a variable with the `@GroupShared`
                 // rate on its type.
                 //
-                hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
+                hoistGlobalVarOptions = HoistGlobalVarOptions(0
+                                        | (UInt)HoistGlobalVarOptions::PlainGlobal
+                                        | (UInt)HoistGlobalVarOptions::RaytracingGlobal
+                                        );
                 break;
             }
         }
