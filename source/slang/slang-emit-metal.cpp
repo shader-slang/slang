@@ -736,6 +736,10 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_ConstRefType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
+            if(type->getOp() == kIROp_ConstRefType)
+            {
+                m_writer->emit("const ");
+            }
             emitType((IRType*)ptrType->getValueType());
             switch ((AddressSpace)ptrType->getAddressSpace())
             {
@@ -757,8 +761,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 break;
             case AddressSpace::MetalObjectData:
                 m_writer->emit(" object_data");
-                // object data is passed by reference
-                m_writer->emit("&");
+                m_writer->emit("*");
                 break;
             }
             return;

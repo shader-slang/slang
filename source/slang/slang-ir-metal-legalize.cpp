@@ -1284,6 +1284,17 @@ namespace Slang
                     varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
                     auto paramVarLayout = varLayoutBuilder.build();
                     builder.addLayoutDecoration(param, paramVarLayout);
+
+                    IRConstRefType* type = as<IRConstRefType>(param->getDataType());
+                    
+                    const auto annotatedPayloadType =
+                        builder.getPtrType(
+                            kIROp_ConstRefType,
+                            type->getValueType(),
+                            AddressSpace::MetalObjectData
+                        );
+
+                    param->setFullType(annotatedPayloadType);
                 }
             }
             IROutputTopologyDecoration* outputDeco = entryPoint.entryPointFunc->findDecoration<IROutputTopologyDecoration>();
@@ -1366,17 +1377,23 @@ namespace Slang
                     meshRef->replaceUsesWith(builder.emitMetalSetVertex(meshRef->getIndex(), meshRef->getElementValue()));
                 }
             });
+            verticesParam->removeFromParent();
+            verticesParam->removeAndDeallocate();
             traverseUses(indicesParam, [&](IRUse* use){
                 if(const auto meshRef = as<IRMeshOutputSet>(use->getUser())){
                     meshRef->replaceUsesWith(builder.emitMetalSetIndices(meshRef->getIndex(), meshRef->getElementValue()));
                 }
             });
+            indicesParam->removeFromParent();
+            indicesParam->removeAndDeallocate();
             if(primitivesParam != nullptr) {
                 traverseUses(primitivesParam, [&](IRUse* use){
                     if(const auto meshRef = as<IRMeshOutputSet>(use->getUser())){
                         meshRef->replaceUsesWith(builder.emitMetalSetPrimitive(meshRef->getIndex(), meshRef->getElementValue()));
                     }
                 });
+                primitivesParam->removeFromParent();
+                primitivesParam->removeAndDeallocate();
             }
         }
 
