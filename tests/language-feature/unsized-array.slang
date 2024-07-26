@@ -6,7 +6,8 @@ RWStructuredBuffer<int> outputBuffer;
 
 int g(int arr[])
 {
-    return arr.getCount();
+    int tmp[] = arr;
+    return tmp.getCount();
 }
 
 int test(int arr[])
