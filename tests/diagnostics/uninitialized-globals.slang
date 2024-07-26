@@ -12,7 +12,7 @@ float use_constexpr_initialized_gs()
 
 float use_undefined_gs()
 {
-    //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'gsUndefined'
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'gsUninitialized'
     return gsUninitialized.x;
 }
 
