@@ -102,6 +102,20 @@ bool specializeResourceParameters(
     return result;
 }
 
+void inlineAllCallsOfFunction(IRFunc* func)
+{
+    traverseUses(func, [&](IRUse* use)
+        {
+            auto user = use->getUser();
+            auto call = as<IRCall>(user);
+            if (!call)
+                return;
+            if (call->getCallee() != func)
+                return;
+            inlineCall(call);
+        });
+}
+
     /// A pass to specialize resource-typed function outputs
 struct ResourceOutputSpecializationPass
 {
@@ -116,11 +130,18 @@ struct ResourceOutputSpecializationPass
     TargetRequest*  targetRequest;
     IRModule*       module;
 
-    // Functions that requires specialization but are currently unspecializable.
-    List<IRFunc*>* unspecializableFuncs;
+    /// Functions that requires specialization but are currently unspecializable.
+    HashSet<IRFunc*>* unspecializableFuncs;
 
+    /// Functions that required specialization and were specialized.
+    HashSet<IRFunc*> specializedFuncs;
+
+    /// Track the last function processed.
+    IRFunc* lastProcessedFunc = nullptr;
+    
     bool processModule()
     {
+        specializedFuncs.clear();
         bool changed = false;
 
         // The main logic consists of iterating over all functions
@@ -140,6 +161,12 @@ struct ResourceOutputSpecializationPass
 
     bool processFunc(IRFunc* oldFunc)
     {
+        // Avoid re-computing by checking our 'processFunc' cache.
+        if (specializedFuncs.contains(oldFunc))
+            return true;
+        if (unspecializableFuncs->contains(oldFunc))
+            return false;
+
         // We don't want to waste any effort on functions that don't merit
         // specialization, so the first step is to identify if the function
         // has any outputs that use resource types.
@@ -209,7 +236,10 @@ struct ResourceOutputSpecializationPass
             // messages can be front-end rather than back-end errors.
             //
             newFunc->removeAndDeallocate();
-            unspecializableFuncs->add(oldFunc);
+            // Check if `oldFunc` is the reason for failing,
+            // Otherwise don't add to 'unspecializableFuncs'
+            if(lastProcessedFunc == oldFunc)
+                unspecializableFuncs->add(oldFunc);
             return false;
         }
 
@@ -274,6 +304,7 @@ struct ResourceOutputSpecializationPass
         {
             specializeCallSite(oldCall, newFunc, funcInfo);
         }
+        specializedFuncs.add(oldFunc);
         return true;
     }
 
@@ -510,16 +541,22 @@ struct ResourceOutputSpecializationPass
         // a state where it isn't useful, but it also won't have any uses,
         // and can be eliminated later.
         //
+        Slang::Result failedToSpecializeParam = SLANG_OK;
         IRParam* nextParam = nullptr;
         for( IRParam* param = func->getFirstParam(); param; param = nextParam )
         {
             nextParam = param->getNextParam();
 
             ParamInfo paramInfo;
-            SLANG_RETURN_ON_FAIL(maybeSpecializeParam(param, paramInfo, outFuncInfo));
+            if(SLANG_FAILED(maybeSpecializeParam(param, paramInfo, outFuncInfo)))
+            {
+                // We collect info on why all parameters fail specialization, do not early break.
+                failedToSpecializeParam = SLANG_FAIL;
+                continue;
+            }
             outFuncInfo.oldParams.add(paramInfo);
         }
-
+        SLANG_RETURN_ON_FAIL(failedToSpecializeParam);
         SLANG_RETURN_ON_FAIL(maybeSpecializeResult(func, outFuncInfo.result, outFuncInfo));
 
         return SLANG_OK;
@@ -736,7 +773,7 @@ struct ResourceOutputSpecializationPass
 
     Result maybeSpecializeParam(IRParam* param, ParamInfo& outParamInfo, FuncInfo& ioFuncInfo)
     {
-        // We only want to specialize in the cse where the parameter
+        // We only want to specialize in the case where the parameter
         // is an `out` or `inout` (both inherit from `IROutTypeBase`),
         // and the pointed-to type is a resource.
         //
@@ -747,6 +784,99 @@ struct ResourceOutputSpecializationPass
         auto valueType = outType->getValueType();
         if(!isResourceType(valueType))
             return SLANG_OK;
+
+        // Before we change something (and likely break this 
+        // function if something fails after a change) we want
+        // to identify all the places in the function
+        // that `store` to the given output parameter.
+        //
+        // Note: this logic is subtly depending on the structure
+        // of how the front-end generates code for `out` and `inout`
+        // parameters:
+        //
+        // * The only `load` of an `inout` parameter is emitted at
+        //   the very start of a function body, to copy it over to
+        //   a temporary variable.
+        //
+        // * The only `store`s of an `out` or `inout` parameter are
+        //   right before `return` instructions, to establish the
+        //   final value of that parameter, and every `out`/`inout`
+        //   parameter is stored along every control-flow path
+        //   that reaches a `return`.
+        //
+        // Those invariants could easily be eliminated in a few different
+        // ways. Notably, if we added some more clever memory optimizations,
+        // then a pass could notice that we have:
+        //
+        //      let val = load(inoutParam);
+        //      ...
+        //      store(inoutParam, val);
+        //
+        // and optimize away the `store` (at least).
+        //
+        // For now we can get away with this because we don't do very many
+        // interesting memory/pointer optimizations in Slang, but it is
+        // still worrying to have this kind of assumption baked in.
+        //
+        // TODO: We should decide on an encoding for the behavior of
+        // `out`/`inout` parameters that doesn't have as many "gotcha" cases.
+        //
+        // We will also now recursively specialize all `IRCall` inside a 'parent function' 
+        // when trying to specialize a 'parent function'. This is to ensure we do not remove
+        // a parameter SSA needs for SSA'ing a localVar into a globalVar (and DCE requires 
+        // to not DCE an important 'IRCall').
+        // 
+        Slang::Result failedCallSpecialization = SLANG_OK;
+        List<IRStore*> stores;
+        traverseUses(param, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                switch (user->getOp())
+                {
+                case kIROp_Store:
+                {
+                    auto store = as<IRStore>(user);
+                    if (store->ptr.get() != param)
+                        return;
+                    stores.add(store);
+                    return;
+                }
+                case kIROp_Call:
+                {
+                    // This call may require an inline if it fails to specialize
+                    IRFunc* func = as<IRFunc>(as<IRCall>(user)->getCallee());
+                    if (!func)
+                        return;
+                    
+                    // Note: processFunc adds to unspecializableFuncs for us
+                    if(!processFunc(func))
+                    {
+                        failedCallSpecialization = SLANG_FAIL;
+                    }
+                    return;
+                }
+                default:
+                    return;
+                };
+            });
+        SLANG_RETURN_ON_FAIL(failedCallSpecialization);
+
+        // Having identified the places where a value is stored to
+        // the output parameter, we iterate over those values to
+        // ensure that they are all specializable and consistent
+        // with one another.
+        //
+        for(auto store : stores)
+        {
+            auto value = store->val.get();
+            SLANG_RETURN_ON_FAIL(specializeOutputValue(value, outParamInfo, ioFuncInfo));
+
+            // Given our assumptions about how `store`s to output
+            // parameters are used, we can eliminate all these `store`s
+            // since the values they write won't ever be used.
+            //
+            store->removeAndDeallocate();
+        }
 
         prepareOutputValue(outParamInfo, ioFuncInfo);
 
@@ -800,69 +930,6 @@ struct ResourceOutputSpecializationPass
             // and we don't need callers to pass in anything.
             //
             outParamInfo.oldArgMode = ParamInfo::OldArgMode::Ignore;
-        }
-
-        // Next, we want to identify all the places in the function
-        // that `store` to the given output parameter.
-        //
-        // Note: this logic is subtly depending on the structure
-        // of how the front-end generates code for `out` and `inout`
-        // parameters:
-        //
-        // * The only `load` of an `inout` parameter is emitted at
-        //   the very start of a function body, to copy it over to
-        //   a temporary variable.
-        //
-        // * The only `store`s of an `out` or `inout` parameter are
-        //   right before `return` instructions, to establish the
-        //   final value of that parameter, and every `out`/`inout`
-        //   parameter is stored along every control-flow path
-        //   that reaches a `return`.
-        //
-        // Those invariants could easily be eliminated in a few different
-        // ways. Notably, if we added some more clever memory optimizations,
-        // then a pass could notice that we have:
-        //
-        //      let val = load(inoutParam);
-        //      ...
-        //      store(inoutParam, val);
-        //
-        // and optimize away the `store` (at least).
-        //
-        // For now we can get away with this because we don't do very many
-        // interesting memory/pointer optimizations in Slang, but it is
-        // still worrying to have this kind of assumption baked in.
-        //
-        // TODO: We should decide on an encoding for the behavior of
-        // `out`/`inout` parameters that doesn't have as many "gotcha" cases.
-        //
-        List<IRStore*> stores;
-        traverseUses(param, [&](IRUse* use)
-            {
-                auto user = use->getUser();
-                auto store = as<IRStore>(user);
-                if (!store)
-                    return;
-                if (store->ptr.get() != param)
-                    return;
-                stores.add(store);
-            });
-
-        // Having identified the places where a value is stored to
-        // the output parameter, we iterate over those values to
-        // ensure that they are all specializable and consistent
-        // with one another.
-        //
-        for(auto store : stores)
-        {
-            auto value = store->val.get();
-            SLANG_RETURN_ON_FAIL(specializeOutputValue(value, outParamInfo, ioFuncInfo));
-
-            // Given our assumptions about how `store`s to output
-            // parameters are used, we can eliminate all these `store`s
-            // since the values they write won't ever be used.
-            //
-            store->removeAndDeallocate();
         }
 
         // It is possible that there will still be used of the parameter
@@ -1125,7 +1192,7 @@ struct ResourceOutputSpecializationPass
 bool specializeResourceOutputs(
     CodeGenContext*         codeGenContext,
     IRModule*               module,
-    List<IRFunc*>&          unspecializableFuncs)
+    HashSet<IRFunc*>&          unspecializableFuncs)
 {
     auto targetRequest = codeGenContext->getTargetReq();
     if(isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
@@ -1170,7 +1237,7 @@ bool specializeResourceUsage(
     for (;;)
     {
         bool changed = true;
-        List<IRFunc*> unspecializableFuncs;
+        HashSet<IRFunc*> unspecializableFuncs;
         while (changed)
         {
             changed = false;
@@ -1201,18 +1268,8 @@ bool specializeResourceUsage(
 
         // Inline unspecializable resource output functions and then continue trying.
         for (auto func : unspecializableFuncs)
-        {
-            traverseUses(func, [&](IRUse* use)
-            {
-                auto user = use->getUser();
-                auto call = as<IRCall>(user);
-                if (!call)
-                    return;
-                if (call->getCallee() != func)
-                    return;
-                inlineCall(call);
-            });
-        }
+            inlineAllCallsOfFunction(func);
+
         simplifyIR(codeGenContext->getTargetProgram(), irModule,
             IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
     }
