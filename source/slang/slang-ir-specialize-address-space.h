@@ -1,11 +1,13 @@
 // slang-ir-specialize-address-space.h
 #pragma once
 
+#include <cinttypes>
+
 namespace Slang
 {
     struct IRModule;
     struct IRInst;
-    enum class AddressSpace;
+    enum class AddressSpace : uint64_t;
 
     struct AddressSpaceSpecializationContext
     {
