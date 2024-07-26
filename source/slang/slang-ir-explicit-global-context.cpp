@@ -12,9 +12,9 @@ namespace Slang
 // thread-group, and wrap them up in an explicit "context"
 // type that gets passed between functions.
 
-enum class HoistableTypes : UInt
+enum class GlobalObjectKind : UInt
 {
-    GlobalVariable = 0b1,
+    GlobalVar = 0b1,
     GlobalParam = 0b10,
     All = 0xFFFFFFFF,
 };
@@ -29,6 +29,12 @@ enum class HoistGlobalVarOptions : UInt
 
 struct IntroduceExplicitGlobalContextPass
 {
+
+    // TODO: (#4742) Discontinuity of AddressSpace values between targets 
+    // (SpvStorageClassFunction vs. AddressSpace::ThreadLocal) needs
+    // to be addressed. This means `addressSpaceOfLocals` may be refactored out.
+
+    /// Target specific options to manage `IntroduceExplicitGlobalContextPass`
     class ExplicitContextPolicy
     {
     public:
@@ -38,13 +44,13 @@ struct IntroduceExplicitGlobalContextPass
             {
             case CodeGenTarget::SPIRV:
             case CodeGenTarget::SPIRVAssembly:
-                hoistableTypes = HoistableTypes::GlobalVariable;
+                hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
                 requiresFuncTypeCorrectionPass = true;
                 addressSpaceOfLocals = (AddressSpace)SpvStorageClassFunction;
                 hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 break;
             case CodeGenTarget::CUDASource:
-                hoistableTypes = HoistableTypes::GlobalVariable;
+                hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
 
                 // One important exception is that CUDA *does* support
                 // global variables with the `__shared__` qualifer, with
@@ -60,12 +66,12 @@ struct IntroduceExplicitGlobalContextPass
             }
         }
 
-        bool canHoistType(HoistableTypes hoistable)
+        bool canHoistType(GlobalObjectKind hoistable)
         {
-            return (UInt)hoistableTypes & (UInt)hoistable;
+            return (UInt)hoistableGlobalObjectKind & (UInt)hoistable;
         }
 
-        bool canHoistGlobalVariable(IRGlobalVar* inst)
+        bool canHoistGlobalVar(IRGlobalVar* inst)
         {
             if (!((UInt)hoistGlobalVarOptions & (UInt)HoistGlobalVarOptions::SharedGlobal)
                 && as<IRGroupSharedRate>(inst->getRate()))
@@ -105,7 +111,7 @@ struct IntroduceExplicitGlobalContextPass
 
     private:
         HoistGlobalVarOptions hoistGlobalVarOptions = HoistGlobalVarOptions::All;
-        HoistableTypes hoistableTypes = HoistableTypes::All;
+        GlobalObjectKind hoistableGlobalObjectKind = GlobalObjectKind::All;
         bool requiresFuncTypeCorrectionPass = false;
         AddressSpace addressSpaceOfLocals = AddressSpace::ThreadLocal;
     };
@@ -131,20 +137,15 @@ struct IntroduceExplicitGlobalContextPass
         return m_options.getAddressSpaceOfLocal();
     }
 
-    bool canHoistType(HoistableTypes hoistable)
+    bool canHoistType(GlobalObjectKind hoistable)
     {
         return m_options.canHoistType(hoistable);
     }
 
-    bool canHoistGlobalVariable(IRGlobalVar* inst)
+    bool canHoistGlobalVar(IRGlobalVar* inst)
     {
-        return m_options.canHoistGlobalVariable(inst);
+        return m_options.canHoistGlobalVar(inst);
     }
-
-    enum class GlobalObjectKind
-    {
-        GlobalParam, GlobalVar
-    };
 
     void processModule()
     {
@@ -162,7 +163,7 @@ struct IntroduceExplicitGlobalContextPass
             {
             case kIROp_GlobalVar:
                 {
-                    if (!canHoistType(HoistableTypes::GlobalVariable))
+                    if (!canHoistType(GlobalObjectKind::GlobalVar))
                         continue;
                     // A "global variable" in HLSL (and thus Slang) is actually
                     // a weird kind of thread-local variable, and so it cannot
@@ -177,7 +178,7 @@ struct IntroduceExplicitGlobalContextPass
                         continue;
                     }
 
-                    if (!canHoistGlobalVariable(globalVar))
+                    if (!canHoistGlobalVar(globalVar))
                         continue;
 
                     m_globalVars.add(globalVar);
@@ -186,7 +187,7 @@ struct IntroduceExplicitGlobalContextPass
 
             case kIROp_GlobalParam:
                 {
-                    if (!canHoistType(HoistableTypes::GlobalParam))
+                    if (!canHoistType(GlobalObjectKind::GlobalParam))
                         continue;
                     // Global parameters are another HLSL/Slang concept
                     // that doesn't have a parallel in langauges like C/C++.
