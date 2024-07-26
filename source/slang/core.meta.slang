@@ -1040,8 +1040,8 @@ __generic<T, let N:int>
 __magic_type(ArrayExpressionType)
 struct Array : IArray<T>
 {
-    [ForceInline]
-    int getCount() { return N; }
+    __intrinsic_op($(kIROp_GetArrayLength))
+    int getCount();
 
     __subscript(int index) -> T
     {
@@ -1049,7 +1049,6 @@ struct Array : IArray<T>
         get;
     }
 }
-
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
 __magic_type(VectorExpressionType)

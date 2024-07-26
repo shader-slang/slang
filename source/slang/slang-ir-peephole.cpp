@@ -283,6 +283,14 @@ struct PeepholeContext : InstPassBase
                 changed = true;
             }
             break;
+        case kIROp_GetArrayLength:
+            if (auto arrayType = as<IRArrayType>(inst->getOperand(0)->getDataType()))
+            {
+                inst->replaceUsesWith(arrayType->getElementCount());
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
         case kIROp_GetResultError:
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultError)
             {
