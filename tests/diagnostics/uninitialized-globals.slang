@@ -62,7 +62,6 @@ vec4 glsl_layout_out_undefined()
     return x;
 }
 
-// OK use of layout output variables
 layout(location = 2) out vec4 y;
 
 void glsl_layout_out_store(vec4 data)
