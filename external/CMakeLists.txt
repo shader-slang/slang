@@ -10,7 +10,11 @@ endif()
 
 # Similarly, disable warnings for external projects
 if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
-    add_compile_options(-w)
+    if(MSVC)
+        add_compile_options(/W0)
+    else()
+        add_compile_options(-w)
+    endif()
 endif()
 
 # Miniz

@@ -418,7 +418,7 @@ void writeInfo(
     //
     // Now write out the function which holds onto the static embedded info table
     //
-    line("RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()");
+    line("RefPtr<SPIRVCoreGrammarInfo>& SPIRVCoreGrammarInfo::getEmbeddedVersion()");
     line("{");
     line("    static RefPtr<SPIRVCoreGrammarInfo> embedded = [](){");
     line("        RefPtr<SPIRVCoreGrammarInfo> info = new SPIRVCoreGrammarInfo();");
