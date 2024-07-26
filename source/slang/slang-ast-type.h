@@ -539,6 +539,8 @@ class PtrTypeBase : public BuiltinType
 
     // Get the type of the pointed-to value.
     Type* getValueType();
+
+    Val* getAddressSpace();
 };
 
 class NoneType : public BuiltinType
@@ -555,6 +557,8 @@ class NullPtrType : public BuiltinType
 class PtrType : public PtrTypeBase 
 {
     SLANG_AST_CLASS(PtrType)
+
+    void _toTextOverride(StringBuilder& out);
 };
 
 // A GPU pointer type into global memory.
@@ -599,6 +603,7 @@ class RefTypeBase : public ParamDirectionType
 class RefType : public RefTypeBase
 {
     SLANG_AST_CLASS(RefType)
+    void _toTextOverride(StringBuilder& out);
 };
 
 // The type for an `constref` parameter, e.g., `constref T`
