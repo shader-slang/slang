@@ -2,7 +2,7 @@
 
 // Using groupshared variables
 groupshared float4 gsConstexpr = float4(1.0f);
-groupshared float4 gsUndefined;
+groupshared float4 gsUninitialized;
 
 // OK
 float use_constexpr_initialized_gs()
@@ -13,7 +13,7 @@ float use_constexpr_initialized_gs()
 float use_undefined_gs()
 {
     //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'gsUndefined'
-    return gsUndefined.x;
+    return gsUninitialized.x;
 }
 
 // Using static variables
