@@ -1286,7 +1286,98 @@ namespace Slang
                     builder.addLayoutDecoration(param, paramVarLayout);
                 }
             }
+            IROutputTopologyDecoration* outputDeco = entryPoint.entryPointFunc->findDecoration<IROutputTopologyDecoration>();
+            const auto topology = outputDeco->getTopology();
+            const auto topStr = topology->getStringSlice();
+            UInt topologyEnum = 0;
+            if(topStr.caseInsensitiveEquals(toSlice("point"))){
+                topologyEnum = 1;
+            } else if(topStr.caseInsensitiveEquals(toSlice("line"))) {
+                topologyEnum = 2;
+            } else if(topStr.caseInsensitiveEquals(toSlice("triangle"))) {
+                topologyEnum = 3;
+            } else {
+                // abort, idk how
+            }
 
+            IRInst* topologyConst = builder.getIntValue(builder.getIntType(), topologyEnum);
+
+            IRType* vertexType = nullptr;
+            IRType* indicesType = nullptr;
+            IRType* primitiveType = nullptr;
+
+            IRInst* maxVertices = nullptr;
+            IRInst* maxPrimitives = nullptr;
+            
+            IRInst* verticesParam = nullptr;
+            IRInst* indicesParam = nullptr;
+            IRInst* primitivesParam = nullptr;
+            for (auto param : func->getParams())
+            {
+                if(param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
+                {
+                    IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+                    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+                    auto paramVarLayout = varLayoutBuilder.build();
+                    builder.addLayoutDecoration(param, paramVarLayout);
+                }
+                if(param->findDecorationImpl(kIROp_VerticesDecoration))
+                {
+                    auto vertexRefType = (IRConstRefType*)param->getDataType();
+                    auto vertexOutputType = (IRVerticesType*)vertexRefType->getValueType();
+                    vertexType = vertexOutputType->getElementType();
+                    maxVertices = vertexOutputType->getMaxElementCount();
+                    SLANG_ASSERT(vertexType);
+
+                    verticesParam = param;
+                }
+                if(param->findDecorationImpl(kIROp_IndicesDecoration))
+                {
+                    auto indicesRefType = (IRConstRefType*)param->getDataType();
+                    auto indicesOutputType = (IRIndicesType*)indicesRefType->getValueType();
+                    indicesType = indicesOutputType->getElementType();
+                    maxPrimitives = indicesOutputType->getMaxElementCount();
+                    SLANG_ASSERT(indicesType);
+
+                    indicesParam = param;
+                }
+                if(param->findDecorationImpl(kIROp_PrimitivesDecoration))
+                {
+                    auto primitivesRefType = (IRConstRefType*)param->getDataType();
+                    auto primitivesOutputType = (IRPrimitivesType*)primitivesRefType->getValueType();
+                    primitiveType = primitivesOutputType->getElementType();
+                    SLANG_ASSERT(primitiveType);
+
+                    primitivesParam = param;
+                }
+            }
+            if(primitiveType == nullptr)
+            {
+                primitiveType = builder.getVoidType();
+            }
+            builder.setInsertBefore(entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+            
+            auto meshParam = builder.emitParam(builder.getMetalMeshType(vertexType, primitiveType, maxVertices, maxPrimitives, topologyConst));
+            builder.addExternCppDecoration(meshParam, toSlice("_slang_mesh"));
+            //This doesnt actually do anything yet, i hardcoded the refs to be the metal variants in the core.meta.slang, idk why this doesnt work
+            traverseUses(verticesParam, [&](IRUse* use){
+                if(const auto meshRef = as<IRMeshOutputSet>(use->getUser())){
+                    meshRef->replaceUsesWith(builder.emitMetalSetVertex(meshRef->getIndex(), meshRef->getElementValue()));
+                }
+            });
+            traverseUses(indicesParam, [&](IRUse* use){
+                if(const auto meshRef = as<IRMeshOutputSet>(use->getUser())){
+                    meshRef->replaceUsesWith(builder.emitMetalSetIndices(meshRef->getIndex(), meshRef->getElementValue()));
+                }
+            });
+            if(primitivesParam != nullptr) {
+                traverseUses(primitivesParam, [&](IRUse* use){
+                    if(const auto meshRef = as<IRMeshOutputSet>(use->getUser())){
+                        meshRef->replaceUsesWith(builder.emitMetalSetPrimitive(meshRef->getIndex(), meshRef->getElementValue()));
+                    }
+                });
+            }
         }
 
         void legalizeDispatchMeshPayloadForMetal(EntryPointInfo entryPoint)
@@ -1353,8 +1444,8 @@ namespace Slang
                     const auto meshGridPropertiesType = builder.getMetalMeshGridPropertiesType();
                     auto mgp = builder.emitParam(meshGridPropertiesType);
                     builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
-                    }
-                });
+                }
+            });
         }
 
         IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType)

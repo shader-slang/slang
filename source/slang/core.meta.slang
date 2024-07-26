@@ -1329,8 +1329,8 @@ struct OutputVertices
         // TODO: Make sure this remains write only, we can't do this with just
         // a 'set' operation as it's legal to only write to part of the output
         // buffer, or part of the output buffer at a time.
-        __intrinsic_op($(kIROp_MeshOutputRef))
-        ref;
+        __intrinsic_op($(kIROp_MetalSetVertex))
+        set;
     }
 };
 
@@ -1345,7 +1345,7 @@ struct OutputIndices
         // It's illegal to not write out the entire primitive at once, so limit
         // this to set
         [mutating]
-        __intrinsic_op($(kIROp_MeshOutputSet))
+        __intrinsic_op($(kIROp_MetalSetIndices))
         set;
     }
 };
@@ -1358,8 +1358,9 @@ struct OutputPrimitives
 {
     __subscript(uint index) -> T
     {
-        __intrinsic_op($(kIROp_MeshOutputRef))
-        ref;
+        // this needs to be done with a target switch, but it doesnt compile for me
+        __intrinsic_op($(kIROp_MetalSetPrimitive))
+        set;
     }
 };
 

@@ -5197,6 +5197,32 @@ namespace Slang
         return emitSwizzle(type, base, elementCount, irElementIndices);
     }
 
+    IRMetalSetVertex* IRBuilder::emitMetalSetVertex(
+        IRInst* index,
+        IRInst* vertex)
+    {
+        auto inst = createInst<IRMetalSetVertex>(this, kIROp_MetalSetVertex, getVoidType(), index, vertex);
+        addInst(inst);
+        return inst;
+    }
+
+    IRMetalSetPrimitive* IRBuilder::emitMetalSetPrimitive(
+        IRInst* index,
+        IRInst* primitive)
+    {
+        auto inst = createInst<IRMetalSetPrimitive>(this, kIROp_MetalSetVertex, getVoidType(), index, primitive);
+        addInst(inst);
+        return inst;
+    }
+
+    IRMetalSetIndices* IRBuilder::emitMetalSetIndices(
+        IRInst* index,
+        IRInst* indices)
+    {
+        auto inst = createInst<IRMetalSetIndices>(this, kIROp_MetalSetVertex, getVoidType(), index, indices);
+        addInst(inst);
+        return inst;
+    }
 
     IRInst* IRBuilder::emitSwizzleSet(
         IRType*         type,

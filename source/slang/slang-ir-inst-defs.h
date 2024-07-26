@@ -192,6 +192,8 @@ INST(Nop, nop, 0, 0)
             INST(PrimitivesType, Primitives, 2, HOISTABLE)
         INST_RANGE(MeshOutputType, VerticesType, PrimitivesType)
 
+        /* Metal Mesh Type */
+            INST(MetalMeshType, metal::mesh, 5, HOISTABLE)
         /* Metal Mesh Grid Properties */
             INST(MetalMeshGridPropertiesType, mesh_grid_properties, 0, HOISTABLE)
 
@@ -495,6 +497,10 @@ INST(GetNaturalStride, getNaturalStride, 1, 0)
 
 INST(MeshOutputRef, meshOutputRef, 2, 0)
 INST(MeshOutputSet, meshOutputSet, 3, 0)
+
+INST(MetalSetVertex, metalSetVertex, 3, 0)
+INST(MetalSetPrimitive, metalSetPrimitive, 3, 0)
+INST(MetalSetIndices, metalSetIndices, 3, 0)
 
 // Construct a vector from a scalar
 //

@@ -492,6 +492,43 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             return true;
         }
+        case kIROp_MetalSetVertex:
+        {
+            m_writer->emit("_slang_mesh.set_vertex(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+        case kIROp_MetalSetPrimitive:
+        {
+            m_writer->emit("_slang_mesh.set_primitive(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+        case kIROp_MetalSetIndices:
+        {
+            m_writer->emit("_slang_mesh.set_index(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit("*3,");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit(".x);\n");
+            m_writer->emit("_slang_mesh.set_index(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit("*3,");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit(".y);\n");
+            m_writer->emit("_slang_mesh.set_index(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit("*3,");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit(".z)");
+            return true;
+        }
         default: break;
     }
     // Not handled
@@ -783,6 +820,31 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
                 break;
         }
+        return;
+    }
+    else if (const auto meshType = as<IRMetalMeshType>(type))
+    {
+        m_writer->emit("metal::mesh<");
+        emitType(meshType->getVerticesType());
+        m_writer->emit(", ");
+        emitType(meshType->getPrimitivesType());
+        m_writer->emit(", ");
+        emitOperand(meshType->getNumVertices(), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(meshType->getNumPrimitives(), getInfo(EmitOp::General));
+        m_writer->emit(", metal::topology::");
+        switch(meshType->getTopology()->getValue()) {
+        case 1:
+            m_writer->emit("point");
+            break;
+        case 2:
+            m_writer->emit("line");
+            break;
+        case 3:
+            m_writer->emit("triangle");
+            break;
+        }
+        m_writer->emit(">");
         return;
     }
     else if(auto specializedType = as<IRSpecialize>(type))
