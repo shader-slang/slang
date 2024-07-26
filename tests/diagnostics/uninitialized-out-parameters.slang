@@ -56,7 +56,7 @@ void instrincs_defined(float x, out float exp)
 // Specialized handling for target switches
 void target_switching_undefined(float x, out float exp)
 {
-    //CHK-DAG: ([[# @LINE + 1]]): warning 41018: returning without initializing out parameter 'exp'
+    //CHK-DAG: ([[# @LINE + 2]]): warning 41018: returning without initializing out parameter 'exp'
     __target_switch {}
 }
 
