@@ -2412,7 +2412,10 @@ extern "C"
         SLANG_MODIFIER_EXPORT,
         SLANG_MODIFIER_EXTERN,
         SLANG_MODIFIER_DIFFERENTIABLE,
-        SLANG_MODIFIER_MUTATING
+        SLANG_MODIFIER_MUTATING,
+        SLANG_MODIFIER_IN,
+        SLANG_MODIFIER_OUT,
+        SLANG_MODIFIER_INOUT
     };
 
     // User Attribute
@@ -3327,7 +3330,10 @@ namespace slang
             Export = SLANG_MODIFIER_EXPORT,
             Extern = SLANG_MODIFIER_EXTERN,
             Differentiable = SLANG_MODIFIER_DIFFERENTIABLE,
-            Mutating = SLANG_MODIFIER_MUTATING
+            Mutating = SLANG_MODIFIER_MUTATING,
+            In = SLANG_MODIFIER_IN,
+            Out = SLANG_MODIFIER_OUT,
+            InOut = SLANG_MODIFIER_INOUT
         };
     };
 
