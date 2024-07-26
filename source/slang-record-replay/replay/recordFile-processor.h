@@ -20,7 +20,7 @@ namespace SlangRecord
     class RecordFileProcessor
     {
     public:
-        RecordFileProcessor(const std::string& filePath);
+        RecordFileProcessor(const Slang::String& filePath);
 
         bool addDecoder(SlangDecoder* pDecoder)
         {

@@ -342,8 +342,10 @@ namespace SlangRecord
 
     JsonConsumer::JsonConsumer(const std::string& filePath)
     {
+        std::filesystem::path jsonFileDir(filePath);
+        jsonFileDir = std::filesystem::absolute(jsonFileDir);
 
-        if (!std::filesystem::exists(filePath))
+        if (!std::filesystem::exists(jsonFileDir.parent_path()))
         {
             slangRecordLog(LogLevel::Error, "Directory for json file does not exist: %s\n", filePath.c_str());
         }

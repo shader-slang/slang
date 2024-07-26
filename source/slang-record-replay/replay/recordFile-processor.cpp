@@ -4,21 +4,23 @@
 
 namespace SlangRecord
 {
-    RecordFileProcessor::RecordFileProcessor(const std::string& filename)
+    RecordFileProcessor::RecordFileProcessor(const Slang::String& filePath)
     {
-        Slang::String path(filename.c_str());
         Slang::FileMode fileMode = Slang::FileMode::Open;
         Slang::FileAccess fileAccess = Slang::FileAccess::Read;
         Slang::FileShare fileShare = Slang::FileShare::None;
 
         // Open the record file with read-only access
-        SlangResult res = m_inputStream.init(path, fileMode, fileAccess, fileShare);
+        SlangResult res = m_inputStream.init(filePath, fileMode, fileAccess, fileShare);
 
         if (res != SLANG_OK)
         {
-            SlangRecord::slangRecordLog(SlangRecord::LogLevel::Error, "Failed to open file %s\n", filename.c_str());
+            SlangRecord::slangRecordLog(SlangRecord::LogLevel::Error, "Failed to open file %s\n", filePath.begin());
             std::abort();
         }
+
+        // Enable log system
+        setLogLevel();
     }
 
     bool RecordFileProcessor::processNextBlock()
