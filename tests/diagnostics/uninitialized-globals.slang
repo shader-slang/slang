@@ -53,7 +53,7 @@ vec4 glsl_layout_in_ok()
     return data;
 }
 
-// Invalid use of layout variables
+// Layout outputs should still be written to at some point
 layout(location = 1) out vec4 x;
 
 vec4 glsl_layout_out_undefined()
@@ -62,16 +62,18 @@ vec4 glsl_layout_out_undefined()
     return x;
 }
 
-// OK use of layout variables
+// OK use of layout output variables
 layout(location = 2) out vec4 y;
 
 void glsl_layout_out_store(vec4 data)
 {
+    // Written to here...
     y = data;
 }
 
 vec4 glsl_layout_out_ok()
 {
+    // ...so read here is treated as OK
     return y;
 }
 
