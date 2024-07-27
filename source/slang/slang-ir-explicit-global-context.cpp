@@ -14,16 +14,17 @@ namespace Slang
 
 enum class GlobalObjectKind : UInt
 {
-    GlobalVar = 0b1,
-    GlobalParam = 0b10,
+    None = 0,
+    GlobalVar = 1 << 0,
+    GlobalParam = 1 << 1,
     All = 0xFFFFFFFF,
 };
 
 enum class HoistGlobalVarOptions : UInt
 {
-    PlainGlobal = 0b0,
-    SharedGlobal = 0b1,
-    RaytracingGlobal = 0b10,
+    PlainGlobal = 0,
+    SharedGlobal = 1 << 0,
+    RaytracingGlobal = 1 << 1,
     All = 0xFFFFFFFF,
 };
 
@@ -348,17 +349,7 @@ struct IntroduceExplicitGlobalContextPass
             {
                 if (pairOfFuncs.second->getOp() == kIROp_Var)
                     continue;
-                auto func = pairOfFuncs.first;
-                builder.setInsertBefore(func->getDataType());
-                auto paramCount = func->getParamCount();
-                List<IRType*> paramTypes;
-                paramTypes.reserve(paramCount);
-                for (UInt i = 0; i < paramCount; i++)
-                    paramTypes.add(func->getParamType(i));
-                paramTypes.add(pairOfFuncs.second->getDataType());
-                auto newFuncType = builder.getFuncType(paramTypes, func->getResultType());
-
-                func->setFullType(newFuncType);
+                fixUpFuncType(pairOfFuncs.first);
             }
         }
     }
