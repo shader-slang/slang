@@ -903,7 +903,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(AlwaysFoldIntoUseSiteDecoration, alwaysFold, 0, 0)
 
     INST(GlobalOutputDecoration, output, 0, 0)
-    INST(GlobalInputDecoration, output, 0, 0)
+    INST(GlobalInputDecoration, input, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
