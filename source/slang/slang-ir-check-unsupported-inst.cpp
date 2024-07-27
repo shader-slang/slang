@@ -42,6 +42,23 @@ namespace Slang
         }
     }
 
+    void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
+    {
+        SLANG_UNUSED(target);
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                switch (inst->getOp())
+                {
+                case kIROp_GetArrayLength:
+                    sink->diagnose(inst, Diagnostics::attemptToQuerySizeOfUnsizedArray);
+                    break;
+                }
+            }
+        }
+    }
+
     void checkUnsupportedInst(TargetRequest* target, IRModule* module, DiagnosticSink* sink)
     {
         HashSet<IRFunc*> checkedFuncsForRecursionDetection;
@@ -62,6 +79,16 @@ namespace Slang
             case kIROp_Func:
                 if (!isCPUTarget(target))
                     checkRecursion(checkedFuncsForRecursionDetection, as<IRFunc>(globalInst), sink);
+                checkUnsupportedInst(target, as<IRFunc>(globalInst), sink);
+                break;
+            case kIROp_Generic:
+                {
+                    auto generic = as<IRGeneric>(globalInst);
+                    auto innerFunc = as<IRFunc>(findGenericReturnVal(generic));
+                    if (innerFunc)
+                        checkUnsupportedInst(target, innerFunc, sink);
+                    break;
+                }
             default:
                 break;
             }

@@ -947,13 +947,13 @@ Result linkAndOptimizeIR(
     specializeResourceUsage(codeGenContext, irModule);
     specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
 
-    // For GLSL targets, we also want to specialize calls to functions that
-    // takes array parameters if possible, to avoid performance issues on
-    // those platforms.
-    if (isKhronosTarget(targetRequest))
-    {
-        specializeArrayParameters(codeGenContext, irModule);
-    }
+    // We also want to specialize calls to functions that
+    // takes unsized array parameters if possible.
+    // Moreover, for Khronos targets, we also want to specialize calls to functions
+    // that takes arrays/structs containing arrays as parameters with the actual
+    // global array object to avoid loading big arrays into SSA registers, which seems
+    // to cause performance issues.
+    specializeArrayParameters(codeGenContext, irModule);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER RESOURCE SPECIALIZATION");

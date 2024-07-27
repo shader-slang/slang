@@ -1108,7 +1108,7 @@ INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
 INST(AlignOf,                           alignOf,                    1, 0)
-
+INST(GetArrayLength,                    GetArrayLength,             1, 0)
 INST(IsType, IsType, 3, 0)
 INST(TypeEquals, TypeEquals, 2, 0)
 INST(IsInt, IsInt, 1, 0)
