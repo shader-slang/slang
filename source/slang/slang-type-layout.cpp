@@ -4389,6 +4389,13 @@ static TypeLayoutResult _createTypeLayout(
 
         return result;
     }
+    else if (as<DynamicResourceType>(type))
+    {
+        return createSimpleTypeLayout(
+            SimpleLayoutInfo(LayoutResourceKind::DescriptorTableSlot, 1),
+            type,
+            rules);
+    }
     else if (auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->getDeclRef();

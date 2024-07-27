@@ -383,6 +383,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_POINTER;
     }
+    else if (const auto dynamicResourceType = as<DynamicResourceType>(type))
+    {
+        return SLANG_TYPE_KIND_DYNAMIC_RESOURCE;
+    }
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE)                          \
     else if(as<TYPE>(type)) do {          \
@@ -2625,6 +2629,15 @@ SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflec
         break;
     case SLANG_MODIFIER_MUTATING:
         modifier = var->findModifier<MutatingAttribute>();
+        break;
+    case SLANG_MODIFIER_IN:
+        modifier = var->findModifier<InModifier>();
+        break;
+    case SLANG_MODIFIER_OUT:
+        modifier = var->findModifier<OutModifier>();
+        break;
+    case SLANG_MODIFIER_INOUT:
+        modifier = var->findModifier<InOutModifier>();
         break;
     default:
         return nullptr;

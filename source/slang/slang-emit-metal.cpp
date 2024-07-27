@@ -1049,7 +1049,7 @@ void MetalSourceEmitter::emitPackOffsetModifier(IRInst* varInst, IRType* valueTy
     // We emit packoffset as a semantic in `emitSemantic`, so nothing to do here.
 }
 
-void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace)
+void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace)
 {
     if (as<IRGroupSharedRate>(rate))
     {
@@ -1057,7 +1057,7 @@ void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRI
         return;
     }
 
-    switch ((AddressSpace)addressSpace)
+    switch (addressSpace)
     {
     case AddressSpace::GroupShared:
         m_writer->emit("threadgroup ");

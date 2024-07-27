@@ -225,6 +225,9 @@ INST(Nop, nop, 0, 0)
 INST(RayQueryType, RayQuery, 1, HOISTABLE)
 INST(HitObjectType, HitObject, 0, HOISTABLE)
 
+// Opaque type that can be dynamically cast to other resource types.
+INST(DynamicResourceType, DynamicResource, 0, HOISTABLE)
+
 // A user-defined structure declaration at the IR level.
 // Unlike in the AST where there is a distinction between
 // a `StructDecl` and a `DeclRefType` that refers to it,
@@ -404,6 +407,8 @@ INST(GetElementPtr, getElementPtr, 2, 0)
 // Pointer offset: computes pBase + offset_in_elements
 INST(GetOffsetPtr, getOffsetPtr, 2, 0) 
 INST(GetAddr, getAddr, 1, 0)
+
+INST(CastDynamicResource, castDynamicResource, 1, 0)
 
 // Get an unowned NativeString from a String.
 INST(getNativeStr, getNativeStr, 1, 0)
@@ -904,7 +909,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(AlwaysFoldIntoUseSiteDecoration, alwaysFold, 0, 0)
 
     INST(GlobalOutputDecoration, output, 0, 0)
-    INST(GlobalInputDecoration, output, 0, 0)
+    INST(GlobalInputDecoration, input, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
@@ -1109,7 +1114,7 @@ INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
 INST(AlignOf,                           alignOf,                    1, 0)
-
+INST(GetArrayLength,                    GetArrayLength,             1, 0)
 INST(IsType, IsType, 3, 0)
 INST(TypeEquals, TypeEquals, 2, 0)
 INST(IsInt, IsInt, 1, 0)
