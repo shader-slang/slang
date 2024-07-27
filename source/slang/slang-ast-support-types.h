@@ -96,6 +96,7 @@ namespace Slang
 
         kConversionCost_GenericParamUpcast = 1,
         kConversionCost_UnconstraintGenericParam = 20,
+        kConversionCost_SizedArrayToUnsizedArray = 30,
 
         // Convert between matrices of different layout
         kConversionCost_MatrixLayout = 5,
