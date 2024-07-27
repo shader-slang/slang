@@ -1325,6 +1325,7 @@ __generic<T, let MAX_VERTS : uint>
 __magic_type(VerticesType)
 __intrinsic_type($(kIROp_VerticesType))
 [__NonCopyableType]
+[require(glsl_hlsl_metal_spirv, meshshading)]
 struct OutputVertices
 {
     __subscript(uint index) -> T
@@ -1332,8 +1333,21 @@ struct OutputVertices
         // TODO: Make sure this remains write only, we can't do this with just
         // a 'set' operation as it's legal to only write to part of the output
         // buffer, or part of the output buffer at a time.
-        __intrinsic_op($(kIROp_MetalSetVertex))
-        set;
+        // __target_switch
+        // {
+        // case metal:
+        // {
+            // this needs to be done with a target switch, but it doesnt compile for me
+            [mutating]
+            __intrinsic_op($(kIROp_MetalSetVertex))
+            set;
+        // }
+        // default:
+        // {
+        //     __intrinsic_op($(kIROp_MeshOutputRef))
+        //     ref;
+        // }
+        // }
     }
 };
 
@@ -1350,6 +1364,9 @@ struct OutputIndices
         [mutating]
         __intrinsic_op($(kIROp_MetalSetIndices))
         set;
+        // [mutating]
+        // __intrinsic_op($(kIROp_MeshOutputSet))
+        // set;
     }
 };
 
@@ -1361,9 +1378,8 @@ struct OutputPrimitives
 {
     __subscript(uint index) -> T
     {
-        // this needs to be done with a target switch, but it doesnt compile for me
-        __intrinsic_op($(kIROp_MetalSetPrimitive))
-        set;
+        __intrinsic_op($(kIROp_MeshOutputRef))
+        ref;
     }
 };
 

@@ -512,21 +512,19 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
         case kIROp_MetalSetIndices:
         {
-            m_writer->emit("_slang_mesh.set_index(");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            m_writer->emit("*3,");
-            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
-            m_writer->emit(".x);\n");
-            m_writer->emit("_slang_mesh.set_index(");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            m_writer->emit("*3,");
-            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
-            m_writer->emit(".y);\n");
-            m_writer->emit("_slang_mesh.set_index(");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            m_writer->emit("*3,");
-            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
-            m_writer->emit(".z)");
+            const auto indices = as<IRVectorType>(inst->getOperand(2)->getDataType());
+            UInt numIndices = as<IRIntLit>(indices->getElementCount())->getValue();
+            for(UInt i = 0; i < numIndices; ++i) {
+                m_writer->emit("_slang_mesh.set_index(");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit("*");
+                m_writer->emitUInt64(numIndices);
+                m_writer->emit(",(");
+                emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+                m_writer->emit(")[");
+                m_writer->emitUInt64(i);
+                m_writer->emit("]);\n");
+            }
             return true;
         }
         default: break;
