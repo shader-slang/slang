@@ -12,6 +12,7 @@
 
 #include "vulkan-api.h"
 #include "examples/example-base/example-base.h"
+#include "source/core/slang-string-util.h"
 
 using Slang::ComPtr;
 
@@ -42,6 +43,8 @@ struct HelloWorldExample
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkPipeline pipeline = VK_NULL_HANDLE;
 
+    bool isPrintEntrypointHashes = false;
+
     // Initializes the Vulkan instance and device.
     int initVulkanInstanceAndDevice();
 
@@ -60,25 +63,44 @@ struct HelloWorldExample
     int printComputeResults();
 
     // Main logic of this example.
-    int run();
+    int run(int argc, char* argv[]);
+
+    // Parses command line options. This example only has one option for testing purpose.
+    int parseOption(int argc, char* argv[]);
+
+    void printEntrypointHashes(int entryPointCount, int targetCount, ComPtr<slang::IComponentType>& composedProgram);
 
     ~HelloWorldExample();
 
 };
 
-int main()
+int main(int argc, char* argv[])
 {
     initDebugCallback();
     HelloWorldExample example;
-    return example.run();
+    return example.run(argc, argv);
 }
 
 /************************************************************/
 /* HelloWorldExample Implementation */
 /************************************************************/
 
-int HelloWorldExample::run()
+int HelloWorldExample::parseOption(int argc, char* argv[])
 {
+    // We only make the parse in a very loose way for only extracting the test option.
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "--print-entrypoint-hashes") == 0)
+        {
+            isPrintEntrypointHashes = true;
+        }
+    }
+    return 0;
+}
+
+int HelloWorldExample::run(int argc, char* argv[])
+{
+    RETURN_ON_FAIL(parseOption(argc, argv));
     RETURN_ON_FAIL(initVulkanInstanceAndDevice());
     RETURN_ON_FAIL(createComputePipelineFromShader());
     RETURN_ON_FAIL(createInOutBuffers());
@@ -204,6 +226,11 @@ int HelloWorldExample::createComputePipelineFromShader()
             0, 0, spirvCode.writeRef(), diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         RETURN_ON_FAIL(result);
+
+        if (isPrintEntrypointHashes)
+        {
+            printEntrypointHashes(1, 1, composedProgram);
+        }
     }
 
     // The following steps are all Vulkan API calls to create a pipeline.
@@ -473,6 +500,28 @@ int HelloWorldExample::printComputeResults()
         printf("%f\n", stagingBufferData[i]);
     }
     return 0;
+}
+
+void HelloWorldExample::printEntrypointHashes(int entryPointCount, int targetCount, ComPtr<slang::IComponentType>& composedProgram)
+{
+    for (int targetIndex = 0; targetIndex < targetCount; targetIndex++)
+    {
+        for (int entryPointIndex = 0; entryPointIndex < entryPointCount; entryPointIndex++)
+        {
+            ComPtr<slang::IBlob> entryPointHashBlob;
+            composedProgram->getEntryPointHash(entryPointIndex, targetIndex, entryPointHashBlob.writeRef());
+
+            Slang::StringBuilder strBuilder;
+            strBuilder << "entrypoint: "<< entryPointIndex << ", target: " << targetIndex << ", hash: ";
+
+            uint8_t* buffer = (uint8_t*)entryPointHashBlob->getBufferPointer();
+            for (size_t i = 0; i < entryPointHashBlob->getBufferSize(); i++)
+            {
+                strBuilder<<Slang::StringUtil::makeStringWithFormat("%.2X", buffer[i]);
+            }
+            fprintf(stdout, "%s\n", strBuilder.begin());
+        }
+    }
 }
 
 HelloWorldExample::~HelloWorldExample()

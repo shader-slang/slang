@@ -120,11 +120,13 @@ namespace SlangRecord
             {
                 uint8_t* buffer = (uint8_t*)outHash->getBufferPointer();
                 Slang::StringBuilder strBuilder;
+                strBuilder << "entrypoint: "<< entryPointIndex << ", target: " << targetIndex << ", hash: ";
+
                 for (size_t i = 0; i < outHash->getBufferSize(); i++)
                 {
-                    strBuilder<<Slang::StringUtil::makeStringWithFormat("%.2X ", buffer[i]);
+                    strBuilder<<Slang::StringUtil::makeStringWithFormat("%.2X", buffer[i]);
                 }
-                slangRecordLog(LogLevel::Verbose, "getEntryPointHash: %s\n", strBuilder.begin());
+                slangRecordLog(LogLevel::Verbose, "%s\n", strBuilder.begin());
             }
             else
             {
