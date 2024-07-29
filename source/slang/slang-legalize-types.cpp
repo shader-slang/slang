@@ -475,15 +475,6 @@ struct TupleTypeBuilder
             // original can also reference the new one.
             ordinaryStructType->insertAfter(originalStructType);
 
-            // Mark the original type for removal once all the other legalization
-            // activity is completed. This is necessary because both the original
-            // and replacement type have the same mangled name, so they would
-            // collide.
-            //
-            // (Also, the original type wasn't legal - that was the whole point...)
-            //originalStructType->removeFromParent();
-            //context->replacedInstructions.add(originalStructType);
-
             for(auto ee : ordinaryElements)
             {
                 // We will ensure that all the original fields are represented,
