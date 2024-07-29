@@ -467,7 +467,8 @@ struct TupleTypeBuilder
             IRBuilder* builder = context->getBuilder();
             IRStructType* ordinaryStructType = builder->createStructType();
             ordinaryStructType->sourceLoc = originalStructType->sourceLoc;
-            copyNameHintAndDebugDecorations(ordinaryStructType, originalStructType);
+            originalStructType->transferDecorationsTo(ordinaryStructType);
+            copyNameHintAndDebugDecorations(originalStructType, ordinaryStructType);
 
             // The new struct type will appear right after the original in the IR,
             // so that we can be sure any instruction that could reference the
@@ -480,8 +481,8 @@ struct TupleTypeBuilder
             // collide.
             //
             // (Also, the original type wasn't legal - that was the whole point...)
-            originalStructType->removeFromParent();
-            context->replacedInstructions.add(originalStructType);
+            //originalStructType->removeFromParent();
+            //context->replacedInstructions.add(originalStructType);
 
             for(auto ee : ordinaryElements)
             {

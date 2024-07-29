@@ -859,6 +859,9 @@ DIAGNOSTIC(55203, Error, systemValueTypeIncompatible, "system value semantic '$0
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
 DIAGNOSTIC(56002, Error, attemptToQuerySizeOfUnsizedArray, "cannot obtain the size of an unsized array.")
 
+// Metal
+DIAGNOSTIC(56100, Error, constantBufferInParameterBlockNotAllowedOnMetal, "nested 'ConstantBuffer' inside a 'ParameterBlock' is not supported on Metal, use 'ParameterBlock' instead.")
+
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
 DIAGNOSTIC(57003, Error, unknownTessPartitioning, "unknown tessellation partitioning '$0'.")
@@ -868,6 +871,7 @@ DIAGNOSTIC(58001, Error, entryPointMustReturnVoidWhenGlobalOutputPresent, "entry
 DIAGNOSTIC(58002, Error, unhandledGLSLSSBOType, "Unhandled GLSL Shader Storage Buffer Object contents, unsized arrays as a final parameter must be the only parameter")
 
 DIAGNOSTIC(58003, Error, inconsistentPointerAddressSpace, "'$0': use of pointer with inconsistent address space.")
+
 
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.
