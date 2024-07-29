@@ -1999,6 +1999,8 @@ static LegalVal coerceToLegalType(
                 auto valValueType = tryGetPointedToType(context->builder, simpleVal->getDataType());
                 if (!valValueType)
                     return val;
+                if (resultValueType == valValueType)
+                    return val;
                 auto loadedVal = context->builder->emitLoad(val.getSimple());
                 auto innerLegalVal = coerceToLegalType(context, LegalType::simple(resultValueType), LegalVal::simple(loadedVal));
                 return LegalVal::implicitDeref(innerLegalVal);
