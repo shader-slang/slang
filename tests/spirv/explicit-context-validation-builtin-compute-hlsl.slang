@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage compute -entry computeMain -enable-experimental-passes
 
 // Check to ensure builtin is not moved into a kernelContext (part of entry-point). Ensure builtin is referenced directly.
 

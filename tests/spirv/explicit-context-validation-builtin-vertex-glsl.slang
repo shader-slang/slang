@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -target spirv -emit-spirv-directly -stage vertex -entry vertexMain
+//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -target spirv -emit-spirv-directly -stage vertex -entry vertexMain -enable-experimental-passes
 
 // Check to ensure varying output/input and builtin is not moved into a kernelContext (part of entry-point). Ensure varying output/input and builtin is referenced directly.
 

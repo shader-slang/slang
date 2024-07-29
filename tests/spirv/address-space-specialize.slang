@@ -1,3 +1,4 @@
+//TEST:SIMPLE(filecheck=CHECK_EXPERIMENTAL):-target spirv -entry main -stage compute -emit-spirv-directly -O0 -enable-experimental-passes
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -emit-spirv-directly -O0
 
 // Test that we can pass arguments in different address space to an `inout` parameter, and have
@@ -8,9 +9,12 @@ static int gArray0[2];
 groupshared int gArray1[2];
 
 // Note: static globals are inside a context variable
-// CHECK: OpTypeArray %int %int_2
-// CHECK: OpVariable %_ptr_Function__arr_int_int_2 Function
+// CHECK_EXPERIMENTAL: OpTypeArray %int %int_2
+// CHECK_EXPERIMENTAL: OpVariable %_ptr_Function__arr_int_int_2 Function
+// CHECK_EXPERIMENTAL: %array_0 = OpFunctionParameter %_ptr_Workgroup__arr_int_int_2
 
+
+// CHECK: %array = OpFunctionParameter %_ptr_Private__arr_int_int_2
 // CHECK: %array_0 = OpFunctionParameter %_ptr_Workgroup__arr_int_int_2
 
 void modify(inout int array[2])
