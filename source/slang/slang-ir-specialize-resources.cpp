@@ -191,6 +191,8 @@ struct ResourceOutputSpecializationPass
         // into a combined pass that specializes in both directions and
         // also folds in SSA formation to clean up temporaries.
 
+        lastProcessedFunc = oldFunc;
+
         // We start the specialization process by making a clone of the
         // original function.
         //
@@ -880,6 +882,7 @@ struct ResourceOutputSpecializationPass
         // a parameter SSA needs for SSA'ing a localVar into a globalVar (and DCE requires 
         // to not DCE an important 'IRCall').
         // 
+        auto callingFunc = getParentFunc(param);
         Slang::Result failedCallSpecialization = SLANG_OK;
         List<IRStore*> stores;
         traverseUses(param, [&](IRUse* use)
@@ -902,11 +905,13 @@ struct ResourceOutputSpecializationPass
                     if (!func)
                         return;
                     
-                    // Note: processFunc adds to unspecializableFuncs for us
+                    // Note: processFunc adds a new unspecializableFunc for us
                     if(!processFunc(func))
                     {
                         failedCallSpecialization = SLANG_FAIL;
                     }
+                    else
+                        lastProcessedFunc = callingFunc;
                     return;
                 }
                 default:
