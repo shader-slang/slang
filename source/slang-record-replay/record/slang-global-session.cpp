@@ -26,7 +26,7 @@ namespace SlangRecord
         }
 
         recorder->recordAddress(m_actualGlobalSession);
-        m_recordManager->endMethodRecordAppendOutput();
+        m_recordManager->apendOutput();
     }
 
     GlobalSessionRecorder::~GlobalSessionRecorder()
@@ -71,7 +71,7 @@ namespace SlangRecord
 
         {   // record output
             recorder->recordAddress(actualSession);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         if (actualSession != nullptr)
@@ -153,7 +153,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outPrelude);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
     }
 
@@ -227,7 +227,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outPrelude);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
     }
 
@@ -245,7 +245,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outCompileRequest);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return res;
@@ -288,7 +288,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(loader);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
         return loader;
     }
@@ -354,7 +354,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outBlob);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
         return res;
     }
@@ -431,7 +431,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(outSessionDesc);
             recorder->recordAddress(*outAllocation);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
         return res;
     }
@@ -451,7 +451,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outBlob);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
         return res;
     }

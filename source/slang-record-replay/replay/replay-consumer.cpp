@@ -7,7 +7,7 @@ namespace SlangRecord
 #define OutputObjectSanityCheck(objId)          \
     do {                                        \
         if(m_objectMap.tryGetValue((objId))) {  \
-            slangRecordLog(LogLevel::Error, "Output object 0x%X lready exists! %s:%d\n", objId, __PRETTY_FUNCTION__, __LINE__); \
+            slangRecordLog(LogLevel::Error, "Output object 0x%X already exists! %s:%d\n", objId, __PRETTY_FUNCTION__, __LINE__); \
             std::abort();                       \
         }                                       \
     } while(0)

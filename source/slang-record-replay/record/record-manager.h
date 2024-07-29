@@ -16,9 +16,9 @@ namespace SlangRecord
         ParameterRecorder* beginMethodRecord(const ApiCallId& callId, uint64_t handleId);
         ParameterRecorder* endMethodRecord();
 
-        // endMethodRecordAppendOutput is an optional call that can be used to append output to
+        // apendOutput is an optional call that can be used to append output to
         // the end of the record. It has to start with a FunctionTailer
-        void endMethodRecordAppendOutput();
+        void apendOutput();
 
         std::filesystem::path const& getRecordFileDirectory() const { return m_recordFileDirectory; }
 

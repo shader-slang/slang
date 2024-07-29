@@ -45,6 +45,7 @@ namespace SlangRecord
             if (!m_objectMap.tryGetValue(objectId, objPtr))
             {
                 slangRecordLog(LogLevel::Error, "Object not found in the object map: %d\n", objectId);
+                std::abort();
             }
 
             return static_cast<slang::IComponentType*>(objPtr);
@@ -229,16 +230,17 @@ namespace SlangRecord
         Slang::Dictionary<ObjectID, void*> m_objectMap;
 
         template<typename T>
-		inline T* getObjectPointer(ObjectID objectId)
-		{
+        inline T* getObjectPointer(ObjectID objectId)
+        {
             void* objPtr = nullptr;
             if (!m_objectMap.tryGetValue(objectId, objPtr))
             {
                 slangRecordLog(LogLevel::Error, "Object not found in the object map: %d\n", objectId);
+                std::abort();
             }
 
             return static_cast<T*>(objPtr);
-		}
+        }
 
         CommonInterfaceReplayer m_commonReplayer {m_objectMap};
     };

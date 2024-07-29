@@ -5,6 +5,7 @@
 #include "../util/record-utility.h"
 #include "../util/emum-to-string.h"
 #include "../../core/slang-string-util.h"
+#include "../../core/slang-io.h"
 
 namespace SlangRecord
 {
@@ -257,7 +258,7 @@ namespace SlangRecord
             {
                 WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
                 WRITE_PAIR(builder, indent, "outLinkedComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outLinkedComponentTypeId));
-                WRITE_PAIR(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                WRITE_PAIR_NO_COMMA(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
             }
         }
 
@@ -281,7 +282,7 @@ namespace SlangRecord
                 WRITE_PAIR(builder, indent, "entryPointIndex", entryPointIndex);
                 WRITE_PAIR(builder, indent, "targetIndex", targetIndex);
                 WRITE_PAIR(builder, indent, "outSharedLibrary", Slang::StringUtil::makeStringWithFormat("0x%X", outSharedLibraryId));
-                WRITE_PAIR(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                WRITE_PAIR_NO_COMMA(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
             }
         }
 
@@ -303,7 +304,7 @@ namespace SlangRecord
                 WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
                 WRITE_PAIR(builder, indent, "newName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             newName != nullptr ? newName : "nullptr"));
-                WRITE_PAIR(builder, indent, "outEntryPoint", Slang::StringUtil::makeStringWithFormat("0x%X", outEntryPointId));
+                WRITE_PAIR_NO_COMMA(builder, indent, "outEntryPoint", Slang::StringUtil::makeStringWithFormat("0x%X", outEntryPointId));
             }
         }
 
@@ -331,7 +332,7 @@ namespace SlangRecord
                 JsonConsumer::_writeCompilerOptionEntryHelper(builder, indent, compilerOptionEntries, compilerOptionEntryCount);
 
                 WRITE_PAIR(builder, indent, "outLinkedComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outLinkedComponentTypeId));
-                WRITE_PAIR(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                WRITE_PAIR_NO_COMMA(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
             }
         }
 
@@ -345,7 +346,7 @@ namespace SlangRecord
         std::filesystem::path jsonFileDir(filePath);
         jsonFileDir = std::filesystem::absolute(jsonFileDir);
 
-        if (!std::filesystem::exists(jsonFileDir.parent_path()))
+        if (!Slang::File::exists(jsonFileDir.parent_path().string().c_str()))
         {
             slangRecordLog(LogLevel::Error, "Directory for json file does not exist: %s\n", filePath.c_str());
         }
