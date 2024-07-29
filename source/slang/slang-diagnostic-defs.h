@@ -872,7 +872,6 @@ DIAGNOSTIC(58002, Error, unhandledGLSLSSBOType, "Unhandled GLSL Shader Storage B
 
 DIAGNOSTIC(58003, Error, inconsistentPointerAddressSpace, "'$0': use of pointer with inconsistent address space.")
 
-
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.
 //
