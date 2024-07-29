@@ -6181,6 +6181,11 @@ void EndToEndCompileRequest::setAllowGLSLInput(bool value)
     getOptionSet().set(CompilerOptionName::AllowGLSL, value);
 }
 
+void EndToEndCompileRequest::setEnableExperimentalPasses(bool value)
+{
+    getOptionSet().set(CompilerOptionName::EnableExperimentalPasses, value);
+}
+
 SlangResult EndToEndCompileRequest::compile()
 {
     SlangResult res = SLANG_FAIL;

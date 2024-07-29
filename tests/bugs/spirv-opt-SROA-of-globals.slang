@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -fvk-use-entrypoint-name
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -fvk-use-entrypoint-name -xslang -enable-experimental-passes
 
 // This test checks that spirv-opt is running SROA (scalar replacement of aggregates) to 
 // hoist out all member variables of a struct. If this sucsessfully runs, we should not see
