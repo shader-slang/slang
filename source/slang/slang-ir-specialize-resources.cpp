@@ -541,22 +541,16 @@ struct ResourceOutputSpecializationPass
         // a state where it isn't useful, but it also won't have any uses,
         // and can be eliminated later.
         //
-        Slang::Result failedToSpecializeParam = SLANG_OK;
         IRParam* nextParam = nullptr;
         for( IRParam* param = func->getFirstParam(); param; param = nextParam )
         {
             nextParam = param->getNextParam();
 
             ParamInfo paramInfo;
-            if(SLANG_FAILED(maybeSpecializeParam(param, paramInfo, outFuncInfo)))
-            {
-                // We collect info on why all parameters fail specialization, do not early break.
-                failedToSpecializeParam = SLANG_FAIL;
-                continue;
-            }
+            SLANG_RETURN_ON_FAIL(maybeSpecializeParam(param, paramInfo, outFuncInfo));
             outFuncInfo.oldParams.add(paramInfo);
         }
-        SLANG_RETURN_ON_FAIL(failedToSpecializeParam);
+
         SLANG_RETURN_ON_FAIL(maybeSpecializeResult(func, outFuncInfo.result, outFuncInfo));
 
         return SLANG_OK;
