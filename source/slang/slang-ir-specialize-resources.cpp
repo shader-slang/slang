@@ -785,7 +785,61 @@ struct ResourceOutputSpecializationPass
         if(!isResourceType(valueType))
             return SLANG_OK;
 
-        // Before we change something (and likely break this 
+        prepareOutputValue(outParamInfo, ioFuncInfo);
+
+        // We are going to remove the parameter and add zero or more
+        // replacements, and we want any replacements to end up
+        // at the same point in the function signature.
+        //
+        IRBuilder paramsBuilder(module);
+        paramsBuilder.setInsertBefore(param);
+
+        // We also need to introduce new instructions into the function
+        // body, as part of the entry block.
+        //
+        IRBlock* block = as<IRBlock>(param->getParent());
+        IRBuilder bodyBuilder(module);
+        bodyBuilder.setInsertBefore(block->getFirstOrdinaryInst());
+
+        // No matter what, we create a local variable that will be
+        // used to replace the parameter.
+        //
+        IRVar* newVar = bodyBuilder.emitVar(valueType);
+
+        if( as<IRInOutType>(outType) )
+        {
+            // If the parameter is an `inout` rather than just
+            // an `out`, then we still need a parameter to
+            // be passed in, but it can be an `in` parameter
+            // instead, which means a `T` instead of an
+            // `InOut<T>`.
+            //
+            IRInst* newParam = paramsBuilder.createParam(valueType);
+            newParam->insertBefore(param);
+            param->transferDecorationsTo(newParam);
+
+            // The start of the function body should assign
+            // from the `in` parameter to the local variable.
+            //
+            bodyBuilder.emitStore(newVar, newParam);
+
+            // We also need call sites to pass in an argument
+            // for the new `in` parameter, which will have to
+            // be dereferenced by one level from the original
+            // argument they were passing.
+            //
+            outParamInfo.oldArgMode = ParamInfo::OldArgMode::Deref;
+        }
+        else
+        {
+            // The case for a pure `out` parameter is easier:
+            // we don't need to initialize the local variable,
+            // and we don't need callers to pass in anything.
+            //
+            outParamInfo.oldArgMode = ParamInfo::OldArgMode::Ignore;
+        }
+
+                // Before we change something (and likely break this 
         // function if something fails after a change) we want
         // to identify all the places in the function
         // that `store` to the given output parameter.
@@ -876,60 +930,6 @@ struct ResourceOutputSpecializationPass
             // since the values they write won't ever be used.
             //
             store->removeAndDeallocate();
-        }
-
-        prepareOutputValue(outParamInfo, ioFuncInfo);
-
-        // We are going to remove the parameter and add zero or more
-        // replacements, and we want any replacements to end up
-        // at the same point in the function signature.
-        //
-        IRBuilder paramsBuilder(module);
-        paramsBuilder.setInsertBefore(param);
-
-        // We also need to introduce new instructions into the function
-        // body, as part of the entry block.
-        //
-        IRBlock* block = as<IRBlock>(param->getParent());
-        IRBuilder bodyBuilder(module);
-        bodyBuilder.setInsertBefore(block->getFirstOrdinaryInst());
-
-        // No matter what, we create a local variable that will be
-        // used to replace the parameter.
-        //
-        IRVar* newVar = bodyBuilder.emitVar(valueType);
-
-        if( as<IRInOutType>(outType) )
-        {
-            // If the parameter is an `inout` rather than just
-            // an `out`, then we still need a parameter to
-            // be passed in, but it can be an `in` parameter
-            // instead, which means a `T` instead of an
-            // `InOut<T>`.
-            //
-            IRInst* newParam = paramsBuilder.createParam(valueType);
-            newParam->insertBefore(param);
-            param->transferDecorationsTo(newParam);
-
-            // The start of the function body should assign
-            // from the `in` parameter to the local variable.
-            //
-            bodyBuilder.emitStore(newVar, newParam);
-
-            // We also need call sites to pass in an argument
-            // for the new `in` parameter, which will have to
-            // be dereferenced by one level from the original
-            // argument they were passing.
-            //
-            outParamInfo.oldArgMode = ParamInfo::OldArgMode::Deref;
-        }
-        else
-        {
-            // The case for a pure `out` parameter is easier:
-            // we don't need to initialize the local variable,
-            // and we don't need callers to pass in anything.
-            //
-            outParamInfo.oldArgMode = ParamInfo::OldArgMode::Ignore;
         }
 
         // It is possible that there will still be used of the parameter
