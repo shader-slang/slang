@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
     std::filesystem::path jsonPath = options.recordFileName.begin();
     jsonPath.replace_extension(".json");
 
-    SlangRecord::JsonConsumer jsonConsumer(jsonPath);
+    SlangRecord::JsonConsumer jsonConsumer(jsonPath.string());
     SlangRecord::ReplayConsumer replayConsumer;
 
     SlangRecord::SlangDecoder decoder;

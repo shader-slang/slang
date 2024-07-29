@@ -120,7 +120,8 @@ namespace SlangRecord
         if (tailer.magic == MAGIC_HEADER)
         {
             // revert back to last read position, and clear tailer
-            m_inputStream.seek(Slang::SeekOrigin::Current, -sizeof(FunctionTailer));
+            int64_t offset = -(int64_t)sizeof(FunctionTailer);
+            m_inputStream.seek(Slang::SeekOrigin::Current, offset);
             memset(&tailer, 0, sizeof(FunctionTailer));
             return NOT_EXSIT;
         }

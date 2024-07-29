@@ -63,7 +63,7 @@ namespace SlangRecord
         virtual void IGlobalSession_setDownstreamCompilerPrelude(ObjectID objectId, SlangPassThrough inPassThrough, char const* prelude) override;
         virtual void IGlobalSession_getDownstreamCompilerPrelude(ObjectID objectId, SlangPassThrough inPassThrough, ObjectID outPreludeId) override;
 
-        virtual void IGlobalSession_getBuildTagString(ObjectID objectId)  { (void) objectId; }
+        virtual void IGlobalSession_getBuildTagString(ObjectID objectId) override  { (void) objectId; }
 
         virtual void IGlobalSession_setDefaultDownstreamCompiler(ObjectID objectId, SlangSourceLanguage sourceLanguage, SlangPassThrough defaultCompiler) override;
         virtual void IGlobalSession_getDefaultDownstreamCompiler(ObjectID objectId, SlangSourceLanguage sourceLanguage) override;
@@ -82,7 +82,7 @@ namespace SlangRecord
         virtual void IGlobalSession_setDownstreamCompilerForTransition(ObjectID objectId, SlangCompileTarget source, SlangCompileTarget target, SlangPassThrough compiler) override;
         virtual void IGlobalSession_getDownstreamCompilerForTransition(ObjectID objectId, SlangCompileTarget source, SlangCompileTarget target) override;
 
-        virtual void IGlobalSession_getCompilerElapsedTime(ObjectID objectId)  { (void) objectId; }
+        virtual void IGlobalSession_getCompilerElapsedTime(ObjectID objectId) override  { (void) objectId; }
 
         virtual void IGlobalSession_setSPIRVCoreGrammar(ObjectID objectId, char const* jsonPath) override;
         virtual void IGlobalSession_parseCommandLineArguments(ObjectID objectId, int argc, const char* const* argv, ObjectID outSessionDescId, ObjectID outAllocationId) override;
@@ -126,31 +126,31 @@ namespace SlangRecord
 
         virtual void ISession_createCompileRequest(ObjectID objectId, ObjectID outCompileRequestId) override;
 
-        virtual void ISession_getLoadedModuleCount(ObjectID objectId)  { (void) objectId; }
+        virtual void ISession_getLoadedModuleCount(ObjectID objectId) override { (void) objectId; }
 
         virtual void ISession_getLoadedModule(ObjectID objectId, SlangInt index, ObjectID outModuleId) override;
 
-        virtual void ISession_isBinaryModuleUpToDate(ObjectID objectId)  { (void) objectId; }
+        virtual void ISession_isBinaryModuleUpToDate(ObjectID objectId) override { (void) objectId; }
 
         // IModule
         virtual void IModule_findEntryPointByName(ObjectID objectId, char const* name, ObjectID outEntryPointId) override;
 
-        virtual void IModule_getDefinedEntryPointCount(ObjectID objectId)  { (void) objectId; }
+        virtual void IModule_getDefinedEntryPointCount(ObjectID objectId) override { (void) objectId; }
 
         virtual void IModule_getDefinedEntryPoint(ObjectID objectId, SlangInt32 index, ObjectID outEntryPointId) override;
         virtual void IModule_serialize(ObjectID objectId, ObjectID outSerializedBlobId) override;
         virtual void IModule_writeToFile(ObjectID objectId, char const* fileName) override;
 
-        virtual void IModule_getName(ObjectID objectId)  { (void) objectId; }
-        virtual void IModule_getFilePath(ObjectID objectId)  { (void) objectId; }
-        virtual void IModule_getUniqueIdentity(ObjectID objectId)  { (void) objectId; }
+        virtual void IModule_getName(ObjectID objectId) override { (void) objectId; }
+        virtual void IModule_getFilePath(ObjectID objectId) override { (void) objectId; }
+        virtual void IModule_getUniqueIdentity(ObjectID objectId) override { (void) objectId; }
 
         virtual void IModule_findAndCheckEntryPoint(ObjectID objectId, char const* name, SlangStage stage, ObjectID outEntryPointId, ObjectID outDiagnostics) override;
 
         virtual void IModule_getSession(ObjectID objectId, ObjectID outSessionId) override;
         virtual void IModule_getLayout(ObjectID objectId, SlangInt targetIndex, ObjectID outDiagnosticsId, ObjectID retProgramLayoutId) override;
 
-        virtual void IModule_getSpecializationParamCount(ObjectID objectId) { (void) objectId; }
+        virtual void IModule_getSpecializationParamCount(ObjectID objectId) override { (void) objectId; }
 
         virtual void IModule_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) override;
         virtual void IModule_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) override;
@@ -168,7 +168,7 @@ namespace SlangRecord
         virtual void IEntryPoint_getSession(ObjectID objectId, ObjectID outSessionId) override;
         virtual void IEntryPoint_getLayout(ObjectID objectId, SlangInt targetIndex, ObjectID outDiagnosticsId, ObjectID retProgramLayoutId) override;
 
-        virtual void IEntryPoint_getSpecializationParamCount(ObjectID objectId) { (void) objectId; };
+        virtual void IEntryPoint_getSpecializationParamCount(ObjectID objectId) override { (void) objectId; };
 
         virtual void IEntryPoint_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) override;
         virtual void IEntryPoint_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) override;
@@ -186,7 +186,7 @@ namespace SlangRecord
         virtual void ICompositeComponentType_getSession(ObjectID objectId, ObjectID outSessionId) override;
         virtual void ICompositeComponentType_getLayout(ObjectID objectId, SlangInt targetIndex, ObjectID outDiagnosticsId, ObjectID retProgramLayoutId) override;
 
-        virtual void ICompositeComponentType_getSpecializationParamCount(ObjectID objectId) { (void) objectId; };
+        virtual void ICompositeComponentType_getSpecializationParamCount(ObjectID objectId) override { (void) objectId; };
 
         virtual void ICompositeComponentType_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) override;
         virtual void ICompositeComponentType_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) override;
@@ -204,7 +204,7 @@ namespace SlangRecord
         virtual void ITypeConformance_getSession(ObjectID objectId, ObjectID outSessionId) override;
         virtual void ITypeConformance_getLayout(ObjectID objectId, SlangInt targetIndex, ObjectID outDiagnosticsId, ObjectID retProgramLayoutId) override;
 
-        virtual void ITypeConformance_getSpecializationParamCount(ObjectID objectId) { (void) objectId; };
+        virtual void ITypeConformance_getSpecializationParamCount(ObjectID objectId) override { (void) objectId; };
 
         virtual void ITypeConformance_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) override;
         virtual void ITypeConformance_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) override;
