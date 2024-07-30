@@ -1325,29 +1325,35 @@ __generic<T, let MAX_VERTS : uint>
 __magic_type(VerticesType)
 __intrinsic_type($(kIROp_VerticesType))
 [__NonCopyableType]
-[require(glsl_hlsl_metal_spirv, meshshading)]
 struct OutputVertices
 {
+    __intrinsic_op($(kIROp_MetalSetVertex))
+    static void __metalSetVertex(uint index, T val);
+
+    __intrinsic_op($(kIROp_MeshOutputSet))
+    void __setVertex(uint index, T val);
+
     __subscript(uint index) -> T
     {
         // TODO: Make sure this remains write only, we can't do this with just
         // a 'set' operation as it's legal to only write to part of the output
         // buffer, or part of the output buffer at a time.
-        // __target_switch
-        // {
-        // case metal:
-        // {
-            // this needs to be done with a target switch, but it doesnt compile for me
-            [mutating]
-            __intrinsic_op($(kIROp_MetalSetVertex))
-            set;
-        // }
-        // default:
-        // {
-        //     __intrinsic_op($(kIROp_MeshOutputRef))
-        //     ref;
-        // }
-        // }
+
+        [mutating]
+        set
+        {
+            __target_switch
+            {
+            case metal: __metalSetVertex(index, newValue);
+            case glsl: __setVertex(index, newValue);
+            case hlsl: __setVertex(index, newValue);
+            case spirv: __setVertex(index, newValue);
+            }
+        }
+        
+        [require(glsl_hlsl_spirv, meshshading)]
+        __intrinsic_op($(kIROp_MeshOutputRef))
+        ref;
     }
 };
 
@@ -1357,16 +1363,29 @@ __intrinsic_type($(kIROp_IndicesType))
 [__NonCopyableType]
 struct OutputIndices
 {
+    __intrinsic_op($(kIROp_MetalSetIndices))
+    static void __metalSetIndices(uint index, T val);
+
+    __intrinsic_op($(kIROp_MeshOutputSet))
+    void __setIndices(uint index, T val);
+
     __subscript(uint index) -> T
     {
-        // It's illegal to not write out the entire primitive at once, so limit
-        // this to set
         [mutating]
-        __intrinsic_op($(kIROp_MetalSetIndices))
-        set;
-        // [mutating]
-        // __intrinsic_op($(kIROp_MeshOutputSet))
-        // set;
+        set
+        {
+            __target_switch
+            {
+            case metal: __metalSetIndices(index, newValue);
+            case glsl: __setIndices(index, newValue);
+            case hlsl: __setIndices(index, newValue);
+            case spirv: __setIndices(index, newValue);
+            }
+        }
+
+        [require(glsl_hlsl_spirv, meshshading)]
+        __intrinsic_op($(kIROp_MeshOutputRef))
+        ref;
     }
 };
 
@@ -1376,10 +1395,26 @@ __intrinsic_type($(kIROp_PrimitivesType))
 [__NonCopyableType]
 struct OutputPrimitives
 {
-    __subscript(uint index) -> T
+    __intrinsic_op($(kIROp_MetalSetPrimitive))
+    static void __metalSetPrimitive(uint index, T val);
+
+    __intrinsic_op($(kIROp_MeshOutputSet))
+    void __setPrimitive(uint index, T val);
+
+    __subscript(uint index)->T
     {
-        __intrinsic_op($(kIROp_MeshOutputRef))
-        ref;
+        [mutating]
+        set
+        {
+            __target_switch
+            {
+            case metal: __metalSetPrimitive(index, newValue);
+            case glsl: __setPrimitive(index, newValue);
+            case hlsl: __setPrimitive(index, newValue);
+            case spirv: __setPrimitive(index, newValue);
+            }
+        }
+
     }
 };
 

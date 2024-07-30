@@ -54,6 +54,11 @@ struct Vertex
     int value : Value;
 };
 
+struct Primitive
+{
+    uint prim : SV_PrimitiveID;
+};
+
 const static uint MAX_VERTS = 12;
 const static uint MAX_PRIMS = 4;
 
@@ -66,7 +71,9 @@ void meshMain(
     // requires:
     // HLSL: , in payload MeshPayload
     OutputVertices<Vertex, MAX_VERTS> verts,
-    OutputIndices<uint3, MAX_PRIMS> triangles)
+    OutputIndices<uint3, MAX_PRIMS> triangles,
+    OutputPrimitives<Primitive, MAX_PRIMS> primitives
+    )
 {
     const uint numVertices = 12;
     const uint numPrimitives = 4;
@@ -76,10 +83,14 @@ void meshMain(
     {
         const int tri = tig / 3;
         verts[tig] = { float4(positions[tig % 3], 0, 1), colors[tig % 3], tri, int(pow(tri, meshPayload.exponent)) };
+        verts[tig].color = float3(0, 1, 0);
     }
 
     if (tig < numPrimitives)
+    {
         triangles[tig] = tig * 3 + uint3(0, 1, 2);
+        primitives[tig] = { tig };
+    }
 }
 
 //

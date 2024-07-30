@@ -503,9 +503,11 @@ INST(GetNaturalStride, getNaturalStride, 1, 0)
 INST(MeshOutputRef, meshOutputRef, 2, 0)
 INST(MeshOutputSet, meshOutputSet, 3, 0)
 
-INST(MetalSetVertex, metalSetVertex, 3, 0)
-INST(MetalSetPrimitive, metalSetPrimitive, 3, 0)
-INST(MetalSetIndices, metalSetIndices, 3, 0)
+// only two parameters as they are effectively static
+// TODO: make them reference the _slang_mesh object directly
+INST(MetalSetVertex, metalSetVertex, 2, 0)
+INST(MetalSetPrimitive, metalSetPrimitive, 2, 0)
+INST(MetalSetIndices, metalSetIndices, 2, 0)
 
 // Construct a vector from a scalar
 //

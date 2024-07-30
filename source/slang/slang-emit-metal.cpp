@@ -494,33 +494,36 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
         case kIROp_MetalSetVertex:
         {
+            auto setVertex = as<IRMetalSetVertex>(inst);
             m_writer->emit("_slang_mesh.set_vertex(");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            emitOperand(setVertex->getIndex(), getInfo(EmitOp::General));
             m_writer->emit(",");
-            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            emitOperand(setVertex->getElementValue(), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }
         case kIROp_MetalSetPrimitive:
         {
+            auto setPrimitive = as<IRMetalSetPrimitive>(inst);
             m_writer->emit("_slang_mesh.set_primitive(");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            emitOperand(setPrimitive->getIndex(), getInfo(EmitOp::General));
             m_writer->emit(",");
-            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            emitOperand(setPrimitive->getElementValue(), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }
         case kIROp_MetalSetIndices:
         {
-            const auto indices = as<IRVectorType>(inst->getOperand(2)->getDataType());
+            auto setIndices = as<IRMetalSetIndices>(inst);
+            const auto indices = as<IRVectorType>(setIndices->getElementValue()->getDataType());
             UInt numIndices = as<IRIntLit>(indices->getElementCount())->getValue();
             for(UInt i = 0; i < numIndices; ++i) {
                 m_writer->emit("_slang_mesh.set_index(");
-                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                emitOperand(setIndices->getIndex(), getInfo(EmitOp::General));
                 m_writer->emit("*");
                 m_writer->emitUInt64(numIndices);
                 m_writer->emit(",(");
-                emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+                emitOperand(setIndices->getElementValue(), getInfo(EmitOp::General));
                 m_writer->emit(")[");
                 m_writer->emitUInt64(i);
                 m_writer->emit("]);\n");

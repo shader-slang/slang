@@ -1372,26 +1372,13 @@ namespace Slang
             auto meshParam = builder.emitParam(builder.getMetalMeshType(vertexType, primitiveType, maxVertices, maxPrimitives, topologyConst));
             builder.addExternCppDecoration(meshParam, toSlice("_slang_mesh"));
             //This doesnt actually do anything yet, i hardcoded the refs to be the metal variants in the core.meta.slang, idk why this doesnt work
-            traverseUses(verticesParam, [&](IRUse* use){
-                if(const auto meshRef = as<IRMeshOutputSet>(use->getUser())){
-                    meshRef->replaceUsesWith(builder.emitMetalSetVertex(meshRef->getIndex(), meshRef->getElementValue()));
-                }
-            });
+            
             verticesParam->removeFromParent();
             verticesParam->removeAndDeallocate();
-            traverseUses(indicesParam, [&](IRUse* use){
-                if(const auto meshRef = as<IRMeshOutputSet>(use->getUser())){
-                    meshRef->replaceUsesWith(builder.emitMetalSetIndices(meshRef->getIndex(), meshRef->getElementValue()));
-                }
-            });
+            
             indicesParam->removeFromParent();
             indicesParam->removeAndDeallocate();
             if(primitivesParam != nullptr) {
-                traverseUses(primitivesParam, [&](IRUse* use){
-                    if(const auto meshRef = as<IRMeshOutputSet>(use->getUser())){
-                        meshRef->replaceUsesWith(builder.emitMetalSetPrimitive(meshRef->getIndex(), meshRef->getElementValue()));
-                    }
-                });
                 primitivesParam->removeFromParent();
                 primitivesParam->removeAndDeallocate();
             }
