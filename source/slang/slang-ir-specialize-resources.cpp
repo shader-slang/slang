@@ -899,7 +899,6 @@ struct ResourceOutputSpecializationPass
                     if (!func)
                         return;
                     
-                    // Note: processFunc adds a new unspecializableFunc for us
                     if(!processFunc(func))
                     {
                         failedCallSpecialization = SLANG_FAIL;
@@ -911,6 +910,9 @@ struct ResourceOutputSpecializationPass
                 };
             });
         SLANG_RETURN_ON_FAIL(failedCallSpecialization);
+        // update the 'lastProcessedFunc' to the 'currently being processed function'.
+        // This is required if we processed any 'kIROp_Call'.
+        lastProcessedFunc = callingFunc;
 
         // Having identified the places where a value is stored to
         // the output parameter, we iterate over those values to
