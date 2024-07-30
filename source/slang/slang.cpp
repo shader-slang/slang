@@ -3153,8 +3153,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // and stash the result blob in an IR op.
     for (auto targetReq : getLinkage()->targets)
     {
-        if (targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL) ||
-            targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedSPIRV))
+        if (targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
         {
             auto frontEndReq = getFrontEndReq();
 
@@ -5785,11 +5784,6 @@ void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool
 void EndToEndCompileRequest::setTargetEmbedDXIL(int targetIndex, bool value)
 {
     getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDXIL, value);
-}
-
-void EndToEndCompileRequest::setTargetEmbedSPIRV(int targetIndex, bool value)
-{
-    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedSPIRV, value);
 }
 
 void EndToEndCompileRequest::setTargetLineDirectiveMode(

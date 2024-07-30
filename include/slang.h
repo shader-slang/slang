@@ -873,7 +873,6 @@ extern "C"
             UnscopedEnum,           // bool
             PreserveParameters,       // bool: preserve all resource parameters in the output code.
             EmbedDXIL,              // bool
-            EmbedSPIRV,             // bool
 
             // Target
 
@@ -4158,10 +4157,6 @@ namespace slang
             bool                    value) = 0;
 
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDXIL(
-            int                     targetIndex,
-            bool                    value) = 0;
-
-        virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedSPIRV(
             int                     targetIndex,
             bool                    value) = 0;
 

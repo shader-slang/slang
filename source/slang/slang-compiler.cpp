@@ -1582,10 +1582,6 @@ namespace Slang
                         library->addRepresentationUnknown(irModule->precompiledDXIL);
                         libraries.add(library);
                     }
-                    else if (irModule->precompiledSPIRV)
-                    {
-                        // TODO
-                    }
                 });
         }
 
@@ -2039,8 +2035,7 @@ namespace Slang
             {                
                 if (auto artifact = targetProgram->getExistingWholeProgramResult())
                 {
-                    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL) &&
-                        !targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedSPIRV))
+                    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
                     {
                         artifacts.add(ComPtr<IArtifact>(artifact));
                     }

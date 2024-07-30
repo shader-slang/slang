@@ -356,8 +356,6 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::PreserveParameters, "-preserve-params", nullptr, "Preserve all resource parameters in the output code, even if they are not used by the shader."},
         { OptionKind::EmbedDXIL, "-embed-dxil", nullptr,
         "Embed DXIL into emitted slang-modules for faster linking" },
-        { OptionKind::EmbedSPIRV, "-embed-spirv", nullptr,
-        "Embed SPIR-V into emitted slang-modules for faster linking" },
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
@@ -1952,7 +1950,6 @@ SlangResult OptionsParser::_parse(
                 break;
             }
             case OptionKind::EmbedDXIL: SLANG_RETURN_ON_FAIL(addEmbeddedLibrary(CodeGenTarget::DXIL, CompilerOptionName::EmbedDXIL)); break;
-            case OptionKind::EmbedSPIRV: SLANG_RETURN_ON_FAIL(addEmbeddedLibrary(CodeGenTarget::SPIRV, CompilerOptionName::EmbedSPIRV)); break;
             case OptionKind::Target:
             {
                 CommandLineArg name;
@@ -2793,11 +2790,6 @@ SlangResult OptionsParser::_parse(
             if (rawTarget.optionSet.getBoolOption(CompilerOptionName::EmbedDXIL))
             {
                 m_compileRequest->setTargetEmbedDXIL(targetID, true);
-            }
-
-            if (rawTarget.optionSet.getBoolOption(CompilerOptionName::EmbedSPIRV))
-            {
-                m_compileRequest->setTargetEmbedSPIRV(targetID, true);
             }
         }
 

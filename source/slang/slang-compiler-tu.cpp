@@ -22,9 +22,6 @@ namespace Slang
         case CodeGenTarget::DXIL:
             linkage.addTarget(Slang::CodeGenTarget::DXIL);
             break;
-        case CodeGenTarget::SPIRV:
-            linkage.addTarget(Slang::CodeGenTarget::SPIRV);
-            break;
         default:
             assert(!"Unhandled target");
             break;
@@ -71,9 +68,6 @@ namespace Slang
         {
         case CodeGenTarget::DXIL:
             builder.emitEmbeddedDXIL(blob);
-            break;
-        case CodeGenTarget::SPIRV:
-            builder.emitEmbeddedSPIRV(blob);
             break;
         default:
             assert(!"Unhandled target");

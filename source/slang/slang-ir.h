@@ -2348,7 +2348,6 @@ public:
 
     // TODO: make a map with lookup by target?
     ComPtr<ISlangBlob> precompiledDXIL;
-    ComPtr<ISlangBlob> precompiledSPIRV;
 private:
     IRModule() = delete;
 
