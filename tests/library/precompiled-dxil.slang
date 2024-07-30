@@ -7,9 +7,9 @@
 // The test passes if there is no errror thrown.
 // TODO: Check if final linkage used only the precompiled dxil.
 
-//TEST:COMPILE: tests/library/export-library.slang -o tests/library/export-library.slang-module -embed-dxil -profile lib_6_6 -incomplete-library
-//TEST:COMPILE: tests/library/precompiled-dxil.slang -o tests/library/precompiled-dxil.slang-module -embed-dxil -profile lib_6_6 -incomplete-library
-//TEST:COMPILE: tests/library/export-library.slang-module tests/library/precompiled-dxil.slang-module -target dxil -entry computeMain -profile cs_6_6 -o tests/library/linked.dxil
+//TEST(windows):COMPILE: tests/library/export-library.slang -o tests/library/export-library.slang-module -embed-dxil -profile lib_6_6 -incomplete-library
+//TEST(windows):COMPILE: tests/library/precompiled-dxil.slang -o tests/library/precompiled-dxil.slang-module -embed-dxil -profile lib_6_6 -incomplete-library
+//TEST(windows):COMPILE: tests/library/export-library.slang-module tests/library/precompiled-dxil.slang-module -target dxil -entry computeMain -profile cs_6_6 -o tests/library/linked.dxil
 
 extern int foo(int a);
 

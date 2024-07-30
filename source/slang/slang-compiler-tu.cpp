@@ -41,7 +41,7 @@ namespace Slang
 
         TargetProgram tp(composite, targetReq);
         tp.getOrCreateLayout(sink);
-        int const entryPointCount = m_entryPoints.getCount();
+        Slang::Index const entryPointCount = m_entryPoints.getCount();
 
         CodeGenContext::EntryPointIndices entryPointIndices;
 
