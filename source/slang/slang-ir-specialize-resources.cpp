@@ -887,8 +887,7 @@ struct ResourceOutputSpecializationPass
         // a parameter SSA needs for SSA'ing a localVar into a globalVar (and DCE requires 
         // to not DCE an important 'IRCall').
         // 
-        auto callingFunc = getParentFunc(param);
-        SpecializeFuncResult failedCallSpecialization = SpecializeFuncResult::Ok;
+        SpecializeFuncResult recursiveSpecializationResult = SpecializeFuncResult::Ok;
         List<IRStore*> stores;
         traverseUses(param, [&](IRUse* use)
             {
@@ -912,7 +911,7 @@ struct ResourceOutputSpecializationPass
                     
                     if(!processFunc(func))
                     {
-                        failedCallSpecialization = SpecializeFuncResult::OtherFuncFailed;
+                        recursiveSpecializationResult = SpecializeFuncResult::OtherFuncFailed;
                     }
                     return;
                 }
@@ -920,7 +919,7 @@ struct ResourceOutputSpecializationPass
                     return;
                 };
             });
-        if (failedResult(failedCallSpecialization)) return failedCallSpecialization;
+        if (failedResult(recursiveSpecializationResult)) return recursiveSpecializationResult;
 
         // Having identified the places where a value is stored to
         // the output parameter, we iterate over those values to
