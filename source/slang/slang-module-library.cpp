@@ -91,10 +91,6 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, String pat
                         auto slice = static_cast<IRBlobLit*>(inst->getOperand(0))->getStringSlice();
                         module.irModule->precompiledDXIL = StringBlob::create(slice);
                     }
-                    if (inst->getOp() == kIROp_EmbeddedSPIRV)
-                    {
-                        // TODO
-                    }
                 }
                 library->m_modules.add(loadedModule);
             }

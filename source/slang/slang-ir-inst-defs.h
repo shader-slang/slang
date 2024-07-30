@@ -1208,7 +1208,6 @@ INST(DebugValue, DebugValue, 2, 0)
 
 /* Embedded Precompiled Libraries */
 INST(EmbeddedDXIL, EmbeddedDXIL, 1, 0)
-INST(EmbeddedSPIRV, EmbeddedSPIRV, 1, 0)
 
 /* Inline assembly */
 
