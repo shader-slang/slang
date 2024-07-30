@@ -1328,10 +1328,10 @@ __intrinsic_type($(kIROp_VerticesType))
 struct OutputVertices
 {
     __intrinsic_op($(kIROp_MetalSetVertex))
-    static void __metalSetVertex(uint index, T val);
+    static void _metalSetVertex(uint index, T val);
 
     __intrinsic_op($(kIROp_MeshOutputSet))
-    void __setVertex(uint index, T val);
+    static void _setVertex(This v, uint index, T val);
 
     __subscript(uint index) -> T
     {
@@ -1344,10 +1344,10 @@ struct OutputVertices
         {
             __target_switch
             {
-            case metal: __metalSetVertex(index, newValue);
-            case glsl: __setVertex(index, newValue);
-            case hlsl: __setVertex(index, newValue);
-            case spirv: __setVertex(index, newValue);
+            case metal: _metalSetVertex(index, newValue);
+            case glsl: _setVertex(this, index, newValue);
+            case hlsl: _setVertex(this, index, newValue);
+            case spirv: _setVertex(this, index, newValue);
             }
         }
         
@@ -1371,17 +1371,17 @@ struct OutputIndices
 
     __subscript(uint index) -> T
     {
-        [mutating]
-        set
-        {
-            __target_switch
-            {
-            case metal: __metalSetIndices(index, newValue);
-            case glsl: __setIndices(index, newValue);
-            case hlsl: __setIndices(index, newValue);
-            case spirv: __setIndices(index, newValue);
-            }
-        }
+        // [mutating]
+        // set
+        // {
+        //     __target_switch
+        //     {
+        //     case metal: __metalSetIndices(index, newValue);
+        //     case glsl: __setIndices(index, newValue);
+        //     case hlsl: __setIndices(index, newValue);
+        //     case spirv: __setIndices(index, newValue);
+        //     }
+        // }
 
         [require(glsl_hlsl_spirv, meshshading)]
         __intrinsic_op($(kIROp_MeshOutputRef))
@@ -1403,17 +1403,17 @@ struct OutputPrimitives
 
     __subscript(uint index)->T
     {
-        [mutating]
-        set
-        {
-            __target_switch
-            {
-            case metal: __metalSetPrimitive(index, newValue);
-            case glsl: __setPrimitive(index, newValue);
-            case hlsl: __setPrimitive(index, newValue);
-            case spirv: __setPrimitive(index, newValue);
-            }
-        }
+        // [mutating]
+        // set
+        // {
+        //     __target_switch
+        //     {
+        //     case metal: __metalSetPrimitive(index, newValue);
+        //     case glsl: __setPrimitive(index, newValue);
+        //     case hlsl: __setPrimitive(index, newValue);
+        //     case spirv: __setPrimitive(index, newValue);
+        //     }
+        // }
 
     }
 };

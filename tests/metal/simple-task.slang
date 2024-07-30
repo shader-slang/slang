@@ -83,13 +83,11 @@ void meshMain(
     {
         const int tri = tig / 3;
         verts[tig] = { float4(positions[tig % 3], 0, 1), colors[tig % 3], tri, int(pow(tri, meshPayload.exponent)) };
-        verts[tig].color = float3(0, 1, 0);
     }
 
     if (tig < numPrimitives)
     {
         triangles[tig] = tig * 3 + uint3(0, 1, 2);
-        primitives[tig] = { tig };
     }
 }
 
