@@ -19,10 +19,11 @@ namespace SlangRecord
         Slang::String recordFileDirectory {m_recordFileDirectory.string().c_str()};
         if (!Slang::File::exists(recordFileDirectory))
         {
-            if (!Slang::Path::createDirectory(recordFileDirectory))
+            std::error_code ec;
+            if (!std::filesystem::create_directory(m_recordFileDirectory, ec))
             {
-                slangRecordLog(LogLevel::Error, "Fail to create directory: %s\n",
-                    recordFileDirectory.begin());
+                slangRecordLog(LogLevel::Error, "Fail to create directory: %s, error (%d): %s\n",
+                    m_recordFileDirectory.string().c_str(), ec.value(), ec.message().c_str());
             }
         }
 

@@ -11,32 +11,34 @@ namespace SlangRecord
 {
 #define SANITY_CHECK() if (!m_isFileValid) return
 
-#define WRITE_INDENT(builder, indent)            \
-    do {                                        \
-        for (int i = 0; i < (indent); i++) {    \
-            (builder) << "  ";                  \
-        }                                       \
-    } while (0)
+    static inline void _writeIndent(Slang::StringBuilder& builder, int indent)
+    {
+        for (int i = 0; i < indent; i++)
+        {
+            builder << "  ";
+        }
+    }
 
-#define WRITE_STRING(builder, indent, str)      \
-    do {                                        \
-        WRITE_INDENT((builder), (indent));      \
-        (builder) << (str);                     \
-    } while (0)
+    template <typename T>
+    static inline void _writeString(Slang::StringBuilder& builder, int indent, T const& str)
+    {
+        _writeIndent(builder, indent);
+        builder << str;
+    }
 
-#define WRITE_PAIR(builder, indent, name, value)            \
-    do                                                      \
-    {                                                       \
-        WRITE_INDENT((builder), (indent));                  \
-        (builder) << (name) << ": " << (value) << ",\n";    \
-    } while (0)
+    template <typename T, typename U>
+    static inline void _writePair(Slang::StringBuilder& builder, int indent, T const& name, U const& value)
+    {
+        _writeIndent(builder, indent);
+        builder << name << ": " << value << ",\n";
+    }
 
-#define WRITE_PAIR_NO_COMMA(builder, indent, name, value)   \
-    do                                                      \
-    {                                                       \
-        WRITE_INDENT((builder), (indent));                  \
-        (builder) << (name) << ": " << (value) << "\n";     \
-    } while (0)
+    template <typename T, typename U>
+    static inline void _writePairNoComma(Slang::StringBuilder& builder, int indent, T const& name, U const& value)
+    {
+        _writeIndent(builder, indent);
+        builder << name << ": " << value << "\n";
+    }
 
     class ScopeWritterForKey
     {
@@ -46,15 +48,7 @@ namespace SlangRecord
             , m_pIndent(pIndent)
             , m_isOutterScope(isOutterScope)
         {
-            WRITE_STRING((*m_pBuilder), (*m_pIndent), keyName + ": {\n");
-            (*m_pIndent)++;
-        }
-
-        ScopeWritterForKey(Slang::StringBuilder* pBuilder, int* pIndent, Slang::String const& keyName, Slang::String const& decoration)
-            : m_pBuilder(pBuilder)
-            , m_pIndent(pIndent)
-        {
-            WRITE_STRING((*m_pBuilder), (*m_pIndent), keyName + ":" + decoration + " {\n");
+            _writeString((*m_pBuilder), (*m_pIndent), keyName + ": {\n");
             (*m_pIndent)++;
         }
 
@@ -63,9 +57,9 @@ namespace SlangRecord
             (*m_pIndent)--;
 
             if (m_isOutterScope)
-                WRITE_STRING((*m_pBuilder), (*m_pIndent), "}\n");
+                _writeString((*m_pBuilder), (*m_pIndent), "}\n");
             else
-                WRITE_STRING((*m_pBuilder), (*m_pIndent), "},\n");
+                _writeString((*m_pBuilder), (*m_pIndent), "},\n");
 
         }
     private:
@@ -85,8 +79,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "retSession", Slang::StringUtil::makeStringWithFormat("0x%X", outSessionId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "retSession", Slang::StringUtil::makeStringWithFormat("0x%X", outSessionId));
             }
         }
 
@@ -105,10 +99,10 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "targetIndex", targetIndex);
-                WRITE_PAIR(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "retProgramLayout", Slang::StringUtil::makeStringWithFormat("0x%X", retProgramLayoutId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "targetIndex", targetIndex);
+                _writePair(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                _writePairNoComma(builder, indent, "retProgramLayout", Slang::StringUtil::makeStringWithFormat("0x%X", retProgramLayoutId));
             }
         }
 
@@ -127,11 +121,11 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "entryPointIndex", entryPointIndex);
-                WRITE_PAIR(builder, indent, "targetIndex", targetIndex);
-                WRITE_PAIR(builder, indent, "outCode", Slang::StringUtil::makeStringWithFormat("0x%X", outCodeId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "entryPointIndex", entryPointIndex);
+                _writePair(builder, indent, "targetIndex", targetIndex);
+                _writePair(builder, indent, "outCode", Slang::StringUtil::makeStringWithFormat("0x%X", outCodeId));
+                _writePairNoComma(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
             }
         }
 
@@ -150,10 +144,10 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "targetIndex", targetIndex);
-                WRITE_PAIR(builder, indent, "outCode", Slang::StringUtil::makeStringWithFormat("0x%X", outCodeId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "targetIndex", targetIndex);
+                _writePair(builder, indent, "outCode", Slang::StringUtil::makeStringWithFormat("0x%X", outCodeId));
+                _writePairNoComma(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
             }
         }
 
@@ -172,10 +166,10 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "entryPointIndex", entryPointIndex);
-                WRITE_PAIR(builder, indent, "targetIndex", targetIndex);
-                WRITE_PAIR_NO_COMMA(builder, indent, "outFileSystem", Slang::StringUtil::makeStringWithFormat("0x%X", outFileSystemId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "entryPointIndex", entryPointIndex);
+                _writePair(builder, indent, "targetIndex", targetIndex);
+                _writePairNoComma(builder, indent, "outFileSystem", Slang::StringUtil::makeStringWithFormat("0x%X", outFileSystemId));
             }
         }
 
@@ -194,10 +188,10 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "entryPointIndex", entryPointIndex);
-                WRITE_PAIR(builder, indent, "targetIndex", targetIndex);
-                WRITE_PAIR_NO_COMMA(builder, indent, "outHash", Slang::StringUtil::makeStringWithFormat("0x%X", outHashId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "entryPointIndex", entryPointIndex);
+                _writePair(builder, indent, "targetIndex", targetIndex);
+                _writePairNoComma(builder, indent, "outHash", Slang::StringUtil::makeStringWithFormat("0x%X", outHashId));
             }
         }
 
@@ -217,7 +211,7 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
                 if (specializationArgCount)
                 {
                     ScopeWritterForKey scopeWritterForArgs(&builder, &indent, "specializationArgs", false);
@@ -226,18 +220,18 @@ namespace SlangRecord
                         bool isLastField = (i == specializationArgCount - 1);
                         ScopeWritterForKey scopeWritterForArg(&builder, &indent, Slang::StringUtil::makeStringWithFormat("[%d]\n", i), isLastField);
                         {
-                            WRITE_PAIR(builder, indent, "kind", SpecializationArgKindToString(specializationArgs[i].kind));
-                            WRITE_PAIR_NO_COMMA(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", specializationArgs[i].type));
+                            _writePair(builder, indent, "kind", SpecializationArgKindToString(specializationArgs[i].kind));
+                            _writePairNoComma(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", specializationArgs[i].type));
                         }
                     }
                 }
                 else
                 {
-                    WRITE_PAIR(builder, indent, "specializationArgs", "nullptr");
+                    _writePair(builder, indent, "specializationArgs", "nullptr");
                 }
-                WRITE_PAIR(builder, indent, "specializationArgCount", specializationArgCount);
-                WRITE_PAIR(builder, indent, "outSpecializedComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outSpecializedComponentTypeId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outSpecializedComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                _writePair(builder, indent, "specializationArgCount", specializationArgCount);
+                _writePair(builder, indent, "outSpecializedComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outSpecializedComponentTypeId));
+                _writePairNoComma(builder, indent, "outSpecializedComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
             }
         }
 
@@ -256,9 +250,9 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "outLinkedComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outLinkedComponentTypeId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "outLinkedComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outLinkedComponentTypeId));
+                _writePairNoComma(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
             }
         }
 
@@ -278,11 +272,11 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "entryPointIndex", entryPointIndex);
-                WRITE_PAIR(builder, indent, "targetIndex", targetIndex);
-                WRITE_PAIR(builder, indent, "outSharedLibrary", Slang::StringUtil::makeStringWithFormat("0x%X", outSharedLibraryId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "entryPointIndex", entryPointIndex);
+                _writePair(builder, indent, "targetIndex", targetIndex);
+                _writePair(builder, indent, "outSharedLibrary", Slang::StringUtil::makeStringWithFormat("0x%X", outSharedLibraryId));
+                _writePairNoComma(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
             }
         }
 
@@ -301,10 +295,10 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "newName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "newName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             newName != nullptr ? newName : "nullptr"));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outEntryPoint", Slang::StringUtil::makeStringWithFormat("0x%X", outEntryPointId));
+                _writePairNoComma(builder, indent, "outEntryPoint", Slang::StringUtil::makeStringWithFormat("0x%X", outEntryPointId));
             }
         }
 
@@ -326,13 +320,13 @@ namespace SlangRecord
             ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
             {
 
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "compilerOptionEntryCount", compilerOptionEntryCount);
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "compilerOptionEntryCount", compilerOptionEntryCount);
 
                 JsonConsumer::_writeCompilerOptionEntryHelper(builder, indent, compilerOptionEntries, compilerOptionEntryCount);
 
-                WRITE_PAIR(builder, indent, "outLinkedComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outLinkedComponentTypeId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                _writePair(builder, indent, "outLinkedComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outLinkedComponentTypeId));
+                _writePairNoComma(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
             }
         }
 
@@ -376,23 +370,23 @@ namespace SlangRecord
             {
                 ScopeWritterForKey scopeWritterForCompileOptionElement(&builder, &indent, Slang::StringUtil::makeStringWithFormat("[%d]\n", j));
                 {
-                    WRITE_PAIR(builder, indent, "name", CompilerOptionNameToString(compilerOptionEntries[j].name));
+                    _writePair(builder, indent, "name", CompilerOptionNameToString(compilerOptionEntries[j].name));
 
                     bool isLastEntry = (j == compilerOptionEntryCount - 1);
                     ScopeWritterForKey scopeWritterValue(&builder, &indent, "value", isLastEntry);
                     {
-                        WRITE_PAIR(builder, indent, "kind", CompilerOptionValueKindToString(compilerOptionEntries[j].value.kind));
-                        WRITE_PAIR(builder, indent, "intValue0", compilerOptionEntries[j].value.intValue0);
-                        WRITE_PAIR(builder, indent, "intValue1", compilerOptionEntries[j].value.intValue1);
-                        WRITE_PAIR(builder, indent, "stringValue0", compilerOptionEntries[j].value.stringValue0);
-                        WRITE_PAIR_NO_COMMA(builder, indent, "stringValue1", compilerOptionEntries[j].value.stringValue1);
+                        _writePair(builder, indent, "kind", CompilerOptionValueKindToString(compilerOptionEntries[j].value.kind));
+                        _writePair(builder, indent, "intValue0", compilerOptionEntries[j].value.intValue0);
+                        _writePair(builder, indent, "intValue1", compilerOptionEntries[j].value.intValue1);
+                        _writePair(builder, indent, "stringValue0", compilerOptionEntries[j].value.stringValue0);
+                        _writePairNoComma(builder, indent, "stringValue1", compilerOptionEntries[j].value.stringValue1);
                     }
                 }
             }
         }
         else
         {
-            WRITE_PAIR_NO_COMMA(builder, indent, "compilerOptionEntries", "nullptr");
+            _writePairNoComma(builder, indent, "compilerOptionEntries", "nullptr");
         }
     }
 
@@ -400,7 +394,7 @@ namespace SlangRecord
     {
         ScopeWritterForKey scopeWritterForSessionDesc(&builder, &indent, keyName);
         {
-            WRITE_PAIR(builder, indent, "structureSize", (uint32_t)desc.structureSize);
+            _writePair(builder, indent, "structureSize", (uint32_t)desc.structureSize);
 
             if (desc.targetCount)
             {
@@ -411,13 +405,13 @@ namespace SlangRecord
                         bool isLastEntry = (i == desc.targetCount - 1);
                         ScopeWritterForKey scopeWritterForTargetElement(&builder, &indent, Slang::StringUtil::makeStringWithFormat("[%d]", i), isLastEntry);
                         {
-                            WRITE_PAIR(builder, indent, "structureSize", (uint32_t)desc.targets[i].structureSize);
-                            WRITE_PAIR(builder, indent, "format", SlangCompileTargetToString(desc.targets[i].format));
-                            WRITE_PAIR(builder, indent, "profile", SlangProfileIDToString(desc.targets[i].profile));
-                            WRITE_PAIR(builder, indent, "flags", SlangTargetFlagsToString(desc.targets[i].flags));
-                            WRITE_PAIR(builder, indent, "floatingPointMode", SlangFloatingPointModeToString(desc.targets[i].floatingPointMode));
-                            WRITE_PAIR(builder, indent, "lineDirectiveMode", SlangLineDirectiveModeToString(desc.targets[i].lineDirectiveMode));
-                            WRITE_PAIR(builder, indent, "forceGLSLScalarBufferLayout", (desc.targets[i].floatingPointMode ? "true" : "false"));
+                            _writePair(builder, indent, "structureSize", (uint32_t)desc.targets[i].structureSize);
+                            _writePair(builder, indent, "format", SlangCompileTargetToString(desc.targets[i].format));
+                            _writePair(builder, indent, "profile", SlangProfileIDToString(desc.targets[i].profile));
+                            _writePair(builder, indent, "flags", SlangTargetFlagsToString(desc.targets[i].flags));
+                            _writePair(builder, indent, "floatingPointMode", SlangFloatingPointModeToString(desc.targets[i].floatingPointMode));
+                            _writePair(builder, indent, "lineDirectiveMode", SlangLineDirectiveModeToString(desc.targets[i].lineDirectiveMode));
+                            _writePair(builder, indent, "forceGLSLScalarBufferLayout", (desc.targets[i].floatingPointMode ? "true" : "false"));
 
                             _writeCompilerOptionEntryHelper(builder, indent, desc.targets[i].compilerOptionEntries, desc.targets[i].compilerOptionEntryCount);
                         }
@@ -426,12 +420,12 @@ namespace SlangRecord
             }
             else
             {
-                WRITE_PAIR(builder, indent, "targets", "nullptr");
+                _writePair(builder, indent, "targets", "nullptr");
             }
 
-            WRITE_PAIR(builder, indent, "targetCount", desc.targetCount);
-            WRITE_PAIR(builder, indent, "flags", SessionFlagsToString(desc.flags));
-            WRITE_PAIR(builder, indent, "defaultMatrixLayoutMode", SlangMatrixLayoutModeToString(desc.defaultMatrixLayoutMode));
+            _writePair(builder, indent, "targetCount", desc.targetCount);
+            _writePair(builder, indent, "flags", SessionFlagsToString(desc.flags));
+            _writePair(builder, indent, "defaultMatrixLayoutMode", SlangMatrixLayoutModeToString(desc.defaultMatrixLayoutMode));
 
             if (desc.searchPathCount)
             {
@@ -440,14 +434,14 @@ namespace SlangRecord
                 {
                     Slang::String searchPath(desc.searchPaths[i]);
                     searchPath = searchPath + ",\n";
-                    WRITE_STRING(builder, indent, searchPath);
+                    _writeString(builder, indent, searchPath);
                 }
             }
             else
             {
-                WRITE_PAIR(builder, indent, "searchPaths", "nullptr");
+                _writePair(builder, indent, "searchPaths", "nullptr");
             }
-            WRITE_PAIR(builder, indent, "searchPathCount", desc.searchPathCount);
+            _writePair(builder, indent, "searchPathCount", desc.searchPathCount);
 
             if (desc.preprocessorMacroCount)
             {
@@ -457,24 +451,24 @@ namespace SlangRecord
                     bool isLastField = (i == desc.preprocessorMacroCount - 1);
                     ScopeWritterForKey scopeWritterForMacroElement(&builder, &indent, Slang::StringUtil::makeStringWithFormat("[%d]", i), isLastField);
 
-                    WRITE_PAIR(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                    _writePair(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                                 desc.preprocessorMacros[i].name != nullptr ? desc.preprocessorMacros[i].name : "nullptr"));
 
-                    WRITE_PAIR(builder, indent, "value", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                    _writePair(builder, indent, "value", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                                 desc.preprocessorMacros[i].value != nullptr ? desc.preprocessorMacros[i].value : "nullptr"));
                 }
             }
             else
             {
-                WRITE_PAIR(builder, indent, "preprocessorMacros", "nullptr");
+                _writePair(builder, indent, "preprocessorMacros", "nullptr");
             }
-            WRITE_PAIR(builder, indent, "preprocessorMacroCount", desc.preprocessorMacroCount);
+            _writePair(builder, indent, "preprocessorMacroCount", desc.preprocessorMacroCount);
 
             AddressFormat address = reinterpret_cast<AddressFormat>(desc.fileSystem);
-            WRITE_PAIR(builder, indent, "fileSystem", Slang::StringUtil::makeStringWithFormat("0x%X", address));
-            WRITE_PAIR(builder, indent, "enableEffectAnnotations", (desc.enableEffectAnnotations ? "true" : "false"));
-            WRITE_PAIR(builder, indent, "allowGLSLSyntax", (desc.allowGLSLSyntax ? "true" : "false"));
-            WRITE_PAIR(builder, indent, "compilerOptionEntryCount", desc.compilerOptionEntryCount);
+            _writePair(builder, indent, "fileSystem", Slang::StringUtil::makeStringWithFormat("0x%X", address));
+            _writePair(builder, indent, "enableEffectAnnotations", (desc.enableEffectAnnotations ? "true" : "false"));
+            _writePair(builder, indent, "allowGLSLSyntax", (desc.allowGLSLSyntax ? "true" : "false"));
+            _writePair(builder, indent, "compilerOptionEntryCount", desc.compilerOptionEntryCount);
             _writeCompilerOptionEntryHelper(builder, indent, desc.compilerOptionEntries, desc.compilerOptionEntryCount);
         }
 
@@ -485,13 +479,13 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        WRITE_STRING(builder, indent, "GlobalFunction::createGlobalSession: {\n");
+        _writeString(builder, indent, "GlobalFunction::createGlobalSession: {\n");
         {
             indent++;
-            WRITE_PAIR_NO_COMMA(builder, indent, "outGlobalSession", Slang::StringUtil::makeStringWithFormat("0x%X", outGlobalSessionId));
+            _writePairNoComma(builder, indent, "outGlobalSession", Slang::StringUtil::makeStringWithFormat("0x%X", outGlobalSessionId));
             indent--;
         }
-        WRITE_STRING(builder, indent, "}\n");
+        _writeString(builder, indent, "}\n");
 
         m_fileStream.write(builder.produceString().begin(), builder.produceString().getLength());
         m_fileStream.flush();
@@ -502,16 +496,16 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        WRITE_STRING(builder, indent, "IGlobalSession::createSession: {\n");
+        _writeString(builder, indent, "IGlobalSession::createSession: {\n");
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::createSession");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
 
                 _writeSessionDescHelper(builder, indent, desc, "inDesc");
 
-                WRITE_PAIR_NO_COMMA(builder, indent, "outSession", Slang::StringUtil::makeStringWithFormat("0x%X", outSessionId));
+                _writePairNoComma(builder, indent, "outSession", Slang::StringUtil::makeStringWithFormat("0x%X", outSessionId));
             }
         }
 
@@ -528,8 +522,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::findProfile");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             name != nullptr ? name : "nullptr"));
             }
         }
@@ -548,9 +542,9 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::setDownstreamCompilerPath");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "passThrough", SlangPassThroughToString(passThrough));
-                WRITE_PAIR_NO_COMMA(builder, indent, "path", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "passThrough", SlangPassThroughToString(passThrough));
+                _writePairNoComma(builder, indent, "path", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             path != nullptr ? path : "nullptr"));
             }
         }
@@ -569,9 +563,9 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::setDownstreamCompilerPrelude");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "passThrough", SlangPassThroughToString(inPassThrough));
-                WRITE_PAIR_NO_COMMA(builder, indent, "preludeText", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "passThrough", SlangPassThroughToString(inPassThrough));
+                _writePairNoComma(builder, indent, "preludeText", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             prelude != nullptr ? prelude : "nullptr"));
             }
         }
@@ -590,9 +584,9 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::getDownstreamCompilerPrelude");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "passThrough", SlangPassThroughToString(inPassThrough));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outPrelude", Slang::StringUtil::makeStringWithFormat("0x%X", outPreludeId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "passThrough", SlangPassThroughToString(inPassThrough));
+                _writePairNoComma(builder, indent, "outPrelude", Slang::StringUtil::makeStringWithFormat("0x%X", outPreludeId));
             }
         }
 
@@ -610,9 +604,9 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::setDefaultDownstreamCompiler");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "sourceLanguage", SlangSourceLanguageToString(sourceLanguage));
-                WRITE_PAIR_NO_COMMA(builder, indent, "defaultCompiler", SlangPassThroughToString(defaultCompiler));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "sourceLanguage", SlangSourceLanguageToString(sourceLanguage));
+                _writePairNoComma(builder, indent, "defaultCompiler", SlangPassThroughToString(defaultCompiler));
             }
         }
 
@@ -630,8 +624,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::getDefaultDownstreamCompiler");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "sourceLanguage", SlangSourceLanguageToString(sourceLanguage));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "sourceLanguage", SlangSourceLanguageToString(sourceLanguage));
             }
         }
 
@@ -645,14 +639,14 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        WRITE_STRING(builder, indent, "IGlobalSession::setLanguagePrelude: {\n");
+        _writeString(builder, indent, "IGlobalSession::setLanguagePrelude: {\n");
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::setLanguagePrelude");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "sourceLanguage", SlangSourceLanguageToString(inSourceLanguage));
-                WRITE_PAIR_NO_COMMA(builder, indent, "preludeText", (prelude != nullptr ? prelude : "nullptr"));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "sourceLanguage", SlangSourceLanguageToString(inSourceLanguage));
+                _writePairNoComma(builder, indent, "preludeText", (prelude != nullptr ? prelude : "nullptr"));
             }
         }
 
@@ -670,9 +664,9 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::getLanguagePrelude");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "sourceLanguage", SlangSourceLanguageToString(inSourceLanguage));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outPrelude", Slang::StringUtil::makeStringWithFormat("0x%X", outPreludeId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "sourceLanguage", SlangSourceLanguageToString(inSourceLanguage));
+                _writePairNoComma(builder, indent, "outPrelude", Slang::StringUtil::makeStringWithFormat("0x%X", outPreludeId));
             }
         }
 
@@ -686,13 +680,13 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        WRITE_STRING(builder, indent, "IGlobalSession::createCompileRequest: {\n");
+        _writeString(builder, indent, "IGlobalSession::createCompileRequest: {\n");
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::createCompileRequest");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outCompileRequest", Slang::StringUtil::makeStringWithFormat("0x%X", outCompileRequest));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "outCompileRequest", Slang::StringUtil::makeStringWithFormat("0x%X", outCompileRequest));
             }
         }
 
@@ -706,15 +700,15 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        WRITE_STRING(builder, indent, "IGlobalSession::addBuiltins: {\n");
+        _writeString(builder, indent, "IGlobalSession::addBuiltins: {\n");
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::addBuiltins");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "sourcePath", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "sourcePath", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             sourcePath != nullptr ? sourcePath : "nullptr"));
-                WRITE_PAIR_NO_COMMA(builder, indent, "sourceString", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePairNoComma(builder, indent, "sourceString", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             sourceString != nullptr ? sourceString : "nullptr"));
             }
         }
@@ -733,8 +727,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::setSharedLibraryLoader");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "loader", Slang::StringUtil::makeStringWithFormat("0x%X", loaderId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "loader", Slang::StringUtil::makeStringWithFormat("0x%X", loaderId));
             }
         }
 
@@ -752,12 +746,12 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::getSharedLibraryLoader");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "retLoader", Slang::StringUtil::makeStringWithFormat("0x%X", outLoaderId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "retLoader", Slang::StringUtil::makeStringWithFormat("0x%X", outLoaderId));
             }
         }
 
-        WRITE_STRING(builder, indent, "}\n");
+        _writeString(builder, indent, "}\n");
 
         m_fileStream.write(builder.produceString().begin(), builder.produceString().getLength());
         m_fileStream.flush();
@@ -773,8 +767,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::checkCompileTargetSupport");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "target", SlangCompileTargetToString(target));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "target", SlangCompileTargetToString(target));
             }
         }
 
@@ -792,8 +786,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::checkPassThroughSupport");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "passThrough", SlangPassThroughToString(passThrough));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "passThrough", SlangPassThroughToString(passThrough));
             }
         }
 
@@ -811,8 +805,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::compileStdLib");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "flags", CompileStdLibFlagsToString(flags));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "flags", CompileStdLibFlagsToString(flags));
             }
         }
 
@@ -826,14 +820,14 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        WRITE_STRING(builder, indent, "IGlobalSession::loadStdLib: {\n");
+        _writeString(builder, indent, "IGlobalSession::loadStdLib: {\n");
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::loadStdLib");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "stdLib-Ignore-Data", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "stdLibSizeInBytes", (uint32_t)stdLibSizeInBytes);
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "stdLib-Ignore-Data", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "stdLibSizeInBytes", (uint32_t)stdLibSizeInBytes);
             }
         }
 
@@ -850,9 +844,9 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::saveStdLib");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "archiveType", SlangArchiveTypeToString(archiveType));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outBlobId", Slang::StringUtil::makeStringWithFormat("0x%X", outBlobId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "archiveType", SlangArchiveTypeToString(archiveType));
+                _writePairNoComma(builder, indent, "outBlobId", Slang::StringUtil::makeStringWithFormat("0x%X", outBlobId));
             }
         }
 
@@ -870,8 +864,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::findCapability");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             name != nullptr ? name : "nullptr"));
             }
         }
@@ -890,10 +884,10 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::setDownstreamCompilerForTransition");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "source", SlangCompileTargetToString(source));
-                WRITE_PAIR(builder, indent, "target", SlangCompileTargetToString(target));
-                WRITE_PAIR_NO_COMMA(builder, indent, "compiler", SlangPassThroughToString(compiler));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "source", SlangCompileTargetToString(source));
+                _writePair(builder, indent, "target", SlangCompileTargetToString(target));
+                _writePairNoComma(builder, indent, "compiler", SlangPassThroughToString(compiler));
             }
         }
 
@@ -911,9 +905,9 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::getDownstreamCompilerForTransition");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "source", SlangCompileTargetToString(source));
-                WRITE_PAIR_NO_COMMA(builder, indent, "target", SlangCompileTargetToString(target));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "source", SlangCompileTargetToString(source));
+                _writePairNoComma(builder, indent, "target", SlangCompileTargetToString(target));
             }
         }
 
@@ -931,8 +925,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::setSPIRVCoreGrammar");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "jsonPath", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "jsonPath", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             jsonPath != nullptr ? jsonPath : "nullptr"));
             }
         }
@@ -950,24 +944,24 @@ namespace SlangRecord
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::parseCommandLineArguments");
-            WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-            WRITE_PAIR(builder, indent, "argc", argc);
+            _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+            _writePair(builder, indent, "argc", argc);
 
             if (argv)
             {
-                WRITE_STRING(builder, indent, "argv: {\n");
+                _writeString(builder, indent, "argv: {\n");
                 ScopeWritterForKey scopeWritteriForArgv(&builder, &indent, "argv");
                 for (int i = 0; i < argc; i++)
                 {
                     if (i == (argc -1))
-                        WRITE_PAIR_NO_COMMA(builder, indent, Slang::StringUtil::makeStringWithFormat("[%d]", i), argv[i]);
+                        _writePairNoComma(builder, indent, Slang::StringUtil::makeStringWithFormat("[%d]", i), argv[i]);
                     else
-                        WRITE_PAIR(builder, indent, Slang::StringUtil::makeStringWithFormat("[%d]", i), argv[i]);
+                        _writePair(builder, indent, Slang::StringUtil::makeStringWithFormat("[%d]", i), argv[i]);
                 }
             }
             else
             {
-                WRITE_PAIR(builder, indent, "argv", "nullptr");
+                _writePair(builder, indent, "argv", "nullptr");
             }
         }
 
@@ -984,7 +978,7 @@ namespace SlangRecord
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::getSessionDescDigest");
-            WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+            _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
 
             if (sessionDesc)
             {
@@ -992,10 +986,10 @@ namespace SlangRecord
             }
             else
             {
-                WRITE_PAIR(builder, indent, "sessionDesc", "nullptr");
+                _writePair(builder, indent, "sessionDesc", "nullptr");
             }
 
-            WRITE_PAIR(builder, indent, "outBlob", Slang::StringUtil::makeStringWithFormat("0x%X", outBlobId));
+            _writePair(builder, indent, "outBlob", Slang::StringUtil::makeStringWithFormat("0x%X", outBlobId));
         }
 
         m_fileStream.write(builder.produceString().begin(), builder.produceString().getLength());
@@ -1012,8 +1006,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "ISession::getGlobalSession");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "retGlobalSession", Slang::StringUtil::makeStringWithFormat("0x%X", outGlobalSessionId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "retGlobalSession", Slang::StringUtil::makeStringWithFormat("0x%X", outGlobalSessionId));
             }
         }
 
@@ -1031,11 +1025,11 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "ISession::loadModule");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "moduleName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "moduleName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             moduleName != nullptr ? moduleName : "nullptr"));
-                WRITE_PAIR(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "retIModule", Slang::StringUtil::makeStringWithFormat("0x%X", outModuleId));
+                _writePair(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "retIModule", Slang::StringUtil::makeStringWithFormat("0x%X", outModuleId));
             }
         }
 
@@ -1053,10 +1047,10 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "ISession::loadModuleFromIRBlob");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "moduleName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "moduleName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             moduleName != nullptr ? moduleName : "nullptr"));
-                WRITE_PAIR(builder, indent, "path", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "path", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             path != nullptr ? path : "nullptr"));
                 if (source)
                 {
@@ -1065,17 +1059,17 @@ namespace SlangRecord
 
                     ScopeWritterForKey scopeWritterForSource(&builder, &indent, Slang::StringUtil::makeStringWithFormat("source (0x%X): {\n", source), false);
                     {
-                        WRITE_PAIR(builder, indent, "bufferPointer", Slang::StringUtil::makeStringWithFormat("0x%X", bufPtr));
-                        WRITE_PAIR_NO_COMMA(builder, indent, "bufferSize", (uint32_t)bufSize);
+                        _writePair(builder, indent, "bufferPointer", Slang::StringUtil::makeStringWithFormat("0x%X", bufPtr));
+                        _writePairNoComma(builder, indent, "bufferSize", (uint32_t)bufSize);
                     }
                 }
                 else
                 {
-                    WRITE_PAIR(builder, indent, "source", "nullptr");
+                    _writePair(builder, indent, "source", "nullptr");
                 }
 
-                WRITE_PAIR(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "retIModule", Slang::StringUtil::makeStringWithFormat("0x%X", outModuleId));
+                _writePair(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                _writePairNoComma(builder, indent, "retIModule", Slang::StringUtil::makeStringWithFormat("0x%X", outModuleId));
             }
         }
 
@@ -1093,10 +1087,10 @@ namespace SlangRecord
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "ISession::loadModuleFromSource");
-            WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-            WRITE_PAIR(builder, indent, "moduleName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+            _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+            _writePair(builder, indent, "moduleName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             moduleName != nullptr ? moduleName : "nullptr"));
-            WRITE_PAIR(builder, indent, "path", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+            _writePair(builder, indent, "path", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             path != nullptr ? path : "nullptr"));
             if (source)
             {
@@ -1104,17 +1098,17 @@ namespace SlangRecord
                 size_t bufSize = source->getBufferSize();
                 ScopeWritterForKey scopeWritterForSource(&builder, &indent, Slang::StringUtil::makeStringWithFormat("source (0x%X): {\n", source), false);
                 {
-                    WRITE_PAIR(builder, indent, "bufferPointer", Slang::StringUtil::makeStringWithFormat("0x%X", bufPtr));
-                    WRITE_PAIR_NO_COMMA(builder, indent, "bufferSize", (uint32_t)bufSize);
+                    _writePair(builder, indent, "bufferPointer", Slang::StringUtil::makeStringWithFormat("0x%X", bufPtr));
+                    _writePairNoComma(builder, indent, "bufferSize", (uint32_t)bufSize);
                 }
             }
             else
             {
-                WRITE_PAIR(builder, indent, "source", "nullptr");
+                _writePair(builder, indent, "source", "nullptr");
             }
 
-            WRITE_PAIR(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
-            WRITE_PAIR_NO_COMMA(builder, indent, "retIModule", Slang::StringUtil::makeStringWithFormat("0x%X", outModuleId));
+            _writePair(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+            _writePairNoComma(builder, indent, "retIModule", Slang::StringUtil::makeStringWithFormat("0x%X", outModuleId));
         }
 
         m_fileStream.write(builder.produceString().begin(), builder.produceString().getLength());
@@ -1131,18 +1125,18 @@ namespace SlangRecord
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "ISession::loadModuleFromSourceString");
-            WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-            WRITE_PAIR(builder, indent, "moduleName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+            _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+            _writePair(builder, indent, "moduleName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             moduleName != nullptr ? moduleName : "nullptr"));
 
-            WRITE_PAIR(builder, indent, "path", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+            _writePair(builder, indent, "path", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             path != nullptr ? path : "nullptr"));
 
-            WRITE_PAIR(builder, indent, "string", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+            _writePair(builder, indent, "string", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             string != nullptr ? string : "nullptr"));
 
-            WRITE_PAIR(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
-            WRITE_PAIR_NO_COMMA(builder, indent, "retIModule", Slang::StringUtil::makeStringWithFormat("0x%X", outModuleId));
+            _writePair(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+            _writePairNoComma(builder, indent, "retIModule", Slang::StringUtil::makeStringWithFormat("0x%X", outModuleId));
         }
 
         m_fileStream.write(builder.produceString().begin(), builder.produceString().getLength());
@@ -1160,7 +1154,7 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "ISession::createCompositeComponentType");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
                 if (componentTypeCount)
                 {
                     ScopeWritterForKey scopeWritterForComponentTypes(&builder, &indent, "componentTypes", false);
@@ -1168,22 +1162,22 @@ namespace SlangRecord
                     {
                         if (i != componentTypeCount - 1)
                         {
-                            WRITE_STRING(builder, indent, Slang::StringUtil::makeStringWithFormat("[%d]: 0x%X,\n", i, componentTypeIds[i]));
+                            _writeString(builder, indent, Slang::StringUtil::makeStringWithFormat("[%d]: 0x%X,\n", i, componentTypeIds[i]));
                         }
                         else
                         {
-                            WRITE_STRING(builder, indent, Slang::StringUtil::makeStringWithFormat("[%d]: 0x%X\n", i, componentTypeIds[i]));
+                            _writeString(builder, indent, Slang::StringUtil::makeStringWithFormat("[%d]: 0x%X\n", i, componentTypeIds[i]));
                         }
                     }
                 }
                 else
                 {
-                    WRITE_PAIR(builder, indent, "componentTypes", "nullptr");
+                    _writePair(builder, indent, "componentTypes", "nullptr");
                 }
             }
-            WRITE_PAIR(builder, indent, "componentTypeCount", componentTypeCount);
-            WRITE_PAIR(builder, indent, "outCompositeComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outCompositeComponentTypeId));
-            WRITE_PAIR_NO_COMMA(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+            _writePair(builder, indent, "componentTypeCount", componentTypeCount);
+            _writePair(builder, indent, "outCompositeComponentType", Slang::StringUtil::makeStringWithFormat("0x%X", outCompositeComponentTypeId));
+            _writePairNoComma(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
         }
 
         m_fileStream.write(builder.produceString().begin(), builder.produceString().getLength());
@@ -1200,8 +1194,8 @@ namespace SlangRecord
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "ISession::specializeType");
-            WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-            WRITE_PAIR(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", typeId));
+            _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+            _writePair(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", typeId));
 
             if (specializationArgCount)
             {
@@ -1210,19 +1204,19 @@ namespace SlangRecord
                 {
                     ScopeWritterForKey scopeWritterForArg(&builder, &indent, Slang::StringUtil::makeStringWithFormat("[%d]\n", i), false);
                     {
-                        WRITE_PAIR(builder, indent, "kind", SpecializationArgKindToString(specializationArgs[i].kind));
-                        WRITE_PAIR_NO_COMMA(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", specializationArgs[i].type));
+                        _writePair(builder, indent, "kind", SpecializationArgKindToString(specializationArgs[i].kind));
+                        _writePairNoComma(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", specializationArgs[i].type));
                     }
                 }
             }
             else
             {
-                WRITE_PAIR(builder, indent, "specializationArgs", "nullptr");
+                _writePair(builder, indent, "specializationArgs", "nullptr");
             }
 
-            WRITE_PAIR(builder, indent, "specializationArgCount", specializationArgCount);
-            WRITE_PAIR(builder, indent, "outDiagnostics", outDiagnosticsId);
-            WRITE_PAIR_NO_COMMA(builder, indent, "retTypeReflectionId", outTypeReflectionId);
+            _writePair(builder, indent, "specializationArgCount", specializationArgCount);
+            _writePair(builder, indent, "outDiagnostics", outDiagnosticsId);
+            _writePairNoComma(builder, indent, "retTypeReflectionId", outTypeReflectionId);
         }
 
         m_fileStream.write(builder.produceString().begin(), builder.produceString().getLength());
@@ -1239,11 +1233,11 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "ISession::getTypeLayout");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", typeId));
-                WRITE_PAIR(builder, indent, "rules", LayoutRulesToString(rules));
-                WRITE_PAIR(builder, indent, "outDiagnostics", outDiagnosticsId);
-                WRITE_PAIR(builder, indent, "retTypeReflectionId", outTypeLayoutReflectionId);
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", typeId));
+                _writePair(builder, indent, "rules", LayoutRulesToString(rules));
+                _writePair(builder, indent, "outDiagnostics", outDiagnosticsId);
+                _writePair(builder, indent, "retTypeReflectionId", outTypeLayoutReflectionId);
             }
         }
 
@@ -1291,8 +1285,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "ISession::createCompileRequest");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "outCompileRequest", outCompileRequestId);
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "outCompileRequest", outCompileRequestId);
             }
         }
 
@@ -1310,9 +1304,9 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "ISession::getLoadedModule");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "index", index);
-                WRITE_PAIR_NO_COMMA(builder, indent, "retModule", Slang::StringUtil::makeStringWithFormat("0x%X", outModuleId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "index", index);
+                _writePairNoComma(builder, indent, "retModule", Slang::StringUtil::makeStringWithFormat("0x%X", outModuleId));
             }
         }
 
@@ -1331,11 +1325,11 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IModule::findEntryPointByName");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             name != nullptr ? name : "nullptr"));
 
-                WRITE_PAIR_NO_COMMA(builder, indent, "outEntryPoint", Slang::StringUtil::makeStringWithFormat("0x%X", outEntryPointId));
+                _writePairNoComma(builder, indent, "outEntryPoint", Slang::StringUtil::makeStringWithFormat("0x%X", outEntryPointId));
             }
         }
 
@@ -1353,9 +1347,9 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IModule::getDefinedEntryPoint");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "index", index);
-                WRITE_PAIR_NO_COMMA(builder, indent, "outEntryPoint", Slang::StringUtil::makeStringWithFormat("0x%X", outEntryPointId));
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "index", index);
+                _writePairNoComma(builder, indent, "outEntryPoint", Slang::StringUtil::makeStringWithFormat("0x%X", outEntryPointId));
             }
         }
 
@@ -1373,8 +1367,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IModule::serialize");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outSerializedBlob", outSerializedBlobId);
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "outSerializedBlob", outSerializedBlobId);
             }
         }
 
@@ -1392,8 +1386,8 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IModule::writeToFile");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "fileName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePairNoComma(builder, indent, "fileName", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             fileName != nullptr ? fileName : "nullptr"));
             }
         }
@@ -1412,12 +1406,12 @@ namespace SlangRecord
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IModule::findAndCheckEntryPoint");
             {
-                WRITE_PAIR(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
-                WRITE_PAIR(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
+                _writePair(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                             name != nullptr ? name : "nullptr"));
-                WRITE_PAIR(builder, indent, "stage", SlangStageToString(stage));
-                WRITE_PAIR(builder, indent, "outEntryPoint", Slang::StringUtil::makeStringWithFormat("0x%X", outEntryPointId));
-                WRITE_PAIR_NO_COMMA(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnostics));
+                _writePair(builder, indent, "stage", SlangStageToString(stage));
+                _writePair(builder, indent, "outEntryPoint", Slang::StringUtil::makeStringWithFormat("0x%X", outEntryPointId));
+                _writePairNoComma(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnostics));
             }
         }
 

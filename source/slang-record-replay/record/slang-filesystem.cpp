@@ -55,15 +55,17 @@ namespace SlangRecord
             std::filesystem::path filePath = m_recordManager->getRecordFileDirectory();
             filePath = filePath / path;
 
-            Slang::String fileDir {filePath.parent_path().string().c_str()};
-            if (!File::exists(fileDir))
+            if (!File::exists(filePath.parent_path().string().c_str()))
             {
                 slangRecordLog(LogLevel::Debug, "Create directory: %s to save captured shader file: %s\n",
                     filePath.parent_path().string().c_str(), filePath.filename().string().c_str());
 
-                if (!Slang::Path::createDirectory(fileDir))
+                std::error_code ec;
+                // std::filesystem::create_directories can create the directory recursively.
+                if (!std::filesystem::create_directories(filePath.parent_path(), ec))
                 {
-                    slangRecordLog(LogLevel::Error, "Fail to create directory: %s\n", fileDir.begin());
+                    slangRecordLog(LogLevel::Error, "Fail to create directory: %s, error (%d): %s\n",
+                        filePath.parent_path().string().c_str(), ec.value(), ec.message().c_str());
                     return SLANG_FAIL;
                 }
             }
