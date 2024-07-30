@@ -904,8 +904,6 @@ struct ResourceOutputSpecializationPass
                     {
                         failedCallSpecialization = SLANG_FAIL;
                     }
-                    else
-                        lastProcessedFunc = callingFunc;
                     return;
                 }
                 default:
