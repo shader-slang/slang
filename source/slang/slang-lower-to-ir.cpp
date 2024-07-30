@@ -8306,54 +8306,50 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         UInt entryIndex = 0;
-        auto addEntry = [&](IRStructKey* requirementKey, Decl* requirementDecl)
+        auto addEntry = [&](IRStructKey* requirementKey, DeclRef<Decl> requirementDeclRef)
             {
                 auto entry = subBuilder->createInterfaceRequirementEntry(
                     requirementKey,
                     nullptr);
-                if (auto inheritance = as<InheritanceDecl>(requirementDecl))
+                if (auto inheritance = requirementDeclRef.as<InheritanceDecl>())
                 {
-                    auto irBaseType = lowerType(context, inheritance->base.type);
+                    auto irBaseType = lowerType(subContext, getSup(subContext->astBuilder, inheritance));
                     auto irWitnessTableType = subBuilder->getWitnessTableType(irBaseType);
                     entry->setRequirementVal(irWitnessTableType);
                 }
                 else
                 {
-                    IRInst* requirementVal = ensureDecl(subContext, requirementDecl).val;
-                    if (requirementVal)
+                    auto requirementVal = ensureDecl(subContext, requirementDeclRef.getDecl()).val;
+
+                    if (auto funcRequirement = requirementDeclRef.as<FunctionDeclBase>())
                     {
-                        switch (requirementVal->getOp())
-                        {
-                        case kIROp_Func:
-                        case kIROp_Generic:
-                        {
-                            // Remove lowered `IRFunc`s since we only care about
-                            // function types.
-                            auto reqType = requirementVal->getFullType();
-                            entry->setRequirementVal(reqType);
-                            break;
-                        }
-                        default:
-                            entry->setRequirementVal(requirementVal);
-                            break;
-                        }
-                        if (requirementDecl->findModifier<HLSLStaticModifier>())
-                        {
-                            getBuilder()->addStaticRequirementDecoration(requirementKey);
-                        }
+                        // We only care about function types in an interface definition,
+                        // so we obtain the IR for the function type from the requirementDeclRef
+                        // directly.
+                        FuncDeclBaseTypeInfo funcInfo;
+                        _lowerFuncDeclBaseTypeInfo(subContext, funcRequirement, funcInfo);
+                        entry->setRequirementVal(funcInfo.type);
+                    }
+                    else
+                    {
+                        entry->setRequirementVal(requirementVal);
+                    }
+                    if (requirementDeclRef.getDecl()->findModifier<HLSLStaticModifier>())
+                    {
+                        getBuilder()->addStaticRequirementDecoration(requirementKey);
                     }
                 }
                 irInterface->setOperand(entryIndex, entry);
                 entryIndex++;
                 // Add addtional requirements for type constraints placed
                 // on an associated types.
-                if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
+                if (auto associatedTypeDeclRef = requirementDeclRef.as<AssocTypeDecl>())
                 {
-                    for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
+                    for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(subContext->astBuilder, associatedTypeDeclRef))
                     {
-                        auto constraintKey = getInterfaceRequirementKey(constraintDecl);
+                        auto constraintKey = getInterfaceRequirementKey(constraintDeclRef.getDecl());
                         auto constraintInterfaceType =
-                            lowerType(context, constraintDecl->getSup().type);
+                            lowerType(context, getSup(subContext->astBuilder, constraintDeclRef));
                         auto witnessTableType =
                             getBuilder()->getWitnessTableType(constraintInterfaceType);
 
@@ -8362,16 +8358,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         irInterface->setOperand(entryIndex, constraintEntry);
                         entryIndex++;
 
-                        context->setValue(constraintDecl, LoweredValInfo::simple(constraintEntry));
+                        context->setValue(constraintDeclRef.getDecl(), LoweredValInfo::simple(constraintEntry));
                     }
                 }
                 else
                 {
                     CallableDecl* callableDecl = nullptr;
-                    if (auto genDecl = as<GenericDecl>(requirementDecl))
+                    if (auto genDecl = as<GenericDecl>(requirementDeclRef.getDecl()))
                         callableDecl = as<CallableDecl>(genDecl->inner);
                     else
-                        callableDecl = as<CallableDecl>(requirementDecl);
+                        callableDecl = as<CallableDecl>(requirementDeclRef.getDecl());
                     if (callableDecl)
                     {
                         // Differentiable functions has additional requirements for the derivatives.
@@ -8384,7 +8380,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     // Add lowered requirement entry to current decl mapping to prevent
                     // the function requirements from being lowered again when we get to
                     // `ensureAllDeclsRec`.
-                    context->setValue(requirementDecl, LoweredValInfo::simple(entry));
+                    context->setValue(requirementDeclRef.getDecl(), LoweredValInfo::simple(entry));
                 }
             };
         for (auto requirementDecl : decl->members)
@@ -8400,7 +8396,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         {
                             auto accessorKey = getInterfaceRequirementKey(accessorDecl);
                             if (accessorKey)
-                                addEntry(accessorKey, accessorDecl);
+                            {
+                                auto accessorDeclRef = createDefaultSpecializedDeclRef(subContext, nullptr, accessorDecl);
+                                addEntry(accessorKey, accessorDeclRef);
+                            }
                         }
                     }
                 }
@@ -8408,7 +8407,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
-                addEntry(requirementKey, requirementDecl);
+                auto requirementDeclRef = createDefaultSpecializedDeclRef(subContext, nullptr, requirementDecl);
+                addEntry(requirementKey, requirementDeclRef);
             }
         }
 
