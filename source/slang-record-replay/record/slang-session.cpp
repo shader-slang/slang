@@ -54,7 +54,7 @@ namespace SlangRecord
         slang::IModule* pModule = m_actualSession->loadModule(moduleName, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pModule);
             m_recordManager->apendOutput();
         }
@@ -83,7 +83,7 @@ namespace SlangRecord
         slang::IModule* pModule = m_actualSession->loadModuleFromIRBlob(moduleName, path, source, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pModule);
             m_recordManager->apendOutput();
         }
@@ -112,7 +112,7 @@ namespace SlangRecord
         slang::IModule* pModule = m_actualSession->loadModuleFromSource(moduleName, path, source, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pModule);
             m_recordManager->apendOutput();
         }
@@ -142,7 +142,7 @@ namespace SlangRecord
 
         {
             // TODO: Not sure if we need to record the diagnostics blob.
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pModule);
             m_recordManager->apendOutput();
         }
@@ -179,7 +179,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outCompositeComponentType);
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             m_recordManager->apendOutput();
         }
 
@@ -213,7 +213,7 @@ namespace SlangRecord
         slang::TypeReflection* pTypeReflection = m_actualSession->specializeType(type, specializationArgs, specializationArgCount, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pTypeReflection);
             m_recordManager->apendOutput();
         }
@@ -241,7 +241,7 @@ namespace SlangRecord
         slang::TypeLayoutReflection* pTypeLayoutReflection = m_actualSession->getTypeLayout(type, targetIndex, rules, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pTypeLayoutReflection);
             m_recordManager->apendOutput();
         }
@@ -267,7 +267,7 @@ namespace SlangRecord
         slang::TypeReflection* pTypeReflection = m_actualSession->getContainerType(elementType, containerType, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pTypeReflection);
             m_recordManager->apendOutput();
         }
@@ -386,7 +386,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outConformance);
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             m_recordManager->apendOutput();
         }
 
