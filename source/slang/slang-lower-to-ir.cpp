@@ -8230,6 +8230,40 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         context->irBuilder->addDecoration(originalKey, op, associatedKey);
     }
 
+    // Given `value` defined as an independent generic of `outerGeneric`, emit IR that specializes it using
+    // the generic params defined in `outerGeneric`.
+    // For example:
+    // ```
+    //  interface IFoo<T> { void f(); }
+    // ```
+    // We will lower `IFoo<T>::f` into `%f = IRGeneric(T) { return IRFunc(...) }`
+    // When we lower the interface type `IFoo`, it will become:
+    // ```
+    // %IFoo = IRGeneric(T1) { return IRInterfaceType(???); )
+    // ```
+    // We want the `???` to be `specialize(%f, T1)`.
+    // To do so, we will call `specializeWithOuterGeneric` with `value` = `%f`, and `outerGeneric` = %IFoo.
+    //
+    IRInst* specializeWithOuterGeneric(IRBuilder* irBuilder, IRInst* value, IRGeneric* outerGeneric)
+    {
+        if (!as<IRGeneric>(value))
+            return value;
+        if (!outerGeneric)
+            return value;
+
+        // If `outerGeneric` has a generic parent, we want to recursively specialize value
+        // using the parent generic first.
+        auto parentGeneric = getOuterGeneric(outerGeneric);
+        if (parentGeneric)
+            value = specializeWithOuterGeneric(irBuilder, value, parentGeneric);
+
+        // Now we can specialize `value` using the params defined in `outerGeneric`.
+        List<IRInst*> args;
+        for (auto param : outerGeneric->getParams())
+            args.add(param);
+        return irBuilder->emitSpecializeInst(irBuilder->getGenericKind(), value, args);
+    }
+
     LoweredValInfo visitInterfaceDecl(InterfaceDecl* decl)
     {
         // The members of an interface will turn into the keys that will
@@ -8326,9 +8360,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         // We only care about function types in an interface definition,
                         // so we obtain the IR for the function type from the requirementDeclRef
                         // directly.
-                        FuncDeclBaseTypeInfo funcInfo;
-                        _lowerFuncDeclBaseTypeInfo(subContext, funcRequirement, funcInfo);
-                        entry->setRequirementVal(funcInfo.type);
+                        SubstitutionSet substSet(requirementDeclRef);
+                        requirementVal = specializeWithOuterGeneric(context->irBuilder, requirementVal->getFullType(), outerGeneric);
+                        entry->setRequirementVal(requirementVal);
                     }
                     else
                     {
@@ -8407,6 +8441,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
+                if (auto genericDecl = as<GenericDecl>(requirementDecl))
+                {
+                    // We need to form a declref into the inner decls in case of a generic requirement.
+                    requirementDecl = getInner(genericDecl);
+                }
                 auto requirementDeclRef = createDefaultSpecializedDeclRef(subContext, nullptr, requirementDecl);
                 addEntry(requirementKey, requirementDeclRef);
             }
