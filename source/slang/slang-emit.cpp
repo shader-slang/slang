@@ -15,6 +15,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-check-recursive-type.h"
+#include "slang-ir-check-shader-parameter-type.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-dll-export.h"
@@ -739,7 +740,14 @@ Result linkAndOptimizeIR(
     }
 
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
+    {
         checkForRecursiveTypes(irModule, sink);
+
+        // For some targets, we are more restrictive about what types are allowed
+        // to be used as shader parameters in ConstantBuffer/ParameterBlock.
+        // We will check for these restrictions here.
+        checkForInvalidShaderParameterType(targetRequest, irModule, sink);
+    }
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
@@ -1213,9 +1221,17 @@ Result linkAndOptimizeIR(
     default:
         break;
     case CodeGenTarget::GLSL:
+        moveGlobalVarInitializationToEntryPoints(irModule);
+        break;
+    // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         moveGlobalVarInitializationToEntryPoints(irModule);
+        if(targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EnableExperimentalPasses))
+            introduceExplicitGlobalContext(irModule, target);
+    #if 0
+        dumpIRIfEnabled(codeGenContext, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
+    #endif
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:

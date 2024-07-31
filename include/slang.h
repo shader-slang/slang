@@ -943,6 +943,7 @@ extern "C"
             NoHLSLPackConstantBufferElements,
             ValidateUniformity,
             AllowGLSL,
+            EnableExperimentalPasses,
 
             // Internal
 

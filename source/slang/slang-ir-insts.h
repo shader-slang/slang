@@ -4075,9 +4075,17 @@ public:
     IRInst* emitIsType(IRInst* value, IRInst* witness, IRInst* typeOperand, IRInst* targetWitness);
 
     IRInst* emitFieldExtract(
+        IRInst* base,
+        IRInst* fieldKey);
+
+    IRInst* emitFieldExtract(
         IRType*         type,
         IRInst*        base,
         IRInst*        field);
+
+    IRInst* emitFieldAddress(
+        IRInst* basePtr,
+        IRInst* fieldKey);
 
     IRInst* emitFieldAddress(
         IRType*         type,
