@@ -5776,11 +5776,6 @@ void EndToEndCompileRequest::setTargetMatrixLayoutMode(int targetIndex, SlangMat
     getTargetOptionSet(targetIndex).setMatrixLayoutMode(MatrixLayoutMode(mode));
 }
 
-void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool value)
-{
-    getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
-}
-
 void EndToEndCompileRequest::setTargetEmbedDXIL(int targetIndex, bool value)
 {
     getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDXIL, value);

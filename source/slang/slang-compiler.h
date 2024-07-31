@@ -2802,7 +2802,6 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDXIL(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
