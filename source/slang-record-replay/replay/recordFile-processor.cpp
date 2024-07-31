@@ -1,24 +1,26 @@
 #include "recordFile-processor.h"
-#include "../util/record-utility.h"
+#include "../util/record-format.h"
 #include "parameter-decoder.h"
 
 namespace SlangRecord
 {
-    RecordFileProcessor::RecordFileProcessor(const std::string& filename)
+    RecordFileProcessor::RecordFileProcessor(const Slang::String& filePath)
     {
-        Slang::String path(filename.c_str());
         Slang::FileMode fileMode = Slang::FileMode::Open;
         Slang::FileAccess fileAccess = Slang::FileAccess::Read;
         Slang::FileShare fileShare = Slang::FileShare::None;
 
         // Open the record file with read-only access
-        SlangResult res = m_inputStream.init(path, fileMode, fileAccess, fileShare);
+        SlangResult res = m_inputStream.init(filePath, fileMode, fileAccess, fileShare);
 
         if (res != SLANG_OK)
         {
-            SlangRecord::slangRecordLog(SlangRecord::LogLevel::Error, "Failed to open file %s\n", filename.c_str());
+            SlangRecord::slangRecordLog(SlangRecord::LogLevel::Error, "Failed to open file %s\n", filePath.begin());
             std::abort();
         }
+
+        // Enable log system
+        setLogLevel();
     }
 
     bool RecordFileProcessor::processNextBlock()
@@ -48,7 +50,7 @@ namespace SlangRecord
         }
 
         FunctionTailer tailer {};
-        if (!processTailer(tailer))
+        if (processTailer(tailer) == ERROR_BLOCK)
         {
             return false;
         }
@@ -71,16 +73,17 @@ namespace SlangRecord
         paramBlock.outputBuffer = m_outputBuffer.getBuffer();
         paramBlock.outputBufferSize = tailer.dataSizeInBytes;
 
-        if (classId == GlobalFunction)
+        if (classId == ApiClassId::GlobalFunction)
         {
-            ret = m_decoder.processFunctionCall(header, paramBlock);
+            ret = m_decoder->processFunctionCall(header, paramBlock);
         }
         else
         {
-            ret = m_decoder.processMethodCall(header, paramBlock);
+            ret = m_decoder->processMethodCall(header, paramBlock);
         }
 
         m_parameterBuffer.clear();
+        m_outputBuffer.clear();
         return ret;
     }
 
@@ -102,22 +105,33 @@ namespace SlangRecord
         return true;
     }
 
-    bool RecordFileProcessor::processTailer(FunctionTailer& tailer)
+    RecordFileResultCode RecordFileProcessor::processTailer(FunctionTailer& tailer)
     {
         size_t readBytes = 0;
         SlangResult res = m_inputStream.read(&tailer, sizeof(FunctionTailer), readBytes);
 
         if (res != SLANG_OK || readBytes != sizeof(FunctionTailer))
         {
-            return false;
+            return ERROR_BLOCK;
+        }
+
+        // If we don't read a valid tailer, but the magic is bit is a header, it indicates that
+        // there is no tailer for this block, but it's still a valid block.
+        if (tailer.magic == MAGIC_HEADER)
+        {
+            // revert back to last read position, and clear tailer
+            int64_t offset = -(int64_t)sizeof(FunctionTailer);
+            m_inputStream.seek(Slang::SeekOrigin::Current, offset);
+            memset(&tailer, 0, sizeof(FunctionTailer));
+            return NOT_EXSIT;
         }
 
         if (tailer.magic != MAGIC_TAILER)
         {
-            return false;
+            return ERROR_BLOCK;
         }
 
-        return true;
+        return RESULT_OK;
     }
 
     bool RecordFileProcessor::processMethod(FunctionHeader const& header, const uint8_t* parameterBuffer, int64_t bufferSize)

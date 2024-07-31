@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include "record-utility.h"
+#include "../../core/slang-string-util.h"
 
 constexpr const char* kRecordLayerEnvVar = "SLANG_RECORD_LAYER";
 constexpr const char* kRecordLayerLogLevel = "SLANG_RECORD_LOG_LEVEL";
@@ -74,9 +75,13 @@ namespace SlangRecord
             return;
         }
 
+        Slang::StringBuilder builder;
+
         va_list args;
         va_start(args, fmt);
-        vfprintf(stdout, fmt, args);
+        Slang::StringUtil::append(fmt, args, builder);
         va_end(args);
+
+        fprintf(stdout, "[slang-record-replay]: %s", builder.begin());
     }
 }

@@ -45,7 +45,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(res);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return res;
@@ -69,7 +69,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outDiagnostics);
             recorder->recordAddress(programLayout);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return programLayout;
@@ -103,7 +103,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outCode);
             recorder->recordAddress(*outDiagnostics);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return res;
@@ -128,7 +128,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outCode);
             recorder->recordAddress(*outDiagnostics);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return res;
@@ -178,7 +178,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outHash);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
     }
 
@@ -203,7 +203,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outSpecializedComponentType);
             recorder->recordAddress(*outDiagnostics);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return res;
@@ -226,7 +226,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outLinkedComponentType);
             recorder->recordAddress(*outDiagnostics);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return res;
@@ -253,7 +253,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outSharedLibrary);
             recorder->recordAddress(*outDiagnostics);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return res;
@@ -275,7 +275,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outEntryPoint);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return res;
@@ -302,7 +302,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outLinkedComponentType);
             recorder->recordAddress(*outDiagnostics);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return res;

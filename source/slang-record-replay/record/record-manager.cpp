@@ -4,6 +4,7 @@
 #include <thread>
 #include "../util/record-utility.h"
 #include "record-manager.h"
+#include "../../core/slang-io.h"
 
 namespace SlangRecord
 {
@@ -15,7 +16,8 @@ namespace SlangRecord
 
         m_recordFileDirectory = m_recordFileDirectory / "slang-record";
 
-        if (!std::filesystem::exists(m_recordFileDirectory))
+        Slang::String recordFileDirectory {m_recordFileDirectory.string().c_str()};
+        if (!Slang::File::exists(recordFileDirectory))
         {
             std::error_code ec;
             if (!std::filesystem::create_directory(m_recordFileDirectory, ec))
@@ -78,7 +80,7 @@ namespace SlangRecord
         return &m_recorder;
     }
 
-    void RecordManager::endMethodRecordAppendOutput()
+    void RecordManager::apendOutput()
     {
         FunctionTailer* pTailer = const_cast<FunctionTailer*>(
                 reinterpret_cast<const FunctionTailer*>(m_memoryStream.getData()));

@@ -28,6 +28,8 @@ namespace SlangRecord
         SlangDecoder() {};
         ~SlangDecoder() {};
 
+		void addConsumer(IDecoderConsumer* consumer) { m_consumers.add(consumer); }
+
 		bool processMethodCall(FunctionHeader const& header, ParameterBlock const& parameterBlock);
 		bool processFunctionCall(FunctionHeader const& header, ParameterBlock const& parameterBlock);
 
@@ -38,7 +40,7 @@ namespace SlangRecord
         bool processICompositeComponentTypeMethods(ApiCallId callId, ObjectID objectId, ParameterBlock const& parameterBlock);
         bool processITypeConformanceMethods(ApiCallId callId, ObjectID objectId, ParameterBlock const& parameterBlock);
 
-		bool CreateGlobalSession(ObjectID objectId, ParameterBlock const& parameterBlock);
+		bool CreateGlobalSession(ParameterBlock const& parameterBlock);
 		bool IGlobalSession_createSession(ObjectID objectId, ParameterBlock const& parameterBlock);
 		void IGlobalSession_findProfile(ObjectID objectId, ParameterBlock const& parameterBlock);
 		void IGlobalSession_setDownstreamCompilerPath(ObjectID objectId, ParameterBlock const& parameterBlock);
