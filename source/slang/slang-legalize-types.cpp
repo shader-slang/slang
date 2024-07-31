@@ -467,21 +467,13 @@ struct TupleTypeBuilder
             IRBuilder* builder = context->getBuilder();
             IRStructType* ordinaryStructType = builder->createStructType();
             ordinaryStructType->sourceLoc = originalStructType->sourceLoc;
-            copyNameHintAndDebugDecorations(ordinaryStructType, originalStructType);
+            originalStructType->transferDecorationsTo(ordinaryStructType);
+            copyNameHintAndDebugDecorations(originalStructType, ordinaryStructType);
 
             // The new struct type will appear right after the original in the IR,
             // so that we can be sure any instruction that could reference the
             // original can also reference the new one.
             ordinaryStructType->insertAfter(originalStructType);
-
-            // Mark the original type for removal once all the other legalization
-            // activity is completed. This is necessary because both the original
-            // and replacement type have the same mangled name, so they would
-            // collide.
-            //
-            // (Also, the original type wasn't legal - that was the whole point...)
-            originalStructType->removeFromParent();
-            context->replacedInstructions.add(originalStructType);
 
             for(auto ee : ordinaryElements)
             {
