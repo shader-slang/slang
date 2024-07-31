@@ -1213,9 +1213,17 @@ Result linkAndOptimizeIR(
     default:
         break;
     case CodeGenTarget::GLSL:
+        moveGlobalVarInitializationToEntryPoints(irModule);
+        break;
+    // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         moveGlobalVarInitializationToEntryPoints(irModule);
+        if(targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EnableExperimentalPasses))
+            introduceExplicitGlobalContext(irModule, target);
+    #if 0
+        dumpIRIfEnabled(codeGenContext, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
+    #endif
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
