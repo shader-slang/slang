@@ -2,8 +2,8 @@
 
 // Test that slang can treat a compute shader parameter as `uniform` without explicit `uniform` keyword.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj  -xslang -Wno-38041
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -xslang -Wno-38041
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj  -xslang -Wno-38040
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -xslang -Wno-38040
 //TEST:SIMPLE(filecheck=WARNING): -target spirv
 
 struct Data
@@ -22,7 +22,7 @@ int test(int val, int a, int b)
 void computeMain(
 
 //TEST_INPUT:uniform(data=[256 1]):name=d
-// WARNING: ([[# @LINE+1]]): warning 38041
+// WARNING: ([[# @LINE+1]]): warning 38040
 	Data d,
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer

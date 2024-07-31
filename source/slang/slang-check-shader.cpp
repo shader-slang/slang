@@ -512,30 +512,23 @@ namespace Slang
                     continue;
                 }
             }
-            bool isBuiltinType = isBuiltinParameterType(param->getType());
-            if (canHaveVaryingInput && isBuiltinType)
+            if (canHaveVaryingInput)
                 continue;
 
-            // For all non-uniform parameters of a general type, we require the parameter be associated with
-            // a system value semantic.
+            // If the stage doesn't allow varying input/output, 
+            // we require the parameter to be associated with a system value semantic.
             if (param->hasModifier<HLSLUniformModifier>())
                 continue;
             if (param->findModifier<HLSLSemantic>())
                 continue;
+
+            bool isBuiltinType = isBuiltinParameterType(param->getType());
             if (!isBuiltinType && doStructFieldsHaveSemantic(param->getType()))
                 continue;
-            if (canHaveVaryingInput)
-            {
-                // We don't really allow a varying input/output of general type, so we need to diagnose an error.
-                sink->diagnose(param, Diagnostics::nonUniformEntryPointParameterMustHaveSemantic, param->getName());
-            }
-            else
-            {
-                // The user is defining a parameter with no 'uniform' modifier for a stage that doesn't support
-                // varying input/output. We will automatically convert it to a 'uniform' parameter, and diagnose a warning.
-                addModifier(param, getCurrentASTBuilder()->create<HLSLUniformModifier>());
-                sink->diagnose(param, Diagnostics::nonUniformEntryPointParameterTreatedAsUniform, param->getName());
-            }
+            // The user is defining a parameter with no 'uniform' modifier for a stage that doesn't support
+            // varying input/output. We will automatically convert it to a 'uniform' parameter, and diagnose a warning.
+            addModifier(param, getCurrentASTBuilder()->create<HLSLUniformModifier>());
+            sink->diagnose(param, Diagnostics::nonUniformEntryPointParameterTreatedAsUniform, param->getName());
         }
         
         for (auto target : linkage->targets)
