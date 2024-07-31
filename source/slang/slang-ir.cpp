@@ -2395,7 +2395,10 @@ namespace Slang
         IRConstant keyInst;
         memset(&keyInst, 0, sizeof(keyInst));
 
-        UnownedStringSlice inSlice((const char*)(blob->getBufferPointer()), blob->getBufferSize());
+        char* buffer = (char*)(getModule()->getMemoryArena().allocate(blob->getBufferSize()));
+        memcpy(buffer, blob->getBufferPointer(), blob->getBufferSize());
+
+        UnownedStringSlice inSlice(buffer, blob->getBufferSize());
 
         // Mark that this is on the stack...
         IRDecoration stackDecoration;
