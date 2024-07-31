@@ -2396,6 +2396,10 @@ namespace Slang
         memset(&keyInst, 0, sizeof(keyInst));
 
         char* buffer = (char*)(getModule()->getMemoryArena().allocate(blob->getBufferSize()));
+        if (!buffer)
+        {
+            return nullptr;
+        }
         memcpy(buffer, blob->getBufferPointer(), blob->getBufferSize());
 
         UnownedStringSlice inSlice(buffer, blob->getBufferSize());
