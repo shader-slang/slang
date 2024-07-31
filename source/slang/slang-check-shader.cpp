@@ -505,6 +505,10 @@ namespace Slang
         {
         case Stage::Vertex:
         case Stage::Fragment:
+        case Stage::Miss:
+        case Stage::AnyHit:
+        case Stage::ClosestHit:
+        case Stage::Callable:
             canHaveVaryingInput = true;
             break;
         default:
