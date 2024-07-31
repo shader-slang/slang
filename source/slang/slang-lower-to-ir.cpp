@@ -8355,18 +8355,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     auto requirementVal = ensureDecl(subContext, requirementDeclRef.getDecl()).val;
 
-                    if (auto funcRequirement = requirementDeclRef.as<FunctionDeclBase>())
+                    switch (requirementVal->getOp())
                     {
-                        // We only care about function types in an interface definition,
-                        // so we obtain the IR for the function type from the requirementDeclRef
-                        // directly.
-                        SubstitutionSet substSet(requirementDeclRef);
+                    default:
+                        // For the majority of requirements, we only care about its type in an
+                        // interface definition, so we store only the type from the lowered IR
+                        // in the interface entry.
+                        // We need to make sure the type is specialized with the outer generic
+                        // parameters in case the interface itself is inside a generic.
+                        //
                         requirementVal = specializeWithOuterGeneric(context->irBuilder, requirementVal->getFullType(), outerGeneric);
                         entry->setRequirementVal(requirementVal);
-                    }
-                    else
-                    {
+                        break;
+
+                    case kIROp_AssociatedType:
+                        // For associated types, we will store it directly inside the interface type.
                         entry->setRequirementVal(requirementVal);
+                        break;
                     }
                     if (requirementDeclRef.getDecl()->findModifier<HLSLStaticModifier>())
                     {
