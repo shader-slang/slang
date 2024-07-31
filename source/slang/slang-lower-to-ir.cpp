@@ -6398,6 +6398,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
     {
+        if (!stmt->targetCases.getCount())
+            return;
+
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
         auto initialBlock = builder->getBlock();

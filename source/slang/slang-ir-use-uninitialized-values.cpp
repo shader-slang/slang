@@ -2,6 +2,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-reachability.h"
 #include "slang-ir.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -37,30 +38,30 @@ namespace Slang
             || (inst->m_op == kIROp_Var);
     }
 
-    static bool isUndefinedParam(IRParam* param)
+    static bool isPotentiallyUnintended(IRParam* param)
     {
-            auto outType = as<IROutType>(param->getFullType());
-            if (!outType)
-                return false;
+        auto outType = as<IROutType>(param->getFullType());
+        if (!outType)
+            return false;
 
-            // Don't check `out Vertices<T>` or `out Indices<T>` parameters
-            // in mesh shaders.
-            // TODO: we should find a better way to represent these mesh shader
-            // parameters so they conform to the initialize before use convention.
-            // For example, we can use a `OutputVetices` and `OutputIndices` type
-            // to represent an output, like `OutputPatch` in domain shader.
-            // For now, we just skip the check for these parameters.
-            switch (outType->getValueType()->getOp())
-            {
-            case kIROp_VerticesType:
-            case kIROp_IndicesType:
-            case kIROp_PrimitivesType:
-                return false;
-            default:
-                break;
-            }
+        // Don't check `out Vertices<T>` or `out Indices<T>` parameters
+        // in mesh shaders.
+        // TODO: we should find a better way to represent these mesh shader
+        // parameters so they conform to the initialize before use convention.
+        // For example, we can use a `OutputVetices` and `OutputIndices` type
+        // to represent an output, like `OutputPatch` in domain shader.
+        // For now, we just skip the check for these parameters.
+        switch (outType->getValueType()->getOp())
+        {
+        case kIROp_VerticesType:
+        case kIROp_IndicesType:
+        case kIROp_PrimitivesType:
+            return false;
+        default:
+            break;
+        }
 
-            return true;
+        return true;
     }
 
     static bool isAliasable(IRInst* inst)
@@ -220,6 +221,15 @@ namespace Slang
             loads.add(call);
     }
 
+    static void collectSpecialCaseInstructions(List<IRInst*>& stores, IRBlock* block)
+    {
+        for (auto inst = block->getFirstInst(); inst; inst = inst->next)
+        {
+            if (as<IRGenericAsm>(inst))
+                stores.add(inst);
+        }
+    }
+
     static void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user, IRInst* inst)
     {
         // Meta intrinsics (which evaluate on type) do nothing
@@ -248,8 +258,6 @@ namespace Slang
         case kIROp_Store:
         case kIROp_SwizzledStore:
         case kIROp_SPIRVAsm:
-        case kIROp_GenericAsm:
-            // For now assume that __intrinsic_asm blocks will do the right thing...
             stores.add(user);
             break;
 
@@ -277,7 +285,7 @@ namespace Slang
         }
     }
 
-    static void cancelLoads(ReachabilityContext &reachability, const List<IRInst*>& stores, List<IRInst*>& loads)
+    static void cancelLoads(ReachabilityContext& reachability, const List<IRInst*>& stores, List<IRInst*>& loads)
     {
         // Remove all loads which are reachable from stores
         for (auto store : stores)
@@ -292,14 +300,9 @@ namespace Slang
         }
     }
 
-    static List<IRInst*> getUnresolvedParamLoads(ReachabilityContext &reachability, IRFunc* func, IRInst* inst)
+    static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List<IRInst*>& loads)
     {
-        // Collect all aliasable addresses
         auto addresses = getAliasableInstructions(inst);
-
-        // Partition instructions
-        List<IRInst*> stores;
-        List<IRInst*> loads;
 
         for (auto alias : addresses)
         {
@@ -310,15 +313,24 @@ namespace Slang
                 collectLoadStore(stores, loads, user, alias);
             }
         }
+    }
 
-        // Only for out params we shall add all returns
+    static List<IRInst*> getUnresolvedParamLoads(ReachabilityContext &reachability, IRFunc* func, IRInst* inst)
+    {
+        // Partition instructions
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        collectAliasableLoadStores(inst, stores, loads);
+
+        // Special cases for parameters
         for (const auto& b : func->getBlocks())
         {
-            auto t = as<IRReturn>(b->getTerminator());
-            if (!t)
-                continue;
+            collectSpecialCaseInstructions(stores, b);
 
-            loads.add(t);
+            auto t = b->getTerminator();
+            if (as<IRReturn>(t))
+                loads.add(t);
         }
 
         cancelLoads(reachability, stores, loads);
@@ -328,20 +340,11 @@ namespace Slang
 
     static List<IRInst*> getUnresolvedVariableLoads(ReachabilityContext &reachability, IRInst* inst)
     {
-        auto addresses = getAliasableInstructions(inst);
-
         // Partition instructions
         List<IRInst*> stores;
         List<IRInst*> loads;
 
-        for (auto alias : addresses)
-        {
-            for (auto use = alias->firstUse; use; use = use->nextUse)
-            {
-                IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user, alias);
-            }
-        }
+        collectAliasableLoadStores(inst, stores, loads);
 
         cancelLoads(reachability, stores, loads);
 
@@ -497,14 +500,14 @@ namespace Slang
         // Check out parameters
         for (auto param : firstBlock->getParams())
         {
-            if (!isUndefinedParam(param))
+            if (!isPotentiallyUnintended(param))
                 continue;
 
             auto loads = getUnresolvedParamLoads(reachability, func, param);
             for (auto load : loads)
             {
                 sink->diagnose(load,
-                        as <IRReturn> (load)
+                        as<IRTerminatorInst>(load)
                         ? Diagnostics::returningWithUninitializedOut
                         : Diagnostics::usingUninitializedOut,
                         param);
