@@ -1189,6 +1189,32 @@ LegalType legalizeTypeImpl(
                 legalElementType);
 
     }
+    else if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+    {
+        auto legalElementType = legalizeType(context, bufferType->getElementType());
+        IRInst* newElementType = nullptr;
+        switch (legalElementType.flavor)
+        {
+        case LegalType::Flavor::simple:
+            if (legalElementType.getSimple() == bufferType->getElementType())
+                return LegalType::simple(bufferType);
+            newElementType = legalElementType.getSimple();
+            break;
+        case LegalType::Flavor::none:
+            newElementType = context->getBuilder()->getIntType();
+            break;
+        default:
+            return LegalType::simple(bufferType);
+        }
+        ShortList<IRInst*> operands;
+        for (UInt i = 0; i < bufferType->getOperandCount(); i++)
+            operands.add(bufferType->getOperand(i));
+        operands[0] = newElementType;
+        return LegalType::simple(context->getBuilder()->getType(
+            bufferType->getOp(),
+            bufferType->getOperandCount(),
+            operands.getArrayView().getBuffer()));
+    }
     else if (isResourceType(type))
     {
         // We assume that any resource types not handled above
