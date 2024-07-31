@@ -333,7 +333,17 @@ namespace Slang
 
     bool isBuiltinParameterType(Type* type)
     {
-        return as<BuiltinType>(type) != nullptr;
+        if (!as<BuiltinType>(type))
+            return false;
+        if (as<BasicExpressionType>(type))
+            return false;
+        if (as<VectorExpressionType>(type))
+            return false;
+        if (as<MatrixExpressionType>(type))
+            return false;
+        if (auto arrayType = as<ArrayExpressionType>(type))
+            return isBuiltinParameterType(arrayType->getElementType());
+        return true;
     }
 
     bool doStructFieldsHaveSemanticImpl(Type* type, HashSet<Type*>& seenTypes)
@@ -523,8 +533,11 @@ namespace Slang
                 continue;
 
             bool isBuiltinType = isBuiltinParameterType(param->getType());
-            if (!isBuiltinType && doStructFieldsHaveSemantic(param->getType()))
+            if (isBuiltinType)
                 continue;
+            if (doStructFieldsHaveSemantic(param->getType()))
+                continue;
+
             // The user is defining a parameter with no 'uniform' modifier for a stage that doesn't support
             // varying input/output. We will automatically convert it to a 'uniform' parameter, and diagnose a warning.
             addModifier(param, getCurrentASTBuilder()->create<HLSLUniformModifier>());
