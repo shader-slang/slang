@@ -4870,6 +4870,27 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitFieldExtract(IRInst* base, IRInst* fieldKey)
+    {
+        IRType* resultType = nullptr;
+        auto valueType = base->getDataType();
+        auto structType = as<IRStructType>(valueType);
+        SLANG_RELEASE_ASSERT(structType);
+        for (auto child : valueType->getChildren())
+        {
+            auto field = as<IRStructField>(child);
+            if (!field)
+                continue;
+            if (field->getKey() == fieldKey)
+            {
+                resultType = field->getFieldType();
+                break;
+            }
+        }
+        SLANG_RELEASE_ASSERT(resultType);
+        return emitFieldExtract(resultType, base, fieldKey);
+    }
+
     IRInst* IRBuilder::emitFieldExtract(
         IRType* type,
         IRInst* base,
@@ -4900,6 +4921,40 @@ namespace Slang
             }
         }
         return type;
+    }
+
+    IRInst* IRBuilder::emitFieldAddress(
+        IRInst* basePtr,
+        IRInst* fieldKey)
+    {
+        AddressSpace addrSpace = AddressSpace::Generic;
+        IRInst* valueType = nullptr;
+        auto basePtrType = unwrapAttributedType(basePtr->getDataType());
+        if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
+        {
+            addrSpace = ptrType->getAddressSpace();
+            valueType = ptrType->getValueType();
+        }
+        else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
+        {
+            valueType = ptrLikeType->getElementType();
+        }
+        IRType* resultType = nullptr;
+        auto structType = as<IRStructType>(valueType);
+        SLANG_RELEASE_ASSERT(structType);
+        for (auto child : valueType->getChildren())
+        {
+            auto field = as<IRStructField>(child);
+            if (!field)
+                continue;
+            if (field->getKey() == fieldKey)
+            {
+                resultType = field->getFieldType();
+                break;
+            }
+        }
+        SLANG_RELEASE_ASSERT(resultType);
+        return emitFieldAddress(getPtrType(kIROp_PtrType, resultType, addrSpace), basePtr, fieldKey);
     }
 
     IRInst* IRBuilder::emitFieldAddress(
@@ -5080,23 +5135,9 @@ namespace Slang
     {
         for (auto access : accessChain)
         {
-            auto basePtrType = cast<IRPtrTypeBase>(basePtr->getDataType());
-            auto valueType = unwrapAttributedType(basePtrType->getValueType());
-            IRType* resultType = nullptr;
             if (auto structKey = as<IRStructKey>(access))
             {
-                auto structType = as<IRStructType>(valueType);
-                SLANG_RELEASE_ASSERT(structType);
-                for (auto field : structType->getFields())
-                {
-                    if (field->getKey() == structKey)
-                    {
-                        resultType = field->getFieldType();
-                        break;
-                    }
-                }
-                SLANG_RELEASE_ASSERT(resultType);
-                basePtr = emitFieldAddress(getPtrType(kIROp_PtrType, resultType, basePtrType->getAddressSpace()), basePtr, structKey);
+                basePtr = emitFieldAddress(basePtr, structKey);
             }
             else
             {
