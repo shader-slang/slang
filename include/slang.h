@@ -4152,6 +4152,10 @@ namespace slang
             int                     targetIndex,
             SlangTargetFlags        flags) = 0;
 
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(
+            int                     targetIndex,
+            bool                    value) = 0;
+
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDXIL(
             int                     targetIndex,
             bool                    value) = 0;

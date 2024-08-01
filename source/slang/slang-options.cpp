@@ -2790,6 +2790,11 @@ SlangResult OptionsParser::_parse(
                 m_compileRequest->setTargetForceGLSLScalarBufferLayout(targetID, true);
             }
 
+            if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))
+            {
+                m_compileRequest->setTargetGenerateWholeProgram(targetID, true);
+            }
+
             if (rawTarget.optionSet.getBoolOption(CompilerOptionName::EmbedDXIL))
             {
                 m_compileRequest->setTargetEmbedDXIL(targetID, true);
