@@ -872,7 +872,6 @@ extern "C"
             DisableSourceMap,       // bool
             UnscopedEnum,           // bool
             PreserveParameters,       // bool: preserve all resource parameters in the output code.
-            EmbedDXIL,              // bool
 
             // Target
 
@@ -970,6 +969,7 @@ extern "C"
             UseUpToDateBinaryModule,    // bool, when set, will only load
                                         // precompiled modules if it is up-to-date with its source.
 
+            EmbedDXIL,                  // bool
             CountOf,
         };
 

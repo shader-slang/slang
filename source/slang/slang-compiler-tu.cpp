@@ -4,6 +4,7 @@
 #include "../core/slang-basic.h"
 #include "slang-compiler.h"
 #include "slang-ir-insts.h"
+#include "slang-capability.h"
 
 namespace Slang
 {
@@ -17,14 +18,49 @@ namespace Slang
         Slang::ASTBuilder* astBuilder = session->getGlobalASTBuilder();
         Slang::Linkage* builtinLinkage = session->getBuiltinLinkage();
         Slang::Linkage linkage(session, astBuilder, builtinLinkage);
+
+        CapabilityName precompileRequirement = CapabilityName::Invalid;
         switch (targetReq->getTarget())
         {
         case CodeGenTarget::DXIL:
             linkage.addTarget(Slang::CodeGenTarget::DXIL);
+            precompileRequirement = CapabilityName::dxil_lib;
             break;
         default:
             assert(!"Unhandled target");
             break;
+        }
+        SLANG_ASSERT(precompileRequirement != CapabilityName::Invalid);
+
+        // Ensure precompilation capability requirements are met.
+        auto targetCaps = targetReq->getTargetCaps();
+        auto precompileRequirementsCapabilitySet = CapabilitySet(precompileRequirement);
+        if (targetCaps.atLeastOneSetImpliedInOther(precompileRequirementsCapabilitySet) == CapabilitySet::ImpliesReturnFlags::NotImplied)
+        {
+            // If `RestrictiveCapabilityCheck` is true we will error, else we will warn.
+            // error ...: dxil libraries require $0, entry point compiled with $1.
+            // warn ...: dxil libraries require $0, entry point compiled with $1, implicitly upgrading capabilities.
+            maybeDiagnoseWarningOrError(
+                                sink,
+                                targetReq->getOptionSet(),
+                                DiagnosticCategory::Capability,
+                                SourceLoc(),
+                                Diagnostics::incompatibleWithPrecompileLib,
+                                Diagnostics::incompatibleWithPrecompileLibRestrictive,
+                                precompileRequirementsCapabilitySet,
+                                targetCaps);
+
+            // add precompile requirements to the cooked targetCaps
+            targetCaps.join(precompileRequirementsCapabilitySet);
+            if (targetCaps.isInvalid())
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::unknownCapability, targetCaps);
+                return SLANG_FAIL;
+            }
+            else
+            {
+                targetReq->setTargetCaps(targetCaps);
+            }
         }
 
         List<RefPtr<ComponentType>> allComponentTypes;

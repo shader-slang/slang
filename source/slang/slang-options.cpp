@@ -700,7 +700,7 @@ struct OptionsParser
     void setProfile(RawTarget* rawTarget, Profile profile);
     void addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom);
 
-    SlangResult addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option, const char* capability);
+    SlangResult addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option);
     
     void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode);
     
@@ -1645,7 +1645,7 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
 }
 
 // Creates a target of the specified type whose output will be embedded as IR metadata
-SlangResult OptionsParser::addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option, const char * capability)
+SlangResult OptionsParser::addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option)
 {
     RawTarget rawTarget;
     rawTarget.format = format;
@@ -1657,12 +1657,6 @@ SlangResult OptionsParser::addEmbeddedLibrary(const CodeGenTarget format, Compil
 
     getCurrentTarget()->optionSet.add(option, true);
     getCurrentTarget()->optionSet.add(CompilerOptionName::GenerateWholeProgram, true);
-    CapabilityName atom = findCapabilityName(UnownedTerminatedStringSlice(capability));
-    if (atom == CapabilityName::Invalid)
-    {
-        return SLANG_FAIL;
-    }
-    addCapabilityAtom(getCurrentTarget(), atom);
 
     return SLANG_OK;
 }
@@ -1957,7 +1951,7 @@ SlangResult OptionsParser::_parse(
                 linkage->m_optionSet.set(optionKind, compressionType);
                 break;
             }
-            case OptionKind::EmbedDXIL: SLANG_RETURN_ON_FAIL(addEmbeddedLibrary(CodeGenTarget::DXIL, CompilerOptionName::EmbedDXIL, "dxil_lib")); break;
+            case OptionKind::EmbedDXIL: SLANG_RETURN_ON_FAIL(addEmbeddedLibrary(CodeGenTarget::DXIL, CompilerOptionName::EmbedDXIL)); break;
             case OptionKind::Target:
             {
                 CommandLineArg name;
