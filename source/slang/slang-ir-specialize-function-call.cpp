@@ -372,7 +372,7 @@ struct FunctionParameterSpecializationContext
             // We don't need to call this function if the specialized function
             // is not pre-existing, because the we will specialize the function
             // based on the call site info exactly, so there is no way that the
-            // arguments don't match the parameters of the function.
+            // arguments mismatch the parameters of the function.
             typeCastForNewArguments(newFunc, oldCall, callInfo);
         }
 
