@@ -367,6 +367,14 @@ struct FunctionParameterSpecializationContext
             newFunc = generateSpecializedFunc(oldFunc, funcInfo, callInfo);
             specializedFuncs.add(callInfo.key, newFunc);
         }
+        else
+        {
+            // We don't need to call this function if the specialized function
+            // is not pre-existing, because the we will specialize the function
+            // based on the call site info exactly, so there is no way that the
+            // arguments don't match the parameters of the function.
+            typeCastForNewArguments(newFunc, oldCall, callInfo);
+        }
 
         // Once we've other found or generated a specialized function
         // we need to generate a call to it, and then use the new
@@ -382,6 +390,39 @@ struct FunctionParameterSpecializationContext
         newCall->insertBefore(oldCall);
         oldCall->replaceUsesWith(newCall);
         oldCall->removeAndDeallocate();
+
+    }
+
+    // After specialization of the function, any resource type parameters will be gone, and they could be replaced as
+    // the index of the resources. For example, if the original function is:
+    //
+    // void foo(Texture2D<float> tex) { ... }
+    //
+    // it could be specialized to:
+    //
+    // void foo(int idx) { ... }
+    //
+    // In such case, we need to check the new arguments of the new call site match the type of the parameters of the
+    // new function, because we didn't do type checking when we generate the new call site. This step is necessary,
+    // because in the old call site, it's allowed to use different data type as the index to retrieve the resources,
+    // however, the new function only allows one data type as the input argument.
+    void typeCastForNewArguments(
+        IRFunc* newFunc,
+        IRCall* oldCall,
+        CallSpecializationInfo& callInfo)
+    {
+        UInt argIndex = 0;
+        for( auto newParam : newFunc->getParams() )
+        {
+            auto newArg = callInfo.newArgs[argIndex];
+            if (newParam->getFullType() != newArg->getDataType())
+            {
+                auto castInst = getBuilder()->emitCast(newParam->getFullType(), newArg);
+                castInst->insertBefore(oldCall);
+                callInfo.newArgs[argIndex] = castInst;
+            }
+            argIndex++;
+        }
     }
 
     // Before diving into the details on how we gather information
