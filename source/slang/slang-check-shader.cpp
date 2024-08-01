@@ -509,6 +509,10 @@ namespace Slang
         case Stage::AnyHit:
         case Stage::ClosestHit:
         case Stage::Callable:
+        case Stage::Geometry:
+        case Stage::Mesh:
+        case Stage::Hull:
+        case Stage::Domain:
             canHaveVaryingInput = true;
             break;
         default:
@@ -526,6 +530,7 @@ namespace Slang
                     continue;
                 }
             }
+
             if (canHaveVaryingInput)
                 continue;
 
@@ -539,6 +544,7 @@ namespace Slang
             bool isBuiltinType = isBuiltinParameterType(param->getType());
             if (isBuiltinType)
                 continue;
+
             if (doStructFieldsHaveSemantic(param->getType()))
                 continue;
 
