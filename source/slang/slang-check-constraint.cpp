@@ -949,6 +949,11 @@ namespace Slang
                     QualType(sndVectorType->getElementType(), snd.isLeftValue));
             }
         }
+
+        if (auto fstUniformParamGroupType = as<UniformParameterGroupType>(fst))
+            return TryUnifyTypes(constraints, QualType(fstUniformParamGroupType->getElementType(), fst.isLeftValue), snd);
+        if (auto sndUniformParamGroupType = as<UniformParameterGroupType>(snd))
+            return TryUnifyTypes(constraints, fst, QualType(sndUniformParamGroupType->getElementType(), snd.isLeftValue));
         return false;
     }
 
