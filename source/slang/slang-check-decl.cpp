@@ -788,6 +788,9 @@ namespace Slang
         if(as<ConstructorDecl>(decl))
             return true;
 
+        if (as<EnumCaseDecl>(decl))
+            return true;
+
         // Things nested inside functions may have dependencies
         // on values from the enclosing scope, but this needs to
         // be dealt with via "capture" so they are also effectively
