@@ -415,9 +415,28 @@ struct FunctionParameterSpecializationContext
         for( auto newParam : newFunc->getParams() )
         {
             auto newArg = callInfo.newArgs[argIndex];
-            if (newParam->getFullType() != newArg->getDataType())
+            bool isSpecialized = true;
+
+            // If the new argument can be found in the old call site, then it's not specialized.
+            // So we don't need to do any cast.
+            for (UInt i = 0; i < oldCall->getArgCount(); i++)
             {
-                auto castInst = getBuilder()->emitCast(newParam->getFullType(), newArg);
+                if (oldCall->getArg(i) == newArg)
+                {
+                    isSpecialized = false;
+                    break;
+                }
+            }
+
+            if (!isSpecialized)
+            {
+                argIndex++;
+                continue;
+            }
+            auto paramType = newParam->getFullType();
+            if (!isTypeEqual(paramType, newArg->getDataType()))
+            {
+                auto castInst = getBuilder()->emitCast(paramType, newArg);
                 castInst->insertBefore(oldCall);
                 callInfo.newArgs[argIndex] = castInst;
             }
