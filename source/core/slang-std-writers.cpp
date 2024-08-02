@@ -1,7 +1,7 @@
 
 #include "slang-std-writers.h"
 
-#ifdef SLANG_WINDOWS_FAMILY
+#if SLANG_WINDOWS_FAMILY
 #include <Windows.h>
 #endif
 
@@ -12,7 +12,7 @@ namespace Slang
 
 /* static */RefPtr<StdWriters> StdWriters::createDefault()
 {
-#ifdef SLANG_WINDOWS_FAMILY
+#if SLANG_WINDOWS_FAMILY
     SetConsoleCP(CP_UTF8);
     SetConsoleOutputCP(CP_UTF8);
 #endif
