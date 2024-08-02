@@ -1619,12 +1619,6 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
         }
     }
 
-    // Hack. Library profile targets imply "whole program" compilation
-    if (profileName == "lib_6_6")
-    {
-        getCurrentTarget()->optionSet.addTargetFlags(SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
-    }
-
     // Any additional capability tokens will be assumed to represent `CapabilityAtom`s.
     // Those atoms will need to be added to the supported capabilities of the target.
     // 
