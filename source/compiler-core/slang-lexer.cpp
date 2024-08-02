@@ -5,9 +5,9 @@
 // input bytes and turning it into semantically useful tokens.
 //
 
+#include "core/slang-char-encode.h"
 #include "slang-name.h"
 #include "slang-source-loc.h"
-
 #include "slang-core-diagnostics.h"
 
 namespace Slang
@@ -205,7 +205,6 @@ namespace Slang
                         c = e;
                     continue;
                 }
-
                 default:
                     break;
                 }
@@ -214,7 +213,13 @@ namespace Slang
                 // some newlines
                 break;
             }
-            // TODO: handle UTF-8 encoding for non-ASCII code points here
+            if (isUtf8LeadingByte((Byte)c))
+            {
+                // Consume all unicode characters.
+                pos--;
+                c = getUnicodePointFromUTF8([&]() {return lexer->m_cursor[pos++]; });
+            }
+            break;
 
             // Default case is to just hand along the byte we read as an ASCII code point.
         } while (offset--);
@@ -262,7 +267,12 @@ namespace Slang
                 }
             }
 
-            // TODO: Need to handle non-ASCII code points.
+            // Consume all unicode characters.
+            if (isUtf8LeadingByte((Byte)c))
+            {
+                lexer->m_cursor--;
+                c = getUnicodePointFromUTF8([&]() {return *lexer->m_cursor++; });
+            }
 
             // Default case is to return the raw byte we saw.
             return c;
@@ -340,6 +350,11 @@ namespace Slang
         }
     }
 
+    static bool isNonAsciiCodePoint(unsigned int codePoint)
+    {
+        return codePoint != -1 && codePoint >= 0x80;
+    }
+
     static void _lexIdentifier(Lexer* lexer)
     {
         for(;;)
@@ -348,12 +363,12 @@ namespace Slang
             if(('a' <= c ) && (c <= 'z')
                 || ('A' <= c) && (c <= 'Z')
                 || ('0' <= c) && (c <= '9')
-                || (c == '_'))
+                || (c == '_')
+                || isNonAsciiCodePoint((unsigned int)c))
             {
                 _advance(lexer);
                 continue;
             }
-
             return;
         }
     }
@@ -1052,7 +1067,8 @@ namespace Slang
 
     static TokenType _lexTokenImpl(Lexer* lexer)
     {
-        switch(_peek(lexer))
+        int nextCodePoint = _peek(lexer);
+        switch(nextCodePoint)
         {
         default:
             break;
@@ -1358,10 +1374,12 @@ namespace Slang
 
         }
 
-        // TODO(tfoley): If we ever wanted to support proper Unicode
-        // in identifiers, etc., then this would be the right place
-        // to perform a more expensive dispatch based on the actual
-        // code point (and not just the first byte).
+        // We treat all unicode characters as a part of an identifier.
+        if (isNonAsciiCodePoint(nextCodePoint))
+        {
+            _lexIdentifier(lexer);
+            return TokenType::Identifier;
+        }
 
         {
             // If none of the above cases matched, then we have an

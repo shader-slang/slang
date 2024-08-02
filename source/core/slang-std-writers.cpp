@@ -1,6 +1,10 @@
 
 #include "slang-std-writers.h"
 
+#ifdef SLANG_WINDOWS_FAMILY
+#include <Windows.h>
+#endif
+
 namespace Slang
 {
 
@@ -8,8 +12,11 @@ namespace Slang
 
 /* static */RefPtr<StdWriters> StdWriters::createDefault()
 {
+#ifdef SLANG_WINDOWS_FAMILY
+    SetConsoleCP(CP_UTF8);
+    SetConsoleOutputCP(CP_UTF8);
+#endif
     RefPtr<StdWriters> stdWriters(new StdWriters);
-
     RefPtr<FileWriter> stdError(new FileWriter(stderr, WriterFlag::AutoFlush | WriterFlag::IsUnowned));
     RefPtr<FileWriter> stdOut(new FileWriter(stdout, WriterFlag::AutoFlush | WriterFlag::IsUnowned));
 
