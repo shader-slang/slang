@@ -530,6 +530,7 @@ void initCommandOptions(CommandOptions& options)
         "Do not pack elements of constant buffers into structs in the output HLSL code." },
         { OptionKind::ValidateUniformity, "-validate-uniformity", nullptr, "Perform uniformity validation analysis." },
         { OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language." },
+        { OptionKind::EnableExperimentalPasses, "-enable-experimental-passes", nullptr, "Enable experimental compiler passes" },
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -1713,6 +1714,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::NoMangle:
             case OptionKind::ValidateUniformity:
             case OptionKind::AllowGLSL:
+            case OptionKind::EnableExperimentalPasses:
             case OptionKind::EmitIr:
             case OptionKind::DumpIntermediates:
             case OptionKind::DumpReproOnError:

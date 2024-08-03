@@ -6423,11 +6423,12 @@ struct SPIRVEmitContext
                 // If the component types are not the same, convert them to be so.
                 if (!isTypeEqual(getVectorElementType(toType), fromElementType))
                 {
+                    SpvOp convertOp = isIntegralType(fromElementType) ? (isSignedType(fromElementType) ? SpvOpSConvert : SpvOpUConvert) : SpvOpFConvert;
                     auto newFromType = replaceVectorElementType(fromType, getVectorElementType(toType));
                     fromSpvInst = emitInstCustomOperandFunc(
                         parent,
                         nullptr,
-                        SpvOpFConvert,
+                        convertOp,
                         [&]() {
                             emitOperand(newFromType);
                             emitOperand(kResultID),
