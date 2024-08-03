@@ -396,41 +396,64 @@ void DocumentVersion::setText(const String& newText)
 {
     text = newText;
     StringUtil::calcLines(text.getUnownedSlice(), lines);
-    utf16CharStarts.clear();
+    mapUTF16CharIndexToCodePointIndex.clear();
+    mapCodePointIndexToUTF8ByteOffset.clear();
 }
+
+void DocumentVersion::ensureUTFBoundsAvailable()
+{
+    for (auto slice : lines)
+    {
+        List<Index> bounds;
+        List<Index> utf8Bounds;
+        Index index = 0;
+        Index codePointIndex = 0;
+        while (index < slice.getLength())
+        {
+            auto startIndex = index;
+            const Char32 codePoint = getUnicodePointFromUTF8(
+                [&]() -> Byte
+                {
+                    if (index < slice.getLength())
+                        return slice[index++];
+                    else
+                        return '\0';
+                });
+            if (!codePoint)
+                break;
+
+            Char16 buffer[2];
+            int count = encodeUnicodePointToUTF16Reversed(codePoint, buffer);
+            for (int i = 0; i < count; i++)
+                bounds.add(codePointIndex);
+            utf8Bounds.add(startIndex);
+            codePointIndex++;
+        }
+        bounds.add(slice.getLength());
+        utf8Bounds.add(slice.getLength());
+        mapUTF16CharIndexToCodePointIndex.add(_Move(bounds));
+        mapCodePointIndexToUTF8ByteOffset.add(_Move(utf8Bounds));
+    }
+}
+
 ArrayView<Index> DocumentVersion::getUTF16Boundaries(Index line)
 {
-    if (!utf16CharStarts.getCount())
+    if (!mapUTF16CharIndexToCodePointIndex.getCount())
     {
-        for (auto slice : lines)
-        {
-            List<Index> bounds;
-            Index index = 0;
-            Index codePointIndex = 0;
-            while (index < slice.getLength())
-            {
-                const Char32 codePoint = getUnicodePointFromUTF8(
-                    [&]() -> Byte
-                    {
-                        if (index < slice.getLength())
-                            return slice[index++];
-                        else
-                            return '\0';
-                    });
-                if (!codePoint)
-                    break;
-                Char16 buffer[2];
-                int count = encodeUnicodePointToUTF16Reversed(codePoint, buffer);
-                for (int i = 0; i < count; i++)
-                    bounds.add(codePointIndex);
-                codePointIndex++;
-            }
-            bounds.add(slice.getLength());
-            utf16CharStarts.add(_Move(bounds));
-        }
+        ensureUTFBoundsAvailable();
     }
-    return line >= 1 && line <= utf16CharStarts.getCount() ? utf16CharStarts[line - 1].getArrayView()
+    return line >= 1 && line <= mapUTF16CharIndexToCodePointIndex.getCount() ? mapUTF16CharIndexToCodePointIndex[line - 1].getArrayView()
                                                            : ArrayView<Index>();
+}
+
+ArrayView<Index> DocumentVersion::getUTF8Boundaries(Index line)
+{
+    if (!mapCodePointIndexToUTF8ByteOffset.getCount())
+    {
+        ensureUTFBoundsAvailable();
+    }
+    return line >= 1 && line <= mapCodePointIndexToUTF8ByteOffset.getCount() ? mapCodePointIndexToUTF8ByteOffset[line - 1].getArrayView()
+        : ArrayView<Index>();
 }
 
 void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(
