@@ -8,7 +8,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 static const float π = float.getPi();
 
-float 圆周率_円周率_원주율()
+float /*комментарий*/ 圆周率_円周率_원주율()
 {
     return π;   
 }
@@ -17,5 +17,5 @@ float 圆周率_円周率_원주율()
 void computeMain()
 {
     // CHECK: 3.14
-    outputBuffer[0] = 圆周率_円周率_원주율();
+    outputBuffer[0] = 圆周率_円周率_원주율()                                                                                                          ;
 }

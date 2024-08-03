@@ -36,6 +36,8 @@ namespace Slang
 
         void oneBasedUTF8LocToZeroBasedUTF16Loc(
             Index inLine, Index inCol, Index& outLine, Index& outCol);
+        void oneBasedUTF8LocToZeroBasedUTF16Loc(
+            Index inLine, Index inCol, int& outLine, int& outCol);
         void zeroBasedUTF16LocToOneBasedUTF8Loc(
             Index inLine, Index inCol, Index& outLine, Index& outCol);
 

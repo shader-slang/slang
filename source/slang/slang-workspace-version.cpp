@@ -406,9 +406,9 @@ ArrayView<Index> DocumentVersion::getUTF16Boundaries(Index line)
         {
             List<Index> bounds;
             Index index = 0;
+            Index codePointIndex = 0;
             while (index < slice.getLength())
             {
-                auto startIndex = index;
                 const Char32 codePoint = getUnicodePointFromUTF8(
                     [&]() -> Byte
                     {
@@ -422,7 +422,8 @@ ArrayView<Index> DocumentVersion::getUTF16Boundaries(Index line)
                 Char16 buffer[2];
                 int count = encodeUnicodePointToUTF16Reversed(codePoint, buffer);
                 for (int i = 0; i < count; i++)
-                    bounds.add(startIndex);
+                    bounds.add(codePointIndex);
+                codePointIndex++;
             }
             bounds.add(slice.getLength());
             utf16CharStarts.add(_Move(bounds));
@@ -445,6 +446,15 @@ void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(
     auto bounds = getUTF16Boundaries(inLine);
     outLine = rsLine;
     outCol = std::lower_bound(bounds.begin(), bounds.end(), inCol - 1) - bounds.begin();
+}
+
+void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(
+    Index inLine, Index inCol, int& outLine, int& outCol)
+{
+    Index ioutLine, ioutCol;
+    oneBasedUTF8LocToZeroBasedUTF16Loc(inLine, inCol, ioutLine, ioutCol);
+    outLine = (int)ioutLine;
+    outCol = (int)ioutCol;
 }
 
 void DocumentVersion::zeroBasedUTF16LocToOneBasedUTF8Loc(
