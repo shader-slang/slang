@@ -219,8 +219,6 @@ namespace Slang
                 pos--;
                 c = getUnicodePointFromUTF8([&]() {return lexer->m_cursor[pos++]; });
             }
-            break;
-
             // Default case is to just hand along the byte we read as an ASCII code point.
         } while (offset--);
 
