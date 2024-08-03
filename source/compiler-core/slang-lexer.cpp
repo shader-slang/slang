@@ -352,7 +352,7 @@ namespace Slang
 
     static bool isNonAsciiCodePoint(unsigned int codePoint)
     {
-        return codePoint != -1 && codePoint >= 0x80;
+        return codePoint != 0xFFFFFFFF && codePoint >= 0x80;
     }
 
     static void _lexIdentifier(Lexer* lexer)
