@@ -1365,6 +1365,8 @@ struct IRConstructorDecorartion : IRDecoration
     bool getSynthesizedStatus() { return cast<IRBoolLit>(getOperand(0))->getValue(); }
 };
 
+IR_SIMPLE_DECORATION(MethodDecoration)
+
 struct IRPackOffsetDecoration : IRDecoration
 {
     enum

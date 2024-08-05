@@ -750,6 +750,7 @@ DIAGNOSTIC(41019, Warning, returningWithPartiallyUninitializedOut, "returning wi
 DIAGNOSTIC(41020, Warning, constructorUninitializedField, "exiting constructor without initializing field '$0'")
 DIAGNOSTIC(41021, Warning, fieldNotDefaultInitialized, "default initializer for '$0' will not initialize field '$1'")
 DIAGNOSTIC(41022, Warning, inOutNeverStoredInto, "inout parameter '$0' is never written to")
+DIAGNOSTIC(41023, Warning, methodNeverMutates, "function marked mutable but never modifies object")
 
 DIAGNOSTIC(41011, Error, typeDoesNotFitAnyValueSize, "type '$0' does not fit in the size required by its conforming interface.")
 DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")

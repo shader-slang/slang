@@ -23,4 +23,22 @@ void state_assigned(inout State state)
     state.rnd = dot(vi, ni);
 }
 
+struct A
+{
+    int state;
+
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41023: function marked mutable but never modifies object
+    [mutating] int next() { return state; }
+};
+
+__generic <T>
+struct B
+{
+    int state;
+
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41023: function marked mutable but never modifies object
+    [mutating] int next() { return state; }
+};
+
 //CHK-NOT: warning 41022
+//CHK-NOT: warning 41023

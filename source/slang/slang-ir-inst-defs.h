@@ -930,6 +930,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
     INST(SemanticDecoration, semantic, 2, 0)
     INST(ConstructorDecoration, constructor, 1, 0)
+    INST(MethodDecoration, method, 0, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
 
         // Reflection metadata for a shader parameter that provides the original type name.

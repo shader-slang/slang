@@ -533,23 +533,27 @@ namespace Slang
 
     static void checkParameterAsOut(ReachabilityContext &reachability, IRFunc* func, IRParam* param, DiagnosticSink* sink)
     {
-            auto loads = getUnresolvedParamLoads(reachability, func, param);
-            for (auto load : loads)
-            {
-                sink->diagnose(load,
-                        as<IRTerminatorInst>(load)
-                        ? Diagnostics::returningWithUninitializedOut
-                        : Diagnostics::usingUninitializedOut,
-                        param);
-            }
+        auto loads = getUnresolvedParamLoads(reachability, func, param);
+        for (auto load : loads)
+        {
+            sink->diagnose(load,
+                as<IRTerminatorInst>(load)
+                ? Diagnostics::returningWithUninitializedOut
+                : Diagnostics::usingUninitializedOut,
+                param);
+        }
     }
 
-    static void checkParameterAsInOut(ReachabilityContext& reachability, IRParam* param, DiagnosticSink* sink)
+    static void checkParameterAsInOut(IRParam* param, bool isThis, DiagnosticSink* sink)
     {
         if (isInstStoredInto(param))
             return;
 
-        sink->diagnose(param, Diagnostics::inOutNeverStoredInto, param);
+        sink->diagnose(param,
+            isThis
+            ? Diagnostics::methodNeverMutates
+            : Diagnostics::inOutNeverStoredInto,
+            param);
     }
 
     static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
@@ -573,15 +577,19 @@ namespace Slang
         if (auto entry = func->findDecoration<IREntryPointDecoration>())
             stage = entry->getProfile().getStage();
 
+        bool method = func->findDecoration<IRMethodDecoration>();
+
         // Check out parameters
         int index = 0;
         for (auto param : firstBlock->getParams())
         {
-            ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index++);
+            ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index);
             if (checkType == AsOut)
                 checkParameterAsOut(reachability, func, param, sink);
             else if (checkType == AsInOut)
-                checkParameterAsInOut(reachability, param, sink);
+                checkParameterAsInOut(param, method && (index == 0), sink);
+
+            index++;
         }
 
         // Check ordinary instructions
