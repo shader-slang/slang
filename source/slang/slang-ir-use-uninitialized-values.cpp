@@ -45,7 +45,7 @@ namespace Slang
         AsInOut   
     };
 
-    static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage)
+    static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, int index)
     {
         IRType* type = param->getFullType();
         if (auto out = as<IROutType>(param->getFullType()))
@@ -69,13 +69,27 @@ namespace Slang
 
             return AsOut;
         }
-        else if (as<IRInOutType>(type))
+        else if (auto inout = as<IRInOutType>(type))
         {
-            // In HLSL the payload (#0) is required to be `inout`
-            bool requiresPayload = !(stage == Stage::AnyHit || stage == Stage::ClosestHit);
-            return (param->getPrevParam() || requiresPayload)
-                ? AsInOut
-                : Never;
+            // TODO: some way to check if the method
+            // is actually used for autodiff
+            if (as<IRDifferentialPairUserCodeType>(inout->getValueType()))
+                return Never;
+
+            switch (stage)
+            {
+            case Stage::AnyHit:
+            case Stage::ClosestHit:
+                // In HLSL the payload is required to be `inout`
+                return (index == 0) ? Never : AsInOut;
+            case Stage::Geometry:
+                // Second parameter is the triangle stream
+                return (index == 1) ? Never : AsInOut;
+            default:
+                break;
+            }
+
+            return AsInOut;
         }
 
         return Never;
@@ -368,7 +382,7 @@ namespace Slang
         return loads;
     }
 
-    static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* inst)
+    static bool isInstStoredInto(IRInst* inst)
     {
         List<IRInst*> stores;
         List<IRInst*> loads;
@@ -532,7 +546,7 @@ namespace Slang
 
     static void checkParameterAsInOut(ReachabilityContext& reachability, IRParam* param, DiagnosticSink* sink)
     {
-        if (isInstStoredInto(reachability, param))
+        if (isInstStoredInto(param))
             return;
 
         sink->diagnose(param, Diagnostics::inOutNeverStoredInto, param);
@@ -560,9 +574,10 @@ namespace Slang
             stage = entry->getProfile().getStage();
 
         // Check out parameters
+        int index = 0;
         for (auto param : firstBlock->getParams())
         {
-            ParameterCheckType checkType = isPotentiallyUnintended(param, stage);
+            ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index++);
             if (checkType == AsOut)
                 checkParameterAsOut(reachability, func, param, sink);
             else if (checkType == AsInOut)
