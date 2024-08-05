@@ -38,30 +38,47 @@ namespace Slang
             || (inst->m_op == kIROp_Var);
     }
 
-    static bool isPotentiallyUnintended(IRParam* param)
+    enum ParameterCheckType
     {
-        auto outType = as<IROutType>(param->getFullType());
-        if (!outType)
-            return false;
+        Never,
+        AsOut,
+        AsInOut   
+    };
 
-        // Don't check `out Vertices<T>` or `out Indices<T>` parameters
-        // in mesh shaders.
-        // TODO: we should find a better way to represent these mesh shader
-        // parameters so they conform to the initialize before use convention.
-        // For example, we can use a `OutputVetices` and `OutputIndices` type
-        // to represent an output, like `OutputPatch` in domain shader.
-        // For now, we just skip the check for these parameters.
-        switch (outType->getValueType()->getOp())
+    static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage)
+    {
+        IRType* type = param->getFullType();
+        if (auto out = as<IROutType>(param->getFullType()))
         {
-        case kIROp_VerticesType:
-        case kIROp_IndicesType:
-        case kIROp_PrimitivesType:
-            return false;
-        default:
-            break;
+            // Don't check `out Vertices<T>` or `out Indices<T>` parameters
+            // in mesh shaders.
+            // TODO: we should find a better way to represent these mesh shader
+            // parameters so they conform to the initialize before use convention.
+            // For example, we can use a `OutputVetices` and `OutputIndices` type
+            // to represent an output, like `OutputPatch` in domain shader.
+            // For now, we just skip the check for these parameters.
+            switch (out->getValueType()->getOp())
+            {
+            case kIROp_VerticesType:
+            case kIROp_IndicesType:
+            case kIROp_PrimitivesType:
+                return Never;
+            default:
+                break;
+            }
+
+            return AsOut;
+        }
+        else if (as<IRInOutType>(type))
+        {
+            // In HLSL the payload (#0) is required to be `inout`
+            bool requiresPayload = !(stage == Stage::AnyHit || stage == Stage::ClosestHit);
+            return (param->getPrevParam() || requiresPayload)
+                ? AsInOut
+                : Never;
         }
 
-        return true;
+        return Never;
     }
 
     static bool isAliasable(IRInst* inst)
@@ -351,6 +368,25 @@ namespace Slang
         return loads;
     }
 
+    static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* inst)
+    {
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        for (auto alias : getAliasableInstructions(inst))
+        {
+            for (auto use = alias->firstUse; use; use = use->nextUse)
+            {
+                IRInst* user = use->getUser();
+                collectLoadStore(stores, loads, user, alias);
+                if (stores.getCount())
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* reference, IRInst* inst)
     {
         List<IRInst*> stores;
@@ -481,6 +517,27 @@ namespace Slang
         }
     }
 
+    static void checkParameterAsOut(ReachabilityContext &reachability, IRFunc* func, IRParam* param, DiagnosticSink* sink)
+    {
+            auto loads = getUnresolvedParamLoads(reachability, func, param);
+            for (auto load : loads)
+            {
+                sink->diagnose(load,
+                        as<IRTerminatorInst>(load)
+                        ? Diagnostics::returningWithUninitializedOut
+                        : Diagnostics::usingUninitializedOut,
+                        param);
+            }
+    }
+
+    static void checkParameterAsInOut(ReachabilityContext& reachability, IRParam* param, DiagnosticSink* sink)
+    {
+        if (isInstStoredInto(reachability, param))
+            return;
+
+        sink->diagnose(param, Diagnostics::inOutNeverStoredInto, param);
+    }
+
     static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     {
         // Differentiable functions will generate undefined values
@@ -495,23 +552,21 @@ namespace Slang
         ReachabilityContext reachability(func);
 
         // Used for a further analysis and to skip usual return checks
-        auto constructor = func->findDecoration <IRConstructorDecorartion> ();
+        auto constructor = func->findDecoration<IRConstructorDecorartion>();
+
+        // Special checks for stages e.g. raytracing shader
+        Stage stage = Stage::Unknown;
+        if (auto entry = func->findDecoration<IREntryPointDecoration>())
+            stage = entry->getProfile().getStage();
 
         // Check out parameters
         for (auto param : firstBlock->getParams())
         {
-            if (!isPotentiallyUnintended(param))
-                continue;
-
-            auto loads = getUnresolvedParamLoads(reachability, func, param);
-            for (auto load : loads)
-            {
-                sink->diagnose(load,
-                        as<IRTerminatorInst>(load)
-                        ? Diagnostics::returningWithUninitializedOut
-                        : Diagnostics::usingUninitializedOut,
-                        param);
-            }
+            ParameterCheckType checkType = isPotentiallyUnintended(param, stage);
+            if (checkType == AsOut)
+                checkParameterAsOut(reachability, func, param, sink);
+            else if (checkType == AsInOut)
+                checkParameterAsInOut(reachability, param, sink);
         }
 
         // Check ordinary instructions
