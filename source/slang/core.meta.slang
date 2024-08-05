@@ -2590,6 +2590,9 @@ attribute_syntax [call]                 : CallAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [shader(stage)]    : EntryPointAttribute;
 
+__attributeTarget(FuncDecl)
+attribute_syntax [Shader(stage)]    : EntryPointAttribute;
+
 // Hull Shader
 __attributeTarget(FuncDecl)
 attribute_syntax [maxtessfactor(factor: float)]     : MaxTessFactorAttribute;

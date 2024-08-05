@@ -19,6 +19,7 @@ int test(int inVal)
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+[Shader("compute")]
 [NumThreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
