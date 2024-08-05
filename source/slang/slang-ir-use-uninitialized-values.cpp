@@ -544,8 +544,15 @@ namespace Slang
         }
     }
 
-    static void checkParameterAsInOut(IRParam* param, bool isThis, DiagnosticSink* sink)
+    static void checkParameterAsInOut(IRParam* param, IRFunc* func, bool isThis, DiagnosticSink* sink)
     {
+        // If the inout is used for the sake of interface conformance, let it be
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            if (as<IRWitnessTableEntry>(use->getUser()))
+                return;
+        }
+
         if (isInstStoredInto(param))
             return;
 
@@ -583,11 +590,13 @@ namespace Slang
         int index = 0;
         for (auto param : firstBlock->getParams())
         {
+            bool isThis = method && (index == 0);
+
             ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index);
             if (checkType == AsOut)
                 checkParameterAsOut(reachability, func, param, sink);
             else if (checkType == AsInOut)
-                checkParameterAsInOut(param, method && (index == 0), sink);
+                checkParameterAsInOut(param, func, isThis, sink);
 
             index++;
         }
