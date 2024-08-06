@@ -197,6 +197,10 @@ namespace Slang
             /// @return SLANG_OK on success
         static SlangResult getCanonical(const String& path, String& outCanonicalPath);
 
+            /// Returns the current working directory
+            /// @return The path in platform native format. Returns empty string if failed.
+        static String getCurrentPath();
+
             /// Returns the executable path
             /// @return The path in platform native format. Returns empty string if failed.
         static String getExecutablePath();

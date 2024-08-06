@@ -661,6 +661,13 @@ namespace Slang
 #endif
     }
 
+    String Path::getCurrentPath()
+    {
+        Slang::String path;
+        getCanonical(".", path);
+        return path;
+    }
+
     String Path::getRelativePath(String base, String path)
     {
         std::filesystem::path p1(base.getBuffer());
