@@ -29,6 +29,7 @@ public:
     virtual void exitFunction(FuncProfileContext context) = 0;
     virtual void getResult(StringBuilder& out) = 0;
     virtual void clear() = 0;
+    virtual void dispose() = 0;
 public:
     static PerformanceProfiler* getProfiler();
 };

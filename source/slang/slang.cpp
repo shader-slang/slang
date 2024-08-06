@@ -142,7 +142,7 @@ void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
 
-    
+
     _initCodeGenTransitionMap();
 
     ::memset(m_downstreamCompilerLocators, 0, sizeof(m_downstreamCompilerLocators));
