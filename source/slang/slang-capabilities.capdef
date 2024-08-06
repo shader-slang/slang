@@ -119,6 +119,8 @@ def _sm_6_7 : _sm_6_6;
 
 def hlsl_nvapi : hlsl;
 
+alias dxil_lib = _sm_6_3;
+
 // cuda versions
 def _cuda_sm_1_0 : cuda;
 def _cuda_sm_2_0 : _cuda_sm_1_0;
@@ -137,6 +139,7 @@ alias any_gfx_target = hlsl | metal | glsl | spirv;
 alias any_cpp_target = cpp | cuda;
 
 alias cpp_cuda = cpp | cuda;
+alias cpp_cuda_spirv = cpp | cuda | spirv;
 alias cpp_cuda_glsl_spirv = cpp | cuda | glsl | spirv;
 alias cpp_cuda_glsl_hlsl = cpp | cuda | glsl | hlsl;
 alias cpp_cuda_glsl_hlsl_spirv = cpp | cuda | glsl | hlsl | spirv;
@@ -371,6 +374,8 @@ alias GL_ARB_shader_image_load_store = GL_EXT_shader_image_load_store;
 alias GL_ARB_shader_image_size = _GL_ARB_shader_image_size | spvImageQuery | metal;
 alias GL_ARB_texture_multisample = _GL_ARB_texture_multisample | _spirv_1_0;
 alias GL_ARB_shader_texture_image_samples = _GL_ARB_shader_texture_image_samples | spvImageQuery | metal;
+alias GL_ARB_sparse_texture = _GL_ARB_sparse_texture | spvSparseResidency;
+alias GL_ARB_sparse_texture2 = _GL_ARB_sparse_texture2 | spvSparseResidency;
 alias GL_ARB_sparse_texture_clamp = _GL_ARB_sparse_texture_clamp | spvSparseResidency;
 alias GL_ARB_texture_gather = _GL_ARB_texture_gather | spvImageGatherExtended | metal;
 alias GL_ARB_texture_query_levels = _GL_ARB_texture_query_levels | spvImageQuery | metal;
@@ -424,6 +429,8 @@ alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmeti
 
 // Define what each shader model means on different targets.
 
+// spirv profile
+
 alias spirv_1_0 = _spirv_1_0;
 alias spirv_1_1 = _spirv_1_1
                 | spirv_1_0
@@ -444,6 +451,16 @@ alias spirv_1_6 = _spirv_1_6 + GL_EXT_debug_printf + GL_EXT_demote_to_helper_inv
                 | spirv_1_5
                 ;
 alias spirv_latest = _spirv_1_6;
+
+alias SPIRV_1_0 = spirv_1_0;
+alias SPIRV_1_1 = spirv_1_1;
+alias SPIRV_1_2 = spirv_1_2;
+alias SPIRV_1_3 = spirv_1_3;
+alias SPIRV_1_4 = spirv_1_4;
+alias SPIRV_1_5 = spirv_1_5;
+alias SPIRV_1_6 = spirv_1_6;
+
+// hlsl profile
 
 alias sm_4_0_version = _sm_4_0
              | _GLSL_150
@@ -596,7 +613,21 @@ alias sm_6_7_version = _sm_6_7
 alias sm_6_7 = sm_6_7_version
              | sm_6_6
              ;
-// Profiles
+
+alias DX_4_0 = sm_4_0;
+alias DX_4_1 = sm_4_1;
+alias DX_5_0 = sm_5_0;
+alias DX_5_1 = sm_5_1;
+alias DX_6_0 = sm_6_0;
+alias DX_6_1 = sm_6_1;
+alias DX_6_2 = sm_6_2;
+alias DX_6_3 = sm_6_3;
+alias DX_6_4 = sm_6_4;
+alias DX_6_5 = sm_6_5;
+alias DX_6_6 = sm_6_6;
+alias DX_6_7 = sm_6_7;
+
+// glsl profile
 
 alias GLSL_130 = _GLSL_130
                | _sm_4_0
@@ -710,30 +741,27 @@ alias GLSL_410_SPIRV_1_0 = _GLSL_410 | spirv_1_0;
 alias GLSL_420_SPIRV_1_0 = _GLSL_420 + GLSL_410_SPIRV_1_0 | GLSL_410_SPIRV_1_0;
 alias GLSL_430_SPIRV_1_0 = _GLSL_430 + GLSL_420_SPIRV_1_0 | GLSL_420_SPIRV_1_0;
 
-alias DX_4_0 = sm_4_0;
-alias DX_4_1 = sm_4_1;
-alias DX_5_0 = sm_5_0;
-alias DX_5_1 = sm_5_1;
-alias DX_6_0 = sm_6_0;
-alias DX_6_1 = sm_6_1;
-alias DX_6_2 = sm_6_2;
-alias DX_6_3 = sm_6_3;
-alias DX_6_4 = sm_6_4;
-alias DX_6_5 = sm_6_5;
-alias DX_6_6 = sm_6_6;
-alias DX_6_7 = sm_6_7;
+// cuda profile
 
+alias cuda_sm_1_0 = _cuda_sm_1_0 | sm_4_0;
+alias cuda_sm_2_0 = _cuda_sm_2_0 | sm_4_1;
+alias cuda_sm_3_0 = _cuda_sm_3_0 | sm_6_0;
+alias cuda_sm_3_5 = _cuda_sm_3_5 | sm_6_0;
+alias cuda_sm_4_0 = _cuda_sm_4_0 | sm_6_0;
+alias cuda_sm_5_0 = _cuda_sm_5_0 | sm_6_0;
+alias cuda_sm_6_0 = _cuda_sm_6_0 | sm_6_0;
+alias cuda_sm_7_0 = _cuda_sm_7_0 | sm_5_1;
+alias cuda_sm_8_0 = _cuda_sm_8_0 | sm_5_1;
+alias cuda_sm_9_0 = _cuda_sm_9_0 | sm_5_1;
+
+// metal profile
 
 alias METAL_2_3 = metallib_2_3;
 alias METAL_2_4 = metallib_2_4;
+alias METAL_3_0 = metallib_3_0;
+alias METAL_3_1 = metallib_3_1;
 
-alias SPIRV_1_0 = spirv_1_0;
-alias SPIRV_1_1 = spirv_1_1;
-alias SPIRV_1_2 = spirv_1_2;
-alias SPIRV_1_3 = spirv_1_3;
-alias SPIRV_1_4 = spirv_1_4;
-alias SPIRV_1_5 = spirv_1_5;
-alias SPIRV_1_6 = spirv_1_6;
+// Profiles of convenience
 
 alias appendstructuredbuffer = sm_5_0_version;
 alias atomic_hlsl = _sm_4_0;

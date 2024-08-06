@@ -4946,6 +4946,7 @@ namespace Slang
             parseOptionalInheritanceClause(parser, decl);
             parser->ReadToken(TokenType::LBrace);
             Token closingToken;
+            parser->pushScopeAndSetParent(decl);
             while (!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces, &closingToken))
             {
                 EnumCaseDecl* caseDecl = parseEnumCaseDecl(parser);
@@ -4956,6 +4957,7 @@ namespace Slang
 
                 parser->ReadToken(TokenType::Comma);
             }
+            parser->PopScope();
             decl->closingSourceLoc = closingToken.loc;
             return decl;
         });

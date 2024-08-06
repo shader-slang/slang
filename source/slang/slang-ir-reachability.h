@@ -16,23 +16,8 @@ struct ReachabilityContext
     ReachabilityContext() = default;
     ReachabilityContext(IRGlobalValueWithCode* code);
 
+    bool isInstReachable(IRInst* from, IRInst* to);
     bool isBlockReachable(IRBlock* from, IRBlock* to);
-
-    bool isInstReachable(IRInst* inst1, IRInst* inst2)
-    {
-        // If inst1 and inst2 are in the same block,
-        // we test if inst2 appears after inst1.
-        if (inst1->getParent() == inst2->getParent())
-        {
-            for (auto inst = inst1->getNextInst(); inst; inst = inst->getNextInst())
-            {
-                if (inst == inst2)
-                    return true;
-            }
-        }
-
-        return isBlockReachable(as<IRBlock>(inst1->getParent()), as<IRBlock>(inst2->getParent()));
-    }
 };
 
 }

@@ -679,14 +679,14 @@ struct __none_t
 {
 };
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t = $( (uint64_t)AddressSpace::UserPointer)ULL>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
 {
     __generic<U>
     __intrinsic_op($(kIROp_BitCast))
-    __init(Ptr<U> ptr);
+    __init(Ptr<U, addrSpace> ptr);
 
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
@@ -703,53 +703,55 @@ struct Ptr
 };
 
 __intrinsic_op($(kIROp_Load))
-T __load<T>(Ptr<T> ptr);
+T __load<T, let addrSpace : uint64_t>(Ptr<T, addrSpace> ptr);
 
 __intrinsic_op($(kIROp_Store))
-void __store<T>(Ptr<T> ptr, T val);
+void __store<T, let addrSpace : uint64_t>(Ptr<T, addrSpace> ptr, T val);
 
 __intrinsic_op($(kIROp_GetElementPtr))
-Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
-
-__intrinsic_op($(kIROp_GetElementPtr))
-Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int64_t index);
+Ptr<T, addrSpace> __getElementPtr<T, let addrSpace : uint64_t, TIndex : __BuiltinIntegerType>(Ptr<T, addrSpace> ptr, TIndex index);
 
 __intrinsic_op($(kIROp_GetOffsetPtr))
-Ptr<T> __getOffsetPtr<T>(Ptr<T> ptr, int index);
+Ptr<T, addrSpace> __getOffsetPtr<T, let addrSpace : uint64_t, TIndex : __BuiltinIntegerType>(Ptr<T, addrSpace> ptr, TIndex index);
 
-__intrinsic_op($(kIROp_GetOffsetPtr))
-Ptr<T> __getOffsetPtr<T>(Ptr<T> ptr, int64_t index);
-
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Less))
-bool operator<(Ptr<T> p1, Ptr<T> p2);
+bool operator <(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Leq))
-bool operator<=(Ptr<T> p1, Ptr<T> p2);
+bool operator <=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Greater))
-bool operator>(Ptr<T> p1, Ptr<T> p2);
+bool operator>(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Geq))
-bool operator>=(Ptr<T> p1, Ptr<T> p2);
+bool operator >=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Neq))
-bool operator!=(Ptr<T> p1, Ptr<T> p2);
+bool operator !=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Eql))
-bool operator==(Ptr<T> p1, Ptr<T> p2);
+bool operator ==(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
 extension bool : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __implicit_conversion($(kConversionCost_PtrToBool))
     __intrinsic_op($(kIROp_CastPtrToBool))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
+
+    __generic<T : __EnumType>
+    __implicit_conversion($(kConversionCost_IntegerTruncate))
+    [__unsafeForceInlineEarly]
+    __init(T v)
+    {
+        return __slang_noop_cast<T.__Tag>(v) != __intCast<T.__Tag>(0);
+    }
 
     static const bool maxValue = true;
     static const bool minValue = false;
@@ -757,9 +759,9 @@ extension bool : IRangedValue
 
 extension uint64_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
 
     static const uint64_t maxValue = 0xFFFFFFFFFFFFFFFFULL;
     static const uint64_t minValue = 0;
@@ -767,9 +769,9 @@ extension uint64_t : IRangedValue
 
 extension int64_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
 
     static const int64_t maxValue =  0x7FFFFFFFFFFFFFFFLL;
     static const int64_t minValue = -0x8000000000000000LL;
@@ -777,9 +779,9 @@ extension int64_t : IRangedValue
 
 extension intptr_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
     static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0x7FFFFFFFFFFFFFFFz":"0x7FFFFFFFz");
     static const intptr_t minValue = $(SLANG_PROCESSOR_X86_64?"0x8000000000000000z":"0x80000000z");
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
@@ -787,9 +789,9 @@ extension intptr_t : IRangedValue
 
 extension uintptr_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
     static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFz":"0xFFFFFFFFz");
     static const uintptr_t minValue = 0z;
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
@@ -818,6 +820,8 @@ __magic_type(ConstRefType)
 __intrinsic_type($(kIROp_ConstRefType))
 struct ConstRef
 {};
+
+typealias __Addr<T> = Ptr<T, $( (uint64_t)AddressSpace::Generic)ULL>;
 
 __generic<T>
 __magic_type(OptionalType)
@@ -961,10 +965,10 @@ extension Ptr<void>
     [__unsafeForceInlineEarly]
     __init(NativeString nativeStr) { this = nativeStr.getBuffer(); }
 
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op(0)
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
 
     __generic<T>
     __intrinsic_op(0)
@@ -1036,8 +1040,8 @@ __generic<T, let N:int>
 __magic_type(ArrayExpressionType)
 struct Array : IArray<T>
 {
-    [ForceInline]
-    int getCount() { return N; }
+    __intrinsic_op($(kIROp_GetArrayLength))
+    int getCount();
 
     __subscript(int index) -> T
     {
@@ -1045,7 +1049,6 @@ struct Array : IArray<T>
         get;
     }
 }
-
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
 __magic_type(VectorExpressionType)
@@ -1620,21 +1623,28 @@ for (auto op : intrinsicUnaryOps)
 
 }}}}
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op(0)
-__prefix Ref<T> operator*(Ptr<T> value);
+[require(cpp_cuda_spirv)]
+__prefix Ref<T> operator*(Ptr<T, addrSpace> value);
 
 __generic<T>
 __intrinsic_op(0)
-__prefix Ptr<T> operator&(__ref T value);
+[require(cpp_cuda_spirv)]
+__prefix Ptr<T, $( (uint64_t)AddressSpace::UserPointer)ULL> operator&(__ref T value);
 
 __generic<T>
+__intrinsic_op(0)
+[require(cpp_cuda_spirv)]
+__Addr<T> __get_addr( __ref T value);
+
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_GetOffsetPtr))
-Ptr<T> operator+(Ptr<T> value, int64_t offset);
+Ptr<T, addrSpace> operator+(Ptr<T, addrSpace> value, int64_t offset);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 [__unsafeForceInlineEarly]
-Ptr<T> operator-(Ptr<T> value, int64_t offset)
+Ptr<T, addrSpace> operator -(Ptr<T, addrSpace> value, int64_t offset)
 {
     return __getOffsetPtr(value, -offset);
 }
@@ -1699,9 +1709,9 @@ matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C,L> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 [__unsafeForceInlineEarly]
-Ptr<T> operator$(op.name)(in out Ptr<T> value)
+Ptr<T, addrSpace> operator$(op.name)(in out Ptr<T, addrSpace> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) 1; return $(fixity.returnVal); }
 
 ${{{{
@@ -2492,8 +2502,8 @@ __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
 
 __generic<T>
-__intrinsic_op($(kIROp_GetLegalizedSPIRVGlobalParamAddr))
-Ptr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
+__intrinsic_op( $(kIROp_GetLegalizedSPIRVGlobalParamAddr))
+__Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();

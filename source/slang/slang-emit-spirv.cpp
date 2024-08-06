@@ -1108,7 +1108,17 @@ struct SPIRVEmitContext
 
         // If we have seen this before, return the memoized instruction
         if (SpvInst** memoized = m_spvTypeInsts.tryGetValue(key))
+        {
+            // There could be another different slang IR inst that translates to
+            // the same spir-v inst.
+            // For example, both Ptr<T> and Ref<T> translates to the same pointer
+            // type in spirv.
+            // In this case we need to make sure we also
+            // register `inst` to map it to the memoized spir-v inst.
+            if (irInst)
+                m_mapIRInstToSpvInst.addIfNotExists(irInst, *memoized);
             return *memoized;
+        }
 
         // Otherwise, we can construct our instruction and record the result
         InstConstructScope scopeInst(this, opcode, irInst);
@@ -1211,6 +1221,19 @@ struct SPIRVEmitContext
             nullptr,
             UnownedStringSlice("NonSemantic.DebugPrintf"));
         return m_NonSemanticDebugPrintfExtInst;
+    }
+
+    SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
+    {
+        switch (addrSpace)
+        {
+        case AddressSpace::Generic:
+            return SpvStorageClassMax;
+        case AddressSpace::UserPointer:
+            return SpvStorageClassPhysicalStorageBuffer;
+        default:
+            return (SpvStorageClass)addrSpace;
+        }
     }
 
     // Now that we've gotten the core infrastructure out of the way,
@@ -1398,7 +1421,7 @@ struct SPIRVEmitContext
                 auto ptrType = as<IRPtrTypeBase>(inst);
                 SLANG_ASSERT(ptrType);
                 if (ptrType->hasAddressSpace())
-                    storageClass = (SpvStorageClass)ptrType->getAddressSpace();
+                    storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
                 if (storageClass == SpvStorageClassStorageBuffer)
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_storage_buffer_storage_class"));
                 if (storageClass == SpvStorageClassPhysicalStorageBuffer)
@@ -1411,14 +1434,24 @@ struct SPIRVEmitContext
                     && as<IRStructType>(valueType)
                     && storageClass == SpvStorageClassPhysicalStorageBuffer);
                 SpvId valueTypeId;
-                if (useForwardDeclaration)
+                if (as<IRVoidType>(valueType))
                 {
-                    valueTypeId = getIRInstSpvID(valueType);
+                    // Emit void* as uint*.
+                    IRBuilder builder(valueType);
+                    builder.setInsertBefore(valueType);
+                    valueTypeId = getID(ensureInst(builder.getUIntType()));
                 }
                 else
                 {
-                    auto spvValueType = ensureInst(valueType);
-                    valueTypeId = getID(spvValueType);
+                    if (useForwardDeclaration)
+                    {
+                        valueTypeId = getIRInstSpvID(valueType);
+                    }
+                    else
+                    {
+                        auto spvValueType = ensureInst(valueType);
+                        valueTypeId = getID(spvValueType);
+                    }
                 }
 
                 auto resultSpvType = emitOpTypePointer(
@@ -3339,7 +3372,7 @@ struct SPIRVEmitContext
                                     if (auto ptrType = as<IRPtrTypeBase>(globalInst->getDataType()))
                                     {
                                         auto addrSpace = ptrType->getAddressSpace();
-                                        if (addrSpace != SpvStorageClassInput && addrSpace != SpvStorageClassOutput)
+                                        if (addrSpace != AddressSpace(SpvStorageClassInput) && addrSpace != AddressSpace(SpvStorageClassOutput))
                                             continue;
                                     }
                                 }
@@ -4042,7 +4075,7 @@ struct SPIRVEmitContext
         if (!ptrType)
             return;
         auto addrSpace = ptrType->getAddressSpace();
-        if (addrSpace == SpvStorageClassInput)
+        if (addrSpace == AddressSpace(SpvStorageClassInput))
         {
             if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
             {
@@ -4333,10 +4366,10 @@ struct SPIRVEmitContext
 
     void maybeEmitPointerDecoration(SpvInst* varInst, IRInst* inst)
     {
-        auto ptrType = as<IRPtrType>(inst->getDataType());
+        auto ptrType = as<IRPtrType>(unwrapArray(inst->getDataType()));
         if (!ptrType)
             return;
-        if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+        if (addressSpaceToStorageClass(ptrType->getAddressSpace()) == SpvStorageClassPhysicalStorageBuffer)
         {
             // If inst has a pointer type with PhysicalStorageBuffer address space,
             // emit AliasedPointer decoration.
@@ -4351,10 +4384,10 @@ struct SPIRVEmitContext
         {
             // If the pointee type is a pointer with StorageBuffer address space,
             // we also want to emit AliasedPointer decoration.
-            ptrType = as<IRPtrType>(ptrType->getValueType());
+            ptrType = as<IRPtrType>(unwrapArray(ptrType->getValueType()));
             if (!ptrType)
                 return;
-            if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+            if (addressSpaceToStorageClass(ptrType->getAddressSpace()) == SpvStorageClassPhysicalStorageBuffer)
             {
                 emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
@@ -4996,7 +5029,7 @@ struct SPIRVEmitContext
     SpvInst* emitLoad(SpvInstParent* parent, IRLoad* inst)
     {
         auto ptrType = as<IRPtrTypeBase>(inst->getPtr()->getDataType());
-        if (ptrType && ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+        if (ptrType && addressSpaceToStorageClass(ptrType->getAddressSpace()) == SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), ptrType->getValueType(), &sizeAndAlignment);
@@ -5011,7 +5044,7 @@ struct SPIRVEmitContext
     SpvInst* emitStore(SpvInstParent* parent, IRStore* inst)
     {
         auto ptrType = as<IRPtrTypeBase>(inst->getPtr()->getDataType());
-        if (ptrType && ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+        if (ptrType && addressSpaceToStorageClass(ptrType->getAddressSpace()) == SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), ptrType->getValueType(), &sizeAndAlignment);
@@ -5077,7 +5110,7 @@ struct SPIRVEmitContext
         return emitOpVectorShuffle(parent, inst, inst->getFullType(), inst->getBase(), inst->getSource(), shuffleIndices.getArrayView());
     }
 
-    IRPtrTypeBase* getPtrTypeWithAddressSpace(IRPtrTypeBase* ptrTypeWithNoAddressSpace, IRIntegerValue addressSpace)
+    IRPtrTypeBase* getPtrTypeWithAddressSpace(IRPtrTypeBase* ptrTypeWithNoAddressSpace, AddressSpace addressSpace)
     {
         // If it's already ok, return as is
         if(ptrTypeWithNoAddressSpace->getAddressSpace() == addressSpace)
@@ -5104,7 +5137,7 @@ struct SPIRVEmitContext
             parent,
             inst,
             // Make sure the resulting pointer has the correct storage class
-            getPtrTypeWithAddressSpace(cast<IRPtrTypeBase>(inst->getDataType()), storageClass),
+            getPtrTypeWithAddressSpace(cast<IRPtrTypeBase>(inst->getDataType()), AddressSpace(storageClass)),
             inst->getOperand(0),
             makeArray(emitIntConstant(0, builder.getIntType()), ensureInst(inst->getOperand(1)))
         );
@@ -6390,11 +6423,12 @@ struct SPIRVEmitContext
                 // If the component types are not the same, convert them to be so.
                 if (!isTypeEqual(getVectorElementType(toType), fromElementType))
                 {
+                    SpvOp convertOp = isIntegralType(fromElementType) ? (isSignedType(fromElementType) ? SpvOpSConvert : SpvOpUConvert) : SpvOpFConvert;
                     auto newFromType = replaceVectorElementType(fromType, getVectorElementType(toType));
                     fromSpvInst = emitInstCustomOperandFunc(
                         parent,
                         nullptr,
-                        SpvOpFConvert,
+                        convertOp,
                         [&]() {
                             emitOperand(newFromType);
                             emitOperand(kResultID),
