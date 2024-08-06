@@ -9546,6 +9546,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // For diagnostics
         if (as<StructDecl>(decl->parentDecl))
             getBuilder()->addSimpleDecoration<IRMethodDecoration>(irFunc);
+        if (decl->hasModifier<SemanticMutatingAttribute>())
+            getBuilder()->addSimpleDecoration<IRSemanticMutatingDecoration>(irFunc);
 
         auto irFuncType = info.type;
         auto& irResultType = info.resultType;

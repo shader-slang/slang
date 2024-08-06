@@ -273,7 +273,7 @@ struct TensorView
     __subscript(uint index) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(index); }
-        [ForceInline] set { store(index, newValue); }
+        [ForceInline] [semanticmutating] set { store(index, newValue); }
 
         [__NoSideEffect]
         ref
@@ -288,7 +288,7 @@ struct TensorView
     __subscript(uint i1, uint i2) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(i1, i2); }
-        [ForceInline] set { store(i1, i2, newValue); }
+        [ForceInline] [semanticmutating] set { store(i1, i2, newValue); }
         [__NoSideEffect]
         ref
         {
@@ -302,7 +302,7 @@ struct TensorView
     __subscript(uint2 i) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(i.x, i.y); }
-        [ForceInline] set { store(i.x, i.y, newValue); }
+        [ForceInline] [semanticmutating] set { store(i.x, i.y, newValue); }
         [__NoSideEffect]
         ref
         {
@@ -316,7 +316,7 @@ struct TensorView
     __subscript(uint i1, uint i2, uint i3) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(i1, i2, i3); }
-        [ForceInline] set { store(i1, i2, i3, newValue); }
+        [ForceInline] [semanticmutating] set { store(i1, i2, i3, newValue); }
         [__NoSideEffect]
         ref
         {
@@ -330,7 +330,7 @@ struct TensorView
     __subscript(uint3 i) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(i.x, i.y, i.z); }
-        [ForceInline] set { store(i.x, i.y, i.z, newValue); }
+        [ForceInline] [semanticmutating] set { store(i.x, i.y, i.z, newValue); }
         [__NoSideEffect]
         ref
         {
@@ -344,7 +344,7 @@ struct TensorView
     __subscript(uint i1, uint i2, uint i3, uint i4) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(i1, i2, i3, i4); }
-        [ForceInline] set { store(i1, i2, i3, i4, newValue); }
+        [ForceInline] [semanticmutating] set { store(i1, i2, i3, i4, newValue); }
         [__NoSideEffect]
         ref
         {
@@ -358,7 +358,7 @@ struct TensorView
     __subscript(uint4 i) -> T
     {
         [__NoSideEffect][ForceInline] get { return load(i.x, i.y, i.z, i.w); }
-        [ForceInline] set { store(i.x, i.y, i.z, i.w, newValue); }
+        [ForceInline] [semanticmutating] set { store(i.x, i.y, i.z, i.w, newValue); }
         [__NoSideEffect]
         ref
         {
@@ -372,7 +372,7 @@ struct TensorView
     __subscript(uint i1, uint i2, uint i3, uint i4, uint i5) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(i1, i2, i3, i4, i5); }
-        [ForceInline] set { store(i1, i2, i3, i4, i5, newValue); }
+        [ForceInline] [semanticmutating] set { store(i1, i2, i3, i4, i5, newValue); }
         [__NoSideEffect]
         ref
         {

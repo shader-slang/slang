@@ -1358,6 +1358,11 @@ struct IRSemanticDecoration : public IRDecoration
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
 };
 
+// Indicates that a function should be treated as a write
+// even if it internally does not actually perform any writes.
+// Used to circumvent diagnistics system without `inout` parameters.
+IR_SIMPLE_DECORATION(SemanticMutatingDecoration)
+
 struct IRConstructorDecorartion : IRDecoration
 {
     IR_LEAF_ISA(ConstructorDecoration)

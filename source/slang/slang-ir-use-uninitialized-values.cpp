@@ -382,25 +382,6 @@ namespace Slang
         return loads;
     }
 
-    static bool isInstStoredInto(IRInst* inst)
-    {
-        List<IRInst*> stores;
-        List<IRInst*> loads;
-
-        for (auto alias : getAliasableInstructions(inst))
-        {
-            for (auto use = alias->firstUse; use; use = use->nextUse)
-            {
-                IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user, alias);
-                if (stores.getCount())
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
     static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* reference, IRInst* inst)
     {
         List<IRInst*> stores;
@@ -553,8 +534,32 @@ namespace Slang
                 return;
         }
 
-        if (isInstStoredInto(param))
-            return;
+        // If there is at least one write...
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        for (auto alias : getAliasableInstructions(param))
+        {
+            for (auto use = alias->firstUse; use; use = use->nextUse)
+            {
+                IRInst* user = use->getUser();
+                collectLoadStore(stores, loads, user, alias);
+
+                // ...we will ignore the rest...
+                if (stores.getCount())
+                    return;
+            }
+        }
+
+        // ...or if there is an intrinsic_asm instruction
+        for (const auto& b : func->getBlocks())
+        {
+            for (auto inst = b->getFirstInst(); inst; inst = inst->next)
+            {
+                if (as<IRGenericAsm>(inst))
+                    return;
+            }
+        }
 
         sink->diagnose(param,
             isThis
@@ -584,21 +589,27 @@ namespace Slang
         if (auto entry = func->findDecoration<IREntryPointDecoration>())
             stage = entry->getProfile().getStage();
 
-        bool method = func->findDecoration<IRMethodDecoration>();
+        bool structMethod = func->findDecoration<IRMethodDecoration>();
+        bool semanticMutating = func->findDecoration<IRSemanticMutatingDecoration>();
 
         // Check out parameters
-        int index = 0;
-        for (auto param : firstBlock->getParams())
+        if (!semanticMutating)
         {
-            bool isThis = method && (index == 0);
+            // Ignore if the user has specified through `[semanticmutating]`
+            // that the parameters are being written to in some sense
+            int index = 0;
+            for (auto param : firstBlock->getParams())
+            {
+                bool isThis = structMethod && (index == 0);
 
-            ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index);
-            if (checkType == AsOut)
-                checkParameterAsOut(reachability, func, param, sink);
-            else if (checkType == AsInOut)
-                checkParameterAsInOut(param, func, isThis, sink);
+                ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index);
+                if (checkType == AsOut)
+                    checkParameterAsOut(reachability, func, param, sink);
+                else if (checkType == AsInOut)
+                    checkParameterAsInOut(param, func, isThis, sink);
 
-            index++;
+                index++;
+            }
         }
 
         // Check ordinary instructions
