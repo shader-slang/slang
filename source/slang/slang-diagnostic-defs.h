@@ -396,6 +396,9 @@ DIAGNOSTIC(36110, Error, stageIsIncompatibleWithCapabilityDefinition, "'$0' is d
 DIAGNOSTIC(36111, Error, unexpectedCapability, "'$0' resolves into a disallowed `$1` Capability.")
 DIAGNOSTIC(36112, Warning, entryPointAndProfileAreIncompatible, "'$0' is defined for stage '$1', which is incompatible with the declared profile '$2'.")
 DIAGNOSTIC(36113, Warning, usingInternalCapabilityName, "'$0' resolves into a '_Internal' `_$1' Capability, use '$1' instead.")
+DIAGNOSTIC(36114, Warning, incompatibleWithPrecompileLib, "Precompiled library requires '$0', has `$1`, implicitly upgrading capabilities.")
+DIAGNOSTIC(36115, Error, incompatibleWithPrecompileLibRestrictive, "Precompiled library requires '$0', has `$1`.")
+
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")

@@ -294,6 +294,7 @@ INST(Block, block, 0, PARENT)
     INST(FloatLit, float_constant, 0, 0)
     INST(PtrLit, ptr_constant, 0, 0)
     INST(StringLit, string_constant, 0, 0)
+    INST(BlobLit, string_constant, 0, 0)
     INST(VoidLit, void_constant, 0, 0)
 INST_RANGE(Constant, BoolLit, VoidLit)
 
@@ -1206,6 +1207,9 @@ INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)
 INST(DebugVar, DebugVar, 4, 0)
 INST(DebugValue, DebugValue, 2, 0)
+
+/* Embedded Precompiled Libraries */
+INST(EmbeddedDXIL, EmbeddedDXIL, 1, 0)
 
 /* Inline assembly */
 

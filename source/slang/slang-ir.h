@@ -1157,6 +1157,11 @@ struct IRStringLit : IRConstant
     IR_LEAF_ISA(StringLit);
 };
 
+struct IRBlobLit : IRConstant
+{
+    IR_LEAF_ISA(BlobLit);
+};
+
 struct IRPtrLit : IRConstant
 {
     IR_LEAF_ISA(PtrLit);
@@ -2340,6 +2345,9 @@ public:
     {
         return m_containerPool;
     }
+
+    // TODO: make a map with lookup by target?
+    ComPtr<ISlangBlob> precompiledDXIL;
 private:
     IRModule() = delete;
 
