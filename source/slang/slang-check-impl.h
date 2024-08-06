@@ -2868,7 +2868,8 @@ namespace Slang
     // texture, buffer, sampler, acceleration structure, etc.
     bool isOpaqueHandleType(Type* type);
 
-    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl = false);
+    void diagnoseMissingCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilitySet& setToFind);
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, HashSet<Decl*>& printedDecls);
 
     void _ensureAllDeclsRec(
         SemanticsDeclVisitorBase* visitor,

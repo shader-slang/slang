@@ -1096,7 +1096,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
 }
 
-void HLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] IRIntegerValue addressSpace)
+void HLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] AddressSpace addressSpace)
 {
     if (as<IRGroupSharedRate>(rate))
     {
