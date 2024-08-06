@@ -593,9 +593,6 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
             dxcOperationResult.writeRef()));
 
         SLANG_RETURN_ON_FAIL(_handleOperationResult(dxcOperationResult, diagnostics, dxcResultBlob));
-
-        ComPtr<IDxcBlobEncoding> dxcResultBlob2 = nullptr;
-        dxcCompiler->Disassemble(dxcResultBlob, dxcResultBlob2.writeRef());
     }
 
     // If we have libraries then we need to link...
