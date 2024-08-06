@@ -43,9 +43,6 @@ namespace SlangRecord
         default:
             slangRecordLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId);
             break;
-        case ApiCallId::CreateGlobalSession:
-            CreateGlobalSession(objectId, parameterBlock);
-            break;
         case ApiCallId::IGlobalSession_createSession:
             IGlobalSession_createSession(objectId, parameterBlock);
             break;
@@ -411,13 +408,29 @@ namespace SlangRecord
 
     bool SlangDecoder::processFunctionCall(FunctionHeader const& header, ParameterBlock const& parameterBlock)
     {
-        return false;
+        switch(header.callId)
+        {
+        default:
+            slangRecordLog(LogLevel::Error, "Unhandled Slang API call: %d\n", header.callId);
+            return false;
+        case ApiCallId::CreateGlobalSession:
+            CreateGlobalSession(parameterBlock);
+            break;
+        }
+        return true;
     }
 
 
-    bool SlangDecoder::CreateGlobalSession(ObjectID objectId, ParameterBlock const& parameterBlock)
+    bool SlangDecoder::CreateGlobalSession(ParameterBlock const& parameterBlock)
     {
-        return false;
+        ObjectID outGlobalSessionId = 0;
+        ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outGlobalSessionId);
+
+        for (auto consumer: m_consumers)
+        {
+            consumer->CreateGlobalSession(outGlobalSessionId);
+        }
+        return true;
     }
 
     bool SlangDecoder::IGlobalSession_createSession(ObjectID objectId, ParameterBlock const& parameterBlock)

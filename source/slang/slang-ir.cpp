@@ -2059,7 +2059,7 @@ namespace Slang
 
     UnownedStringSlice IRConstant::getStringSlice()
     {
-        assert(getOp() == kIROp_StringLit);
+        assert(getOp() == kIROp_StringLit || getOp() == kIROp_BlobLit);
         // If the transitory decoration is set, then this is uses the transitoryStringVal for the text storage.
         // This is typically used when we are using a transitory IRInst held on the stack (such that it can be looked up in cached), 
         // that just points to a string elsewhere, and NOT the typical normal style, where the string is held after the instruction in memory.
@@ -2133,6 +2133,7 @@ namespace Slang
             {
                 return value.ptrVal == rhs->value.ptrVal;
             }
+            case kIROp_BlobLit:
             case kIROp_StringLit:
             {
                 return getStringSlice() == rhs->getStringSlice();
@@ -2174,6 +2175,7 @@ namespace Slang
             {
                 return combineHash(code, Slang::getHashCode(value.ptrVal));
             }
+            case kIROp_BlobLit:
             case kIROp_StringLit:
             {
                 const UnownedStringSlice slice = getStringSlice();
@@ -2264,6 +2266,7 @@ namespace Slang
                 irValue->value.ptrVal = keyInst.value.ptrVal;
                 break;
             }
+            case kIROp_BlobLit:
             case kIROp_StringLit:
             {
                 const UnownedStringSlice slice = keyInst.getStringSlice();
@@ -2385,6 +2388,36 @@ namespace Slang
         dstSlice.numChars = uint32_t(inSlice.getLength());
 
         return static_cast<IRStringLit*>(_findOrEmitConstant(keyInst));
+    }
+
+    IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
+    {
+        IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
+
+        char* buffer = (char*)(getModule()->getMemoryArena().allocate(blob->getBufferSize()));
+        if (!buffer)
+        {
+            return nullptr;
+        }
+        memcpy(buffer, blob->getBufferPointer(), blob->getBufferSize());
+
+        UnownedStringSlice inSlice(buffer, blob->getBufferSize());
+
+        // Mark that this is on the stack...
+        IRDecoration stackDecoration;
+        memset(&stackDecoration, 0, sizeof(stackDecoration));
+        stackDecoration.m_op = kIROp_TransitoryDecoration;
+        stackDecoration.insertAtEnd(&keyInst);
+
+        keyInst.m_op = kIROp_BlobLit;
+        keyInst.typeUse.usedValue = nullptr; // not used
+
+        IRConstant::StringSliceValue& dstSlice = keyInst.value.transitoryStringVal;
+        dstSlice.chars = const_cast<char*>(inSlice.begin());
+        dstSlice.numChars = uint32_t(inSlice.getLength());
+
+        return static_cast<IRBlobLit*>(_findOrEmitConstant(keyInst));
     }
 
     IRPtrLit* IRBuilder::_getPtrValue(void* data)
@@ -3800,6 +3833,13 @@ namespace Slang
         return nullptr;
     }
 
+    IRInst* IRBuilder::emitEmbeddedDXIL(ISlangBlob *blob)
+    {
+        IRInst* args[] = { getBlobValue(blob) };
+
+        return emitIntrinsicInst(getVoidType(), kIROp_EmbeddedDXIL, 1, args);
+    }
+
     enum class TypeCastStyle
     {
         Unknown = -1, 
@@ -4870,6 +4910,27 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitFieldExtract(IRInst* base, IRInst* fieldKey)
+    {
+        IRType* resultType = nullptr;
+        auto valueType = base->getDataType();
+        auto structType = as<IRStructType>(valueType);
+        SLANG_RELEASE_ASSERT(structType);
+        for (auto child : valueType->getChildren())
+        {
+            auto field = as<IRStructField>(child);
+            if (!field)
+                continue;
+            if (field->getKey() == fieldKey)
+            {
+                resultType = field->getFieldType();
+                break;
+            }
+        }
+        SLANG_RELEASE_ASSERT(resultType);
+        return emitFieldExtract(resultType, base, fieldKey);
+    }
+
     IRInst* IRBuilder::emitFieldExtract(
         IRType* type,
         IRInst* base,
@@ -4900,6 +4961,40 @@ namespace Slang
             }
         }
         return type;
+    }
+
+    IRInst* IRBuilder::emitFieldAddress(
+        IRInst* basePtr,
+        IRInst* fieldKey)
+    {
+        AddressSpace addrSpace = AddressSpace::Generic;
+        IRInst* valueType = nullptr;
+        auto basePtrType = unwrapAttributedType(basePtr->getDataType());
+        if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
+        {
+            addrSpace = ptrType->getAddressSpace();
+            valueType = ptrType->getValueType();
+        }
+        else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
+        {
+            valueType = ptrLikeType->getElementType();
+        }
+        IRType* resultType = nullptr;
+        auto structType = as<IRStructType>(valueType);
+        SLANG_RELEASE_ASSERT(structType);
+        for (auto child : valueType->getChildren())
+        {
+            auto field = as<IRStructField>(child);
+            if (!field)
+                continue;
+            if (field->getKey() == fieldKey)
+            {
+                resultType = field->getFieldType();
+                break;
+            }
+        }
+        SLANG_RELEASE_ASSERT(resultType);
+        return emitFieldAddress(getPtrType(kIROp_PtrType, resultType, addrSpace), basePtr, fieldKey);
     }
 
     IRInst* IRBuilder::emitFieldAddress(
@@ -5080,23 +5175,9 @@ namespace Slang
     {
         for (auto access : accessChain)
         {
-            auto basePtrType = cast<IRPtrTypeBase>(basePtr->getDataType());
-            auto valueType = unwrapAttributedType(basePtrType->getValueType());
-            IRType* resultType = nullptr;
             if (auto structKey = as<IRStructKey>(access))
             {
-                auto structType = as<IRStructType>(valueType);
-                SLANG_RELEASE_ASSERT(structType);
-                for (auto field : structType->getFields())
-                {
-                    if (field->getKey() == structKey)
-                    {
-                        resultType = field->getFieldType();
-                        break;
-                    }
-                }
-                SLANG_RELEASE_ASSERT(resultType);
-                basePtr = emitFieldAddress(getPtrType(kIROp_PtrType, resultType, basePtrType->getAddressSpace()), basePtr, structKey);
+                basePtr = emitFieldAddress(basePtr, structKey);
             }
             else
             {
@@ -7055,6 +7136,10 @@ namespace Slang
 
             case kIROp_BoolLit:
                 dump(context, irConst->value.intVal ? "true" : "false");
+                return;
+
+            case kIROp_BlobLit:
+                dump(context, "<binary blob>");
                 return;
 
             case kIROp_StringLit:

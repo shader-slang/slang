@@ -450,14 +450,14 @@ public:
         void addAsConstantBuffer(
             slang::TypeLayoutReflection* typeLayout,
             Index physicalDescriptorSetIndex,
-            BindingRegisterOffsetPair const& containerOffset,
-            BindingRegisterOffsetPair const& elementOffset);
+            BindingRegisterOffsetPair containerOffset,
+            BindingRegisterOffsetPair elementOffset);
 
         void addAsValue(
             slang::TypeLayoutReflection* typeLayout,
             Index physicalDescriptorSetIndex,
-            BindingRegisterOffsetPair const& containerOffset,
-            BindingRegisterOffsetPair const& elementOffset);
+            BindingRegisterOffsetPair containerOffset,
+            BindingRegisterOffsetPair elementOffset);
 
         D3D12_ROOT_SIGNATURE_DESC1& build();
     };
