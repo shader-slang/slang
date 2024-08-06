@@ -145,6 +145,7 @@ namespace Slang
         static void append(StringBuilder& ioBuilder, const UnownedStringSlice& path);
 
         static bool createDirectory(const String& path);
+        static bool createDirectoryRecursive(const String& path);
 
             /// Accept either style of delimiter
         SLANG_FORCE_INLINE static bool isDelimiter(char c) { return c == '/' || c == '\\'; }

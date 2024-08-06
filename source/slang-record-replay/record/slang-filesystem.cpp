@@ -59,8 +59,7 @@ namespace SlangRecord
                 slangRecordLog(LogLevel::Debug, "Create directory: %s to save captured shader file: %s\n",
                     dirPath.getBuffer(), filePath.getBuffer());
 
-                // Path::createDirectories can create the directory recursively.
-                if (!Path::createDirectories(dirPath))
+                if (!Path::createDirectoryRecursive(dirPath))
                 {
                     slangRecordLog(LogLevel::Error, "Fail to create directory: %s\n",
                         dirPath.getBuffer());

@@ -15,7 +15,7 @@ namespace SlangRecord
         m_recordFileDirectory = Slang::Path::combine(m_recordFileDirectory, "slang-record");
         if (!Slang::File::exists(m_recordFileDirectory))
         {
-            if (!Slang::Path::createDirectories(m_recordFileDirectory))
+            if (!Slang::Path::createDirectoryRecursive(m_recordFileDirectory))
             {
                 slangRecordLog(LogLevel::Error, "Fail to create directory: %s\n",
                     m_recordFileDirectory.getBuffer());
