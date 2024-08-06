@@ -224,28 +224,28 @@ SLANG_UNIT_TEST(declTreeReflection)
         SLANG_CHECK(getTypeFullName(funcReflection->getParameterByIndex(1)->getType()) == "half");
         
         // Access parent generic container from a specialized method.
-        auto specializedGeneric = funcReflection->getGenericContainer();
-        SLANG_CHECK(specializedGeneric != nullptr);
-        SLANG_CHECK(UnownedStringSlice(specializedGeneric->getName()) == "h");
-        SLANG_CHECK(specializedGeneric->asDecl()->getKind() == slang::DeclReflection::Kind::Generic);
+        auto specializationInfo = funcReflection->getGenericContainer();
+        SLANG_CHECK(specializationInfo != nullptr);
+        SLANG_CHECK(UnownedStringSlice(specializationInfo->getName()) == "h");
+        SLANG_CHECK(specializationInfo->asDecl()->getKind() == slang::DeclReflection::Kind::Generic);
         // Check type parameters
-        SLANG_CHECK(specializedGeneric->getTypeParameterCount() == 1);
-        auto typeParam = specializedGeneric->getTypeParameter(0);
+        SLANG_CHECK(specializationInfo->getTypeParameterCount() == 1);
+        auto typeParam = specializationInfo->getTypeParameter(0);
         SLANG_CHECK(UnownedStringSlice(typeParam->getName()) == "U"); // generic name
-        SLANG_CHECK(getTypeFullName(specializedGeneric->getConcreteType(typeParam)) == "float"); // specialized type name under the context in which the generic is obtained
-        SLANG_CHECK(specializedGeneric->getTypeParameterConstraintCount(typeParam) == 0);
+        SLANG_CHECK(getTypeFullName(specializationInfo->getConcreteType(typeParam)) == "float"); // specialized type name under the context in which the generic is obtained
+        SLANG_CHECK(specializationInfo->getTypeParameterConstraintCount(typeParam) == 0);
 
         // Go up another level to the generic struct
-        specializedGeneric = specializedGeneric->getOuterGenericContainer();
-        SLANG_CHECK(specializedGeneric != nullptr);
-        SLANG_CHECK(UnownedStringSlice(specializedGeneric->getName()) == "MyGenericType");
-        SLANG_CHECK(specializedGeneric->asDecl()->getKind() == slang::DeclReflection::Kind::Generic);
+        specializationInfo = specializationInfo->getOuterGenericContainer();
+        SLANG_CHECK(specializationInfo != nullptr);
+        SLANG_CHECK(UnownedStringSlice(specializationInfo->getName()) == "MyGenericType");
+        SLANG_CHECK(specializationInfo->asDecl()->getKind() == slang::DeclReflection::Kind::Generic);
         // Check type parameters
-        SLANG_CHECK(specializedGeneric->getTypeParameterCount() == 1);
-        typeParam = specializedGeneric->getTypeParameter(0);
+        SLANG_CHECK(specializationInfo->getTypeParameterCount() == 1);
+        typeParam = specializationInfo->getTypeParameter(0);
         SLANG_CHECK(UnownedStringSlice(typeParam->getName()) == "T"); // generic name
-        SLANG_CHECK(getTypeFullName(specializedGeneric->getConcreteType(typeParam)) == "half"); // specialized type name under the context in which the generic is obtained
-        SLANG_CHECK(specializedGeneric->getTypeParameterConstraintCount(typeParam) == 2);
+        SLANG_CHECK(getTypeFullName(specializationInfo->getConcreteType(typeParam)) == "half"); // specialized type name under the context in which the generic is obtained
+        SLANG_CHECK(specializationInfo->getTypeParameterConstraintCount(typeParam) == 2);
 
         // Query 'j' on the type 'half'
         funcReflection = compositeProgram->getLayout()->findFunctionByNameInType(type, "j<10>");
@@ -253,7 +253,7 @@ SLANG_UNIT_TEST(declTreeReflection)
         SLANG_CHECK(UnownedStringSlice(funcReflection->getName()) == "j");
         
         // Check the generic parameters
-        auto specializationInfo = funcReflection->getGenericContainer();
+        specializationInfo = funcReflection->getGenericContainer();
         SLANG_CHECK(specializationInfo != nullptr);
         SLANG_CHECK(UnownedStringSlice(specializationInfo->getName()) == "j");
         SLANG_CHECK(specializationInfo->asDecl()->getKind() == slang::DeclReflection::Kind::Generic);

@@ -2672,12 +2672,12 @@ SLANG_API SlangReflectionType* spReflectionVariable_GetType(SlangReflectionVaria
 {
     auto var = convert(inVar);
 
+    if(!var) return nullptr;
+
     auto astBuilder = getModule(var.getDecl())->getLinkage()->getASTBuilder();
 
     if (auto inheritanceDecl = as<InheritanceDecl>(var.getDecl()))
         return convert(inheritanceDecl->base.type);
-
-    if(!var) return nullptr;
 
     if (auto varDecl = as<VarDeclBase>(var.getDecl()))
         return convert(
