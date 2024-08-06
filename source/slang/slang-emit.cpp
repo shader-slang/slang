@@ -15,6 +15,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-check-recursive-type.h"
+#include "slang-ir-check-shader-parameter-type.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-dll-export.h"
@@ -746,7 +747,14 @@ Result linkAndOptimizeIR(
     }
 
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
+    {
         checkForRecursiveTypes(irModule, sink);
+
+        // For some targets, we are more restrictive about what types are allowed
+        // to be used as shader parameters in ConstantBuffer/ParameterBlock.
+        // We will check for these restrictions here.
+        checkForInvalidShaderParameterType(targetRequest, irModule, sink);
+    }
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
@@ -954,13 +962,13 @@ Result linkAndOptimizeIR(
     specializeResourceUsage(codeGenContext, irModule);
     specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
 
-    // For GLSL targets, we also want to specialize calls to functions that
-    // takes array parameters if possible, to avoid performance issues on
-    // those platforms.
-    if (isKhronosTarget(targetRequest))
-    {
-        specializeArrayParameters(codeGenContext, irModule);
-    }
+    // We also want to specialize calls to functions that
+    // takes unsized array parameters if possible.
+    // Moreover, for Khronos targets, we also want to specialize calls to functions
+    // that takes arrays/structs containing arrays as parameters with the actual
+    // global array object to avoid loading big arrays into SSA registers, which seems
+    // to cause performance issues.
+    specializeArrayParameters(codeGenContext, irModule);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER RESOURCE SPECIALIZATION");
@@ -1220,9 +1228,17 @@ Result linkAndOptimizeIR(
     default:
         break;
     case CodeGenTarget::GLSL:
+        moveGlobalVarInitializationToEntryPoints(irModule);
+        break;
+    // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         moveGlobalVarInitializationToEntryPoints(irModule);
+        if(targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EnableExperimentalPasses))
+            introduceExplicitGlobalContext(irModule, target);
+    #if 0
+        dumpIRIfEnabled(codeGenContext, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
+    #endif
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
@@ -1725,9 +1741,13 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             {
                 if (SLANG_FAILED(compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount()/4))))
                 {
+                    String err;
+                    String dis;
+                    disassembleSPIRV(spirv, err, dis);
                     codeGenContext->getSink()->diagnoseWithoutSourceView(
                         SourceLoc{},
-                        Diagnostics::spirvValidationFailed
+                        Diagnostics::spirvValidationFailed,
+                        dis
                     );
                 }
             }

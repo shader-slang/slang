@@ -943,6 +943,7 @@ extern "C"
             NoHLSLPackConstantBufferElements,
             ValidateUniformity,
             AllowGLSL,
+            EnableExperimentalPasses,
 
             // Internal
 
@@ -969,6 +970,7 @@ extern "C"
             UseUpToDateBinaryModule,    // bool, when set, will only load
                                         // precompiled modules if it is up-to-date with its source.
 
+            EmbedDXIL,                  // bool
             CountOf,
         };
 
@@ -2412,7 +2414,10 @@ extern "C"
         SLANG_MODIFIER_EXPORT,
         SLANG_MODIFIER_EXTERN,
         SLANG_MODIFIER_DIFFERENTIABLE,
-        SLANG_MODIFIER_MUTATING
+        SLANG_MODIFIER_MUTATING,
+        SLANG_MODIFIER_IN,
+        SLANG_MODIFIER_OUT,
+        SLANG_MODIFIER_INOUT
     };
 
     // User Attribute
@@ -3327,7 +3332,10 @@ namespace slang
             Export = SLANG_MODIFIER_EXPORT,
             Extern = SLANG_MODIFIER_EXTERN,
             Differentiable = SLANG_MODIFIER_DIFFERENTIABLE,
-            Mutating = SLANG_MODIFIER_MUTATING
+            Mutating = SLANG_MODIFIER_MUTATING,
+            In = SLANG_MODIFIER_IN,
+            Out = SLANG_MODIFIER_OUT,
+            InOut = SLANG_MODIFIER_INOUT
         };
     };
 
@@ -4145,7 +4153,6 @@ namespace slang
             int                     targetIndex,
             SlangTargetFlags        flags) = 0;
 
-
             /*!
             @brief Set the floating point mode (e.g., precise or fast) to use a target.
             */
@@ -4697,6 +4704,13 @@ namespace slang
         // return a copy of internal profiling results, and if `shouldClear` is true, clear the internal profiling results before returning.
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool shouldClear) = 0;
 
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(
+            int                     targetIndex,
+            bool                    value) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDXIL(
+            int                     targetIndex,
+            bool                    value) = 0;
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()

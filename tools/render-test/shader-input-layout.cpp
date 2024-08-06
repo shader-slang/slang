@@ -462,7 +462,10 @@ namespace renderer_test
                 sb << typeName << "<";
                 for (;;)
                 {
-                    sb << parseTypeName(parser);
+                    if (parser.LookAhead(Misc::TokenType::IntLiteral))
+                        sb << parser.ReadInt();
+                    else
+                        sb << parseTypeName(parser);
                     if (!parser.AdvanceIf(","))
                         break;
                     sb << ",";

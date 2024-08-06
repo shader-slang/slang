@@ -2,15 +2,16 @@
 #define DECODER_CONSUMER_H
 
 #include "slang.h"
-// #include "../../slang/slang-compiler.h"
+#include "../../core/slang-stream.h"
 #include "../util/record-format.h"
+#include "../util/record-utility.h"
 
 namespace SlangRecord
 {
     class IDecoderConsumer
     {
     public:
-        virtual void CreateGlobalSession(ObjectID objectId, const uint8_t* parameterBuffer, int64_t bufferSize) = 0;
+        virtual void CreateGlobalSession(ObjectID outGlobalSessionId) = 0;
         virtual void IGlobalSession_createSession(ObjectID objectId, slang::SessionDesc const&  desc, ObjectID outSessionId) = 0;
         virtual void IGlobalSession_findProfile(ObjectID objectId, char const* name) = 0;
         virtual void IGlobalSession_setDownstreamCompilerPath(ObjectID objectId, SlangPassThrough passThrough, char const* path) = 0;
@@ -106,8 +107,8 @@ namespace SlangRecord
 
         virtual void IModule_getSpecializationParamCount(ObjectID objectId) { (void) objectId; }
 
-        virtual void IModule_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCode, ObjectID outDiagnostics) = 0;
-        virtual void IModule_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCode, ObjectID outDiagnostics) = 0;
+        virtual void IModule_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) = 0;
+        virtual void IModule_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) = 0;
         virtual void IModule_getResultAsFileSystem(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outFileSystem) = 0;
         virtual void IModule_getEntryPointHash(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outHashId) = 0;
         virtual void IModule_specialize(ObjectID objectId, slang::SpecializationArg const* specializationArgs,
@@ -124,8 +125,8 @@ namespace SlangRecord
 
         virtual void IEntryPoint_getSpecializationParamCount(ObjectID objectId) { (void) objectId; };
 
-        virtual void IEntryPoint_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCode, ObjectID outDiagnostics) = 0;
-        virtual void IEntryPoint_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCode, ObjectID outDiagnostics) = 0;
+        virtual void IEntryPoint_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) = 0;
+        virtual void IEntryPoint_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) = 0;
         virtual void IEntryPoint_getResultAsFileSystem(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outFileSystem) = 0;
         virtual void IEntryPoint_getEntryPointHash(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outHashId) = 0;
         virtual void IEntryPoint_specialize(ObjectID objectId, slang::SpecializationArg const* specializationArgs,
@@ -142,8 +143,8 @@ namespace SlangRecord
 
         virtual void ICompositeComponentType_getSpecializationParamCount(ObjectID objectId) { (void) objectId; };
 
-        virtual void ICompositeComponentType_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCode, ObjectID outDiagnostics) = 0;
-        virtual void ICompositeComponentType_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCode, ObjectID outDiagnostics) = 0;
+        virtual void ICompositeComponentType_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) = 0;
+        virtual void ICompositeComponentType_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) = 0;
         virtual void ICompositeComponentType_getResultAsFileSystem(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outFileSystem) = 0;
         virtual void ICompositeComponentType_getEntryPointHash(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outHashId) = 0;
         virtual void ICompositeComponentType_specialize(ObjectID objectId, slang::SpecializationArg const* specializationArgs,
@@ -160,8 +161,8 @@ namespace SlangRecord
 
         virtual void ITypeConformance_getSpecializationParamCount(ObjectID objectId) { (void) objectId; };
 
-        virtual void ITypeConformance_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCode, ObjectID outDiagnostics) = 0;
-        virtual void ITypeConformance_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCode, ObjectID outDiagnostics) = 0;
+        virtual void ITypeConformance_getEntryPointCode(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) = 0;
+        virtual void ITypeConformance_getTargetCode(ObjectID objectId, SlangInt targetIndex, ObjectID outCodeId, ObjectID outDiagnosticsId) = 0;
         virtual void ITypeConformance_getResultAsFileSystem(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outFileSystem) = 0;
         virtual void ITypeConformance_getEntryPointHash(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outHashId) = 0;
         virtual void ITypeConformance_specialize(ObjectID objectId, slang::SpecializationArg const* specializationArgs,
