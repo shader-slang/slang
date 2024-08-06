@@ -15,6 +15,8 @@ namespace Slang
         virtual bool doesParamWantSpecialization(IRParam* param, IRInst* arg) = 0;
 
         virtual bool isParamSuitableForSpecialization(IRParam* param, IRInst* arg);
+
+        virtual bool doesParamTypeWantSpecialization(IRParam* param, IRInst* arg);
     };
 
 

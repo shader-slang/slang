@@ -691,8 +691,8 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
 void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsConstantBuffer(
     slang::TypeLayoutReflection* typeLayout,
     Index physicalDescriptorSetIndex,
-    BindingRegisterOffsetPair const& offsetForChildrenThatNeedNewSpace,
-    BindingRegisterOffsetPair const& offsetForOrdinaryChildren)
+    BindingRegisterOffsetPair offsetForChildrenThatNeedNewSpace,
+    BindingRegisterOffsetPair offsetForOrdinaryChildren)
 {
     if (typeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
     {
@@ -705,6 +705,7 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsConstantBuffer(
             offsetForOrdinaryChildren.primary.spaceOffset,
             1,
             false);
+        offsetForRangeType++;
     }
 
     addAsValue(typeLayout, physicalDescriptorSetIndex, offsetForChildrenThatNeedNewSpace, offsetForOrdinaryChildren);
@@ -713,8 +714,8 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsConstantBuffer(
 void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
     slang::TypeLayoutReflection* typeLayout,
     Index physicalDescriptorSetIndex,
-    BindingRegisterOffsetPair const& containerOffset,
-    BindingRegisterOffsetPair const& elementOffset)
+    BindingRegisterOffsetPair containerOffset,
+    BindingRegisterOffsetPair elementOffset)
 {
     // Our first task is to add the binding ranges for stuff that is
     // directly contained in `typeLayout` rather than via sub-objects.
