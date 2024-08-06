@@ -1206,7 +1206,9 @@ namespace Slang
             Expr*    originalExpr);
 
         DeclVisibility getTypeVisibility(Type* type);
+        bool isVisibilityOfDeclVisibleInScope(DeclRef<Decl> declRef, DeclVisibility visibility, Scope* scope);
         bool isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope);
+        bool isDeclVisible(DeclRef<Decl> declRef);
         LookupResult filterLookupResultByVisibility(const LookupResult& lookupResult);
         LookupResult filterLookupResultByVisibilityAndDiagnose(const LookupResult& lookupResult, SourceLoc loc, bool& outDiagnosed);
 
@@ -1449,7 +1451,7 @@ namespace Slang
             Type*                toType,
             Expr**               outToExpr,
             InitializerListExpr* fromInitializerListExpr,
-            UInt                       &ioInitArgIndex);
+            UInt                 &ioInitArgIndex);
 
             /// Read an aggregate value from an initializer list expression.
             ///
@@ -2879,4 +2881,20 @@ namespace Slang
         FrontEndEntryPointRequest* entryPointReq);
 
     bool resolveStageOfProfileWithEntryPoint(Profile& entryPointProfile, CompilerOptionSet& optionSet, const List<RefPtr<TargetRequest>>& targets, FuncDecl* entryPointFuncDecl, DiagnosticSink* sink);
+
+    LookupResult lookUpMember(
+        ASTBuilder* astBuilder,
+        SemanticsVisitor* semantics,
+        Name* name,
+        Type* type,
+        Scope* sourceScope,
+        LookupMask          mask,
+        LookupOptions       options);
+
+    ConstructorDecl* _getDefaultCtor(StructDecl* structDecl);
+    List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut);
+    Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, TypeExp varDeclType);
+
+    DeclRefBase* _getDeclRefFromVal(Val* val);
+
 }

@@ -506,7 +506,7 @@ DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without a
 DIAGNOSTIC(30401, Error, invalidTypeForConstraint, "type '$0' cannot be used as a constraint.")
 
 // 305xx: initializer lists
-DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
+DIAGNOSTIC(30500, Error, tooManyInitializers, "cannot find matching constructor to call with arguments count of '$0'")
 DIAGNOSTIC(30501, Error, cannotUseInitializerListForArrayOfUnknownSize, "cannot use initializer list for array of statically unknown size '$0'")
 DIAGNOSTIC(30502, Error, cannotUseInitializerListForVectorOfUnknownSize, "cannot use initializer list for vector of statically unknown size '$0'")
 DIAGNOSTIC(30503, Error, cannotUseInitializerListForMatrixOfUnknownSize, "cannot use initializer list for matrix of statically unknown size '$0' rows")

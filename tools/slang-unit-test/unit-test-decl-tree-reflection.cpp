@@ -80,16 +80,16 @@ SLANG_UNIT_TEST(declTreeReflection)
     SLANG_CHECK(moduleDeclReflection->getKind() == slang::DeclReflection::Kind::Module);
     SLANG_CHECK(moduleDeclReflection->getChildrenCount() == 4);
 
-    // First declaration should be a struct with 1 variable
+    // First declaration should be a struct with 1 variable and 2 constructor (memberwise and default ctor)
     auto firstDecl = moduleDeclReflection->getChild(0);
     SLANG_CHECK(firstDecl->getKind() == slang::DeclReflection::Kind::Struct);
-    SLANG_CHECK(firstDecl->getChildrenCount() == 1);
+    SLANG_CHECK(firstDecl->getChildrenCount() == 3);
 
     {
         slang::TypeReflection* type = firstDecl->getType(globalSession);
         SLANG_CHECK(getTypeFullName(type) == "MyFuncPropertyAttribute");
 
-        // Check the field of the struct.
+        // Check the field of the struct
         SLANG_CHECK(type->getFieldCount() == 1);
         auto field = type->getFieldByIndex(0);
         SLANG_CHECK(UnownedStringSlice(field->getName()) == "v");

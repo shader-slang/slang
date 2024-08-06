@@ -128,7 +128,7 @@ namespace Slang
         // for aggregate initialization.
         //
         auto firstInitExpr = fromInitializerListExpr->args[ioInitArgIndex];
-        if(shouldUseInitializerDirectly(toType, firstInitExpr))
+        if(canCoerce(toType, firstInitExpr->type, firstInitExpr) && (shouldUseInitializerDirectly(toType, firstInitExpr)))
         {
             ioInitArgIndex++;
             return _coerce(
@@ -201,6 +201,18 @@ namespace Slang
         return baseStructDeclRef;
     }
 
+    GenericAppDeclRef* _getGenericAppDeclRefType(Type* argType)
+    {
+        auto argDeclRefType = as<DeclRefType>(argType);
+        if (argDeclRefType)
+        {
+            if (auto genericType = as<GenericAppDeclRef>(argDeclRefType->getDeclRefBase()))
+                return genericType;
+        }
+
+        return nullptr;
+    }
+
     bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         Type*                inToType,
         Expr**               outToExpr,
@@ -222,6 +234,13 @@ namespace Slang
             if(ioArgIndex < argCount)
             {
                 auto arg = fromInitializerListExpr->args[ioArgIndex++];
+
+                if (!canCoerce(toType, arg->type, nullptr))
+                {
+                    *outToExpr = arg;
+                    return true;
+                }
+
                 return _coerce(
                     CoercionSite::Initializer,
                     toType,
@@ -424,52 +443,123 @@ namespace Slang
         else if(auto toDeclRefType = as<DeclRefType>(toType))
         {
             auto toTypeDeclRef = toDeclRefType->getDeclRef();
+            // Trying to initialize a `struct` type given an initializer list.
             if(auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
             {
-                // Trying to initialize a `struct` type given an initializer list.
-                //
-                // Before we iterate over the fields, we want to check if this struct
-                // inherits from another `struct` type. If so, we want to read
-                // an initializer for that base type first.
-                //
-                if (auto baseStructType = findBaseStructType(m_astBuilder, toStructDeclRef))
+                auto toStructDecl = toStructDeclRef.getDecl();
+                ensureDecl(toStructDecl, DeclCheckState::DefaultConstructorReadyForUse);
+
+                // We will try to coerce the initializer list (in order) into a constructor.
+                List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, toStructDecl, nullptr);
+                
+                // Easy case of default constructor
+                if (argCount == 0)
                 {
-                    Expr* coercedArg = nullptr;
-                    bool argResult = _readValueFromInitializerList(
-                        baseStructType,
-                        outToExpr ? &coercedArg : nullptr,
-                        fromInitializerListExpr,
-                        ioArgIndex);
+                    if (outToExpr)
+                        *outToExpr = constructDefaultInitExprForVar(this, (TypeExp)toType);
+                    return true;
+                }
 
-                    // No point in trying further if any argument fails
-                    if (!argResult)
-                        return false;
+                // Non-default constructor case
+                List<Expr*> maybeArgList;
+                maybeArgList.reserve(argCount);
+                Index ioArgIndexMirror = ioArgIndex;
+                UInt ioArgIndexCandidate = 0;
+                for (auto& ctor : ctorList)
+                {
+                    auto ctorParamCount = ctor->getParameters().getCount();
+                    
+                    ioArgIndexCandidate = ioArgIndexMirror;
+                    ioArgIndex = ctorParamCount;
 
-                    if (coercedArg)
+                    // Skip if too many params expected by ctor
+                    if (ctorParamCount != Index(argCount))
+                        continue;
+
+                    List<ConstructorDecl*> maybeCandidate;
+                    auto parameters = getParameters(m_astBuilder, ctor);
+                    auto parametersCount = parameters.getCount();
+                    for (auto index = coercedArgs.getCount(); index < parametersCount; index++)
                     {
-                        coercedArgs.add(coercedArg);
+                        auto ctorParam = parameters[index];
+                        auto paramType = getType(getASTBuilder(), ctorParam);
+                        
+                        Expr* coercedArg = nullptr;
+                        _readValueFromInitializerList(
+                            paramType,
+                            outToExpr ? &coercedArg : nullptr,
+                            fromInitializerListExpr,
+                            ioArgIndexCandidate);
+
+                        if (coercedArg)
+                            maybeArgList.add(coercedArg);
+                        else
+                            break;
+                    }
+
+                    if (maybeArgList.getCount() != ctor->getParameters().getCount())
+                        continue;
+
+                    // Skip non-visible constructors.
+                    if (!isDeclVisible(ctor))
+                    {
+                        getSink()->diagnose(fromInitializerListExpr, Diagnostics::declIsNotVisible, ctor);
+                        continue;
+                    }
+
+                    // We cannot fail anymore, set ioArgIndex to the 'used up arg count'.
+                    if (outToExpr)
+                    {
+                        ioArgIndex = ioArgIndexCandidate;
+
+                        for (auto i : maybeArgList)
+                            coercedArgs.add(i);
+
+                        // We want lookup to resolve our init function as a generic using Slang's
+                        // builtin 'lookup' logic.
+                        auto ctorToInvoke = m_astBuilder->create<VarExpr>();
+                        ctorToInvoke->scope = this->getOuterScope();
+                        ctorToInvoke->name = getName(String(toStructDecl->getName()->text));
+                            
+                        Expr* callee = ctorToInvoke;
+
+                        InvokeExpr* constructorExpr = m_astBuilder->create<InvokeExpr>();
+                        constructorExpr->loc = fromInitializerListExpr->loc;
+                        constructorExpr->functionExpr = callee;
+                        constructorExpr->arguments.addRange(coercedArgs);
+                        constructorExpr->type = toType;
+
+                        *outToExpr = CheckExpr(constructorExpr);
+
+                        return true;
                     }
                 }
 
-                // We will go through the fields in order and try to match them
-                // up with initializer arguments.
+                // If we have a generic being compared to another generic (with different generic arguments) 
+                // coerce logic will fail regardless of if generics are valid together. Example is below:
                 //
-                for(auto fieldDeclRef : getMembersOfType<VarDecl>(m_astBuilder, toStructDeclRef, MemberFilterStyle::Instance))
+                // MyStruct<T> tmp = {MyStructBase<U>(), 1}; // assume 'U' is unresolved at this point in time but equal to T 
+                //
+                //
+                // To handle this since this is not verifiable coerce logic:
+                // 1. We need to ensure we don't have any matching constructors
+                // 2. if '1.' is true we can assign the possibly compatible generics and let generic resolution diagnose 
+                // if something makes zero sense.
+                if (auto toGenericType = _getGenericAppDeclRefType(toType))
                 {
-                    Expr* coercedArg = nullptr;
-                    bool argResult = _readValueFromInitializerList(
-                        getType(m_astBuilder, fieldDeclRef),
-                        outToExpr ? &coercedArg : nullptr,
-                        fromInitializerListExpr,
-                        ioArgIndex);
-
-                    // No point in trying further if any argument fails
-                    if(!argResult)
-                        return false;
-
-                    if( coercedArg )
+                    auto arg = fromInitializerListExpr->args[ioArgIndexMirror];
+                    if (auto fromGenericType = _getGenericAppDeclRefType(getType(m_astBuilder, arg)))
                     {
-                        coercedArgs.add(coercedArg);
+                        for (;;)
+                        {
+                            if (toGenericType->getBase() != fromGenericType->getBase())
+                                break;
+
+                            ioArgIndex = ioArgIndexMirror;
+                            *outToExpr = arg;
+                            ioArgIndex++;
+                            return true;
+                        }
                     }
                 }
             }
@@ -533,7 +623,7 @@ namespace Slang
         {
             if( outToExpr )
             {
-                getSink()->diagnose(fromInitializerListExpr, Diagnostics::tooManyInitializers, argIndex, argCount);
+                getSink()->diagnose(fromInitializerListExpr, Diagnostics::tooManyInitializers, argCount);
             }
         }
 

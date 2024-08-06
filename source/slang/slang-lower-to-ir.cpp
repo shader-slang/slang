@@ -9694,7 +9694,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
 
                 // Used for diagnostics
-                getBuilder()->addConstructorDecoration(irFunc, constructorDecl->isSynthesized);
+                getBuilder()->addConstructorDecoration(irFunc, constructorDecl->containsOption(ConstructorTags::Synthesized));
             }
 
             // We lower whatever statement was stored on the declaration

@@ -1,6 +1,6 @@
 // simple-namespace.slang
 
-//TEST(compute):COMPARE_COMPUTE:-vk -render-feature int16
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -render-feature int16
 
 // Test that default initialization works with 16-bit types under Vulkan.
 
@@ -31,5 +31,10 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     int tid = dispatchThreadID.x;
     int inVal = tid;
     int outVal = test(inVal);
+
+//BUF: 0
+//BUF: 1111
+//BUF: 2222
+//BUF: 3333
     outputBuffer[tid] = outVal;
 }

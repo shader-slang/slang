@@ -367,14 +367,30 @@ class FunctionDeclBase : public CallableDecl
     Stmt* body = nullptr;
 };
 
+enum class ConstructorTags : int
+{
+    None = 0,
+    
+    /// Indicates whether the declaration was synthesized by
+    /// Slang and not actually provided by the user
+    Synthesized = 1 << 0,
+    
+    /// Derived classes will call this ctor if they need a memberwise ctor for public members.
+    MemberwiseCtorForPublicVisibility = 1 << 1,    
+
+    /// Derived classes will call this ctor if they need a memberwise ctor for public and internal members.
+    /// This ctor may be equal to 'isMemberwiseCtorForPublicVisibility'
+    MemberwiseCtorForInternalVisibility = 1 << 2,
+};
+
 // A constructor/initializer to create instances of a type
 class ConstructorDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(ConstructorDecl)
    
-    // Indicates whether the declaration was synthesized by
-    // slang and not actually provided by the user
-    bool isSynthesized = false;
+    int options = (int)ConstructorTags::None;
+    void addOption(ConstructorTags option) { options |= (int)option; }
+    bool containsOption(ConstructorTags option) { return options & (int)option; }
 };
 
 // A subscript operation used to index instances of a type

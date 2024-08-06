@@ -1483,7 +1483,7 @@ namespace Slang
         ConstraintSystem constraints;
         constraints.loc = context.loc;
         constraints.genericDecl = genericDeclRef.getDecl();
-
+        auto innerDecl = genericDeclRef.getDecl()->inner;
         // In order to perform matching between the types passed in at the
         // call site represented by `context` and the parameters of the
         // declaraiton being applied, we want to form a reference to
@@ -1493,7 +1493,32 @@ namespace Slang
         // Check what type of declaration we are dealing with, and then try
         // to match it up with the arguments accordingly...
 
-        if (auto funcDeclRef = as<CallableDecl>(genericDeclRef.getDecl()->inner))
+        if (as<StructDecl>(genericDeclRef.getDecl()->inner))
+        {
+            // We have a ctor. We need to get the underlying callable.
+            auto functionVarExpr = as<VarExpr>(context.originalExpr->functionExpr);
+            if (auto genericFunctionDeclRef = as<GenericDecl>(functionVarExpr->declRef))
+            {
+                // Figure out what ctor we are using if our base is a struct decl
+                StructDecl* baseStruct = nullptr;
+                if (auto genericStructDecl = as<GenericDecl>(genericFunctionDeclRef.getDecl()))
+                    baseStruct = as<StructDecl>(genericStructDecl->inner);
+                if (baseStruct)
+                {
+                    // TODO: search for valid ctor "more correctly"
+                    auto ctorList = _getCtorList(getASTBuilder(), this, baseStruct, nullptr);
+                    for (auto& i : ctorList)
+                    {
+                        if (i->getParameters().getCount() != context.argCount)
+                            continue;
+                        innerDecl = i;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (auto funcDeclRef = as<CallableDecl>(innerDecl))
         {
             List<QualType> paramTypes;
             if (!innerParameterTypes)

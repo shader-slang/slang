@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -shaderobj
 
 struct Test
 {
@@ -11,7 +11,7 @@ struct Test
 
 uint test(uint val)
 {
-	Test t = { float4(1.0f), 16, 99.0f };
+    Test t = { { 1.0f, 1.0f, 1.0f, 1.0f }, 16, 99.0f };
 	return val + t.b;
 }
 
@@ -26,5 +26,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 	uint inVal = tid;
 	uint outVal = test(inVal);
 
+//BUF: 10
+//BUF-NEXT: 11
+//BUF-NEXT: 12
+//BUF-NEXT: 13
 	outputBuffer[tid] = outVal;
 }

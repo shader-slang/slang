@@ -880,9 +880,9 @@ namespace Slang
         return DeclVisibility::Public;
     }
 
-    bool SemanticsVisitor::isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope)
+
+    bool SemanticsVisitor::isVisibilityOfDeclVisibleInScope(DeclRef<Decl> declRef, DeclVisibility visibility, Scope* scope)
     {
-        auto visibility = getDeclVisibility(declRef.getDecl());
         if (visibility == DeclVisibility::Public)
             return true;
         if (visibility == DeclVisibility::Internal)
@@ -911,7 +911,17 @@ namespace Slang
             }
             return false;
         }
-        return false;
+        return false;   
+    }
+
+    bool SemanticsVisitor::isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope)
+    {
+        return isVisibilityOfDeclVisibleInScope(declRef, getDeclVisibility(declRef.getDecl()), scope);
+    }
+
+    bool SemanticsVisitor::isDeclVisible(DeclRef<Decl> declRef)
+    {
+        return isDeclVisibleFromScope(declRef, m_outerScope);
     }
 
     LookupResult SemanticsVisitor::filterLookupResultByVisibility(const LookupResult& lookupResult)

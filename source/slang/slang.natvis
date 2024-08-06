@@ -278,6 +278,7 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ContinueStmt">(Slang::ContinueStmt*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ReturnStmt">(Slang::ReturnStmt*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExpressionStmt">(Slang::ExpressionStmt*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TargetSwitchStmt">(Slang::TargetSwitchStmt*)&amp;astNodeType</ExpandedItem>
             <Item Name="[Stmt]">(Slang::Stmt*)this,!</Item>
         </Expand>
     </Type>
