@@ -1113,7 +1113,7 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
 
     instsInProgress.remove(origInst);
 
-    if (auto primalInst = pair.primal)
+    if (pair.primal)
     {
         mapPrimalInst(origInst, pair.primal);
         mapDifferentialInst(origInst, pair.differential);
