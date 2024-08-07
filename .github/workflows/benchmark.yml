@@ -37,9 +37,7 @@ jobs:
           build-llvm: true
       - name: Build Slang
         run: |
-          cmake --preset default --fresh \
-            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-            -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
           cmake --workflow --preset release
       - name: Run benchmark
         run: |
