@@ -2,7 +2,6 @@
 #define FILE_PROCESSOR_H
 
 #include <cstdlib>
-#include <string>
 #include "../../core/slang-stream.h"
 #include "../util/record-utility.h"
 #include "slang-decoder.h"
