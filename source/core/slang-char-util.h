@@ -61,7 +61,7 @@ struct CharUtil
         /// Returns the value if c interpretted as a octal digit
         /// If c is not a valid octal returns -1
     inline static int getOctalDigitValue(char c) { return isOctalDigit(c) ? (c - '0') : -1; }
-    
+
     struct CharFlagMap
     {
         Flags flags[0x100];
