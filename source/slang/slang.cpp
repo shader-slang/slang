@@ -3161,7 +3161,6 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
             {
                 translationUnit->getModule()->precompileForTargets(
                     getSink(),
-                    this,
                     targetReq);
             }
         }
