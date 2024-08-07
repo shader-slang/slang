@@ -27,7 +27,7 @@ jobs:
     runs-on: [Windows, self-hosted]
     steps:
       - uses: actions/checkout@v3
-      - name: Setup
+      - name: Common setup
         uses: ./.github/actions/common-setup
         with:
           os: windows
@@ -39,8 +39,9 @@ jobs:
         run: |
           cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
           cmake --workflow --preset release
+      - name: Setup
+          cd tests/mdl
+          pip install halo prettytable argparse
       - name: Run benchmark
         run: |
-          cd tests/mdl
-          pip install halo
           python compile.py --samples 1

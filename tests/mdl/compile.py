@@ -8,8 +8,6 @@ import sys
 import prettytable
 import json
 
-from timeit import timeit
-
 ### Setup ###
 
 def clear_mkdir(dir):
