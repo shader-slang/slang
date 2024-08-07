@@ -2590,6 +2590,9 @@ attribute_syntax [call]                 : CallAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [shader(stage)]    : EntryPointAttribute;
 
+__attributeTarget(FuncDecl)
+attribute_syntax [Shader(stage)]    : EntryPointAttribute;
+
 // Hull Shader
 __attributeTarget(FuncDecl)
 attribute_syntax [maxtessfactor(factor: float)]     : MaxTessFactorAttribute;
@@ -2624,6 +2627,9 @@ attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 // Compute Shader
 __attributeTarget(FuncDecl)
 attribute_syntax [numthreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [NumThreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;
