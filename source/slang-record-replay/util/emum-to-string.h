@@ -34,6 +34,7 @@ namespace SlangRecord
         CASE(SLANG_METAL_LIB);
         CASE(SLANG_METAL_LIB_ASM);
         CASE(SLANG_HOST_SHARED_LIBRARY);
+        CASE(SLANG_WGSL);
         CASE(SLANG_TARGET_COUNT_OF);
         default:
             Slang::StringBuilder str;

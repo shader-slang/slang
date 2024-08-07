@@ -101,6 +101,7 @@
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
 #include "slang-emit-metal.h"
+#include "slang-emit-wgsl.h"
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
 #include "slang-emit-torch.h"
@@ -1608,6 +1609,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             case SourceLanguage::Metal:
             {
                 sourceEmitter = new MetalSourceEmitter(desc);
+                break;
+            }
+            case SourceLanguage::WGSL:
+            {
+                sourceEmitter = new WGSLSourceEmitter(desc);
                 break;
             }
             default: break;
