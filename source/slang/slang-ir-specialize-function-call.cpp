@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -363,8 +364,16 @@ struct FunctionParameterSpecializationContext
             // a new callee function based on the original
             // function and the information we gathered.
             //
-            newFunc = generateSpecializedFunc(oldFunc, funcInfo);
+            newFunc = generateSpecializedFunc(oldFunc, funcInfo, callInfo);
             specializedFuncs.add(callInfo.key, newFunc);
+        }
+        else
+        {
+            // We don't need to call this function if the specialized function
+            // is not pre-existing, because the we will specialize the function
+            // based on the call site info exactly, so there is no way that the
+            // arguments mismatch the parameters of the function.
+            typeCastForNewArguments(newFunc, oldCall, callInfo);
         }
 
         // Once we've other found or generated a specialized function
@@ -381,6 +390,58 @@ struct FunctionParameterSpecializationContext
         newCall->insertBefore(oldCall);
         oldCall->replaceUsesWith(newCall);
         oldCall->removeAndDeallocate();
+
+    }
+
+    // After specialization of the function, any resource type parameters will be gone, and they could be replaced as
+    // the index of the resources. For example, if the original function is:
+    //
+    // void foo(Texture2D<float> tex) { ... }
+    //
+    // it could be specialized to:
+    //
+    // void foo(int idx) { ... }
+    //
+    // In such case, we need to check the new arguments of the new call site match the type of the parameters of the
+    // new function, because we didn't do type checking when we generate the new call site. This step is necessary,
+    // because in the old call site, it's allowed to use different data type as the index to retrieve the resources,
+    // however, the new function only allows one data type as the input argument.
+    void typeCastForNewArguments(
+        IRFunc* newFunc,
+        IRCall* oldCall,
+        CallSpecializationInfo& callInfo)
+    {
+        UInt argIndex = 0;
+        for( auto newParam : newFunc->getParams() )
+        {
+            auto newArg = callInfo.newArgs[argIndex];
+            bool isSpecialized = true;
+
+            // If the new argument can be found in the old call site, then it's not specialized.
+            // So we don't need to do any cast.
+            for (UInt i = 0; i < oldCall->getArgCount(); i++)
+            {
+                if (oldCall->getArg(i) == newArg)
+                {
+                    isSpecialized = false;
+                    break;
+                }
+            }
+
+            if (!isSpecialized)
+            {
+                argIndex++;
+                continue;
+            }
+            auto paramType = newParam->getFullType();
+            if (!isTypeEqual(paramType, newArg->getDataType()))
+            {
+                auto castInst = getBuilder()->emitCast(paramType, newArg);
+                castInst->insertBefore(oldCall);
+                callInfo.newArgs[argIndex] = castInst;
+            }
+            argIndex++;
+        }
     }
 
     // Before diving into the details on how we gather information
@@ -803,7 +864,8 @@ struct FunctionParameterSpecializationContext
     //
     IRFunc* generateSpecializedFunc(
         IRFunc*                         oldFunc,
-        FuncSpecializationInfo const&   funcInfo)
+        FuncSpecializationInfo const&   funcInfo,
+        CallSpecializationInfo const&   callInfo)
     {
         // We will make use of the infrastructure for cloning
         // IR code, that is defined in `ir-clone.{h,cpp}`.
@@ -933,6 +995,18 @@ struct FunctionParameterSpecializationContext
             newBodyInst->insertBefore(newFirstOrdinary);
         }
 
+        // We need to handle a corner case where the new argument of
+        // the callee of this specialized function could be a use of
+        // NonUniformResourceIndex(), in such case, any indexing operation
+        // on the global buffer by using this new argument should be
+        // decorated with NonUniformDecoration. However, inside the new
+        // specialized function, we don't have that information anymore.
+        // Therefore, we will need to scan the new argument list to find out
+        // this case, and insert the NonUniformResourceIndex() instruction
+        // on the corresponding parameter of the new specialized function.
+        maybeInsertNonUniformResourceIndex(newFunc, funcInfo, callInfo);
+
+
         // At this point we've created a new specialized function,
         // and as such it may contain call sites that were not
         // covered when we built our initial work list.
@@ -963,6 +1037,44 @@ struct FunctionParameterSpecializationContext
         simplifyFunc(codeGenContext->getTargetProgram(), newFunc, IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
 
         return newFunc;
+    }
+
+    void maybeInsertNonUniformResourceIndex(
+        IRFunc* newFunc,
+        FuncSpecializationInfo const&   funcInfo,
+        CallSpecializationInfo const&   callInfo)
+    {
+        auto builder = getBuilder();
+        uint32_t paramIndex = 0;
+
+        SLANG_ASSERT(callInfo.newArgs.getCount() == funcInfo.newParams.getCount());
+
+        // Iterate over the new arguments, new parameters pair, and
+        // find out if there is any use of NonUniformResourceIndex()
+        // in the new arguments.
+        for (auto newArg : callInfo.newArgs)
+        {
+            if (newArg->getOp() == Slang::kIROp_NonUniformResourceIndex)
+            {
+                auto firstOrdinary = newFunc->getFirstOrdinaryInst();
+
+                IRCloneEnv cloneEnv;
+                auto newParam = funcInfo.newParams[paramIndex];
+
+                // Clone the NonUniformResourceIndex call and insert it at beginning
+                // of the function. Then replace every use of the parameter with the
+                // NonUniformResourceIndex.
+                auto clonedInst = cloneInstAndOperands(&cloneEnv, builder, newArg);
+                clonedInst->insertBefore(firstOrdinary);
+                newParam->replaceUsesWith(clonedInst);
+
+                // At last, set the operand of the NonUniformResourceIndex to the new parameter
+                // because we haven't done it yet during inst clone.
+                clonedInst->setOperand(0, newParam);
+            }
+            paramIndex++;
+        }
+
     }
 };
 
