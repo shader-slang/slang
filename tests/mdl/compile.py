@@ -30,6 +30,11 @@ parser.add_argument('--output', type=str, default='benchmarks.json')
 
 args = parser.parse_args(sys.argv[1:])
 
+if not os.path.exists('slang-benchmarks'):
+    repo = 'ssh://git@gitlab-master.nvidia.com:12051/slang/slang-benchmarks.git'
+    command = f'git clone {repo}'
+    subprocess.check_output(command)
+
 dxc = 'dxc.exe'
 slangc = '..\\..\\build\\Release\\bin\\slangc.exe'
 target = args.target
@@ -67,8 +72,6 @@ def parse(results):
 
 timings = {}
 def run(command, key):
-    print(command)
-
     profile = {}
     for i in range(samples):
         try:
@@ -117,19 +120,21 @@ def compile_cmd(file, output, stage=None, entry=None, emit=False):
 modules = []
 
 with halo.Halo(text=' compiling modules...', spinner='dots') as spinner:
-    for file in glob.glob('*.slang'):
-        if file.startswith('hit'):
+    for file in glob.glob('slang-benchmarks\\mdl\\*.slang'):
+        if file.endswith('hit.slang'):
             run(compile_cmd(file, 'modules/closesthit.slang-module', stage='closesthit'), 'module/closesthit')
             run(compile_cmd(file, 'modules/anyhit.slang-module', stage='anyhit'), 'module/anyhit')
             run(compile_cmd(file, 'modules/shadow.slang-module', stage='anyhit', entry='shadow'), 'module/shadow')
         else:
-            run(compile_cmd(file, f'modules/{file}-module'), 'module/' + file)
-            modules.append(f'modules/{file}-module')
+            basename = os.path.basename(file)
+            run(compile_cmd(file, f'modules/{basename}-module'), 'module/' + file)
+            modules.append(f'modules/{basename}-module')
 
         spinner.info(f' compiled {file}.'), spinner.start()
 
 ### Entrypoint compilation ###
 with halo.Halo(text=' compiling entrypoints...', spinner='dots') as spinner:
+    hit = 'slang-benchmarks/mdl/hit.slang'
     files = ' '.join(modules)
 
     # Module
@@ -149,17 +154,17 @@ with halo.Halo(text=' compiling entrypoints...', spinner='dots') as spinner:
     spinner.info(f'compiled shadow (module)'), spinner.start()
 
     # Monolithic    
-    cmd = compile_cmd(f'hit.slang', f'targets/dxr-ch-mono', stage='closesthit', emit=True)
+    cmd = compile_cmd(hit, f'targets/dxr-ch-mono', stage='closesthit', emit=True)
     run(cmd, f'full/{target_ext}/mono/closesthit')
     
     spinner.info(f'compiled shadow (monolithic)'), spinner.start()
 
-    cmd = compile_cmd(f'hit.slang', f'targets/dxr-ah-mono', stage='anyhit', emit=True)
+    cmd = compile_cmd(hit, f'targets/dxr-ah-mono', stage='anyhit', emit=True)
     run(cmd, f'full/{target_ext}/mono/anyhit')
     
     spinner.info(f'compiled shadow (monolithic)'), spinner.start()
 
-    cmd = compile_cmd(f'hit.slang', f'targets/dxr-sh-mono', stage='anyhit', entry='shadow', emit=True)
+    cmd = compile_cmd(hit, f'targets/dxr-sh-mono', stage='anyhit', entry='shadow', emit=True)
     run(cmd, f'full/{target_ext}/mono/shadow')
     
     spinner.info(f'compiled shadow (monolithic)'), spinner.start()
@@ -189,7 +194,51 @@ for k, v in timings.items():
 
     json_data.append(data)
 
+# TODO: append target to benchmark file name
 with open(args.output, 'w') as file:
     json.dump(json_data, file, indent=4)
 
-# TODO: Generate readable Markdown as well
+# Generate readable Markdown as well
+print(4 * '\n')
+print('# Slang MDL benchmark results\n')
+print('## Module precompilation time\n')
+print(f'Total: **{timings[f'full/{target_ext}/precompilation']['compileInner']} ms**\n')
+
+print('## Module compilation for entry points\n')
+
+entries = [ 'Closest Hit', 'Any Hit', 'Shadow' ]
+prefixes = [ 'closesthit', 'anyhit', 'shadow' ]
+
+table = prettytable.PrettyTable()
+table.set_style(prettytable.MARKDOWN)
+table.field_names = [ 'Entry', 'Total' ]
+
+total = 0
+for entry, prefix in zip(entries, prefixes):
+    row = [ entry ]
+    db = timings[f'full/{target_ext}/module/{prefix}']
+    spCompile = db['compileInner']
+    row.append(f'{spCompile:.3f}s')
+    table.add_row(row)
+    total += spCompile
+
+print(f'Total: **{total} ms**\n')
+print(table, end='\n\n')
+
+print('## Monolithic compilation for entry points\n')
+
+table = prettytable.PrettyTable()
+table.set_style(prettytable.MARKDOWN)
+table.field_names = [ 'Entry', 'Total' ]
+
+total = 0
+for entry, prefix in zip(entries, prefixes):
+    row = [ entry ]
+    db = timings[f'full/{target_ext}/mono/{prefix}']
+    spCompile = db['compileInner']
+    row.append(f'{spCompile:.3f}s')
+    table.add_row(row)
+    total += spCompile
+
+print(f'Total: **{total} ms**\n')
+print(table, end='\n\n')

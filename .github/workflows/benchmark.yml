@@ -41,4 +41,6 @@ jobs:
           cmake --workflow --preset release
       - name: Run benchmark
         run: |
-          python.exe tests/mdl/compile.py --samples 1
+          cd tests/mdl
+          pip install halo
+          python compile.py --samples 1
