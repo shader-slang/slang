@@ -24,7 +24,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: [Windows, self-hosted]
     steps:
       - uses: actions/checkout@v3
       - name: Setup
