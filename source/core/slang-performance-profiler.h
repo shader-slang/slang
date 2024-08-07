@@ -68,7 +68,9 @@ private:
     List<ProfileInfo> m_profilEntries;
 };
 
-#define SLANG_PROFILE PerformanceProfilerFuncRAIIContext _profileContext(__func__)
+#define SLANG_PROFILE            PerformanceProfilerFuncRAIIContext _profileContext(__func__)
+#define SLANG_PROFILE_SECTION(s) PerformanceProfilerFuncRAIIContext _profileContext##s(#s)
+
 }
 
 #endif

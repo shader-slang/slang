@@ -3,6 +3,7 @@
 #include "../core/slang-basic.h"
 #include "../core/slang-platform.h"
 #include "../core/slang-io.h"
+#include "../core/slang-performance-profiler.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-hex-dump-util.h"
 #include "../core/slang-riff.h"
@@ -2297,6 +2298,7 @@ namespace Slang
 
     void EndToEndCompileRequest::generateOutput()
     {
+        SLANG_PROFILE;
         generateOutput(getSpecializedGlobalAndEntryPointsComponentType());
 
         // If we are in command-line mode, we might be expected to actually

@@ -1,0 +1,48 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - 'LICENCE'
+      - 'CONTRIBUTION.md'
+      - 'README.md'
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - 'LICENCE'
+      - 'CONTRIBUTION.md'
+      - 'README.md'
+
+# permissions:
+#   # deployments permission to deploy GitHub pages website
+#   deployments: write
+#   # contents permission to update benchmark contents in gh-pages branch
+#   contents: write
+
+jobs:
+  build:
+    runs-on: [Windows, self-hosted]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Common setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: windows
+          compiler: cl
+          platform: x86_64
+          config: release
+          build-llvm: true
+      - name: Build Slang
+        run: |
+          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --workflow --preset release
+      - name: Setup
+        run: |
+          cd tests/mdl
+          pip install halo prettytable argparse
+      - name: Run benchmark
+        run: |
+          python compile.py --samples 1
