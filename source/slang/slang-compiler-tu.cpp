@@ -10,20 +10,16 @@ namespace Slang
 {
     SLANG_NO_THROW SlangResult SLANG_MCALL Module::precompileForTargets(
         DiagnosticSink* sink,
-        EndToEndCompileRequest* endToEndReq,
         TargetRequest* targetReq)
     {
         auto module = getIRModule();
-        Slang::Session* session = endToEndReq->getSession();
-        Slang::ASTBuilder* astBuilder = session->getGlobalASTBuilder();
-        Slang::Linkage* builtinLinkage = session->getBuiltinLinkage();
-        Slang::Linkage linkage(session, astBuilder, builtinLinkage);
+        auto linkage = getLinkage();
 
         CapabilityName precompileRequirement = CapabilityName::Invalid;
         switch (targetReq->getTarget())
         {
         case CodeGenTarget::DXIL:
-            linkage.addTarget(Slang::CodeGenTarget::DXIL);
+            linkage->addTarget(Slang::CodeGenTarget::DXIL);
             precompileRequirement = CapabilityName::dxil_lib;
             break;
         default:
@@ -72,7 +68,7 @@ namespace Slang
         }
 
         auto composite = CompositeComponentType::create(
-            &linkage,
+            linkage,
             allComponentTypes);
 
         TargetProgram tp(composite, targetReq);
@@ -84,7 +80,7 @@ namespace Slang
         entryPointIndices.setCount(entryPointCount);
         for (Index i = 0; i < entryPointCount; i++)
             entryPointIndices[i] = i;
-        CodeGenContext::Shared sharedCodeGenContext(&tp, entryPointIndices, sink, endToEndReq);
+        CodeGenContext::Shared sharedCodeGenContext(&tp, entryPointIndices, sink, nullptr);
         CodeGenContext codeGenContext(&sharedCodeGenContext);
 
         ComPtr<IArtifact> outArtifact;
