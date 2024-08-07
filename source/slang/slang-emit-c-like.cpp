@@ -95,6 +95,10 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
         {
             return SourceLanguage::Metal;
         }
+        case CodeGenTarget::WGSL:
+        {
+            return SourceLanguage::WGSL;
+        }
     }
 }
 
