@@ -5305,6 +5305,10 @@ namespace slang
             SlangInt32 index) = 0;
 
         virtual SLANG_NO_THROW DeclReflection* SLANG_MCALL getModuleReflection() = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
+            SlangCompileTarget target,
+            ISlangBlob** outDiagnostics) = 0;
     };
     
     #define SLANG_UUID_IModule IModule::getTypeGuid()
