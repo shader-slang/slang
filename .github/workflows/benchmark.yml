@@ -1,0 +1,35 @@
+on:
+  push:
+    branches:
+      - master
+
+# permissions:
+#   # deployments permission to deploy GitHub pages website
+#   deployments: write
+#   # contents permission to update benchmark contents in gh-pages branch
+#   contents: write
+
+jobs:
+  benchmark:
+    name: Performance regression check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: windows
+          compiler: cl
+          platform: x86_64
+          config: release
+          build-llvm: true
+      - name: Build Slang
+        run: |
+            cmake --preset default --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+              -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+            cmake --workflow --preset release
+          fi
+      - name: Run benchmark
+        run: |
+            python.exe tests/mdl/compile.py --samples 1
