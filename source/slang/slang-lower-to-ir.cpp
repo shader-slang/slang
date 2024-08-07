@@ -3967,6 +3967,21 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(getBuilder()->getIntValue(builder->getUIntType(), value));
     }
 
+    LoweredValInfo visitPackExpr(PackExpr*)
+    {
+        SLANG_UNIMPLEMENTED_X("pack expressions lowering");
+    }
+
+    LoweredValInfo visitEachExpr(EachExpr*)
+    {
+        SLANG_UNIMPLEMENTED_X("each expressions lowering");
+    }
+
+    LoweredValInfo visitExpandExpr(ExpandExpr*)
+    {
+        SLANG_UNIMPLEMENTED_X("expand expressions lowering");
+    }
+
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");

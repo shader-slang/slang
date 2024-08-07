@@ -266,7 +266,7 @@ namespace Slang
                 addDirectBaseType(baseType, satisfyingWitness);
             }
         }
-        else if (auto genericTypeParamDeclRef = declRef.as<GenericTypeParamDecl>())
+        else if (auto genericTypeParamDeclRef = declRef.as<GenericTypeParamDeclBase>())
         {
             // The constraints placed on a generic type parameter are siblings of that
             // parameter in its parent `GenericDecl`, so we need to enumerate all of
@@ -298,7 +298,14 @@ namespace Slang
                 //
                 auto subDeclRefType = as<DeclRefType>(subType);
                 if (!subDeclRefType)
-                    continue;
+                {
+                    if (auto subEachType = as<EachType>(subType))
+                    {
+                        subDeclRefType = as<DeclRefType>(subEachType->getElementType());
+                    }
+                    if (!subDeclRefType)
+                        continue;
+                }
                 if (subDeclRefType->getDeclRef() != genericTypeParamDeclRef)
                     continue;
 
@@ -921,6 +928,10 @@ namespace Slang
             InheritanceInfo info;
             info.facets = mergedFacets;
             return info;
+        }
+        else if (auto eachType = as<EachType>(type))
+        {
+            return _calcInheritanceInfo(eachType->getElementType());
         }
         else
         {

@@ -677,6 +677,7 @@ namespace Slang
     struct SubstitutionSet
     {
         DeclRefBase* declRef = nullptr;
+        Index packExpansionIndex = -1;
         SubstitutionSet() = default;
         SubstitutionSet(DeclRefBase* declRefBase)
             :declRef(declRefBase)

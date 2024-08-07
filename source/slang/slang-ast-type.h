@@ -698,6 +698,54 @@ class TupleType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+class EachType : public Type
+{
+    SLANG_AST_CLASS(EachType)
+    Type* getElementType() const { return as<Type>(getOperand(0)); }
+    DeclRefType* getElementDeclRefType() const { return as<DeclRefType>(getOperand(0)); }
+
+    EachType(Type* elementType)
+    {
+        m_operands.add(ValNodeOperand(elementType));
+    }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+class ExpandType : public Type
+{
+    SLANG_AST_CLASS(ExpandType)
+    Type* getPatternType() const { return as<Type>(getOperand(0)); }
+    Index getCapturedTypePackCount() { return getOperandCount() - 1; }
+    Type* getCapturedTypePack(Index i) { return as<Type>(getOperand(i + 1)); }
+    ExpandType(Type* patternType, ArrayView<Type*> capturedPacks)
+    {
+        m_operands.add(ValNodeOperand(patternType));
+        for (auto t : capturedPacks)
+            m_operands.add(ValNodeOperand(t));
+    }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+// A concrete pack of types.
+class TypePack : public Type
+{
+    SLANG_AST_CLASS(TypePack)
+    TypePack(ArrayView<Type*> types)
+    {
+        for (auto t : types)
+            m_operands.add(ValNodeOperand(t));
+    }
+    Index getTypeCount() { return getOperandCount(); }
+    Type* getElementType(Index i) { return as<Type>(getOperand(i)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 // The "type" of an expression that names a generic declaration.
 class GenericDeclRefType : public Type 
 {

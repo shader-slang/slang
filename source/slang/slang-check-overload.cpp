@@ -15,20 +15,25 @@ namespace Slang
         ParamCounts counts = { 0, 0 };
         for (auto param : params)
         {
-            counts.allowed++;
+            if (counts.allowed >= 0)
+                counts.allowed++;
 
-            // No initializer means no default value
-            //
-            // TODO(tfoley): The logic here is currently broken in two ways:
-            //
-            // 1. We are assuming that once one parameter has a default, then all do.
-            //    This can/should be validated earlier, so that we can assume it here.
-            //
-            // 2. We are not handling the possibility of multiple declarations for
-            //    a single function, where we'd need to merge default parameters across
-            //    all the declarations.
-            if (!param.getDecl()->initExpr)
+            if (isTypePack(getParamType(m_astBuilder, param)))
             {
+                counts.allowed = -1;
+            }
+            else if (!param.getDecl()->initExpr)
+            {
+                // No initializer means no default value
+                //
+                // TODO(tfoley): The logic here is currently broken in two ways:
+                //
+                // 1. We are assuming that once one parameter has a default, then all do.
+                //    This can/should be validated earlier, so that we can assume it here.
+                //
+                // 2. We are not handling the possibility of multiple declarations for
+                //    a single function, where we'd need to merge default parameters across
+                //    all the declarations.
                 counts.required++;
             }
         }
@@ -42,7 +47,8 @@ namespace Slang
         {
             if (auto typeParam = as<GenericTypeParamDecl>(m))
             {
-                counts.allowed++;
+                if (counts.allowed >= 0)
+                    counts.allowed++;
                 if (!typeParam->initType.Ptr())
                 {
                     counts.required++;
@@ -50,11 +56,16 @@ namespace Slang
             }
             else if (auto valParam = as<GenericValueParamDecl>(m))
             {
-                counts.allowed++;
+                if (counts.allowed >= 0)
+                    counts.allowed++;
                 if (!valParam->initExpr)
                 {
                     counts.required++;
                 }
+            }
+            else if (auto packParam = as<GenericTypePackParamDecl>(m))
+            {
+                counts.allowed = -1;
             }
         }
         return counts;
@@ -130,7 +141,7 @@ namespace Slang
             break;
         }
 
-        if (argCount >= paramCounts.required && argCount <= paramCounts.allowed)
+        if (argCount >= paramCounts.required && (paramCounts.allowed == -1 || argCount <= paramCounts.allowed))
             return true;
 
         // Emit an error message if we are checking this call for real
@@ -270,13 +281,35 @@ namespace Slang
                 getSink()->diagnose(context.loc, Diagnostics::cannotSpecializeGeneric, candidate.item.declRef);
             }
         };
+        List<QualType> paramTypes;
+        for (auto memberRef : getMembers(m_astBuilder, genericDeclRef))
+        {
+            if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
+            {
+                paramTypes.add(DeclRefType::create(m_astBuilder, typeParamRef));
+            }
+            else if (auto valParamRef = memberRef.as<GenericValueParamDecl>())
+            {
+                paramTypes.add(getType(m_astBuilder, valParamRef));
+            }
+            else if (auto typePackParam = memberRef.as<GenericTypePackParamDecl>())
+            {
+                paramTypes.add(DeclRefType::create(m_astBuilder, typeParamRef));
+            }
+        }
+        ShortList<Expr*> matchedArgs;
+        if (!context.matchArgumentsToParams(this, paramTypes, false, matchedArgs))
+        {
+            maybeReportGeneralError();
+            return false;
+        }
 
         Index aa = 0;
         for (auto memberRef : getMembers(m_astBuilder, genericDeclRef))
         {
             if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
             {
-                if (aa >= context.argCount)
+                if (aa >= matchedArgs.getCount())
                 {
                     if (allowPartialGenericApp)
                     {
@@ -319,7 +352,7 @@ namespace Slang
                 // the checking "for real" in which case any errors
                 // we run into need to be reported.
                 //
-                auto arg = context.getArg(aa++);
+                auto arg = matchedArgs[aa++];
                 if (context.mode == OverloadResolveContext::Mode::JustTrying)
                 {
                     typeArg = tryCoerceToProperType(TypeExp(arg));
@@ -345,7 +378,7 @@ namespace Slang
             }
             else if (auto valParamRef = memberRef.as<GenericValueParamDecl>())
             {
-                if (aa >= context.argCount)
+                if (aa >= matchedArgs.getCount())
                 {
                     if (allowPartialGenericApp)
                     {
@@ -384,7 +417,7 @@ namespace Slang
                 // to the type of the parameter (and fail if the
                 // coercion is not possible)
                 //
-                arg = context.getArg(aa++);
+                arg = matchedArgs[aa++];
                 if (context.mode == OverloadResolveContext::Mode::JustTrying)
                 {
                     ConversionCost cost = kConversionCost_None;
@@ -415,6 +448,66 @@ namespace Slang
                 if( !val )
                 {
                     val = m_astBuilder->getOrCreate<ErrorIntVal>(m_astBuilder->getIntType());
+                }
+                checkedArgs.add(val);
+            }
+            else if (auto typePackParam = memberRef.as<GenericTypePackParamDecl>())
+            {
+                Val* val = nullptr;
+                if (aa >= matchedArgs.getCount())
+                {
+                    // If we run out of matched args, we will just create an empty pack.
+                    val = m_astBuilder->getTypePack(ArrayView<Type*>());
+                }
+                else
+                {
+                    auto arg = matchedArgs[aa++];
+                    if (auto packExpr = as<PackExpr>(arg))
+                    {
+                        // We are providing a concrete pack of types as arguments to a type pack parameter.
+                        // We need to create a `TypePack` type to serve as the argument.
+                        ShortList<Type*> coercedProperTypes;
+
+                        // Coerce all types in the pack to proper types.
+                        for (Index i = 0; i < packExpr->args.getCount(); i++)
+                        {
+                            TypeExp typeArg;
+                            auto elementTypeExpr = packExpr->args[i];
+                            if (context.mode == OverloadResolveContext::Mode::JustTrying)
+                            {
+                                typeArg = tryCoerceToProperType(TypeExp(elementTypeExpr));
+                                if (!typeArg.type)
+                                {
+                                    typeArg.type = m_astBuilder->getErrorType();
+                                    success = false;
+                                }
+                            }
+                            else
+                            {
+                                elementTypeExpr = ExpectATypeRepr(elementTypeExpr);
+                                typeArg = CoerceToProperType(TypeExp(elementTypeExpr));
+                            }
+                            // If we failed to get a valid type (either because
+                            // there was no matching argument, or because the
+                            // "just trying" coercion failed), then we create
+                            // an error type to stand in for the argument
+                            //
+                            if (!typeArg.type)
+                            {
+                                typeArg.type = m_astBuilder->getErrorType();
+                                success = false;
+                            }
+                            coercedProperTypes.add(typeArg.type);
+                        }
+                        val = m_astBuilder->getTypePack(coercedProperTypes.getArrayView().arrayView);
+                    }
+                    else if (auto expandExpr = as<ExpandExpr>(arg))
+                    {
+                        auto argType = expandExpr->type.type;
+                        if (auto typeType = as<TypeType>(argType))
+                            argType = typeType->getType();
+                        val = argType;
+                    }
                 }
                 checkedArgs.add(val);
             }
@@ -1448,6 +1541,87 @@ namespace Slang
         AddOverloadCandidate(context, candidate, baseCost);
     }
 
+    bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
+        SemanticsVisitor* semantics,
+        const List<QualType>& params,
+        bool computeTypes,
+        ShortList<Expr*>& outMatchedArgs)
+    {
+        // We allow params to end with one or more variadic packs.
+        // We will first find out how many type packs there are.
+        Index typePackCount = 0;
+        for (Index i = params.getCount() - 1; i >= 0; --i)
+        {
+            if (isTypePack(params[i].type))
+                typePackCount++;
+            else
+                break;
+        }
+        auto fixedParamCount = params.getCount() - typePackCount;
+
+        auto remainingArgCount = getArgCount() - fixedParamCount;
+
+        // If there are remaining arguments after matching all fixed parameters,
+        // we'd better have at least one type pack.
+        if (remainingArgCount > 0 && typePackCount == 0)
+            return false;
+
+        // Now we can match the arguments to the parameters.
+
+        // The fixed part comes first.
+        for (Index i = 0; i < Math::Min(getArgCount(), fixedParamCount); ++i)
+        {
+            auto arg = getArg(i);
+            outMatchedArgs.add(arg);
+        }
+
+        // Try to match the variadic part.
+        // Is the corresponding argument a expand expr? If so it will map 1:1 to the type pack param.
+        auto astBuilder = semantics->getASTBuilder();
+        while (remainingArgCount > 0)
+        {
+            if (as<ExpandExpr>(getArg(fixedParamCount)))
+            {
+                outMatchedArgs.add(getArg(fixedParamCount));
+                fixedParamCount++;
+                remainingArgCount--;
+                typePackCount--;
+                continue;
+            }
+            break;
+        }
+
+        if (remainingArgCount <= 0)
+            return true;
+        if (typePackCount == 0)
+            return false;
+
+        // If the number of type packs can't evenly divide the remaining arguments,
+        // there isn't a match.
+        if (remainingArgCount % typePackCount != 0)
+            return false;
+
+        // The default case is to group the remaining arguments into evenly divided PackExprs.
+        Index typePackSize = remainingArgCount / typePackCount;
+        for (Index i = 0; i < typePackCount; ++i)
+        {
+            auto packExpr = astBuilder->create<PackExpr>();
+            packExpr->loc = loc;
+            ShortList<Type*> types;
+            for (Index j = 0; j < typePackSize; ++j)
+            {
+                auto arg = getArg(fixedParamCount + i * typePackSize + j);
+                packExpr->args.add(arg);
+                if (computeTypes)
+                    types.add(getArgTypeForInference(fixedParamCount + i * typePackSize + j, semantics));
+            }
+            if (computeTypes)
+                packExpr->type = astBuilder->getTypePack(types.getArrayView().arrayView);
+            outMatchedArgs.add(packExpr);
+        }
+        return true;
+    }
+
     DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
         DeclRef<GenericDecl>    genericDeclRef,
         OverloadResolveContext& context,
@@ -1506,25 +1680,23 @@ namespace Slang
                 innerParameterTypes = &paramTypes;
             }
 
-            Index valueArgCount = context.getArgCount();
-            Index valueParamCount = innerParameterTypes->getCount();
+            ShortList<Expr*> matchedArgs;
 
-            // If there are too many arguments, we cannot possibly have a match.
+            // We now try to match arguments to parameters.
             //
             // Note that if there are *too few* arguments, we might still have
             // a match, because the other arguments might have default values
             // that can be used.
             //
-            if (valueArgCount > valueParamCount)
+            if (!context.matchArgumentsToParams(this, *innerParameterTypes, true, matchedArgs))
             {
                 return DeclRef<Decl>();
             }
 
-            // If any of the arguments were specified explicitly (and are thus known),
-            // we do not want to take them into account during the unification and
-            // constraint generation step.
+            // Perform type unification between arguments and parameters, so
+            // we can populate the resolve system with inital constraints.
             //
-            for (Index aa = 0; aa < valueArgCount; ++aa)
+            for (Index aa = 0; aa < matchedArgs.getCount(); ++aa)
             {
                 // The question here is whether failure to "unify" an argument
                 // and parameter should lead to immediate failure.
@@ -1543,11 +1715,12 @@ namespace Slang
                 //
                 // So the question is then whether a mismatch during the
                 // unification step should be taken as an immediate failure...
-                auto argType = context.getArgTypeForInference(aa, this);
+                auto argType = matchedArgs[aa]->type;
                 auto paramType = (*innerParameterTypes)[aa];
                 TryUnifyTypes(
                     constraints,
-                    QualType(argType, paramType.isLeftValue),
+                    ValUnificationContext(),
+                    QualType(argType.type, paramType.isLeftValue),
                     paramType);
             }
         }

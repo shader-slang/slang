@@ -1561,7 +1561,7 @@ namespace Slang
             // A variable with an explicit type is simpler, for the
             // most part.
             SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
-            TypeExp typeExp = subVisitor.CheckUsableType(varDecl->type);
+            TypeExp typeExp = subVisitor.CheckUsableType(varDecl->type, varDecl);
             varDecl->type = typeExp;
             if (varDecl->type.equals(m_astBuilder->getVoidType()))
             {
@@ -7076,6 +7076,13 @@ namespace Slang
             {
                 args.add(DeclRefType::create(astBuilder, astBuilder->getDirectDeclRef(genericTypeParamDecl)));
             }
+            else if (auto genericTypePackParamDecl = as<GenericTypePackParamDecl>(mm))
+            {
+                auto packType = DeclRefType::create(astBuilder, astBuilder->getDirectDeclRef(genericTypePackParamDecl));
+                auto eachType = astBuilder->getEachType(packType);
+                auto expandType = astBuilder->getExpandType(eachType, makeArrayViewSingle(packType));
+                args.add(expandType);
+            }
             else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
             {
                 if (semantics)
@@ -7522,7 +7529,7 @@ namespace Slang
         if(typeExpr.exp)
         {
             SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(paramDecl));
-            typeExpr = subVisitor.CheckUsableType(typeExpr);
+            typeExpr = subVisitor.CheckUsableType(typeExpr, paramDecl);
             paramDecl->type = typeExpr;
             checkMeshOutputDecl(paramDecl);
         }
@@ -8361,7 +8368,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
     {
-        decl->returnType = CheckUsableType(decl->returnType);
+        decl->returnType = CheckUsableType(decl->returnType, decl);
 
         visitAbstractStorageDeclCommon(decl);
 
@@ -8371,7 +8378,7 @@ namespace Slang
     void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
     {
         SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
-        decl->type = subVisitor.CheckUsableType(decl->type);
+        decl->type = subVisitor.CheckUsableType(decl->type, decl);
         visitAbstractStorageDeclCommon(decl);
         checkVisibility(decl);
     }
@@ -8587,7 +8594,7 @@ namespace Slang
                 return createDefaultSubstitutionsIfNeeded(m_astBuilder, this, extDeclRef).as<ExtensionDecl>();
             }
 
-            if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
+            if (!TryUnifyTypes(constraints, ValUnificationContext(), extDecl->targetType.Ptr(), type))
                 return DeclRef<ExtensionDecl>();
 
             ConversionCost baseCost;

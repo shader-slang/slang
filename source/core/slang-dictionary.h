@@ -301,7 +301,7 @@ namespace Slang
     {};
 
     template<typename T, typename DictionaryType>
-    class HashSetBase
+    class HashSetBase : public RefObject
     {
     protected:
         DictionaryType dict;

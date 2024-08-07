@@ -235,7 +235,7 @@ void GenericAppDeclRef::_toTextOverride(StringBuilder& out)
     auto genericDecl = as<GenericDecl>(getGenericDeclRef()->getDecl());
     Index paramCount = 0;
     for (auto member : genericDecl->members)
-        if (as<GenericTypeParamDecl>(member) || as<GenericValueParamDecl>(member))
+        if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
             paramCount++;
     getGenericDeclRef()->toText(out);
     out << "<";
@@ -429,6 +429,8 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
     DeclRef<Decl>   declRef)
 {
     if (declRef.as<GenericTypeParamDecl>())
+        return declRef;
+    if (declRef.as<GenericTypePackParamDecl>())
         return declRef;
     if (declRef.as<GenericValueParamDecl>())
         return declRef;

@@ -894,6 +894,14 @@ namespace Slang
             return result;
         }
 
+        SemanticsContext withParentExpandExpr(ExpandExpr* expr)
+        {
+            SemanticsContext result(*this);
+            result.m_parentExpandExpr = expr;
+            result.m_capturedTypePacks = new OrderedHashSet<Type*>();
+            return result;
+        }
+
             /// Information for tracking one or more outer statements.
             ///
             /// During checking of statements, we need to track what
@@ -1003,6 +1011,8 @@ namespace Slang
 
         Decl* getDeclToExcludeFromLookup() { return m_declToExcludeFromLookup; }
 
+        OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
+
     private:
         SharedSemanticsContext* m_shared = nullptr;
 
@@ -1044,6 +1054,10 @@ namespace Slang
         // 2. the logic expression is in the init expression of a static const variable.
         // 3. the logic expression is in an array size declaration.
         bool m_shouldShortCircuitLogicExpr = true;
+
+        ExpandExpr* m_parentExpandExpr = nullptr;
+
+        RefPtr<OrderedHashSet<Type*>> m_capturedTypePacks;
     };
 
     struct OuterScopeContextRAII
@@ -1341,10 +1355,10 @@ namespace Slang
         // TODO(tfoley): consider just allowing `void` as a
         // simple example of a "unit" type, and get rid of
         // this check.
-        TypeExp CoerceToUsableType(TypeExp const& typeExp);
+        TypeExp CoerceToUsableType(TypeExp const& typeExp, Decl* decl);
 
         // Check a type, and coerce it to be usable
-        TypeExp CheckUsableType(TypeExp typeExp);
+        TypeExp CheckUsableType(TypeExp typeExp, Decl* decl);
 
         Expr* CheckTerm(Expr* term);
 
@@ -1353,6 +1367,8 @@ namespace Slang
         Expr* CreateErrorExpr(Expr* expr);
 
         bool IsErrorExpr(Expr* expr);
+
+        static bool isTypePack(Type* type);
 
         // Capture the "base" expression in case this is a member reference
         Expr* GetBaseExpr(Expr* expr);
@@ -2060,6 +2076,8 @@ namespace Slang
         struct Constraint
         {
             Decl*		decl = nullptr; // the declaration of the thing being constraints
+            Index indexInPack = 0; // If the constraint is for a type parameter pack, which index in the pack is this constraint for?
+
             Val*	val = nullptr; // the value to which we are constraining it
             bool isUsedAsLValue = false;   // If this constraint is for a type parameter, is the type used in an l-value parameter?
             bool satisfied = false; // Has this constraint been met?
@@ -2249,6 +2267,7 @@ namespace Slang
                 else
                     return semantics->maybeResolveOverloadedExpr(getArg(index), LookupMask::Default, nullptr)->type;
             }
+            bool matchArgumentsToParams(SemanticsVisitor* semantics, const List<QualType>& params, bool computeTypes, ShortList<Expr*>& outMatchedArgs);
 
             bool disallowNestedConversions = false;
 
@@ -2433,9 +2452,15 @@ namespace Slang
         // indirect parents.
         GenericDecl* findNextOuterGeneric(Decl* decl);
 
+        struct ValUnificationContext
+        {
+            Index indexInTypePack = 0;
+        };
+
         // Try to find a unification for two values
         bool TryUnifyVals(
             ConstraintSystem&	constraints,
+            ValUnificationContext unificationContext,
             Val*			fst,
             bool            fstLVal,
             Val*			snd,
@@ -2443,6 +2468,7 @@ namespace Slang
 
         bool tryUnifyDeclRef(
             ConstraintSystem&       constraints,
+            ValUnificationContext unificationContext,
             DeclRefBase*   fst,
             bool           fstLVal,
             DeclRefBase*   snd,
@@ -2450,6 +2476,7 @@ namespace Slang
 
         bool tryUnifyGenericAppDeclRef(
             ConstraintSystem& constraints,
+            ValUnificationContext unificationContext,
             GenericAppDeclRef* fst,
             bool            fstLVal,
             GenericAppDeclRef* snd,
@@ -2457,36 +2484,43 @@ namespace Slang
 
         bool TryUnifyTypeParam(
             ConstraintSystem&     constraints,
-            GenericTypeParamDecl* typeParamDecl,
+            ValUnificationContext unificationContext,
+            GenericTypeParamDeclBase* typeParamDecl,
             QualType              type);
 
         bool TryUnifyIntParam(
             ConstraintSystem&               constraints,
+            ValUnificationContext unificationContext,
             GenericValueParamDecl*	paramDecl,
             IntVal*                  val);
 
         bool TryUnifyIntParam(
             ConstraintSystem&       constraints,
+            ValUnificationContext unificationContext,
             DeclRef<VarDeclBase> const&   varRef,
             IntVal*          val);
 
         bool TryUnifyTypesByStructuralMatch(
             ConstraintSystem&       constraints,
+            ValUnificationContext unificationContext,
             QualType fst,
             QualType snd);
 
         bool TryUnifyTypes(
             ConstraintSystem&       constraints,
+            ValUnificationContext unificationContext,
             QualType fst,
             QualType snd);
 
         bool TryUnifyConjunctionType(
             ConstraintSystem&   constraints,
+            ValUnificationContext unificationContext,
             QualType            fst,
             QualType            snd);
 
         void maybeUnifyUnconstraintIntParam(
             ConstraintSystem& constraints,
+            ValUnificationContext unificationContext,
             IntVal* param,
             IntVal* arg,
             bool paramIsLVal);
@@ -2696,6 +2730,10 @@ namespace Slang
 
         Expr* visitAsTypeExpr(AsTypeExpr* expr);
 
+        Expr* visitExpandExpr(ExpandExpr* expr);
+
+        Expr* visitEachExpr(EachExpr* expr);
+
         void maybeCheckKnownBuiltinInvocation(Expr* invokeExpr);
 
         //
@@ -2726,7 +2764,7 @@ namespace Slang
         CASE(OpenRefExpr)
         CASE(MakeOptionalExpr)
         CASE(PartiallyAppliedGenericExpr)
-
+        CASE(PackExpr)
     #undef CASE
 
         Expr* visitStaticMemberExpr(StaticMemberExpr* expr);

@@ -533,12 +533,52 @@ TypeType* ASTBuilder::getTypeType(Type* type)
     return getOrCreate<TypeType>(type);
 }
 
+Type* ASTBuilder::getEachType(Type* baseType)
+{
+    // each expand each T ==> each T
+    if (auto expandType = as<ExpandType>(baseType))
+    {
+        auto eachType = as<EachType>(expandType->getPatternType());
+        if (eachType)
+            return eachType;
+    }
+    SLANG_ASSERT(!as<EachType>(baseType));
+    return getOrCreate<EachType>(baseType);
+}
+
+Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Type*> capturedPacks)
+{
+    return getOrCreate<ExpandType>(pattern, capturedPacks);
+}
+
+TypePack* ASTBuilder::getTypePack(ArrayView<Type*> types)
+{
+    return getOrCreate<TypePack>(types);
+}
+
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(
     Type* type)
 {
     return getOrCreate<TypeEqualityWitness>(type, type);
 }
 
+SubtypeWitnessPack* ASTBuilder::getSubtypeWitnessPack(
+    Type* subType, Type* superType, ArrayView<SubtypeWitness*> witnesses)
+{
+    return getOrCreate<SubtypeWitnessPack>(subType, superType, witnesses);
+}
+
+ExpandSubtypeWitness* ASTBuilder::getExpandSubtypeWitness(
+    Type* subType, Type* superType, SubtypeWitness* patternWitness)
+{
+    return getOrCreate<ExpandSubtypeWitness>(subType, superType, patternWitness);
+}
+
+EachSubtypeWitness* ASTBuilder::getEachSubtypeWitness(
+    Type* subType, Type* superType, SubtypeWitness* patternWitness)
+{
+    return getOrCreate<EachSubtypeWitness>(subType, superType, patternWitness);
+}
 
 DeclaredSubtypeWitness* ASTBuilder::getDeclaredSubtypeWitness(
     Type*                   subType,
