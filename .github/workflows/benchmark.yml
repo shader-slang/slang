@@ -26,14 +26,6 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup
-        uses: ./.github/actions/common-setup
-        with:
-          os: windows
-          compiler: cl
-          platform: x86_64
-          config: release
-          build-llvm: true
       - name: Build Slang
         run: |
             cmake --preset default --fresh \
