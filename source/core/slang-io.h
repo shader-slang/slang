@@ -145,6 +145,7 @@ namespace Slang
         static void append(StringBuilder& ioBuilder, const UnownedStringSlice& path);
 
         static bool createDirectory(const String& path);
+        static bool createDirectoryRecursive(const String& path);
 
             /// Accept either style of delimiter
         SLANG_FORCE_INLINE static bool isDelimiter(char c) { return c == '/' || c == '\\'; }
@@ -196,6 +197,10 @@ namespace Slang
             /// @param outCanonicalPath The canonical path for 'path' is call is successful
             /// @return SLANG_OK on success
         static SlangResult getCanonical(const String& path, String& outCanonicalPath);
+
+            /// Returns the current working directory
+            /// @return The path in platform native format. Returns empty string if failed.
+        static String getCurrentPath();
 
             /// Returns the executable path
             /// @return The path in platform native format. Returns empty string if failed.

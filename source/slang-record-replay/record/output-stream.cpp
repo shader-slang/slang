@@ -3,18 +3,17 @@
 
 namespace SlangRecord
 {
-    FileOutputStream::FileOutputStream(const std::string& filename, bool append)
+    FileOutputStream::FileOutputStream(const Slang::String& fileName, bool append)
     {
-        Slang::String path(filename.c_str());
         Slang::FileMode fileMode = append ? Slang::FileMode::Append : Slang::FileMode::Create;
         Slang::FileAccess fileAccess = Slang::FileAccess::Write;
         Slang::FileShare fileShare = Slang::FileShare::None;
 
-        SlangResult res = m_fileStream.init(path, fileMode, fileAccess, fileShare);
+        SlangResult res = m_fileStream.init(fileName, fileMode, fileAccess, fileShare);
 
         if (res != SLANG_OK)
         {
-            SlangRecord::slangRecordLog(SlangRecord::LogLevel::Error, "Failed to open file %s\n", filename.c_str());
+            SlangRecord::slangRecordLog(SlangRecord::LogLevel::Error, "Failed to open file %s\n", fileName.getBuffer());
             std::abort();
         }
     }
