@@ -73,7 +73,7 @@ namespace Slang
                     counts.required++;
                 }
             }
-            else if (auto packParam = as<GenericTypePackParamDecl>(m))
+            else if (as<GenericTypePackParamDecl>(m))
             {
                 counts.allowed = -1;
             }

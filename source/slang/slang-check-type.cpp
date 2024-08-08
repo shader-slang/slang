@@ -221,7 +221,7 @@ namespace Slang
             return true;
         if (auto declRefType = as<DeclRefType>(type))
         {
-            if (auto genericTypePackParamDecl = as<GenericTypePackParamDecl>(declRefType->getDeclRef().getDecl()))
+            if (as<GenericTypePackParamDecl>(declRefType->getDeclRef().getDecl()))
             {
                 return true;
             }
