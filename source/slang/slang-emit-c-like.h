@@ -368,6 +368,7 @@ public:
         /// Emit high-level statements for the body of a function.
     void emitFunctionBody(IRGlobalValueWithCode* code);
 
+    void emitFuncHeader(IRFunc* func) { emitFuncHeaderImpl(func); }
     void emitSimpleFunc(IRFunc* func) { emitSimpleFuncImpl(func); }
 
     void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
@@ -501,6 +502,7 @@ public:
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc);
     virtual void emitSimpleValueImpl(IRInst* inst);
     virtual void emitModuleImpl(IRModule* module, DiagnosticSink* sink);
+    virtual void emitFuncHeaderImpl(IRFunc* func);
     virtual void emitSimpleFuncImpl(IRFunc* func);
     virtual void emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
