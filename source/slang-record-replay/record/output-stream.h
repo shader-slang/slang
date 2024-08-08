@@ -1,7 +1,7 @@
 #ifndef OUTPUT_STREAM_H
 #define OUTPUT_STREAM_H
 
-#include <string>
+#include "../../core/slang-string.h"
 #include "../../core/slang-stream.h"
 
 namespace SlangRecord
@@ -17,7 +17,7 @@ namespace SlangRecord
     class FileOutputStream : public OutputStream
     {
     public:
-        FileOutputStream(const std::string& filename, bool append = false);
+        FileOutputStream(const Slang::String& fileName, bool append = false);
         virtual ~FileOutputStream() override;
         virtual void write(const void* data, size_t len) override;
         virtual void flush() override;

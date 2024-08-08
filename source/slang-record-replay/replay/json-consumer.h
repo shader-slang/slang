@@ -56,7 +56,7 @@ namespace SlangRecord
     class JsonConsumer : public IDecoderConsumer
     {
     public:
-        JsonConsumer(const std::string& filePath);
+        JsonConsumer(const Slang::String& filePath);
 
         virtual void CreateGlobalSession(ObjectID outGlobalSessionId);
         virtual void IGlobalSession_createSession(ObjectID objectId, slang::SessionDesc const&  desc, ObjectID outSessionId);

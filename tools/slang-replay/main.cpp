@@ -1,10 +1,11 @@
 #include <stdio.h>
-#include <filesystem>
 
 #include <replay/recordFile-processor.h>
 #include <replay/json-consumer.h>
 #include <replay/replay-consumer.h>
 #include <replay/slang-decoder.h>
+
+#include "../../source/core/slang-io.h"
 
 struct Options
 {
@@ -77,11 +78,8 @@ int main(int argc, char *argv[])
 
     SlangRecord::RecordFileProcessor recordFileProcessor(options.recordFileName);
 
-
-    std::filesystem::path jsonPath = options.recordFileName.begin();
-    jsonPath.replace_extension(".json");
-
-    SlangRecord::JsonConsumer jsonConsumer(jsonPath.string());
+    Slang::String jsonPath = Slang::Path::replaceExt(options.recordFileName, "json");
+    SlangRecord::JsonConsumer jsonConsumer(jsonPath);
     SlangRecord::ReplayConsumer replayConsumer;
 
     SlangRecord::SlangDecoder decoder;
