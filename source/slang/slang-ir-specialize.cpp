@@ -610,11 +610,7 @@ struct SpecializationContext
         auto witnessTable = as<IRWitnessTable>(lookupInst->getWitnessTable());
         if (!witnessTable)
         {
-            // If `witnessTable` operand is not a direct witness table,
-            // it could be a Tuple of witness tables for a variadic type pack.
-            // We can still specialize the lookup if the tuple is fully specialized.
-            //
-            return maybeSpecializeWitnessPackLookup(lookupInst);
+            return false;
         }
 
         // Because we have a concrete witness table, we can
@@ -645,32 +641,6 @@ struct SpecializationContext
         lookupInst->replaceUsesWith(satisfyingVal);
         lookupInst->removeAndDeallocate();
 
-        return true;
-    }
-
-    bool maybeSpecializeWitnessPackLookup(IRLookupWitnessMethod* lookupInst)
-    {
-        auto witnessPack = as<IRMakeWitnessPack>(lookupInst->getWitnessTable());
-        if (!witnessPack)
-            return false;
-        ShortList<IRInst*> results;
-        for (UInt i = 0; i < witnessPack->getOperandCount(); i++)
-        {
-            auto witnessTable = as<IRWitnessTable>(witnessPack->getOperand(i));
-            if (!witnessTable)
-                return false;
-            auto requirementKey = lookupInst->getRequirementKey();
-            auto satisfyingVal = findWitnessVal(witnessTable, requirementKey);
-            if (!satisfyingVal)
-                return false;
-            results.add(satisfyingVal);
-        }
-        IRBuilder builder(lookupInst);
-        builder.setInsertBefore(lookupInst);
-        auto resultInst = builder.emitMakeWitnessPack(lookupInst->getFullType(), results.getArrayView().arrayView);
-        lookupInst->replaceUsesWith(resultInst);
-        lookupInst->removeAndDeallocate();
-        addUsersToWorkList(resultInst);
         return true;
     }
 

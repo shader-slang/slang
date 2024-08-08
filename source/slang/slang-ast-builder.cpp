@@ -724,6 +724,22 @@ top:
         return getExpandSubtypeWitness(expandWitness->getSub(), cType, innerTransitiveWitness);
     }
 
+    // If left hand is a DeclaredWitness for a type pack parameter T, then we want to perform the
+    // transitive lookup on `each T`, and then form a new ExpandSubtypeWitness with the result.
+    //
+    if (auto declaredWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        if (auto declRefType = as<DeclRefType>(declaredWitness->getSub()))
+        {
+            if (declRefType->getDeclRef().as<GenericTypePackParamDecl>())
+            {
+                auto newLeftHandWitness = getEachSubtypeWitness(getEachType(declaredWitness->getSub()), declaredWitness->getSup(), declaredWitness);
+                auto transitiveWitness = getTransitiveSubtypeWitness(newLeftHandWitness, bIsSubtypeOfCWitness);
+                return getExpandSubtypeWitness(aType, cType, transitiveWitness);
+            }
+        }
+    }
+
     // If none of the above special cases applied, then we are just going to create
     // a `TransitiveSubtypeWitness` directly.
     //
