@@ -301,7 +301,7 @@ namespace Slang
     {};
 
     template<typename T, typename DictionaryType>
-    class HashSetBase : public RefObject
+    class HashSetBase
     {
     protected:
         DictionaryType dict;
@@ -321,7 +321,6 @@ namespace Slang
             init(arg, args...);
         }
         HashSetBase(const HashSetBase& set)
-            : RefObject()
         {
             operator=(set);
         }

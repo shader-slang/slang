@@ -894,11 +894,11 @@ namespace Slang
             return result;
         }
 
-        SemanticsContext withParentExpandExpr(ExpandExpr* expr)
+        SemanticsContext withParentExpandExpr(ExpandExpr* expr, OrderedHashSet<Type*>* capturedTypes)
         {
             SemanticsContext result(*this);
             result.m_parentExpandExpr = expr;
-            result.m_capturedTypePacks = new OrderedHashSet<Type*>();
+            result.m_capturedTypePacks = capturedTypes;
             return result;
         }
 
@@ -1057,7 +1057,7 @@ namespace Slang
 
         ExpandExpr* m_parentExpandExpr = nullptr;
 
-        RefPtr<OrderedHashSet<Type*>> m_capturedTypePacks;
+        OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
     };
 
     struct OuterScopeContextRAII

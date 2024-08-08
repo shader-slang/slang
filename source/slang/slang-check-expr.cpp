@@ -3469,7 +3469,8 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitExpandExpr(ExpandExpr* expr)
     {
-        auto subContext = this->withParentExpandExpr(expr);
+        OrderedHashSet<Type*> capturedTypePackSet;
+        auto subContext = this->withParentExpandExpr(expr, &capturedTypePackSet);
         expr->baseExpr = dispatchExpr(expr->baseExpr, subContext);
 
         Type* patternType = nullptr;
@@ -3493,7 +3494,7 @@ namespace Slang
             getSink()->diagnose(expr, Diagnostics::expandTermCapturesNoTypePacks);
         }
         List<Type*> capturedTypePacks;
-        for (auto capturedType : *subContext.getCapturedTypePacks())
+        for (auto capturedType : capturedTypePackSet)
         {
             capturedTypePacks.add(capturedType);
         }
