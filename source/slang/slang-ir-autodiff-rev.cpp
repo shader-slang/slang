@@ -147,7 +147,7 @@ namespace Slang
         if (!checkpointHint)
             checkpointHint = originalFunc->findDecoration<IRCheckpointHintDecoration>();
         if (checkpointHint)
-            builder->addDecoration(existingPrimalFunc, checkpointHint->getOp());
+            cloneCheckpointHint(builder, checkpointHint, cast<IRGlobalValueWithCode>(existingPrimalFunc));
 
         builder->emitBlock();
         params = _defineFuncParams(builder, as<IRFunc>(existingPrimalFunc));

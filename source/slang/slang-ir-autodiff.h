@@ -356,6 +356,11 @@ struct IRAutodiffPassOptions
     // Nothing for now...
 };
 
+void checkAutodiffPatterns(
+    TargetProgram* target,
+    IRModule*                           module,
+    DiagnosticSink*                     sink);
+
 bool processAutodiffCalls(
     TargetProgram* target,
     IRModule*                           module,
@@ -367,6 +372,8 @@ bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module);
 // Utility methods
 
 void copyCheckpointHints(IRBuilder* builder, IRGlobalValueWithCode* oldInst, IRGlobalValueWithCode* newInst);
+
+void cloneCheckpointHint(IRBuilder* builder, IRCheckpointHintDecoration* oldInst, IRGlobalValueWithCode* code);
 
 void stripDerivativeDecorations(IRInst* inst);
 
