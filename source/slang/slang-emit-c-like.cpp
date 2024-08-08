@@ -3453,9 +3453,16 @@ void CLikeSourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
     m_writer->emit(")");
 }
 
-void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
+void CLikeSourceEmitter::emitFuncHeaderImpl(IRFunc* func)
 {
     auto resultType = func->getResultType();
+    auto name = getName(func);
+    emitType(resultType, name);
+    emitSimpleFuncParamsImpl(func);
+}
+
+void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
+{
 
     // Deal with decorations that need
     // to be emitted as attributes
@@ -3471,12 +3478,8 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 
     emitFunctionPreambleImpl(func);
 
-    auto name = getName(func);
-
     emitFuncDecorations(func);
-
-    emitType(resultType, name);
-    emitSimpleFuncParamsImpl(func);
+    emitFuncHeader(func);
     emitSemantics(func);
 
     // TODO: encode declaration vs. definition
