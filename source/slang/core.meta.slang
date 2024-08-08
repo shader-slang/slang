@@ -2030,7 +2030,16 @@ T reinterpret(U value);
 __generic<T>
 [__readNone]
 [ForceInline]
+__intrinsic_op($(kIROp_Unmodified))
 void unused(inout T){}
+
+// This can be used to silence the warning about not writing before initializing
+// an out paramter.
+__generic<T>
+[__readNone]
+[ForceInline]
+__intrinsic_op($(kIROp_Unmodified))
+void unmodified(inout T){}
 
 // Specialized function
 

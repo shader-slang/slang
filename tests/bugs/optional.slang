@@ -14,7 +14,7 @@ struct P
 }
 struct Tr
 {
-    int test<T:IArithmetic>(T t, inout P p)
+    int test<T:IArithmetic>(T t, P p)
     {
         const IFoo hit = p.f;
         let castResult = hit as S;

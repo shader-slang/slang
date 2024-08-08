@@ -6,7 +6,7 @@
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-struct DefaultData
+struct DefaultData : IDefaultInitializable
 {
     static const int2 val = int2(0, 1);
     float2 size;
@@ -16,13 +16,10 @@ struct DefaultData
 
 extension DefaultData
 {
-    int someGet()
-    {
-        return val.x;
-    }
+    int someGet() { return val.x; }
 }
 
-int loadDefaultData(inout DefaultData noInit)
+int loadDefaultData(DefaultData noInit)
 {
     outputBuffer[1] = 1;
     return noInit.someGet();

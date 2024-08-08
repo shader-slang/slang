@@ -9509,7 +9509,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerFuncDeclInContext(IRGenContext* subContext, IRBuilder* subBuilder, FunctionDeclBase* decl, bool emitBody = true)
     {
-
         IRGeneric* outerGeneric = nullptr;
         subContext->funcDecl = decl;
 
@@ -9543,6 +9542,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addForceInlineDecoration(irFunc);
             }
         }
+
+        // For diagnostics
+        if (as<StructDecl>(decl->parentDecl))
+            getBuilder()->addSimpleDecoration<IRMethodDecoration>(irFunc);
 
         auto irFuncType = info.type;
         auto& irResultType = info.resultType;

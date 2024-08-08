@@ -55,7 +55,7 @@ void myTriangleClosestHit(inout MyRayPayload payload)
 // In this case, the return value is used to specify
 // whether the hit should be accepted (true) or ignored (false).
 //
-bool myTriangleAnyHit(inout MyRayPayload payload)
+bool myTriangleAnyHit(MyRayPayload payload)
 {
 	return true;
 }
@@ -73,7 +73,7 @@ void myProceduralClosestHit(inout MyRayPayload payload, MyProceduralHitAttrs att
 {
 	payload.value = attrs.value;
 }
-bool myProceduralAnyHit(inout MyRayPayload payload)
+bool myProceduralAnyHit(MyRayPayload payload)
 {
 	return true;
 }
@@ -85,7 +85,7 @@ bool myProceduralAnyHit(inout MyRayPayload payload)
 // For now we will only deal with the single-intersection
 // case.
 //
-bool myProceduralIntersection(inout float tHit, inout MyProceduralHitAttrs hitAttrs)
+bool myProceduralIntersection(float tHit, MyProceduralHitAttrs hitAttrs)
 {
 	return true;
 }
