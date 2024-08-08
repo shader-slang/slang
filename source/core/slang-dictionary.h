@@ -321,6 +321,7 @@ namespace Slang
             init(arg, args...);
         }
         HashSetBase(const HashSetBase& set)
+            : RefObject()
         {
             operator=(set);
         }

@@ -441,8 +441,6 @@ Result linkAndOptimizeIR(
     outLinkedIR = linkIR(codeGenContext);
     auto irModule = outLinkedIR.module;
     auto irEntryPoints = outLinkedIR.entryPoints;
-    auto str = dumpIRToString(irModule->getModuleInst());
-    File::writeAllText("d:\\test-ir.txt", str);
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "LINKED");
 #endif
@@ -665,8 +663,6 @@ Result linkAndOptimizeIR(
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
         if (!codeGenContext->isSpecializationDisabled())
             changed |= specializeModule(targetProgram, irModule, codeGenContext->getSink());
-        auto str = dumpIRToString(irModule->getModuleInst());
-        File::writeAllText("d:\\test-ir-after-spec.txt", str);
         if (codeGenContext->getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
