@@ -8,56 +8,25 @@
 
 namespace Slang
 {
-    SLANG_NO_THROW SlangResult SLANG_MCALL Module::precompileForTargets(
-        DiagnosticSink* sink,
-        TargetRequest* targetReq)
-    {
-        auto module = getIRModule();
+    SLANG_NO_THROW SlangResult SLANG_MCALL Module::precompileForTarget(
+        SlangCompileTarget target,
+        slang::IBlob** outDiagnostics)
+    {         
+        
+        if (target != SLANG_DXIL)
+        {
+            return SLANG_FAIL;
+        }
+        CodeGenTarget targetEnum = CodeGenTarget(target);
+        
+        auto module = getIRModule();        
         auto linkage = getLinkage();
 
-        CapabilityName precompileRequirement = CapabilityName::Invalid;
-        switch (targetReq->getTarget())
-        {
-        case CodeGenTarget::DXIL:
-            linkage->addTarget(Slang::CodeGenTarget::DXIL);
-            precompileRequirement = CapabilityName::dxil_lib;
-            break;
-        default:
-            assert(!"Unhandled target");
-            break;
-        }
-        SLANG_ASSERT(precompileRequirement != CapabilityName::Invalid);
-
-        // Ensure precompilation capability requirements are met.
-        auto targetCaps = targetReq->getTargetCaps();
-        auto precompileRequirementsCapabilitySet = CapabilitySet(precompileRequirement);
-        if (targetCaps.atLeastOneSetImpliedInOther(precompileRequirementsCapabilitySet) == CapabilitySet::ImpliesReturnFlags::NotImplied)
-        {
-            // If `RestrictiveCapabilityCheck` is true we will error, else we will warn.
-            // error ...: dxil libraries require $0, entry point compiled with $1.
-            // warn ...: dxil libraries require $0, entry point compiled with $1, implicitly upgrading capabilities.
-            maybeDiagnoseWarningOrError(
-                                sink,
-                                targetReq->getOptionSet(),
-                                DiagnosticCategory::Capability,
-                                SourceLoc(),
-                                Diagnostics::incompatibleWithPrecompileLib,
-                                Diagnostics::incompatibleWithPrecompileLibRestrictive,
-                                precompileRequirementsCapabilitySet,
-                                targetCaps);
-
-            // add precompile requirements to the cooked targetCaps
-            targetCaps.join(precompileRequirementsCapabilitySet);
-            if (targetCaps.isInvalid())
-            {
-                sink->diagnose(SourceLoc(), Diagnostics::unknownCapability, targetCaps);
-                return SLANG_FAIL;
-            }
-            else
-            {
-                targetReq->setTargetCaps(targetCaps);
-            }
-        }
+        DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+        applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+        applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+       
+        TargetRequest* targetReq = new TargetRequest(linkage, targetEnum);
 
         List<RefPtr<ComponentType>> allComponentTypes;
         allComponentTypes.add(this); // Add Module as a component type
@@ -72,19 +41,33 @@ namespace Slang
             allComponentTypes);
 
         TargetProgram tp(composite, targetReq);
-        tp.getOrCreateLayout(sink);
+        tp.getOrCreateLayout(&sink);
         Slang::Index const entryPointCount = m_entryPoints.getCount();
-
+        tp.getOptionSet().add(CompilerOptionName::GenerateWholeProgram, true);
+                
+        switch (targetReq->getTarget())
+        {
+        case CodeGenTarget::DXIL:            
+            tp.getOptionSet().add(CompilerOptionName::Profile, Profile::RawEnum::DX_Lib_6_6);
+            break;
+        default:
+            assert(!"Unhandled target");
+            break;
+        }
+        
         CodeGenContext::EntryPointIndices entryPointIndices;
 
         entryPointIndices.setCount(entryPointCount);
         for (Index i = 0; i < entryPointCount; i++)
             entryPointIndices[i] = i;
-        CodeGenContext::Shared sharedCodeGenContext(&tp, entryPointIndices, sink, nullptr);
+        CodeGenContext::Shared sharedCodeGenContext(&tp, entryPointIndices, &sink, nullptr);
         CodeGenContext codeGenContext(&sharedCodeGenContext);
 
         ComPtr<IArtifact> outArtifact;
         SlangResult res = codeGenContext.emitTranslationUnit(outArtifact);
+
+        sink.getBlobIfNeeded(outDiagnostics);
+
         if (res != SLANG_OK)
         {
             return res;
