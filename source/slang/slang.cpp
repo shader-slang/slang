@@ -5683,7 +5683,7 @@ void Session::addBuiltinSource(
         sourceBlob);
 
     SlangResult res = compileRequest->executeActionsInner();
-    // if (SLANG_FAILED(res))
+    if (SLANG_FAILED(res))
     {
         char const* diagnostics = sink.outputBuffer.getBuffer();
         fprintf(stderr, "%s", diagnostics);

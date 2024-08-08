@@ -38,6 +38,12 @@ namespace Slang
             || (inst->m_op == kIROp_Var);
     }
 
+    static bool isUnmodifying(IRFunc *func)
+    {
+        auto intr = func->findDecoration<IRIntrinsicOpDecoration>();
+        return (intr && intr->getIntrinsicOp() == kIROp_Unmodified);
+    }
+
     enum ParameterCheckType
     {
         Never,
@@ -306,6 +312,7 @@ namespace Slang
         
         // Miscellaenous cases
         case kIROp_ManagedPtrAttach:
+        case kIROp_Unmodified:
             stores.add(user);
             break;
 
@@ -592,18 +599,21 @@ namespace Slang
         bool structMethod = func->findDecoration<IRMethodDecoration>();
 
         // Check out parameters
-        int index = 0;
-        for (auto param : firstBlock->getParams())
+        if (!isUnmodifying(func))
         {
-            bool isThis = structMethod && (index == 0);
+            int index = 0;
+            for (auto param : firstBlock->getParams())
+            {
+                bool isThis = structMethod && (index == 0);
 
-            ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index);
-            if (checkType == AsOut)
-                checkParameterAsOut(reachability, func, param, sink);
-            else if (checkType == AsInOut)
-                checkParameterAsInOut(param, func, isThis, sink);
+                ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index);
+                if (checkType == AsOut)
+                    checkParameterAsOut(reachability, func, param, sink);
+                else if (checkType == AsInOut)
+                    checkParameterAsInOut(param, func, isThis, sink);
 
-            index++;
+                index++;
+            }
         }
 
         // Check ordinary instructions

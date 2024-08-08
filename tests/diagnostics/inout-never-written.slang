@@ -31,7 +31,11 @@ struct A
     [mutating] int next() { return state; }
     
     // TODO: unmodified(...)
-    int progress() {}
+    [mutating] int progress()
+    {
+        unmodified(state);
+        return state;
+    }
 };
 
 __generic <T>
