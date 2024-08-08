@@ -1369,6 +1369,8 @@ namespace Slang
         bool IsErrorExpr(Expr* expr);
 
         static bool isTypePack(Type* type);
+        static bool isAbstractTypePack(Type* type);
+
 
         // Capture the "base" expression in case this is a member reference
         Expr* GetBaseExpr(Expr* expr);
@@ -2267,7 +2269,14 @@ namespace Slang
                 else
                     return semantics->maybeResolveOverloadedExpr(getArg(index), LookupMask::Default, nullptr)->type;
             }
-            bool matchArgumentsToParams(SemanticsVisitor* semantics, const List<QualType>& params, bool computeTypes, ShortList<Expr*>& outMatchedArgs);
+            struct MatchedArg
+            {
+                Index first;
+                Index count;
+                Expr* argExpr;
+                Type* argType;
+            };
+            bool matchArgumentsToParams(SemanticsVisitor* semantics, const List<QualType>& params, bool computeTypes, ShortList<MatchedArg>& outMatchedArgs);
 
             bool disallowNestedConversions = false;
 

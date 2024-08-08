@@ -3,7 +3,22 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-void accept<params T>(expand each T value) {}
+struct S<T>
+{
+    T v;
+    __init(T x)
+    {
+        v = x;
+    }
+}
+
+
+S<T> makeS<T>(T x)
+{
+    return S<T>(x);
+}
+
+void accept<each T>(expand each T value) {}
 
 T writeSingle<T : __BuiltinFloatingPointType>(T value)
 {
@@ -12,9 +27,9 @@ T writeSingle<T : __BuiltinFloatingPointType>(T value)
     return value;
 }
 
-void write<params T : __BuiltinFloatingPointType>(expand each T value)
+void write<each T : __BuiltinFloatingPointType>(expand S<each T> value)
 {
-    accept(expand writeSingle(each value));
+    accept(expand writeSingle((each value).v));
 }
 
 [numthreads(1,1,1)]
@@ -24,6 +39,6 @@ void computeMain()
     // CHECK: 2.0
     // CHECK: 3.0
     // CHECK: 4.0
-
-    write(1.0, 2.0, 3.0, 4.0);
+    write();
+    write(makeS(1.0), makeS(2.0), makeS(3.0), makeS(4.0));
 }

@@ -15,12 +15,19 @@ namespace Slang
         ParamCounts counts = { 0, 0 };
         for (auto param : params)
         {
-            if (counts.allowed >= 0)
-                counts.allowed++;
-
-            if (isTypePack(getParamType(m_astBuilder, param)))
+            Index allowedArgCountToAdd = 1;
+            auto paramType = getParamType(m_astBuilder, param);
+            if (isTypePack(paramType))
             {
-                counts.allowed = -1;
+                if (auto typePack = as<TypePack>(paramType))
+                {
+                    counts.required += typePack->getTypeCount();
+                    allowedArgCountToAdd = typePack->getTypeCount();
+                }
+                else
+                {
+                    counts.allowed = -1;
+                }
             }
             else if (!param.getDecl()->initExpr)
             {
@@ -36,6 +43,9 @@ namespace Slang
                 //    all the declarations.
                 counts.required++;
             }
+
+            if (counts.allowed >= 0)
+                counts.allowed += allowedArgCountToAdd;
         }
         return counts;
     }
@@ -297,7 +307,7 @@ namespace Slang
                 paramTypes.add(DeclRefType::create(m_astBuilder, typeParamRef));
             }
         }
-        ShortList<Expr*> matchedArgs;
+        ShortList<OverloadResolveContext::MatchedArg> matchedArgs;
         if (!context.matchArgumentsToParams(this, paramTypes, false, matchedArgs))
         {
             maybeReportGeneralError();
@@ -355,12 +365,12 @@ namespace Slang
                 auto arg = matchedArgs[aa++];
                 if (context.mode == OverloadResolveContext::Mode::JustTrying)
                 {
-                    typeArg = tryCoerceToProperType(TypeExp(arg));
+                    typeArg = tryCoerceToProperType(TypeExp(arg.argExpr));
                 }
                 else
                 {
-                    arg = ExpectATypeRepr(arg);
-                    typeArg = CoerceToProperType(TypeExp(arg));
+                    arg.argExpr = ExpectATypeRepr(arg.argExpr);
+                    typeArg = CoerceToProperType(TypeExp(arg.argExpr));
                 }
 
                 // If we failed to get a valid type (either because
@@ -417,7 +427,7 @@ namespace Slang
                 // to the type of the parameter (and fail if the
                 // coercion is not possible)
                 //
-                arg = matchedArgs[aa++];
+                arg = matchedArgs[aa++].argExpr;
                 if (context.mode == OverloadResolveContext::Mode::JustTrying)
                 {
                     ConversionCost cost = kConversionCost_None;
@@ -461,8 +471,8 @@ namespace Slang
                 }
                 else
                 {
-                    auto arg = matchedArgs[aa++];
-                    if (auto packExpr = as<PackExpr>(arg))
+                    auto matchedArg = matchedArgs[aa++];
+                    if (auto packExpr = as<PackExpr>(matchedArg.argExpr))
                     {
                         // We are providing a concrete pack of types as arguments to a type pack parameter.
                         // We need to create a `TypePack` type to serve as the argument.
@@ -501,7 +511,7 @@ namespace Slang
                         }
                         val = m_astBuilder->getTypePack(coercedProperTypes.getArrayView().arrayView);
                     }
-                    else if (auto expandExpr = as<ExpandExpr>(arg))
+                    else if (auto expandExpr = as<ExpandExpr>(matchedArg.argExpr))
                     {
                         auto argType = expandExpr->type.type;
                         if (auto typeType = as<TypeType>(argType))
@@ -1661,7 +1671,7 @@ namespace Slang
         SemanticsVisitor* semantics,
         const List<QualType>& params,
         bool computeTypes,
-        ShortList<Expr*>& outMatchedArgs)
+        ShortList<MatchedArg>& outMatchedArgs)
     {
         // We allow params to end with one or more variadic packs.
         // We will first find out how many type packs there are.
@@ -1687,7 +1697,11 @@ namespace Slang
         // The fixed part comes first.
         for (Index i = 0; i < Math::Min(getArgCount(), fixedParamCount); ++i)
         {
-            auto arg = getArg(i);
+            MatchedArg arg;
+            arg.argExpr = getArg(i);
+            arg.argType = getArgType(i);
+            arg.first = i;
+            arg.count = 1;
             outMatchedArgs.add(arg);
         }
 
@@ -1696,9 +1710,15 @@ namespace Slang
         auto astBuilder = semantics->getASTBuilder();
         while (remainingArgCount > 0)
         {
-            if (as<ExpandExpr>(getArg(fixedParamCount)))
+            auto argType = getArgType(fixedParamCount);
+            if (isAbstractTypePack(argType))
             {
-                outMatchedArgs.add(getArg(fixedParamCount));
+                MatchedArg arg;
+                arg.argExpr = getArg(fixedParamCount);
+                arg.argType = getArgType(fixedParamCount);
+                arg.first = fixedParamCount;
+                arg.count = 1;
+                outMatchedArgs.add(arg);
                 fixedParamCount++;
                 remainingArgCount--;
                 typePackCount--;
@@ -1721,19 +1741,34 @@ namespace Slang
         Index typePackSize = remainingArgCount / typePackCount;
         for (Index i = 0; i < typePackCount; ++i)
         {
-            auto packExpr = astBuilder->create<PackExpr>();
-            packExpr->loc = loc;
+            PackExpr* packExpr = nullptr;
+            if (mode == Mode::ForReal)
+            {
+                packExpr = astBuilder->create<PackExpr>();
+                packExpr->loc = loc;
+            }
             ShortList<Type*> types;
             for (Index j = 0; j < typePackSize; ++j)
             {
-                auto arg = getArg(fixedParamCount + i * typePackSize + j);
-                packExpr->args.add(arg);
+                if (packExpr)
+                {
+                    auto arg = getArg(fixedParamCount + i * typePackSize + j);
+                    packExpr->args.add(arg);
+                }
                 if (computeTypes)
                     types.add(getArgTypeForInference(fixedParamCount + i * typePackSize + j, semantics));
             }
+            MatchedArg matchedArg;
+            matchedArg.argExpr = packExpr;
             if (computeTypes)
-                packExpr->type = astBuilder->getTypePack(types.getArrayView().arrayView);
-            outMatchedArgs.add(packExpr);
+            {
+                matchedArg.argType = astBuilder->getTypePack(types.getArrayView().arrayView);
+                if (packExpr)
+                    packExpr->type = matchedArg.argType;
+            }
+            matchedArg.first = fixedParamCount + i * typePackSize;
+            matchedArg.count = typePackSize;
+            outMatchedArgs.add(matchedArg);
         }
         return true;
     }
@@ -1796,7 +1831,7 @@ namespace Slang
                 innerParameterTypes = &paramTypes;
             }
 
-            ShortList<Expr*> matchedArgs;
+            ShortList<OverloadResolveContext::MatchedArg> matchedArgs;
 
             // We now try to match arguments to parameters.
             //
@@ -1831,13 +1866,19 @@ namespace Slang
                 //
                 // So the question is then whether a mismatch during the
                 // unification step should be taken as an immediate failure...
-                auto argType = matchedArgs[aa]->type;
+                auto argType = matchedArgs[aa].argType;
                 auto paramType = (*innerParameterTypes)[aa];
-                TryUnifyTypes(
+                auto canUnify = TryUnifyTypes(
                     constraints,
                     ValUnificationContext(),
-                    QualType(argType.type, paramType.isLeftValue),
+                    QualType(argType, paramType.isLeftValue),
                     paramType);
+
+                // It is an error if we can't unify the argument with a type pack parameter.
+                if (!canUnify && isTypePack(paramType))
+                {
+                    return DeclRef<Decl>();
+                }
             }
         }
         else

@@ -170,7 +170,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     // signature
     if (parentGenericDeclRef && 
         !declRef.as<GenericValueParamDecl>() &&
-        !declRef.as<GenericTypeParamDecl>())
+        !declRef.as<GenericTypeParamDeclBase>())
     {
         auto substArgs = tryGetGenericArguments(SubstitutionSet(declRef), parentGenericDeclRef.getDecl());
         if (substArgs.getCount())

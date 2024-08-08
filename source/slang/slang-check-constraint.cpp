@@ -1019,6 +1019,7 @@ namespace Slang
                     if (!TryUnifyTypes(constraints, subUnifyCtx, QualType(fstTypePack->getElementType(i), fst.isLeftValue), QualType(sndExpandType->getPatternType(), snd.isLeftValue)))
                         return false;
                 }
+                return true;
             }
         }
 
@@ -1033,6 +1034,7 @@ namespace Slang
                     if (!TryUnifyTypes(constraints, subUnifyCtx, QualType(fstExpandType->getPatternType(), fst.isLeftValue), QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
                         return false;
                 }
+                return true;
             }
         }
 

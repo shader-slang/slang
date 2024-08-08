@@ -215,11 +215,9 @@ namespace Slang
         return false;
     }
 
-    bool SemanticsVisitor::isTypePack(Type* type)
+    bool SemanticsVisitor::isAbstractTypePack(Type* type)
     {
         if (as<ExpandType>(type))
-            return true;
-        if (as<TypePack>(type))
             return true;
         if (auto declRefType = as<DeclRefType>(type))
         {
@@ -229,6 +227,13 @@ namespace Slang
             }
         }
         return false;
+    }
+
+    bool SemanticsVisitor::isTypePack(Type* type)
+    {
+        if (as<TypePack>(type))
+            return true;
+        return isAbstractTypePack(type);
     }
 
     bool SemanticsVisitor::CoerceToProperTypeImpl(

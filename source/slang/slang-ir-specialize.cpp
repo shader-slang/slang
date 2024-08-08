@@ -2262,6 +2262,15 @@ struct SpecializationContext
         {
             elementCount = firstTupleType->getOperandCount();
         }
+        if (elementCount == 0)
+        {
+            auto resultTuple = builder.emitMakeTuple(0, (IRInst*const*)nullptr);
+            expandInst->replaceUsesWith(resultTuple);
+            expandInst->removeAndDeallocate();
+            addUsersToWorkList(resultTuple);
+            return true;
+        }
+
         for (UInt i = 0; i < elementCount; i++)
         {
             IRCloneEnv cloneEnv;

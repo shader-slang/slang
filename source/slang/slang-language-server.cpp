@@ -245,6 +245,10 @@ String getDeclKindString(DeclRef<Decl> declRef)
     {
         return "(generic type parameter) ";
     }
+    else if (declRef.as<GenericTypePackParamDecl>())
+    {
+        return "(generic type pack parameter) ";
+    }
     else if (declRef.as<GenericValueParamDecl>())
     {
         return "(generic value parameter) ";

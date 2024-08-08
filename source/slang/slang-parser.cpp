@@ -1481,7 +1481,7 @@ namespace Slang
             return paramDecl;
         }
         Decl* paramDecl = nullptr;
-        if (AdvanceIf(parser, "params"))
+        if (AdvanceIf(parser, "each"))
         {
             // A type pack parameter.
             paramDecl = parser->astBuilder->create<GenericTypePackParamDecl>();

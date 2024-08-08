@@ -535,12 +535,10 @@ TypeType* ASTBuilder::getTypeType(Type* type)
 
 Type* ASTBuilder::getEachType(Type* baseType)
 {
-    // each expand each T ==> each T
+    // each expand T ==> T
     if (auto expandType = as<ExpandType>(baseType))
     {
-        auto eachType = as<EachType>(expandType->getPatternType());
-        if (eachType)
-            return eachType;
+        return expandType->getPatternType();
     }
     SLANG_ASSERT(!as<EachType>(baseType));
     return getOrCreate<EachType>(baseType);
