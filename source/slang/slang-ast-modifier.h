@@ -997,15 +997,6 @@ class MutatingAttribute : public Attribute
     SLANG_AST_CLASS(MutatingAttribute)
 };
 
-// A '[semanticmutating]` attribute which indicates that
-// a member function should be treated as a `[mutating]`
-// method but does not modify things through its `this`
-// argument.
-class SemanticMutatingAttribute : public Attribute
-{
-    SLANG_AST_CLASS(SemanticMutatingAttribute);
-};
-
 // A `[nonmutating]` attribute, which indicates that a
 // `set` accessor does not need to modify anything through
 // its `this` parameter.

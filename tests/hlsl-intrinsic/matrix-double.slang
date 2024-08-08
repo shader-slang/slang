@@ -44,8 +44,10 @@ IntMatrix makeIntMatrix(int v)
     return m;
 }
 
-void test1(inout FloatMatrix ft, __ref FloatMatrix f, int idx)
+void test1(inout FloatMatrix ft, inout FloatMatrix f, int idx)
 {
+    unmodified(f);
+
     // fmod
     ft += FloatMatrix(IntMatrix(((f % makeFloatMatrix(0.11f)) * makeFloatMatrix(100)) + makeFloatMatrix(0.5)));
 
@@ -110,8 +112,10 @@ void test1(inout FloatMatrix ft, __ref FloatMatrix f, int idx)
     ft += max(f, makeFloatMatrix(0.75));
 }
 
-void test2(inout FloatMatrix ft, __ref FloatMatrix f)
+void test2(inout FloatMatrix ft, inout FloatMatrix f)
 {
+    unmodified(f);
+
     ft += pow(makeFloatMatrix(0.5), f);
 
     ft += smoothstep(makeFloatMatrix(0.2), makeFloatMatrix(0.7), f);

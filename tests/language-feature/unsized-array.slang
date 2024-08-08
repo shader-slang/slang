@@ -15,8 +15,9 @@ int test(int arr[])
     return arr[0] + g(arr);
 }
 
-int test2<T>(__ref T arr[])
+int test2<T>(inout T arr[])
 {
+    unmodified(arr);
     return arr.getCount();
 }
 
