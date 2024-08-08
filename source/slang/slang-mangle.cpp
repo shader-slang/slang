@@ -266,6 +266,23 @@ namespace Slang
             emitType(context, andType->getLeft());
             emitType(context, andType->getRight());
         }
+        else if (auto expandType = as<ExpandType>(type))
+        {
+            emitRaw(context, "Tx");
+            emitType(context, expandType->getPatternType());
+        }
+        else if (auto eachType = as<EachType>(type))
+        {
+            emitRaw(context, "Te");
+            emitType(context, eachType->getElementType());
+        }
+        else if (auto typePack = as<TypePack>(type))
+        {
+            emitRaw(context, "Tp");
+            emit(context, typePack->getTypeCount());
+            for (Index i = 0; i < typePack->getTypeCount(); i++)
+                emitType(context, typePack->getElementType(i));
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in type mangling");
@@ -492,6 +509,10 @@ namespace Slang
                     {
                         genericParameterCount++;
                     }
+                    else if (mm.is<GenericTypePackParamDecl>())
+                    {
+                        genericParameterCount++;
+                    }
                     else
                     {
                     }
@@ -499,12 +520,16 @@ namespace Slang
 
                 emit(context, genericParameterCount);
 
-                OrderedDictionary<GenericTypeParamDecl*, List<Type*>> genericConstraints;
+                OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> genericConstraints;
                 for (auto mm : getMembers(context->astBuilder, parentGenericDeclRef))
                 {
                     if (auto genericTypeParamDecl = mm.as<GenericTypeParamDecl>())
                     {
                         emitRaw(context, "T");
+                    }
+                    if (auto genericTypePackParamDecl = mm.as<GenericTypePackParamDecl>())
+                    {
+                        emitRaw(context, "TP");
                     }
                     else if (auto genericValueParamDecl = mm.as<GenericValueParamDecl>())
                     {

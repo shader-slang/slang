@@ -534,7 +534,7 @@ public:
         /// This searches up the parent chain starting with `getParent()` looking for a code-bearing
         /// value that things are being inserted into (could be a function, generic, etc.)
         ///
-    IRGlobalValueWithCode* getFunc() const;
+    IRInst* getFunc() const;
 
 private:
         /// Internal constructor
@@ -566,6 +566,8 @@ enum class IRTypeLayoutRuleName
     Std140,
     _Count,
 };
+
+struct IRBlock;
 
 // Every value in the IR is an instruction (even things
 // like literal values).
@@ -833,6 +835,13 @@ struct IRInst
     /// Print the IR to stdout for debugging purposes
     ///
     void dump();
+
+    /// Insert a basic block at the end of this func/code containing inst.
+    void addBlock(IRBlock* block);
+
+    IRBlock* getFirstBlock() { return (IRBlock*)getFirstChild(); }
+    IRBlock* getLastBlock() { return (IRBlock*)getLastChild(); }
+
 };
 
 enum class IRDynamicCastBehavior
@@ -1286,11 +1295,6 @@ struct IRBlock : IRInst
             getLastOrdinaryInst());
     }
 
-    // The parent of a basic block is assumed to be a
-    // value with code (e.g., a function, global variable
-    // with initializer, etc.).
-    IRGlobalValueWithCode* getParent() { return cast<IRGlobalValueWithCode>(IRInst::getParent()); }
-
     // The predecessor and successor lists of a block are needed
     // when we want to work with the control flow graph (CFG) of
     // a function. Rather than store these explicitly (and thus
@@ -1615,6 +1619,7 @@ struct IRRateQualifiedType : IRType
 // same type.
 SIMPLE_IR_PARENT_TYPE(Kind, Type);
 SIMPLE_IR_TYPE(TypeKind, Kind);
+SIMPLE_IR_TYPE(TypeParameterPackKind, Kind);
 
 // The kind of any and all generics.
 //
@@ -1936,6 +1941,16 @@ struct IRTargetTupleType : IRType
     IR_LEAF_ISA(TargetTupleType)
 };
 
+/// Represents a `expand T` type used in variadic generic decls in Slang. Expected to be substituted
+/// by actual types during specialization.
+struct IRExpandType : IRType
+{
+    IR_LEAF_ISA(ExpandTypeOrVal)
+    IRType* getPatternType() { return (IRType*)(getOperand(0)); }
+    UInt getCaptureCount() { return getOperandCount() - 1; }
+    IRType* getCaptureType(UInt index) { return (IRType*)(getOperand(index + 1)); }
+};
+
 /// Represents an `Result<T,E>`, used by functions that throws error codes.
 struct IRResultType : IRType
 {
@@ -2034,9 +2049,6 @@ struct IRGlobalValueWithCode : IRInst
     {
         return IRInstList<IRBlock>(getChildren());
     }
-
-    // Add a block to the end of this function.
-    void addBlock(IRBlock* block);
 
     IR_PARENT_ISA(GlobalValueWithCode)
 };

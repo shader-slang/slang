@@ -553,6 +553,66 @@ namespace Slang
         return paramType;
     }
 
+    struct FlattenedTypeListView
+    {
+        QualType* firstType;
+        Index count;
+
+        struct Iterator
+        {
+            FlattenedTypeListView* view;
+            Index index;
+            Index subIndex;
+            TypePack* pack;
+            Iterator& operator++()
+            {
+                if (pack && subIndex < pack->getTypeCount() - 1)
+                {
+                    subIndex++;
+                    return *this;
+                }
+                subIndex = 0;
+                for (;;)
+                {
+                    index++;
+                    pack = nullptr;
+                    if (index >= view->count)
+                    {
+                        return *this;
+                    }
+                    if (auto packType = as<TypePack>(view->firstType[index].type))
+                    {
+                        pack = packType;
+                        if (pack->getTypeCount() == 0)
+                            continue;
+                    }
+                    break;
+                }
+                return *this;
+            }
+            QualType operator*() const
+            {
+                if (index >= view->count)
+                    return nullptr;
+
+                if (pack)
+                    return QualType(pack->getElementType(subIndex), view->firstType[index].isLeftValue);
+                return view->firstType[index].type;
+            }
+            bool operator!=(Iterator const& other) const
+            {
+                return index != other.index || subIndex != other.subIndex;
+            }
+            bool operator==(Iterator const& other) const
+            {
+                return index == other.index && subIndex == other.subIndex;
+            }
+        };
+
+        Iterator begin() { return Iterator{ this, 0, 0, nullptr }; }
+        Iterator end() { return Iterator{ this, count, 0, nullptr }; }
+    };
+
     bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         OverloadResolveContext&	context,
         OverloadCandidate&		candidate)
@@ -590,37 +650,93 @@ namespace Slang
             break;
         }
 
-        // Note(tfoley): We might have fewer arguments than parameters in the
-        // case where one or more parameters had defaults.
-        SLANG_RELEASE_ASSERT(argCount <= paramTypes.getCount());
-
-        for (Index ii = 0; ii < argCount; ++ii)
+        Index paramIndex = 0;
+        Index argIndex = 0;
+        struct Arg { Expr* argExpr; Type* type; };
+        auto readArg = [&]() -> Arg
         {
-            auto& arg = context.getArg(ii);
-            auto paramType = paramTypes[ii];
-            auto argType = QualType(context.getArgType(ii), paramType.isLeftValue);
-            if (!paramType)
-                return false;
-            if (!argType)
-                return false;
-            if (context.mode == OverloadResolveContext::Mode::JustTrying)
+            if (argIndex >= argCount)
+                return { nullptr, nullptr };
+            auto arg = context.getArg(argIndex);
+            Arg result = { arg, context.getArgType(argIndex) };
+            argIndex++;
+            return result;
+        };
+
+        auto coerceArgToParam = [&](Arg arg, QualType paramType) -> Expr*
             {
-                ConversionCost cost = kConversionCost_None;
-                if( context.disallowNestedConversions )
+                if (!arg.argExpr)
+                    return nullptr;
+                auto argType = QualType(arg.type, paramType.isLeftValue);
+                if (!paramType)
+                    return nullptr;
+                if (!argType)
+                    return nullptr;
+                if (context.mode == OverloadResolveContext::Mode::JustTrying)
                 {
-                    // We need an exact match in this case.
-                    if(!paramType->equals(argType))
+                    ConversionCost cost = kConversionCost_None;
+                    if (context.disallowNestedConversions)
+                    {
+                        // We need an exact match in this case.
+                        if (!paramType->equals(argType))
+                            return nullptr;
+                    }
+                    else if (!canCoerce(paramType, argType, arg.argExpr, &cost))
+                    {
+                        return nullptr;
+                    }
+                    candidate.conversionCostSum += cost;
+                }
+                else
+                {
+                    arg.argExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr);
+                }
+                return arg.argExpr;
+            };
+        ShortList<Expr*> resultArgs;
+
+        while (paramIndex < paramTypes.getCount())
+        {
+            auto paramType = paramTypes[paramIndex];
+            if (auto paramTypePack = as<TypePack>(paramType))
+            {
+                ShortList<Expr*> innerArgs;
+                for (Index i = 0; i < paramTypePack->getTypeCount(); i++)
+                {
+                    auto arg = readArg();
+                    auto coercedArg = coerceArgToParam(arg, QualType(paramTypePack->getElementType(i), paramType.isLeftValue));
+                    if (!coercedArg)
+                    {
                         return false;
+                    }
+                    innerArgs.add(coercedArg);
                 }
-                else if (!canCoerce(paramType, argType, arg, &cost))
-                {
-                    return false;
-                }
-                candidate.conversionCostSum += cost;
+                auto packArg = m_astBuilder->create<PackExpr>();
+                for (auto aa : innerArgs)
+                    packArg->args.add(aa);
+                packArg->type = paramType;
+                resultArgs.add(packArg);
             }
             else
             {
-                arg = coerce(CoercionSite::Argument, paramType, arg);
+                auto arg = readArg();
+                auto coercedArg = coerceArgToParam(arg, paramType);
+                if (!coercedArg)
+                {
+                    return false;
+                }
+                resultArgs.add(coercedArg);
+            }
+            paramIndex++;
+        }
+        if (context.mode == OverloadResolveContext::Mode::ForReal)
+        {
+            context.argCount = resultArgs.getCount();
+            if (context.args)
+            {
+                context.args->setCount(context.argCount);
+                for (Index i = 0; i < context.argCount; i++)
+                    (*context.args)[i] = resultArgs[i];
             }
         }
         return true;
@@ -2157,7 +2273,7 @@ namespace Slang
         context.originalExpr = expr;
         context.funcLoc = funcExpr->loc;
         context.argCount = expr->arguments.getCount();
-        context.args = expr->arguments.getBuffer();
+        context.args = &expr->arguments;
         context.loc = expr->loc;
         context.sourceScope = m_outerScope;
         context.baseExpr = GetBaseExpr(funcExpr);
@@ -2411,7 +2527,7 @@ namespace Slang
         context.originalExpr = genericAppExpr;
         context.funcLoc = baseExpr->loc;
         context.argCount = args.getCount();
-        context.args = args.getBuffer();
+        context.args = &args;
         context.loc = genericAppExpr->loc;
         context.sourceScope = m_outerScope;
         context.baseExpr = GetBaseExpr(baseExpr);

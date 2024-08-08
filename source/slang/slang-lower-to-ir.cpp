@@ -1653,6 +1653,83 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(resultVal);
     }
 
+    LoweredValInfo visitTypePack(TypePack* typePack)
+    {
+        ShortList<IRType*> types;
+        for (Index i = 0; i < typePack->getTypeCount(); i++)
+        {
+            auto loweredType = lowerType(context, typePack->getElementType(i));
+            types.add(loweredType);
+        }
+        auto irBuilder = getBuilder();
+        IRType* irTypePack = irBuilder->getTupleType((UInt)types.getCount(), types.getArrayView().getBuffer());
+        return LoweredValInfo::simple(irTypePack);
+    }
+
+    LoweredValInfo visitEachType(EachType* eachType)
+    {
+        auto type = lowerType(context, eachType->getElementType());
+        return LoweredValInfo::simple(getBuilder()->emitEachInst(
+            getBuilder()->getTypeKind(),
+            type));
+    }
+
+    LoweredValInfo visitExpandType(ExpandType* expandType)
+    {
+        auto irBuilder = getBuilder();
+        auto type = lowerType(context, expandType->getPatternType());
+        ShortList<IRInst*> capturedTypes;
+        for (Index i = 0; i < expandType->getCapturedTypePackCount(); i++)
+        {
+            auto loweredType = lowerType(context, expandType->getCapturedTypePack(i));
+            capturedTypes.add(loweredType);
+        }
+        return LoweredValInfo::simple(irBuilder->getExpandTypeOrVal(
+            irBuilder->getTypeKind(), type, capturedTypes.getArrayView().arrayView));
+    }
+
+    LoweredValInfo visitSubtypeWitnessPack(SubtypeWitnessPack* witnessPack)
+    {
+        auto irBuilder = getBuilder();
+        ShortList<IRInst*> witnesses;
+        ShortList<IRType*> elementTypes;
+        for (Index i = 0; i < witnessPack->getCount(); i++)
+        {
+            auto loweredWitness = lowerVal(context, witnessPack->getWitness(i));
+            witnesses.add(loweredWitness.val);
+            elementTypes.add(loweredWitness.val->getFullType());
+        }
+        auto irWitnessPack = irBuilder->emitMakeWitnessPack(
+            irBuilder->getTupleType((UInt)elementTypes.getCount(), elementTypes.getArrayView().getBuffer()),
+            witnesses.getArrayView().arrayView);
+        return LoweredValInfo::simple(irWitnessPack);
+    }
+
+    LoweredValInfo visitExpandSubtypeWitness(ExpandSubtypeWitness* witness)
+    {
+        auto irBuilder = getBuilder();
+
+        auto patternWitnessVal = lowerVal(context, witness->getPatternTypeWitness());
+        auto subType = lowerType(context, witness->getSub());
+        auto supType = lowerType(context, witness->getSup());
+        auto witnessTableType = irBuilder->getWitnessTableType(supType);
+        ShortList<IRInst*> captures;
+        if (auto expandType = as<IRExpandType>(subType))
+        {
+            for (UInt i = 0; i < expandType->getCaptureCount(); i++)
+            {
+                captures.add(expandType->getCaptureType(i));
+            }
+        }
+        return LoweredValInfo::simple(irBuilder->getExpandTypeOrVal(witnessTableType, patternWitnessVal.val, captures.getArrayView().arrayView));
+    }
+
+    LoweredValInfo visitEachSubtypeWitness(EachSubtypeWitness* witness)
+    {
+        auto elementWitness = lowerVal(context, witness->getPatternTypeWitness());
+        return elementWitness;
+    }
+
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
     {
         if (as<ThisTypeConstraintDecl>(val->getDeclRef()))
@@ -3967,21 +4044,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(getBuilder()->getIntValue(builder->getUIntType(), value));
     }
 
-    LoweredValInfo visitPackExpr(PackExpr*)
-    {
-        SLANG_UNIMPLEMENTED_X("pack expressions lowering");
-    }
-
-    LoweredValInfo visitEachExpr(EachExpr*)
-    {
-        SLANG_UNIMPLEMENTED_X("each expressions lowering");
-    }
-
-    LoweredValInfo visitExpandExpr(ExpandExpr*)
-    {
-        SLANG_UNIMPLEMENTED_X("expand expressions lowering");
-    }
-
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
@@ -4328,6 +4390,44 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitParenExpr(ParenExpr* expr)
     {
         return lowerSubExpr(expr->base);
+    }
+
+    LoweredValInfo visitPackExpr(PackExpr* expr)
+    {
+        List<IRInst*> irArgs;
+        for (auto arg : expr->args)
+        {
+            irArgs.add(getSimpleVal(context, lowerSubExpr(arg)));
+        }
+        auto irMakeTuple = getBuilder()->emitMakeTuple(irArgs);
+        return LoweredValInfo::simple(irMakeTuple);
+    }
+
+    LoweredValInfo visitEachExpr(EachExpr* expr)
+    {
+        auto subVal = lowerSubExpr(expr->baseExpr);
+        auto irEach = getBuilder()->emitEachInst(lowerType(context, expr->type), getSimpleVal(context, subVal));
+        return LoweredValInfo::simple(irEach);
+    }
+
+    LoweredValInfo visitExpandExpr(ExpandExpr* expr)
+    {
+        auto irBuilder = getBuilder();
+        auto irType = lowerType(context, expr->type);
+        List<IRInst*> irCapaturedPacks;
+        if (auto expandType = as<IRExpandType>(irType))
+        {
+            for (UInt i = 0; i < expandType->getCaptureCount(); i++)
+            {
+                irCapaturedPacks.add(expandType->getCaptureType(i));
+            }
+        }
+        auto expandInst = irBuilder->emitExpandInst(irType, (UInt)irCapaturedPacks.getCount(), irCapaturedPacks.getBuffer());
+        irBuilder->setInsertInto(expandInst);
+        auto block = irBuilder->emitBlock();
+        irBuilder->emitYield(getSimpleVal(context, lowerSubExpr(expr->baseExpr)));
+        irBuilder->setInsertAfter(expandInst);
+        return LoweredValInfo::simple(expandInst);
     }
 
     LoweredValInfo getSimpleDefaultVal(IRType* type)
@@ -8968,11 +9068,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // in the order they were declared.
         for (auto member : genericDecl->members)
         {
-            if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
+            if (auto typeParamDecl = as<GenericTypeParamDeclBase>(member))
             {
-                // TODO: use a `TypeKind` to represent the
-                // classifier of the parameter.
-                auto param = subBuilder->emitParam(subBuilder->getTypeType());
+                IRType* typeKind = nullptr;
+                if (as<GenericTypePackParamDecl>(member))
+                    typeKind = subBuilder->getTypeParameterPackKind();
+                else
+                    typeKind = subBuilder->getTypeType();
+                auto param = subBuilder->emitParam(typeKind);
                 addNameHint(context, param, typeParamDecl);
                 subContext->setValue(typeParamDecl, LoweredValInfo::simple(param));
             }

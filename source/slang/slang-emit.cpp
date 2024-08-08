@@ -441,7 +441,8 @@ Result linkAndOptimizeIR(
     outLinkedIR = linkIR(codeGenContext);
     auto irModule = outLinkedIR.module;
     auto irEntryPoints = outLinkedIR.entryPoints;
-
+    auto str = dumpIRToString(irModule->getModuleInst());
+    File::writeAllText("d:\\test-ir.txt", str);
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "LINKED");
 #endif

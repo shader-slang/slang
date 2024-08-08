@@ -1036,6 +1036,7 @@ namespace Slang
             }
         }
 
+
         // A generic parameter type can unify with anything.
         // TODO: there actually needs to be some kind of "occurs check" sort
         // of thing here...
@@ -1121,6 +1122,19 @@ namespace Slang
             return TryUnifyTypes(constraints, unifyCtx, fst, QualType(sndUniformParamGroupType->getElementType(), snd.isLeftValue));
 
         // Each T can coerce with any DeclRefType.
+        if (auto eachSnd = as<EachType>(snd))
+        {
+            if (auto innerSnd = eachSnd->getElementDeclRefType())
+            {
+                if (auto sndTypePackParamDecl = as<GenericTypePackParamDecl>(innerSnd->getDeclRef().getDecl()))
+                {
+                    if (innerSnd->getDeclRef().getDecl()->parentDecl == constraints.genericDecl)
+                    {
+                        return TryUnifyTypeParam(constraints, unifyCtx, sndTypePackParamDecl, fst);
+                    }
+                }
+            }
+        }
         if (auto eachFst = as<EachType>(fst))
         {
             if (auto innerFst = eachFst->getElementDeclRefType())

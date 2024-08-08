@@ -7577,6 +7577,27 @@ namespace Slang
                 }
             }
         }
+        else if (isTypePack(paramDecl->type.type))
+        {
+            // A parameter pack is always `const` if it is not `inout`.
+            bool hasConstModifier = false;
+            for (auto modifier : paramDecl->modifiers)
+            {
+                if (as<OutModifier>(modifier) || as<InOutModifier>(modifier) || as<RefModifier>(modifier) || as<ConstRefModifier>(modifier))
+                {
+                    getSink()->diagnose(modifier, Diagnostics::parameterPackMustBeConst);
+                }
+                else if (as<ConstModifier>(modifier))
+                {
+                    hasConstModifier = true;
+                }
+            }
+            if (!hasConstModifier)
+            {
+                auto constModifier = this->getASTBuilder()->create<ConstModifier>();
+                addModifier(paramDecl, constModifier);
+            }
+        }
 
         // Only texture types are allowed to have memory qualifiers on parameters
         if(!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
@@ -9509,12 +9530,12 @@ namespace Slang
             outTypeList.add(type);
         }
     }
-    OrderedDictionary<GenericTypeParamDecl*, List<Type*>> getCanonicalGenericConstraints(
+    OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericConstraints(
         ASTBuilder* astBuilder,
         DeclRef<ContainerDecl> genericDecl)
     {
-        OrderedDictionary<GenericTypeParamDecl*, List<Type*>> genericConstraints;
-        for (auto mm : getMembersOfType<GenericTypeParamDecl>(astBuilder, genericDecl))
+        OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> genericConstraints;
+        for (auto mm : getMembersOfType<GenericTypeParamDeclBase>(astBuilder, genericDecl))
         {
             genericConstraints[mm.getDecl()] = List<Type*>();
         }
@@ -9529,7 +9550,7 @@ namespace Slang
             constraintTypes->add(genericTypeConstraintDecl.getDecl()->getSup().type);
         }
 
-        OrderedDictionary<GenericTypeParamDecl*, List<Type*>> result;
+        OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> result;
         for (auto& constraints : genericConstraints)
         {
             List<Type*> typeList;

@@ -367,6 +367,8 @@ DIAGNOSTIC(30103, Error, expectTypePackAfterEach, "expected a type pack after 'e
 DIAGNOSTIC(30104, Error, eachExprMustBeInsideExpandExpr, "'each' expression must be inside 'expand' expression.")
 DIAGNOSTIC(30105, Error, expandTermCapturesNoTypePacks, "'expand' term captures no type packs. At least one type pack must be referenced via an 'each' term inside an 'expand' term.")
 DIAGNOSTIC(30106, Error, improperUseOfType, "type '$0' cannot be used in this context.")
+DIAGNOSTIC(30107, Error, parameterPackMustBeConst, "a parameter pack must be declared as 'const'.")
+
 
 // Include
 DIAGNOSTIC(30500, Error, includedFileMissingImplementing, "missing 'implementing' declaration in the included source file '$0'.")

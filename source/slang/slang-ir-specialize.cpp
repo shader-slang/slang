@@ -576,6 +576,12 @@ struct SpecializationContext
 
         case kIROp_BindExistentialsType:
             return maybeSpecializeBindExistentialsType(as<IRBindExistentialsType>(inst));
+
+        case kIROp_Expand:
+            return maybeSpecializeExpand(as<IRExpand>(inst));
+
+        case kIROp_ExpandTypeOrVal:
+            return maybeSpecializeExpandTypeOrVal(as<IRExpandType>(inst));
         }
     }
 
@@ -812,10 +818,10 @@ struct SpecializationContext
 
                 // We will then iterate until our work list goes dry.
                 //
+
                 while (workList.getCount() != 0)
                 {
                     IRInst* inst = workList.getLast();
-
                     workList.removeLast();
                     workListSet.remove(inst);
 
@@ -2193,6 +2199,232 @@ struct SpecializationContext
 
         }
         return false;
+    }
+
+    IRInst* specializeExpandChildInst(IRCloneEnv& cloneEnv, IRBuilder* builder, IRInst* childInst, UInt index)
+    {
+        bool useFreshEnv = false;
+        auto type = clonePatternVal(cloneEnv, builder, childInst->getFullType(), index);
+        switch (childInst->getOp())
+        {
+        case kIROp_Each:
+        {
+            auto eachInst = as<IREach>(childInst);
+            auto packInst = eachInst->getElement();
+            builder->emitGetTupleElement((IRType*)type, packInst, index);
+            break;
+        }
+        case kIROp_Expand:
+        {
+            addToWorkList(childInst);
+            useFreshEnv = true;
+            break;
+        }
+        }
+        for (UInt i = 0; i < childInst->getOperandCount(); i++)
+        {
+            clonePatternVal(cloneEnv, builder, childInst->getOperand(i), index);
+        }
+        auto newInst = cloneInst(&cloneEnv, builder, childInst);
+        newInst = builder->replaceOperand(&newInst->typeUse, type);
+        cloneEnv.mapOldValToNew[childInst] = newInst;
+        IRBuilder subBuilder(*builder);
+        subBuilder.setInsertInto(newInst);
+        for (auto child : childInst->getChildren())
+        {
+            specializeExpandChildInst(cloneEnv, &subBuilder, child, index);
+        }
+        return newInst;
+    }
+
+    bool maybeSpecializeExpand(IRExpand* expandInst)
+    {
+        if (expandInst->getCaptureCount() == 0)
+            return false;
+
+        bool anyAbstractPack = false;
+        for (UInt i = 0; i < expandInst->getCaptureCount(); i++)
+        {
+            if (!as<IRTupleType>(expandInst->getCapture(i)))
+            {
+                anyAbstractPack = true;
+                break;
+            }
+        }
+        if (anyAbstractPack)
+            return false;
+
+        IRBuilder builder(expandInst);
+        builder.setInsertBefore(expandInst);
+        List<IRInst*> elements;
+        UInt elementCount = 0;
+        if (auto firstTupleType = as<IRTupleType>(expandInst->getCapture(0)))
+        {
+            elementCount = firstTupleType->getOperandCount();
+        }
+        for (UInt i = 0; i < elementCount; i++)
+        {
+            IRCloneEnv cloneEnv;
+            IRBlock* firstBlock = nullptr;
+            IRBuilder subBuilder = builder;
+            for (auto childBlock : expandInst->getBlocks())
+            {
+                auto newBlock = subBuilder.emitBlock();
+                if (!firstBlock)
+                    firstBlock = newBlock;
+                cloneEnv.mapOldValToNew[childBlock] = newBlock;
+            }
+            builder.emitBranch(firstBlock);
+
+            IRBlock* mergeBlock = subBuilder.emitBlock();
+            builder.setInsertInto(mergeBlock);
+
+            for (auto childBlock : expandInst->getBlocks())
+            {
+                auto newBlock = cloneEnv.mapOldValToNew[childBlock];
+                subBuilder.setInsertInto(newBlock);
+                for (auto child : childBlock->getChildren())
+                {
+                    if (as<IRYield>(child))
+                    {
+                        elements.add(cloneEnv.mapOldValToNew[child->getOperand(0)]);
+                        subBuilder.emitBranch(mergeBlock);
+                        continue;
+                    }
+                    specializeExpandChildInst(cloneEnv, &subBuilder, child, i);
+                }
+            }
+
+        }
+        auto resultTuple = builder.emitMakeTuple(elements);
+        auto currentBlock = builder.getBlock();
+        for (auto nextInst = expandInst->next; nextInst;)
+        {
+            auto next = nextInst->next;
+            nextInst->insertAtEnd(currentBlock);
+            nextInst = next;
+        }
+        addUsersToWorkList(expandInst);
+        expandInst->replaceUsesWith(resultTuple);
+        expandInst->removeAndDeallocate();
+        return true;
+    }
+
+    IRInst* clonePatternValImpl(IRCloneEnv& cloneEnv, IRBuilder* builder, IRInst* val, UInt indexInPack)
+    {
+        if (!val)
+            return val;
+
+        switch (val->getOp())
+        {
+        case kIROp_ExpandTypeOrVal:
+            return val;
+        case kIROp_Each:
+        {
+            auto eachInst = as<IREach>(val);
+            auto packInst = eachInst->getElement();
+            if (auto tuple = as<IRTupleType>(packInst))
+            {
+                SLANG_RELEASE_ASSERT(indexInPack < tuple->getOperandCount());
+                return tuple->getOperand(indexInPack);
+            }
+            else if (auto makeTuple = as<IRMakeTuple>(packInst))
+            {
+                SLANG_RELEASE_ASSERT(indexInPack < makeTuple->getOperandCount());
+                return makeTuple->getOperand(indexInPack);
+            }
+            else if (!as<IRTypeKind>(packInst->getDataType()))
+            {
+                auto type = clonePatternVal(cloneEnv, builder, val, indexInPack);
+                return builder->emitGetTupleElement((IRType*)type, packInst, indexInPack);
+            }
+            return val;
+        }
+        default:
+            break;
+        }
+        bool anyChange = false;
+        ShortList<IRInst*> operands;
+        for (UInt i = 0; i < val->getOperandCount(); i++)
+        {
+            auto newOperand = clonePatternVal(cloneEnv, builder, val->getOperand(i), indexInPack);
+            if (newOperand != val->getOperand(i))
+                anyChange = true;
+            operands.add(newOperand);
+        }
+        auto newType = clonePatternVal(cloneEnv, builder, val->getFullType(), indexInPack);
+        if (newType != val->getFullType())
+            anyChange = true;
+        if (!anyChange)
+            return val;
+
+        auto newVal = builder->emitIntrinsicInst((IRType*)newType, val->getOp(), operands.getCount(), operands.getArrayView().getBuffer());
+        if (newVal != val)
+        {
+            cloneInstDecorationsAndChildren(&cloneEnv, module, val, newVal);
+        }
+        return newVal;
+    }
+
+    IRInst* clonePatternVal(IRCloneEnv& cloneEnv, IRBuilder* builder, IRInst* val, UInt indexInPack)
+    {
+        if (auto clonedVal = cloneEnv.mapOldValToNew.tryGetValue(val))
+            return *clonedVal;
+        cloneEnv.mapOldValToNew[val] = val;
+        auto result = clonePatternValImpl(cloneEnv, builder, val, indexInPack);
+        cloneEnv.mapOldValToNew[val] = result;
+        return result;
+    }
+
+    bool maybeSpecializeExpandTypeOrVal(IRExpandType* expandInst)
+    {
+        if (expandInst->getCaptureCount() == 0)
+            return false;
+
+        bool anyAbstractPack = false;
+        for (UInt i = 0; i < expandInst->getCaptureCount(); i++)
+        {
+            if (!as<IRTupleType>(expandInst->getCaptureType(i)))
+            {
+                anyAbstractPack = true;
+                break;
+            }
+        }
+        if (anyAbstractPack)
+            return false;
+        IRBuilder builder(expandInst);
+        builder.setInsertBefore(expandInst);
+        List<IRInst*> elements;
+        UInt elementCount = 0;
+        if (auto firstTupleType = as<IRTupleType>(expandInst->getCaptureType(0)))
+        {
+            elementCount = firstTupleType->getOperandCount();
+        }
+        for (UInt i = 0; i < elementCount; i++)
+        {
+            IRCloneEnv cloneEnv;
+            auto element = clonePatternVal(cloneEnv, &builder, expandInst->getPatternType(), i);
+            elements.add(element);
+        }
+        addUsersToWorkList(expandInst);
+        if (as<IRWitnessTableType>(expandInst->getDataType()))
+        {
+            List<IRType*> types;
+            for (auto element : elements)
+                types.add(element->getDataType());
+            auto newTupleType = builder.getTupleType(types);
+            auto result = builder.emitMakeWitnessPack(newTupleType, elements.getArrayView());
+            expandInst->replaceUsesWith(result);
+            expandInst->removeAndDeallocate();
+            return true;
+        }
+        else
+        {
+            auto newTupleType = builder.getTupleType(elements.getCount(), (IRType*const*)elements.getBuffer());
+            expandInst->replaceUsesWith(newTupleType);
+            expandInst->removeAndDeallocate();
+            return true;
+        }
     }
 
     // The handling of specialization for global generic type

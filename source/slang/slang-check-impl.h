@@ -2248,11 +2248,11 @@ namespace Slang
 
             // The original arguments to the call
             Index argCount = 0;
-            Expr** args = nullptr;
+            List<Expr*>* args = nullptr;
             Type** argTypes = nullptr;
 
             Index getArgCount() { return argCount; }
-            Expr*& getArg(Index index) { return args[index]; }
+            Expr*& getArg(Index index) { return (*args)[index]; }
             Type* getArgType(Index index)
             {
                 if(argTypes)

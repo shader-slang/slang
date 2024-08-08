@@ -1505,12 +1505,6 @@ namespace Slang
             auto paramType = DeclRefType::create(
                 parser->astBuilder,
                 DeclRef<Decl>(paramDecl));
-            if (as<GenericTypePackParamDecl>(paramDecl))
-            {
-                // The subtype of a type constraint for a type pack parameter T should be
-                // Each(T).
-                paramType = parser->astBuilder->getEachType(paramType);
-            }
 
             auto paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
             paramTypeExpr->loc = paramDecl->loc;
