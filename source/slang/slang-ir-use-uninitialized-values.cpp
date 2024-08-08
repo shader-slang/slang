@@ -590,26 +590,20 @@ namespace Slang
             stage = entry->getProfile().getStage();
 
         bool structMethod = func->findDecoration<IRMethodDecoration>();
-        bool semanticMutating = func->findDecoration<IRSemanticMutatingDecoration>();
 
         // Check out parameters
-        if (!semanticMutating)
+        int index = 0;
+        for (auto param : firstBlock->getParams())
         {
-            // Ignore if the user has specified through `[semanticmutating]`
-            // that the parameters are being written to in some sense
-            int index = 0;
-            for (auto param : firstBlock->getParams())
-            {
-                bool isThis = structMethod && (index == 0);
+            bool isThis = structMethod && (index == 0);
 
-                ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index);
-                if (checkType == AsOut)
-                    checkParameterAsOut(reachability, func, param, sink);
-                else if (checkType == AsInOut)
-                    checkParameterAsInOut(param, func, isThis, sink);
+            ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index);
+            if (checkType == AsOut)
+                checkParameterAsOut(reachability, func, param, sink);
+            else if (checkType == AsInOut)
+                checkParameterAsInOut(param, func, isThis, sink);
 
-                index++;
-            }
+            index++;
         }
 
         // Check ordinary instructions

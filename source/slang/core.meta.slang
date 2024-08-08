@@ -2029,7 +2029,6 @@ T reinterpret(U value);
 // an out paramter.
 __generic<T>
 [__readNone]
-[semanticmutating]
 [ForceInline]
 void unused(inout T){}
 
@@ -2650,9 +2649,6 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [mutating] : MutatingAttribute;
-
-__attributeTarget(FunctionDeclBase)
-attribute_syntax [semanticmutating] : SemanticMutatingAttribute;
 
 __attributeTarget(SetterDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
