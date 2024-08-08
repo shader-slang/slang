@@ -844,6 +844,29 @@ SLANG_API SlangReflectionVariable* spReflection_FindVarByNameInType(SlangReflect
     return nullptr;
 }
 
+SLANG_API SlangReflectionType* spReflection_FindTypeByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name)
+{
+    auto programLayout = convert(reflection);
+    auto program = programLayout->getProgram();
+
+    auto type = convert(reflType);
+
+    Slang::DiagnosticSink sink(
+        programLayout->getTargetReq()->getLinkage()->getSourceManager(),
+        Lexer::sourceLocationLexer);
+    
+    try
+    {
+        auto result = program->findDeclFromStringInType(type, name, LookupMask::type, &sink);
+        if (result)
+            return convert(DeclRefType::create(programLayout->getTargetReq()->getLinkage()->getASTBuilder(), result));
+    }
+    catch (...)
+    {
+    }
+    return nullptr;
+}
+
 SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * reflection, char const * name)
 {
     auto programLayout = convert(reflection);
@@ -3027,6 +3050,16 @@ SLANG_API SlangReflectionDecl* spReflectionDecl_getChild(SlangReflectionDecl* pa
     return nullptr;
 }
 
+SLANG_API char const* spReflectionDecl_getName(SlangReflectionDecl* decl)
+{
+    Decl* slangDecl = (Decl*)decl;
+    
+    if (auto name = slangDecl->getName())
+        return getText(name).getBuffer();
+
+    return nullptr;
+}
+
 SLANG_API SlangDeclKind spReflectionDecl_getKind(SlangReflectionDecl* decl)
 {
     Decl* slangDecl = (Decl*)decl;
@@ -3049,6 +3082,10 @@ SLANG_API SlangDeclKind spReflectionDecl_getKind(SlangReflectionDecl* decl)
     else if (as<ModuleDecl>(slangDecl))
     {
         return SLANG_DECL_KIND_MODULE;
+    }
+    else if (as<NamespaceDecl>(slangDecl))
+    {
+        return SLANG_DECL_KIND_NAMESPACE;
     }
     else
         return SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION;

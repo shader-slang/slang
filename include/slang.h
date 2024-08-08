@@ -2191,7 +2191,8 @@ extern "C"
         SLANG_DECL_KIND_FUNC,
         SLANG_DECL_KIND_MODULE,
         SLANG_DECL_KIND_GENERIC,
-        SLANG_DECL_KIND_VARIABLE
+        SLANG_DECL_KIND_VARIABLE,
+        SLANG_DECL_KIND_NAMESPACE
     };
 
 #ifndef SLANG_RESOURCE_SHAPE
@@ -2587,6 +2588,7 @@ extern "C"
 
     SLANG_API unsigned int spReflectionDecl_getChildrenCount(SlangReflectionDecl* parentDecl);
     SLANG_API SlangReflectionDecl* spReflectionDecl_getChild(SlangReflectionDecl* parentDecl, unsigned int index);
+    SLANG_API char const* spReflectionDecl_getName(SlangReflectionDecl* decl);
     SLANG_API SlangDeclKind spReflectionDecl_getKind(SlangReflectionDecl* decl);
     SLANG_API SlangReflectionFunction* spReflectionDecl_castToFunction(SlangReflectionDecl* decl);
     SLANG_API SlangReflectionVariable* spReflectionDecl_castToVariable(SlangReflectionDecl* decl);
@@ -2702,6 +2704,7 @@ extern "C"
     SLANG_API SlangReflectionFunction* spReflection_FindFunctionByName(SlangReflection* reflection, char const* name);
     SLANG_API SlangReflectionFunction* spReflection_FindFunctionByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name);
     SLANG_API SlangReflectionVariable* spReflection_FindVarByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name);
+    SLANG_API SlangReflectionType* spReflection_FindTypeByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name);
 
     SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* reflection);
     SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(SlangReflection* reflection, SlangUInt index);
@@ -3801,6 +3804,14 @@ namespace slang
                 name);
         }
 
+        TypeReflection* findTypeByNameInType(TypeReflection* type, const char* name)
+        {
+            return (TypeReflection*)spReflection_FindTypeByNameInType(
+                (SlangReflection*) this,
+                (SlangReflectionType*) type,
+                name);
+        }
+
         TypeLayoutReflection* getTypeLayout(
             TypeReflection* type,
             LayoutRules     rules = LayoutRules::Default)
@@ -3861,7 +3872,13 @@ namespace slang
             Module = SLANG_DECL_KIND_MODULE,
             Generic = SLANG_DECL_KIND_GENERIC,
             Variable = SLANG_DECL_KIND_VARIABLE,
+            Namespace = SLANG_DECL_KIND_NAMESPACE,
         };
+
+        char const* getName()
+        {
+            return spReflectionDecl_getName((SlangReflectionDecl*) this);
+        }
 
         Kind getKind()
         {

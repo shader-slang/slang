@@ -70,6 +70,15 @@ SLANG_UNIT_TEST(declTreeReflection)
             T j<let N : int>(T x, out int o) { o = N; return x; }
         }
 
+
+        namespace MyNamespace
+        {
+            struct MyStruct
+            {
+                int x;
+            }
+        }
+
         )";
 
     auto moduleName = "moduleG" + String(Process::getId());
@@ -101,7 +110,7 @@ SLANG_UNIT_TEST(declTreeReflection)
     auto moduleDeclReflection = module->getModuleReflection();
     SLANG_CHECK(moduleDeclReflection != nullptr);
     SLANG_CHECK(moduleDeclReflection->getKind() == slang::DeclReflection::Kind::Module);
-    SLANG_CHECK(moduleDeclReflection->getChildrenCount() == 7);
+    SLANG_CHECK(moduleDeclReflection->getChildrenCount() == 8);
 
     // First declaration should be a struct with 1 variable
     auto firstDecl = moduleDeclReflection->getChild(0);
@@ -179,6 +188,11 @@ SLANG_UNIT_TEST(declTreeReflection)
 
     auto innerStruct = genericReflection->getInnerDecl();
     SLANG_CHECK(innerStruct->getKind() == slang::DeclReflection::Kind::Struct);
+
+    // Check that the seventh declaration is a namespace
+    auto seventhDecl = moduleDeclReflection->getChild(6);
+    SLANG_CHECK(seventhDecl->getKind() == slang::DeclReflection::Kind::Namespace);
+    SLANG_CHECK(UnownedStringSlice(seventhDecl->getName()) == "MyNamespace");
 
 
     // Check type-lookup-by-name
@@ -263,6 +277,14 @@ SLANG_UNIT_TEST(declTreeReflection)
         SLANG_CHECK(specializationInfo->getConcreteIntVal(valueParam) == 10);
     }
 
+    // Check lookups on a namespace
+    {
+        auto type = compositeProgram->getLayout()->findTypeByName("MyNamespace");
+        SLANG_CHECK(type != nullptr);
+        SLANG_CHECK(UnownedStringSlice(type->getName()) == "MyNamespace");
+        auto innerStruct = compositeProgram->getLayout()->findTypeByNameInType(type, "MyStruct");
+    }
+
 
     // Check iterators
     {
@@ -271,7 +293,7 @@ SLANG_UNIT_TEST(declTreeReflection)
         {
             count++;
         }
-        SLANG_CHECK(count == 7);
+        SLANG_CHECK(count == 8);
 
         count = 0;
         for (auto* child : moduleDeclReflection->getChildrenOfKind<slang::DeclReflection::Kind::Func>())
@@ -289,6 +311,13 @@ SLANG_UNIT_TEST(declTreeReflection)
 
         count = 0;
         for (auto* child : moduleDeclReflection->getChildrenOfKind<slang::DeclReflection::Kind::Generic>())
+        {
+            count++;
+        }
+        SLANG_CHECK(count == 1);
+
+        count = 0;
+        for (auto* child : moduleDeclReflection->getChildrenOfKind<slang::DeclReflection::Kind::Namespace>())
         {
             count++;
         }
