@@ -673,15 +673,15 @@ namespace Slang
             return result;
         };
 
-        auto coerceArgToParam = [&](Arg arg, QualType paramType) -> Expr*
+        auto coerceArgToParam = [&](Arg arg, QualType paramType) -> Arg
             {
                 if (!arg.argExpr)
-                    return nullptr;
+                    return { nullptr, nullptr };
                 auto argType = QualType(arg.type, paramType.isLeftValue);
                 if (!paramType)
-                    return nullptr;
+                    return { nullptr, nullptr };
                 if (!argType)
-                    return nullptr;
+                    return { nullptr, nullptr };
                 if (context.mode == OverloadResolveContext::Mode::JustTrying)
                 {
                     ConversionCost cost = kConversionCost_None;
@@ -689,11 +689,11 @@ namespace Slang
                     {
                         // We need an exact match in this case.
                         if (!paramType->equals(argType))
-                            return nullptr;
+                            return { nullptr, nullptr };
                     }
                     else if (!canCoerce(paramType, argType, arg.argExpr, &cost))
                     {
-                        return nullptr;
+                        return { nullptr, nullptr };
                     }
                     candidate.conversionCostSum += cost;
                 }
@@ -701,7 +701,7 @@ namespace Slang
                 {
                     arg.argExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr);
                 }
-                return arg.argExpr;
+                return arg;
             };
         ShortList<Expr*> resultArgs;
 
@@ -715,27 +715,40 @@ namespace Slang
                 {
                     auto arg = readArg();
                     auto coercedArg = coerceArgToParam(arg, QualType(paramTypePack->getElementType(i), paramType.isLeftValue));
-                    if (!coercedArg)
+                    if (!coercedArg.type)
                     {
                         return false;
                     }
-                    innerArgs.add(coercedArg);
+                    if (context.mode == OverloadResolveContext::Mode::ForReal)
+                        innerArgs.add(coercedArg.argExpr);
                 }
-                auto packArg = m_astBuilder->create<PackExpr>();
-                for (auto aa : innerArgs)
-                    packArg->args.add(aa);
-                packArg->type = paramType;
-                resultArgs.add(packArg);
+                if (context.mode == OverloadResolveContext::Mode::ForReal)
+                {
+                    auto packArg = m_astBuilder->create<PackExpr>();
+                    for (auto aa : innerArgs)
+                        packArg->args.add(aa);
+                    packArg->type = paramType;
+                    resultArgs.add(packArg);
+                }
             }
             else
             {
                 auto arg = readArg();
+                if (!arg.type)
+                {
+                    // If we run out of arguments, we can exit the loop now.
+                    // Note that in this type we don't need to worry about
+                    // default arguments, because we already checked that
+                    // the number of arguments was correct in `TryCheckOverloadCandidateArity`.
+                    break;
+                }
                 auto coercedArg = coerceArgToParam(arg, paramType);
-                if (!coercedArg)
+                if (!coercedArg.type)
                 {
                     return false;
                 }
-                resultArgs.add(coercedArg);
+                if (context.mode == OverloadResolveContext::Mode::ForReal)
+                    resultArgs.add(coercedArg.argExpr);
             }
             paramIndex++;
         }
