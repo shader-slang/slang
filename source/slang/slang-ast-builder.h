@@ -531,9 +531,9 @@ public:
 
     SubtypeWitnessPack* getSubtypeWitnessPack(Type* subType, Type* superType, ArrayView<SubtypeWitness*> witnesses);
 
-    ExpandSubtypeWitness* getExpandSubtypeWitness(Type* subType, Type* superType, SubtypeWitness* patternWitness);
+    SubtypeWitness* getExpandSubtypeWitness(Type* subType, Type* superType, SubtypeWitness* patternWitness);
 
-    EachSubtypeWitness* getEachSubtypeWitness(Type* subType, Type* superType, SubtypeWitness* patternWitness);
+    SubtypeWitness* getEachSubtypeWitness(Type* subType, Type* superType, SubtypeWitness* patternWitness);
 
         /// Produce a witness that `A <: C` given witnesses that `A <: B` and `B <: C`
     SubtypeWitness* getTransitiveSubtypeWitness(

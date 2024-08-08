@@ -493,7 +493,7 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
         }
         if (found)
         {
-            auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().getCount() +
+            auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDeclBase>().getCount() +
                 genericDecl->getMembersOfType<GenericValueParamDecl>().getCount();
             if (index + ordinaryParamCount < args.getCount())
             {

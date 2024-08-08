@@ -461,7 +461,7 @@ public:
         return false;
     }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
-    bool visiitPackExpr(PackExpr* expr)
+    bool visitPackExpr(PackExpr* expr)
     {
         for (auto arg : expr->args)
         {

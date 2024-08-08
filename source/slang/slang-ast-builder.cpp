@@ -546,6 +546,11 @@ Type* ASTBuilder::getEachType(Type* baseType)
 
 Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Type*> capturedPacks)
 {
+    // expand each T ==> T
+    if (auto eachType = as<EachType>(pattern))
+    {
+        return eachType->getElementType();
+    }
     return getOrCreate<ExpandType>(pattern, capturedPacks);
 }
 
@@ -566,15 +571,19 @@ SubtypeWitnessPack* ASTBuilder::getSubtypeWitnessPack(
     return getOrCreate<SubtypeWitnessPack>(subType, superType, witnesses);
 }
 
-ExpandSubtypeWitness* ASTBuilder::getExpandSubtypeWitness(
+SubtypeWitness* ASTBuilder::getExpandSubtypeWitness(
     Type* subType, Type* superType, SubtypeWitness* patternWitness)
 {
+    if (auto eachWitness = as<EachSubtypeWitness>(patternWitness))
+        return eachWitness->getPatternTypeWitness();
     return getOrCreate<ExpandSubtypeWitness>(subType, superType, patternWitness);
 }
 
-EachSubtypeWitness* ASTBuilder::getEachSubtypeWitness(
+SubtypeWitness* ASTBuilder::getEachSubtypeWitness(
     Type* subType, Type* superType, SubtypeWitness* patternWitness)
 {
+    if (auto expandWitness = as<ExpandSubtypeWitness>(patternWitness))
+        return expandWitness->getPatternTypeWitness();
     return getOrCreate<EachSubtypeWitness>(subType, superType, patternWitness);
 }
 
@@ -687,6 +696,32 @@ top:
             cType,
             getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfConjunction),
             indexOfCInConjunction);
+    }
+
+    // If left hand is a SubtypeWitnessPack, then we should also return a SubtypeWitnessPack
+    // where each witness in the pack is the transitive subtype witness of the corresponding
+    // witness in the original pack.
+    //
+    if (auto witnessPack = as<SubtypeWitnessPack>(aIsSubtypeOfBWitness))
+    {
+        List<SubtypeWitness*> newWitnesses;
+        for (Index i = 0; i < witnessPack->getCount(); i++)
+        {
+            newWitnesses.add(getTransitiveSubtypeWitness(witnessPack->getWitness(i), bIsSubtypeOfCWitness));
+        }
+        return getSubtypeWitnessPack(
+            aType,
+            cType,
+            newWitnesses.getArrayView());
+    }
+
+    // If left hand is a ExpandSubtypeWitness, then we want to perform the transitive lookup
+    // on the pattern witness, and then form a new ExpandSubtypeWitness with the result.
+    //
+    if (auto expandWitness = as<ExpandSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        auto innerTransitiveWitness = getTransitiveSubtypeWitness(expandWitness->getPatternTypeWitness(), bIsSubtypeOfCWitness);
+        return getExpandSubtypeWitness(expandWitness->getSub(), cType, innerTransitiveWitness);
     }
 
     // If none of the above special cases applied, then we are just going to create

@@ -594,6 +594,9 @@ struct IRGenContext
 
     bool includeDebugInfo = false;
 
+    // The element index if we are inside an `expand` expression.
+    IRInst* expandIndex = nullptr;
+
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
         : shared(inShared)
         , astBuilder(inAstBuilder)
@@ -1727,7 +1730,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitEachSubtypeWitness(EachSubtypeWitness* witness)
     {
         auto elementWitness = lowerVal(context, witness->getPatternTypeWitness());
-        return elementWitness;
+        auto irBuilder = getBuilder();
+        auto subType = lowerType(context, witness->getSub());
+        auto witnessTableType = irBuilder->getWitnessTableType(subType);
+        return LoweredValInfo::simple(irBuilder->emitEachInst(witnessTableType, getSimpleVal(context, elementWitness)));
     }
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
@@ -4406,7 +4412,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitEachExpr(EachExpr* expr)
     {
         auto subVal = lowerSubExpr(expr->baseExpr);
-        auto irEach = getBuilder()->emitEachInst(lowerType(context, expr->type), getSimpleVal(context, subVal));
+        SLANG_ASSERT(context->expandIndex);
+        auto irEach = getBuilder()->emitGetTupleElement(lowerType(context, expr->type), getSimpleVal(context, subVal), context->expandIndex);
         return LoweredValInfo::simple(irEach);
     }
 
@@ -4414,17 +4421,28 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         auto irBuilder = getBuilder();
         auto irType = lowerType(context, expr->type);
-        List<IRInst*> irCapaturedPacks;
+        List<IRInst*> irCapturedPacks;
         if (auto expandType = as<IRExpandType>(irType))
         {
             for (UInt i = 0; i < expandType->getCaptureCount(); i++)
             {
-                irCapaturedPacks.add(expandType->getCaptureType(i));
+                irCapturedPacks.add(expandType->getCaptureType(i));
             }
         }
-        auto expandInst = irBuilder->emitExpandInst(irType, (UInt)irCapaturedPacks.getCount(), irCapaturedPacks.getBuffer());
+        else
+        {
+            // If the type of the expression is not an ExpandType, then it must be
+            // a DeclRefType to a generic type pack parameter.
+            // In this case, the captured type is just the DeclRefType itself.
+            irCapturedPacks.add(irType);
+        }
+        auto expandInst = irBuilder->emitExpandInst(irType, (UInt)irCapturedPacks.getCount(), irCapturedPacks.getBuffer());
         irBuilder->setInsertInto(expandInst);
         irBuilder->emitBlock();
+        auto eachIndex = irBuilder->emitParam(irBuilder->getIntType());
+        IRInst* oldExpandIndex = context->expandIndex;
+        context->expandIndex = eachIndex;
+        SLANG_DEFER(context->expandIndex = oldExpandIndex);
         irBuilder->emitYield(getSimpleVal(context, lowerSubExpr(expr->baseExpr)));
         irBuilder->setInsertAfter(expandInst);
         return LoweredValInfo::simple(expandInst);

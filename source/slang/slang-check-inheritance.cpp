@@ -931,7 +931,32 @@ namespace Slang
         }
         else if (auto eachType = as<EachType>(type))
         {
-            return _calcInheritanceInfo(eachType->getElementType());
+            auto elementInheritanceInfo = getInheritanceInfo(eachType->getElementType());
+            SemanticsVisitor visitor(this);
+            auto directFacet = new(arena) Facet::Impl(
+                Facet::Kind::Type,
+                Facet::Directness::Self,
+                DeclRef<Decl>(),
+                type,
+                visitor.createTypeEqualityWitness(type));
+            Facet tail = directFacet;
+            for (auto facet : elementInheritanceInfo.facets)
+            {
+                if (facet->directness == Facet::Directness::Direct)
+                {
+                    auto eachFacet = new(arena) Facet::Impl(
+                        Facet::Kind::Type,
+                        Facet::Directness::Direct,
+                        facet->origin.declRef,
+                        facet->origin.type,
+                        astBuilder->getEachSubtypeWitness(type, facet->subtypeWitness->getSup(), facet->subtypeWitness));
+                    tail->next = eachFacet;
+                    tail = eachFacet;
+                }
+            }
+            InheritanceInfo info;
+            info.facets = FacetList(directFacet);
+            return info;
         }
         else
         {

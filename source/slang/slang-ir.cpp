@@ -3534,9 +3534,10 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitEachInst(IRType* type, IRInst* base)
+    IRInst* IRBuilder::emitEachInst(IRType* type, IRInst* base, IRInst* indexArg)
     {
-        return emitIntrinsicInst(type, kIROp_Each, 1, &base);
+        IRInst* args[] = { base, indexArg };
+        return emitIntrinsicInst(type, kIROp_Each, indexArg ? 2 : 1, args);
     }
 
     IRInst* IRBuilder::emitLookupInterfaceMethodInst(
@@ -4041,6 +4042,12 @@ namespace Slang
         return emitIntrinsicInst(getNativeStringType(), kIROp_getNativeStr, 1, &str);
     }
 
+    IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, IRInst* element)
+    {
+        IRInst* args[] = { tuple, element };
+        return emitIntrinsicInst(type, kIROp_GetTupleElement, 2, args);
+    }
+
     IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element)
     {
         // As a quick simplification/optimization, if the user requests
@@ -4054,9 +4061,7 @@ namespace Slang
                 return makeTuple->getOperand(element);
             }
         }
-
-        IRInst* args[] = { tuple, getIntValue(getIntType(), element) };
-        return emitIntrinsicInst(type, kIROp_GetTupleElement, 2, args);
+        return emitGetTupleElement(type, tuple, getIntValue(getIntType(), element));
     }
 
     IRInst* IRBuilder::emitMakeResultError(IRType* resultType, IRInst* errorVal)

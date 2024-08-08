@@ -3,7 +3,7 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-struct S<T:__BuiltinArithmeticType>
+struct S<T>
 {
     T v;
     __init(T x)
@@ -13,26 +13,23 @@ struct S<T:__BuiltinArithmeticType>
 }
 
 
-S<T> makeS<T:__BuiltinArithmeticType>(T x)
+S<T> makeS<T>(T x)
 {
     return S<T>(x);
 }
-bool cmp<T:__BuiltinArithmeticType>(T a, int b)
-{
-    return a > __int_cast<T>(b);
-}
+
 void accept<each T>(expand each T value) {}
 
-T writeSingle<T : __BuiltinFloatingPointType>(inout int offset, T value)
+void writeSingle<T : __BuiltinFloatingPointType>(T value)
 {
-    outputBuffer[offset++] = __realCast<float>(value);
-    return value;
+    static int counter = 0;
+    outputBuffer[counter++] = __realCast<float>(value);
+    //return value;
 }
 
 void write<each T : __BuiltinFloatingPointType>(expand S<each T> value)
 {
-    int offset = 0;
-    accept(expand writeSingle(offset, cmp((each value).v, 0) ? (each value).v : __realCast<each T>(0.0)));
+    accept(expand writeSingle((each value).v));
 }
 
 [numthreads(1,1,1)]
@@ -43,5 +40,5 @@ void computeMain()
     // CHECK: 3.0
     // CHECK: 4.0
     write();
-    write(makeS(1.0), makeS(2.0h), makeS(3.0), makeS(4.0));
+    write(makeS(1.0), makeS(2.0), makeS(3.0), makeS(4.0));
 }

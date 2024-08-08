@@ -3747,7 +3747,7 @@ public:
     }
 
     IRInst* emitExpandInst(IRType* type, UInt capturedArgCount, IRInst* const* capturedArgs);
-    IRInst* emitEachInst(IRType* type, IRInst* base);
+    IRInst* emitEachInst(IRType* type, IRInst* base, IRInst* indexArg = nullptr);
 
     IRInst* emitLookupInterfaceMethodInst(
         IRType* type,
@@ -3871,7 +3871,13 @@ public:
 
     IRInst* emitGetNativeString(IRInst* str);
 
+    IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, int element)
+    {
+        return emitGetTupleElement(type, tuple, (UInt)element);
+    }
+
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, UInt element);
+    IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, IRInst* element);
 
     IRInst* emitMakeResultError(IRType* resultType, IRInst* errorVal);
     IRInst* emitMakeResultValue(IRType* resultType, IRInst* val);

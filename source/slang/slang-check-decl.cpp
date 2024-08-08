@@ -7079,9 +7079,9 @@ namespace Slang
             else if (auto genericTypePackParamDecl = as<GenericTypePackParamDecl>(mm))
             {
                 auto packType = DeclRefType::create(astBuilder, astBuilder->getDirectDeclRef(genericTypePackParamDecl));
-                auto eachType = astBuilder->getEachType(packType);
-                auto expandType = astBuilder->getExpandType(eachType, makeArrayViewSingle(packType));
-                args.add(expandType);
+                //auto eachType = astBuilder->getEachType(packType);
+                //auto expandType = astBuilder->getExpandType(eachType, makeArrayViewSingle(packType));
+                args.add(packType);
             }
             else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
             {

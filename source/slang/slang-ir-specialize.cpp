@@ -1,6 +1,6 @@
 // slang-ir-specialize.cpp
 #include "slang-ir-specialize.h"
-
+#include "slang-ir-peephole.h"
 #include "slang-ir.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
@@ -582,6 +582,9 @@ struct SpecializationContext
 
         case kIROp_ExpandTypeOrVal:
             return maybeSpecializeExpandTypeOrVal(as<IRExpandType>(inst));
+
+        case kIROp_GetTupleElement:
+            return maybeSpecializeFoldableInst(inst);
         }
     }
 
@@ -594,7 +597,7 @@ struct SpecializationContext
     {
         // Note: While we currently have named the instruction
         // `lookup_witness_method`, the `method` part is a misnomer
-        // and the same instruction can look up *any* interface
+        // and the same instruction can look up *any* interfacemay
         // requirement based on the witness table that provides
         // a conformance, and the "key" that indicates the interface
         // requirement.
@@ -606,7 +609,13 @@ struct SpecializationContext
         //
         auto witnessTable = as<IRWitnessTable>(lookupInst->getWitnessTable());
         if (!witnessTable)
-            return false;
+        {
+            // If `witnessTable` operand is not a direct witness table,
+            // it could be a Tuple of witness tables for a variadic type pack.
+            // We can still specialize the lookup if the tuple is fully specialized.
+            //
+            return maybeSpecializeWitnessPackLookup(lookupInst);
+        }
 
         // Because we have a concrete witness table, we can
         // use it to look up the IR value that satisfies
@@ -637,6 +646,45 @@ struct SpecializationContext
         lookupInst->removeAndDeallocate();
 
         return true;
+    }
+
+    bool maybeSpecializeWitnessPackLookup(IRLookupWitnessMethod* lookupInst)
+    {
+        auto witnessPack = as<IRMakeWitnessPack>(lookupInst->getWitnessTable());
+        if (!witnessPack)
+            return false;
+        ShortList<IRInst*> results;
+        for (UInt i = 0; i < witnessPack->getOperandCount(); i++)
+        {
+            auto witnessTable = as<IRWitnessTable>(witnessPack->getOperand(i));
+            if (!witnessTable)
+                return false;
+            auto requirementKey = lookupInst->getRequirementKey();
+            auto satisfyingVal = findWitnessVal(witnessTable, requirementKey);
+            if (!satisfyingVal)
+                return false;
+            results.add(satisfyingVal);
+        }
+        IRBuilder builder(lookupInst);
+        builder.setInsertBefore(lookupInst);
+        auto resultInst = builder.emitMakeWitnessPack(lookupInst->getFullType(), results.getArrayView().arrayView);
+        lookupInst->replaceUsesWith(resultInst);
+        lookupInst->removeAndDeallocate();
+        addUsersToWorkList(resultInst);
+        return true;
+    }
+
+    bool maybeSpecializeFoldableInst(IRInst* inst)
+    {
+        auto firstUse = inst->firstUse;
+        bool instChanged = peepholeOptimizeInst(targetProgram, module, inst);
+
+        for (auto use = firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            addToWorkList(user);
+        }
+        return instChanged;
     }
 
     // The above subroutine needed a way to look up
@@ -2203,36 +2251,29 @@ struct SpecializationContext
 
     IRInst* specializeExpandChildInst(IRCloneEnv& cloneEnv, IRBuilder* builder, IRInst* childInst, UInt index)
     {
-        bool useFreshEnv = false;
-        auto type = clonePatternVal(cloneEnv, builder, childInst->getFullType(), index);
+        IRCloneEnv freshEnv;
+        IRCloneEnv* subEnv = &cloneEnv;
         switch (childInst->getOp())
         {
-        case kIROp_Each:
-        {
-            auto eachInst = as<IREach>(childInst);
-            auto packInst = eachInst->getElement();
-            builder->emitGetTupleElement((IRType*)type, packInst, index);
-            break;
-        }
         case kIROp_Expand:
         {
-            addToWorkList(childInst);
-            useFreshEnv = true;
+            subEnv = &freshEnv;
             break;
         }
         }
+        auto type = clonePatternVal(*subEnv, builder, childInst->getFullType(), index);
         for (UInt i = 0; i < childInst->getOperandCount(); i++)
         {
-            clonePatternVal(cloneEnv, builder, childInst->getOperand(i), index);
+            clonePatternVal(*subEnv, builder, childInst->getOperand(i), index);
         }
-        auto newInst = cloneInst(&cloneEnv, builder, childInst);
+        auto newInst = cloneInst(subEnv, builder, childInst);
         newInst = builder->replaceOperand(&newInst->typeUse, type);
-        cloneEnv.mapOldValToNew[childInst] = newInst;
+        subEnv->mapOldValToNew[childInst] = newInst;
         IRBuilder subBuilder(*builder);
         subBuilder.setInsertInto(newInst);
         for (auto child : childInst->getChildren())
         {
-            specializeExpandChildInst(cloneEnv, &subBuilder, child, index);
+            specializeExpandChildInst(*subEnv, &subBuilder, child, index);
         }
         return newInst;
     }
@@ -2283,6 +2324,10 @@ struct SpecializationContext
                     firstBlock = newBlock;
                 cloneEnv.mapOldValToNew[childBlock] = newBlock;
             }
+            auto indexParam = expandInst->getFirstBlock()->getFirstParam();
+            SLANG_ASSERT(indexParam);
+            cloneEnv.mapOldValToNew[indexParam] = subBuilder.getIntValue(subBuilder.getIntType(), i);
+
             builder.emitBranch(firstBlock);
 
             IRBlock* mergeBlock = subBuilder.emitBlock();
@@ -2301,6 +2346,7 @@ struct SpecializationContext
                         continue;
                     }
                     specializeExpandChildInst(cloneEnv, &subBuilder, child, i);
+                    addToWorkList(childBlock);
                 }
             }
 
