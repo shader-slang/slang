@@ -4424,7 +4424,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         auto expandInst = irBuilder->emitExpandInst(irType, (UInt)irCapaturedPacks.getCount(), irCapaturedPacks.getBuffer());
         irBuilder->setInsertInto(expandInst);
-        auto block = irBuilder->emitBlock();
+        irBuilder->emitBlock();
         irBuilder->emitYield(getSimpleVal(context, lowerSubExpr(expr->baseExpr)));
         irBuilder->setInsertAfter(expandInst);
         return LoweredValInfo::simple(expandInst);
