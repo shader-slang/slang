@@ -675,8 +675,6 @@ namespace Slang
 
         auto coerceArgToParam = [&](Arg arg, QualType paramType) -> Arg
             {
-                if (!arg.argExpr)
-                    return { nullptr, nullptr };
                 auto argType = QualType(arg.type, paramType.isLeftValue);
                 if (!paramType)
                     return { nullptr, nullptr };
