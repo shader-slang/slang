@@ -45,4 +45,6 @@ jobs:
           pip install halo prettytable argparse
       - name: Run benchmark
         run: |
-          python compile.py --samples 1
+          cd tests/mdl
+          Copy-Item -Path C:\slang-benchmarks -Destination . -Recurse
+          python compile.py --samples 16 --target dxil
