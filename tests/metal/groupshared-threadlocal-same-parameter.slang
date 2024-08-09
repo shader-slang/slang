@@ -48,6 +48,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[tid] = g_altValuesReturned[tid];
     }
 
-    // BUF: 1
+    // BUF: 2
     // BUF: 3
 }

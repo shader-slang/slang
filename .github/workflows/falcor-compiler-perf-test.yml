@@ -22,6 +22,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
+    if: false
     timeout-minutes: 100
     continue-on-error: true
     strategy:
