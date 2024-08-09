@@ -1968,6 +1968,23 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 context->irBuilder->getTypeKind()));
     }
 
+    IRType* visitTupleType(TupleType* type)
+    {
+        List<IRType*> elementTypes;
+        if (as<TypePack>(type->getTypePack()))
+        {
+            for (Index i = 0; i < type->getMemberCount(); i++)
+            {
+                elementTypes.add(lowerType(context, type->getMember(i)));
+            }
+            return context->irBuilder->getTupleType(elementTypes);
+        }
+        else
+        {
+            return lowerType(context, type->getTypePack());
+        }
+    }
+
     IRType* visitNamedExpressionType(NamedExpressionType* type)
     {
         return (IRType*)getSimpleVal(context, dispatchType(type->getCanonicalType()));

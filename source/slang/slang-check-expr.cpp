@@ -3546,7 +3546,7 @@ namespace Slang
         }
         else
         {
-            if (!isTypePack(baseType))
+            if (!isTypePack(baseType) && !as<TupleType>(baseType))
                 goto error;
         }
         {

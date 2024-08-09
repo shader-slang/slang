@@ -9,6 +9,22 @@
 #include "slang-generated-ast-macro.h"
 namespace Slang {
 
+bool isAbstractTypePack(Type* type)
+{
+    if (as<ExpandType>(type))
+        return true;
+    if (isDeclRefTypeOf<GenericTypePackParamDecl>(type))
+        return true;
+    return false;
+}
+
+bool isTypePack(Type* type)
+{
+    if (as<TypePack>(type))
+        return true;
+    return isAbstractTypePack(type);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Type* Type::_createCanonicalTypeOverride()
@@ -257,6 +273,26 @@ Type* MatrixExpressionType::getRowType()
         rowType = getCurrentASTBuilder()->getVectorType(getElementType(), getColumnCount());
     }
     return rowType;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TupleType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Type* TupleType::getMember(Index i) const
+{
+    if (auto typePack = as<TypePack>(_getGenericTypeArg(getDeclRefBase(), 0)))
+        return typePack->getElementType(i);
+    return nullptr;
+}
+
+Index TupleType::getMemberCount() const
+{
+    if (auto typePack = as<TypePack>(_getGenericTypeArg(getDeclRefBase(), 0)))
+        return typePack->getTypeCount();
+    return 0;
+}
+
+Type* TupleType::getTypePack() const
+{
+    return as<Type>(_getGenericTypeArg(getDeclRefBase(), 0));
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArrayExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -520,49 +556,6 @@ Type* FuncType::_createCanonicalTypeOverride()
     return canType;
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TupleType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-void TupleType::_toTextOverride(StringBuilder& out)
-{
-    out << toSlice("(");
-    for (Index pp = 0; pp < getOperandCount(); ++pp)
-    {
-        if (pp != 0)
-            out << toSlice(", ");
-        out << getOperand(pp);
-    }
-    out << toSlice(")");
-}
-
-Val* TupleType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
-{
-    int diff = 0;
-
-    // just recurse into the members
-    List<Type*> substMemberTypes;
-    for (Index m = 0; m < getMemberCount(); m++)
-        substMemberTypes.add(as<Type>(getMember(m)->substituteImpl(astBuilder, subst, &diff)));
-
-    // early exit for no change...
-    if (!diff)
-        return this;
-
-    (*ioDiff)++;
-    return astBuilder->getTupleType(substMemberTypes);
-}
-
-Type* TupleType::_createCanonicalTypeOverride()
-{
-    // member types
-    List<Type*> canMemberTypes;
-    for (Index m = 0; m < getMemberCount(); m++)
-    {
-        canMemberTypes.add(getMember(m)->getCanonicalType());
-    }
-
-    return getCurrentASTBuilder()->getTupleType(canMemberTypes);
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! EachType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 void EachType::_toTextOverride(StringBuilder& out)
 {
@@ -706,7 +699,18 @@ Val* TypePack::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     ShortList<Type*> substElementTypes;
     for (Index i = 0; i < getTypeCount(); i++)
     {
-        substElementTypes.add(as<Type>(getElementType(i)->substituteImpl(astBuilder, subst, &diff)));
+        auto substType = as<Type>(getElementType(i)->substituteImpl(astBuilder, subst, &diff));
+        if (auto typePack = as<TypePack>(substType))
+        {
+            for (Index j = 0; j < typePack->getTypeCount(); j++)
+            {
+                substElementTypes.add(typePack->getElementType(j));
+            }
+        }
+        else
+        {
+            substElementTypes.add(substType);
+        }
     }
     if (!diff)
         return this;

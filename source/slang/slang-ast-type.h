@@ -71,6 +71,19 @@ class DeclRefType : public Type
     }
 };
 
+template<typename T>
+DeclRef<T> isDeclRefTypeOf(Type* type)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        return declRefType->getDeclRef().template as<T>();
+    }
+    return DeclRef<T>();
+}
+
+bool isTypePack(Type* type);
+bool isAbstractTypePack(Type* type);
+
 // Base class for types that can be used in arithmetic expressions
 class ArithmeticExpressionType : public DeclRefType 
 {
@@ -678,24 +691,14 @@ class FuncType : public Type
 };
 
 // A tuple is a product of its member types
-class TupleType : public Type
+class TupleType : public DeclRefType
 {
     SLANG_AST_CLASS(TupleType)
 
-    // Construct a unary tupletion
-    TupleType(ArrayView<Type*> memberTypes)
-    {
-        for (auto t : memberTypes)
-            m_operands.add(ValNodeOperand(t));
-    }
+    Index getMemberCount() const;
+    Type* getMember(Index i) const;
+    Type* getTypePack() const;
 
-    auto getMemberCount() const { return getOperandCount(); }
-    Type* getMember(Index i) const { return as<Type>(getOperand(i)); }
-
-    // Overrides should be public so base classes can access
-    void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 class EachType : public Type

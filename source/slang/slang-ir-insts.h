@@ -3848,6 +3848,13 @@ public:
 
     IRInst* emitMakeTuple(IRType* type, List<IRInst*> const& args)
     {
+        if (args.getCount() == 1)
+        {
+            if (args[0]->getOp() == kIROp_Expand)
+            {
+                return args[0];
+            }
+        }
         return emitMakeTuple(type, args.getCount(), args.getBuffer());
     }
 

@@ -525,7 +525,19 @@ FuncType* ASTBuilder::getFuncType(ArrayView<Type*> parameters, Type* result, Typ
 
 TupleType* ASTBuilder::getTupleType(List<Type*>& types)
 {
-    return getOrCreate<TupleType>(types.getArrayView());
+    // The canonical form of a tuple type is always a DeclRefType(GenAppDeclRef(TupleDecl, TypePack(types...))).
+    // If `types` is already a single TypePack, then we can use that directly.
+    if (types.getCount() == 1)
+    {
+        if (isTypePack(types[0]))
+        {
+            return as<TupleType>(getSpecializedBuiltinType(types[0], "TupleType"));
+        }
+    }
+
+    // Otherwise, we need to create a TypePack to hold the types.
+    auto typePack = getTypePack(types.getArrayView());
+    return as<TupleType>(getSpecializedBuiltinType(typePack, "TupleType"));
 }
 
 TypeType* ASTBuilder::getTypeType(Type* type)
@@ -539,6 +551,12 @@ Type* ASTBuilder::getEachType(Type* baseType)
     if (auto expandType = as<ExpandType>(baseType))
     {
         return expandType->getPatternType();
+    }
+
+    // each Tuple<X> ==> each X, because we know that Tuple type must be in the form of Tuple<TypePack<...>>.
+    if (auto tupleType = as<TupleType>(baseType))
+    {
+        return getEachType(tupleType->getTypePack());
     }
     SLANG_ASSERT(!as<EachType>(baseType));
     return getOrCreate<EachType>(baseType);

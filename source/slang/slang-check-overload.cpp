@@ -304,7 +304,7 @@ namespace Slang
             }
             else if (auto typePackParam = memberRef.as<GenericTypePackParamDecl>())
             {
-                paramTypes.add(DeclRefType::create(m_astBuilder, typeParamRef));
+                paramTypes.add(DeclRefType::create(m_astBuilder, typePackParam));
             }
         }
         ShortList<OverloadResolveContext::MatchedArg> matchedArgs;
@@ -1722,6 +1722,10 @@ namespace Slang
         while (remainingArgCount > 0)
         {
             auto argType = getArgType(fixedParamCount);
+            if (auto typeType = as<TypeType>(argType))
+            {
+                argType = typeType->getType();
+            }
             if (isAbstractTypePack(argType))
             {
                 MatchedArg arg;

@@ -1368,10 +1368,6 @@ namespace Slang
 
         bool IsErrorExpr(Expr* expr);
 
-        static bool isTypePack(Type* type);
-        static bool isAbstractTypePack(Type* type);
-
-
         // Capture the "base" expression in case this is a member reference
         Expr* GetBaseExpr(Expr* expr);
 
