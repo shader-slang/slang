@@ -870,6 +870,14 @@ bool operator!=(__none_t noneVal, Optional<T> val)
     return val.hasValue;
 }
 
+__generic<each T>
+__magic_type(TupleType)
+struct Tuple
+{
+    __intrinsic_op($(0))
+    __init(expand each T);
+}
+
 __generic<T>
 __magic_type(NativeRefType)
 __intrinsic_type($(kIROp_NativePtrType))

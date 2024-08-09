@@ -1115,8 +1115,10 @@ namespace Slang
         OverloadResolveContext overloadContext;
         overloadContext.disallowNestedConversions = true;
         overloadContext.argCount = 1;
+        List<Expr*> args;
+        args.add(fromExpr);
         overloadContext.argTypes = &fromType.type;
-        overloadContext.args = &fromExpr;
+        overloadContext.args = &args;
         overloadContext.sourceScope = m_outerScope;
         overloadContext.originalExpr = nullptr;
         if(fromExpr)

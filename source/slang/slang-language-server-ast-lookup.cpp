@@ -461,7 +461,16 @@ public:
         return false;
     }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
-    bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
+    bool visitPackExpr(PackExpr* expr)
+    {
+        for (auto arg : expr->args)
+        {
+            if(dispatchIfNotNull(arg))
+                return true;
+        }
+        return false;
+    }
+    bool reportLookupResultIfInExprLeadingIdentifierRange(Expr* expr)
     {
         auto humaneLoc = context->sourceManager->getHumaneLoc(expr->loc, SourceLocType::Actual);
         auto tokenLen = context->doc->getTokenLength(humaneLoc.line, humaneLoc.column);
@@ -473,6 +482,24 @@ public:
             context->results.add(result);
             return true;
         }
+        return false;
+    }
+    bool visitExpandExpr(ExpandExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
+        return dispatchIfNotNull(expr->baseExpr);
+    }
+    bool visitEachExpr(EachExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
+        return dispatchIfNotNull(expr->baseExpr);
+    }
+    bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
         return dispatchIfNotNull(expr->baseFunction);
     }
     bool visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)

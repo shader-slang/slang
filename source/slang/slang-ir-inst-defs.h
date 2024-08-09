@@ -101,6 +101,7 @@ INST(Nop, nop, 0, 0)
     //
     /* Kind */
         INST(TypeKind, Type, 0, HOISTABLE)
+        INST(TypeParameterPackKind, TypeParameterPack, 0, HOISTABLE)
         INST(RateKind, Rate, 0, HOISTABLE)
         INST(GenericKind, Generic, 0, HOISTABLE)
     INST_RANGE(Kind, TypeKind, GenericKind)
@@ -244,6 +245,7 @@ INST(RTTIType, rtti_type, 0, HOISTABLE)
 INST(RTTIHandleType, rtti_handle_type, 0, HOISTABLE)
 INST(TupleType, tuple_type, 0, HOISTABLE)
 INST(TargetTupleType, TargetTuple, 0, HOISTABLE)
+INST(ExpandTypeOrVal, ExpandTypeOrVal, 1, HOISTABLE)
 
 // A type that identifies it's contained type as being emittable as `spirv_literal.
 INST(SPIRVLiteralType, spirvLiteralType, 1, HOISTABLE)
@@ -343,6 +345,9 @@ INST(MakeTuple, makeTuple, 0, 0)
 INST(MakeTargetTuple, makeTuple, 0, 0)
 INST(GetTargetTupleElement, getTargetTupleElement, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
+INST(MakeWitnessPack, MakeWitnessPack, 0, HOISTABLE)
+INST(Expand, Expand, 1, 0)
+INST(Each, Each, 1, HOISTABLE)
 INST(MakeResultValue, makeResultValue, 1, 0)
 INST(MakeResultError, makeResultError, 1, 0)
 INST(IsResultError, isResultError, 1, 0)
@@ -566,6 +571,7 @@ INST(SwizzledStore, swizzledStore, 2, 0)
 /* IRTerminatorInst */
 
     INST(Return, return_val, 1, 0)
+    INST(Yield, yield, 1, 0)
     /* IRUnconditionalBranch */
         // unconditionalBranch <target>
         INST(unconditionalBranch, unconditionalBranch, 1, 0)
