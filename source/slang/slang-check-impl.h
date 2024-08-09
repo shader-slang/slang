@@ -2267,10 +2267,8 @@ namespace Slang
             }
             struct MatchedArg
             {
-                Index first;
-                Index count;
-                Expr* argExpr;
-                Type* argType;
+                Expr* argExpr = nullptr;
+                Type* argType = nullptr;
             };
             bool matchArgumentsToParams(SemanticsVisitor* semantics, const List<QualType>& params, bool computeTypes, ShortList<MatchedArg>& outMatchedArgs);
 

@@ -9,7 +9,7 @@ T writeSingle<T : __BuiltinFloatingPointType>(inout int offset, T value)
     return value;
 }
 
-void write<each T : __BuiltinFloatingPointType>(Tuple<expand each T> tuple)
+void write<each T : __BuiltinFloatingPointType>(Tuple<T> tuple)
 {
     int offset = 0;
     expand writeSingle(offset, each tuple);

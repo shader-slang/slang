@@ -250,6 +250,16 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
                 addType(getType(m_astBuilder, genericValParam));
             }
         }
+        else if (auto genericTypePackParam = paramDeclRef.as<GenericTypePackParamDecl>())
+        {
+            if (!first) sb << ", ";
+            first = false;
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamType);
+                sb << "each ";
+                sb << getText(genericTypePackParam.getName());
+            }
+        }
         else
         {
         }

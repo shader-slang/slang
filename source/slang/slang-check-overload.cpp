@@ -518,6 +518,18 @@ namespace Slang
                             argType = typeType->getType();
                         val = argType;
                     }
+                    else if (auto typeType = as<TypeType>(matchedArg.argType))
+                    {
+                        if (isAbstractTypePack(typeType->getType()))
+                        {
+                            val = typeType->getType();
+                        }
+                    }
+                }
+                if (val == nullptr)
+                {
+                    maybeReportGeneralError();
+                    return false;
                 }
                 checkedArgs.add(val);
             }
@@ -1711,8 +1723,6 @@ namespace Slang
             MatchedArg arg;
             arg.argExpr = getArg(i);
             arg.argType = getArgType(i);
-            arg.first = i;
-            arg.count = 1;
             outMatchedArgs.add(arg);
         }
 
@@ -1731,8 +1741,6 @@ namespace Slang
                 MatchedArg arg;
                 arg.argExpr = getArg(fixedParamCount);
                 arg.argType = getArgType(fixedParamCount);
-                arg.first = fixedParamCount;
-                arg.count = 1;
                 outMatchedArgs.add(arg);
                 fixedParamCount++;
                 remainingArgCount--;
@@ -1781,8 +1789,6 @@ namespace Slang
                 if (packExpr)
                     packExpr->type = matchedArg.argType;
             }
-            matchedArg.first = fixedParamCount + i * typePackSize;
-            matchedArg.count = typePackSize;
             outMatchedArgs.add(matchedArg);
         }
         return true;
