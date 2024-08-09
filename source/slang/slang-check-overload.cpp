@@ -575,66 +575,6 @@ namespace Slang
         return paramType;
     }
 
-    struct FlattenedTypeListView
-    {
-        QualType* firstType;
-        Index count;
-
-        struct Iterator
-        {
-            FlattenedTypeListView* view;
-            Index index;
-            Index subIndex;
-            TypePack* pack;
-            Iterator& operator++()
-            {
-                if (pack && subIndex < pack->getTypeCount() - 1)
-                {
-                    subIndex++;
-                    return *this;
-                }
-                subIndex = 0;
-                for (;;)
-                {
-                    index++;
-                    pack = nullptr;
-                    if (index >= view->count)
-                    {
-                        return *this;
-                    }
-                    if (auto packType = as<TypePack>(view->firstType[index].type))
-                    {
-                        pack = packType;
-                        if (pack->getTypeCount() == 0)
-                            continue;
-                    }
-                    break;
-                }
-                return *this;
-            }
-            QualType operator*() const
-            {
-                if (index >= view->count)
-                    return nullptr;
-
-                if (pack)
-                    return QualType(pack->getElementType(subIndex), view->firstType[index].isLeftValue);
-                return view->firstType[index].type;
-            }
-            bool operator!=(Iterator const& other) const
-            {
-                return index != other.index || subIndex != other.subIndex;
-            }
-            bool operator==(Iterator const& other) const
-            {
-                return index == other.index && subIndex == other.subIndex;
-            }
-        };
-
-        Iterator begin() { return Iterator{ this, 0, 0, nullptr }; }
-        Iterator end() { return Iterator{ this, count, 0, nullptr }; }
-    };
-
     bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         OverloadResolveContext&	context,
         OverloadCandidate&		candidate)

@@ -700,17 +700,7 @@ Val* TypePack::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     for (Index i = 0; i < getTypeCount(); i++)
     {
         auto substType = as<Type>(getElementType(i)->substituteImpl(astBuilder, subst, &diff));
-        if (auto typePack = as<TypePack>(substType))
-        {
-            for (Index j = 0; j < typePack->getTypeCount(); j++)
-            {
-                substElementTypes.add(typePack->getElementType(j));
-            }
-        }
-        else
-        {
-            substElementTypes.add(substType);
-        }
+        substElementTypes.add(substType);
     }
     if (!diff)
         return this;
