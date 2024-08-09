@@ -46,5 +46,7 @@ jobs:
       - name: Run benchmark
         run: |
           cd tests/mdl
+          ls .
+          ls C:\
           Copy-Item -Path C:\slang-benchmarks -Destination . -Recurse
           python compile.py --samples 16 --target dxil
