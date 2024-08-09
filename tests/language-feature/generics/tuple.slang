@@ -22,7 +22,6 @@ void computeMain()
     // CHECK: 2.0
     // CHECK: 3.0
     // CHECK: 4.0
-    //write(Tuple());
     let tuple = Tuple<float, half, float, float>(1.0, 2.0h, 3.0, 4.0);
     write(tuple);
 }
