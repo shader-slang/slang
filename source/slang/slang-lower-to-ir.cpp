@@ -10423,8 +10423,15 @@ LoweredValInfo ensureDecl(
         SLANG_UNEXPECTED("Generic type/value shouldn't be handled here!");
     }
 
-    IRBuilder subIRBuilder(context->irBuilder->getModule());
-    subIRBuilder.setInsertInto(subIRBuilder.getModule());
+    IRBuilder subIRBuilder(*context->irBuilder);
+    if (as<VarDecl>(decl) && decl->findModifier<LocalTempVarModifier>())
+    {
+        // Do not modify insert location.
+    }
+    else
+    {
+        subIRBuilder.setInsertInto(subIRBuilder.getModule());
+    }
 
     IRGenEnv subEnv;
     subEnv.outer = context->env;

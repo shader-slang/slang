@@ -61,7 +61,10 @@ namespace Slang
     Expr* SemanticsVisitor::moveTemp(Expr* const& expr, F const& func)
     {
         VarDecl* varDecl = m_astBuilder->create<VarDecl>();
-        varDecl->parentDecl = nullptr; // TODO: need to fill this in somehow!
+        varDecl->parentDecl = nullptr;
+        if (m_outerScope && m_outerScope->containerDecl)
+            m_outerScope->containerDecl->addMember(varDecl);
+        addModifier(varDecl, m_astBuilder->create<LocalTempVarModifier>());
         varDecl->checkState = DeclCheckState::DefinitionChecked;
         varDecl->nameAndLoc.loc = expr->loc;
         varDecl->initExpr = expr;
