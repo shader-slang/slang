@@ -28,7 +28,6 @@ struct A
     //CHK-DAG: ([[# @LINE + 1]]): warning 41023: method marked `[mutable]` but never modifies `this`
     [mutating] int next() { return state; }
     
-    // TODO: unmodified(...)
     [mutating] int progress()
     {
         unmodified(state);

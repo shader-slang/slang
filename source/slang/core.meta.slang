@@ -2025,16 +2025,14 @@ T reinterpret(U value);
 
 // Use an otherwise unused value
 //
-// This can be used to silence the warning about returning before initializing
-// an out paramter.
+// This can be used to silence the warning about returning before initializing an out paramter.
 __generic<T>
 [__readNone]
 [ForceInline]
 __intrinsic_op($(kIROp_Unmodified))
 void unused(inout T){}
 
-// This can be used to silence the warning about not writing before initializing
-// an out paramter.
+// This can be used to silence the warning about not writing to an inout parameter.
 __generic<T>
 [__readNone]
 [ForceInline]

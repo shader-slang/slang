@@ -46,9 +46,9 @@ namespace Slang
 
     enum ParameterCheckType
     {
-        Never,
-        AsOut,
-        AsInOut   
+        Never,    // Parameter does NOT to be checked for uninitialization (e.g. is `in` or special type)
+        AsOut,    // Parameter DOES need to be checked for usage before initializations
+        AsInOut   // Parameter DOES need to be checked to see if it is ever written to
     };
 
     static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, int index)

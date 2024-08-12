@@ -55,8 +55,9 @@ void myTriangleClosestHit(inout MyRayPayload payload)
 // In this case, the return value is used to specify
 // whether the hit should be accepted (true) or ignored (false).
 //
-bool myTriangleAnyHit(MyRayPayload payload)
+bool myTriangleAnyHit(inout MyRayPayload payload)
 {
+    unmodified(payload);
 	return true;
 }
 
