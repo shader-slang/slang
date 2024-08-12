@@ -18,9 +18,7 @@ void state_never_assigned(inout State state, inout float v)
 
 void state_assigned(inout State state)
 {
-    int3 vi = __slang_noop_cast <int3, float3> (state.v);
-    int3 ni = __slang_noop_cast <int3, float3> (state.n);
-    state.rnd = dot(vi, ni);
+    state.rnd = (int) dot(state.v, state.n);
 }
 
 struct A

@@ -2039,7 +2039,7 @@ __generic<T>
 [__readNone]
 [ForceInline]
 __intrinsic_op($(kIROp_Unmodified))
-void unmodified(inout T){}
+void unmodified(out T){}
 
 // Specialized function
 
