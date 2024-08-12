@@ -3182,6 +3182,20 @@ void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSe
     emitLayoutSemanticsImpl(inst, uniformSemanticSpelling, EmitLayoutSemanticOption::kPostType);
 }
 
+void CLikeSourceEmitter::emitSwitchCaseSelectorsImpl(const SwitchRegion::Case *const currentCase, const bool isDefault)
+{
+    for(auto caseVal : currentCase->values)
+    {
+        m_writer->emit("case ");
+        emitOperand(caseVal, getInfo(EmitOp::General));
+        m_writer->emit(":\n");
+    }
+    if(isDefault)
+    {
+        m_writer->emit("default:\n");
+    }
+}
+
 void CLikeSourceEmitter::emitRegion(Region* inRegion)
 {
     // We will use a loop so that we can process sequential (simple)
@@ -3337,17 +3351,8 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                 auto defaultCase = switchRegion->defaultCase;
                 for(auto currentCase : switchRegion->cases)
                 {
-                    for(auto caseVal : currentCase->values)
-                    {
-                        m_writer->emit("case ");
-                        emitOperand(caseVal, getInfo(EmitOp::General));
-                        m_writer->emit(":\n");
-                    }
-                    if(currentCase.Ptr() == defaultCase)
-                    {
-                        m_writer->emit("default:\n");
-                    }
-
+                    const bool isDefault {currentCase.Ptr() == defaultCase};
+                    emitSwitchCaseSelectors(currentCase.Ptr(), isDefault);
                     m_writer->indent();
                     m_writer->emit("{\n");
                     m_writer->indent();
