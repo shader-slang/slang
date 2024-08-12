@@ -74,8 +74,9 @@ void myProceduralClosestHit(inout MyRayPayload payload, MyProceduralHitAttrs att
 {
 	payload.value = attrs.value;
 }
-bool myProceduralAnyHit(MyRayPayload payload)
+bool myProceduralAnyHit(inout MyRayPayload payload)
 {
+    unmodified(payload);
 	return true;
 }
 
@@ -86,8 +87,10 @@ bool myProceduralAnyHit(MyRayPayload payload)
 // For now we will only deal with the single-intersection
 // case.
 //
-bool myProceduralIntersection(float tHit, MyProceduralHitAttrs hitAttrs)
+bool myProceduralIntersection(inout float tHit, inout MyProceduralHitAttrs hitAttrs)
 {
+    unmodified(tHit);
+    unmodified(hitAttrs);
 	return true;
 }
 
