@@ -522,6 +522,61 @@ class SubtypeWitness : public Witness
     ConversionCost getOverloadResolutionCost();
 };
 
+class TypePackSubtypeWitness : public SubtypeWitness
+{
+    SLANG_AST_CLASS(TypePackSubtypeWitness)
+
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+
+    Index getCount() { return getOperandCount() - 2; }
+    SubtypeWitness* getWitness(Index index) { return as<SubtypeWitness>(getOperand(index + 2)); }
+
+    TypePackSubtypeWitness(Type* sub, Type* sup, ArrayView<SubtypeWitness*> witnesses)
+    {
+        setOperands(sub);
+        addOperands(sup);
+        for(auto w : witnesses)
+            addOperands(ValNodeOperand(w));
+    }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+class EachSubtypeWitness : public SubtypeWitness
+{
+    SLANG_AST_CLASS(EachSubtypeWitness)
+
+    EachSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+class ExpandSubtypeWitness : public SubtypeWitness
+{
+    SLANG_AST_CLASS(ExpandSubtypeWitness)
+
+    ExpandSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 class TypeEqualityWitness : public SubtypeWitness 
 {
     SLANG_AST_CLASS(TypeEqualityWitness)
