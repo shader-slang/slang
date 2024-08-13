@@ -248,7 +248,8 @@ public:
     //
 
     void ensureTypePrelude(IRType* type);
-    void emitDeclarator(DeclaratorInfo* declarator);
+    void emitDeclarator(DeclaratorInfo* declarator) {emitDeclaratorImpl(declarator);}
+    virtual void emitDeclaratorImpl(DeclaratorInfo* declarator);
 
     void emitType(IRType* type, const StringSliceLoc* nameLoc) { emitTypeImpl(type, nameLoc); }
     void emitType(IRType* type, Name* name);

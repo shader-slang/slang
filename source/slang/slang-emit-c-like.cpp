@@ -155,7 +155,7 @@ void CLikeSourceEmitter::ensureTypePrelude(IRType* type)
     }
 }
 
-void CLikeSourceEmitter::emitDeclarator(DeclaratorInfo* declarator)
+void CLikeSourceEmitter::emitDeclaratorImpl(DeclaratorInfo* declarator)
 {
     if (!declarator) return;
 
