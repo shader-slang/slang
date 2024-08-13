@@ -2025,12 +2025,19 @@ T reinterpret(U value);
 
 // Use an otherwise unused value
 //
-// This can be used to silence the warning about returning before initializing
-// an out paramter.
+// This can be used to silence the warning about returning before initializing an out paramter.
 __generic<T>
 [__readNone]
 [ForceInline]
+__intrinsic_op($(kIROp_Unmodified))
 void unused(inout T){}
+
+// This can be used to silence the warning about not writing to an inout parameter.
+__generic<T>
+[__readNone]
+[ForceInline]
+__intrinsic_op($(kIROp_Unmodified))
+void unmodified(out T){}
 
 // Specialized function
 
@@ -2590,6 +2597,9 @@ attribute_syntax [call]                 : CallAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [shader(stage)]    : EntryPointAttribute;
 
+__attributeTarget(FuncDecl)
+attribute_syntax [Shader(stage)]    : EntryPointAttribute;
+
 // Hull Shader
 __attributeTarget(FuncDecl)
 attribute_syntax [maxtessfactor(factor: float)]     : MaxTessFactorAttribute;
@@ -2624,6 +2634,9 @@ attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 // Compute Shader
 __attributeTarget(FuncDecl)
 attribute_syntax [numthreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [NumThreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;

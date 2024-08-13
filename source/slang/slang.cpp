@@ -26,6 +26,8 @@
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
 #include "slang-type-layout.h"
+#include "slang-lookup.h"
+
 #
 #include "slang-options.h"
 
@@ -2279,7 +2281,10 @@ DeclRef<Decl> ComponentType::findDeclFromString(
         linkage,
         nullptr,
         sink);
-    SemanticsVisitor visitor(&sharedSemanticsContext);
+    SemanticsContext context(&sharedSemanticsContext);
+    context = context.allowStaticReferenceToNonStaticMember();
+
+    SemanticsVisitor visitor(context);
 
     auto checkedExpr = visitor.CheckExpr(expr);
     if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
@@ -2288,6 +2293,86 @@ DeclRef<Decl> ComponentType::findDeclFromString(
     }
 
     m_decls[name] = result;
+    return result;
+}
+
+DeclRef<Decl> ComponentType::findDeclFromStringInType(
+    Type* type,
+    String const& name,
+    LookupMask mask,
+    DiagnosticSink* sink)
+{
+    DeclRef<Decl> result;
+
+    // Only look up in the type if it is a DeclRefType
+    if (!as<DeclRefType>(type))
+        return DeclRef<Decl>();
+
+    // TODO(JS): For now just used the linkages ASTBuilder to keep on scope
+    //
+    // The parseTermString uses the linkage ASTBuilder for it's parsing.
+    //
+    // It might be possible to just create a temporary ASTBuilder - the worry though is
+    // that the parsing sets a member variable in AST node to one of these scopes, and then
+    // it become a dangling pointer. So for now we go with the linkages.
+    auto astBuilder = getLinkage()->getASTBuilder();
+
+    // Otherwise, we need to start looking in
+    // the modules that were directly or
+    // indirectly referenced.
+    //
+    Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
+
+    auto linkage = getLinkage();
+
+    SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+
+    Expr* expr = linkage->parseTermString(name, scope);
+
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        nullptr,
+        sink);
+    SemanticsContext context(&sharedSemanticsContext);
+    context = context.allowStaticReferenceToNonStaticMember();
+
+    SemanticsVisitor visitor(context);
+
+    GenericAppExpr* genericOuterExpr = nullptr;
+    if (as<GenericAppExpr>(expr))
+    {
+        // Unwrap the generic application, and re-wrap it around the static-member expr
+        genericOuterExpr = as<GenericAppExpr>(expr);
+        expr = genericOuterExpr->functionExpr;
+    }
+
+    if (!as<VarExpr>(expr))
+        return result;
+
+    auto rs = astBuilder->create<StaticMemberExpr>();
+    auto typeExpr = astBuilder->create<SharedTypeExpr>();
+    auto typetype = astBuilder->getOrCreate<TypeType>(type);
+    typeExpr->type = typetype;
+    rs->baseExpression = typeExpr;
+    rs->name = as<VarExpr>(expr)->name;
+
+    expr = rs;
+
+    // If we have a generic-app expression, re-wrap the static-member expr
+    if (genericOuterExpr)
+    {
+        genericOuterExpr->functionExpr = expr;
+        expr = genericOuterExpr;
+    }
+    
+    auto checkedTerm = visitor.CheckTerm(expr);
+    auto resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+
+    if (auto declRefExpr = as<DeclRefExpr>(resolvedTerm))
+    {
+        result = declRefExpr->declRef;
+    }
+
     return result;
 }
 
@@ -2657,6 +2742,7 @@ static void _outputIncludes(const List<SourceFile*>& sourceFiles, SourceManager*
 void FrontEndCompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
+    SLANG_PROFILE;
     if (translationUnit->isChecked)
         return;
 
@@ -2839,6 +2925,7 @@ void FrontEndCompileRequest::checkAllTranslationUnits()
 
 void FrontEndCompileRequest::generateIR()
 {
+    SLANG_PROFILE;
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
     // Our task in this function is to generate IR code
@@ -2936,6 +3023,7 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 
 SlangResult FrontEndCompileRequest::executeActionsInner()
 {
+    SLANG_PROFILE_SECTION(frontEndExecute);
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
     for (TranslationUnitRequest* translationUnit : translationUnits)
@@ -2961,7 +3049,11 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         return SLANG_FAIL;
 
     // Perform semantic checking on the whole collection
-    checkAllTranslationUnits();
+    {
+        SLANG_PROFILE_SECTION(SemanticChecking);
+        checkAllTranslationUnits();
+    }
+
     if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -3087,6 +3179,7 @@ void EndToEndCompileRequest::init()
 
 SlangResult EndToEndCompileRequest::executeActionsInner()
 {
+    SLANG_PROFILE_SECTION(endToEndActions);
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.
     //
@@ -6218,6 +6311,7 @@ SlangResult EndToEndCompileRequest::compile()
     if (getOptionSet().getBoolOption(CompilerOptionName::ReportDownstreamTime))
     {
         getSession()->getCompilerElapsedTime(&totalStartTime, &downstreamStartTime);
+        PerformanceProfiler::getProfiler()->clear();
     }
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
@@ -6232,6 +6326,7 @@ SlangResult EndToEndCompileRequest::compile()
 
     try
     {
+        SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
     }
     catch (const AbortCompilationException& e)

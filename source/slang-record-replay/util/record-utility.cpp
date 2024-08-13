@@ -1,11 +1,11 @@
 
-#include <cstring>
-#include <string>
+#include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <mutex>
 
 #include "record-utility.h"
+#include "../../core/slang-string.h"
 #include "../../core/slang-string-util.h"
 
 constexpr const char* kRecordLayerEnvVar = "SLANG_RECORD_LAYER";
@@ -15,7 +15,7 @@ namespace SlangRecord
 {
     static thread_local unsigned int g_logLevel = LogLevel::Silent;
 
-    static bool getEnvironmentVariable(const char* name, std::string& out)
+    static bool getEnvironmentVariable(const char* name, Slang::String& out)
     {
 #ifdef _WIN32
         char* envVar = nullptr;
@@ -31,12 +31,12 @@ namespace SlangRecord
             out = envVar;
         }
 #endif
-        return out.empty() == false;
+        return out.getLength() > 0;
     }
 
     bool isRecordLayerEnabled()
     {
-        std::string envVarStr;
+        Slang::String envVarStr;
         if(getEnvironmentVariable(kRecordLayerEnvVar, envVarStr))
         {
             if (envVarStr == "1")
@@ -55,16 +55,12 @@ namespace SlangRecord
             return;
         }
 
-        std::string envVarStr;
+        Slang::String envVarStr;
         if (getEnvironmentVariable(kRecordLayerLogLevel, envVarStr))
         {
-            char* end = nullptr;
-            unsigned int logLevel = std::strtol(envVarStr.c_str(), &end, 10);
-            if (end && (*end == 0))
-            {
-                g_logLevel = std::min((unsigned int)(LogLevel::Verbose), logLevel);
-                return;
-            }
+            unsigned int logLevel = Slang::stringToUInt(envVarStr);
+            g_logLevel = std::min((unsigned int)(LogLevel::Verbose), logLevel);
+            return;
         }
     }
 
