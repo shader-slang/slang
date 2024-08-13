@@ -16,17 +16,14 @@ on:
       - 'CONTRIBUTION.md'
       - 'README.md'
 
-# permissions:
-#   # deployments permission to deploy GitHub pages website
-#   deployments: write
-#   # contents permission to update benchmark contents in gh-pages branch
-#   contents: write
-
 jobs:
   build:
-    runs-on: [Windows, self-hosted]
+    runs-on: [Windows, benchmark, self-hosted]
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+          fetch-depth: '0'
       - name: Common setup
         uses: ./.github/actions/common-setup
         with:
@@ -42,11 +39,21 @@ jobs:
       - name: Setup
         run: |
           cd tests/mdl
-          pip install halo prettytable argparse
+          pip install prettytable argparse
       - name: Run benchmark
         run: |
           cd tests/mdl
-          ls .
-          ls C:\
           Copy-Item -Path C:\slang-benchmarks -Destination . -Recurse
-          python compile.py --samples 16 --target dxil
+          python compile.py --samples 1 --target dxil --ci
+      - uses: actions/checkout@v3
+        with:
+          repository: venkataram-nv/benchmark
+          ref: main
+          path: ./benchmark
+      - name: Push results
+        run: |
+          # TODO: only when pushing to master
+          cp tests/mdl/benchmarks.json benchmark
+          cd benchmark
+          git add . && git commit -m "message"
+          git push origin main
