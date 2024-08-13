@@ -1922,15 +1922,27 @@ namespace Slang
         checkVisibility(classDecl);
     }
 
-    bool isDefaultInitializable(VarDeclBase* var)
+    bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
     {
         // find groupshared modifier
-        if (var->findModifier<HLSLGroupSharedModifier>())
+        if (varDecl->findModifier<HLSLGroupSharedModifier>())
+        {
+            if (sink && varDecl->initExpr)
+                sink->diagnose(varDecl, Diagnostics::cannotHaveInitializer, varDecl, "groupshared");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool isDefaultInitializable(VarDeclBase* varDecl)
+    {
+        if (!DiagnoseIsAllowedInitExpr(varDecl, nullptr))
             return false;
 
-        // find struct and modifiers associated with var
-        StructDecl* structDecl = as<StructDecl>(var);
-        if (auto declRefType = as<DeclRefType>(var->getType()))
+        // find struct and modifiers associated with varDecl
+        StructDecl* structDecl = as<StructDecl>(varDecl);
+        if (auto declRefType = as<DeclRefType>(varDecl->getType()))
         {
             if (auto genericAppRefDecl = as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
             {
@@ -1988,8 +2000,11 @@ namespace Slang
             return defaultCall;
         }
     }
+
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
+        DiagnoseIsAllowedInitExpr(varDecl, getSink());
+
         // if zero initialize is true, set everything to a default
         if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) 
             && !varDecl->initExpr

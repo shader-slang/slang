@@ -14,7 +14,7 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-groupshared uint myGroupSharedValue = foo();
+groupshared uint myGroupSharedValue;
 
 uint foo()
 {
@@ -24,5 +24,8 @@ uint foo()
 [numthreads(4, 1, 1)]
 void computeMain(uint i : SV_GroupIndex)
 {
+    myGroupSharedValue = foo();
+    GroupMemoryBarrierWithGroupSync();
+    
     outputBuffer[i] = i + myGroupSharedValue;
 }
