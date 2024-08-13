@@ -3,6 +3,12 @@
 # It prints information about breaking-changes first and the rest.
 # The content is mostly based on `git log --oneline --since 202X-YY-ZZ`.
 
+# Usage: the script takes one command-line argument that will be used on '-since' option of git command.
+# As an example, you can run a script with a following command, and it will print commit titles between today and 2024-07-01.
+# ```
+# docs/scripts/release-note.sh 2024-07-01
+# ```
+
 # This script is supposed to work on all Windows based shell systems including WSL and git-bash.
 # If you make any modifications, please test them, because CI doesn't test this script.
 
