@@ -345,13 +345,18 @@ void CLikeSourceEmitter::_emitPostfixTypeAttr(IRAttr* attr)
     // we may need to handle it here.
 }
 
+void CLikeSourceEmitter::emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator)
+{
+    emitSimpleType(type);
+    emitDeclarator(declarator);
+}
+
 void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 {
     switch (type->getOp())
     {
     default:
-        emitSimpleType(type);
-        emitDeclarator(declarator);
+        emitSimpleTypeAndDeclarator(type, declarator);
         break;
 
     case kIROp_RateQualifiedType:
@@ -1846,7 +1851,8 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
 
     emitRateQualifiers(inst);
 
-    if(as<IRModuleInst>(inst->getParent()))
+    bool isConstant(as<IRModuleInst>(inst->getParent()));
+    if(isConstant)
     {
         // "Ordinary" instructions at module scope are constants
 
@@ -1861,12 +1867,17 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
         case SourceLanguage::Metal:
             m_writer->emit("constant ");
             break;
+        case SourceLanguage::WGSL:
+            // This is handled by emitVarKeyword, below
+            break;
         default:
             m_writer->emit("const ");
             break;
         }
 
     }
+
+    emitVarKeyword(type, isConstant);
 
     emitType(type, getName(inst));
     m_writer->emit(" = ");
@@ -3121,6 +3132,8 @@ void CLikeSourceEmitter::_emitStoreImpl(IRStore* store)
 
 void CLikeSourceEmitter::_emitInstAsDefaultInitializedVar(IRInst* inst, IRType* type)
 {
+    emitVarKeyword(type, /* isConstant */ false);
+
     emitType(type, getName(inst));
 
     // On targets that support empty initializers, we will emit it.
@@ -3943,6 +3956,8 @@ void CLikeSourceEmitter::emitParameterGroup(IRGlobalParam* varDecl, IRUniformPar
     emitParameterGroupImpl(varDecl, type);
 }
 
+void CLikeSourceEmitter::emitVarKeywordImpl(IRType * /* type */, bool /* isConstant */) {}
+
 void CLikeSourceEmitter::emitVar(IRVar* varDecl)
 {
     auto allocatedType = varDecl->getDataType();
@@ -3980,6 +3995,8 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
     }
 #endif
     emitRateQualifiersAndAddressSpace(varDecl);
+
+    emitVarKeyword(varType, /* isConstant */ false);
 
     emitType(varType, getName(varDecl));
 
@@ -4111,6 +4128,7 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
     emitVarModifiers(layout, varDecl, varType);
 
     emitRateQualifiersAndAddressSpace(varDecl);
+    emitVarKeyword(varType, /* isConstant */ true);
     emitType(varType, getName(varDecl));
 
     // TODO: These shouldn't be needed for ordinary
@@ -4184,6 +4202,7 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
     emitDecorationLayoutSemantics(varDecl, "register");
 
     emitRateQualifiersAndAddressSpace(varDecl);
+    emitVarKeyword(varType, /* isConstant */ false);
     emitType(varType, getName(varDecl));
 
     emitSemantics(varDecl);
