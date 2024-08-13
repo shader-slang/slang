@@ -202,7 +202,7 @@ For now, we require that all variadic generic type packs to appear in the end of
 definitions are invalid:
 
 ```
-void f<each T, U>() {} // Error, ordinary parameeter `U` after type pack.
+void f<each T, U>() {} // Error, ordinary parameter `U` after type pack.
 void g<each T, U = int>() {} // Error, ordinary parameter after type pack.
 void k<each T, let i : int>() {} // Error.
 void h<U = int, each T>() {} // OK.
