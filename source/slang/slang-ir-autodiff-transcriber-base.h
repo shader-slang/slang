@@ -123,8 +123,14 @@ struct AutoDiffTranscriberBase
 
     InstPair transcribeBlock(IRBuilder* builder, IRBlock* origBlock)
     {
-        HashSet<IRInst*> emptySet;
-        return transcribeBlockImpl(builder, origBlock, emptySet);
+        HashSet<IRInst*> ignore;
+        for (auto inst = origBlock->getFirstInst(); inst; inst = inst->next)
+        {
+            if (inst->m_op == kIROp_Unmodified)
+                ignore.add(inst);
+        }
+
+        return transcribeBlockImpl(builder, origBlock, ignore);
     }
 
     // Transcribe a generic definition

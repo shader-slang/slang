@@ -38,30 +38,67 @@ namespace Slang
             || (inst->m_op == kIROp_Var);
     }
 
-    static bool isPotentiallyUnintended(IRParam* param)
+    static bool isUnmodifying(IRFunc *func)
     {
-        auto outType = as<IROutType>(param->getFullType());
-        if (!outType)
-            return false;
+        auto intr = func->findDecoration<IRIntrinsicOpDecoration>();
+        return (intr && intr->getIntrinsicOp() == kIROp_Unmodified);
+    }
 
-        // Don't check `out Vertices<T>` or `out Indices<T>` parameters
-        // in mesh shaders.
-        // TODO: we should find a better way to represent these mesh shader
-        // parameters so they conform to the initialize before use convention.
-        // For example, we can use a `OutputVetices` and `OutputIndices` type
-        // to represent an output, like `OutputPatch` in domain shader.
-        // For now, we just skip the check for these parameters.
-        switch (outType->getValueType()->getOp())
+    enum ParameterCheckType
+    {
+        Never,    // Parameter does NOT to be checked for uninitialization (e.g. is `in` or special type)
+        AsOut,    // Parameter DOES need to be checked for usage before initializations
+        AsInOut   // Parameter DOES need to be checked to see if it is ever written to
+    };
+
+    static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, int index)
+    {
+        IRType* type = param->getFullType();
+        if (auto out = as<IROutType>(param->getFullType()))
         {
-        case kIROp_VerticesType:
-        case kIROp_IndicesType:
-        case kIROp_PrimitivesType:
-            return false;
-        default:
-            break;
+            // Don't check `out Vertices<T>` or `out Indices<T>` parameters
+            // in mesh shaders.
+            // TODO: we should find a better way to represent these mesh shader
+            // parameters so they conform to the initialize before use convention.
+            // For example, we can use a `OutputVetices` and `OutputIndices` type
+            // to represent an output, like `OutputPatch` in domain shader.
+            // For now, we just skip the check for these parameters.
+            switch (out->getValueType()->getOp())
+            {
+            case kIROp_VerticesType:
+            case kIROp_IndicesType:
+            case kIROp_PrimitivesType:
+                return Never;
+            default:
+                break;
+            }
+
+            return AsOut;
+        }
+        else if (auto inout = as<IRInOutType>(type))
+        {
+            // TODO: some way to check if the method
+            // is actually used for autodiff
+            if (as<IRDifferentialPairUserCodeType>(inout->getValueType()))
+                return Never;
+
+            switch (stage)
+            {
+            case Stage::AnyHit:
+            case Stage::ClosestHit:
+                // In HLSL the payload is required to be `inout`
+                return (index == 0) ? Never : AsInOut;
+            case Stage::Geometry:
+                // Second parameter is the triangle stream
+                return (index == 1) ? Never : AsInOut;
+            default:
+                break;
+            }
+
+            return AsInOut;
         }
 
-        return true;
+        return Never;
     }
 
     static bool isAliasable(IRInst* inst)
@@ -275,6 +312,7 @@ namespace Slang
         
         // Miscellaenous cases
         case kIROp_ManagedPtrAttach:
+        case kIROp_Unmodified:
             stores.add(user);
             break;
 
@@ -481,6 +519,62 @@ namespace Slang
         }
     }
 
+    static void checkParameterAsOut(ReachabilityContext &reachability, IRFunc* func, IRParam* param, DiagnosticSink* sink)
+    {
+        auto loads = getUnresolvedParamLoads(reachability, func, param);
+        for (auto load : loads)
+        {
+            sink->diagnose(load,
+                as<IRTerminatorInst>(load)
+                ? Diagnostics::returningWithUninitializedOut
+                : Diagnostics::usingUninitializedOut,
+                param);
+        }
+    }
+
+    static void checkParameterAsInOut(IRParam* param, IRFunc* func, bool isThis, DiagnosticSink* sink)
+    {
+        // If the inout is used for the sake of interface conformance, let it be
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            if (as<IRWitnessTableEntry>(use->getUser()))
+                return;
+        }
+
+        // If there is at least one write...
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        for (auto alias : getAliasableInstructions(param))
+        {
+            for (auto use = alias->firstUse; use; use = use->nextUse)
+            {
+                IRInst* user = use->getUser();
+                collectLoadStore(stores, loads, user, alias);
+
+                // ...we will ignore the rest...
+                if (stores.getCount())
+                    return;
+            }
+        }
+
+        // ...or if there is an intrinsic_asm instruction
+        for (const auto& b : func->getBlocks())
+        {
+            for (auto inst = b->getFirstInst(); inst; inst = inst->next)
+            {
+                if (as<IRGenericAsm>(inst))
+                    return;
+            }
+        }
+
+        sink->diagnose(param,
+            isThis
+            ? Diagnostics::methodNeverMutates
+            : Diagnostics::inOutNeverStoredInto,
+            param);
+    }
+
     static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     {
         // Differentiable functions will generate undefined values
@@ -495,22 +589,30 @@ namespace Slang
         ReachabilityContext reachability(func);
 
         // Used for a further analysis and to skip usual return checks
-        auto constructor = func->findDecoration <IRConstructorDecorartion> ();
+        auto constructor = func->findDecoration<IRConstructorDecorartion>();
+
+        // Special checks for stages e.g. raytracing shader
+        Stage stage = Stage::Unknown;
+        if (auto entry = func->findDecoration<IREntryPointDecoration>())
+            stage = entry->getProfile().getStage();
+
+        bool structMethod = func->findDecoration<IRMethodDecoration>();
 
         // Check out parameters
-        for (auto param : firstBlock->getParams())
+        if (!isUnmodifying(func))
         {
-            if (!isPotentiallyUnintended(param))
-                continue;
-
-            auto loads = getUnresolvedParamLoads(reachability, func, param);
-            for (auto load : loads)
+            int index = 0;
+            for (auto param : firstBlock->getParams())
             {
-                sink->diagnose(load,
-                        as<IRTerminatorInst>(load)
-                        ? Diagnostics::returningWithUninitializedOut
-                        : Diagnostics::usingUninitializedOut,
-                        param);
+                bool isThis = structMethod && (index == 0);
+
+                ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index);
+                if (checkType == AsOut)
+                    checkParameterAsOut(reachability, func, param, sink);
+                else if (checkType == AsInOut)
+                    checkParameterAsInOut(param, func, isThis, sink);
+
+                index++;
             }
         }
 
