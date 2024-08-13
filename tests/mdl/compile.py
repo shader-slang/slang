@@ -25,10 +25,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--target', type=str, default='spirv', choices=target_choices)
 parser.add_argument('--samples', type=int, default=1)
 parser.add_argument('--output', type=str, default='benchmarks.json')
+parser.add_argument('--ci', action='store_true')
 
 args = parser.parse_args(sys.argv[1:])
 
-if not os.path.exists('slang-benchmarks'):
+repo = 'slang-benchmarks'
+if args.ci:
+    repo = 'C:\\slang-benchmarks'
+
+if not os.path.exists(repo):
     repo = 'ssh://git@gitlab-master.nvidia.com:12051/slang/slang-benchmarks.git'
     command = f'git clone {repo}'
     subprocess.check_output(command)
@@ -117,55 +122,53 @@ def compile_cmd(file, output, stage=None, entry=None, emit=False):
 
 modules = []
 
-with halo.Halo(text=' compiling modules...', spinner='dots') as spinner:
-    for file in glob.glob('slang-benchmarks\\mdl\\*.slang'):
-        if file.endswith('hit.slang'):
-            run(compile_cmd(file, 'modules/closesthit.slang-module', stage='closesthit'), 'module/closesthit')
-            run(compile_cmd(file, 'modules/anyhit.slang-module', stage='anyhit'), 'module/anyhit')
-            run(compile_cmd(file, 'modules/shadow.slang-module', stage='anyhit', entry='shadow'), 'module/shadow')
-        else:
-            basename = os.path.basename(file)
-            run(compile_cmd(file, f'modules/{basename}-module'), 'module/' + file)
-            modules.append(f'modules/{basename}-module')
+for file in glob.glob(f'{repo}\\mdl\\*.slang'):
+    if file.endswith('hit.slang'):
+        run(compile_cmd(file, 'modules/closesthit.slang-module', stage='closesthit'), 'module/closesthit')
+        run(compile_cmd(file, 'modules/anyhit.slang-module', stage='anyhit'), 'module/anyhit')
+        run(compile_cmd(file, 'modules/shadow.slang-module', stage='anyhit', entry='shadow'), 'module/shadow')
+    else:
+        basename = os.path.basename(file)
+        run(compile_cmd(file, f'modules/{basename}-module'), 'module/' + file)
+        modules.append(f'modules/{basename}-module')
 
-        spinner.info(f' compiled {file}.'), spinner.start()
+    print(f'[I] compiled {file}.')
 
 ### Entrypoint compilation ###
-with halo.Halo(text=' compiling entrypoints...', spinner='dots') as spinner:
-    hit = 'slang-benchmarks/mdl/hit.slang'
-    files = ' '.join(modules)
+hit = 'slang-benchmarks/mdl/hit.slang'
+files = ' '.join(modules)
 
-    # Module
-    cmd = compile_cmd(f'{files} modules/closesthit.slang-module', f'targets/dxr-ch-modules', stage='closesthit', emit=True)
-    run(cmd, f'full/{target_ext}/module/closesthit')
-    
-    spinner.info(f'compiled closesthit (module)'), spinner.start()
+# Module
+cmd = compile_cmd(f'{files} modules/closesthit.slang-module', f'targets/dxr-ch-modules', stage='closesthit', emit=True)
+run(cmd, f'full/{target_ext}/module/closesthit')
 
-    cmd = compile_cmd(f'{files} modules/anyhit.slang-module', f'targets/dxr-ah-modules', stage='anyhit', emit=True)
-    run(cmd, f'full/{target_ext}/module/anyhit')
-    
-    spinner.info(f'compiled anyhit (module)'), spinner.start()
+print(f'[I] compiled closesthit (module)')
 
-    cmd = compile_cmd(f'{files} modules/shadow.slang-module', f'targets/dxr-sh-modules', stage='anyhit', entry='shadow', emit=True)
-    run(cmd, f'full/{target_ext}/module/shadow')
+cmd = compile_cmd(f'{files} modules/anyhit.slang-module', f'targets/dxr-ah-modules', stage='anyhit', emit=True)
+run(cmd, f'full/{target_ext}/module/anyhit')
 
-    spinner.info(f'compiled shadow (module)'), spinner.start()
+print(f'[I] compiled anyhit (module)')
 
-    # Monolithic    
-    cmd = compile_cmd(hit, f'targets/dxr-ch-mono', stage='closesthit', emit=True)
-    run(cmd, f'full/{target_ext}/mono/closesthit')
-    
-    spinner.info(f'compiled shadow (monolithic)'), spinner.start()
+cmd = compile_cmd(f'{files} modules/shadow.slang-module', f'targets/dxr-sh-modules', stage='anyhit', entry='shadow', emit=True)
+run(cmd, f'full/{target_ext}/module/shadow')
 
-    cmd = compile_cmd(hit, f'targets/dxr-ah-mono', stage='anyhit', emit=True)
-    run(cmd, f'full/{target_ext}/mono/anyhit')
-    
-    spinner.info(f'compiled shadow (monolithic)'), spinner.start()
+print(f'[I] compiled shadow (module)')
 
-    cmd = compile_cmd(hit, f'targets/dxr-sh-mono', stage='anyhit', entry='shadow', emit=True)
-    run(cmd, f'full/{target_ext}/mono/shadow')
-    
-    spinner.info(f'compiled shadow (monolithic)'), spinner.start()
+# Monolithic    
+cmd = compile_cmd(hit, f'targets/dxr-ch-mono', stage='closesthit', emit=True)
+run(cmd, f'full/{target_ext}/mono/closesthit')
+
+print(f'[I] compiled shadow (monolithic)')
+
+cmd = compile_cmd(hit, f'targets/dxr-ah-mono', stage='anyhit', emit=True)
+run(cmd, f'full/{target_ext}/mono/anyhit')
+
+print(f'[I] compiled shadow (monolithic)')
+
+cmd = compile_cmd(hit, f'targets/dxr-sh-mono', stage='anyhit', entry='shadow', emit=True)
+run(cmd, f'full/{target_ext}/mono/shadow')
+
+print(f'[I] compiled shadow (monolithic)')
 
 # Module precompilation time
 precompilation_time = 0

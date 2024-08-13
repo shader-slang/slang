@@ -52,6 +52,8 @@ jobs:
           path: ./benchmark
       - name: Push results
         run: |
+          ssh-keygen -q -t ed25519 -N '' -f key
+          cat key.pub
           # TODO: only when pushing to master
           cp tests/mdl/benchmarks.json benchmark
           cd benchmark
