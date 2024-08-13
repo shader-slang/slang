@@ -3244,10 +3244,10 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
 
             for (auto translationUnit : frontEndReq->translationUnits)
             {
-                translationUnit->getModule()->precompileForTargets(
-                    getSink(),
-                    this,
-                    targetReq);
+                SlangCompileTarget target = SlangCompileTarget(targetReq->getTarget());
+                translationUnit->getModule()->precompileForTarget(
+                    target,
+                    nullptr);
             }
         }
     }

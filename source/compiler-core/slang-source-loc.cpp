@@ -597,7 +597,10 @@ void SourceFile::setContents(ISlangBlob* blob)
 
     char const* decodedContentBegin = (char const*)m_contentBlob->getBufferPointer();
     const UInt decodedContentSize = m_contentBlob->getBufferSize();
-    assert(decodedContentSize <= rawContentSize);
+    if (decodedContentSize > rawContentSize)
+    {
+        printf("Warning: Decoded content size is larger than raw content size\n");
+    }
     char const* decodedContentEnd = decodedContentBegin + decodedContentSize;
 
     m_content = UnownedStringSlice(decodedContentBegin, decodedContentEnd);

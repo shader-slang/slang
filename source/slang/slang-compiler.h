@@ -1482,10 +1482,9 @@ namespace Slang
             SlangInt32 index) override;
 
         /// Precompile TU to target language
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTargets(
-            DiagnosticSink* sink,
-            EndToEndCompileRequest* endToEndReq,
-            TargetRequest* targetReq);
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
+            SlangCompileTarget target,
+            slang::IBlob** outDiagnostics) override;
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
