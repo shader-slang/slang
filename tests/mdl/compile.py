@@ -89,6 +89,7 @@ def run(command, key):
             profile = p
         else:
             for k, v in p.items():
+                profile.setdefault(k, 0)
                 profile[k] += v
 
     for k in profile:
