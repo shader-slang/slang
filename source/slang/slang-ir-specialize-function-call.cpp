@@ -553,10 +553,6 @@ struct FunctionParameterSpecializationContext
             // We start by recursively setting up whatever
             // `oldBase` needs:
             //
-            // TODO: We should add check 2 more things in the key
-            // such that our specialization can handle the corner cases
-            // that if the oldBase is a nonuniform resource and also
-            // the data type of oldIndex will be handled correctly.
             getCallInfoForArg(ioInfo, oldBase);
 
             // Then we process `oldIndex` just like we
@@ -565,10 +561,10 @@ struct FunctionParameterSpecializationContext
             // the arguments at the new call site, and
             // don't add anything to the specialization key.
             //
-            // if (oldIndex->getOp() == kIROp_NonUniformResourceIndex)
-            // {
-            //
-            // }
+            // We should also add 2 more things such that our specialization
+            // can handle the corner cases that if the oldBase is a nonuniform
+            // resource and also the data type of oldIndex will be handled correctly.
+            // By doing so, just add the oldIndex to the key of call info.
             ioInfo.key.vals.add(oldIndex);
             ioInfo.newArgs.add(oldIndex);
         }
