@@ -20,7 +20,7 @@ bool isAbstractTypePack(Type* type)
 
 bool isTypePack(Type* type)
 {
-    if (as<TypePack>(type))
+    if (as<ConcreteTypePack>(type))
         return true;
     return isAbstractTypePack(type);
 }
@@ -278,14 +278,14 @@ Type* MatrixExpressionType::getRowType()
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TupleType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Type* TupleType::getMember(Index i) const
 {
-    if (auto typePack = as<TypePack>(_getGenericTypeArg(getDeclRefBase(), 0)))
+    if (auto typePack = as<ConcreteTypePack>(_getGenericTypeArg(getDeclRefBase(), 0)))
         return typePack->getElementType(i);
     return nullptr;
 }
 
 Index TupleType::getMemberCount() const
 {
-    if (auto typePack = as<TypePack>(_getGenericTypeArg(getDeclRefBase(), 0)))
+    if (auto typePack = as<ConcreteTypePack>(_getGenericTypeArg(getDeclRefBase(), 0)))
         return typePack->getTypeCount();
     return 0;
 }
@@ -581,7 +581,7 @@ Val* EachType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     auto substElementType = as<Type>(getElementType()->substituteImpl(astBuilder, subst, &diff));
     if (!diff)
         return this;
-    if (auto typePack = as<TypePack>(substElementType))
+    if (auto typePack = as<ConcreteTypePack>(substElementType))
     {
         if (subst.packExpansionIndex >= 0 && subst.packExpansionIndex < typePack->getTypeCount())
         {
@@ -625,7 +625,7 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
 {
     int diff = 0;
     ShortList<Type*> capturedPacks;
-    ShortList<TypePack*> concreteTypePacks;
+    ShortList<ConcreteTypePack*> concreteTypePacks;
     for (Index i = 0; i < getCapturedTypePackCount(); i++)
     {
         auto substCapturedTypePack = getCapturedTypePack(i)->substituteImpl(astBuilder, subst, &diff);
@@ -637,7 +637,7 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
         else
         {
             capturedPacks.add(as<Type>(substCapturedTypePack));
-            if (auto pack = as<TypePack>(capturedPacks.getLast()))
+            if (auto pack = as<ConcreteTypePack>(capturedPacks.getLast()))
             {
                 concreteTypePacks.add(pack);
             }
@@ -672,8 +672,8 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
     }
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypePack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-void TypePack::_toTextOverride(StringBuilder& out)
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConcreteTypePack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void ConcreteTypePack::_toTextOverride(StringBuilder& out)
 {
     for (Index i = 0; i < getTypeCount(); i++)
     {
@@ -683,7 +683,7 @@ void TypePack::_toTextOverride(StringBuilder& out)
     }
 }
 
-Type* TypePack::_createCanonicalTypeOverride()
+Type* ConcreteTypePack::_createCanonicalTypeOverride()
 {
     ShortList<Type*> canonicalElementTypes;
     for (Index i = 0; i < getTypeCount(); i++)
@@ -693,7 +693,7 @@ Type* TypePack::_createCanonicalTypeOverride()
     return getCurrentASTBuilder()->getTypePack(canonicalElementTypes.getArrayView().arrayView);
 }
 
-Val* TypePack::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* ConcreteTypePack::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
     ShortList<Type*> substElementTypes;

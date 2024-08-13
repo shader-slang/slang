@@ -19,7 +19,7 @@ namespace Slang
             auto paramType = getParamType(m_astBuilder, param);
             if (isTypePack(paramType))
             {
-                if (auto typePack = as<TypePack>(paramType))
+                if (auto typePack = as<ConcreteTypePack>(paramType))
                 {
                     counts.required += typePack->getTypeCount();
                     allowedArgCountToAdd = typePack->getTypeCount();
@@ -658,7 +658,7 @@ namespace Slang
         while (paramIndex < paramTypes.getCount())
         {
             auto paramType = paramTypes[paramIndex];
-            if (auto paramTypePack = as<TypePack>(paramType))
+            if (auto paramTypePack = as<ConcreteTypePack>(paramType))
             {
                 ShortList<Expr*> innerArgs;
                 for (Index i = 0; i < paramTypePack->getTypeCount(); i++)

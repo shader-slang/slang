@@ -272,9 +272,9 @@ void TypeEqualityWitness::_toTextOverride(StringBuilder& out)
     out << toSlice("TypeEqualityWitness(") << getSub() << toSlice(")");
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SubtypeWitnessPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypePackSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Val* SubtypeWitnessPack::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* TypePackSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
     ShortList<SubtypeWitness*> newWitnesses;
@@ -292,7 +292,7 @@ Val* SubtypeWitnessPack::_substituteImplOverride(ASTBuilder* astBuilder, Substit
     return getCurrentASTBuilder()->getSubtypeWitnessPack(newSub, newSup, newWitnesses.getArrayView().arrayView);
 }
 
-Val* SubtypeWitnessPack::_resolveImplOverride()
+Val* TypePackSubtypeWitness::_resolveImplOverride()
 {
     int diff = 0;
     ShortList<SubtypeWitness*> newWitnesses;
@@ -316,7 +316,7 @@ Val* SubtypeWitnessPack::_resolveImplOverride()
     return getCurrentASTBuilder()->getSubtypeWitnessPack(newSub, newSup, newWitnesses.getArrayView().arrayView);
 }
 
-void SubtypeWitnessPack::_toTextOverride(StringBuilder& out)
+void TypePackSubtypeWitness::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("Pack(");
     for (Index i = 0; i < getCount(); i++)
@@ -337,10 +337,10 @@ Val* ExpandSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Subst
     auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
     if (!diff)
         return this;
-    if (auto subTypePack = as<TypePack>(newSub))
+    if (auto subTypePack = as<ConcreteTypePack>(newSub))
     {
         // If sub is substituted into a concrete type pack, we should return a
-        // SubtypeWitnessPack.
+        // TypePackSubtypeWitness.
         ShortList<SubtypeWitness*> newWitnesses;
         for (Index i = 0; i < subTypePack->getTypeCount(); i++)
         {
@@ -389,7 +389,7 @@ Val* EachSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Substit
 {
     int diff = 0;
     auto newPatternWitness = as<SubtypeWitness>(getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
-    if (auto witnessPack = as<SubtypeWitnessPack>(newPatternWitness))
+    if (auto witnessPack = as<TypePackSubtypeWitness>(newPatternWitness))
     {
         if (subst.packExpansionIndex >= 0 && subst.packExpansionIndex < witnessPack->getCount())
         {

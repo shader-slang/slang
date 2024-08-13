@@ -253,9 +253,9 @@ namespace Slang
         }
 
         // We can recursively join two TypePacks.
-        if (auto leftTypePack = as<TypePack>(left))
+        if (auto leftTypePack = as<ConcreteTypePack>(left))
         {
-            if (auto rightTypePack = as<TypePack>(right))
+            if (auto rightTypePack = as<ConcreteTypePack>(right))
             {
                 if(leftTypePack->getTypeCount() != rightTypePack->getTypeCount())
                     return nullptr;
@@ -893,9 +893,9 @@ namespace Slang
                 return TryUnifyTypes(constraints, unifyCtx, eachType->getElementType(), sndEachType->getElementType());
             }
         }
-        else if (auto typePack = as<TypePack>(fst))
+        else if (auto typePack = as<ConcreteTypePack>(fst))
         {
-            if (auto sndTypePack = as<TypePack>(snd))
+            if (auto sndTypePack = as<ConcreteTypePack>(snd))
             {
                 if (typePack->getTypeCount() != sndTypePack->getTypeCount())
                     return false;
@@ -997,9 +997,9 @@ namespace Slang
         }
 
         // If one of the types is a type pack, we need to recursively unify the element types.
-        if (auto fstTypePack = as<TypePack>(fst))
+        if (auto fstTypePack = as<ConcreteTypePack>(fst))
         {
-            if (auto sndTypePack = as<TypePack>(snd))
+            if (auto sndTypePack = as<ConcreteTypePack>(snd))
             {
                 if (fstTypePack->getTypeCount() != sndTypePack->getTypeCount())
                     return false;
@@ -1023,7 +1023,7 @@ namespace Slang
             }
         }
 
-        if (auto sndTypePack = as<TypePack>(snd))
+        if (auto sndTypePack = as<ConcreteTypePack>(snd))
         {
             if (auto fstExpandType = as<ExpandType>(fst))
             {

@@ -232,7 +232,7 @@ namespace Slang
             }
             return nullptr;
         }
-        else if (auto subTypePack = as<TypePack>(subType))
+        else if (auto subTypePack = as<ConcreteTypePack>(subType))
         {
             // A type pack (T0, T1, ...) is a subtype of supType, if each of its elements
             // is a subtype of the supType.

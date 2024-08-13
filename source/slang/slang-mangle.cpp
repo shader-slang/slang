@@ -276,7 +276,7 @@ namespace Slang
             emitRaw(context, "Te");
             emitType(context, eachType->getElementType());
         }
-        else if (auto typePack = as<TypePack>(type))
+        else if (auto typePack = as<ConcreteTypePack>(type))
         {
             emitRaw(context, "Tp");
             emit(context, typePack->getTypeCount());

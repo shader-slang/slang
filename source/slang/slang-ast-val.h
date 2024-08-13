@@ -522,9 +522,9 @@ class SubtypeWitness : public Witness
     ConversionCost getOverloadResolutionCost();
 };
 
-class SubtypeWitnessPack : public SubtypeWitness
+class TypePackSubtypeWitness : public SubtypeWitness
 {
-    SLANG_AST_CLASS(SubtypeWitnessPack)
+    SLANG_AST_CLASS(TypePackSubtypeWitness)
 
     Type* getSub() { return as<Type>(getOperand(0)); }
     Type* getSup() { return as<Type>(getOperand(1)); }
@@ -532,7 +532,7 @@ class SubtypeWitnessPack : public SubtypeWitness
     Index getCount() { return getOperandCount() - 2; }
     SubtypeWitness* getWitness(Index index) { return as<SubtypeWitness>(getOperand(index + 2)); }
 
-    SubtypeWitnessPack(Type* sub, Type* sup, ArrayView<SubtypeWitness*> witnesses)
+    TypePackSubtypeWitness(Type* sub, Type* sup, ArrayView<SubtypeWitness*> witnesses)
     {
         setOperands(sub);
         addOperands(sup);

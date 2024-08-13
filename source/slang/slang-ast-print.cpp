@@ -335,7 +335,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
                     outParamRange->add(makeRange<Index>(rangeStart, rangeEnd));
                 first = false;
             };
-            if (auto typePack = as<TypePack>(paramType))
+            if (auto typePack = as<ConcreteTypePack>(paramType))
             {
                 for (Index elementIndex = 0; elementIndex < typePack->getTypeCount(); ++elementIndex)
                 {

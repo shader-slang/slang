@@ -525,8 +525,8 @@ FuncType* ASTBuilder::getFuncType(ArrayView<Type*> parameters, Type* result, Typ
 
 TupleType* ASTBuilder::getTupleType(List<Type*>& types)
 {
-    // The canonical form of a tuple type is always a DeclRefType(GenAppDeclRef(TupleDecl, TypePack(types...))).
-    // If `types` is already a single TypePack, then we can use that directly.
+    // The canonical form of a tuple type is always a DeclRefType(GenAppDeclRef(TupleDecl, ConcreteTypePack(types...))).
+    // If `types` is already a single ConcreteTypePack, then we can use that directly.
     if (types.getCount() == 1)
     {
         if (isTypePack(types[0]))
@@ -535,7 +535,7 @@ TupleType* ASTBuilder::getTupleType(List<Type*>& types)
         }
     }
 
-    // Otherwise, we need to create a TypePack to hold the types.
+    // Otherwise, we need to create a ConcreteTypePack to hold the types.
     auto typePack = getTypePack(types.getArrayView());
     return as<TupleType>(getSpecializedBuiltinType(typePack, "TupleType"));
 }
@@ -553,7 +553,7 @@ Type* ASTBuilder::getEachType(Type* baseType)
         return expandType->getPatternType();
     }
 
-    // each Tuple<X> ==> each X, because we know that Tuple type must be in the form of Tuple<TypePack<...>>.
+    // each Tuple<X> ==> each X, because we know that Tuple type must be in the form of Tuple<ConcreteTypePack<...>>.
     if (auto tupleType = as<TupleType>(baseType))
     {
         return getEachType(tupleType->getTypePack());
@@ -572,9 +572,9 @@ Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Type*> capturedPacks)
     return getOrCreate<ExpandType>(pattern, capturedPacks);
 }
 
-TypePack* ASTBuilder::getTypePack(ArrayView<Type*> types)
+ConcreteTypePack* ASTBuilder::getTypePack(ArrayView<Type*> types)
 {
-    return getOrCreate<TypePack>(types);
+    return getOrCreate<ConcreteTypePack>(types);
 }
 
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(
@@ -583,10 +583,10 @@ TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(
     return getOrCreate<TypeEqualityWitness>(type, type);
 }
 
-SubtypeWitnessPack* ASTBuilder::getSubtypeWitnessPack(
+TypePackSubtypeWitness* ASTBuilder::getSubtypeWitnessPack(
     Type* subType, Type* superType, ArrayView<SubtypeWitness*> witnesses)
 {
-    return getOrCreate<SubtypeWitnessPack>(subType, superType, witnesses);
+    return getOrCreate<TypePackSubtypeWitness>(subType, superType, witnesses);
 }
 
 SubtypeWitness* ASTBuilder::getExpandSubtypeWitness(
@@ -716,11 +716,11 @@ top:
             indexOfCInConjunction);
     }
 
-    // If left hand is a SubtypeWitnessPack, then we should also return a SubtypeWitnessPack
+    // If left hand is a TypePackSubtypeWitness, then we should also return a TypePackSubtypeWitness
     // where each witness in the pack is the transitive subtype witness of the corresponding
     // witness in the original pack.
     //
-    if (auto witnessPack = as<SubtypeWitnessPack>(aIsSubtypeOfBWitness))
+    if (auto witnessPack = as<TypePackSubtypeWitness>(aIsSubtypeOfBWitness))
     {
         List<SubtypeWitness*> newWitnesses;
         for (Index i = 0; i < witnessPack->getCount(); i++)

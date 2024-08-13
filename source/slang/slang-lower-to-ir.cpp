@@ -1656,7 +1656,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(resultVal);
     }
 
-    LoweredValInfo visitTypePack(TypePack* typePack)
+    LoweredValInfo visitConcreteTypePack(ConcreteTypePack* typePack)
     {
         ShortList<IRType*> types;
         for (Index i = 0; i < typePack->getTypeCount(); i++)
@@ -1691,7 +1691,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             irBuilder->getTypeKind(), type, capturedTypes.getArrayView().arrayView));
     }
 
-    LoweredValInfo visitSubtypeWitnessPack(SubtypeWitnessPack* witnessPack)
+    LoweredValInfo visitTypePackSubtypeWitness(TypePackSubtypeWitness* witnessPack)
     {
         auto irBuilder = getBuilder();
         ShortList<IRInst*> witnesses;
@@ -1971,7 +1971,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitTupleType(TupleType* type)
     {
         List<IRType*> elementTypes;
-        if (as<TypePack>(type->getTypePack()))
+        if (as<ConcreteTypePack>(type->getTypePack()))
         {
             for (Index i = 0; i < type->getMemberCount(); i++)
             {

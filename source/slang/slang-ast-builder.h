@@ -518,7 +518,7 @@ public:
 
     Type* getExpandType(Type* pattern, ArrayView<Type*> capturedPacks);
 
-    TypePack* getTypePack(ArrayView<Type*> types);
+    ConcreteTypePack* getTypePack(ArrayView<Type*> types);
 
         /// Produce a witness that `T : T` for any type `T`
     TypeEqualityWitness* getTypeEqualityWitness(
@@ -529,7 +529,7 @@ public:
         Type*                   superType,
         DeclRef<Decl> const&    declRef);
 
-    SubtypeWitnessPack* getSubtypeWitnessPack(Type* subType, Type* superType, ArrayView<SubtypeWitness*> witnesses);
+    TypePackSubtypeWitness* getSubtypeWitnessPack(Type* subType, Type* superType, ArrayView<SubtypeWitness*> witnesses);
 
     SubtypeWitness* getExpandSubtypeWitness(Type* subType, Type* superType, SubtypeWitness* patternWitness);
 

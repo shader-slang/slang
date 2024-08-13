@@ -734,10 +734,10 @@ class ExpandType : public Type
 };
 
 // A concrete pack of types.
-class TypePack : public Type
+class ConcreteTypePack : public Type
 {
-    SLANG_AST_CLASS(TypePack)
-    TypePack(ArrayView<Type*> types)
+    SLANG_AST_CLASS(ConcreteTypePack)
+    ConcreteTypePack(ArrayView<Type*> types)
     {
         for (auto t : types)
             m_operands.add(ValNodeOperand(t));
