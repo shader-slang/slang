@@ -564,7 +564,8 @@ struct FunctionParameterSpecializationContext
             // We should also add 2 more things such that our specialization
             // can handle the corner cases that if the oldBase is a nonuniform
             // resource and also the data type of oldIndex will be handled correctly.
-            // By doing so, just add the oldIndex to the key of call info.
+            // By doing so, we form an IRAttributedType to include both information
+            // and add it to the key of call info.
 
             List<IRAttr*> irAttrs;
             if (oldIndex->getOp() == kIROp_NonUniformResourceIndex)
