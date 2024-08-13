@@ -489,6 +489,11 @@ public:
     virtual void emitPreModuleImpl();
     virtual void emitPostModuleImpl();
 
+    virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator);
+    void emitSimpleTypeAndDeclarator(IRType* type, DeclaratorInfo* declarator) {emitSimpleTypeAndDeclaratorImpl(type, declarator);};
+    virtual void emitVarKeywordImpl(IRType * type, bool isConstant);
+    void emitVarKeyword(IRType * type, bool isConstant) {emitVarKeywordImpl(type, isConstant);}
+
     virtual void beforeComputeEmitActions(IRModule* module) { SLANG_UNUSED(module); };
 
     virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace) { SLANG_UNUSED(rate); SLANG_UNUSED(addressSpace); }
