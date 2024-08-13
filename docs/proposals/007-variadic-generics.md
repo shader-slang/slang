@@ -487,8 +487,9 @@ After matching and the remaining overload resolution logic, `S<int, int, void, f
 GenericAppDeclRef
     genericDecl = "S"
     args = [
-        DeclRefType("int"),
-        TypePack(DeclRefType("int"), DeclRefType("void"), DeclRefType("float"), DeclRefType("bool"))
+        DeclRefType("int"), // For `T`
+        TypePack(DeclRefType("int"), DeclRefType("void")), // For `U`
+        TypePack(DeclRefType("float"), DeclRefType("bool")) // For `V`
     ]
 ```
 
