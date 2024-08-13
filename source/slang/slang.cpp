@@ -26,6 +26,8 @@
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
 #include "slang-type-layout.h"
+#include "slang-lookup.h"
+
 #
 #include "slang-options.h"
 
@@ -2279,7 +2281,10 @@ DeclRef<Decl> ComponentType::findDeclFromString(
         linkage,
         nullptr,
         sink);
-    SemanticsVisitor visitor(&sharedSemanticsContext);
+    SemanticsContext context(&sharedSemanticsContext);
+    context = context.allowStaticReferenceToNonStaticMember();
+
+    SemanticsVisitor visitor(context);
 
     auto checkedExpr = visitor.CheckExpr(expr);
     if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
@@ -2288,6 +2293,86 @@ DeclRef<Decl> ComponentType::findDeclFromString(
     }
 
     m_decls[name] = result;
+    return result;
+}
+
+DeclRef<Decl> ComponentType::findDeclFromStringInType(
+    Type* type,
+    String const& name,
+    LookupMask mask,
+    DiagnosticSink* sink)
+{
+    DeclRef<Decl> result;
+
+    // Only look up in the type if it is a DeclRefType
+    if (!as<DeclRefType>(type))
+        return DeclRef<Decl>();
+
+    // TODO(JS): For now just used the linkages ASTBuilder to keep on scope
+    //
+    // The parseTermString uses the linkage ASTBuilder for it's parsing.
+    //
+    // It might be possible to just create a temporary ASTBuilder - the worry though is
+    // that the parsing sets a member variable in AST node to one of these scopes, and then
+    // it become a dangling pointer. So for now we go with the linkages.
+    auto astBuilder = getLinkage()->getASTBuilder();
+
+    // Otherwise, we need to start looking in
+    // the modules that were directly or
+    // indirectly referenced.
+    //
+    Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
+
+    auto linkage = getLinkage();
+
+    SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+
+    Expr* expr = linkage->parseTermString(name, scope);
+
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        nullptr,
+        sink);
+    SemanticsContext context(&sharedSemanticsContext);
+    context = context.allowStaticReferenceToNonStaticMember();
+
+    SemanticsVisitor visitor(context);
+
+    GenericAppExpr* genericOuterExpr = nullptr;
+    if (as<GenericAppExpr>(expr))
+    {
+        // Unwrap the generic application, and re-wrap it around the static-member expr
+        genericOuterExpr = as<GenericAppExpr>(expr);
+        expr = genericOuterExpr->functionExpr;
+    }
+
+    if (!as<VarExpr>(expr))
+        return result;
+
+    auto rs = astBuilder->create<StaticMemberExpr>();
+    auto typeExpr = astBuilder->create<SharedTypeExpr>();
+    auto typetype = astBuilder->getOrCreate<TypeType>(type);
+    typeExpr->type = typetype;
+    rs->baseExpression = typeExpr;
+    rs->name = as<VarExpr>(expr)->name;
+
+    expr = rs;
+
+    // If we have a generic-app expression, re-wrap the static-member expr
+    if (genericOuterExpr)
+    {
+        genericOuterExpr->functionExpr = expr;
+        expr = genericOuterExpr;
+    }
+    
+    auto checkedTerm = visitor.CheckTerm(expr);
+    auto resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+
+    if (auto declRefExpr = as<DeclRefExpr>(resolvedTerm))
+    {
+        result = declRefExpr->declRef;
+    }
+
     return result;
 }
 
@@ -3147,6 +3232,24 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         SLANG_RETURN_ON_FAIL(maybeWriteContainer(m_containerOutputPath));
 
         return SLANG_OK;
+    }
+
+    // If requested, attempt to compile the translation unit all the way down to the target language
+    // and stash the result blob in an IR op.
+    for (auto targetReq : getLinkage()->targets)
+    {
+        if (targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+        {
+            auto frontEndReq = getFrontEndReq();
+
+            for (auto translationUnit : frontEndReq->translationUnits)
+            {
+                translationUnit->getModule()->precompileForTargets(
+                    getSink(),
+                    this,
+                    targetReq);
+            }
+        }
     }
 
     // If codegen is enabled, we need to move along to
@@ -5756,6 +5859,16 @@ void EndToEndCompileRequest::setMatrixLayoutMode(SlangMatrixLayoutMode mode)
 void EndToEndCompileRequest::setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode  mode)
 {
     getTargetOptionSet(targetIndex).setMatrixLayoutMode(MatrixLayoutMode(mode));
+}
+
+void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
+}
+
+void EndToEndCompileRequest::setTargetEmbedDXIL(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDXIL, value);
 }
 
 void EndToEndCompileRequest::setTargetLineDirectiveMode(

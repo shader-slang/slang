@@ -294,6 +294,7 @@ INST(Block, block, 0, PARENT)
     INST(FloatLit, float_constant, 0, 0)
     INST(PtrLit, ptr_constant, 0, 0)
     INST(StringLit, string_constant, 0, 0)
+    INST(BlobLit, string_constant, 0, 0)
     INST(VoidLit, void_constant, 0, 0)
 INST_RANGE(Constant, BoolLit, VoidLit)
 
@@ -930,6 +931,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
     INST(SemanticDecoration, semantic, 2, 0)
     INST(ConstructorDecoration, constructor, 1, 0)
+    INST(MethodDecoration, method, 0, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
 
         // Reflection metadata for a shader parameter that provides the original type name.
@@ -1093,6 +1095,7 @@ INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
 INST(BitCast,                           bitCast,                    1, 0)
 INST(Reinterpret,                       reinterpret,                1, 0)
+INST(Unmodified,                        unmodified,                1, 0)
 INST(OutImplicitCast,                   outImplicitCast,           1, 0)
 INST(InOutImplicitCast,                 inOutImplicitCast,         1, 0)
 INST(IntCast, intCast, 1, 0)
@@ -1204,6 +1207,9 @@ INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)
 INST(DebugVar, DebugVar, 4, 0)
 INST(DebugValue, DebugValue, 2, 0)
+
+/* Embedded Precompiled Libraries */
+INST(EmbeddedDXIL, EmbeddedDXIL, 1, 0)
 
 /* Inline assembly */
 

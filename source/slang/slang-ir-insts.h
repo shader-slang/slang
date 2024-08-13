@@ -1365,6 +1365,8 @@ struct IRConstructorDecorartion : IRDecoration
     bool getSynthesizedStatus() { return cast<IRBoolLit>(getOperand(0))->getValue(); }
 };
 
+IR_SIMPLE_DECORATION(MethodDecoration)
+
 struct IRPackOffsetDecoration : IRDecoration
 {
     enum
@@ -3431,6 +3433,7 @@ public:
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
+    IRBlobLit* getBlobValue(ISlangBlob* blob);
     IRPtrLit* _getPtrValue(void* ptr);
     IRPtrLit* getNullPtrValue(IRType* type);
     IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
@@ -3946,6 +3949,8 @@ public:
 
     IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* value);
     IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* alignment, IRInst* value);
+
+    IRInst* emitEmbeddedDXIL(ISlangBlob* blob);
 
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
