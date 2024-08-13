@@ -44,18 +44,4 @@ jobs:
         run: |
           cd tests/mdl
           Copy-Item -Path C:\slang-benchmarks -Destination . -Recurse
-          python compile.py --samples 1 --target dxil --ci
-      - uses: actions/checkout@v3
-        with:
-          repository: venkataram-nv/benchmark
-          ref: main
-          path: ./benchmark
-      - name: Push results
-        run: |
-          ssh-keygen -q -t ed25519 -N '' -f key
-          cat key.pub
-          # TODO: only when pushing to master
-          cp tests/mdl/benchmarks.json benchmark
-          cd benchmark
-          git add . && git commit -m "message"
-          git push origin main
+          python compile.py --samples 16 --target dxil --ci
