@@ -1922,9 +1922,46 @@ namespace Slang
         checkVisibility(classDecl);
     }
 
+    bool isDefaultInitializable(VarDeclBase* var)
+    {
+        // find groupshared modifier
+        if (var->findModifier<HLSLGroupSharedModifier>())
+            return false;
+
+        // find struct and modifiers associatd with var
+        StructDecl* structDecl = as<StructDecl>(var);
+        if (auto declRefType = as<DeclRefType>(var->getType()))
+        {
+            if (auto genericAppRefDecl = as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
+            {
+                auto baseGenericRefType = genericAppRefDecl->getBase()->getDecl();
+                if (auto baseTypeStruct = as<StructDecl>(baseGenericRefType))
+                {
+                    structDecl = baseTypeStruct;
+                }
+                else if (auto genericDecl = as<GenericDecl>(baseGenericRefType))
+                {
+                    if(auto innerTypeStruct = as<StructDecl>(genericDecl->inner))
+                        structDecl = innerTypeStruct;
+                }
+            }
+        }
+        if (structDecl)
+        {
+            if (auto intrinsicOpModifier = structDecl->findModifier<IntrinsicTypeModifier>())
+                if(intrinsicOpModifier->irOp == kIROp_RayQueryType)
+                    return false;
+        }
+
+        return true;
+    }
+
     static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
     {
         if (!varDecl->type || !varDecl->type.type)
+            return nullptr;
+        
+        if (!isDefaultInitializable(varDecl))
             return nullptr;
 
         ConstructorDecl* defaultCtor = nullptr;
