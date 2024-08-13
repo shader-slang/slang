@@ -513,13 +513,13 @@ type packs from the user defined tuple types/tuple values when we introduce tupl
 ### IR Representation
 
 #### Expressing Types
-Types are hoistable insts in Slang IR and is globally deduplicated based on their operands. To allow type packs to benefit from
-this global deduplication service, we will represent `expand` and `each` types in the IR almost 1:1 as they are represented in the AST.
+
+A concrete type pack type is represented as `IRTupleType(T0, T1, ..., Tn)` in the IR, and an abstract type pack such as an `expand` type will eventually be specialized into an `IRTupleType`. This means that a function parameter whose type is a type pack is translated into a single parameter with a equivalent tuple type. In fact, there is no real semantic difference between a tuple type and a type pack, and the reason that we distinguish type packs from tuple types in the frontend is to avoid ambiguity between a user-defined tuple and a compiler-synthesized type pack. Once we are in the IR, there is no more reason to treat them as separate types.
+
+We will represent `expand` and `each` types in the IR almost 1:1 as they are represented in the AST. Note that types are hoistable insts in Slang IR and is globally deduplicated based on their operands, representing it in the natural way will allow these types to take advantage from Slang IR's global deduplication service.
 
 This means that `each T` is represented as `IREachType(T)`, and `expand patternType` is represented as `IRExpandType(PatternType, capturedTypePacks)`
 in the IR.
-
-A concrete type pack type is represented as `IRTypePack(T0, T1, ..., Tn)` in the IR.
 
 For example, the type `expand vector<each T, each U>`, where `T` and `U` are generic type pack parameters, is represented in the IR as:
 ```
@@ -538,7 +538,7 @@ For example, the type `expand vector<each T, each U>`, where `T` and `U` are gen
 A value whose type is a type pack is called a value pack. A value pack is represented in the IR as a tuple.
 For example, the value pack `(1,2,3)` will be represented in the IR as:
 ```
-IRMakeTuple(1,2,3) : IRTypePack(int, int, int)
+IRMakeTuple(1,2,3) : IRTupleType(int, int, int)
 ```
 
 An `expand(PatternExpr)` expression should be represented in the IR as:
@@ -560,7 +560,7 @@ For example, given `v` as value pack whose type is a type pack, `let x = expand 
 
 ```
 %v = /*some value pack whose type is a TypePack*/
-%x = IRExpand
+%x = IRExpand : IRTuple(...)
 {
     IRBlock
     {
