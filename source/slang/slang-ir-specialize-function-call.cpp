@@ -565,7 +565,16 @@ struct FunctionParameterSpecializationContext
             // can handle the corner cases that if the oldBase is a nonuniform
             // resource and also the data type of oldIndex will be handled correctly.
             // By doing so, just add the oldIndex to the key of call info.
-            ioInfo.key.vals.add(oldIndex);
+
+            List<IRAttr*> irAttrs;
+            if (oldIndex->getOp() == kIROp_NonUniformResourceIndex)
+            {
+                IRAttr* attr = getBuilder()->getAttr(kIROp_NonUniformAttr);
+                irAttrs.add(attr);
+            }
+            auto irType = getBuilder()->getAttributedType(oldIndex->getDataType(), irAttrs);
+            ioInfo.key.vals.add(irType);
+
             ioInfo.newArgs.add(oldIndex);
         }
         else if (oldArg->getOp() == kIROp_Load)
