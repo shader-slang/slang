@@ -1928,7 +1928,7 @@ namespace Slang
         if (var->findModifier<HLSLGroupSharedModifier>())
             return false;
 
-        // find struct and modifiers associatd with var
+        // find struct and modifiers associated with var
         StructDecl* structDecl = as<StructDecl>(var);
         if (auto declRefType = as<DeclRefType>(var->getType()))
         {
