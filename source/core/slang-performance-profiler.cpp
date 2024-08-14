@@ -31,11 +31,14 @@ namespace Slang
         }
         virtual void getResult(StringBuilder& out) override
         {
-            for (auto func : data)
+            char buffer[512];
+            for (const auto& func : data)
             {
-                out << func.key << ": \t";
+                memset(buffer, 0, sizeof(buffer));
+                snprintf(buffer, sizeof(buffer), "[*] %30s", func.key);
+                out << buffer << " \t";
                 auto milliseconds = std::chrono::duration_cast< std::chrono::milliseconds >(func.value.duration);
-                out << func.value.invocationCount << "\t" << milliseconds.count() << "ms\n";
+                out << func.value.invocationCount << " \t" << milliseconds.count() << "ms\n";
             }
         }
         virtual void clear() override
