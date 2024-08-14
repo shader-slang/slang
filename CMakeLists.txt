@@ -46,6 +46,7 @@ include(Glob)
 include(LLVM)
 include(SlangTarget)
 include(AutoOption)
+include(GitHubRelease)
 
 #
 # Options
@@ -127,23 +128,24 @@ enum_option(
     FETCH_BINARY
     "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default for Windows)"
     USE_SYSTEM_LLVM
-    "Build slang-llvm using system-provided LLVM and Clang binaries (default for non-Windows hosts)"
+    "Build slang-llvm using system-provided LLVM and Clang binaries"
     DISABLE
     "Do not build llvm or fetch slang-llvm"
 )
-macro(slang_llvm_binary_url_option version filename)
+
+if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
+    # If the user didn't specify a URL, find the best one now
+    if(NOT SLANG_SLANG_LLVM_BINARY_URL)
+        get_best_slang_binary_release_url(url)
+        if(NOT url)
+            message(FATAL_ERROR "Unable to find binary release for slang-llvm, please set a different SLANG_SLANG_LLVM_FLAVOR or set SLANG_SLANG_LLVM_BINARY_URL manually")
+        endif()
+    endif()
     set(SLANG_SLANG_LLVM_BINARY_URL
-        "https://github.com/shader-slang/slang-llvm/releases/download/${version}/${filename}"
+        ${url}
         CACHE STRING
         "URL specifying the location of the slang-llvm prebuilt library"
     )
-endmacro()
-if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-13.x-43-win64.zip")
-elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-v13.x-43-macosx-x86_64-release.zip")
-else()
-    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-v13.x-43-linux-x86_64-release.zip")
 endif()
 
 #
@@ -392,7 +394,7 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
     endif()
 
     set(slang_llvm_dest_object
-        ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${slang_llvm_filename}
+        ${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${slang_llvm_filename}
     )
     add_custom_command(
         OUTPUT ${slang_llvm_dest_object}
