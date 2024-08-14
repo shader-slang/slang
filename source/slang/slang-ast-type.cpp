@@ -624,6 +624,12 @@ Type* ExpandType::_createCanonicalTypeOverride()
 Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
+
+    // Given ExpandType(PatternType, CapturedTypePackParams), we first need to know
+    // if all captured GenericTypePackParams can be substituted into concrete type packs.
+    // We can't expand the ExpandType into a concrete type pack, if any of the captured type
+    // pack parameters aren't concrete themselves.
+    //
     ShortList<Type*> capturedPacks;
     ShortList<ConcreteTypePack*> concreteTypePacks;
     for (Index i = 0; i < getCapturedTypePackCount(); i++)
@@ -649,6 +655,11 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
         auto substPatternType = getPatternType()->substituteImpl(astBuilder, subst, &diff);
         if (!diff)
             return this;
+
+        // If some part of pattern type or captured type can be substituted into something else,
+        // but not all of the captured types are resolved to concrete type packs yet, we will just
+        // create a new ExpandType with the substituted pattern/capture types, instead of actually
+        // expanding into a concrete type pack.
         (*ioDiff)++;
         return astBuilder->getExpandType(as<Type>(substPatternType), capturedPacks.getArrayView().arrayView);
     }
