@@ -568,7 +568,7 @@ struct FunctionParameterSpecializationContext
             // and add it to the key of call info.
 
             List<IRAttr*> irAttrs;
-            if (oldIndex->getOp() == kIROp_NonUniformResourceIndex)
+            if (findNonuniformIndexInst(oldIndex))
             {
                 IRAttr* attr = getBuilder()->getAttr(kIROp_NonUniformAttr);
                 irAttrs.add(attr);
@@ -591,6 +591,27 @@ struct FunctionParameterSpecializationContext
             // a case that this routine is not covering.
             //
             SLANG_UNEXPECTED("mising case in 'getCallInfoForArg'");
+        }
+    }
+
+    IRInst* findNonuniformIndexInst(IRInst* inst)
+    {
+        while(1)
+        {
+            if (inst == nullptr)
+                return nullptr;
+
+            if (inst->getOp() == kIROp_NonUniformResourceIndex)
+                return inst;
+
+            if (inst->getOp() == kIROp_IntCast)
+            {
+                inst = inst->getOperand(0);
+            }
+            else
+            {
+                return nullptr;
+            }
         }
     }
 
@@ -1010,7 +1031,7 @@ struct FunctionParameterSpecializationContext
         // in the new arguments.
         for (auto newArg : callInfo.newArgs)
         {
-            if (newArg->getOp() == Slang::kIROp_NonUniformResourceIndex)
+            if (auto nonuniformIdxInst = findNonuniformIndexInst(newArg))
             {
                 auto firstOrdinary = newFunc->getFirstOrdinaryInst();
 
@@ -1020,7 +1041,7 @@ struct FunctionParameterSpecializationContext
                 // Clone the NonUniformResourceIndex call and insert it at beginning
                 // of the function. Then replace every use of the parameter with the
                 // NonUniformResourceIndex.
-                auto clonedInst = cloneInstAndOperands(&cloneEnv, builder, newArg);
+                auto clonedInst = cloneInstAndOperands(&cloneEnv, builder, nonuniformIdxInst);
                 clonedInst->insertBefore(firstOrdinary);
                 newParam->replaceUsesWith(clonedInst);
 
