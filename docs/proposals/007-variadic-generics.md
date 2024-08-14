@@ -263,9 +263,9 @@ definition of `MyPack`. The definition `expand F<each T>` is represented as:
 ExpandType(
     pattern = DeclRefType(
         GenericAppDeclRef(F,
-            args = [EachType(DeclRefType(GenericTypeParamDecl "T"))])
+            args = [EachType(DeclRefType(GenericTypePackParamDecl "T"))])
     ),
-    capture = DeclRefType(GenericTypeParamDecl "T")
+    capture = DeclRefType(GenericTypePackParamDecl "T")
 )
 ```
 
