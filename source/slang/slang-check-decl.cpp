@@ -1940,7 +1940,7 @@ namespace Slang
         if (!DiagnoseIsAllowedInitExpr(varDecl, nullptr))
             return false;
 
-        // find struct and modifiers associated with varDecl
+        // Find struct and modifiers associated with varDecl
         StructDecl* structDecl = as<StructDecl>(varDecl);
         if (auto declRefType = as<DeclRefType>(varDecl->getType()))
         {
@@ -1960,9 +1960,9 @@ namespace Slang
         }
         if (structDecl)
         {
-            if (auto intrinsicOpModifier = structDecl->findModifier<IntrinsicTypeModifier>())
-                if(intrinsicOpModifier->irOp == kIROp_RayQueryType)
-                    return false;
+            // find if a type is non-copyable
+            if (structDecl->findModifier<NonCopyableTypeAttribute>())
+                return false;
         }
 
         return true;
