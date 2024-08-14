@@ -203,6 +203,10 @@ struct UTF8Util
         /// Non valid utf8 input or ending starting in partial characters, will produce 
         /// undefined results without error.
     static Index calcCodePointCount(const UnownedStringSlice& in);
+
+
+        /// Given a slice in UTF8, calculate the number of UTF16 characters needed to represent the string.
+    static Index calcUTF16CharCount(const UnownedStringSlice& in);
 };
 
 }
