@@ -216,7 +216,7 @@ These rules means that expressions like `expand int`, or `each T` on its own are
 
 Similarly, when using `expand` and `each` on values, we require that:
 - The pattern expression of an `expand` expression must capture at least one value whose type is a generic type pack parameter.
-- The expression after `each` must refer to an value whose type is a generic type pack parameter, and the `each` expression can only appear inside an `expand` expression.
+- The expression after `each` must refer to a value whose type is a generic type pack parameter, and the `each` expression can only appear inside an `expand` expression.
 
 Detailed Explanation
 --------------------
@@ -380,7 +380,7 @@ By the definition of `expand` and `each`, we have these simplification rules:
 ### Type Constraints for Subtype Relationships
 
 We define the sub-type relationship for type packs so that: if `T` is a type pack, then
-`T: IBase` if every type in `T` is a subtype of `IFoo`.
+`T: IFoo` if every type in `T` is a subtype of `IFoo`.
 
 In a generic definition `__generic<each T : IFoo>`, we will say the type pack `T` is a subtype of
 `IFoo`. In the generic definition, we will have a `GenericTypeConstraintDecl` where
@@ -402,7 +402,7 @@ The subtype witness for a `ExpandType(patternType, capture) : IBase` is represen
 Similar to `ExpandType` and `EachType`, we will have simplification rules such that:
 
 - `ExpandSubtypeWitness(EachSubtypeWitness(x))` => `x`
-- `EachSubtypeWitness(ExpandSubtypeWitness(x))` => `x.
+- `EachSubtypeWitness(ExpandSubtypeWitness(x))` => `x`.
 
 #### Canonical Representation of `TransitiveSubtypeWitness` for Type Packs
 
