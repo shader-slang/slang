@@ -221,8 +221,7 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
         SlangResult res = m_actualModule->precompileForTarget(target, outDiagnostics);
         return res;
-    };
-
+    }
 
     SLANG_NO_THROW slang::ISession* ModuleRecorder::getSession()
     {
