@@ -380,7 +380,7 @@ By the definition of `expand` and `each`, we have these simplification rules:
 ### Type Constraints for Subtype Relationships
 
 We define the sub-type relationship for type packs so that: if `T` is a type pack, then
-`T: IFoo` if every type in `T` is a subtype of `IFoo`.
+`T` is a subtype of `IFoo` (noted as `T:IFoo`) if every type in `T` is a subtype of `IFoo`.
 
 In a generic definition `__generic<each T : IFoo>`, we will say the type pack `T` is a subtype of
 `IFoo`. In the generic definition, we will have a `GenericTypeConstraintDecl` where
