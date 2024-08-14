@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -363,7 +364,7 @@ struct FunctionParameterSpecializationContext
             // a new callee function based on the original
             // function and the information we gathered.
             //
-            newFunc = generateSpecializedFunc(oldFunc, funcInfo);
+            newFunc = generateSpecializedFunc(oldFunc, funcInfo, callInfo);
             specializedFuncs.add(callInfo.key, newFunc);
         }
 
@@ -381,6 +382,7 @@ struct FunctionParameterSpecializationContext
         newCall->insertBefore(oldCall);
         oldCall->replaceUsesWith(newCall);
         oldCall->removeAndDeallocate();
+
     }
 
     // Before diving into the details on how we gather information
@@ -559,6 +561,21 @@ struct FunctionParameterSpecializationContext
             // the arguments at the new call site, and
             // don't add anything to the specialization key.
             //
+            // We should also add 2 more things such that our specialization
+            // can handle the corner cases that if the oldBase is a nonuniform
+            // resource and also the data type of oldIndex will be handled correctly.
+            // By doing so, we form an IRAttributedType to include both information
+            // and add it to the key of call info.
+
+            List<IRAttr*> irAttrs;
+            if (findNonuniformIndexInst(oldIndex))
+            {
+                IRAttr* attr = getBuilder()->getAttr(kIROp_NonUniformAttr);
+                irAttrs.add(attr);
+            }
+            auto irType = getBuilder()->getAttributedType(oldIndex->getDataType(), irAttrs);
+            ioInfo.key.vals.add(irType);
+
             ioInfo.newArgs.add(oldIndex);
         }
         else if (oldArg->getOp() == kIROp_Load)
@@ -574,6 +591,27 @@ struct FunctionParameterSpecializationContext
             // a case that this routine is not covering.
             //
             SLANG_UNEXPECTED("mising case in 'getCallInfoForArg'");
+        }
+    }
+
+    IRInst* findNonuniformIndexInst(IRInst* inst)
+    {
+        while(1)
+        {
+            if (inst == nullptr)
+                return nullptr;
+
+            if (inst->getOp() == kIROp_NonUniformResourceIndex)
+                return inst;
+
+            if (inst->getOp() == kIROp_IntCast)
+            {
+                inst = inst->getOperand(0);
+            }
+            else
+            {
+                return nullptr;
+            }
         }
     }
 
@@ -803,7 +841,8 @@ struct FunctionParameterSpecializationContext
     //
     IRFunc* generateSpecializedFunc(
         IRFunc*                         oldFunc,
-        FuncSpecializationInfo const&   funcInfo)
+        FuncSpecializationInfo const&   funcInfo,
+        CallSpecializationInfo const&   callInfo)
     {
         // We will make use of the infrastructure for cloning
         // IR code, that is defined in `ir-clone.{h,cpp}`.
@@ -933,6 +972,18 @@ struct FunctionParameterSpecializationContext
             newBodyInst->insertBefore(newFirstOrdinary);
         }
 
+        // We need to handle a corner case where the new argument of
+        // the callee of this specialized function could be a use of
+        // NonUniformResourceIndex(), in such case, any indexing operation
+        // on the global buffer by using this new argument should be
+        // decorated with NonUniformDecoration. However, inside the new
+        // specialized function, we don't have that information anymore.
+        // Therefore, we will need to scan the new argument list to find out
+        // this case, and insert the NonUniformResourceIndex() instruction
+        // on the corresponding parameter of the new specialized function.
+        maybeInsertNonUniformResourceIndex(newFunc, funcInfo, callInfo);
+
+
         // At this point we've created a new specialized function,
         // and as such it may contain call sites that were not
         // covered when we built our initial work list.
@@ -963,6 +1014,44 @@ struct FunctionParameterSpecializationContext
         simplifyFunc(codeGenContext->getTargetProgram(), newFunc, IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
 
         return newFunc;
+    }
+
+    void maybeInsertNonUniformResourceIndex(
+        IRFunc* newFunc,
+        FuncSpecializationInfo const&   funcInfo,
+        CallSpecializationInfo const&   callInfo)
+    {
+        auto builder = getBuilder();
+        uint32_t paramIndex = 0;
+
+        SLANG_ASSERT(callInfo.newArgs.getCount() == funcInfo.newParams.getCount());
+
+        // Iterate over the new arguments, new parameters pair, and
+        // find out if there is any use of NonUniformResourceIndex()
+        // in the new arguments.
+        for (auto newArg : callInfo.newArgs)
+        {
+            if (auto nonuniformIdxInst = findNonuniformIndexInst(newArg))
+            {
+                auto firstOrdinary = newFunc->getFirstOrdinaryInst();
+
+                IRCloneEnv cloneEnv;
+                auto newParam = funcInfo.newParams[paramIndex];
+
+                // Clone the NonUniformResourceIndex call and insert it at beginning
+                // of the function. Then replace every use of the parameter with the
+                // NonUniformResourceIndex.
+                auto clonedInst = cloneInstAndOperands(&cloneEnv, builder, nonuniformIdxInst);
+                clonedInst->insertBefore(firstOrdinary);
+                newParam->replaceUsesWith(clonedInst);
+
+                // At last, set the operand of the NonUniformResourceIndex to the new parameter
+                // because we haven't done it yet during inst clone.
+                clonedInst->setOperand(0, newParam);
+            }
+            paramIndex++;
+        }
+
     }
 };
 
