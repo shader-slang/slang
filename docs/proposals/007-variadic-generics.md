@@ -285,7 +285,7 @@ ExpandType(
 ```
 
 Note that in this definition, the pattern type no longer contains any references to any `GenericTypePackParamDecl` so there is no way for us
-to know how many elements should the `ExpandType` expand into just from the pattern type itself. Fortunately, we still kept a reference to
+to know how many elements the `ExpandType` should expand into just from the pattern type itself. Fortunately, we still kept a reference to
 the generic type param decl through the `capture` argument in the `ExpandType`. This will allow us to evaluate it into `(int, int, int)` when
 we apply substitution `T=ConcreteTypePack(float, double, void)` to it.
 
