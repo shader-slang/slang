@@ -17,7 +17,7 @@ Status: prototype branch available.
 
 Author: Yong He
 
-Implementation: [PR 4833](https://github.dev/shader-slang/slang/pull/4833)
+Implementation: [PR 4833](https://github.com/shader-slang/slang/pull/4833)
 
 Reviewed by: Kai Zhang
 
