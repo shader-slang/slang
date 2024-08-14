@@ -515,7 +515,7 @@ type packs from the user defined tuple types/tuple values when we introduce tupl
 
 #### Expressing Types
 
-A concrete type pack type is represented as `IRTupleType(T0, T1, ..., Tn)` in the IR, and an abstract type pack such as an `expand` type will eventually be specialized into an `IRTupleType`. This means that a function parameter whose type is a type pack is translated into a single parameter with a equivalent tuple type. In fact, there is no real semantic difference between a tuple type and a type pack, and the reason that we distinguish type packs from tuple types in the frontend is to avoid ambiguity between a user-defined tuple and a compiler-synthesized type pack. Once we are in the IR, there is no more reason to treat them as separate types.
+A concrete type pack is represented as `IRTupleType(T0, T1, ..., Tn)` in the IR, and an abstract type pack such as an `expand` type will eventually be specialized into an `IRTupleType`. This means that a function parameter whose type is a type pack is translated into a single parameter with an equivalent tuple type. In fact, there is no real semantic difference between a tuple type and a type pack, and the reason that we distinguish type packs from tuple types in the frontend is to avoid ambiguity between a user-defined tuple and a compiler-synthesized type pack. Once we are in the IR, there is no more reason to treat them as separate types.
 
 We will represent `expand` and `each` types in the IR almost 1:1 as they are represented in the AST. Note that types are hoistable insts in Slang IR and is globally deduplicated based on their operands, representing it in the natural way will allow these types to take advantage from Slang IR's global deduplication service.
 
