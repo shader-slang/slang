@@ -11,8 +11,8 @@ RWStructuredBuffer<uint> uintBuffer;
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=intBuffer
 RWStructuredBuffer<int> intBuffer;
 
-groupshared uint shareMemUI[4] = { 0, 0, 0, 0 };
-groupshared int shareMemI[4] = { 0, 0, 0, 0 };
+groupshared uint shareMemUI[4];
+groupshared int shareMemI[4];
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -20,6 +20,9 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_DispatchThreadID)
 {
+    shareMemUI = { 0, 0, 0, 0 };
+    shareMemI = { 0, 0, 0, 0 };
+    AllMemoryBarrierWithGroupSync();
     int idx = dispatchThreadID.x;
     float val = 0.0f;
 
