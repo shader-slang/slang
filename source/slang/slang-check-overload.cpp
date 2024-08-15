@@ -680,6 +680,10 @@ namespace Slang
                     packArg->type = paramType;
                     resultArgs.add(packArg);
                 }
+
+                // Always add a flat cost for using an argument pack,
+                // so that we prefer non-pack overloads when possible.
+                candidate.conversionCostSum += kConversionCost_ParameterPack;
             }
             else
             {
@@ -1669,26 +1673,26 @@ namespace Slang
         // Try to match the variadic part.
         // Is the corresponding argument a expand expr? If so it will map 1:1 to the type pack param.
         auto astBuilder = semantics->getASTBuilder();
-        while (remainingArgCount > 0)
-        {
-            auto argType = getArgType(fixedParamCount);
-            if (auto typeType = as<TypeType>(argType))
-            {
-                argType = typeType->getType();
-            }
-            if (isAbstractTypePack(argType))
-            {
-                MatchedArg arg;
-                arg.argExpr = getArg(fixedParamCount);
-                arg.argType = getArgType(fixedParamCount);
-                outMatchedArgs.add(arg);
-                fixedParamCount++;
-                remainingArgCount--;
-                typePackCount--;
-                continue;
-            }
-            break;
-        }
+        //while (remainingArgCount > 0)
+        //{
+        //    auto argType = getArgType(fixedParamCount);
+        //    if (auto typeType = as<TypeType>(argType))
+        //    {
+        //        argType = typeType->getType();
+        //    }
+        //    if (isAbstractTypePack(argType))
+        //    {
+        //        MatchedArg arg;
+        //        arg.argExpr = getArg(fixedParamCount);
+        //        arg.argType = getArgType(fixedParamCount);
+        //        outMatchedArgs.add(arg);
+        //        fixedParamCount++;
+        //        remainingArgCount--;
+        //        typePackCount--;
+        //        continue;
+        //    }
+        //    break;
+        //}
 
         if (remainingArgCount <= 0)
             return true;
@@ -1704,6 +1708,24 @@ namespace Slang
         Index typePackSize = remainingArgCount / typePackCount;
         for (Index i = 0; i < typePackCount; ++i)
         {
+            // If type pack size is 1, we may not need to wrap things in a PackExpr,
+            // if the argument is already a pack.
+            if (typePackSize == 1)
+            {
+                auto argType = getArgType(fixedParamCount + i);
+                if (auto typeType = as<TypeType>(argType))
+                {
+                    argType = typeType->getType();
+                }
+                if (isTypePack(argType))
+                {
+                    MatchedArg arg;
+                    arg.argExpr = getArg(fixedParamCount + i);
+                    arg.argType = getArgType(fixedParamCount + i);
+                    outMatchedArgs.add(arg);
+                    continue;
+                }
+            }
             PackExpr* packExpr = nullptr;
             if (mode == Mode::ForReal)
             {

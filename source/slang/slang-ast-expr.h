@@ -291,8 +291,7 @@ class SwizzleExpr: public Expr
 {
     SLANG_AST_CLASS(SwizzleExpr)
     Expr* base = nullptr;
-    int elementCount;
-    int elementIndices[4];
+    ShortList<UInt, 4> elementIndices;
     SourceLoc memberOpLoc;
 };
 
@@ -423,6 +422,11 @@ class SizeOfExpr : public SizeOfLikeExpr
 class AlignOfExpr : public SizeOfLikeExpr
 {
     SLANG_AST_CLASS(AlignOfExpr);
+};
+
+class CountOfExpr : public SizeOfLikeExpr
+{
+    SLANG_AST_CLASS(CountOfExpr);
 };
 
 class MakeOptionalExpr : public Expr

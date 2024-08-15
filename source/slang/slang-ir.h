@@ -1940,6 +1940,24 @@ struct IRTupleType : IRType
     IR_LEAF_ISA(TupleType)
 };
 
+
+/// Represents a type pack. Type packs behave like tuples, but they have a
+/// "flattening" semantics, so that MakeTypePack(MakeTypePack(T1,T2), T3) is
+/// MakeTypePack(T1,T2,T3).
+struct IRTypePack : IRType
+{
+    IR_LEAF_ISA(TypePack)
+};
+
+// A placeholder struct key for tuple type layouts that will be replaced with
+// the actual struct key when the tuple type is materialized into a struct type.
+struct IRIndexedFieldKey : IRInst
+{
+    IR_LEAF_ISA(IndexedFieldKey)
+    IRInst* getBaseType() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+};
+
 /// Represents a tuple in target language. TargetTupleType will not be lowered to structs.
 struct IRTargetTupleType : IRType
 {
