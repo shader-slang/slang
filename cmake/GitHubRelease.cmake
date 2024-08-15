@@ -2,17 +2,14 @@ function(check_release_and_get_latest owner repo version os arch out_var)
     # Construct the URL for the specified version's release API endpoint
     set(version_url "https://api.github.com/repos/${owner}/${repo}/releases/tags/v${version}")
 
-    # Path to save the JSON response
-    set(json_output_file "${CMAKE_BINARY_DIR}/release_info.json")
+    set(json_output_file "${CMAKE_CURRENT_BINARY_DIR}/${owner}_${repo}_release_info.json")
 
-    # Function to check if the file exists in the assets
-    function(check_assets_for_file json_content expected_zip found_var)
-        # Parse the JSON array of assets
+    function(check_assets_for_file json_content filename found_var)
         string(JSON asset_count LENGTH "${json_content}" "assets")
         set(found "FALSE")
         foreach(i RANGE 0 ${asset_count})
             string(JSON asset_name GET "${json_content}" "assets" ${i} "name")
-            if("${asset_name}" STREQUAL "${expected_zip}")
+            if("${asset_name}" STREQUAL "${filename}")
                 set(found "TRUE")
                 break()
             endif()
@@ -21,44 +18,36 @@ function(check_release_and_get_latest owner repo version os arch out_var)
     endfunction()
 
     # Download the specified release info from GitHub
-    file(DOWNLOAD "${version_url}" "${json_output_file}" STATUS download_status)
-
-    # Check if the download was successful
-    list(GET download_status 0 status_code)
+    file(DOWNLOAD "${version_url}" "${json_output_file}" STATUS download_statuses)
+    list(GET download_statuses 0 status_code)
     if(status_code EQUAL 0)
-        # Read the downloaded JSON file
         file(READ "${json_output_file}" json_content)
 
-        # Construct the expected zip file name
-        set(expected_zip "slang-${version}-${os}-${arch}.zip")
-
         # Check if the specified version contains the expected ZIP file
-        check_assets_for_file("${json_content}" "${expected_zip}" file_found)
+        set(desired_zip "${repo}-${version}-${os}-${arch}.zip")
+        check_assets_for_file("${json_content}" "${desired_zip}" file_found)
 
         if(file_found)
             set(${out_var} "${version}" PARENT_SCOPE)
+            return()
         endif()
-        return()
+        message(WARNING "Failed to find ${desired_zip} in release assets for ${version} from ${version_url}.\nFalling back to latest version if it differs")
+    else()
+        message(WARNING "Failed to download release info for version ${version} from ${version_url}.\nFalling back to latest version if it differs")
     endif()
 
-    message(WARNING "Failed to download release info for version ${version} from ${version_url}.\nFalling back to latest version if it differs")
 
-    # If not found, get the latest release
+    # If not found, get the latest release tag
     set(latest_release_url "https://api.github.com/repos/${owner}/${repo}/releases/latest")
-
-    # Download the latest release info
     file(DOWNLOAD "${latest_release_url}" "${json_output_file}" STATUS download_status)
-
-    # Check if the download was successful
     list(GET download_status 0 status_code)
     if(NOT status_code EQUAL 0)
         message(WARNING "Failed to download latest release info from ${latest_release_url}")
         return()
     endif()
 
-    # Read the latest release JSON
+    # Get the tag from this release json file
     file(READ "${json_output_file}" latest_json_content)
-
     string(JSON latest_release_tag GET "${latest_json_content}" "tag_name")
     string(REGEX REPLACE "^v" "" latest_version "${latest_release_tag}")
 
@@ -68,18 +57,15 @@ function(check_release_and_get_latest owner repo version os arch out_var)
         return()
     endif()
 
-    # Construct the expected zip file name
-    set(expected_zip "slang-${latest_version}-${os}-${arch}.zip")
-
     # Check if the expected ZIP file is in the latest release
-    check_assets_for_file("${latest_json_content}" "${expected_zip}" file_found_latest)
+    set(desired_zip "${repo}-${latest_version}-${os}-${arch}.zip")
+    check_assets_for_file("${latest_json_content}" "${desired_zip}" file_found_latest)
 
     if(file_found_latest)
-        # Extract the latest release tag name and set it as the output variable
+        # If we got it, we found a good version
         set(${out_var} "${latest_version}" PARENT_SCOPE)
     else()
         message(WARNING "No release binary for ${os}-${arch} exists for ${version} or the latest version ${latest_version}")
-        return()
     endif()
 endfunction()
 
