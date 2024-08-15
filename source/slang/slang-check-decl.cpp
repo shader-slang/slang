@@ -2011,31 +2011,25 @@ namespace Slang
             }
             else if(overloadContext.bestCandidate)
             {
-                // We want to be sure we are not trying to set a uninitialized value to initialized
-                // if the ctor was synthisized by the compiler (without a user knowing).
-                auto ctorBestCandidate = as<ConstructorDecl>(overloadContext.bestCandidate->item.declRef.getDecl());
-                if (!ctorBestCandidate || !ctorBestCandidate->containsOption(ConstructorTags::Synthesized))
+                // If we are in the single-candidate case, then we again
+                // want to ignore the case where that candidate wasn't
+                // actually applicable, because declaring a variable
+                // of a type that *doesn't* have a default initializer
+                // isn't actually an error.
+                //
+                if (overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
                 {
-                    // If we are in the single-candidate case, then we again
-                    // want to ignore the case where that candidate wasn't
-                    // actually applicable, because declaring a variable
-                    // of a type that *doesn't* have a default initializer
-                    // isn't actually an error.
+                    getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
+                }
+                else
+                {
+                    // If we had a single best candidate *and* it was applicable,
+                    // then we use it to construct a new initial-value expression
+                    // for the variable, that will be used for all downstream
+                    // code generation.
                     //
-                    if (overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
-                    {
-                        getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
-                    }
-                    else
-                    {
-                        // If we had a single best candidate *and* it was applicable,
-                        // then we use it to construct a new initial-value expression
-                        // for the variable, that will be used for all downstream
-                        // code generation.
-                        //
-                        varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
-                        getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{ *overloadContext.bestCandidate, 0 });
-                    }
+                    varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+                    getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{*overloadContext.bestCandidate, 0});
                 }
             }
         }
