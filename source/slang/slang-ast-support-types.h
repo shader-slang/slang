@@ -96,6 +96,7 @@ namespace Slang
 
         kConversionCost_GenericParamUpcast = 1,
         kConversionCost_UnconstraintGenericParam = 20,
+        kConversionCost_SizedArrayToUnsizedArray = 30,
 
         // Convert between matrices of different layout
         kConversionCost_MatrixLayout = 5,
@@ -676,6 +677,14 @@ namespace Slang
     struct SubstitutionSet
     {
         DeclRefBase* declRef = nullptr;
+
+        // The element index if the substitution is happening inside a pack expansion.
+        // For example, if we are substituting the pattern type of `expand each T`, where
+        // `T` is a type pack, then packExpansionIndex will have a value starting from 0
+        // to the count of the type pack during expansion of the `expand` type when we
+        // substitute `each T` with the element of `T` at index `packExpansionIndex`.
+        Index packExpansionIndex = -1;
+
         SubstitutionSet() = default;
         SubstitutionSet(DeclRefBase* declRefBase)
             :declRef(declRefBase)

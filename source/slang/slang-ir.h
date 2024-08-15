@@ -39,17 +39,6 @@ struct  IRModule;
 struct  IRStructField;
 struct  IRStructKey;
 
-enum class AddressSpace
-{
-    Generic = 0x7fffffff,
-    ThreadLocal = 1,
-    Global = 2,
-    GroupShared = 3,
-    Uniform = 4,
-    // specific address space for payload data in metal
-    MetalObjectData = 5,
-};
-
 typedef unsigned int IROpFlags;
 enum : IROpFlags
 {
@@ -1168,6 +1157,11 @@ struct IRStringLit : IRConstant
     IR_LEAF_ISA(StringLit);
 };
 
+struct IRBlobLit : IRConstant
+{
+    IR_LEAF_ISA(BlobLit);
+};
+
 struct IRPtrLit : IRConstant
 {
     IR_LEAF_ISA(PtrLit);
@@ -1562,6 +1556,7 @@ SIMPLE_IR_TYPE(TextureBufferType, UniformParameterGroupType)
 SIMPLE_IR_TYPE(GLSLInputParameterGroupType, VaryingParameterGroupType)
 SIMPLE_IR_TYPE(GLSLOutputParameterGroupType, VaryingParameterGroupType)
 SIMPLE_IR_TYPE(ParameterBlockType, UniformParameterGroupType)
+SIMPLE_IR_TYPE(DynamicResourceType, Type)
 
 struct IRGLSLShaderStorageBufferType : IRBuiltinGenericType
 {
@@ -1709,11 +1704,11 @@ struct IRPtrTypeBase : IRType
 {
     IRType* getValueType() { return (IRType*)getOperand(0); }
 
-    bool hasAddressSpace() { return getOperandCount() > 1; }
+    bool hasAddressSpace() { return getOperandCount() > 1 && getAddressSpace() != AddressSpace::Generic; }
 
-    IRIntegerValue getAddressSpace()
+    AddressSpace getAddressSpace()
     {
-        return getOperandCount() > 1 ? static_cast<IRIntLit*>(getOperand(1))->getValue() : -1;
+        return getOperandCount() > 1 ? (AddressSpace)static_cast<IRIntLit*>(getOperand(1))->getValue() : AddressSpace::Generic;
     }
 
     IR_PARENT_ISA(PtrTypeBase)
@@ -2350,6 +2345,9 @@ public:
     {
         return m_containerPool;
     }
+
+    // TODO: make a map with lookup by target?
+    ComPtr<ISlangBlob> precompiledDXIL;
 private:
     IRModule() = delete;
 

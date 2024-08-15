@@ -1,19 +1,12 @@
-//TEST:SIMPLE(filecheck=CHK): -target spirv
+//TEST:SIMPLE(filecheck=CHK): -allow-glsl -target spirv
 
 // Using groupshared variables
-groupshared float4 gsConstexpr = float4(1.0f);
-groupshared float4 gsUndefined;
-
-// OK
-float use_constexpr_initialized_gs()
-{
-    return gsConstexpr.x;
-}
+groupshared float4 gsUninitialized;
 
 float use_undefined_gs()
 {
-    //CHK-DAG: warning 41017: use of uninitialized global variable 'gsUndefined'
-    return gsUndefined.x;
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'gsUninitialized'
+    return gsUninitialized.x;
 }
 
 // Using static variables
@@ -35,7 +28,7 @@ void write_to_later()
 
 float use_never_written()
 {
-    //CHK-DAG: warning 41017: use of uninitialized global variable 'writtenNever'
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'writtenNever'
     return writtenNever;
 }
 
@@ -43,6 +36,37 @@ float use_never_written()
 float use_later_writte()
 {
     return writtenLater;
+}
+
+// Varying inputs never warn
+layout(location = 0) in vec4 data;
+
+vec4 glsl_layout_in_ok()
+{
+    return data;
+}
+
+// Layout outputs should still be written to at some point
+layout(location = 1) out vec4 x;
+
+vec4 glsl_layout_out_undefined()
+{
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'x'
+    return x;
+}
+
+layout(location = 2) out vec4 y;
+
+void glsl_layout_out_store(vec4 data)
+{
+    // Written to here...
+    y = data;
+}
+
+vec4 glsl_layout_out_ok()
+{
+    // ...so read here is treated as OK
+    return y;
 }
 
 //CHK-NOT: warning 41017

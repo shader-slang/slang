@@ -6,7 +6,7 @@
 
 #include "slang-ast-support-types.h"
 #include "slang-ast-all.h"
-
+#include "slang-ir.h"
 #include "../core/slang-type-traits.h"
 #include "../core/slang-memory-arena.h"
 
@@ -336,7 +336,7 @@ public:
             case ASTNodeType::ThisTypeDecl:
             case ASTNodeType::ExtensionDecl:
             case ASTNodeType::AssocTypeDecl:
-                return getLookupDeclRef(lookupDeclRef->getLookupSource(), lookupDeclRef->getWitness(), memberDecl);
+                return getLookupDeclRef(lookupDeclRef->getLookupSource(), lookupDeclRef->getWitness(), memberDecl).template as<T>();
             default:
                 break;
             }
@@ -396,13 +396,13 @@ public:
         return getOrCreate<GenericAppDeclRef>(innerDecl, genericDeclRef, args);
     }
 
-    LookupDeclRef* getLookupDeclRef(Type* base, SubtypeWitness* subtypeWitness, Decl* declToLookup)
+    DeclRef<Decl> getLookupDeclRef(Type* base, SubtypeWitness* subtypeWitness, Decl* declToLookup)
     {
         auto result = getOrCreate<LookupDeclRef>(declToLookup, base, subtypeWitness);
         return result;
     }
 
-    LookupDeclRef* getLookupDeclRef(SubtypeWitness* subtypeWitness, Decl* declToLookup)
+    DeclRef<Decl> getLookupDeclRef(SubtypeWitness* subtypeWitness, Decl* declToLookup)
     {
         return getLookupDeclRef(subtypeWitness->getSub(), subtypeWitness, declToLookup);
     }
@@ -439,7 +439,7 @@ public:
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
         // Construct the type `Ptr<valueType>`, where `Ptr`
         // is looked up as a builtin type.
-    PtrType* getPtrType(Type* valueType);
+    PtrType* getPtrType(Type* valueType, AddressSpace addrSpace);
 
         // Construct the type `Out<valueType>`
     OutType* getOutType(Type* valueType);
@@ -448,7 +448,7 @@ public:
     InOutType* getInOutType(Type* valueType);
 
         // Construct the type `Ref<valueType>`
-    RefType* getRefType(Type* valueType);
+    RefType* getRefType(Type* valueType, AddressSpace addrSpace);
 
         // Construct the type `ConstRef<valueType>`
     ConstRefType* getConstRefType(Type* valueType);
@@ -459,6 +459,7 @@ public:
         // Construct a pointer type like `Ptr<valueType>`, but where
         // the actual type name for the pointer type is given by `ptrTypeName`
     PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
+    PtrTypeBase* getPtrType(Type* valueType, AddressSpace addrSpace, char const* ptrTypeName);
 
     ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
 
@@ -513,6 +514,12 @@ public:
 
     TypeType* getTypeType(Type* type);
 
+    Type* getEachType(Type* baseType);
+
+    Type* getExpandType(Type* pattern, ArrayView<Type*> capturedPacks);
+
+    ConcreteTypePack* getTypePack(ArrayView<Type*> types);
+
         /// Produce a witness that `T : T` for any type `T`
     TypeEqualityWitness* getTypeEqualityWitness(
         Type* type);
@@ -521,6 +528,12 @@ public:
         Type*                   subType,
         Type*                   superType,
         DeclRef<Decl> const&    declRef);
+
+    TypePackSubtypeWitness* getSubtypeWitnessPack(Type* subType, Type* superType, ArrayView<SubtypeWitness*> witnesses);
+
+    SubtypeWitness* getExpandSubtypeWitness(Type* subType, Type* superType, SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getEachSubtypeWitness(Type* subType, Type* superType, SubtypeWitness* patternWitness);
 
         /// Produce a witness that `A <: C` given witnesses that `A <: B` and `B <: C`
     SubtypeWitness* getTransitiveSubtypeWitness(

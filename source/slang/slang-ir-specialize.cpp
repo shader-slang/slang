@@ -131,6 +131,15 @@ struct SpecializationContext
         return false;
     }
 
+    // Check if an inst is a dynamic dispatch witness table. 
+    // These insts may not have any uses yet, and do not have side effects,
+    // but should be specialized if necessary.
+    //
+    bool isWitnessTableType(IRInst* inst)
+    {
+        return inst->findDecoration<IRDynamicDispatchWitnessDecoration>();
+    }
+
     // When an instruction isn't fully specialized, but its operands *are*
     // then it is a candidate for specialization itself, so we will have
     // a query to check for the "all operands fully specialized" case.
@@ -826,8 +835,12 @@ struct SpecializationContext
                     // specialization opportunities (generic specialization,
                     // existential specialization, simplifications, etc.)
                     //
-                    if (inst->hasUses() || inst->mightHaveSideEffects())
+                    if (inst->hasUses() ||
+                        inst->mightHaveSideEffects() ||
+                        isWitnessTableType(inst))
+                    {
                         hasSpecialization |= maybeSpecializeInst(inst);
+                    }
 
                     // Finally, we need to make our logic recurse through
                     // the whole IR module, so we want to add the children
@@ -1996,9 +2009,6 @@ struct SpecializationContext
             auto index = inst->getIndex();
 
             auto val = wrapInst->getWrappedValue();
-            auto ptrType = cast<IRPtrTypeBase>(val->getDataType());
-            auto arrayType = cast<IRArrayTypeBase>(ptrType->getValueType());
-            auto elementType = arrayType->getElementType();
 
             auto resultType = inst->getFullType();
 
@@ -2013,8 +2023,7 @@ struct SpecializationContext
                 slotOperands.add(wrapInst->getSlotOperand(ii));
             }
 
-            auto elementPtrType = builder.getPtrType(ptrType->getOp(), elementType);
-            auto newElementAddr = builder.emitElementAddress(elementPtrType, val, index);
+            auto newElementAddr = builder.emitElementAddress(val, index);
 
             auto newWrapExistentialInst = builder.emitWrapExistential(
                 resultType, newElementAddr, slotOperandCount, slotOperands.getArrayView().getBuffer());

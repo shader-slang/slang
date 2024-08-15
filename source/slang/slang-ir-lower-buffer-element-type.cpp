@@ -578,7 +578,7 @@ namespace Slang
                 {
                     if (auto ptrType = as<IRPtrType>(globalInst))
                     {
-                        if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+                        if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
                             elementType = ptrType->getValueType();
                     }
                 }
@@ -703,7 +703,7 @@ namespace Slang
                                         for (UInt i = 0; i < user->getOperandCount(); i++)
                                             args.add(user->getOperand(i));
                                         auto newArrayPtrVal = builder.emitFieldAddress(
-                                            getLoweredPtrLikeType(ptrVal->getDataType(), loweredElementTypeInfo.loweredInnerArrayType),
+                                            builder.getPtrType(loweredElementTypeInfo.loweredInnerArrayType),
                                             ptrVal,
                                             loweredElementTypeInfo.loweredInnerStructKey);
                                         builder.replaceOperand(use, newArrayPtrVal);

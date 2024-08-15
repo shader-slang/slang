@@ -1814,7 +1814,7 @@ void CLikeSourceEmitter::emitRateQualifiers(IRInst* value)
     const auto rate = value->getRate();
     if (rate)
     {
-        emitRateQualifiersAndAddressSpaceImpl(rate, -1);
+        emitRateQualifiersAndAddressSpaceImpl(rate, AddressSpace::Generic);
     }
 }
 
@@ -1822,8 +1822,8 @@ void CLikeSourceEmitter::emitRateQualifiersAndAddressSpace(IRInst* value)
 {
     const auto rate = value->getRate();
     const auto ptrTy = composeGetters<IRPtrTypeBase>(value, &IRInst::getDataType);
-    const auto addressSpace = ptrTy ? ptrTy->getAddressSpace() : -1;
-    if (rate || addressSpace != -1)
+    const auto addressSpace = ptrTy ? ptrTy->getAddressSpace() : AddressSpace::Generic;
+    if (rate || addressSpace != AddressSpace::Generic)
     {
         emitRateQualifiersAndAddressSpaceImpl(rate, addressSpace);
     }
@@ -2887,6 +2887,9 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugLine:
     case kIROp_DebugVar:
     case kIROp_DebugValue:
+        break;
+
+    case kIROp_Unmodified:
         break;
 
         // Insts that needs to be emitted as code blocks.
