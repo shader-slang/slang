@@ -15,11 +15,11 @@ Status
 
 Status: prototype branch available.
 
-Author: Yong He
+Author: Yong He.
 
 Implementation: [PR 4833](https://github.com/shader-slang/slang/pull/4833)
 
-Reviewed by: Kai Zhang
+Reviewed by: Kai Zhang, Jay Kwak, Ariel Glasroth.
 
 Background
 ----------
