@@ -247,6 +247,7 @@ bool isSimpleDataType(IRType* type)
 bool isSimpleHLSLDataType(IRInst* type)
 {
     // TODO
+    if (type) return true; // no unused param error
     return true;
 }
 

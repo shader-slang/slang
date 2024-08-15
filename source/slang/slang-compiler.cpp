@@ -1563,7 +1563,6 @@ namespace Slang
                 {
                     if (inst->getOp() == kIROp_EmbeddedDXIL)
                     {
-                        printf("Extracting embedded DXIL from module inst\n");
                         auto slice = static_cast<IRBlobLit*>(inst->getOperand(0))->getStringSlice();
                         ArtifactDesc desc = ArtifactDescUtil::makeDescForCompileTarget(SLANG_DXIL);
                         desc.kind = ArtifactKind::Library;
@@ -1572,7 +1571,6 @@ namespace Slang
 
                         library->addRepresentationUnknown(StringBlob::create(slice));
                         libraries.add(library);
-                        printf("Added embedded DXIL to libraries\n");
                     }
                 }
             }
