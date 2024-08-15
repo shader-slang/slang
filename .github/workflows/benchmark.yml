@@ -1,4 +1,4 @@
-name: Benchmark
+name: MDL Benchmark
 
 on:
   push:
@@ -42,6 +42,6 @@ jobs:
           pip install prettytable argparse
       - name: Run benchmark
         run: |
-          cd tests/mdl
+          cd tools/benchmark
           Copy-Item -Path C:\slang-benchmarks -Destination . -Recurse
           python compile.py --samples 16 --target dxil --ci
