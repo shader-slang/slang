@@ -13,7 +13,13 @@ namespace Slang
         }
         return nullptr;
     }
-
+    bool allParamHaveInitExpr(ConstructorDecl* ctor)
+    {
+        for (auto i : ctor->getParameters())
+            if (!i->initExpr)
+                return false;
+        return true;
+    }
     List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut)
     {
         List<ConstructorDecl*> ctorList;
@@ -36,7 +42,7 @@ namespace Slang
                 if (!ctor)
                     return;
                 ctorList.add(ctor);
-                if (ctor->members.getCount() != 0 || !defaultCtorOut)
+                if (ctor->members.getCount() != 0 && !allParamHaveInitExpr(ctor) || !defaultCtorOut)
                     return;
                 *defaultCtorOut = ctor;
             };
