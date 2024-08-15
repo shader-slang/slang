@@ -7679,7 +7679,7 @@ namespace Slang
 
     static bool _doesCtorExpectInitializerListUsage(ConstructorDecl* ctor)
     {
-        return ctor->containsOption(ConstructorTags::Synthesized) && ctor->getParameters().getCount() != 0;
+        return ctor->containsOption(ConstructorTags::Synthesized) && ctor->getParameters().getCount() != 0 && !allParamHaveInitExpr(ctor);
     }
 
     void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
@@ -7818,23 +7818,10 @@ namespace Slang
             for (auto& m : structDecl->members)
             {
                 auto varDeclBase = as<VarDeclBase>(m);
-
                 // Static variables are initialized at start of runtime, not inside a constructor
                 if (!varDeclBase
-                    || varDeclBase->hasModifier<HLSLStaticModifier>())
-                    continue;
-
-                // Default initializer initializes/zero's out all values,
-                // do this here. 
-                auto intendedInitExpr = varDeclBase->initExpr;
-                if(structDeclInfo.defaultCtor == ctor && !intendedInitExpr)
-                {
-                    auto defaultExpr = m_astBuilder->create<DefaultConstructExpr>();
-                    defaultExpr->type = varDeclBase->type.type;
-                    intendedInitExpr = defaultExpr;
-                }
-
-                if (!intendedInitExpr)
+                    || varDeclBase->hasModifier<HLSLStaticModifier>()
+                    || !varDeclBase->initExpr)
                     continue;
 
                 MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
@@ -7847,7 +7834,7 @@ namespace Slang
 
                 auto assign = m_astBuilder->create<AssignExpr>();
                 assign->left = memberExpr;
-                assign->right = intendedInitExpr;
+                assign->right = varDeclBase->initExpr;
                 assign->loc = m->loc;
 
                 auto stmt = m_astBuilder->create<ExpressionStmt>();

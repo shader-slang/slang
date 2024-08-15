@@ -465,15 +465,27 @@ namespace Slang
                 maybeArgList.reserve(argCount);
                 Index ioArgIndexMirror = ioArgIndex;
                 UInt ioArgIndexCandidate = 0;
+
+                // We also need to maximize the ctor arg count which is valid when processing ctor.
+                ctorList.stableSort(
+                    [&](ConstructorDecl* a, ConstructorDecl* b)
+                    {
+                        return a->getParameters().getCount() > b->getParameters().getCount();            
+                    }
+                    );
+
                 for (auto& ctor : ctorList)
                 {
                     auto ctorParamCount = ctor->getParameters().getCount();
-                    
+                    if (ctorParamCount == 0)
+                        continue;
+
                     ioArgIndexCandidate = ioArgIndexMirror;
                     ioArgIndex = ctorParamCount;
 
-                    // Skip if too many params expected by ctor
-                    if (ctorParamCount != Index(argCount))
+                    // Skip processing ctor if too many params expected by ctor
+                    // We need to allow non-exact param counts to support array to constructor init-list syntax
+                    if (ctorParamCount > Index(argCount))
                         continue;
 
                     List<ConstructorDecl*> maybeCandidate;

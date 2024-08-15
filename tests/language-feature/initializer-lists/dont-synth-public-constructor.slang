@@ -8,7 +8,6 @@
 // ERROR: error 30500
 import dont_synth_public_constructor_helper;
 
-//TEST_INPUT: ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -21,6 +20,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         && val1.nested1.val1 == 2
         && val1.nested1.val2 == 2
         ) ? 1 : 0;
-
-// BUF: 1
 }

@@ -2934,6 +2934,7 @@ namespace Slang
         LookupOptions       options);
 
     ConstructorDecl* _getDefaultCtor(StructDecl* structDecl);
+    bool allParamHaveInitExpr(ConstructorDecl* ctor);
     List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut);
     bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink);
     bool isDefaultInitializable(Type* varDeclType, VarDeclBase* associatedDecl);
