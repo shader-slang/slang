@@ -7815,39 +7815,36 @@ namespace Slang
 
             auto seqStmtChild = m_astBuilder->create<SeqStmt>();
             seqStmtChild->stmts.reserve(structDecl->members.getCount());
-            for (auto& m : structDecl->members)
+            for (auto varDeclBaseRef : getMembersOfType<VarDeclBase>(m_astBuilder, structDecl, MemberFilterStyle::Instance))
             {
-                auto varDeclBase = as<VarDeclBase>(m);
-                // Static variables are initialized at start of runtime, not inside a constructor
-                if (!varDeclBase
-                    || varDeclBase->hasModifier<HLSLStaticModifier>()
-                    || !varDeclBase->initExpr)
+                auto varDeclBase = varDeclBaseRef.getDecl();
+                if (!varDeclBase->initExpr)
                     continue;
 
                 MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
                 memberExpr->baseExpression = thisExpr;
-                memberExpr->declRef = m->getDefaultDeclRef();
+                memberExpr->declRef = varDeclBase->getDefaultDeclRef();
                 memberExpr->scope = ctor->ownedScope;
-                memberExpr->loc = m->loc;
-                memberExpr->name = m->getName();
-                memberExpr->type = DeclRefType::create(getASTBuilder(), m->getDefaultDeclRef());
+                memberExpr->loc = varDeclBase->loc;
+                memberExpr->name = varDeclBase->getName();
+                memberExpr->type = DeclRefType::create(getASTBuilder(), varDeclBase->getDefaultDeclRef());
 
                 auto assign = m_astBuilder->create<AssignExpr>();
                 assign->left = memberExpr;
                 assign->right = varDeclBase->initExpr;
-                assign->loc = m->loc;
+                assign->loc = varDeclBase->loc;
 
                 auto stmt = m_astBuilder->create<ExpressionStmt>();
                 stmt->expression = assign;
-                stmt->loc = m->loc;
+                stmt->loc = varDeclBase->loc;
 
                 Expr* checkedMemberVarExpr;
-                if (cachedDeclToCheckedVar.containsKey(m))
-                    checkedMemberVarExpr = cachedDeclToCheckedVar[m];
+                if (cachedDeclToCheckedVar.containsKey(varDeclBase))
+                    checkedMemberVarExpr = cachedDeclToCheckedVar[varDeclBase];
                 else
                 {
                     checkedMemberVarExpr = CheckTerm(memberExpr);
-                    cachedDeclToCheckedVar.add({ m, checkedMemberVarExpr });
+                    cachedDeclToCheckedVar.add({ varDeclBase, checkedMemberVarExpr });
                 }
                 if (!checkedMemberVarExpr->type.isLeftValue)
                     continue;
@@ -7881,7 +7878,7 @@ namespace Slang
             auto paramList = ctor->getParameters();
             
             Index memberIndex = 0;
-            auto members = structDecl->getMembersOfType<VarDeclBase>();
+            auto members = getMembersOfType<VarDeclBase>(m_astBuilder, structDecl, MemberFilterStyle::Instance);
 
             auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
             auto seqStmtChild = m_astBuilder->create<SeqStmt>();
@@ -7960,13 +7957,13 @@ namespace Slang
                 paramExpr->type = paramType;
                 paramExpr->loc = param->loc;
 
-                // skip static members
-                VarDeclBase* member = members[memberIndex++];
-                while (member->hasModifier<HLSLStaticModifier>() || getDeclVisibility(member) < ctorVisibility)
+                // Skip static members
+                VarDeclBase* member = members[memberIndex++].getDecl();
+                while (getDeclVisibility(member) < ctorVisibility)
                 {
                     // Should note be possible to be out of range unless compiler generated a synth-ctor wrong.
                     SLANG_ASSERT(memberIndex < members.getCount());
-                    member = members[memberIndex++];
+                    member = members[memberIndex++].getDecl();
                 }
 
                 MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();

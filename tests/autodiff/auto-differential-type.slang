@@ -50,8 +50,8 @@ A f(A a)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     {
-        A a = {1.0, 2.0};
-        A.Differential b = {0.2};
+        A a = { 1.0, 2.0 };
+        A.Differential b = {0.2, 0};
 
         dpA dpa = dpA(a, b);
 

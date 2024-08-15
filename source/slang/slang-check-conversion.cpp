@@ -306,7 +306,6 @@ namespace Slang
         {
             // TODO(tfoley): If we can compute the size of the array statically,
             // then we want to check that there aren't too many initializers present
-
             auto toElementType = toArrayType->getElementType();
             if(!toArrayType->isUnsized())
             {
@@ -491,11 +490,18 @@ namespace Slang
                     List<ConstructorDecl*> maybeCandidate;
                     auto parameters = getParameters(m_astBuilder, ctor);
                     auto parametersCount = parameters.getCount();
+
                     for (auto index = coercedArgs.getCount(); index < parametersCount; index++)
                     {
                         auto ctorParam = parameters[index];
-                        auto paramType = getType(getASTBuilder(), ctorParam);
-                        
+                        auto paramType = ctorParam.getDecl()->type.type;
+                        // Find 'equivlent typed' parameter if a member of the struct to allow subsitution
+                        // in an attempt to resolve the generic of a type 
+                        // (required for vector/matrix/array resolution)
+                        for (auto i : getMembersOfType<VarDecl>(m_astBuilder, toStructDeclRef, MemberFilterStyle::Instance))
+                            if (i.getDecl()->type.type == paramType)
+                                paramType = getType(m_astBuilder, i);
+
                         Expr* coercedArg = nullptr;
                         _readValueFromInitializerList(
                             paramType,
