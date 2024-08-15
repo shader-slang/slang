@@ -23,21 +23,21 @@ struct A : IDifferentiable
     [__unsafeForceInlineEarly]
     static Differential dzero()
     {
-        B b = {0.0};
+        B b = {};
         return b;
     }
 
     [__unsafeForceInlineEarly]
     static Differential dadd(Differential a, Differential b)
     {
-        B o = {a.z + b.z};
+        B o = { a.z + b.z, {}};
         return o;
     }
 
     [__unsafeForceInlineEarly]
     static Differential dmul<T: __BuiltinRealType>(T a, Differential b)
     {
-        B o = {__realCast<float, T>(a) * b.z};
+        B o = { __realCast<float, T>(a) * b.z, {}};
         return o;
     }
 };
