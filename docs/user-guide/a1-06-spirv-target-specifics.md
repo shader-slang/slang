@@ -110,7 +110,8 @@ When targeting SPIR-V, this option emits [SPIR-V NonSemantic Shader DebugInfo In
 ### -O<optimization-level>
 Set the optimization level.
 When targeting SPIR-V, this option applies to the downstream compiler.
-"none(0)" option can help to identify issues when the problem is from the optimization step of the downstream compiler.
+"-O0" option can help to identify issues when the problem is from the optimization step of the downstream compiler.
+Compared to the macro inlining, the specialization helps debugging with "-O0" option, because the specialization preserves the code structure much more than the macro inlining.
 
 ### -fvk-{b|s|t|u}-shift <N> <space>
 For example '-fvk-b-shift <N> <space>' shifts by N the inferred binding
