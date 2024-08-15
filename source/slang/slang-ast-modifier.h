@@ -38,6 +38,9 @@ class ToBeSynthesizedModifier : public Modifier {SLANG_AST_CLASS(ToBeSynthesized
 // Marks that the definition of a decl is synthesized.
 class SynthesizedModifier : public Modifier { SLANG_AST_CLASS(SynthesizedModifier) };
 
+// Marks a synthesized variable as local temporary variable.
+class LocalTempVarModifier : public Modifier { SLANG_AST_CLASS(LocalTempVarModifier) };
+
 // An `extern` variable in an extension is used to introduce additional attributes on an existing
 // field.
 class ExtensionExternVarModifier : public Modifier
