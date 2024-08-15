@@ -1922,9 +1922,58 @@ namespace Slang
         checkVisibility(classDecl);
     }
 
+    bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
+    {
+        // find groupshared modifier
+        if (varDecl->findModifier<HLSLGroupSharedModifier>())
+        {
+            if (sink && varDecl->initExpr)
+                sink->diagnose(varDecl, Diagnostics::cannotHaveInitializer, varDecl, "groupshared");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool isDefaultInitializable(VarDeclBase* varDecl)
+    {
+        if (!DiagnoseIsAllowedInitExpr(varDecl, nullptr))
+            return false;
+
+        // Find struct and modifiers associated with varDecl
+        StructDecl* structDecl = as<StructDecl>(varDecl);
+        if (auto declRefType = as<DeclRefType>(varDecl->getType()))
+        {
+            if (auto genericAppRefDecl = as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
+            {
+                auto baseGenericRefType = genericAppRefDecl->getBase()->getDecl();
+                if (auto baseTypeStruct = as<StructDecl>(baseGenericRefType))
+                {
+                    structDecl = baseTypeStruct;
+                }
+                else if (auto genericDecl = as<GenericDecl>(baseGenericRefType))
+                {
+                    if(auto innerTypeStruct = as<StructDecl>(genericDecl->inner))
+                        structDecl = innerTypeStruct;
+                }
+            }
+        }
+        if (structDecl)
+        {
+            // find if a type is non-copyable
+            if (structDecl->findModifier<NonCopyableTypeAttribute>())
+                return false;
+        }
+
+        return true;
+    }
+
     static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
     {
         if (!varDecl->type || !varDecl->type.type)
+            return nullptr;
+        
+        if (!isDefaultInitializable(varDecl))
             return nullptr;
 
         ConstructorDecl* defaultCtor = nullptr;
@@ -1951,8 +2000,11 @@ namespace Slang
             return defaultCall;
         }
     }
+
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
+        DiagnoseIsAllowedInitExpr(varDecl, getSink());
+
         // if zero initialize is true, set everything to a default
         if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) 
             && !varDecl->initExpr

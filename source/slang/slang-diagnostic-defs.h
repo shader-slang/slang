@@ -526,6 +526,8 @@ DIAGNOSTIC(30504, Error, cannotUseInitializerListForType, "cannot use initialize
 // 3062x: variables
 DIAGNOSTIC(30620, Error, varWithoutTypeMustHaveInitializer, "a variable declaration without an initial-value expression must be given an explicit type")
 DIAGNOSTIC(30622, Error, ambiguousDefaultInitializerForType, "more than one default initializer was found for type '$0'")
+DIAGNOSTIC(30623, Error, cannotHaveInitializer, "'$0' cannot have an initializer because it is $1")
+
 
 // 307xx: parameters
 DIAGNOSTIC(30700, Error, outputParameterCannotHaveDefaultValue, "an 'out' or 'inout' parameter cannot have a default-value expression")
