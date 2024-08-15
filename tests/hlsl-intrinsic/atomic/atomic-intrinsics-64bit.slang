@@ -17,10 +17,10 @@ RWByteAddressBuffer uBuf;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):name=iBuf
 RWByteAddressBuffer iBuf;
 
-groupshared float    f32Shared[4] = { 0.f, 0.f, 0.f, 0.f };
-groupshared uint64_t u64Shared[4] = { 0, 0, 0, 0 };
-groupshared int64_t  i64Shared[4] = { 0, 0, 0, 0 };
-groupshared uint64_t indexAlloc = 0;
+groupshared float f32Shared[4];
+groupshared uint64_t u64Shared[4];
+groupshared int64_t i64Shared[4];
+groupshared uint64_t indexAlloc;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -28,6 +28,12 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_DispatchThreadID)
 {
+    f32Shared = { 0.f, 0.f, 0.f, 0.f };
+    u64Shared = { 0, 0, 0, 0 };
+    i64Shared = { 0, 0, 0, 0 };
+    indexAlloc = 0;
+    GroupMemoryBarrierWithGroupSync();
+
     int idx = dispatchThreadID.x;
     bool result = true;
 

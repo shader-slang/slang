@@ -1173,6 +1173,7 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
     INST(UNormAttr, unorm, 0, HOISTABLE)
     INST(SNormAttr, snorm, 0, HOISTABLE)
     INST(NoDiffAttr, no_diff, 0, HOISTABLE)
+    INST(NonUniformAttr, nonuniform, 0, HOISTABLE)
 
     /* SemanticAttr */
         INST(UserSemanticAttr, userSemantic, 2, HOISTABLE)

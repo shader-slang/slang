@@ -4315,6 +4315,21 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return lowerSubExpr(expr->base);
     }
 
+    LoweredValInfo visitPackExpr(PackExpr*)
+    {
+        SLANG_UNIMPLEMENTED_X("codegen for pack expression");
+    }
+
+    LoweredValInfo visitEachExpr(EachExpr*)
+    {
+        SLANG_UNIMPLEMENTED_X("codegen for each expression");
+    }
+
+    LoweredValInfo visitExpandExpr(ExpandExpr*)
+    {
+        SLANG_UNIMPLEMENTED_X("codegen for expand expression");
+    }
+
     LoweredValInfo getSimpleDefaultVal(IRType* type)
     {
         type = (IRType*)unwrapAttributedType(type);
