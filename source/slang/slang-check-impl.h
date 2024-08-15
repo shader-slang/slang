@@ -2758,8 +2758,6 @@ namespace Slang
 
         CASE(DerefExpr)
         CASE(MakeRefExpr)
-        CASE(MatrixSwizzleExpr)
-        CASE(SwizzleExpr)
         CASE(OverloadedExpr)
         CASE(OverloadedExpr2)
         CASE(AggTypeCtorExpr)
@@ -2771,6 +2769,9 @@ namespace Slang
         CASE(PartiallyAppliedGenericExpr)
         CASE(PackExpr)
     #undef CASE
+        
+        Expr* visitSwizzleExpr(SwizzleExpr* expr) { return expr; }
+        Expr* visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr) { return expr; }
 
         Expr* visitStaticMemberExpr(StaticMemberExpr* expr);
 

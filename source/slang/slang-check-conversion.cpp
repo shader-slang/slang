@@ -521,7 +521,10 @@ namespace Slang
                     // Skip non-visible constructors.
                     if (!isDeclVisible(ctor))
                     {
-                        getSink()->diagnose(fromInitializerListExpr, Diagnostics::declIsNotVisible, ctor);
+                        // if an exact argument match with our init-list we know the user meant to use a
+                        // member-wise constructor, error
+                        if(ctorParamCount == Index(argCount))
+                            getSink()->diagnose(fromInitializerListExpr, Diagnostics::declIsNotVisible, ctor);
                         continue;
                     }
 
