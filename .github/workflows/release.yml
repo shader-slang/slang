@@ -6,6 +6,11 @@ on:
     # caches filled in a scope available to everyone
     branches:
       - master
+    paths-ignore:
+      - 'docs/**'
+      - 'LICENCE'
+      - 'CONTRIBUTION.md'
+      - 'README.md'
     tags:
       - 'v*'
 

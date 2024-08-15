@@ -61,7 +61,10 @@ namespace Slang
     Expr* SemanticsVisitor::moveTemp(Expr* const& expr, F const& func)
     {
         VarDecl* varDecl = m_astBuilder->create<VarDecl>();
-        varDecl->parentDecl = nullptr; // TODO: need to fill this in somehow!
+        varDecl->parentDecl = nullptr;
+        if (m_outerScope && m_outerScope->containerDecl)
+            m_outerScope->containerDecl->addMember(varDecl);
+        addModifier(varDecl, m_astBuilder->create<LocalTempVarModifier>());
         varDecl->checkState = DeclCheckState::DefinitionChecked;
         varDecl->nameAndLoc.loc = expr->loc;
         varDecl->initExpr = expr;
@@ -2101,7 +2104,7 @@ namespace Slang
                 getSink()->diagnose(subscriptExpr, Diagnostics::multiDimensionalArrayNotSupported);
             }
 
-            auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()));
+            auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);
             auto arrayType = getArrayType(
                 m_astBuilder,
                 elementType,
@@ -3476,6 +3479,119 @@ namespace Slang
         return expr;
     }
 
+
+    Expr* SemanticsExprVisitor::visitExpandExpr(ExpandExpr* expr)
+    {
+        OrderedHashSet<Type*> capturedTypePackSet;
+        auto subContext = this->withParentExpandExpr(expr, &capturedTypePackSet);
+        expr->baseExpr = dispatchExpr(expr->baseExpr, subContext);
+
+        Type* patternType = nullptr;
+        bool isTypeExpr = false;
+        if (auto typeType = as<TypeType>(expr->baseExpr->type))
+        {
+            patternType = typeType->getType();
+            isTypeExpr = true;
+        }
+        else
+        {
+            patternType = expr->baseExpr->type;
+        }
+        if (as<ErrorType>(patternType))
+        {
+            expr->type = m_astBuilder->getErrorType();
+            return expr;
+        }
+        if (subContext.getCapturedTypePacks()->getCount() == 0)
+        {
+            getSink()->diagnose(expr, Diagnostics::expandTermCapturesNoTypePacks);
+        }
+        List<Type*> capturedTypePacks;
+        for (auto capturedType : capturedTypePackSet)
+        {
+            capturedTypePacks.add(capturedType);
+        }
+        auto expandType = m_astBuilder->getExpandType(patternType, capturedTypePacks.getArrayView());
+        if (isTypeExpr)
+            expr->type = m_astBuilder->getTypeType(expandType);
+        else
+            expr->type = QualType(expandType);
+        return expr;
+    }
+
+    Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
+    {
+        if (!m_parentExpandExpr)
+        {
+            getSink()->diagnose(expr, Diagnostics::eachExprMustBeInsideExpandExpr);
+            expr->type = m_astBuilder->getErrorType();
+            return expr;
+        }
+
+        expr->baseExpr = CheckTerm(expr->baseExpr);
+        bool isTypeNode = false;
+        Type* baseType = nullptr;
+        if (auto typeType = as<TypeType>(expr->baseExpr->type))
+        {
+            isTypeNode = true;
+            baseType = typeType->getType();
+        }
+        else
+        {
+            baseType = expr->baseExpr->type;
+        }
+        if (as<ErrorType>(baseType))
+        {
+            expr->type = m_astBuilder->getErrorType();
+            return expr;
+        }
+        if (isTypeNode)
+        {
+            auto declRefType = as<DeclRefType>(baseType);
+            if (!declRefType)
+            {
+                goto error;
+            }
+            if (!declRefType->getDeclRef().as<GenericTypePackParamDecl>())
+            {
+                goto error;
+            }
+        }
+        else
+        {
+            if (!isTypePack(baseType) && !as<TupleType>(baseType))
+                goto error;
+        }
+        {
+            SLANG_ASSERT(m_capturedTypePacks);
+            if (auto baseExpandType = as<ExpandType>(baseType))
+            {
+                for (Index i = 0; i < baseExpandType->getCapturedTypePackCount(); i++)
+                {
+                    auto capturedType = baseExpandType->getCapturedTypePack(i);
+                    m_capturedTypePacks->add(capturedType);
+                }
+            }
+            else
+            {
+                m_capturedTypePacks->add(baseType);
+            }
+            auto eachType = m_astBuilder->getEachType(baseType);
+            if (isTypeNode)
+                expr->type = m_astBuilder->getTypeType(eachType);
+            else
+                expr->type = QualType(eachType);
+            return expr;
+        }
+    error:;
+        expr->type = m_astBuilder->getErrorType();
+        if (!as<ErrorType>(baseType))
+        {
+            getSink()->diagnose(expr, Diagnostics::expectTypePackAfterEach);
+        }
+        return expr;
+    }
+
     void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
     {
         auto checkedInvokeExpr = as<InvokeExpr>(invokeExpr);
@@ -4435,7 +4551,7 @@ namespace Slang
         expr->base = CheckProperType(expr->base);
         if (as<ErrorType>(expr->base.type))
             expr->type = expr->base.type;
-        auto ptrType = m_astBuilder->getPtrType(expr->base.type);
+        auto ptrType = m_astBuilder->getPtrType(expr->base.type, AddressSpace::UserPointer);
         expr->type = m_astBuilder->getTypeType(ptrType);
         return expr;
     }

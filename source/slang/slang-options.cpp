@@ -353,7 +353,9 @@ void initCommandOptions(CommandOptions& options)
         "The language to be used for source embedding. Defaults to C/C++. Currently only C/C++ are supported"},
         { OptionKind::DisableShortCircuit, "-disable-short-circuit", nullptr, "Disable short-circuiting for \"&&\" and \"||\" operations" },
         { OptionKind::UnscopedEnum, "-unscoped-enum", nullptr, "Treat enums types as unscoped by default."},
-        { OptionKind::PreserveParameters, "-preserve-params", nullptr, "Preserve all resource parameters in the output code, even if they are not used by the shader."}
+        { OptionKind::PreserveParameters, "-preserve-params", nullptr, "Preserve all resource parameters in the output code, even if they are not used by the shader."},
+        { OptionKind::EmbedDXIL, "-embed-dxil", nullptr,
+        "Embed DXIL into emitted slang-modules for faster linking" },
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
@@ -426,7 +428,6 @@ void initCommandOptions(CommandOptions& options)
         "A path to a specific spirv.core.grammar.json to use when generating SPIR-V output" },
         { OptionKind::IncompleteLibrary, "-incomplete-library", nullptr,
         "Allow generating code from incomplete libraries with unresolved external functions" },
-
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
@@ -529,6 +530,7 @@ void initCommandOptions(CommandOptions& options)
         "Do not pack elements of constant buffers into structs in the output HLSL code." },
         { OptionKind::ValidateUniformity, "-validate-uniformity", nullptr, "Perform uniformity validation analysis." },
         { OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language." },
+        { OptionKind::EnableExperimentalPasses, "-enable-experimental-passes", nullptr, "Enable experimental compiler passes" },
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -698,6 +700,8 @@ struct OptionsParser
     void setProfileVersion(RawTarget* rawTarget, ProfileVersion profileVersion);
     void setProfile(RawTarget* rawTarget, Profile profile);
     void addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom);
+
+    SlangResult addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option);
     
     void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode);
     
@@ -1635,6 +1639,23 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
     return SLANG_OK;
 }
 
+// Creates a target of the specified type whose output will be embedded as IR metadata
+SlangResult OptionsParser::addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option)
+{
+    RawTarget rawTarget;
+    rawTarget.format = format;
+    // Silently allow redundant targets if it is the same as the last specified target.
+    if (m_rawTargets.getCount() == 0 || m_rawTargets.getLast().format != rawTarget.format)
+    {
+        m_rawTargets.add(rawTarget);
+    }
+
+    getCurrentTarget()->optionSet.add(option, true);
+    getCurrentTarget()->optionSet.add(CompilerOptionName::GenerateWholeProgram, true);
+
+    return SLANG_OK;
+}
+
 SlangResult OptionsParser::_parse(
     int             argc,
     char const* const* argv)
@@ -1693,6 +1714,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::NoMangle:
             case OptionKind::ValidateUniformity:
             case OptionKind::AllowGLSL:
+            case OptionKind::EnableExperimentalPasses:
             case OptionKind::EmitIr:
             case OptionKind::DumpIntermediates:
             case OptionKind::DumpReproOnError:
@@ -1925,6 +1947,7 @@ SlangResult OptionsParser::_parse(
                 linkage->m_optionSet.set(optionKind, compressionType);
                 break;
             }
+            case OptionKind::EmbedDXIL: SLANG_RETURN_ON_FAIL(addEmbeddedLibrary(CodeGenTarget::DXIL, CompilerOptionName::EmbedDXIL)); break;
             case OptionKind::Target:
             {
                 CommandLineArg name;
@@ -2755,6 +2778,16 @@ SlangResult OptionsParser::_parse(
             if (rawTarget.optionSet.shouldUseScalarLayout())
             {
                 m_compileRequest->setTargetForceGLSLScalarBufferLayout(targetID, true);
+            }
+
+            if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))
+            {
+                m_compileRequest->setTargetGenerateWholeProgram(targetID, true);
+            }
+
+            if (rawTarget.optionSet.getBoolOption(CompilerOptionName::EmbedDXIL))
+            {
+                m_compileRequest->setTargetEmbedDXIL(targetID, true);
             }
         }
 
