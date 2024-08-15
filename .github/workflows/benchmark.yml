@@ -36,12 +36,9 @@ jobs:
         run: |
           cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
           cmake --workflow --preset release
-      - name: Setup
-        run: |
-          cd tests/mdl
-          pip install prettytable argparse
       - name: Run benchmark
         run: |
           cd tools/benchmark
+          pip install prettytable argparse
           Copy-Item -Path C:\slang-benchmarks -Destination . -Recurse
           python compile.py --samples 16 --target dxil --ci
