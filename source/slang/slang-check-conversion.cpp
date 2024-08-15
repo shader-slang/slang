@@ -456,7 +456,7 @@ namespace Slang
                 if (argCount == 0)
                 {
                     if (outToExpr)
-                        *outToExpr = constructDefaultInitExprForVar(this, (TypeExp)toType);
+                        *outToExpr = constructDefaultInitExprForVar(this, (TypeExp)toType, nullptr);
                     return true;
                 }
 

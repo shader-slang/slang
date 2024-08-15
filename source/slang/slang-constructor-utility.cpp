@@ -54,9 +54,65 @@ namespace Slang
         return ctorList;
     }
 
-    Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, TypeExp varDeclType)
+    bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
+    {
+        if (!varDecl)
+            return true;
+
+        // find groupshared modifier
+        if (varDecl->findModifier<HLSLGroupSharedModifier>())
+        {
+            if (sink && varDecl->initExpr)
+                sink->diagnose(varDecl, Diagnostics::cannotHaveInitializer, varDecl, "groupshared");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool isDefaultInitializable(Type* varDeclType, VarDeclBase* associatedDecl)
+    {
+        if (!DiagnoseIsAllowedInitExpr(associatedDecl, nullptr))
+            return false;
+
+        // Find struct and modifiers associated with varDecl
+        StructDecl* structDecl = nullptr;
+        if (auto declRefType = as<DeclRefType>(varDeclType))
+        {
+            if (auto genericAppRefDecl = as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
+            {
+                auto baseGenericRefType = genericAppRefDecl->getBase()->getDecl();
+                if (auto baseTypeStruct = as<StructDecl>(baseGenericRefType))
+                {
+                    structDecl = baseTypeStruct;
+                }
+                else if (auto genericDecl = as<GenericDecl>(baseGenericRefType))
+                {
+                    if (auto innerTypeStruct = as<StructDecl>(genericDecl->inner))
+                        structDecl = innerTypeStruct;
+                }
+            }
+            else
+            {
+                structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl());
+            }
+        }
+        if (structDecl)
+        {
+            // find if a type is non-copyable
+            if (structDecl->findModifier<NonCopyableTypeAttribute>())
+                return false;
+        }
+
+        return true;
+    }
+
+    Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, TypeExp varDeclType, VarDeclBase* decl)
     {
         if (!varDeclType || !varDeclType.type)
+            return nullptr;
+
+        if (!isDefaultInitializable(varDeclType.type, decl))
             return nullptr;
 
         ConstructorDecl* defaultCtor = nullptr;

@@ -2935,7 +2935,9 @@ namespace Slang
 
     ConstructorDecl* _getDefaultCtor(StructDecl* structDecl);
     List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut);
-    Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, TypeExp varDeclType);
+    bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink);
+    bool isDefaultInitializable(Type* varDeclType, VarDeclBase* associatedDecl);
+    Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, TypeExp varDeclType, VarDeclBase* decl);
 
     DeclRefBase* _getDeclRefFromVal(Val* val);
 

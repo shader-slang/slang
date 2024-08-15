@@ -1912,85 +1912,6 @@ namespace Slang
         checkVisibility(classDecl);
     }
 
-    bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
-    {
-        // find groupshared modifier
-        if (varDecl->findModifier<HLSLGroupSharedModifier>())
-        {
-            if (sink && varDecl->initExpr)
-                sink->diagnose(varDecl, Diagnostics::cannotHaveInitializer, varDecl, "groupshared");
-            return false;
-        }
-
-        return true;
-    }
-
-    bool isDefaultInitializable(VarDeclBase* varDecl)
-    {
-        if (!DiagnoseIsAllowedInitExpr(varDecl, nullptr))
-            return false;
-
-        // Find struct and modifiers associated with varDecl
-        StructDecl* structDecl = as<StructDecl>(varDecl);
-        if (auto declRefType = as<DeclRefType>(varDecl->getType()))
-        {
-            if (auto genericAppRefDecl = as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
-            {
-                auto baseGenericRefType = genericAppRefDecl->getBase()->getDecl();
-                if (auto baseTypeStruct = as<StructDecl>(baseGenericRefType))
-                {
-                    structDecl = baseTypeStruct;
-                }
-                else if (auto genericDecl = as<GenericDecl>(baseGenericRefType))
-                {
-                    if(auto innerTypeStruct = as<StructDecl>(genericDecl->inner))
-                        structDecl = innerTypeStruct;
-                }
-            }
-        }
-        if (structDecl)
-        {
-            // find if a type is non-copyable
-            if (structDecl->findModifier<NonCopyableTypeAttribute>())
-                return false;
-        }
-
-        return true;
-    }
-
-    static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
-    {
-        if (!varDecl->type || !varDecl->type.type)
-            return nullptr;
-        
-        if (!isDefaultInitializable(varDecl))
-            return nullptr;
-
-        ConstructorDecl* defaultCtor = nullptr;
-        auto declRefType = as<DeclRefType>(varDecl->type.type);
-        if (declRefType)
-        {
-            if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
-            {
-                defaultCtor = _getDefaultCtor(structDecl);
-            }
-        }
-
-        if (defaultCtor)
-        {
-            auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
-            auto member = visitor->getASTBuilder()->getMemberDeclRef(declRefType->getDeclRef(), defaultCtor);
-            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
-            return invoke;
-        }
-        else
-        {
-            auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();
-            defaultCall->type = QualType(varDecl->type);
-            return defaultCall;
-        }
-    }
-
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
         DiagnoseIsAllowedInitExpr(varDecl, getSink());
@@ -2001,7 +1922,7 @@ namespace Slang
             && as<VarDecl>(varDecl)
             )
         {
-            varDecl->initExpr = constructDefaultInitExprForVar(this, varDecl->type);
+            varDecl->initExpr = constructDefaultInitExprForVar(this, varDecl->type, varDecl);
         }
         
         if (auto initExpr = varDecl->initExpr)
@@ -7826,7 +7747,7 @@ namespace Slang
             if (!isDefaultInitializableType
                 || varDeclBase->initExpr)
                 continue;
-            varDeclBase->initExpr = constructDefaultInitExprForVar(this, varDeclBase->type);
+            varDeclBase->initExpr = constructDefaultInitExprForVar(this, varDeclBase->type, varDeclBase);
         }
 
         Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
