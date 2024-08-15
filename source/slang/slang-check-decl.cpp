@@ -7079,8 +7079,6 @@ namespace Slang
             else if (auto genericTypePackParamDecl = as<GenericTypePackParamDecl>(mm))
             {
                 auto packType = DeclRefType::create(astBuilder, astBuilder->getDirectDeclRef(genericTypePackParamDecl));
-                //auto eachType = astBuilder->getEachType(packType);
-                //auto expandType = astBuilder->getExpandType(eachType, makeArrayViewSingle(packType));
                 args.add(packType);
             }
             else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
@@ -7579,7 +7577,7 @@ namespace Slang
         }
         else if (isTypePack(paramDecl->type.type))
         {
-            // A parameter pack is always `const` if it is not `inout`.
+            // For now, we only allow parameter packs to be `const`.
             bool hasConstModifier = false;
             for (auto modifier : paramDecl->modifiers)
             {
