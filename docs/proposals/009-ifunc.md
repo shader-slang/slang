@@ -104,7 +104,7 @@ in its `__call` method.
 The `IMutatingFunc` interface is for defining functors that has a mutable state. The following example demonstrates its use:
 
 ```
-void forEach(int data[100], inout IFunc<void, int> f)
+void forEach(int data[100], inout IMutatingFunc<void, int> f)
 {
     for (int i = 0; i < data.getCount(); i++)
         f(data[i]);
