@@ -7799,8 +7799,10 @@ namespace Slang
             thisExpr->scope = ctor->ownedScope;
             thisExpr->type = ctor->returnType.type;
 
-            for (auto param : paramList)
+            auto paramCount = paramList.getCount();
+            while (paramIndex < paramCount)
             {
+                auto param = paramList[paramIndex];
                 // If we have a base type, the first arg is a 'base->__init(...)'. We need to find this 'base->__init(...)'
                 // and assign the parameters needed to call '__init(...)'
                 if (paramIndex == 0 && baseTypeCtorList.getCount() > 0)
