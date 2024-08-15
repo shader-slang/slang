@@ -426,7 +426,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
         "Generate SPIR-V output by compiling generated GLSL with glslang" },
         { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
-        "Generate SPIR-V output direclty (default)" },
+        "Generate SPIR-V output directly (default)" },
         { OptionKind::SPIRVCoreGrammarJSON, "-spirv-core-grammar", nullptr,
         "A path to a specific spirv.core.grammar.json to use when generating SPIR-V output" },
         { OptionKind::IncompleteLibrary, "-incomplete-library", nullptr,
