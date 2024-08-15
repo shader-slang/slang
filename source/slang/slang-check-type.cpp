@@ -389,7 +389,7 @@ namespace Slang
         return CoerceToProperType(TranslateTypeNode(typeExp));
     }
 
-    TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp)
+    TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
     {
         TypeExp result = CoerceToProperType(typeExp);
         Type* type = result.type;
@@ -404,12 +404,20 @@ namespace Slang
                 return result;
             }
         }
+
+        // A type pack is not a usable type other than for defining parameters.
+        if (!as<ParamDecl>(decl) && isTypePack(type))
+        {
+            getSink()->diagnose(typeExp.exp, Diagnostics::improperUseOfType, typeExp.type);
+            result.type = m_astBuilder->getErrorType();
+            return result;
+        }
         return result;
     }
 
-    TypeExp SemanticsVisitor::CheckUsableType(TypeExp typeExp)
+    TypeExp SemanticsVisitor::CheckUsableType(TypeExp typeExp, Decl* decl)
     {
-        return CoerceToUsableType(TranslateTypeNode(typeExp));
+        return CoerceToUsableType(TranslateTypeNode(typeExp), decl);
     }
 
     bool SemanticsVisitor::ValuesAreEqual(
