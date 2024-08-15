@@ -99,6 +99,8 @@ bool isValueType(IRInst* type);
 
 bool isSimpleDataType(IRType* type);
 
+bool isSimpleHLSLDataType(IRType* type);
+
 SourceLoc findFirstUseLoc(IRInst* inst);
 
 inline bool isChildInstOf(IRInst* inst, IRInst* parent)

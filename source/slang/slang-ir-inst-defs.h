@@ -780,6 +780,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
     INST(WaveSizeDecoration,                waveSize,               1, 0)
 
+    INST(AvailableInDXILDecoration,         availableInDXIL,        0, 0)
+
         // Added to IRParam parameters to an entry point
     /* GeometryInputPrimitiveTypeDecoration */
         INST(PointInputPrimitiveTypeDecoration,  pointPrimitiveType,     0, 0)

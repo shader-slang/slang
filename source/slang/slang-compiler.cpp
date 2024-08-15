@@ -350,7 +350,7 @@ namespace Slang
     Profile Profile::lookUp(UnownedStringSlice const& name)
     {
         #define PROFILE(TAG, NAME, STAGE, VERSION)	if(name == UnownedTerminatedStringSlice(#NAME)) return Profile::TAG;
-        #define PROFILE_ALIAS(TAG, DEF, NAME)		if(name == UnownedTerminatedStringSlice(#NAME)) return Profile::TAG;
+        #define PROFILE_ALIAS(TAG, DEF, NAME)     	if(name == UnownedTerminatedStringSlice(#NAME)) return Profile::TAG;
         #include "slang-profile-defs.h"
 
         return Profile::Unknown;
@@ -1090,23 +1090,6 @@ namespace Slang
         return SLANG_OK;
     }
 
-    bool CodeGenContext::isPrecompiled()
-    {
-        auto program = getProgram();
-
-        bool allPrecompiled = true;
-        program->enumerateIRModules([&](IRModule* irModule)
-            {
-                // TODO: Conditionalize this on target
-                if (!irModule->precompiledDXIL)
-                {
-                    allPrecompiled = false;
-                }
-            });
-
-        return allPrecompiled;
-    }
-
     SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact)
     {
         outArtifact.setNull();
@@ -1268,15 +1251,17 @@ namespace Slang
         }
         else
         {
-            if (!isPrecompiled())
+            CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
+
+            if (target == CodeGenTarget::DXILAssembly || target == CodeGenTarget::DXIL)
             {
-                CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
-
-                SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
-                sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
-
-                sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
+                sourceCodeGenContext.removeAvailableInDXIL = true;
             }
+
+            SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
+            sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
+
+            sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
         }
 
         if (sourceArtifact)
@@ -1567,24 +1552,31 @@ namespace Slang
             libraries.addRange(linkage->m_libModules.getBuffer(), linkage->m_libModules.getCount());
         }
 
-        if (isPrecompiled())
+        auto program = getProgram();
+
+        // Load embedded precompiled libraries from IR into library artifacts
+        program->enumerateIRModules([&](IRModule* irModule)
         {
-            auto program = getProgram();
-            program->enumerateIRModules([&](IRModule* irModule)
+            for (auto inst : irModule->getModuleInst()->getChildren())
+            {
+                if (target == CodeGenTarget::DXILAssembly || target == CodeGenTarget::DXIL)
                 {
-                    // TODO: conditionalize on target
-                    if (irModule->precompiledDXIL)
+                    if (inst->getOp() == kIROp_EmbeddedDXIL)
                     {
+                        printf("Extracting embedded DXIL from module inst\n");
+                        auto slice = static_cast<IRBlobLit*>(inst->getOperand(0))->getStringSlice();
                         ArtifactDesc desc = ArtifactDescUtil::makeDescForCompileTarget(SLANG_DXIL);
                         desc.kind = ArtifactKind::Library;
 
                         auto library = ArtifactUtil::createArtifact(desc);
 
-                        library->addRepresentationUnknown(irModule->precompiledDXIL);
+                        library->addRepresentationUnknown(StringBlob::create(slice));
                         libraries.add(library);
+                        printf("Added embedded DXIL to libraries\n");
                     }
-                });
-        }
+                }
+            }
+        });
 
         options.compilerSpecificArguments = allocator.allocate(compilerSpecificArguments);
         options.requiredCapabilityVersions = SliceUtil::asSlice(requiredCapabilityVersions);

@@ -2729,6 +2729,10 @@ namespace Slang
 
         void maybeDumpIntermediate(IArtifact* artifact);
 
+        // Used to cause instructions available in precompiled DXIL to be
+        // removed between IR linking and target source generation.
+        bool removeAvailableInDXIL = false;
+
     protected:
         CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
         ExtensionTracker* m_extensionTracker = nullptr;
@@ -2765,11 +2769,6 @@ namespace Slang
 
 
         SlangResult _emitEntryPoints(ComPtr<IArtifact>& outArtifact);
-
-	/* Checks if all modules in the target program are already compiled to the
-        target language, indicating that a pass-through linking using the
-        downstream compiler is viable.*/
-        bool isPrecompiled();
     private:
         Shared* m_shared = nullptr;
     };

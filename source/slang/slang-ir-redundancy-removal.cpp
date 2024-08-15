@@ -145,6 +145,30 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
     return result;
 }
 
+// Remove all [AvailableInDXIL] functions when compiling DXIL.
+void removeAvailableInDXIL(IRModule* module)
+{
+    printf("removeAvailableInDXIL\n");
+    List<IRInst*> toRemove;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (!as<IRFunc>(globalInst))
+        {
+            continue;
+        }
+        if (globalInst->findDecoration<IRAvailableInDXILDecoration>())
+        {
+            printf("removing due to precompdxil:\n");
+            globalInst->findDecoration<IRNameHintDecoration>()->dump();
+            toRemove.add(globalInst);
+        }
+    }
+    for (auto inst : toRemove)
+    {
+        inst->removeAndDeallocate();
+    }
+}
+
 static IRInst* _getRootVar(IRInst* inst)
 {
     while (inst)

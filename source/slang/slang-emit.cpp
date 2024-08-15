@@ -58,6 +58,7 @@
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
+#include "slang-ir-redundancy-removal.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-sccp.h"
@@ -737,6 +738,11 @@ Result linkAndOptimizeIR(
         break;
     default:
         break;
+    }
+
+    if (codeGenContext->removeAvailableInDXIL)
+    {
+        removeAvailableInDXIL(irModule);
     }
 
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())

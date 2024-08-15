@@ -10,4 +10,6 @@ namespace Slang
     bool removeRedundancyInFunc(IRGlobalValueWithCode* func);
 
     bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func);
+
+    void removeAvailableInDXIL(IRModule* module);
 }

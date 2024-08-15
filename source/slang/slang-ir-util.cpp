@@ -244,6 +244,12 @@ bool isSimpleDataType(IRType* type)
     }
 }
 
+bool isSimpleHLSLDataType(IRInst* type)
+{
+    // TODO
+    return true;
+}
+
 SourceLoc findFirstUseLoc(IRInst* inst)
 {
     for (auto use = inst->firstUse; use; use = use->nextUse)
