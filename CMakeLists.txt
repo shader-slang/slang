@@ -126,7 +126,7 @@ enum_option(
     "How to get or build slang-llvm:"
     # Options
     FETCH_BINARY
-    "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default for Windows)"
+    "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default)"
     USE_SYSTEM_LLVM
     "Build slang-llvm using system-provided LLVM and Clang binaries"
     DISABLE
