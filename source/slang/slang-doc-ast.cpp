@@ -47,9 +47,14 @@ namespace Slang {
     }
 }
 
+bool doWeDocDecl(Decl* decl)
+{
+    return !getText(decl->getName()).startsWith("$__syn") && !decl->findModifier<SynthesizedModifier>();
+}
+
 static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
 {
-    if (decl == nullptr)
+    if (decl == nullptr || !doWeDocDecl(decl))
     {
         return;
     }
@@ -109,7 +114,7 @@ SlangResult ASTMarkupUtil::extract(ModuleDecl* moduleDecl, SourceManager* source
             item.searchStyle = getSearchStyle(decl);
 
             // Don't generate documentation for synthesized members.
-            if (getText(decl->getName()).startsWith("$__syn"))
+            if (!doWeDocDecl(decl))
                 item.searchStyle = DocMarkupExtractor::SearchStyle::None;
         }
 
