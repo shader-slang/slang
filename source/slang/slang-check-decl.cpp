@@ -10342,7 +10342,6 @@ namespace Slang
                 auto varDecl = varDeclRef.getDecl();
                 ensureDecl(varDecl, DeclCheckState::TypesFullyResolved);
                 auto declVisibility = getDeclVisibility(varDecl);
-                auto varDeclType = varDecl->type;
 
                 switch (declVisibility)
                 {
