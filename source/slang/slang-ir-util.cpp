@@ -244,10 +244,11 @@ bool isSimpleDataType(IRType* type)
     }
 }
 
-bool isSimpleHLSLDataType(IRInst* type)
+bool isSimpleHLSLDataType(IRInst* inst)
 {
-    // TODO
-    if (type) return true; // no unused param error
+    // TODO: Add criteria
+    // https://github.com/shader-slang/slang/issues/4792
+    (void)inst; // avoid unused param error
     return true;
 }
 

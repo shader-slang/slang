@@ -4,6 +4,7 @@
 #include "../core/slang-basic.h"
 #include "slang-compiler.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-capability.h"
 
 namespace Slang
@@ -84,9 +85,12 @@ namespace Slang
 
                 if (!hasResourceType)
                 {
-                    // add HLSL export decoration to inst to preserve it in precompilation
-                    hasAtLeastOneFunction = true;
-                    builder.addDecorationIfNotExist(inst, kIROp_HLSLExportDecoration);
+                    if (isSimpleHLSLDataType(inst))
+                    {
+                        // add HLSL export decoration to inst to preserve it in precompilation
+                        hasAtLeastOneFunction = true;
+                        builder.addDecorationIfNotExist(inst, kIROp_HLSLExportDecoration);
+                    }
                 }
             }
         }

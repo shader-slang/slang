@@ -99,7 +99,7 @@ bool isValueType(IRInst* type);
 
 bool isSimpleDataType(IRType* type);
 
-bool isSimpleHLSLDataType(IRType* type);
+bool isSimpleHLSLDataType(IRInst* inst);
 
 SourceLoc findFirstUseLoc(IRInst* inst);
 
