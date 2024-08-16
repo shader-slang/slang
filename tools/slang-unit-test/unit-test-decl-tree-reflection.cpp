@@ -277,15 +277,6 @@ SLANG_UNIT_TEST(declTreeReflection)
         SLANG_CHECK(specializationInfo->getConcreteIntVal(valueParam) == 10);
     }
 
-    // Check lookups on a namespace
-    {
-        auto type = compositeProgram->getLayout()->findTypeByName("MyNamespace");
-        SLANG_CHECK(type != nullptr);
-        SLANG_CHECK(UnownedStringSlice(type->getName()) == "MyNamespace");
-        auto innerStruct = compositeProgram->getLayout()->findTypeByNameInType(type, "MyStruct");
-    }
-
-
     // Check iterators
     {
         unsigned int count = 0;

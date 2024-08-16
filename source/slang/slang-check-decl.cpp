@@ -7119,6 +7119,95 @@ namespace Slang
 
         return args;
     }
+    
+    SubstitutionSet makeSubstitutionFromIncompleteSet(
+        ASTBuilder* astBuilder,
+        SemanticsVisitor* semantics,
+        DeclRef<GenericDecl> genericDeclRef,
+        Dictionary<Decl*, Val*> paramArgMap,
+        DiagnosticSink* sink)
+    {
+        GenericDecl* genericDecl = genericDeclRef.getDecl();
+        List<Val*> args;
+        List<Val*> defaultArgs = getDefaultSubstitutionArgs(astBuilder, semantics, genericDecl);
+
+        UIndex argIndex = 0;
+        for (auto mm : genericDecl->members)
+        {
+            if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm))
+            {
+                if (auto userArg = paramArgMap[genericTypeParamDecl])
+                {
+                    args.add(userArg);
+                }
+                else
+                {
+                    args.add(defaultArgs[argIndex]);
+                }
+            }
+            else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
+            {
+                if (auto userArg = paramArgMap[genericValueParamDecl])
+                {
+                    args.add(userArg);
+                }
+                else
+                {
+                    args.add(defaultArgs[argIndex]);
+                }
+            }
+
+            argIndex++;
+        }
+
+        // create default substitution arguments for constraints
+        for (auto mm : genericDecl->members)
+        {
+            if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(mm))
+            {
+                if (auto declRefType = as<DeclRefType>(genericTypeConstraintDecl->sub))
+                {
+                    if (auto typeParamDecl = as<GenericTypeParamDecl>(declRefType->getDeclRef().getDecl()))
+                    {
+                        if (paramArgMap.containsKey(typeParamDecl))
+                        {
+                            auto userArg = paramArgMap[declRefType->getDeclRef().getDecl()];
+                            
+                            // Check constraint satisfaction
+                            auto superType = genericDeclRef.substitute(astBuilder, genericTypeConstraintDecl->getSup().type);
+                            auto witness = semantics->isSubtype(as<Type>(userArg), superType, IsSubTypeOptions::None);
+                            if (!witness)
+                            {
+                                // abort. TODO: use sink
+                                SLANG_ASSERT(!"User argument does not satisfy constraint");
+                                return SubstitutionSet();
+                            }
+
+                            args.add(witness);
+                        }
+                        else
+                        {
+                            args.add(defaultArgs[argIndex]);
+                        }
+                    }
+                    else
+                    {
+                        // Error out for now.. we don't really support more complex subtypes at the moment.
+                        SLANG_ASSERT_FAILURE("unsupported subtype for generic type constraint");
+                    }
+                }
+                else
+                {
+                    // Error out for now.. we don't really support more complex subtypes at the moment.
+                    SLANG_ASSERT_FAILURE("unsupported subtype for generic type constraint");
+                }
+                argIndex ++;
+            }
+        }
+
+        // Make a substitition set out of the arguments.
+        return SubstitutionSet(astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView()));
+    }
 
     typedef Dictionary<Name*, CallableDecl*> TargetDeclDictionary;
 

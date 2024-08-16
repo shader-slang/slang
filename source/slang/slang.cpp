@@ -1348,6 +1348,35 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     return asExternal(specializedType);
 }
 
+
+DeclRef<Decl> Linkage:: specializeGeneric(
+        DeclRef<Decl>                       declRef,
+        Dictionary<Decl*, Val*>             argMap,
+        DiagnosticSink*                     sink)
+{
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+    
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+
+    SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
+    SemanticsVisitor visitor(&sharedSemanticsContext);
+
+    // Create substituted parent decl ref.
+    auto innerDecl = declRef.getDecl();
+
+    while (!as<GenericDecl>(innerDecl))
+    {
+        innerDecl = innerDecl->parentDecl;
+    }
+    
+    auto genericDecl = innerDecl;
+    auto parentDeclRef = createDefaultSubstitutionsIfNeeded(getASTBuilder(), &visitor, DeclRef(genericDecl)).as<GenericDecl>();
+
+    auto substSet = makeSubstitutionFromIncompleteSet(getASTBuilder(), &visitor, parentDeclRef, argMap, sink);
+
+    return substituteDeclRef(substSet, getASTBuilder(), parentDeclRef);
+}
+
 SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     slang::TypeReflection*  inType,
     SlangInt                targetIndex,

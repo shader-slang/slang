@@ -844,29 +844,6 @@ SLANG_API SlangReflectionVariable* spReflection_FindVarByNameInType(SlangReflect
     return nullptr;
 }
 
-SLANG_API SlangReflectionType* spReflection_FindTypeByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name)
-{
-    auto programLayout = convert(reflection);
-    auto program = programLayout->getProgram();
-
-    auto type = convert(reflType);
-
-    Slang::DiagnosticSink sink(
-        programLayout->getTargetReq()->getLinkage()->getSourceManager(),
-        Lexer::sourceLocationLexer);
-    
-    try
-    {
-        auto result = program->findDeclFromStringInType(type, name, LookupMask::type, &sink);
-        if (result)
-            return convert(DeclRefType::create(programLayout->getTargetReq()->getLinkage()->getASTBuilder(), result));
-    }
-    catch (...)
-    {
-    }
-    return nullptr;
-}
-
 SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * reflection, char const * name)
 {
     auto programLayout = convert(reflection);
@@ -3717,6 +3694,54 @@ SLANG_API  SlangReflectionType* spReflection_specializeType(
 
     return convert(specializedType);
 }
+
+
+SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
+                SlangReflection*            inProgramLayout,
+                SlangReflectionGeneric*         generic,
+                unsigned int                    argCount,
+                SlangReflectionVariable* const* params,
+                SlangReflectionGenericArg*      args,
+                ISlangBlob**                    outDiagnostics)
+{
+    auto programLayout = convert(inProgramLayout);
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return nullptr;
+    auto astBuilder = getModule(slangGeneric.getDecl())->getLinkage()->getASTBuilder();
+
+    auto linkage = programLayout->getProgram()->getLinkage();
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+
+    Dictionary<Decl*, Val*> argMap;
+    for (unsigned int i = 0; i < argCount; ++i)
+    {
+        auto param = convert(params[i]);
+        auto arg = args[i];
+
+        if (param.as<GenericTypeParamDecl>())
+        {
+            Type* type = convert(arg.type);
+            argMap[param.getDecl()] = type;
+        }
+        else if (param.as<GenericValueParamDecl>())
+        {
+            int64_t intVal = arg.intValue;
+            argMap[param.getDecl()] = astBuilder->getIntVal(astBuilder->getUIntType(), (IntegerLiteralValue)intVal);
+        }
+        else
+        {
+            // abort (TODO: throw a proper error)
+            return nullptr;
+        }
+    }
+
+    auto specialized = linkage->specializeGeneric(slangGeneric, argMap, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    return convertDeclToGeneric(specialized);
+}
+
 
 SLANG_API SlangUInt spReflection_getHashedStringCount(
     SlangReflection*  reflection)

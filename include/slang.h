@@ -2122,6 +2122,12 @@ extern "C"
     typedef struct SlangReflectionUserAttribute     SlangReflectionUserAttribute;
     typedef struct SlangReflectionFunction          SlangReflectionFunction;
     typedef struct SlangReflectionGeneric           SlangReflectionGeneric;
+    
+    union SlangReflectionGenericArg
+    {
+        SlangReflectionType* type;
+        int64_t intValue;
+    };
 
     /*
     Type aliases to maintain backward compatibility.
@@ -2704,7 +2710,6 @@ extern "C"
     SLANG_API SlangReflectionFunction* spReflection_FindFunctionByName(SlangReflection* reflection, char const* name);
     SLANG_API SlangReflectionFunction* spReflection_FindFunctionByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name);
     SLANG_API SlangReflectionVariable* spReflection_FindVarByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name);
-    SLANG_API SlangReflectionType* spReflection_FindTypeByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name);
 
     SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* reflection);
     SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(SlangReflection* reflection, SlangUInt index);
@@ -3614,6 +3619,25 @@ namespace slang
             return spReflectionGeneric_GetConcreteIntVal((SlangReflectionGeneric*)this, (SlangReflectionVariable*)valueParam);
         }
 
+        union GenericArgReflection
+        {
+            TypeReflection* type;
+            int64_t intVal;
+        };
+
+        GenericReflection* specializeGenericTypeParameter(
+            GenericReflection*           generic,
+            uint32_t                     argCount,
+            const VariableReflection*    params,
+            const GenericArgReflection*  args)
+        {
+            return (GenericReflection*)spReflectionGeneric_SpecializeGenericTypeParameter(
+                (SlangReflectionGeneric*)this,
+                (SlangReflectionGeneric*)generic,
+                argCount,
+                (SlangReflectionVariable* const*)params,
+                (SlangReflectionGenericArg* const*)args);
+        }
     };
 
     struct EntryPointReflection
@@ -3799,14 +3823,6 @@ namespace slang
         VariableReflection* findVarByNameInType(TypeReflection* type, const char* name)
         {
             return (VariableReflection*)spReflection_FindVarByNameInType(
-                (SlangReflection*) this,
-                (SlangReflectionType*) type,
-                name);
-        }
-
-        TypeReflection* findTypeByNameInType(TypeReflection* type, const char* name)
-        {
-            return (TypeReflection*)spReflection_FindTypeByNameInType(
                 (SlangReflection*) this,
                 (SlangReflectionType*) type,
                 name);

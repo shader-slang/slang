@@ -2163,6 +2163,11 @@ namespace Slang
 
         void setFileSystem(ISlangFileSystem* fileSystem);
 
+        DeclRef<Decl> specializeGeneric(
+            DeclRef<Decl>                       inUnspecializedGeneric,
+            Dictionary<Decl*, Val*>             argMap,
+            DiagnosticSink*                     sink);
+
         DiagnosticSink::Flags diagnosticSinkFlags = 0;
 
         bool m_requireCacheFileSystem = false;
@@ -3372,6 +3377,16 @@ SLANG_FORCE_INLINE Type* asInternal(slang::TypeReflection* type)
 SLANG_FORCE_INLINE slang::TypeReflection* asExternal(Type* type)
 {
     return reinterpret_cast<slang::TypeReflection*>(type);
+}
+
+SLANG_FORCE_INLINE DeclRef<Decl> asInternal(slang::GenericReflection* generic)
+{
+    return DeclRef<Decl>(reinterpret_cast<DeclRefBase*>(generic));
+}
+
+SLANG_FORCE_INLINE slang::GenericReflection* asExternal(DeclRef<Decl> generic)
+{
+    return reinterpret_cast<slang::GenericReflection*>(generic.declRefBase);
 }
 
 SLANG_FORCE_INLINE TypeLayout* asInternal(slang::TypeLayoutReflection* type)
