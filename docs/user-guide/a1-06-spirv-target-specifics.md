@@ -82,14 +82,22 @@ SPIR-V 1.5 with [SPV_EXT_shader_atomic_float16_add](https://github.com/KhronosGr
 +--------+-----------------+-----------------+-----------------------+------------------+------------------+
 
 
+ConstantBuffer, (RW)StructuredBuffer (RW)ByteAddressBuffer
+----------------------------------------------------------
+
+Each member in a `ConstantBuffer` will be emitted as `uniform` parameter.
+StructuredBuffer and ByteAddressBuffer are translated to a shader storage buffer with `readonly` layout.
+RWStructuredBuffer and RWByteAddressBuffer are translated to a shader storage buffer with `read-write` layout.
+
+
 ParameterBlock for SPIR-V target
 --------------------------------
 
 `ParameterBlock` is a Slang generic type for binding uniform parameters.
 It is similar to `ConstantBuffer` in HLSL, but `ParameterBlock` can include not only constant parameters but also descriptors such as Texture2D or StructuredBuffer.
 
-Because the Vulkan API doesn't natively support `ParameterBlock` that has a mixture of descriptors and constants, Slang emits each member as an individual variable.
-When targeting SPIR-V, the individual variable will be emitted as either `uniform` or `buffer`.
+Because the Vulkan API doesn't natively support `ParameterBlock` that has a mixture of descriptors and constants, Slang emits each member as an individual parameter.
+When targeting SPIR-V, the individual parameter will be emitted as either `uniform` or `buffer`.
 
 
 SPIR-V specific Compiler options
@@ -99,9 +107,11 @@ The following compiler options are specific to SPIR-V.
 
 ### -emit-spirv-directly
 Generate SPIR-V output directly (default)
+It cannot be used with -emit-spirv-via-glsl
 
 ### -emit-spirv-via-glsl
 Generate SPIR-V output by compiling generated GLSL with glslang
+It cannot be used with -emit-spirv-directly
 
 ### -g
 Include debug information in the generated code, where possible.
@@ -130,6 +140,8 @@ It lets you specify the descriptor for the source at a certain register.
 
 ### -fvk-use-scalar-layout, -force-glsl-scalar-layout
 Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV.
+These options will be applied globally.
+If you need to apply a different buffer layout for indivisual StructuredBuffer, you can specify the layout as a second generic argument to StructuredBuffer. E.g., StructuredBuffer<T, Std140Layout>
 
 ### -fvk-use-gl-layout
 Use std430 layout instead of D3D buffer layout for raw buffer load/stores.
@@ -189,18 +201,13 @@ TODO
 ### [vk::spirv_instruction(op : int, set : String = "")]
 When applied to a function, the function will use the `op` value corresponding to a SPIR-V instruction. You can also specify which instruction set you want to use as a second argument. E.G., `[[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]`
 
-### [spv_target_env_1_3]
-TODO: I am not sure what it does. There isn't an example on slang-test
 
-
-Multiple Entrypoint support
+Multiple entry points support
 ---------------------------
 
-TODO: We want to mention that ConstantBuffer translates to uniform buffer, RWByteAddressBuffer, RWStructuredBuffer, ByteAddressBuffer, StructuredBuffer translates to a shader storage buffer, where RW** buffers will have a read-write layout on the buffer and the non RW ones have read-only layout.
-
-TODO: Also want to talk about how you can control the buffer layout globally with -fvk-use-scalar-layout, or individually on StructuredBuffer with StructuredBuffer<T, Std140Layout> etc.
-
-TODO: we need to talk about how ParameterBlock<T> and ConstantBuffer<T> get laid out to descriptor sets.
+Slang supports mutiple entry points when targeting SPIR-V.
+It is same to HLSL and SPIR-V that allows a shader source to have multiple entry points.
+Note that GLSL requires the entry point to be named, "main", and a shader source can have only one entry point.
 
 
 Memory pointer
@@ -208,19 +215,34 @@ Memory pointer
 
 TODO: Describe any information when using memory pointers for SPIR-V
 
+TODO: ConstBufferPointer
 
-Buffer layout and alignment
----------------------------
 
-TODO: Need to digest the comments writing in "compute/buffer-layout.slang" and write up a user-friendly document here.
+Difference between `std140` layout and `std430` layout
+------------------------------------------------------
+
+When constant parameters are send to the shader, there are different rules applied to the alignment and paddings.
+`std140` requires alignment of 16 bytes on `struct` types and it adds padding to round up to 16 bytes for each member.
+`std430` requires a natural alignment, which means that the required alignment is same as its size.
 
 
 Matrix type translation
 -----------------------
 
-TODO: we just want to say that we are following the same behavior in DXC to translate a N-row-by-M-column matrix in Slang maps to a N-column-by-M-row matrix in GLSL/SPIRV. If you can talk more about the reasoning behind this decision, that would be great.
+When targeting SPIR-V, Slang assumes Row-Major matrix, which is same behavior as HLSL/DXC.
+You can change the behavior to Column-major with a compiler option, "-matrix-layout-column-major".
 
-TODO: It seems like we already have a document for [matrix-majorness](a1-01-matrix-layout.md)
+One of frequently asked questions is that "GLSL/OpenGL uses Column-major and why Slang uses Row-major for targeting SPIR-V?"
+GLSL specification says that "Initialization of matrix values is done with constructors in column-major order", and also says "(In Matrix,) two subscripts select a column and then a row."
+Although it is considered "Column-major", when we access the matrix as 2-dimensional array, the first subscript selects "column" and not "row".
+This is effectively same to a Row-major system when the first subscript selects row and the second subscript selects column.
+
+The actual difference is on the fact that the "memory layout" is in Column-major when OpenGL sends the matrix data to shader.
+When the shader reads the data from the memory, it needs to know how to handle.
+That's why you can specify `row_major` and `column_major` for uniform parameters as their `layout` qualifier in GLSL.
+By default, OpenGL sends the matrix data in Column-major layout, but it is up-to the application to decide how to layout the matrix data.
+
+For more detailed explanation, please checkout another document [a1-01-matrix-layout](a1-01-matrix-layout.md)
 
 
 Legalization (Need to use a more user friendly word)
