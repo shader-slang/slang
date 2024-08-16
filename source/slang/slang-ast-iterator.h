@@ -132,12 +132,30 @@ struct ASTIterator
             for (auto arg : expr->arguments)
                 dispatchIfNotNull(arg);
         }
+        void visitPackExpr(PackExpr* expr)
+        {
+            for (auto arg : expr->args)
+                dispatchIfNotNull(arg);
+        }
+
+        void visitExpandExpr(ExpandExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->baseExpr);
+        }
+
+        void visitEachExpr(EachExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->baseExpr);
+        }
 
         void visitDerefExpr(DerefExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->base);
         }
+
         void visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
