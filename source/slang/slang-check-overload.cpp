@@ -1172,6 +1172,10 @@ namespace Slang
         LookupResultItem const& left,
         LookupResultItem const& right)
     {
+        // Equal lookup-items, choose the left one.
+        if (left.declRef == right.declRef)
+            return 1;
+
         // It is possible for lookup to return both an interface requirement
         // and the concrete function that satisfies that requirement.
         // We always want to favor a concrete method over an interface
@@ -1184,7 +1188,7 @@ namespace Slang
         // this kind of "is an override of ..." information on declarations
         // directly (it is only visible through the requirement witness
         // information for inheritance declarations).
-        //
+        
         auto leftDeclRefParent = left.declRef.getParent();
         auto rightDeclRefParent = right.declRef.getParent();
         bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
@@ -1432,7 +1436,10 @@ namespace Slang
                 return overloadRankDiff;
         }
 
-        return 0;
+        // Since some overload logic requires a simplified overload item list
+        // we require some comparison to remove clearly invalid overload candidates
+        // to avoid errors.
+        return CompareLookupResultItems(left->item, right->item);
     }
 
     void SemanticsVisitor::AddOverloadCandidateInner(
@@ -2417,6 +2424,28 @@ namespace Slang
         }
         else if (context.bestCandidate)
         {
+            // We allow a special case for when `funcExpr` is expected to be a Default initializer
+            // but none exist. Note, we cannot just create a default initializer for every variable
+            // since then we are introducing initialization to every variable through an indirect
+            // init returning data.
+            if (context.argCount == 0)
+            {
+                auto oldMode = context.mode;
+                context.mode = OverloadResolveContext::Mode::JustTrying;
+                bool arityIsValid = TryCheckOverloadCandidateArity(context, *context.bestCandidate);
+                context.mode = oldMode;
+
+                if (!arityIsValid)
+                {
+                    auto initListExpr = m_astBuilder->create<InitializerListExpr>();
+                    initListExpr->loc = expr->loc;
+                    initListExpr->type = m_astBuilder->getInitializerListType();
+                    Expr* outExpr = nullptr;
+                    if (_coerceInitializerList(context.bestCandidate->resultType, &outExpr, initListExpr))
+                        return outExpr;
+                }
+            }
+
             // There was one best candidate, even if it might not have been
             // applicable in the end.
             // We will report errors for this one candidate, then, to give
@@ -2437,20 +2466,6 @@ namespace Slang
             {
                 typeExpr = maybeResolveOverloadedExpr(overloadedExpr, LookupMask::type, nullptr);
             }
-        }
-
-        if (auto typetype = as<TypeType>(typeExpr->type))
-        {
-            // We allow a special case when `funcExpr` represents a composite type,
-            // in which case we will try to construct the type via memberwise assignment from the arguments.
-            //
-            auto initListExpr = m_astBuilder->create<InitializerListExpr>();
-            initListExpr->loc = expr->loc;
-            initListExpr->args.addRange(expr->arguments);
-            initListExpr->type = m_astBuilder->getInitializerListType();
-            Expr* outExpr = nullptr;
-            if (_coerceInitializerList(typetype->getType(), &outExpr, initListExpr))
-                return outExpr;
         }
 
         // Nothing at all was found that we could even consider invoking.

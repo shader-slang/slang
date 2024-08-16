@@ -7987,6 +7987,26 @@ namespace Slang
             }
             seqStmt->stmts.insert(ctorInfo.insertOffset++, seqStmtChild);
         }
+
+        // compiler generated ctor may be destroyed if unused
+        if(structDeclInfo.defaultCtor
+            && structDeclInfo.defaultCtor->containsOption(ConstructorTags::Synthesized))
+        {
+            bool destroy = false;
+            if (!structDeclInfo.defaultCtor->body)
+                destroy = true;
+            else if (auto block = as<BlockStmt>(structDeclInfo.defaultCtor->body))
+            {
+                if (as<SeqStmt>(block->body)->stmts.getCount() == 0)
+                    destroy = true;
+            }
+            if (destroy)
+            {
+                structDecl->members.remove(structDeclInfo.defaultCtor);
+                structDecl->invalidateMemberDictionary();
+                structDecl->buildMemberDictionary();
+            }
+        }
     }
 
     void SemanticsDeclHeaderVisitor::cloneModifiers(Decl* dest, Decl* src)
