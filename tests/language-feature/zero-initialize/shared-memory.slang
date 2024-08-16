@@ -6,8 +6,8 @@ RWStructuredBuffer<uint> outputBuffer;
 // GLSL-NOT: error 30623
 // HLSL-NOT: error 30623
 
-// GLSL-NOT: {{.*}}={{.*}}0{{.}};
-// HLSL-NOT: {{.*}}={{.*}}0{{.}};
+// GLSL-NOT: globalMem{{.*}} =
+// HLSL-NOT: globalMem{{.*}} =
 
 groupshared uint globalMem;
 

@@ -7,6 +7,21 @@ struct Test
 	int b = 1;
 	int c = 0;
 	int d = 1 + 1;
+    __init(int a_in)
+    {
+        a = a_in;
+    }
+    __init(int a_in, int b_in)
+    {
+        a = a_in;
+        b = b_in;
+    }
+    __init(int a_in, int b_in, int c_in)
+    {
+        a = a_in;
+        b = b_in;
+        c = c_in;
+    }
 }
 
 int test(int inVal)

@@ -1814,7 +1814,7 @@ namespace Slang
         SemanticsDeclVisitorBase* visitor,
         ASTBuilder* m_astBuilder,
         AggTypeDecl* decl,
-        List<TypeExp>&& argList,
+        List<VarDeclBase*>&& argList,
         DeclVisibility visibility)
     {
         auto ctor = m_astBuilder->create<ConstructorDecl>();
@@ -1850,7 +1850,7 @@ namespace Slang
         for (auto arg : argList)
         {
             auto param = m_astBuilder->create<ParamDecl>();
-            param->type = (TypeExp)arg;
+            param->type = (TypeExp)arg->type;
             param->parentDecl = ctor;
             param->loc = ctor->loc;
             ctor->members.add(param);
@@ -7972,7 +7972,7 @@ namespace Slang
                 memberExpr->scope = ctor->ownedScope;
                 memberExpr->loc = member->loc;
                 memberExpr->name = member->getName();
-                memberExpr->type = DeclRefType::create(getASTBuilder(), member->getDefaultDeclRef());
+                memberExpr->type = DeclRefType::create(getASTBuilder(), memberExpr->declRef);
 
                 auto assign = m_astBuilder->create<AssignExpr>();
                 assign->left = memberExpr;
@@ -7988,7 +7988,7 @@ namespace Slang
             seqStmt->stmts.insert(ctorInfo.insertOffset++, seqStmtChild);
         }
 
-        // compiler generated ctor may be destroyed if unused
+        // Compiler generated ctor may be destroyed
         if(structDeclInfo.defaultCtor
             && structDeclInfo.defaultCtor->containsOption(ConstructorTags::Synthesized))
         {
@@ -10224,7 +10224,7 @@ namespace Slang
     static ConstructorDecl* _tryToGenerateCtorWithArgList(
         SemanticsDeclVisitorBase* visitor,
         ASTBuilder* astBuilder,
-        List<TypeExp>&& args,
+        List<VarDeclBase*>&& args,
         List<ConstructorDecl*>& existingCtorList,
         StructDecl* structDecl,
         DeclVisibility visibility)
@@ -10250,7 +10250,7 @@ namespace Slang
             {
                 auto newCtorArg = args[i];
                 auto existingCtorArg = existingCtorArgs[i];
-                if (visitor->getConversionCost(newCtorArg, existingCtorArg->getType()) == kConversionCost_Impossible)
+                if (visitor->getConversionCost(newCtorArg->getType(), existingCtorArg->getType()) == kConversionCost_Impossible)
                 {
                     equalCtor = false;
                     break;
@@ -10284,11 +10284,11 @@ namespace Slang
         // Add an empty constructor for all combinations of visibility and access
         // which is possible:
         // 1. public constructor - usable *outside class scope* in a *different module*
-        List<TypeExp> publicCtorArgs;
+        List<VarDeclBase*> publicCtorArgs;
         // 2. public-internal constructor - usable *outside class scope* in the *same module*
-        List<TypeExp> publicInternalCtorArgs;
+        List<VarDeclBase*> publicInternalCtorArgs;
         // 3. public-private-internal constructor - usable *inside class scope* in the *same module*
-        List<TypeExp> publicPrivateInternalCtorArgs;
+        List<VarDeclBase*> publicPrivateInternalCtorArgs;
  
         // Harvest parameters which map to the base type ctor.
         if(auto baseStructRef = findBaseStructDeclRef(m_astBuilder, structDecl))
@@ -10321,12 +10321,12 @@ namespace Slang
             {
                 for (auto i : ctorForPublic->getParameters())
                 {
-                    publicCtorArgs.add(i->type);
+                    publicCtorArgs.add(i);
                 }
                 for (auto i : ctorForInternal->getParameters())
                 {
-                    publicInternalCtorArgs.add(i->type);
-                    publicPrivateInternalCtorArgs.add(i->type);
+                    publicInternalCtorArgs.add(i);
+                    publicPrivateInternalCtorArgs.add(i);
                 }
             }
         }
@@ -10347,20 +10347,20 @@ namespace Slang
                 switch (declVisibility)
                 {
                 case DeclVisibility::Private:
-                    publicPrivateInternalCtorArgs.add(varDeclType);
+                    publicPrivateInternalCtorArgs.add(varDecl);
                     if(!varDecl->initExpr)
                         maxVisibilityToGenerateCtor = DeclVisibility::Private;
                     break;
                 case DeclVisibility::Internal:
-                    publicPrivateInternalCtorArgs.add(varDeclType);
-                    publicInternalCtorArgs.add(varDeclType);
+                    publicPrivateInternalCtorArgs.add(varDecl);
+                    publicInternalCtorArgs.add(varDecl);
                     if (!varDecl->initExpr)
                         maxVisibilityToGenerateCtor = DeclVisibility::Internal;
                     break;
                 case DeclVisibility::Public:
-                    publicPrivateInternalCtorArgs.add(varDeclType);
-                    publicInternalCtorArgs.add(varDeclType);
-                    publicCtorArgs.add(varDeclType);
+                    publicPrivateInternalCtorArgs.add(varDecl);
+                    publicInternalCtorArgs.add(varDecl);
+                    publicCtorArgs.add(varDecl);
                     break;
                 default:
                     // Unknown visibility

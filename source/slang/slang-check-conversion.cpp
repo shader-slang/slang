@@ -213,6 +213,29 @@ namespace Slang
         return nullptr;
     }
 
+    bool _allowCStyleInitList(List<ConstructorDecl*> ctorList)
+    {
+        bool foundNonDefaultInit = false;
+        for (auto i : ctorList)
+        {
+            // Default ctor do not affect this logic.
+            if (i->getParameters().getCount() == 0)
+                continue;
+
+            // Cannot contain user defined ctor which is a non default ctor
+            if (!i->containsOption(ConstructorTags::Synthesized))
+                return false;
+
+            // Cannot contain 2+ non-default init's, this is ambigious for a c-style init list:
+            // `MyStruct[3] tmp = {1,2, 1,2, 1,2};`
+            // if `__init(int, int)` and `__init(int)` were both defined we would have ambiguity.
+            if (foundNonDefaultInit)
+                return false;
+            foundNonDefaultInit = true;
+        }
+        return true;
+    }
+
     bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         Type*                inToType,
         Expr**               outToExpr,
@@ -443,15 +466,16 @@ namespace Slang
         {
             auto toTypeDeclRef = toDeclRefType->getDeclRef();
             // Trying to initialize a `struct` type given an initializer list.
+            // We will try to coerce the initializer list into a constructor.
             if(auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
             {
                 auto toStructDecl = toStructDeclRef.getDecl();
                 ensureDecl(toStructDecl, DeclCheckState::DefaultConstructorReadyForUse);
 
-                // We will try to coerce the initializer list (in order) into a constructor.
                 List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, toStructDecl, nullptr);
-                
-                // Easy case of default constructor
+                bool allowCStyleInitList = _allowCStyleInitList(ctorList);
+
+                // Easy case of default constructor or equivalent
                 if (argCount == 0)
                 {
                     if (outToExpr)
@@ -465,26 +489,19 @@ namespace Slang
                 Index ioArgIndexMirror = ioArgIndex;
                 UInt ioArgIndexCandidate = 0;
 
-                // We also need to maximize the ctor arg count which is valid when processing ctor.
-                ctorList.stableSort(
-                    [&](ConstructorDecl* a, ConstructorDecl* b)
-                    {
-                        return a->getParameters().getCount() > b->getParameters().getCount();            
-                    }
-                    );
-
                 for (auto& ctor : ctorList)
                 {
+                    // Don't try to init default ctor with this logic
                     auto ctorParamCount = ctor->getParameters().getCount();
                     if (ctorParamCount == 0)
                         continue;
 
                     ioArgIndexCandidate = ioArgIndexMirror;
                     ioArgIndex = ctorParamCount;
-
-                    // Skip processing ctor if too many params expected by ctor
-                    // We need to allow non-exact param counts to support array to constructor init-list syntax
-                    if (ctorParamCount > Index(argCount))
+                    
+                    // if allowCStyleInitList, process any ctor which comes next. ioArgIndex may not be 0
+                    // if !allowCStyleInitList, process any ctor that exactly matched our argument count. ioArgIndex must start at 0.
+                    if (!allowCStyleInitList && ctorParamCount != Index(argCount))
                         continue;
 
                     List<ConstructorDecl*> maybeCandidate;
@@ -495,9 +512,6 @@ namespace Slang
                     {
                         auto ctorParam = parameters[index];
                         auto paramType = ctorParam.getDecl()->type.type;
-                        // Find 'equivlent typed' parameter if a member of the struct to allow subsitution
-                        // in an attempt to resolve the generic of a type 
-                        // (required for vector/matrix/array resolution)
                         for (auto i : getMembersOfType<VarDecl>(m_astBuilder, toStructDeclRef, MemberFilterStyle::Instance))
                             if (i.getDecl()->type.type == paramType)
                                 paramType = getType(m_astBuilder, i);
@@ -505,7 +519,7 @@ namespace Slang
                         Expr* coercedArg = nullptr;
                         _readValueFromInitializerList(
                             paramType,
-                            outToExpr ? &coercedArg : nullptr,
+                            &coercedArg,
                             fromInitializerListExpr,
                             ioArgIndexCandidate);
 
@@ -515,7 +529,7 @@ namespace Slang
                             break;
                     }
 
-                    if (maybeArgList.getCount() != ctor->getParameters().getCount())
+                    if (maybeArgList.getCount() != ctorParamCount)
                         continue;
 
                     // Skip non-visible constructors.
@@ -551,9 +565,8 @@ namespace Slang
                         constructorExpr->type = toType;
 
                         *outToExpr = CheckExpr(constructorExpr);
-
-                        return true;
                     }
+                    return true;
                 }
 
                 // If we have a generic being compared to another generic (with different generic arguments) 
@@ -561,11 +574,11 @@ namespace Slang
                 //
                 // MyStruct<T> tmp = {MyStructBase<U>(), 1}; // assume 'U' is unresolved at this point in time but equal to T 
                 //
-                //
                 // To handle this since this is not verifiable coerce logic:
                 // 1. We need to ensure we don't have any matching constructors
                 // 2. if '1.' is true we can assign the possibly compatible generics and let generic resolution diagnose 
                 // if something makes zero sense.
+
                 if (auto toGenericType = _getGenericAppDeclRefType(toType))
                 {
                     auto arg = fromInitializerListExpr->args[ioArgIndexMirror];
@@ -644,7 +657,7 @@ namespace Slang
         {
             if( outToExpr )
             {
-                getSink()->diagnose(fromInitializerListExpr, Diagnostics::tooManyInitializers, argCount);
+                getSink()->diagnose(fromInitializerListExpr, Diagnostics::tooManyInitializers, argCount, toType);
             }
         }
 
