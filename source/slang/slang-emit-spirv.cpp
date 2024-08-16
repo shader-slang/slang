@@ -1269,6 +1269,8 @@ struct SPIRVEmitContext
         case AddressSpace::Global:
         case AddressSpace::MetalObjectData:
             SLANG_UNEXPECTED("Unhandled AddressSpace in addressSpaceToStorageClass");
+            // gcc and msvc can't figure out that this will never return something
+            return SpvStorageClassMax;
         }
     }
 
