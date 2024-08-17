@@ -1,3 +1,6 @@
+//TEST:COMPILE: tests/modules/environment.slang -o tests/modules/environment.slang-module
+//TEST:COMPILE: tests/modules/hit.slang -stage closesthit -entry closesthit -target dxil -o monolithic.dxil
+
 import environment;
 
 StructuredBuffer <Environment_sample_data> environment_sample_buffer;
