@@ -56,7 +56,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outDiagnostics);
             recorder->recordAddress(pModule);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         ModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
@@ -85,7 +85,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outDiagnostics);
             recorder->recordAddress(pModule);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         ModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
@@ -114,7 +114,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outDiagnostics);
             recorder->recordAddress(pModule);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         ModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
@@ -144,7 +144,7 @@ namespace SlangRecord
             // TODO: Not sure if we need to record the diagnostics blob.
             recorder->recordAddress(*outDiagnostics);
             recorder->recordAddress(pModule);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         ModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
@@ -180,7 +180,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outCompositeComponentType);
             recorder->recordAddress(*outDiagnostics);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         if (SLANG_OK == result)
@@ -215,7 +215,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outDiagnostics);
             recorder->recordAddress(pTypeReflection);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return pTypeReflection;
@@ -243,7 +243,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outDiagnostics);
             recorder->recordAddress(pTypeLayoutReflection);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return pTypeLayoutReflection;
@@ -269,7 +269,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outDiagnostics);
             recorder->recordAddress(pTypeReflection);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return pTypeReflection;
@@ -289,7 +289,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(pTypeReflection);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return pTypeReflection;
@@ -312,7 +312,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(outNameBlob);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return result;
@@ -337,7 +337,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(outNameBlob);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return result;
@@ -387,7 +387,7 @@ namespace SlangRecord
         {
             recorder->recordAddress(*outConformance);
             recorder->recordAddress(*outDiagnostics);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         if (SLANG_OK != result)
@@ -415,7 +415,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outCompileRequest);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         return result;
@@ -444,7 +444,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(pModule);
-            m_recordManager->endMethodRecordAppendOutput();
+            m_recordManager->apendOutput();
         }
 
         if (pModule)

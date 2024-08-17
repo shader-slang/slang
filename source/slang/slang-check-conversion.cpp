@@ -903,7 +903,11 @@ namespace Slang
                 *outCost = kConversionCost_NullPtrToPtr;
             }
             if (outToExpr)
-                *outToExpr = fromExpr;
+            {
+                auto* defaultExpr = getASTBuilder()->create<DefaultConstructExpr>();
+                defaultExpr->type = QualType(toType);
+                *outToExpr = defaultExpr;
+            }
             return true;
         }
         // none_t can be cast into any Optional<T> type.
@@ -1111,8 +1115,10 @@ namespace Slang
         OverloadResolveContext overloadContext;
         overloadContext.disallowNestedConversions = true;
         overloadContext.argCount = 1;
+        List<Expr*> args;
+        args.add(fromExpr);
         overloadContext.argTypes = &fromType.type;
-        overloadContext.args = &fromExpr;
+        overloadContext.args = &args;
         overloadContext.sourceScope = m_outerScope;
         overloadContext.originalExpr = nullptr;
         if(fromExpr)

@@ -420,6 +420,12 @@ namespace Slang
         DeclRef<Decl> findDeclFromString(
             String const& name,
             DiagnosticSink* sink);
+        
+        DeclRef<Decl> findDeclFromStringInType(
+            Type* type,
+            String const& name,
+            LookupMask mask,
+            DiagnosticSink* sink);
 
         Dictionary<String, IntVal*>& getMangledNameToIntValMap();
         ConstantIntVal* tryFoldIntVal(IntVal* intVal);
@@ -1474,6 +1480,11 @@ namespace Slang
         /// Get the path to a file this module depends on.
         virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
             SlangInt32 index) override;
+
+        /// Precompile TU to target language
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
+            SlangCompileTarget target,
+            slang::IBlob** outDiagnostics) override;
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
@@ -2714,6 +2725,8 @@ namespace Slang
 
         SlangResult emitEntryPoints(ComPtr<IArtifact>& outArtifact);
 
+        SlangResult emitTranslationUnit(ComPtr<IArtifact>& outArtifact);
+
         void maybeDumpIntermediate(IArtifact* artifact);
 
     protected:
@@ -2753,6 +2766,10 @@ namespace Slang
 
         SlangResult _emitEntryPoints(ComPtr<IArtifact>& outArtifact);
 
+	/* Checks if all modules in the target program are already compiled to the
+        target language, indicating that a pass-through linking using the
+        downstream compiler is viable.*/
+        bool isPrecompiled();
     private:
         Shared* m_shared = nullptr;
     };
@@ -2790,6 +2807,8 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDXIL(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;

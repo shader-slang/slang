@@ -1,6 +1,9 @@
+#include <stdlib.h>
+
 #include "slang-filesystem.h"
 #include "../util/record-utility.h"
 #include "output-stream.h"
+#include "../../core/slang-io.h"
 
 namespace SlangRecord
 {
@@ -49,10 +52,22 @@ namespace SlangRecord
         // know something wrong with the loadFile call if we can't find the file in the record directory.
         if ((res == SLANG_OK) && (*outBlob != nullptr) && ((*outBlob)->getBufferSize() != 0))
         {
-            std::filesystem::path filePath = m_recordManager->getRecordFileDirectory();
-            filePath = filePath / path;
+            Slang::String filePath = Slang::Path::combine(m_recordManager->getRecordFileDirectory(), path);
+            Slang::String dirPath = Slang::Path::getParentDirectory(filePath);
+            if (!File::exists(dirPath))
+            {
+                slangRecordLog(LogLevel::Debug, "Create directory: %s to save captured shader file: %s\n",
+                    dirPath.getBuffer(), filePath.getBuffer());
 
-            FileOutputStream fileStream(filePath.string().c_str());
+                if (!Path::createDirectoryRecursive(dirPath))
+                {
+                    slangRecordLog(LogLevel::Error, "Fail to create directory: %s\n",
+                        dirPath.getBuffer());
+                    return SLANG_FAIL;
+                }
+            }
+
+            FileOutputStream fileStream(filePath);
 
             fileStream.write((*outBlob)->getBufferPointer(), (*outBlob)->getBufferSize());
             fileStream.flush();

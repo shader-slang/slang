@@ -119,6 +119,8 @@ def _sm_6_7 : _sm_6_6;
 
 def hlsl_nvapi : hlsl;
 
+alias dxil_lib = _sm_6_3;
+
 // cuda versions
 def _cuda_sm_1_0 : cuda;
 def _cuda_sm_2_0 : _cuda_sm_1_0;

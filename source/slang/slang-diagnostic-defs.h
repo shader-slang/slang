@@ -363,6 +363,12 @@ DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid
 DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
 DIAGNOSTIC(30102, Error, differentiableMemberShouldHaveCorrespondingFieldInDiffType, "differentiable member '$0' should have a corresponding field in '$1'. Use [DerivativeMember($1.<field-name>)] or mark as no_diff")
 
+DIAGNOSTIC(30103, Error, expectTypePackAfterEach, "expected a type pack or a tuple after 'each'.")
+DIAGNOSTIC(30104, Error, eachExprMustBeInsideExpandExpr, "'each' expression must be inside 'expand' expression.")
+DIAGNOSTIC(30105, Error, expandTermCapturesNoTypePacks, "'expand' term captures no type packs. At least one type pack must be referenced via an 'each' term inside an 'expand' term.")
+DIAGNOSTIC(30106, Error, improperUseOfType, "type '$0' cannot be used in this context.")
+DIAGNOSTIC(30107, Error, parameterPackMustBeConst, "a parameter pack must be declared as 'const'.")
+
 
 // Include
 DIAGNOSTIC(30500, Error, includedFileMissingImplementing, "missing 'implementing' declaration in the included source file '$0'.")
@@ -396,6 +402,9 @@ DIAGNOSTIC(36110, Error, stageIsIncompatibleWithCapabilityDefinition, "'$0' is d
 DIAGNOSTIC(36111, Error, unexpectedCapability, "'$0' resolves into a disallowed `$1` Capability.")
 DIAGNOSTIC(36112, Warning, entryPointAndProfileAreIncompatible, "'$0' is defined for stage '$1', which is incompatible with the declared profile '$2'.")
 DIAGNOSTIC(36113, Warning, usingInternalCapabilityName, "'$0' resolves into a '_Internal' `_$1' Capability, use '$1' instead.")
+DIAGNOSTIC(36114, Warning, incompatibleWithPrecompileLib, "Precompiled library requires '$0', has `$1`, implicitly upgrading capabilities.")
+DIAGNOSTIC(36115, Error, incompatibleWithPrecompileLibRestrictive, "Precompiled library requires '$0', has `$1`.")
+
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
@@ -517,6 +526,8 @@ DIAGNOSTIC(30504, Error, cannotUseInitializerListForType, "cannot use initialize
 // 3062x: variables
 DIAGNOSTIC(30620, Error, varWithoutTypeMustHaveInitializer, "a variable declaration without an initial-value expression must be given an explicit type")
 DIAGNOSTIC(30622, Error, ambiguousDefaultInitializerForType, "more than one default initializer was found for type '$0'")
+DIAGNOSTIC(30623, Error, cannotHaveInitializer, "'$0' cannot have an initializer because it is $1")
+
 
 // 307xx: parameters
 DIAGNOSTIC(30700, Error, outputParameterCannotHaveDefaultValue, "an 'out' or 'inout' parameter cannot have a default-value expression")
@@ -649,7 +660,8 @@ DIAGNOSTIC(38033, Error, cannotUseNoDiffInNonDifferentiableFunc, "cannot use 'no
 DIAGNOSTIC(38034, Error, cannotUseConstRefOnDifferentiableParameter, "cannot use '__constref' on a differentiable parameter.")
 DIAGNOSTIC(38034, Error, cannotUseConstRefOnDifferentiableMemberMethod, "cannot use '[constref]' on a differentiable member method of a differentiable type.")
 
-DIAGNOSTIC(38040, Error, nonUniformEntryPointParameterMustHaveSemantic, "non-uniform parameter '$0' must have a system-value semantic.")
+DIAGNOSTIC(38040, Warning, nonUniformEntryPointParameterTreatedAsUniform, "parameter '$0' is treated as 'uniform' because it does not have a system-value semantic.")
+
 
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
 DIAGNOSTIC(39999, Error, errorInImportedModule, "import of module '$0' failed because of a compilation error")
@@ -748,6 +760,8 @@ DIAGNOSTIC(41018, Warning, returningWithUninitializedOut, "returning without ini
 DIAGNOSTIC(41019, Warning, returningWithPartiallyUninitializedOut, "returning without fully initializing out parameter '$0'")
 DIAGNOSTIC(41020, Warning, constructorUninitializedField, "exiting constructor without initializing field '$0'")
 DIAGNOSTIC(41021, Warning, fieldNotDefaultInitialized, "default initializer for '$0' will not initialize field '$1'")
+DIAGNOSTIC(41022, Warning, inOutNeverStoredInto, "inout parameter '$0' is never written to")
+DIAGNOSTIC(41023, Warning, methodNeverMutates, "method marked `[mutable]` but never modifies `this`")
 
 DIAGNOSTIC(41011, Error, typeDoesNotFitAnyValueSize, "type '$0' does not fit in the size required by its conforming interface.")
 DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
@@ -858,6 +872,9 @@ DIAGNOSTIC(55202, Error, systemValueAttributeNotSupported, "system value semanti
 DIAGNOSTIC(55203, Error, systemValueTypeIncompatible, "system value semantic '$0' should have type '$1' or be convertible to type '$1'.")
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
 DIAGNOSTIC(56002, Error, attemptToQuerySizeOfUnsizedArray, "cannot obtain the size of an unsized array.")
+
+// Metal
+DIAGNOSTIC(56100, Error, constantBufferInParameterBlockNotAllowedOnMetal, "nested 'ConstantBuffer' inside a 'ParameterBlock' is not supported on Metal, use 'ParameterBlock' instead.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")

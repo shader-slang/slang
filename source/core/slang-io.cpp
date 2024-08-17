@@ -562,6 +562,13 @@ namespace Slang
 #endif
     }
 
+    bool Path::createDirectoryRecursive(const String& path)
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(path.getBuffer(), ec);
+        return !ec;
+    }
+
     /* static */SlangResult Path::getPathType(const String& path, SlangPathType* pathTypeOut)
     {
 #ifdef _WIN32
@@ -659,6 +666,13 @@ namespace Slang
         }
 #   endif
 #endif
+    }
+
+    String Path::getCurrentPath()
+    {
+        Slang::String path;
+        getCanonical(".", path);
+        return path;
     }
 
     String Path::getRelativePath(String base, String path)

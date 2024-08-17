@@ -2,6 +2,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-reachability.h"
 #include "slang-ir.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -37,12 +38,24 @@ namespace Slang
             || (inst->m_op == kIROp_Var);
     }
 
-    static bool isUndefinedParam(IRParam* param)
+    static bool isUnmodifying(IRFunc *func)
     {
-            auto outType = as<IROutType>(param->getFullType());
-            if (!outType)
-                return false;
+        auto intr = func->findDecoration<IRIntrinsicOpDecoration>();
+        return (intr && intr->getIntrinsicOp() == kIROp_Unmodified);
+    }
 
+    enum ParameterCheckType
+    {
+        Never,    // Parameter does NOT to be checked for uninitialization (e.g. is `in` or special type)
+        AsOut,    // Parameter DOES need to be checked for usage before initializations
+        AsInOut   // Parameter DOES need to be checked to see if it is ever written to
+    };
+
+    static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, int index)
+    {
+        IRType* type = param->getFullType();
+        if (auto out = as<IROutType>(param->getFullType()))
+        {
             // Don't check `out Vertices<T>` or `out Indices<T>` parameters
             // in mesh shaders.
             // TODO: we should find a better way to represent these mesh shader
@@ -50,17 +63,42 @@ namespace Slang
             // For example, we can use a `OutputVetices` and `OutputIndices` type
             // to represent an output, like `OutputPatch` in domain shader.
             // For now, we just skip the check for these parameters.
-            switch (outType->getValueType()->getOp())
+            switch (out->getValueType()->getOp())
             {
             case kIROp_VerticesType:
             case kIROp_IndicesType:
             case kIROp_PrimitivesType:
-                return false;
+                return Never;
             default:
                 break;
             }
 
-            return true;
+            return AsOut;
+        }
+        else if (auto inout = as<IRInOutType>(type))
+        {
+            // TODO: some way to check if the method
+            // is actually used for autodiff
+            if (as<IRDifferentialPairUserCodeType>(inout->getValueType()))
+                return Never;
+
+            switch (stage)
+            {
+            case Stage::AnyHit:
+            case Stage::ClosestHit:
+                // In HLSL the payload is required to be `inout`
+                return (index == 0) ? Never : AsInOut;
+            case Stage::Geometry:
+                // Second parameter is the triangle stream
+                return (index == 1) ? Never : AsInOut;
+            default:
+                break;
+            }
+
+            return AsInOut;
+        }
+
+        return Never;
     }
 
     static bool isAliasable(IRInst* inst)
@@ -72,6 +110,7 @@ namespace Slang
         case kIROp_FieldAddress:
         case kIROp_GetElement:
         case kIROp_GetElementPtr:
+        case kIROp_InOutImplicitCast:
             return true;
         default:
             break;
@@ -220,6 +259,15 @@ namespace Slang
             loads.add(call);
     }
 
+    static void collectSpecialCaseInstructions(List<IRInst*>& stores, IRBlock* block)
+    {
+        for (auto inst = block->getFirstInst(); inst; inst = inst->next)
+        {
+            if (as<IRGenericAsm>(inst))
+                stores.add(inst);
+        }
+    }
+
     static void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user, IRInst* inst)
     {
         // Meta intrinsics (which evaluate on type) do nothing
@@ -248,8 +296,6 @@ namespace Slang
         case kIROp_Store:
         case kIROp_SwizzledStore:
         case kIROp_SPIRVAsm:
-        case kIROp_GenericAsm:
-            // For now assume that __intrinsic_asm blocks will do the right thing...
             stores.add(user);
             break;
 
@@ -267,6 +313,7 @@ namespace Slang
         
         // Miscellaenous cases
         case kIROp_ManagedPtrAttach:
+        case kIROp_Unmodified:
             stores.add(user);
             break;
 
@@ -277,7 +324,7 @@ namespace Slang
         }
     }
 
-    static void cancelLoads(ReachabilityContext &reachability, const List<IRInst*>& stores, List<IRInst*>& loads)
+    static void cancelLoads(ReachabilityContext& reachability, const List<IRInst*>& stores, List<IRInst*>& loads)
     {
         // Remove all loads which are reachable from stores
         for (auto store : stores)
@@ -292,14 +339,9 @@ namespace Slang
         }
     }
 
-    static List<IRInst*> getUnresolvedParamLoads(ReachabilityContext &reachability, IRFunc* func, IRInst* inst)
+    static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List<IRInst*>& loads)
     {
-        // Collect all aliasable addresses
         auto addresses = getAliasableInstructions(inst);
-
-        // Partition instructions
-        List<IRInst*> stores;
-        List<IRInst*> loads;
 
         for (auto alias : addresses)
         {
@@ -310,15 +352,24 @@ namespace Slang
                 collectLoadStore(stores, loads, user, alias);
             }
         }
+    }
 
-        // Only for out params we shall add all returns
+    static List<IRInst*> getUnresolvedParamLoads(ReachabilityContext &reachability, IRFunc* func, IRInst* inst)
+    {
+        // Partition instructions
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        collectAliasableLoadStores(inst, stores, loads);
+
+        // Special cases for parameters
         for (const auto& b : func->getBlocks())
         {
-            auto t = as<IRReturn>(b->getTerminator());
-            if (!t)
-                continue;
+            collectSpecialCaseInstructions(stores, b);
 
-            loads.add(t);
+            auto t = b->getTerminator();
+            if (as<IRReturn>(t))
+                loads.add(t);
         }
 
         cancelLoads(reachability, stores, loads);
@@ -328,20 +379,11 @@ namespace Slang
 
     static List<IRInst*> getUnresolvedVariableLoads(ReachabilityContext &reachability, IRInst* inst)
     {
-        auto addresses = getAliasableInstructions(inst);
-
         // Partition instructions
         List<IRInst*> stores;
         List<IRInst*> loads;
 
-        for (auto alias : addresses)
-        {
-            for (auto use = alias->firstUse; use; use = use->nextUse)
-            {
-                IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user, alias);
-            }
-        }
+        collectAliasableLoadStores(inst, stores, loads);
 
         cancelLoads(reachability, stores, loads);
 
@@ -478,6 +520,62 @@ namespace Slang
         }
     }
 
+    static void checkParameterAsOut(ReachabilityContext &reachability, IRFunc* func, IRParam* param, DiagnosticSink* sink)
+    {
+        auto loads = getUnresolvedParamLoads(reachability, func, param);
+        for (auto load : loads)
+        {
+            sink->diagnose(load,
+                as<IRTerminatorInst>(load)
+                ? Diagnostics::returningWithUninitializedOut
+                : Diagnostics::usingUninitializedOut,
+                param);
+        }
+    }
+
+    static void checkParameterAsInOut(IRParam* param, IRFunc* func, bool isThis, DiagnosticSink* sink)
+    {
+        // If the inout is used for the sake of interface conformance, let it be
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            if (as<IRWitnessTableEntry>(use->getUser()))
+                return;
+        }
+
+        // If there is at least one write...
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        for (auto alias : getAliasableInstructions(param))
+        {
+            for (auto use = alias->firstUse; use; use = use->nextUse)
+            {
+                IRInst* user = use->getUser();
+                collectLoadStore(stores, loads, user, alias);
+
+                // ...we will ignore the rest...
+                if (stores.getCount())
+                    return;
+            }
+        }
+
+        // ...or if there is an intrinsic_asm instruction
+        for (const auto& b : func->getBlocks())
+        {
+            for (auto inst = b->getFirstInst(); inst; inst = inst->next)
+            {
+                if (as<IRGenericAsm>(inst))
+                    return;
+            }
+        }
+
+        sink->diagnose(param,
+            isThis
+            ? Diagnostics::methodNeverMutates
+            : Diagnostics::inOutNeverStoredInto,
+            param);
+    }
+
     static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     {
         // Differentiable functions will generate undefined values
@@ -492,22 +590,30 @@ namespace Slang
         ReachabilityContext reachability(func);
 
         // Used for a further analysis and to skip usual return checks
-        auto constructor = func->findDecoration <IRConstructorDecorartion> ();
+        auto constructor = func->findDecoration<IRConstructorDecorartion>();
+
+        // Special checks for stages e.g. raytracing shader
+        Stage stage = Stage::Unknown;
+        if (auto entry = func->findDecoration<IREntryPointDecoration>())
+            stage = entry->getProfile().getStage();
+
+        bool structMethod = func->findDecoration<IRMethodDecoration>();
 
         // Check out parameters
-        for (auto param : firstBlock->getParams())
+        if (!isUnmodifying(func))
         {
-            if (!isUndefinedParam(param))
-                continue;
-
-            auto loads = getUnresolvedParamLoads(reachability, func, param);
-            for (auto load : loads)
+            int index = 0;
+            for (auto param : firstBlock->getParams())
             {
-                sink->diagnose(load,
-                        as <IRReturn> (load)
-                        ? Diagnostics::returningWithUninitializedOut
-                        : Diagnostics::usingUninitializedOut,
-                        param);
+                bool isThis = structMethod && (index == 0);
+
+                ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index);
+                if (checkType == AsOut)
+                    checkParameterAsOut(reachability, func, param, sink);
+                else if (checkType == AsInOut)
+                    checkParameterAsInOut(param, func, isThis, sink);
+
+                index++;
             }
         }
 

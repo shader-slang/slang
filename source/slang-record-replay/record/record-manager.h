@@ -1,9 +1,11 @@
 #ifndef RECORD_MANAGER_H
 #define RECORD_MANAGER_H
 
-#include <filesystem>
 #include "parameter-recorder.h"
 #include "../util/record-format.h"
+
+#include "../../core/slang-string.h"
+#include "../../core/slang-io.h"
 
 namespace SlangRecord
 {
@@ -16,11 +18,11 @@ namespace SlangRecord
         ParameterRecorder* beginMethodRecord(const ApiCallId& callId, uint64_t handleId);
         ParameterRecorder* endMethodRecord();
 
-        // endMethodRecordAppendOutput is an optional call that can be used to append output to
+        // apendOutput is an optional call that can be used to append output to
         // the end of the record. It has to start with a FunctionTailer
-        void endMethodRecordAppendOutput();
+        void apendOutput();
 
-        std::filesystem::path const& getRecordFileDirectory() const { return m_recordFileDirectory; }
+        const Slang::String& getRecordFileDirectory() const { return m_recordFileDirectory; }
 
     private:
         void clearWithHeader(const ApiCallId& callId, uint64_t handleId);
@@ -28,7 +30,7 @@ namespace SlangRecord
 
         MemoryStream m_memoryStream;
         std::unique_ptr<FileOutputStream> m_fileStream;
-        std::filesystem::path             m_recordFileDirectory = std::filesystem::current_path();
+        Slang::String m_recordFileDirectory = Slang::Path::getCurrentPath();
         ParameterRecorder m_recorder;
     };
 } // namespace SlangRecord

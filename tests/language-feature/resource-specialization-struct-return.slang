@@ -1,14 +1,15 @@
-//DISABLE_TEST:SIMPLE:-target hlsl -entry computeMain -profile cs_6_2
+//TEST:SIMPLE(filecheck=CHECK_DXIL):-target dxil -entry computeMain -profile cs_6_2
+//CHECK_DXIL: computeMain
 
-// This test demonstrates returning struct with resource causes internal compiler error
+// This test demonstrates returning struct with resource.
 
-RWTexture1D<float> g_t;
+RWTexture1D<int> g_t;
 RWStructuredBuffer<int> outputBuffer;
 
 struct Thing
 {
     int a;
-    RWTexture1D<float> t;
+    RWTexture1D<int> t;
 };
 
 Thing makeThing()

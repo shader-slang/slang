@@ -170,7 +170,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     // signature
     if (parentGenericDeclRef && 
         !declRef.as<GenericValueParamDecl>() &&
-        !declRef.as<GenericTypeParamDecl>())
+        !declRef.as<GenericTypeParamDeclBase>())
     {
         auto substArgs = tryGetGenericArguments(SubstitutionSet(declRef), parentGenericDeclRef.getDecl());
         if (substArgs.getCount())
@@ -250,6 +250,16 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
                 addType(getType(m_astBuilder, genericValParam));
             }
         }
+        else if (auto genericTypePackParam = paramDeclRef.as<GenericTypePackParamDecl>())
+        {
+            if (!first) sb << ", ";
+            first = false;
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamType);
+                sb << "each ";
+                sb << getText(genericTypePackParam.getName());
+            }
+        }
         else
         {
         }
@@ -269,57 +279,73 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
         bool first = true;
         for (auto paramDeclRef : getParameters(m_astBuilder, funcDeclRef))
         {
-            if (!first) sb << ", ";
-
             auto rangeStart = sb.getLength();
 
             ParamDecl* paramDecl = paramDeclRef.getDecl();
+            auto paramType = getType(m_astBuilder, paramDeclRef);
 
+            auto addParamElement = [&](Type* type, Index elementIndex)
             {
-                ScopePart scopePart(this, Part::Type::ParamType);
+                if (!first) sb << ", ";
 
-                // Seems these apply to parameters/VarDeclBase and are not part of the 'type'
-                // but seems more appropriate to put in the Type Part
-
-                if (paramDecl->hasModifier<InOutModifier>())
+                // Type part.
                 {
-                    sb << toSlice("inout ");
-                }
-                else if (paramDecl->hasModifier<OutModifier>())
-                {
-                    sb << toSlice("out ");
-                }
-                else if (paramDecl->hasModifier<InModifier>())
-                {
-                    sb << toSlice("in ");
+                    ScopePart scopePart(this, Part::Type::ParamType);
+
+                    // Seems these apply to parameters/VarDeclBase and are not part of the 'type'
+                    // but seems more appropriate to put in the Type Part
+
+                    if (paramDecl->hasModifier<InOutModifier>())
+                    {
+                        sb << toSlice("inout ");
+                    }
+                    else if (paramDecl->hasModifier<OutModifier>())
+                    {
+                        sb << toSlice("out ");
+                    }
+                    else if (paramDecl->hasModifier<InModifier>())
+                    {
+                        sb << toSlice("in ");
+                    }
+
+                    // And this to params/variables (not the type)
+                    if (paramDecl->hasModifier<ConstModifier>())
+                    {
+                        sb << toSlice("const ");
+                    }
+
+                    addType(type);
                 }
 
-                // And this to params/variables (not the type)
-                if (paramDecl->hasModifier<ConstModifier>())
+                // Output the parameter name if there is one, and it's enabled in the options
+                if (m_optionFlags & OptionFlag::ParamNames && paramDecl->getName())
                 {
-                    sb << toSlice("const ");
+                    sb << " ";
+                    {
+                        ScopePart scopePart(this, Part::Type::ParamName);
+                        sb << paramDecl->getName()->text;
+                        if (elementIndex != -1)
+                            sb << "_" << elementIndex;
+                    }
                 }
 
-                addType(getType(m_astBuilder, paramDeclRef));
-            }
+                auto rangeEnd = sb.getLength();
 
-            // Output the parameter name if there is one, and it's enabled in the options
-            if (m_optionFlags & OptionFlag::ParamNames && paramDecl->getName())
+                if (outParamRange)
+                    outParamRange->add(makeRange<Index>(rangeStart, rangeEnd));
+                first = false;
+            };
+            if (auto typePack = as<ConcreteTypePack>(paramType))
             {
-                sb << " ";
-
+                for (Index elementIndex = 0; elementIndex < typePack->getTypeCount(); ++elementIndex)
                 {
-                    ScopePart scopePart(this, Part::Type::ParamName);
-                    sb << paramDecl->getName()->text;
+                    addParamElement(typePack->getElementType(elementIndex), elementIndex);
                 }
             }
-
-            auto rangeEnd = sb.getLength();
-
-            if (outParamRange)
-                outParamRange->add(makeRange<Index>(rangeStart, rangeEnd));
-
-            first = false;
+            else
+            {
+                addParamElement(paramType, -1);
+            }
         }
 
         sb << ")";

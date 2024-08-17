@@ -6,7 +6,7 @@
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-static groupshared uint g_values[2] = { 1, 0 };
+static groupshared uint g_values[2];
 static uint g_altValues[2] = { 2, 3 };
 
 static groupshared uint g_valuesReturned[2];
@@ -27,6 +27,7 @@ uint[2] maybeGroupSharedReturn(uint id)
 [numthreads(2, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    g_values = { 1, 0 };
     AllMemoryBarrierWithGroupSync();
     uint tid = dispatchThreadID.x;
     if (tid == 0)

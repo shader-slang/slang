@@ -245,6 +245,10 @@ String getDeclKindString(DeclRef<Decl> declRef)
     {
         return "(generic type parameter) ";
     }
+    else if (declRef.as<GenericTypePackParamDecl>())
+    {
+        return "(generic type pack parameter) ";
+    }
     else if (declRef.as<GenericValueParamDecl>())
     {
         return "(generic value parameter) ";
@@ -654,9 +658,12 @@ SlangResult LanguageServer::hover(
             maybeAppendAdditionalOverloadsHint();
             auto nodeHumaneLoc =
                 version->linkage->getSourceManager()->getHumaneLoc(leafNode->loc);
-            hover.range.start.line = int(nodeHumaneLoc.line - 1);
-            hover.range.end.line = int(nodeHumaneLoc.line - 1);
-            hover.range.start.character = int(nodeHumaneLoc.column - 1);
+            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                nodeHumaneLoc.line,
+                nodeHumaneLoc.column,
+                hover.range.start.line,
+                hover.range.start.character);
+            hover.range.end = hover.range.start;
             auto name = declRef.getName();
             if (auto ctorDecl = declRef.as<ConstructorDecl>())
             {
@@ -668,17 +675,19 @@ SlangResult LanguageServer::hover(
             }
             if (name)
             {
-                hover.range.end.character = int(nodeHumaneLoc.column + name->text.getLength() - 1);
+                hover.range.end.character = hover.range.start.character + (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice());
             }
         }
     };
     auto fillLoc = [&](SourceLoc loc)
     {
         auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(loc, SourceLocType::Actual);
-        hover.range.start.line = int(humaneLoc.line - 1);
-        hover.range.end.line = int(humaneLoc.line - 1);
-        hover.range.start.character = int(humaneLoc.column - 1);
-        hover.range.end.character = hover.range.start.character + int(doc->getTokenLength(humaneLoc.line, humaneLoc.column));
+        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, hover.range.start.line, hover.range.start.character);
+        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+            humaneLoc.line,
+            humaneLoc.column + doc->getTokenLength(humaneLoc.line, humaneLoc.column),
+            hover.range.end.line,
+            hover.range.end.character);
     };
     auto fillExprHoverInfo = [&](Expr* expr)
     {
@@ -851,7 +860,7 @@ SlangResult LanguageServer::gotoDefinition(
                                                                 : declRefExpr->declRef.getLoc(),
                     SourceLocType::Actual);
             auto name = declRefExpr->declRef.getName();
-            locations.add(LocationResult{location, name ? (int)name->text.getLength() : 0});
+            locations.add(LocationResult{location, name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0});
         }
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(leafNode))
@@ -863,7 +872,7 @@ SlangResult LanguageServer::gotoDefinition(
                 auto location = version->linkage->getSourceManager()->getHumaneLoc(
                     item.declRef.getNameLoc(), SourceLocType::Actual);
                 auto name = item.declRef.getName();
-                locations.add(LocationResult{location, name ? (int)name->text.getLength() : 0});
+                locations.add(LocationResult{location, name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0});
             }
         }
         else 
@@ -874,7 +883,7 @@ SlangResult LanguageServer::gotoDefinition(
                 auto location = version->linkage->getSourceManager()->getHumaneLoc(
                     item.declRef.getNameLoc(), SourceLocType::Actual);
                 auto name = item.declRef.getName();
-                locations.add(LocationResult{location, name ? (int)name->text.getLength() : 0});
+                locations.add(LocationResult{location, name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0});
             }
         }
     }
@@ -909,8 +918,11 @@ SlangResult LanguageServer::gotoDefinition(
             {
                 result.uri =
                     URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
-                result.range.start.line = int(loc.loc.line - 1);
-                result.range.start.character = int(loc.loc.column - 1);
+                doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                    loc.loc.line,
+                    loc.loc.column,
+                    result.range.start.line,
+                    result.range.start.character);
                 result.range.end = result.range.start;
                 result.range.end.character += loc.length;
                 results.add(result);

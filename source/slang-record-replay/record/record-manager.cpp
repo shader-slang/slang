@@ -1,9 +1,8 @@
-
-#include <string>
 #include <sstream>
 #include <thread>
 #include "../util/record-utility.h"
 #include "record-manager.h"
+#include "../../core/slang-io.h"
 
 namespace SlangRecord
 {
@@ -13,20 +12,18 @@ namespace SlangRecord
         std::stringstream ss;
         ss << "gs-"<< globalSessionHandle <<"-t-"<<std::this_thread::get_id() << ".cap";
 
-        m_recordFileDirectory = m_recordFileDirectory / "slang-record";
-
-        if (!std::filesystem::exists(m_recordFileDirectory))
+        m_recordFileDirectory = Slang::Path::combine(m_recordFileDirectory, "slang-record");
+        if (!Slang::File::exists(m_recordFileDirectory))
         {
-            std::error_code ec;
-            if (!std::filesystem::create_directory(m_recordFileDirectory, ec))
+            if (!Slang::Path::createDirectoryRecursive(m_recordFileDirectory))
             {
-                slangRecordLog(LogLevel::Error, "Fail to create directory: %s, error (%d): %s\n",
-                    m_recordFileDirectory.string().c_str(), ec.value(), ec.message().c_str());
+                slangRecordLog(LogLevel::Error, "Fail to create directory: %s\n",
+                    m_recordFileDirectory.getBuffer());
             }
         }
 
-        std::filesystem::path recordFilePath = m_recordFileDirectory / ss.str();
-        m_fileStream = std::make_unique<FileOutputStream>(recordFilePath.string());
+        Slang::String recordFilePath = Slang::Path::combine(m_recordFileDirectory, Slang::String(ss.str().c_str()));
+        m_fileStream = std::make_unique<FileOutputStream>(recordFilePath);
     }
 
     void RecordManager::clearWithHeader(const ApiCallId& callId, uint64_t handleId)
@@ -78,7 +75,7 @@ namespace SlangRecord
         return &m_recorder;
     }
 
-    void RecordManager::endMethodRecordAppendOutput()
+    void RecordManager::apendOutput()
     {
         FunctionTailer* pTailer = const_cast<FunctionTailer*>(
                 reinterpret_cast<const FunctionTailer*>(m_memoryStream.getData()));
