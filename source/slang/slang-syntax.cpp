@@ -526,9 +526,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             {
                 SLANG_UNEXPECTED("unhandled type");
             }
-            // Always create builtin types in global AST builder.
-            if (astBuilder->getSharedASTBuilder()->getInnerASTBuilder() != astBuilder)
-                return DeclRefType::create(astBuilder->getSharedASTBuilder()->getInnerASTBuilder(), declRef);
 
             declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
             ValNodeDesc nodeDesc = {};
