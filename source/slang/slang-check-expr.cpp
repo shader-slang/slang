@@ -2652,7 +2652,7 @@ namespace Slang
         // Next check the argument expressions
         for (auto & arg : expr->arguments)
         {
-            arg = CheckTerm(arg);
+            arg = CheckExpr(arg);
         }
 
         // if the expression is '&&' or '||', we will convert it
