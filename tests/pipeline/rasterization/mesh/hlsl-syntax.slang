@@ -2,7 +2,21 @@
 
 // Test that we can ingest hlsl mesh output syntax
 
-//TEST:CROSS_COMPILE:-target spirv -profile sm_6_5 -entry main -stage mesh
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -profile sm_6_5 -entry main -stage mesh
+
+//CHECK: OpCapability MeshShadingEXT
+//CHECK: OpExtension "SPV_EXT_mesh_shader"
+//CHECK-DAG: OpEntryPoint MeshEXT
+//CHECK-DAG: OpExecutionMode %{{.*}} OutputPrimitivesEXT 1
+//CHECK-DAG: OpExecutionMode %{{.*}} OutputTrianglesEXT
+
+//CHECK: OpDecorate %gl_LocalInvocationIndex BuiltIn LocalInvocationIndex
+//CHECK-NOT: OpDecorate %gl_PrimitiveTriangleIndicesEXT BuiltIn PrimitiveTriangleIndicesEXT
+
+//CHECK: %gl_LocalInvocationIndex = OpVariable
+//CHECK-NOT: %gl_PrimitiveTriangleIndicesEXT = OpVariable
+
+//CHECK: OpSetMeshOutputsEXT %uint_3 %uint_1
 
 const static float2 positions[3] = {
   float2(0.0, -0.5),

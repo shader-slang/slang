@@ -7682,6 +7682,55 @@ namespace Slang
         return ctor->containsOption(ConstructorTags::Synthesized) && ctor->getParameters().getCount() != 0 && !allParamHaveInitExpr(ctor);
     }
 
+    template<typename T>
+    static bool containsTargetType(ASTBuilder* m_astBuilder, NodeBase* target)
+    {
+        if (!target)
+            return false;
+
+        if (as<T>(target))
+            return true;
+
+        if (auto aggTypeDecl = as<AggTypeDecl>(target))
+        {
+            for (auto i : getMembersOfType<VarDeclBase>(m_astBuilder, aggTypeDecl, MemberFilterStyle::Instance))
+                if (containsTargetType<T>(m_astBuilder, i.getDecl()->type))
+                    return true;
+        }
+        else if (auto genericDecl = as<GenericAppDeclRef>(target))
+        {
+            for (auto i : genericDecl->getArgs())
+                if (containsTargetType<T>(m_astBuilder, as<Type>(i)))
+                    return true;
+            return containsTargetType<T>(m_astBuilder, genericDecl->getBase());
+        }
+        else if (auto vectorExpr = as<VectorExpressionType>(target))
+        {
+            return containsTargetType<T>(m_astBuilder, vectorExpr->getElementType());
+        }
+        else if (auto matrixExpr = as<MatrixExpressionType>(target))
+        {
+            return containsTargetType<T>(m_astBuilder, matrixExpr->getElementType());
+        }
+        else if (auto arrayExpr = as<ArrayExpressionType>(target))
+        {
+            return containsTargetType<T>(m_astBuilder, arrayExpr->getElementType());
+        }
+        else if (auto basicExpr = as<BasicExpressionType>(target))
+        {
+            return containsTargetType<T>(m_astBuilder, basicExpr->getDeclRef());
+        }
+        else if (auto declRefType = as<DeclRefType>(target))
+        {
+            return containsTargetType<T>(m_astBuilder, declRefType->getDeclRef());
+        }
+        else if (auto directDeclRef = as<DirectDeclRef>(target))
+        {
+            return containsTargetType<T>(m_astBuilder, directDeclRef->getDecl());
+        }
+        return false;
+    }
+
     void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     {
         if (aggTypeDecl->hasTag(TypeTag::Incomplete) && aggTypeDecl->hasModifier<HLSLExportModifier>())
@@ -7888,6 +7937,9 @@ namespace Slang
             thisExpr->type = ctor->returnType.type;
 
             auto paramCount = paramList.getCount();
+
+            // ensure synth'ed ctor has correct modifier to tag as a "CUDA host function"
+            bool foundCudaHostModifier = false;
             while (paramIndex < paramCount)
             {
                 auto param = paramList[paramIndex];
@@ -7912,6 +7964,14 @@ namespace Slang
                     }
                     if (baseCtor)
                     {
+                        //Manage CUDA host modifier based on inheritance
+                        if (baseCtor->findModifier<CudaHostAttribute>())
+                        {
+                            foundCudaHostModifier = true;
+                            addModifier(ctor, m_astBuilder->create<CudaHostAttribute>());
+                        }
+                        //
+
                         auto baseCtorParamCount = baseCtor->getParameters().getCount();
 
                         // Now assign the found ctor and add it to our auto-synthisized ctor
@@ -7957,14 +8017,25 @@ namespace Slang
                 paramExpr->type = paramType;
                 paramExpr->loc = param->loc;
 
-                // Skip static members
+                // Do not map a variable which is not visible
+                // Do not map a read-only variable for default-init
                 VarDeclBase* member = members[memberIndex++].getDecl();
-                while (getDeclVisibility(member) < ctorVisibility)
+                while (getDeclVisibility(member) < ctorVisibility
+                    || !getTypeForDeclRef(m_astBuilder, member, member->loc).isLeftValue)
                 {
                     // Should note be possible to be out of range unless compiler generated a synth-ctor wrong.
                     SLANG_ASSERT(memberIndex < members.getCount());
                     member = members[memberIndex++].getDecl();
                 }
+
+                //Manage CUDA host modifier based on inheritance
+                //containsType
+                if (!foundCudaHostModifier && containsTargetType<TorchTensorType>(m_astBuilder, member->type.type))
+                {
+                    foundCudaHostModifier = true;
+                    addModifier(ctor, m_astBuilder->create<CudaHostAttribute>());
+                }
+                //
 
                 MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
                 memberExpr->baseExpression = thisExpr;
@@ -10335,37 +10406,39 @@ namespace Slang
         // a (1:1 element) ctor for public members (public member-wise ctor) to synthesize.
         // This principal also applies for private members and internal/public member-wise ctor synthisis.
         DeclVisibility maxVisibilityToGenerateCtor = getDeclVisibility(structDecl);
-        for(auto m : getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance))
+        for(auto varDeclRef : getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance))
         {   
-            if (auto varDeclRef = as<VarDecl>(m))
-            {
-                auto varDecl = varDeclRef.getDecl();
-                ensureDecl(varDecl, DeclCheckState::TypesFullyResolved);
-                auto declVisibility = getDeclVisibility(varDecl);
+            auto varDecl = varDeclRef.getDecl();
+            ensureDecl(varDecl, DeclCheckState::TypesFullyResolved);
 
-                switch (declVisibility)
-                {
-                case DeclVisibility::Private:
-                    publicPrivateInternalCtorArgs.add(varDecl);
-                    if(!varDecl->initExpr)
-                        maxVisibilityToGenerateCtor = DeclVisibility::Private;
-                    break;
-                case DeclVisibility::Internal:
-                    publicPrivateInternalCtorArgs.add(varDecl);
-                    publicInternalCtorArgs.add(varDecl);
-                    if (!varDecl->initExpr)
-                        maxVisibilityToGenerateCtor = DeclVisibility::Internal;
-                    break;
-                case DeclVisibility::Public:
-                    publicPrivateInternalCtorArgs.add(varDecl);
-                    publicInternalCtorArgs.add(varDecl);
-                    publicCtorArgs.add(varDecl);
-                    break;
-                default:
-                    // Unknown visibility
-                    SLANG_ASSERT(false);
-                    break;
-                }
+            // Do not map a read-only variable for default-init
+            if (!getTypeForDeclRef(m_astBuilder, varDeclRef, varDeclRef.getLoc()).isLeftValue)
+                continue;
+
+            auto declVisibility = getDeclVisibility(varDecl);
+
+            switch (declVisibility)
+            {
+            case DeclVisibility::Private:
+                publicPrivateInternalCtorArgs.add(varDecl);
+                if(!varDecl->initExpr)
+                    maxVisibilityToGenerateCtor = DeclVisibility::Private;
+                break;
+            case DeclVisibility::Internal:
+                publicPrivateInternalCtorArgs.add(varDecl);
+                publicInternalCtorArgs.add(varDecl);
+                if (!varDecl->initExpr)
+                    maxVisibilityToGenerateCtor = DeclVisibility::Internal;
+                break;
+            case DeclVisibility::Public:
+                publicPrivateInternalCtorArgs.add(varDecl);
+                publicInternalCtorArgs.add(varDecl);
+                publicCtorArgs.add(varDecl);
+                break;
+            default:
+                // Unknown visibility
+                SLANG_ASSERT(false);
+                break;
             }
         }
         if (maxVisibilityToGenerateCtor >= DeclVisibility::Public)

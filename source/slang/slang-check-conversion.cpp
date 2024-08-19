@@ -479,7 +479,10 @@ namespace Slang
                 if (argCount == 0)
                 {
                     if (outToExpr)
+                    {
                         *outToExpr = constructDefaultInitExprForVar(this, (TypeExp)toType, nullptr);
+                        (*outToExpr)->loc = fromInitializerListExpr->loc;
+                    }
                     return true;
                 }
 
@@ -552,19 +555,22 @@ namespace Slang
 
                         // We want lookup to resolve our init function as a generic using Slang's
                         // builtin 'lookup' logic.
+                        // Note, we need to also ensure we can infer the generic based on the target type
                         auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-                        ctorToInvoke->scope = this->getOuterScope();
+                        ctorToInvoke->scope = toStructDecl->ownedScope;
                         ctorToInvoke->name = getName(String(toStructDecl->getName()->text));
-                            
+                        ctorToInvoke->type = toType;
                         Expr* callee = ctorToInvoke;
 
                         InvokeExpr* constructorExpr = m_astBuilder->create<InvokeExpr>();
                         constructorExpr->loc = fromInitializerListExpr->loc;
-                        constructorExpr->functionExpr = callee;
+                        constructorExpr->functionExpr = CheckTerm(callee);
                         constructorExpr->arguments.addRange(coercedArgs);
                         constructorExpr->type = toType;
 
-                        *outToExpr = CheckExpr(constructorExpr);
+                        //TODO:
+
+                        *outToExpr = CheckInvokeExprWithCheckedOperands(constructorExpr);
                     }
                     return true;
                 }

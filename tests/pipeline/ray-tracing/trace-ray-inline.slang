@@ -1,14 +1,24 @@
 // trace-ray-inline.slang
 
-//TEST:CROSS_COMPILE:-target dxil-asm -stage compute -profile sm_6_5 -entry main -line-directive-mode none
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -profile glsl_460+GL_EXT_ray_query -entry main -line-directive-mode none
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -profile sm_6_5 -entry main
+//TEST:SIMPLE(filecheck=DXIL):-target dxil -stage compute -profile sm_6_5 -entry main
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -profile glsl_460+GL_EXT_ray_query -entry main
 
-// CHECK: OpCapability RayQueryKHR
-// CHECK: OpExtension "SPV_KHR_ray_query"
-// CHECK: OpRayQueryInitializeKHR
-// CHECK: OpRayQueryProceedKHR
-// CHECK: OpRayQueryGetIntersectionTypeKHR
-// CHECK: OpRayQueryConfirmIntersectionKHR
+// HLSL: {{.*}}.TraceRayInline
+// HLSL: {{.*}}.Proceed
+// HLSL: {{.*}}.CandidateType
+// HLSL: {{.*}}.CommitProceduralPrimitiveHit
+// HLSL: {{.*}}.CommitNonOpaqueTriangleHit
+
+/// ensure the compiled HLSL is valid
+// DXIL: @main
+
+// SPV: OpCapability RayQueryKHR
+// SPV: OpExtension "SPV_KHR_ray_query"
+// SPV: OpRayQueryInitializeKHR
+// SPV: OpRayQueryProceedKHR
+// SPV: OpRayQueryGetIntersectionTypeKHR
+// SPV: OpRayQueryConfirmIntersectionKHR
 
 // The goal of this shader is to use all the main pieces
 // of functionality in DXR 1.1's `TraceRayInline` feature,

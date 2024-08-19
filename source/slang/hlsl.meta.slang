@@ -15470,7 +15470,7 @@ struct RayDesc
 
     __target_intrinsic(hlsl, TMin)
     __target_intrinsic(cuda, TMin)
-    float TMin;
+    float  TMin;
 
     __target_intrinsic(hlsl, Direction)
     __target_intrinsic(cuda, Direction)
@@ -15478,7 +15478,7 @@ struct RayDesc
 
     __target_intrinsic(hlsl, TMax)
     __target_intrinsic(cuda, TMax)
-    float TMax;
+    float  TMax;
 };
 
 // 10.1.3 - Ray Acceleration Structure

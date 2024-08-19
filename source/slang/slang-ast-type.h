@@ -512,6 +512,11 @@ class TensorViewType : public BuiltinType
     Type* getElementType();
 };
 
+class TorchTensorType : public BuiltinType
+{
+    SLANG_AST_CLASS(TorchTensorType)
+};
+
 // Base class for built in string types
 class StringTypeBase : public BuiltinType
 {

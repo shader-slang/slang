@@ -1188,7 +1188,7 @@ namespace Slang
         // this kind of "is an override of ..." information on declarations
         // directly (it is only visible through the requirement witness
         // information for inheritance declarations).
-        
+        //
         auto leftDeclRefParent = left.declRef.getParent();
         auto rightDeclRefParent = right.declRef.getParent();
         bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
@@ -1776,7 +1776,16 @@ namespace Slang
         ConstraintSystem constraints;
         constraints.loc = context.loc;
         constraints.genericDecl = genericDeclRef.getDecl();
+
+        List<Decl*> membersToResolve;
+        for (auto i : constraints.genericDecl->members)
+        {
+            if (as<GenericTypeConstraintDecl>(i))
+                continue;
+            membersToResolve.add(i);
+        }
         auto innerDecl = genericDeclRef.getDecl()->inner;
+
         // In order to perform matching between the types passed in at the
         // call site represented by `context` and the parameters of the
         // declaraiton being applied, we want to form a reference to
@@ -1789,6 +1798,8 @@ namespace Slang
         if (as<StructDecl>(genericDeclRef.getDecl()->inner))
         {
             // We have a ctor. We need to get the underlying callable.
+            // We have a ctor, we can assume that the generic arg list is equal to our return type
+            // arg list
             auto functionVarExpr = as<VarExpr>(context.originalExpr->functionExpr);
             if (auto genericFunctionDeclRef = as<GenericDecl>(functionVarExpr->declRef))
             {
@@ -1811,75 +1822,123 @@ namespace Slang
             }
         }
 
-        if (auto funcDeclRef = as<CallableDecl>(innerDecl))
+        // TODO: Infer generics using return-type with parameter-list correctly through checking function body.
+
+        // Infer generic based on return-type with ctor
+        // TODO: mix with deducing generics from parameter list, if we do this we will be able
+        // to use this logic for all ctor's. This addition would be required since otherwise
+        // a return-type which is type "U" may be more ambiguous than a parameter of type "int"
+        // and cause compile error.
+        if (as<ConstructorDecl>(innerDecl)
+            && as<ConstructorDecl>(innerDecl)->containsOption(ConstructorTags::Synthesized)
+            && context.originalExpr && context.originalExpr->type.type)
         {
-            List<QualType> paramTypes;
-            if (!innerParameterTypes)
+            if (auto declRefType = as<DeclRefType>(context.originalExpr->type.type))
             {
-                auto params = getParameters(m_astBuilder, funcDeclRef).toArray();
-                for (auto param : params)
+                if (auto genericAppDeclRef = as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
                 {
-                    paramTypes.add(getParamQualType(m_astBuilder, param));
+                    Index genericDeclArgIndex = 0;
+                    auto genericDeclArgCount = membersToResolve.getCount();
+
+                    Index genericAppDeclRefIndex = 0;
+                    auto genericAppDeclRefArgCount = genericAppDeclRef->getArgCount();
+                    
+                    while (genericAppDeclRefArgCount > genericAppDeclRefIndex
+                            && genericDeclArgCount > genericDeclArgIndex)
+                    {
+                        auto genericAppDeclRefArg = genericAppDeclRef->getArg(genericAppDeclRefIndex);
+                        if (as<SubtypeWitness>(genericAppDeclRefArg))
+                        {
+                            genericAppDeclRefIndex++;
+                            continue;
+                        }
+
+                        auto genericDeclArg = membersToResolve[genericDeclArgIndex];
+
+                        Constraint constraint;
+                        constraint.decl = genericDeclArg;
+                        constraint.val = genericAppDeclRefArg;
+                        constraints.constraints.add(constraint);
+
+                        genericDeclArgIndex++;
+                        genericAppDeclRefIndex++;
+                    }
                 }
-                innerParameterTypes = &paramTypes;
             }
+        }
 
-            ShortList<OverloadResolveContext::MatchedArg> matchedArgs;
-
-            // We now try to match arguments to parameters.
-            //
-            // Note that if there are *too few* arguments, we might still have
-            // a match, because the other arguments might have default values
-            // that can be used.
-            //
-            if (!context.matchArgumentsToParams(this, *innerParameterTypes, true, matchedArgs))
+        if(constraints.constraints.getCount() == 0)
+        {
+            // Infer generics using parameters to function
+            if (auto funcDeclRef = as<CallableDecl>(innerDecl))
             {
-                return DeclRef<Decl>();
-            }
+                List<QualType> paramTypes;
+                if (!innerParameterTypes)
+                {
+                    auto params = getParameters(m_astBuilder, funcDeclRef).toArray();
+                    for (auto param : params)
+                    {
+                        paramTypes.add(getParamQualType(m_astBuilder, param));
+                    }
+                    innerParameterTypes = &paramTypes;
+                }
 
-            // Perform type unification between arguments and parameters, so
-            // we can populate the resolve system with inital constraints.
-            //
-            for (Index aa = 0; aa < matchedArgs.getCount(); ++aa)
-            {
-                // The question here is whether failure to "unify" an argument
-                // and parameter should lead to immediate failure.
-                //
-                // The case that is interesting is if we want to unify, say:
-                // `vector<float,N>` and `vector<int,3>`
-                //
-                // It is clear that we should solve with `N = 3`, and then
-                // a later step may find that the resulting types aren't
-                // actually a match.
-                //
-                // A more refined approach to "unification" could of course
-                // see that `int` can convert to `float` and use that fact.
-                // (and indeed we already use something like this to unify
-                // `float` and `vector<T,3>`)
-                //
-                // So the question is then whether a mismatch during the
-                // unification step should be taken as an immediate failure...
-                auto argType = matchedArgs[aa].argType;
-                auto paramType = (*innerParameterTypes)[aa];
-                auto canUnify = TryUnifyTypes(
-                    constraints,
-                    ValUnificationContext(),
-                    QualType(argType, paramType.isLeftValue),
-                    paramType);
+                ShortList<OverloadResolveContext::MatchedArg> matchedArgs;
 
-                // It is an error if we can't unify the argument with a type pack parameter.
-                if (!canUnify && isTypePack(paramType))
+                // We now try to match arguments to parameters.
+                //
+                // Note that if there are *too few* arguments, we might still have
+                // a match, because the other arguments might have default values
+                // that can be used.
+                //
+                if (!context.matchArgumentsToParams(this, *innerParameterTypes, true, matchedArgs))
                 {
                     return DeclRef<Decl>();
                 }
+
+                // Perform type unification between arguments and parameters, so
+                // we can populate the resolve system with inital constraints.
+                //
+                for (Index aa = 0; aa < matchedArgs.getCount(); ++aa)
+                {
+                    // The question here is whether failure to "unify" an argument
+                    // and parameter should lead to immediate failure.
+                    //
+                    // The case that is interesting is if we want to unify, say:
+                    // `vector<float,N>` and `vector<int,3>`
+                    //
+                    // It is clear that we should solve with `N = 3`, and then
+                    // a later step may find that the resulting types aren't
+                    // actually a match.
+                    //
+                    // A more refined approach to "unification" could of course
+                    // see that `int` can convert to `float` and use that fact.
+                    // (and indeed we already use something like this to unify
+                    // `float` and `vector<T,3>`)
+                    //
+                    // So the question is then whether a mismatch during the
+                    // unification step should be taken as an immediate failure...
+                    auto argType = matchedArgs[aa].argType;
+                    auto paramType = (*innerParameterTypes)[aa];
+                    auto canUnify = TryUnifyTypes(
+                        constraints,
+                        ValUnificationContext(),
+                        QualType(argType, paramType.isLeftValue),
+                        paramType);
+
+                    // It is an error if we can't unify the argument with a type pack parameter.
+                    if (!canUnify && isTypePack(paramType))
+                    {
+                        return DeclRef<Decl>();
+                    }
+                }
+            }
+            else
+            {
+                // TODO(tfoley): any other cases needed here?
+                return DeclRef<Decl>();
             }
         }
-        else
-        {
-            // TODO(tfoley): any other cases needed here?
-            return DeclRef<Decl>();
-        }
-
         // Once we have added all the appropriate constraints to the system, we
         // will try to solve for a set of arguments to the generic that satisfy
         // those constraints.
@@ -1891,8 +1950,7 @@ namespace Slang
         // TODO(tfoley): We probably need to pass along the explicit arguments here,
         // so that the solver knows to accept those arguments as-is.
         //
-        return trySolveConstraintSystem(
-            &constraints, genericDeclRef, knownGenericArgs, outBaseCost);
+        return trySolveConstraintSystem(&constraints, genericDeclRef, knownGenericArgs, outBaseCost);
     }
 
     void SemanticsVisitor::AddTypeOverloadCandidates(
