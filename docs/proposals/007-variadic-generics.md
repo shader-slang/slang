@@ -1,4 +1,4 @@
-Variadic Generics
+SP #007: Variadic Generics
 =================
 
 Variadic generics is the ability to define and use generic types and functions that has arbitrary number of generic type parameters.
@@ -13,11 +13,14 @@ written in native Slang code rather than on top of it with macros or custom code
 Status
 ------
 
-Status: prototype branch available.
+Status: Implementation in-progress.
 
 Author: Yong He.
 
-Implementation: [PR 4833](https://github.com/shader-slang/slang/pull/4833)
+Implementation:
+    [PR 4833](https://github.com/shader-slang/slang/pull/4833),
+    [PR 4849](https://github.com/shader-slang/slang/pull/4849),
+    [PR 4850](https://github.com/shader-slang/slang/pull/4850)
 
 Reviewed by: Kai Zhang, Jay Kwak, Ariel Glasroth.
 

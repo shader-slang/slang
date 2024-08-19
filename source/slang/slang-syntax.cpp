@@ -507,7 +507,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     // TODO: need to figure out how to unify this with the logic
     // in the generic case...
     Type* DeclRefType::create(
-        ASTBuilder*     astBuilder,
+        ASTBuilder* astBuilder,
         DeclRef<Decl>   declRef)
     {
         if (declRef.getDecl()->findModifier<BuiltinTypeModifier>())
@@ -526,9 +526,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             {
                 SLANG_UNEXPECTED("unhandled type");
             }
-            // Always create builtin types in global AST builder.
-            if (astBuilder->getSharedASTBuilder()->getInnerASTBuilder() != astBuilder)
-                return DeclRefType::create(astBuilder->getSharedASTBuilder()->getInnerASTBuilder(), declRef);
 
             declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
             ValNodeDesc nodeDesc = {};
