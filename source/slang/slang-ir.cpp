@@ -2881,9 +2881,9 @@ namespace Slang
             operands);
     }
 
-    IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace)
+    IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
     {
-        return (IRPtrType*)getPtrType(op, valueType, getIntValue(getUInt64Type(), addressSpace));
+        return (IRPtrType*)getPtrType(op, valueType, getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)));
     }
 
     IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRInst* addressSpace)
@@ -4530,7 +4530,7 @@ namespace Slang
 
     IRGlobalVar* IRBuilder::createGlobalVar(
         IRType*         valueType,
-        IRIntegerValue  addressSpace)
+        AddressSpace  addressSpace)
     {
         auto ptrType = getPtrType(kIROp_PtrType, valueType, addressSpace);
         IRGlobalVar* globalVar = createInst<IRGlobalVar>(
@@ -4807,7 +4807,7 @@ namespace Slang
 
     IRVar* IRBuilder::emitVar(
         IRType*         type,
-        IRIntegerValue  addressSpace)
+        AddressSpace  addressSpace)
     {
         auto allocatedType = getPtrType(kIROp_PtrType, type, addressSpace);
         auto inst = createInst<IRVar>(

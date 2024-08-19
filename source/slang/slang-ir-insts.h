@@ -3537,10 +3537,9 @@ public:
     IRRefType*  getRefType(IRType* valueType, AddressSpace addrSpace);
     IRConstRefType* getConstRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
+    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRInst* addressSpace);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace) { return getPtrType(op, valueType, (IRIntegerValue)addressSpace); }
-    IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace) { return getPtrType(kIROp_PtrType, valueType, (IRIntegerValue)addressSpace); }
+    IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace) { return getPtrType(kIROp_PtrType, valueType, addressSpace); }
 
     IRTextureTypeBase* getTextureType(
         IRType* elementType,
@@ -4030,7 +4029,7 @@ public:
         IRType* valueType);
     IRGlobalVar* createGlobalVar(
         IRType*         valueType,
-        IRIntegerValue  addressSpace);
+        AddressSpace   addressSpace);
     IRGlobalParam* createGlobalParam(
         IRType* valueType);
     
@@ -4124,7 +4123,7 @@ public:
         IRType* type);
     IRVar* emitVar(
         IRType* type,
-        IRIntegerValue addressSpace);
+        AddressSpace addressSpace);
 
     IRInst* emitLoad(
         IRType* type,
