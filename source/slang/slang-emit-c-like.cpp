@@ -3713,6 +3713,11 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     m_writer->emit(";\n\n");
 }
 
+void CLikeSourceEmitter::emitStructDeclarationSeparatorImpl()
+{
+    m_writer->emit(";");
+}
+
 void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, bool allowOffsetLayout)
 {
     m_writer->emit("\n{\n");
@@ -3745,7 +3750,8 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, b
         emitType(fieldType, getName(fieldKey));
         emitSemantics(fieldKey, allowOffsetLayout);
         emitPostDeclarationAttributesForType(fieldType);
-        m_writer->emit(";\n");
+        emitStructDeclarationSeparator();
+        m_writer->emit("\n");
     }
 
     m_writer->dedent();
