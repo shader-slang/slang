@@ -8030,9 +8030,12 @@ namespace Slang
 
                 // Do not map a variable which is not visible
                 // Do not map a read-only variable for default-init
+                // Do not map compiler generated 'internal processing' variable
                 VarDeclBase* member = members[memberIndex++].getDecl();
                 while (getDeclVisibility(member) < ctorVisibility
-                    || !getTypeForDeclRef(m_astBuilder, member, member->loc).isLeftValue)
+                    || !getTypeForDeclRef(m_astBuilder, member, member->loc).isLeftValue
+                    || member->getName() && member->getName()->text[0] == '$'
+                    )
                 {
                     // Should note be possible to be out of range unless compiler generated a synth-ctor wrong.
                     SLANG_ASSERT(memberIndex < members.getCount());
