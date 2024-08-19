@@ -2571,17 +2571,11 @@ struct SpecializationContext
         if (expandInst->getCaptureCount() == 0)
             return false;
 
-        bool anyAbstractPack = false;
         for (UInt i = 0; i < expandInst->getCaptureCount(); i++)
         {
             if (!as<IRTypePack>(expandInst->getCaptureType(i)))
-            {
-                anyAbstractPack = true;
-                break;
-            }
+                return false;
         }
-        if (anyAbstractPack)
-            return false;
         IRBuilder builder(expandInst);
         builder.setInsertBefore(expandInst);
         List<IRInst*> elements;
