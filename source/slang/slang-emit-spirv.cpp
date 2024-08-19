@@ -1224,8 +1224,7 @@ struct SPIRVEmitContext
 
     static SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
     {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic error "-Wswitch-enum"
+        SLANG_EXHAUSTIVE_SWITCH_BEGIN
         switch (addrSpace)
         {
         case AddressSpace::Generic:
@@ -1270,10 +1269,12 @@ struct SPIRVEmitContext
             return SpvStorageClassPhysicalStorageBuffer;
         case AddressSpace::Global:
         case AddressSpace::MetalObjectData:
-        default:
-            SLANG_UNEXPECTED("Unhandled AddressSpace in addressSpaceToStorageClass");
+            // msvc is limiting us from putting the UNEXPECTED macro here, so
+            // just fall out
+            ;
         }
-#pragma GCC diagnostic pop
+        SLANG_UNEXPECTED("Unhandled AddressSpace in addressSpaceToStorageClass");
+        SLANG_EXHAUSTIVE_SWITCH_END
     }
 
     // Now that we've gotten the core infrastructure out of the way,
