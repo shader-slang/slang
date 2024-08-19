@@ -2426,7 +2426,7 @@ struct SpecializationContext
 
         for (UInt i = 0; i < expandInst->getCaptureCount(); i++)
         {
-            if (!as<IRTupleType>(expandInst->getCapture(i)))
+            if (!as<IRTypePack>(expandInst->getCapture(i)))
                 return false;
         }
 
