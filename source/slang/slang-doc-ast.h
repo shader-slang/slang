@@ -8,6 +8,8 @@
 
 #include "slang-ast-all.h"
 
+#include "slang-syntax.h"
+
 namespace Slang {
 
 /* Holds the documentation markup that is associated with each node (typically a decl) from a module */
