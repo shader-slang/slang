@@ -7683,7 +7683,7 @@ namespace Slang
     }
 
     template<typename T>
-    static bool containsTargetType(ASTBuilder* m_astBuilder, NodeBase* target)
+    bool _containsTargetType(ASTBuilder* m_astBuilder, NodeBase* target, HashSet<NodeBase*>& visitedNodes)
     {
         if (!target)
             return false;
@@ -7691,44 +7691,55 @@ namespace Slang
         if (as<T>(target))
             return true;
 
+        if (visitedNodes.contains(target))
+            return false;
+        visitedNodes.add(target);
+
         if (auto aggTypeDecl = as<AggTypeDecl>(target))
         {
             for (auto i : getMembersOfType<VarDeclBase>(m_astBuilder, aggTypeDecl, MemberFilterStyle::Instance))
-                if (containsTargetType<T>(m_astBuilder, i.getDecl()->type))
+                if (_containsTargetType<T>(m_astBuilder, i.getDecl()->type, visitedNodes))
                     return true;
         }
         else if (auto genericDecl = as<GenericAppDeclRef>(target))
         {
             for (auto i : genericDecl->getArgs())
-                if (containsTargetType<T>(m_astBuilder, as<Type>(i)))
+                if (_containsTargetType<T>(m_astBuilder, as<Type>(i), visitedNodes))
                     return true;
-            return containsTargetType<T>(m_astBuilder, genericDecl->getBase());
+            return _containsTargetType<T>(m_astBuilder, genericDecl->getBase(), visitedNodes);
         }
         else if (auto vectorExpr = as<VectorExpressionType>(target))
         {
-            return containsTargetType<T>(m_astBuilder, vectorExpr->getElementType());
+            return _containsTargetType<T>(m_astBuilder, vectorExpr->getElementType(), visitedNodes);
         }
         else if (auto matrixExpr = as<MatrixExpressionType>(target))
         {
-            return containsTargetType<T>(m_astBuilder, matrixExpr->getElementType());
+            return _containsTargetType<T>(m_astBuilder, matrixExpr->getElementType(), visitedNodes);
         }
         else if (auto arrayExpr = as<ArrayExpressionType>(target))
         {
-            return containsTargetType<T>(m_astBuilder, arrayExpr->getElementType());
+            return _containsTargetType<T>(m_astBuilder, arrayExpr->getElementType(), visitedNodes);
         }
         else if (auto basicExpr = as<BasicExpressionType>(target))
         {
-            return containsTargetType<T>(m_astBuilder, basicExpr->getDeclRef());
+            return _containsTargetType<T>(m_astBuilder, basicExpr->getDeclRef(), visitedNodes);
         }
         else if (auto declRefType = as<DeclRefType>(target))
         {
-            return containsTargetType<T>(m_astBuilder, declRefType->getDeclRef());
+            return _containsTargetType<T>(m_astBuilder, declRefType->getDeclRef(), visitedNodes);
         }
         else if (auto directDeclRef = as<DirectDeclRef>(target))
         {
-            return containsTargetType<T>(m_astBuilder, directDeclRef->getDecl());
+            return _containsTargetType<T>(m_astBuilder, directDeclRef->getDecl(), visitedNodes);
         }
         return false;
+    }
+
+    template<typename T>
+    bool containsTargetType(ASTBuilder* m_astBuilder, NodeBase* target)
+    {
+        HashSet<NodeBase*> visitedNodes;
+        return _containsTargetType<T>(m_astBuilder, target, visitedNodes);
     }
 
     void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
