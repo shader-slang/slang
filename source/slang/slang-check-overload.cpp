@@ -1673,26 +1673,6 @@ namespace Slang
         // Try to match the variadic part.
         // Is the corresponding argument a expand expr? If so it will map 1:1 to the type pack param.
         auto astBuilder = semantics->getASTBuilder();
-        //while (remainingArgCount > 0)
-        //{
-        //    auto argType = getArgType(fixedParamCount);
-        //    if (auto typeType = as<TypeType>(argType))
-        //    {
-        //        argType = typeType->getType();
-        //    }
-        //    if (isAbstractTypePack(argType))
-        //    {
-        //        MatchedArg arg;
-        //        arg.argExpr = getArg(fixedParamCount);
-        //        arg.argType = getArgType(fixedParamCount);
-        //        outMatchedArgs.add(arg);
-        //        fixedParamCount++;
-        //        remainingArgCount--;
-        //        typePackCount--;
-        //        continue;
-        //    }
-        //    break;
-        //}
 
         if (remainingArgCount <= 0)
             return true;
