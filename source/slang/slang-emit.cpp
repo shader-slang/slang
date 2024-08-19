@@ -1536,15 +1536,28 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     auto targetProgram = getTargetProgram();
 
     auto lineDirectiveMode = targetProgram->getOptionSet().getEnumOption<LineDirectiveMode>(CompilerOptionName::LineDirectiveMode);
-    // To try to make the default behavior reasonable, we will
-    // always use C-style line directives (to give the user
-    // good source locations on error messages from downstream
-    // compilers) *unless* they requested raw GLSL as the
-    // output (in which case we want to maximize compatibility
-    // with downstream tools).
-    if (lineDirectiveMode ==  LineDirectiveMode::Default && targetRequest->getTarget() == CodeGenTarget::GLSL)
+    // We will generally use C-style line directives in order to give the user good
+    // source locations on error messages from downstream compilers, but there are
+    // a few exceptions.
+    if (lineDirectiveMode == LineDirectiveMode::Default)
     {
-        lineDirectiveMode = LineDirectiveMode::GLSL;
+
+        switch(targetRequest->getTarget())
+        {
+
+        case CodeGenTarget::GLSL:
+            // We want to maximize compatibility with downstream tools.
+            lineDirectiveMode = LineDirectiveMode::GLSL;
+            break;
+
+        case CodeGenTarget::WGSL:
+            // WGSL doesn't support line directives.
+            // See https://github.com/gpuweb/gpuweb/issues/606.
+            lineDirectiveMode = LineDirectiveMode::None;
+            break;
+
+        }
+
     }
 
     ComPtr<IBoxValue<SourceMap>> sourceMap;
