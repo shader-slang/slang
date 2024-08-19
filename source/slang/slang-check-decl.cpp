@@ -1854,6 +1854,9 @@ namespace Slang
             param->parentDecl = ctor;
             param->loc = ctor->loc;
             ctor->members.add(param);
+
+            if (arg->hasModifier<NoDiffModifier>())
+                addModifier(param, m_astBuilder->create<NoDiffModifier>());
         }
 
         addVisibilityModifier(m_astBuilder, ctor, visibility);
@@ -1925,6 +1928,8 @@ namespace Slang
             varDecl->initExpr = constructDefaultInitExprForVar(this, varDecl->type, varDecl);
         }
         
+        auto type = varDecl->getType();
+
         if (auto initExpr = varDecl->initExpr)
         {
             // Disable the short-circuiting for static const variable init expression
@@ -1950,6 +1955,9 @@ namespace Slang
             varDecl->setCheckState(DeclCheckState::DefinitionChecked);
             _validateCircularVarDefinition(varDecl);
         }
+        // all structDecl's need to be set to a default value (else it is a compile error for HLSL)
+        else if (as<StructDecl>(type))
+            varDecl->initExpr = constructDefaultInitExprForVar(this, varDecl->type, varDecl);
         else
         {
             // If a variable doesn't have an explicit initial-value
@@ -1972,12 +1980,12 @@ namespace Slang
             // and filtering them to ones that are applicable
             // to our "call site" with zero arguments.
             //
+            
             OverloadResolveContext overloadContext;
             overloadContext.loc = varDecl->nameAndLoc.loc;
             overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
             overloadContext.sourceScope = m_outerScope;
 
-            auto type = varDecl->getType();
             ImplicitCastMethodKey key = ImplicitCastMethodKey(QualType(), type, nullptr);
             auto ctorMethod = getShared()->tryGetImplicitCastMethod(key);
             if (ctorMethod)
