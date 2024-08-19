@@ -44,5 +44,31 @@ struct B
     [mutating] int next() { return state; }
 };
 
+// Sometimes an inOutImplicitCast is done,
+// this needs to be tracked as an alias;
+// none of the following functions should 
+// generate warnings
+uint lcg(inout uint prev)
+{
+    const uint LCG_A = 1664525u;
+    const uint LCG_C = 1013904223u;
+    prev = (LCG_A * prev + LCG_C);
+    return prev & 0x00FFFFFF;
+}
+
+float rnd(inout uint prev)
+{
+    return ((float) lcg(prev) / (float) 0x01000000);
+}
+
+float3 sample(inout int seed)
+{
+    float3 xi;
+    xi.x = rnd(seed);
+    xi.y = rnd(seed);
+    xi.z = rnd(seed);
+    return xi.z;
+}
+
 //CHK-NOT: warning 41022
 //CHK-NOT: warning 41023
