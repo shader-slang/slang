@@ -49,7 +49,7 @@ namespace Slang {
 
 bool doWeDocDecl(Decl* decl)
 {
-    return !getText(decl->getName()).startsWith("$__syn") && !decl->findModifier<SynthesizedModifier>();
+    return !getText(decl->getName()).startsWith("$__syn") && !decl->hasModifier<SynthesizedModifier>();
 }
 
 static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
