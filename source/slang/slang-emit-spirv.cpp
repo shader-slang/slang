@@ -1224,6 +1224,8 @@ struct SPIRVEmitContext
 
     static SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
     {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wswitch-enum"
         switch (addrSpace)
         {
         case AddressSpace::Generic:
@@ -1268,10 +1270,10 @@ struct SPIRVEmitContext
             return SpvStorageClassPhysicalStorageBuffer;
         case AddressSpace::Global:
         case AddressSpace::MetalObjectData:
+        default:
             SLANG_UNEXPECTED("Unhandled AddressSpace in addressSpaceToStorageClass");
-            // gcc and msvc can't figure out that this will never return something
-            return SpvStorageClassMax;
         }
+#pragma GCC diagnostic pop
     }
 
     // Now that we've gotten the core infrastructure out of the way,
