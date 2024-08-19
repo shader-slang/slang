@@ -39,6 +39,6 @@ void computeMain()
     // CHECK: 2.0
     // CHECK: 3.0
     // CHECK: 4.0
-    write();
     write(makeS(1.0), makeS(2.0), makeS(3.0), makeS(4.0));
+    write();
 }
