@@ -398,6 +398,9 @@ public:
     void emitStructDeclarationsBlock(IRStructType* structType, bool allowOffsetLayout);
     void emitClass(IRClassType* structType);
 
+    void emitStructDeclarationSeparator() {emitStructDeclarationSeparatorImpl();}
+    virtual void emitStructDeclarationSeparatorImpl();
+
         /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
