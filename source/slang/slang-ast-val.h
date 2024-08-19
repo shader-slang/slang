@@ -248,6 +248,30 @@ class FuncCallIntVal : public IntVal
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
+class CountOfIntVal : public IntVal
+{
+    SLANG_AST_CLASS(CountOfIntVal)
+
+    CountOfIntVal(Type* inType, Type* typeArg)
+    {
+        setOperands(inType, typeArg);
+    }
+
+    Val* getTypeArg() { return getOperand(1); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+    bool _isLinkTimeValOverride()
+    {
+        return false;
+    }
+
+    static Val* tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType);
+
+    static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType);
+};
+
 class WitnessLookupIntVal : public IntVal
 {
     SLANG_AST_CLASS(WitnessLookupIntVal)

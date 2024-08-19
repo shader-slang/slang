@@ -2802,6 +2802,11 @@ namespace Slang
         return getTupleType(SLANG_COUNT_OF(operands), operands);
     }
 
+    IRTypePack* IRBuilder::getTypePack(UInt count, IRType* const* types)
+    {
+        return (IRTypePack*)getType(kIROp_TypePack, count, (IRInst* const*)types);
+    }
+
     IRExpandType* IRBuilder::getExpandTypeOrVal(IRType* type, IRInst* pattern, ArrayView<IRInst*> capture)
     {
         ShortList<IRInst*> args;
@@ -4044,6 +4049,21 @@ namespace Slang
             typeInst);
         addInst(inst);
         return inst;
+    }
+
+    IRInst* IRBuilder::emitMakeValuePack(IRType* type, UInt count, IRInst* const* args)
+    {
+        return emitIntrinsicInst(type, kIROp_MakeValuePack, count, args);
+    }
+
+    IRInst* IRBuilder::emitMakeValuePack(UInt count, IRInst* const* args)
+    {
+        ShortList<IRType*> types;
+        for (UInt i = 0; i < count; ++i)
+            types.add(args[i]->getFullType());
+
+        auto type = getTypePack((UInt)types.getCount(), types.getArrayView().getBuffer());
+        return emitIntrinsicInst(type, kIROp_MakeValuePack, count, args);
     }
 
     IRInst* IRBuilder::emitMakeTuple(IRType* type, UInt count, IRInst* const* args)
@@ -5773,6 +5793,19 @@ namespace Slang
             this,
             kIROp_AlignOf,
             getUIntType(),
+            sizedType);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitCountOf(
+        IRType* type,
+        IRInst* sizedType)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_CountOf,
+            type,
             sizedType);
         addInst(inst);
         return inst;

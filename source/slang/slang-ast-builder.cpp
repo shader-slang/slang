@@ -572,9 +572,26 @@ Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Type*> capturedPacks)
     return getOrCreate<ExpandType>(pattern, capturedPacks);
 }
 
+void flattenTypeList(ShortList<Type*>& flattenedList, Type* type)
+{
+    if (auto typePack = as<ConcreteTypePack>(type))
+    {
+        for (Index i = 0; i < typePack->getTypeCount(); i++)
+            flattenTypeList(flattenedList, typePack->getElementType(i));
+    }
+    else
+    {
+        flattenedList.add(type);
+    }
+}
+
 ConcreteTypePack* ASTBuilder::getTypePack(ArrayView<Type*> types)
 {
-    return getOrCreate<ConcreteTypePack>(types);
+    // Flatten all type packs in the type list.
+    ShortList<Type*> flattenedTypes;
+    for (auto type : types)
+        flattenTypeList(flattenedTypes, type);
+    return getOrCreate<ConcreteTypePack>(flattenedTypes.getArrayView().arrayView);
 }
 
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(

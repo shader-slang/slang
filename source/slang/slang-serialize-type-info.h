@@ -242,6 +242,31 @@ struct SerialTypeInfo<List<T, ALLOCATOR>>
     }
 };
 
+// ShortList
+template <typename T, int n, typename ALLOCATOR>
+struct SerialTypeInfo<ShortList<T, n, ALLOCATOR>>
+{
+    typedef ShortList<T, n, ALLOCATOR> NativeType;
+    typedef SerialIndex SerialType;
+
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+
+        dst = writer->addArray(src.getArrayView().getBuffer(), src.getCount());
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        auto& dst = *(NativeType*)native;
+        auto& src = *(const SerialType*)serial;
+
+        reader->getArray(src, dst);
+    }
+};
+
 // String
 template <>
 struct SerialTypeInfo<String>
