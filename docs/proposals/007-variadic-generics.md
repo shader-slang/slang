@@ -13,14 +13,15 @@ written in native Slang code rather than on top of it with macros or custom code
 Status
 ------
 
-Status: Implementation in-progress.
+Status: Implemented.
 
 Author: Yong He.
 
 Implementation:
     [PR 4833](https://github.com/shader-slang/slang/pull/4833),
     [PR 4849](https://github.com/shader-slang/slang/pull/4849),
-    [PR 4850](https://github.com/shader-slang/slang/pull/4850)
+    [PR 4850](https://github.com/shader-slang/slang/pull/4850),
+    [PR 4856](https://github.com/shader-slang/slang/pull/4856)
 
 Reviewed by: Kai Zhang, Jay Kwak, Ariel Glasroth.
 

@@ -11,9 +11,11 @@ Status
 
 Author: Yong He
 
-Implementation: In-progress.
+Status: Implemented.
 
-Reviewed by: N/A
+Implementation: [PR 4856](https://github.com/shader-slang/slang/pull/4856).
+
+Reviewed by: Jay Kwak, Kai Zhang, Ariel Glasroth.
 
 Background
 ----------
