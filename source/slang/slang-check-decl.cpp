@@ -7791,16 +7791,16 @@ namespace Slang
             }
         };
 
-        List<DeclAndCtorInfo> inheritanceDefaultCtorList{};
+        List<DeclAndCtorInfo> inheritanceInfoList{};
         for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
         {
             auto declRefType = as<DeclRefType>(inheritanceMember->base.type);
             if (!declRefType)
                 continue;
-            auto structOfInheritance = as<AggTypeDecl>(declRefType->getDeclRef().getDecl());
-            if (!structOfInheritance)
+            auto typeOfInheritance = as<AggTypeDecl>(declRefType->getDeclRef().getDecl());
+            if (!typeOfInheritance)
                 continue;
-            inheritanceDefaultCtorList.add(DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, inheritanceMember, false));
+            inheritanceInfoList.add(DeclAndCtorInfo(m_astBuilder, this, typeOfInheritance, inheritanceMember, false));
         }
         DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, nullptr, false);
 
@@ -7833,8 +7833,8 @@ namespace Slang
                 continue;
 
             auto seqStmtChild = m_astBuilder->create<SeqStmt>();
-            seqStmtChild->stmts.reserve(inheritanceDefaultCtorList.getCount());
-            for (auto& declInfo : inheritanceDefaultCtorList)
+            seqStmtChild->stmts.reserve(inheritanceInfoList.getCount());
+            for (auto& declInfo : inheritanceInfoList)
             {
                 if (!declInfo.m_defaultCtor)
                     continue;
@@ -7931,10 +7931,11 @@ namespace Slang
         // Pre-calculate if we have a base-type and its associated ctor-list
         // We also must ensure inheritance-decl is checked, else we may not have up-to-date 'DerivativeMemberAttribute' modifiers
         DeclAndCtorInfo* baseCtorInfo = nullptr;
-        for(auto i : inheritanceDefaultCtorList)
+        for(auto& i : inheritanceInfoList)
         {
             ensureDecl(i.m_inheritanceDecl, DeclCheckState::DefinitionChecked);
-            baseCtorInfo = &i;
+            if(as<StructDecl>(i.m_parent))
+                baseCtorInfo = &i;
         }
 
         // Insert parameters as values for member-wise init expression.
@@ -10390,10 +10391,17 @@ namespace Slang
         List<VarDeclBase*> publicPrivateInternalCtorArgs;
  
         // Harvest parameters which map to the base type ctor.
-        if(auto baseStructRef = findBaseStructDeclRef(m_astBuilder, structDecl))
+        // Note: assumes 1 structDecl, N number inheritance decl
+        for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
         {
-            auto baseStruct = baseStructRef.getDecl();
-            DeclVisibility baseVisibilityToDerived = (isVisibilityOfDeclVisibleInScope(baseStruct,DeclVisibility::Internal, structDecl->ownedScope)) ? DeclVisibility::Internal : DeclVisibility::Public;
+            auto declRefType = as<DeclRefType>(inheritanceMember->base.type);
+            if (!declRefType)
+                continue;
+            auto baseStruct = as<StructDecl>(declRefType->getDeclRef().getDecl());
+            if (!baseStruct)
+                continue;
+
+            DeclVisibility baseVisibilityToDerived = (isVisibilityOfDeclVisibleInScope(baseStruct, DeclVisibility::Internal, structDecl->ownedScope)) ? DeclVisibility::Internal : DeclVisibility::Public;
 
             ConstructorDecl* ctorForPublic = nullptr;
             ConstructorDecl* ctorForInternal = nullptr;
