@@ -564,9 +564,57 @@ namespace Slang
 
     bool Path::createDirectoryRecursive(const String& path)
     {
-        std::error_code ec;
-        std::filesystem::create_directories(path.getBuffer(), ec);
-        return !ec;
+        String finalPath = Path::simplify(path);
+        if (finalPath.getLength() == 0)
+        {
+            return false;
+        }
+
+        List<String> pathList;
+
+        // Check whether the parent directories exist, and add to the pathList if they are
+        // not, we will create all the directories from back of the list.
+        String parentDir = finalPath;
+        while(1)
+        {
+            if (parentDir.getLength() == 0 || File::exists(parentDir))
+            {
+                break;
+            }
+            else
+            {
+                pathList.add(parentDir);
+                parentDir = Path::getParentDirectory(parentDir);
+            }
+        }
+
+        // If there are no directories to create, then we are done
+        if (pathList.getCount() == 0)
+        {
+            return true;
+        }
+
+        // Traverse from back of the list, because that is most outer directory.
+        Int i = 0;
+        for (i = pathList.getCount() - 1; i >= 0; i--)
+        {
+            if (!createDirectory(pathList[i]))
+            {
+                break;
+            }
+        }
+
+        // Something wrong when creating parent directories
+        if (i > 0)
+        {
+            // Remove the directories if we've created
+            if (i != pathList.getCount() - 1)
+                remove(pathList[i]);
+
+            return false;
+        }
+
+        return true;
     }
 
     /* static */SlangResult Path::getPathType(const String& path, SlangPathType* pathTypeOut)
