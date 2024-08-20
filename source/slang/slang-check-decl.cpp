@@ -1854,14 +1854,9 @@ namespace Slang
             param->parentDecl = ctor;
             param->loc = ctor->loc;
             ctor->members.add(param);
-
-            if (arg->hasModifier<NoDiffModifier>())
-                addModifier(param, m_astBuilder->create<NoDiffModifier>());
         }
-
         addVisibilityModifier(m_astBuilder, ctor, visibility);
-        addModifier(ctor, m_astBuilder->create<TreatAsDifferentiableAttribute>());
-        
+        addModifier(ctor, m_astBuilder->create<BackwardDifferentiableAttribute>());
         decl->addMember(ctor);
         return ctor;
     }
@@ -7934,6 +7929,9 @@ namespace Slang
             baseTypeCtorList = _getCtorList(m_astBuilder, this, baseStructRef.getDecl(), nullptr);
         }
 
+        if (structDecl->getName() && structDecl->getName()->text.equals("RayDesc"))
+            __debugbreak();
+
         // Insert parameters as values for member-wise init expression.
         for (auto& ctorInfo : structDeclInfo.ctorInfoList)
         {
@@ -7983,13 +7981,12 @@ namespace Slang
                     }
                     if (baseCtor)
                     {
-                        //Manage CUDA host modifier based on inheritance
+                        // Manage CUDA host modifier based on inheritance
                         if (baseCtor->findModifier<CudaHostAttribute>())
                         {
                             foundCudaHostModifier = true;
                             addModifier(ctor, m_astBuilder->create<CudaHostAttribute>());
                         }
-                        //
 
                         auto baseCtorParamCount = baseCtor->getParameters().getCount();
 
@@ -8049,6 +8046,12 @@ namespace Slang
                     SLANG_ASSERT(memberIndex < members.getCount());
                     member = members[memberIndex++].getDecl();
                 }
+
+                // Check for differentiability, if we cannot diff this member attach a no_diff attribute.
+                if (( !this->isTypeDifferentiable(member->type) || !member->hasModifier<DerivativeMemberAttribute>()) && !param->hasModifier<NoDiffModifier>())
+                    addModifier(param, m_astBuilder->create<NoDiffModifier>());
+
+
 
                 //Manage CUDA host modifier based on inheritance
                 //containsType
