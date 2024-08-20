@@ -1666,11 +1666,16 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     return true;
 }
 
+bool CLikeSourceEmitter::isPointerSyntaxRequiredImpl(IRInst* /* inst */)
+{
+    return doesTargetSupportPtrTypes();
+}
+
 void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec)
 {
     EmitOpInfo newOuterPrec = outerPrec;
 
-    if (doesTargetSupportPtrTypes())
+    if (isPointerSyntaxRequiredImpl(inst))
     {
         switch (inst->getOp())
         {
@@ -1769,7 +1774,7 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
 
 void CLikeSourceEmitter::emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec)
 {
-    if (doesTargetSupportPtrTypes())
+    if (isPointerSyntaxRequiredImpl(inst))
     {
         auto prec = getInfo(EmitOp::Prefix);
         auto newOuterPrec = outerPrec;
@@ -2312,7 +2317,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
         IRFieldAddress* ii = (IRFieldAddress*) inst;
 
-        if (doesTargetSupportPtrTypes())
+        if (isPointerSyntaxRequiredImpl(inst))
         {
             auto prec = getInfo(EmitOp::Prefix);
             needClose = maybeEmitParens(outerPrec, prec);

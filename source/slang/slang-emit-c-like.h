@@ -428,6 +428,7 @@ public:
 
     void emitGlobalInst(IRInst* inst);
     virtual void emitGlobalInstImpl(IRInst* inst);
+    virtual bool isPointerSyntaxRequiredImpl(IRInst* inst);
 
     void ensureInstOperand(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel = EmitAction::Level::Definition);
 
