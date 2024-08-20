@@ -11,9 +11,11 @@ Status
 
 Author: Yong He
 
-Implementation: In-progress.
+Status: Implemented.
 
-Reviewed by: N/A
+Implementation: [PR 4856](https://github.com/shader-slang/slang/pull/4856).
+
+Reviewed by: Jay Kwak, Kai Zhang, Ariel Glasroth.
 
 Background
 ----------
@@ -32,7 +34,7 @@ __generic<each T>
 __magic_type(TupleType)
 struct Tuple
 {
-    __intrinsic_op($(0))
+    __intrinsic_op($(kIROp_MakeTuple))
     __init(expand each T);
 }
 ```
@@ -77,14 +79,7 @@ Tuple<expand each T, expand each U> concat<each T, each U>(Tuple<expand each T> 
 {
     return makeTuple<expand each T, expand each U>(expand each first, expand each second);
 }
-Tuple<expand each T, expand each U> concat<each T, each U>(Tuple<expand each T> first, expand each U second)
-{
-    return makeTuple<expand each T, expand each U>(expand each first, expand each second);
-}
 ```
-
-Note that we can't have an overload that takes a type pack and append it to the beginning of a tuple yet, because we
-currently don't support having type pack arguments that aren't at the end of an argument list.
 
 
 ### Counting
@@ -135,3 +130,11 @@ Should we automatically treat `Tuple` type to conform to any interface `IFoo` if
 should the tuple type's equivalent method return `Tuple<expand(int, T)>` or just `int`? In some cases you want one but
 other times you want the other. And if the method returns a tuple, it is no longer consistent with the base interface
 definition so this is all ill-formed.
+
+We also considered having an overload of `concat` that appends individual elements to the end of a tuple, such as:
+```
+Tuple<T, U> concat<each T, each U>(Tuple<T> t, each U values);
+```
+However, this could lead to surprising behavior when the user writes `concat(t0, t1, t2)` where t1 and t2 are also tuples.
+Having this overload means the result would be `(t0_0, t0_1, ... t0_n, t1, t2)` where the user could be expecting `t1` and `t2`
+to be flattened into the resulting tuple. To avoid this surprising behavior, we decide to not include this overload in stdlib.

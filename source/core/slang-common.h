@@ -158,6 +158,30 @@ public:
 #define UNREACHABLE_RETURN(x) return x;
 #endif
 
+#if SLANG_GCC
+#    define SLANG_EXHAUSTIVE_SWITCH_BEGIN \
+         _Pragma("GCC diagnostic push"); \
+         _Pragma("GCC diagnostic error \"-Wswitch-enum\"");
+#    define SLANG_EXHAUSTIVE_SWITCH_END \
+         _Pragma("GCC diagnostic pop");
+#elif SLANG_CLANG
+#    define SLANG_EXHAUSTIVE_SWITCH_BEGIN \
+         _Pragma("clang diagnostic push"); \
+         _Pragma("clang diagnostic error \"-Wswitch-enum\"");
+#    define SLANG_EXHAUSTIVE_SWITCH_END \
+         _Pragma("clang diagnostic pop");
+#elif SLANG_VC
+#    define SLANG_EXHAUSTIVE_SWITCH_BEGIN \
+        _Pragma("warning(push)"); \
+        _Pragma("warning(error : 4062)");
+#    define SLANG_EXHAUSTIVE_SWITCH_END \
+        _Pragma("warning(pop)");
+#else
+#    define SLANG_EXHAUSTIVE_SWITCH_BEGIN
+#    define SLANG_EXHAUSTIVE_SWITCH_END
+#endif
+
+
 //
 // Use `SLANG_ASSUME(myBoolExpression);` to inform the compiler that the condition is true.
 // Do not rely on side effects of the condition being performed.

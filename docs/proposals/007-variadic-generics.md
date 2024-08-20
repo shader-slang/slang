@@ -1,4 +1,4 @@
-Variadic Generics
+SP #007: Variadic Generics
 =================
 
 Variadic generics is the ability to define and use generic types and functions that has arbitrary number of generic type parameters.
@@ -13,11 +13,15 @@ written in native Slang code rather than on top of it with macros or custom code
 Status
 ------
 
-Status: prototype branch available.
+Status: Implemented.
 
 Author: Yong He.
 
-Implementation: [PR 4833](https://github.com/shader-slang/slang/pull/4833)
+Implementation:
+    [PR 4833](https://github.com/shader-slang/slang/pull/4833),
+    [PR 4849](https://github.com/shader-slang/slang/pull/4849),
+    [PR 4850](https://github.com/shader-slang/slang/pull/4850),
+    [PR 4856](https://github.com/shader-slang/slang/pull/4856)
 
 Reviewed by: Kai Zhang, Jay Kwak, Ariel Glasroth.
 
@@ -235,6 +239,9 @@ is a `DeclRefType(GenericTypePackParameterDecl "T")`.
 The most general case of a type pack is defined by the `expand PatternExpr` type expression. In this case, the expression will be translated into a `ExpandType`, representing a
 abstract type pack that can be evaluated by substituting all `each X` expressions in the `PatternExpr` with a corresponding element in `X`, and joining all the resulting element types
 into a type pack.
+
+Note that a `ConcreteTypePack` is very similar in semantic meaning to a `Tuple`, with the exception that `ConcreteTypePack` also bears the automatic flattening semantic, such that
+`ConcreteTypePack(ConcreteTypePack(a,b), c)` is equivalent and can be simplified to `ConcreteTypePack(a,b,c)`.
 
 In summary, a type pack can be represented by one of:
 - `ConcreteTypePack`, a simple concrete list of element types.
@@ -507,15 +514,11 @@ f(3, Pack(Foo(), Bar()), Pack(1.0f, false))
 After resolving the call. The `Pack(...)` represents the `PackExpr` synthesized by the compiler to create a `ValuePack` whose type is a `TypePack`, so
 it can be used as argument to a `TypePack` parameter.
 
-To help with understanding, a `TypePack(T0, T1, ... Tn)` can be thought as a `Tuple<T0, T1, ... Tn>` type, and a `PackExpr(v0, v1, ... vn)` is an operation that
-creates a tuple from the values of `v0, v1, ... vn`. The reason we are not referring them as tuple types directly is because we want to distinguish the compiler-synthesized
-type packs from the user defined tuple types/tuple values when we introduce tuple types in the standard library in the future.
-
 ### IR Representation
 
 #### Expressing Types
 
-A concrete type pack is represented as `IRTupleType(T0, T1, ..., Tn)` in the IR, and an abstract type pack such as an `expand` type will eventually be specialized into an `IRTupleType`. This means that a function parameter whose type is a type pack is translated into a single parameter with an equivalent tuple type. In fact, there is no real semantic difference between a tuple type and a type pack, and the reason that we distinguish type packs from tuple types in the frontend is to avoid ambiguity between a user-defined tuple and a compiler-synthesized type pack. Once we are in the IR, there is no more reason to treat them as separate types.
+A concrete type pack is represented as `IRTypePack(T0, T1, ..., Tn)` in the IR, and an abstract type pack such as an `expand` type will eventually be specialized into an `IRTypePack`. This means that a function parameter whose type is a type pack is translated into a single parameter of `IRTypePack` type. Again, `IRTypePack` is in many ways similar to `IRTupleType`, except that `IRTypePack` are automatically flattened into enclosing type packs during specialization.
 
 We will represent `expand` and `each` types in the IR almost 1:1 as they are represented in the AST. Note that types are hoistable insts in Slang IR and is globally deduplicated based on their operands, representing it in the natural way will allow these types to take advantage from Slang IR's global deduplication service.
 
@@ -536,10 +539,10 @@ For example, the type `expand vector<each T, each U>`, where `T` and `U` are gen
 
 #### Expressing Values
 
-A value whose type is a type pack is called a value pack. A value pack is represented in the IR as a tuple.
+A value whose type is a type pack is called a value pack. A value pack is represented in the IR as a `IRMakeValuePack` inst.
 For example, the value pack `(1,2,3)` will be represented in the IR as:
 ```
-IRMakeTuple(1,2,3) : IRTupleType(int, int, int)
+IRMakeValuePack(1,2,3) : IRTypePack(int, int, int)
 ```
 
 An `expand(PatternExpr)` expression should be represented in the IR as:
@@ -561,7 +564,7 @@ For example, given `v` as value pack whose type is a type pack, `let x = expand 
 
 ```
 %v = /*some value pack whose type is a TypePack*/
-%x = IRExpand : IRTuple(...)
+%x = IRExpand : IRTypePack(...)
 {
     IRBlock
     {
@@ -612,7 +615,7 @@ all references to `IRParam` with the concrete index for the copy. Therefore, spe
 ```
 
 Step 2 is to hookup each copied blocks by replacing all the `yield` instructions with `branch` instructions, and form the final result of the value pack
-by packing up all the values computed at each "loop iteration" in an `IRMakeTuple` inst:
+by packing up all the values computed at each "loop iteration" in an `IRMakeValuePack` inst:
 
 ```
 %block0 = IRBlock
@@ -635,23 +638,25 @@ by packing up all the values computed at each "loop iteration" in an `IRMakeTupl
 }
 %mergeBlock = IRBlock
 {
-    %expand = IRMakeTuple(%r0, %r1, %r2);
+    %expand = IRMakeValuePack(%r0, %r1, %r2);
 }
 ```
 
 With this, we can replace the original `IRExpand` inst with `%expand` and specailization is done. The specialized instructions like `IRGetTupleElement(%v, 0)` will be picked up
-in the follow-up step during specalization and replaced with the actual value at the specified index since `%v` is a known value pack represented by `IRMakeTuple`. So after
+in the follow-up step during specalization and replaced with the actual value at the specified index since `%v` is a known value pack represented by `IRMakeValuePack`. So after
 folding and other simplifications, we should result in
 ```
-%expand = IRMakeTuple(2,3,4)
+%expand = IRMakeValuePack(2,3,4)
 ```
-When specializing the original expression with `IRMakeTuple(1,2,3)` in the IR.
+When specializing the original expression with `IRMakeValuePack(1,2,3)` in the IR.
 
 Specialization of types and witness follows the same idea of value specialization, but since types and witnesses are represented directly as ordinary insts and operands instead of the
 nested children of an `IRExpand`, we will use a recursive process on the type structure to perform the specialization. Most of the recursion logic should be trivial, and the only
 interesting case is when specializing `IRExpandType` and `IREachType`. During the recursion process, we should maintain a state called `indexInPack` to represent the current expansion
 index when specializing the pattern type of an `IRExpandType`, and then when we get to specialize an `IREachType(TPack)`, we should know which index in the pack we are currently
 expanding by looking at the `indexInPack` context variable, and replace `IREachType(TypePack(T0, T1, ... Tn))` with the `T` at `indexInPack`.
+
+After the specialization pass, there should be no more `IRExpand` and `IRExpandType` instructions in the IR. And we can lower t he remaining `IRTypePack` the same way as `IRTupleType`s.
 
 
 Alternatives Considered

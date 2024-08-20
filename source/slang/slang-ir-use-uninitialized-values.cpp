@@ -110,6 +110,7 @@ namespace Slang
         case kIROp_FieldAddress:
         case kIROp_GetElement:
         case kIROp_GetElementPtr:
+        case kIROp_InOutImplicitCast:
             return true;
         default:
             break;
