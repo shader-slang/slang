@@ -596,7 +596,7 @@ struct FunctionParameterSpecializationContext
 
     IRInst* findNonuniformIndexInst(IRInst* inst)
     {
-        while(1)
+        for(;;)
         {
             if (inst == nullptr)
                 return nullptr;

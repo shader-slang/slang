@@ -575,7 +575,7 @@ namespace Slang
         // Check whether the parent directories exist, and add to the pathList if they are
         // not, we will create all the directories from back of the list.
         String parentDir = finalPath;
-        while(1)
+        for(;;)
         {
             if (parentDir.getLength() == 0 || File::exists(parentDir))
             {
