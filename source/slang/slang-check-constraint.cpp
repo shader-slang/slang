@@ -165,7 +165,7 @@ namespace Slang
         // some `IFoo<X>`, then we can also consider `type` as a valid joined result.
         if (auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(interfaceType))
         {
-            if (auto genAppDeclRef = as<GenericAppDeclRef>(interfaceDeclRef.declRefBase))
+            if (as<GenericAppDeclRef>(interfaceDeclRef.declRefBase))
             {
                 auto inheritanceInfo = getShared()->getInheritanceInfo(type);
                 for (auto facet : inheritanceInfo.facets)
