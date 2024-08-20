@@ -7929,9 +7929,6 @@ namespace Slang
             baseTypeCtorList = _getCtorList(m_astBuilder, this, baseStructRef.getDecl(), nullptr);
         }
 
-        if (structDecl->getName() && structDecl->getName()->text.equals("RayDesc"))
-            __debugbreak();
-
         // Insert parameters as values for member-wise init expression.
         for (auto& ctorInfo : structDeclInfo.ctorInfoList)
         {
