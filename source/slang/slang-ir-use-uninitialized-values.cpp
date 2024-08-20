@@ -180,9 +180,8 @@ namespace Slang
             // Avoid the recursive step if its a
             // recursive structure like a linked list
             IRType* ptype = ptr->getValueType();
-            if (auto spec = as<IRSpecialize>(ptype))
-                if(auto resolvedType = as<IRType>(resolveSpecialization(spec)))
-                    ptype = resolvedType;
+            if(auto resolvedType = as<IRType>(getResolvedInstForDecorations(ptype)))
+                ptype = resolvedType;
             return (ptype != upper) && canIgnoreType(ptype, upper);
         }
 
