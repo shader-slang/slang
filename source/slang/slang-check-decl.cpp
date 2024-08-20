@@ -7758,29 +7758,35 @@ namespace Slang
 
         struct DeclAndCtorInfo
         {
-            StructDecl* parent = nullptr;
-            ConstructorDecl* defaultCtor = nullptr;
-            
+            AggTypeDecl* m_parent;
+            InheritanceDecl* m_inheritanceDecl;
+            ConstructorDecl* m_defaultCtor = nullptr;
+
             struct CtorAndInsertOffset
             {
-                ConstructorDecl* ctor;
-                Index insertOffset;
+                ConstructorDecl* m_ctor;
+                Index m_insertOffset;
             };
 
-            List<CtorAndInsertOffset> ctorInfoList;
+            List<CtorAndInsertOffset> m_ctorInfoList;
             DeclAndCtorInfo()
             {
             }
-            DeclAndCtorInfo(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* parent, const bool getOnlyDefault)
+            DeclAndCtorInfo(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, AggTypeDecl* parent, InheritanceDecl* inheritanceDecl, const bool getOnlyDefault) : m_parent(parent), m_inheritanceDecl(inheritanceDecl)
             {
+                // only get ctor info from structDecl
+                StructDecl* structDecl = as<StructDecl>(parent);
+                if (!structDecl)
+                    return;
+
                 if (getOnlyDefault)
-                    defaultCtor = _getDefaultCtor(parent);
+                    m_defaultCtor = _getDefaultCtor(structDecl);
                 else
                 {
-                    auto ctorList = _getCtorList(m_astBuilder, visitor, parent, &defaultCtor);
-                    ctorInfoList.reserve(ctorList.getCount());
+                    auto ctorList = _getCtorList(m_astBuilder, visitor, structDecl, &m_defaultCtor);
+                    m_ctorInfoList.reserve(ctorList.getCount());
                     for(auto i : ctorList)
-                        ctorInfoList.add({i, 0});
+                        m_ctorInfoList.add({i, 0});
                 }
             }
         };
@@ -7791,12 +7797,12 @@ namespace Slang
             auto declRefType = as<DeclRefType>(inheritanceMember->base.type);
             if (!declRefType)
                 continue;
-            auto structOfInheritance = as<StructDecl>(declRefType->getDeclRef().getDecl());
+            auto structOfInheritance = as<AggTypeDecl>(declRefType->getDeclRef().getDecl());
             if (!structOfInheritance)
                 continue;
-            inheritanceDefaultCtorList.add(DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, true));
+            inheritanceDefaultCtorList.add(DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, inheritanceMember, false));
         }
-        DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, false);
+        DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, nullptr, false);
 
         // ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if init expressions 
         // of members are to be synthisised, they are.
@@ -7816,9 +7822,9 @@ namespace Slang
         Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
 
         // Insert 'this->base->__init()' into 'this->__init()'.
-        for (auto& ctorInfo : structDeclInfo.ctorInfoList)
+        for (auto& ctorInfo : structDeclInfo.m_ctorInfoList)
         {
-            auto ctor = ctorInfo.ctor;
+            auto ctor = ctorInfo.m_ctor;
 
             // Synthesized constructors should not inject a defaultCtor of base-struct-type
             // unless ctor has 0 parameters. This is to allow a ctor which desires to be
@@ -7830,14 +7836,14 @@ namespace Slang
             seqStmtChild->stmts.reserve(inheritanceDefaultCtorList.getCount());
             for (auto& declInfo : inheritanceDefaultCtorList)
             {
-                if (!declInfo.defaultCtor)
+                if (!declInfo.m_defaultCtor)
                     continue;
 
                 auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-                ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
-                ctorToInvoke->name = declInfo.defaultCtor->getName();
-                ctorToInvoke->loc = declInfo.defaultCtor->loc;
-                ctorToInvoke->type = structDeclInfo.defaultCtor->returnType.type;
+                ctorToInvoke->declRef = declInfo.m_defaultCtor->getDefaultDeclRef();
+                ctorToInvoke->name = declInfo.m_defaultCtor->getName();
+                ctorToInvoke->loc = declInfo.m_defaultCtor->loc;
+                ctorToInvoke->type = structDeclInfo.m_defaultCtor->returnType.type;
 
                 auto invoke = m_astBuilder->create<InvokeExpr>();
                 invoke->functionExpr = ctorToInvoke;
@@ -7848,11 +7854,11 @@ namespace Slang
 
                 // A base may not have any value, if this is the case do not insert a `__init()`
                 // since coercing is impossible.
-                if (!canCoerce(declInfo.defaultCtor->returnType.type, ctor->returnType.type, thisExpr))
+                if (!canCoerce(declInfo.m_defaultCtor->returnType.type, ctor->returnType.type, thisExpr))
                     continue;
 
                 auto assign = m_astBuilder->create<AssignExpr>();
-                assign->left = coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
+                assign->left = coerce(CoercionSite::Initializer, declInfo.m_defaultCtor->returnType.type, thisExpr);
                 assign->right = invoke;
                 auto stmt = m_astBuilder->create<ExpressionStmt>();
                 stmt->expression = assign;
@@ -7865,13 +7871,13 @@ namespace Slang
                 continue;
 
             auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
-            seqStmt->stmts.insert(ctorInfo.insertOffset++, seqStmtChild);
+            seqStmt->stmts.insert(ctorInfo.m_insertOffset++, seqStmtChild);
         }
 
         // Assign member variable init expressions
-        for (auto& ctorInfo : structDeclInfo.ctorInfoList)
+        for (auto& ctorInfo : structDeclInfo.m_ctorInfoList)
         {
-            auto ctor = ctorInfo.ctor;
+            auto ctor = ctorInfo.m_ctor;
             ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
             thisExpr->scope = ctor->ownedScope;
             thisExpr->type = ctor->returnType.type;
@@ -7918,21 +7924,23 @@ namespace Slang
                 continue;
 
             auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
-            seqStmt->stmts.insert(ctorInfo.insertOffset++, seqStmtChild);
+            seqStmt->stmts.insert(ctorInfo.m_insertOffset++, seqStmtChild);
         }
 
+        // Note: we assume only 1 inheritance decl currently.
         // Pre-calculate if we have a base-type and its associated ctor-list
-        auto baseStructRef = findBaseStructDeclRef(m_astBuilder, structDecl);
-        List<ConstructorDecl*> baseTypeCtorList;
-        if (baseStructRef)
+        // We also must ensure inheritance-decl is checked, else we may not have up-to-date 'DerivativeMemberAttribute' modifiers
+        DeclAndCtorInfo* baseCtorInfo = nullptr;
+        for(auto i : inheritanceDefaultCtorList)
         {
-            baseTypeCtorList = _getCtorList(m_astBuilder, this, baseStructRef.getDecl(), nullptr);
+            ensureDecl(i.m_inheritanceDecl, DeclCheckState::DefinitionChecked);
+            baseCtorInfo = &i;
         }
 
         // Insert parameters as values for member-wise init expression.
-        for (auto& ctorInfo : structDeclInfo.ctorInfoList)
+        for (auto& ctorInfo : structDeclInfo.m_ctorInfoList)
         {
-            auto ctor = ctorInfo.ctor;
+            auto ctor = ctorInfo.m_ctor;
             if(!_doesCtorExpectInitializerListUsage(ctor))
                 continue;
             auto ctorVisibility = getDeclVisibility(ctor);
@@ -7959,20 +7967,20 @@ namespace Slang
                 auto param = paramList[paramIndex];
                 // If we have a base type, the first arg is a 'base->__init(...)'. We need to find this 'base->__init(...)'
                 // and assign the parameters needed to call '__init(...)'
-                if (paramIndex == 0 && baseTypeCtorList.getCount() > 0)
+                if (paramIndex == 0 && baseCtorInfo && baseCtorInfo->m_ctorInfoList.getCount() > 0)
                 {
-                    auto baseStruct = baseStructRef.getDecl();
+                    auto baseStruct = baseCtorInfo->m_parent;
 
                     // First find a member-wise 'base->__init()' which maps to this current ctor being filled
                     ConstructorDecl* baseCtor = nullptr;
                     ConstructorTags memberwiseCtorToCall = ConstructorTags::MemberwiseCtorForPublicVisibility;
                     if (isVisibilityOfDeclVisibleInScope(baseStruct, DeclVisibility::Internal, structDecl->ownedScope))
                         memberwiseCtorToCall = ConstructorTags::MemberwiseCtorForInternalVisibility;
-                    for (auto i : baseTypeCtorList)
+                    for (auto& i : baseCtorInfo->m_ctorInfoList)
                     {
-                        if (i->containsOption(memberwiseCtorToCall))
+                        if (i.m_ctor->containsOption(memberwiseCtorToCall))
                         {
-                            baseCtor = i;
+                            baseCtor = i.m_ctor;
                             break;
                         }
                     }
@@ -8048,8 +8056,6 @@ namespace Slang
                 if (( !this->isTypeDifferentiable(member->type) || !member->hasModifier<DerivativeMemberAttribute>()) && !param->hasModifier<NoDiffModifier>())
                     addModifier(param, m_astBuilder->create<NoDiffModifier>());
 
-
-
                 //Manage CUDA host modifier based on inheritance
                 //containsType
                 if (!foundCudaHostModifier && containsTargetType<TorchTensorType>(m_astBuilder, member->type.type))
@@ -8078,24 +8084,24 @@ namespace Slang
 
                 seqStmtChild->stmts.add(stmt);
             }
-            seqStmt->stmts.insert(ctorInfo.insertOffset++, seqStmtChild);
+            seqStmt->stmts.insert(ctorInfo.m_insertOffset++, seqStmtChild);
         }
 
         // Compiler generated ctor may be destroyed
-        if(structDeclInfo.defaultCtor
-            && structDeclInfo.defaultCtor->containsOption(ConstructorTags::Synthesized))
+        if(structDeclInfo.m_defaultCtor
+            && structDeclInfo.m_defaultCtor->containsOption(ConstructorTags::Synthesized))
         {
             bool destroy = false;
-            if (!structDeclInfo.defaultCtor->body)
+            if (!structDeclInfo.m_defaultCtor->body)
                 destroy = true;
-            else if (auto block = as<BlockStmt>(structDeclInfo.defaultCtor->body))
+            else if (auto block = as<BlockStmt>(structDeclInfo.m_defaultCtor->body))
             {
                 if (as<SeqStmt>(block->body)->stmts.getCount() == 0)
                     destroy = true;
             }
             if (destroy)
             {
-                structDecl->members.remove(structDeclInfo.defaultCtor);
+                structDecl->members.remove(structDeclInfo.m_defaultCtor);
                 structDecl->invalidateMemberDictionary();
                 structDecl->buildMemberDictionary();
             }
