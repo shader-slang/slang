@@ -21,7 +21,7 @@ namespace SlangRecord
         ISlangUnknown* getInterface(const Guid& guid);
 
         explicit EntryPointRecorder(slang::IEntryPoint* entryPoint, RecordManager* recordManager);
-        ~EntryPointRecorder();
+        // ~EntryPointRecorder();
 
         // Interfaces for `IComponentType`
         virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override;

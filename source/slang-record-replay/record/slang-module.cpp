@@ -14,11 +14,6 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, module);
     }
 
-    ModuleRecorder::~ModuleRecorder()
-    {
-        m_actualModule->release();
-    }
-
     ISlangUnknown* ModuleRecorder::getInterface(const Guid& guid)
     {
         if(guid == ModuleRecorder::getTypeGuid())

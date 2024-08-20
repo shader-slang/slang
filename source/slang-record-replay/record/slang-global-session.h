@@ -15,7 +15,7 @@ namespace SlangRecord
     {
         public:
             explicit GlobalSessionRecorder(slang::IGlobalSession* session);
-            virtual ~GlobalSessionRecorder();
+            // virtual ~GlobalSessionRecorder();
 
             SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
             SLANG_REF_OBJECT_IUNKNOWN_RELEASE

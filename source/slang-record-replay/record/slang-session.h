@@ -20,7 +20,7 @@ namespace SlangRecord
         ISlangUnknown* getInterface(const Guid& guid);
 
         explicit SessionRecorder(slang::ISession* session, RecordManager* recordManager);
-        ~SessionRecorder();
+        // ~SessionRecorder();
 
         SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL getGlobalSession() override;
         SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModule(

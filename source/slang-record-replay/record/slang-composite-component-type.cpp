@@ -15,11 +15,6 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, componentType);
     }
 
-    CompositeComponentTypeRecorder::~CompositeComponentTypeRecorder()
-    {
-        m_actualCompositeComponentType->release();
-    }
-
     ISlangUnknown* CompositeComponentTypeRecorder::getInterface(const Guid& guid)
     {
         if (guid == IComponentType::getTypeGuid())

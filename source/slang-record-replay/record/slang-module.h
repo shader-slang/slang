@@ -21,7 +21,7 @@ namespace SlangRecord
         ISlangUnknown* getInterface(const Guid& guid);
 
         explicit ModuleRecorder(slang::IModule* module, RecordManager* recordManager);
-        ~ModuleRecorder();
+        // ~ModuleRecorder();
 
         // Interfaces for `IModule`
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL findEntryPointByName(

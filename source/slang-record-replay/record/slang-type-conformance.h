@@ -21,7 +21,7 @@ namespace SlangRecord
         ISlangUnknown* getInterface(const Guid& guid);
 
         explicit TypeConformanceRecorder(slang::ITypeConformance* typeConformance, RecordManager* recordManager);
-        ~TypeConformanceRecorder();
+        // ~TypeConformanceRecorder();
 
         // Interfaces for `IComponentType`
         virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override;

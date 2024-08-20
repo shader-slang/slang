@@ -14,11 +14,6 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, typeConformance);
     }
 
-    TypeConformanceRecorder::~TypeConformanceRecorder()
-    {
-        m_actualTypeConformance->release();
-    }
-
     ISlangUnknown* TypeConformanceRecorder::getInterface(const Guid& guid)
     {
         if (guid == TypeConformanceRecorder::getTypeGuid())

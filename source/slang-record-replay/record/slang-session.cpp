@@ -17,11 +17,6 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Verbose, "%s: %p\n", "SessionRecorder create:", session);
     }
 
-    SessionRecorder::~SessionRecorder()
-    {
-        m_actualSession->release();
-    }
-
     ISlangUnknown* SessionRecorder::getInterface(const Guid& guid)
     {
         if(guid == ISlangUnknown::getTypeGuid() || guid == ISession::getTypeGuid())

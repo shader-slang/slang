@@ -14,11 +14,6 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, entryPoint);
     }
 
-    EntryPointRecorder::~EntryPointRecorder()
-    {
-        m_actualEntryPoint->release();
-    }
-
     ISlangUnknown* EntryPointRecorder::getInterface(const Guid& guid)
     {
         if(guid == EntryPointRecorder::getTypeGuid())
