@@ -9339,7 +9339,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     {
                         typeBuilder.setInsertInto(param.clonedParam);
                         param.clonedParam->setFullType((IRType*)cloneInst(&cloneEnv, &typeBuilder, param.originalParam->getFullType()));
-                        cloneInstDecorationsAndChildren(&cloneEnv, typeBuilder.getModule(), param.clonedParam, param.originalParam);
+                        cloneInstDecorationsAndChildren(&cloneEnv, typeBuilder.getModule(), param.originalParam, param.clonedParam);
                     }
 
                     typeBuilder.setInsertInto(block);
