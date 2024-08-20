@@ -31,6 +31,7 @@
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-hlsl-legalize.h"
 #include "slang-ir-metal-legalize.h"
+#include "slang-ir-wgsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-legalize-array-return-type.h"
@@ -1234,6 +1235,12 @@ Result linkAndOptimizeIR(
             legalizeEntryPointVaryingParamsForCUDA(irModule, codeGenContext->getSink());
         }
         break;
+
+    case CodeGenTarget::WGSL:
+    {
+        legalizeIRForWGSL(irModule, sink);
+    }
+    break;
 
     default:
         break;
