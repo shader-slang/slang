@@ -162,7 +162,8 @@ namespace Slang
         }
 
         // If `interfaceType` represents some generic interface type, such as `IFoo<T>`, and `type` conforms to
-        // some `IFoo<X>`, then we can also consider `type` as a valid joined result.
+        // some `IFoo<X>`, then we should attempt to unify the them to discover constraints for
+        // `T`.
         if (auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(interfaceType))
         {
             if (as<GenericAppDeclRef>(interfaceDeclRef.declRefBase))
