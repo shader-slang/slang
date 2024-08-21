@@ -605,21 +605,6 @@ struct IRTypeLegalizationContext
     TargetProgram* targetProgram;
     IRBuilder builderStorage;
 
-    List<IRFunc*> entryPoints;
-    List<IRFunc*>& getEntryPoints()
-    {
-        if (entryPoints.getCount() == 0)
-        {
-            for (auto i : module->getGlobalInsts())
-            {
-                if (auto func = as<IRFunc>(i))
-                    if (i->findDecoration<IREntryPointDecoration>())
-                        entryPoints.add(func);
-            }
-        }
-        return entryPoints;
-    }
-
     IRTypeLegalizationContext(
         TargetProgram* target,
         IRModule* inModule);
@@ -663,6 +648,22 @@ struct IRTypeLegalizationContext
     };
 
     List<PointerValue> activePointerValues;
+
+    List<IRFunc*> entryPoints;
+
+    List<IRFunc*>& getEntryPoints()
+    {
+        if (entryPoints.getCount() == 0)
+        {
+            for (auto i : module->getGlobalInsts())
+            {
+                if (auto func = as<IRFunc>(i))
+                    if (i->findDecoration<IREntryPointDecoration>())
+                        entryPoints.add(func);
+            }
+        }
+        return entryPoints;
+    }
 
     IRBuilder* getBuilder() { return builder; }
 
