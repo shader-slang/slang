@@ -1202,7 +1202,9 @@ bool specializeResourceOutputs(
     HashSet<IRFunc*>&          unspecializableFuncs)
 {
     auto targetRequest = codeGenContext->getTargetReq();
-    if(isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
+    // D3D & SPIRV/GLSL cannot easily use resources as parameters
+    // Metal cannot assign globals to resource-outputting functions (in global scope)
+    if(isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isMetalTarget(targetRequest))
     {}
     else
     {

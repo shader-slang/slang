@@ -1221,7 +1221,7 @@ Result linkAndOptimizeIR(
     // concrete value.
     // These sort of GlobalVar's should be removed in-favor of directly
     // using the known value since this may be an indirect use of a resource
-    // variable (which is illegal for most targets).
+    // variable (which is illegal for almost targets).
     simplifyGlobalVars(irModule);
 
     switch( target )
