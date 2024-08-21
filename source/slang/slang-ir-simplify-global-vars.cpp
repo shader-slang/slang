@@ -40,10 +40,19 @@ namespace Slang
 
     void simplifyGlobalVars(IRModule* module)
     {
+        IRBuilder builder(module);
         for (auto inst : module->getGlobalInsts())
         {
             auto globalVar = as<IRGlobalVar>(inst);
             if (!globalVar)
+                continue;
+
+            // Only simplify resource types since otherwise we need additional logic
+            // not yet implemented
+            auto globalVarType = globalVar->getDataType();
+            auto globalPtrType = as<IRPtrTypeBase>(globalVarType);
+            if (!globalPtrType
+                || !isResourceType(globalPtrType->getValueType()))
                 continue;
 
             // Find any trivial use which is supposed-to-be part of the
