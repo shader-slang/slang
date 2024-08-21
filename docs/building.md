@@ -101,10 +101,6 @@ There are several options for getting llvm-support:
     - You can set `SLANG_SLANG_LLVM_BINARY_URL` to point to a local
       `libslang-llvm.so/slang-llvm.dll` or set it to a URL of an zip/archive
       containing such a file
-    - If this isn't set then the build system tries to download it from the
-      release on github matching the current tag. If such a tag doesn't exist
-      or doesn't have the correct os*arch combination then the latest release
-      will be tried.
 - Use a system supplied LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`, you
   must have llvm-13.0 and a matching libclang installed. It's important that
   either:
