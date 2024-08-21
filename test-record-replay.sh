@@ -69,11 +69,11 @@ resultCheck()
 }
 
 # TODO: Add more test commands here in this array
-testCommands=("./build/Debug/bin/hello-world")
+testCommands=("./build/Debug/bin/hello-world" "./build/Debug/bin/triangle")
 
 # Enable hash code generation for the test such that
 # we can have something to compare with replaying the test
-argsToEnableHashCode="--print-entrypoint-hashes"
+argsToEnableHashCode="--test-mode"
 
 declare -A testStats
 
@@ -91,6 +91,7 @@ do
     expectedResults=()
     parseStandardOutput  expectedResults "${lines[@]}"
 
+    echo "Expected Results: ${expectedResults[@]}"
     if [ ${#expectedResults[@]} -eq 0 ]; then
         log "No expected results found" $RED
         rm -rf ./slang-record/*
@@ -126,6 +127,7 @@ do
     else
         testStats[$testCommand]="FAILED"
     fi
+    printf "\n"
 done
 
 for testName in "${!testStats[@]}"

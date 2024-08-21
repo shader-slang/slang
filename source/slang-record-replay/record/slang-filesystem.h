@@ -18,7 +18,6 @@ namespace SlangRecord
     {
     public:
         explicit FileSystemRecorder(ISlangFileSystemExt* fileSystem, RecordManager* recordManager);
-        // ~FileSystemRecorder();
 
         // ISlangUnknown
         SLANG_REF_OBJECT_IUNKNOWN_ALL

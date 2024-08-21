@@ -106,7 +106,6 @@ namespace SlangRecord
     SlangResult CommonInterfaceReplayer::getEntryPointHash(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outHashId)
     {
         InputObjectSanityCheck(objectId);
-        OutputObjectSanityCheck(outHashId);
 
         SlangResult res = SLANG_OK;
         slang::IComponentType* pObj = getObjectPointer(objectId);
@@ -115,7 +114,6 @@ namespace SlangRecord
 
         if (outHash)
         {
-            m_objectMap.add(outHashId, outHash);
             if (outHash->getBufferSize())
             {
                 uint8_t* buffer = (uint8_t*)outHash->getBufferPointer();
