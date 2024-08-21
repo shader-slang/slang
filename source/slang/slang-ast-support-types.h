@@ -147,6 +147,9 @@ namespace Slang
         // Cost of converting an integer to a half type
         kConversionCost_IntegerToHalfConversion = 500,
 
+        // Cost of using a concrete argument pack
+        kConversionCost_ParameterPack = 500,
+
         // Default case (usable for user-defined conversions)
         kConversionCost_Default = 500,
 

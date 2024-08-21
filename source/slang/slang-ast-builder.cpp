@@ -525,7 +525,19 @@ FuncType* ASTBuilder::getFuncType(ArrayView<Type*> parameters, Type* result, Typ
 
 TupleType* ASTBuilder::getTupleType(List<Type*>& types)
 {
-    return getOrCreate<TupleType>(types.getArrayView());
+    // The canonical form of a tuple type is always a DeclRefType(GenAppDeclRef(TupleDecl, ConcreteTypePack(types...))).
+    // If `types` is already a single ConcreteTypePack, then we can use that directly.
+    if (types.getCount() == 1)
+    {
+        if (isTypePack(types[0]))
+        {
+            return as<TupleType>(getSpecializedBuiltinType(types[0], "TupleType"));
+        }
+    }
+
+    // Otherwise, we need to create a ConcreteTypePack to hold the types.
+    auto typePack = getTypePack(types.getArrayView());
+    return as<TupleType>(getSpecializedBuiltinType(typePack, "TupleType"));
 }
 
 TypeType* ASTBuilder::getTypeType(Type* type)
@@ -560,9 +572,26 @@ Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Type*> capturedPacks)
     return getOrCreate<ExpandType>(pattern, capturedPacks);
 }
 
+void flattenTypeList(ShortList<Type*>& flattenedList, Type* type)
+{
+    if (auto typePack = as<ConcreteTypePack>(type))
+    {
+        for (Index i = 0; i < typePack->getTypeCount(); i++)
+            flattenTypeList(flattenedList, typePack->getElementType(i));
+    }
+    else
+    {
+        flattenedList.add(type);
+    }
+}
+
 ConcreteTypePack* ASTBuilder::getTypePack(ArrayView<Type*> types)
 {
-    return getOrCreate<ConcreteTypePack>(types);
+    // Flatten all type packs in the type list.
+    ShortList<Type*> flattenedTypes;
+    for (auto type : types)
+        flattenTypeList(flattenedTypes, type);
+    return getOrCreate<ConcreteTypePack>(flattenedTypes.getArrayView().arrayView);
 }
 
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(

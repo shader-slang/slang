@@ -354,6 +354,53 @@ int test()
 }
 ```
 
+## Tuple Types
+
+Tuple types can hold collection of values of different types.
+Tuples types are defined in Slang with the `Tuple<...>` syntax, and
+constructed with either a constructor or the `makeTuple` function:
+```csharp
+Tuple<int, float, bool> t0 = Tuple<int, float, bool>(5, 2.0f, false);
+Tuple<int, float, bool> t1 = makeTuple(3, 1.0f, true);
+```
+
+Tuple elements can be accessed with `_0`, `_1` member names:
+```csharp
+int i = t0._0; // 5
+bool b = t1._2; // true
+```
+
+You can use the swizzle syntax similar to vectors and matrices to form new
+tuples:
+
+```csharp
+t0._0_0_1 // evaluates to (5, 5, 2.0f)
+```
+
+You can concatenate two tuples:
+
+```csharp
+concat(t0, t1) // evaluates to (5, 2.0f, false, 3, 1.0f, true)
+```
+
+If all element types of a tuple conforms to `IComparable`, then the tuple itself
+will conform to `IComparable`, and you can use comparison operators on the tuples
+to compare them:
+
+```csharp
+let cmp = t0 < t1; // false
+```
+
+You can use `countof()` on a tuple type or a tuple value to obtain the number of
+elements in a tuple. This is considered a compile-time constant.
+```csharp
+int n = countof(Tuple<int, float>); // 2
+int n1 = countof(makeTuple(1,2,3)); // 3
+```
+
+All tuple types will be translated to `struct` types, and receive the same layout
+as `struct` types.
+
 ## `Optional<T>` type
 
 Slang supports the `Optional<T>` type to represent a value that may not exist.
