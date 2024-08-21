@@ -2102,6 +2102,7 @@ namespace Slang
         };
 
         Type* TryJoinVectorAndScalarType(
+            ConstraintSystem* constraints,
             VectorExpressionType* vectorType,
             BasicExpressionType*  scalarType);
 
@@ -2196,11 +2197,13 @@ namespace Slang
         ConversionCost getConversionCost(Type* toType, QualType fromType);
 
         Type* _tryJoinTypeWithInterface(
+            ConstraintSystem* constraints,
             Type*                   type,
             Type*                   interfaceType);
 
         // Try to compute the "join" between two types
         Type* TryJoinTypes(
+            ConstraintSystem* constraints,
             QualType  left,
             QualType  right);
 

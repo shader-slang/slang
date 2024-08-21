@@ -9314,15 +9314,46 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     auto typeGeneric = typeBuilder.emitGeneric();
                     typeGeneric->setFullType(typeBuilder.getGenericKind());
                     typeBuilder.setInsertInto(typeGeneric);
-                    typeBuilder.emitBlock();
+                    auto block = typeBuilder.emitBlock();
                     
+                    struct ParamCloneInfo
+                    {
+                        IRParam* originalParam;
+                        IRParam* clonedParam;
+                    };
+                    ShortList<ParamCloneInfo> paramCloneInfos;
+
                     for (auto child : parentGeneric->getFirstBlock()->getChildren())
                     {
                         if (valuesToClone.contains(child))
                         {
-                            cloneInst(&cloneEnv, &typeBuilder, child);
+                            if (child->getOp() == kIROp_Param)
+                            {
+                                // Params may have forward references in its type and
+                                // decorations, so we just create a placeholder for it
+                                // in this first pass.
+                                IRParam* clonedParam = typeBuilder.emitParam(nullptr);
+                                cloneEnv.mapOldValToNew[child] = clonedParam;
+                                paramCloneInfos.add({ (IRParam*)child, clonedParam });
+                            }
+                            else
+                            {
+                                cloneInst(&cloneEnv, &typeBuilder, child);
+                            }
                         }
                     }
+
+                    // In a second pass, clone the types and decorations on params which may
+                    // contain forward references.
+                    for (auto param : paramCloneInfos)
+                    {
+                        typeBuilder.setInsertInto(param.clonedParam);
+                        param.clonedParam->setFullType((IRType*)cloneInst(&cloneEnv, &typeBuilder, param.originalParam->getFullType()));
+                        cloneInstDecorationsAndChildren(&cloneEnv, typeBuilder.getModule(), param.originalParam, param.clonedParam);
+                    }
+
+                    typeBuilder.setInsertInto(block);
+
                     IRInst* clonedReturnType = nullptr;
                     cloneEnv.mapOldValToNew.tryGetValue(returnType, clonedReturnType);
                     if (clonedReturnType)
