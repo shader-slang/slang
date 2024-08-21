@@ -180,6 +180,7 @@ static void _cloneInstDecorationsAndChildren(
             // the type might be a forward reference to things defined
             // later in the block that we haven't cloned and registered yet.
             newChild = builder->emitParam(nullptr);
+            paramPairs.add({ oldChild, newChild });
         }
         else
         {
@@ -194,13 +195,6 @@ static void _cloneInstDecorationsAndChildren(
         if( oldChild->getFirstDecorationOrChild() )
         {
             pairs.add({ oldChild, newChild });
-        }
-
-        // Add params to a separate list so that we can clone their types later
-        // after the entire block is cloned.
-        if (oldChild->getOp() == kIROp_Param)
-        {
-            paramPairs.add({oldChild, newChild});
         }
     }
 

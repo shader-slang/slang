@@ -4,7 +4,7 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-interface IOperation<T : __BuiltinFloatingPointType> // <== This is the problem
+interface IOperation<T : __BuiltinFloatingPointType>
 {
   static T apply(T lhs, T rhs);
 };
