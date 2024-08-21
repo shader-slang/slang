@@ -1957,9 +1957,6 @@ namespace Slang
             varDecl->setCheckState(DeclCheckState::DefinitionChecked);
             _validateCircularVarDefinition(varDecl);
         }
-        // all structDecl's need to be set to a default value (else it is a compile error for HLSL)
-        else if (as<DeclRefType>(type) && as<StructDecl>(as<DeclRefType>(type)->getDeclRef()))
-            varDecl->initExpr = constructDefaultInitExprForVar(this, varDecl->type, varDecl);
         else
         {
             // If a variable doesn't have an explicit initial-value

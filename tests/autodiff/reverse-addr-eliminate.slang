@@ -53,7 +53,7 @@ A f(A a, int i)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    A a;
+    A a = {};
     a.x = 1;
     a.y = 2;
 
