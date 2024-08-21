@@ -51,6 +51,7 @@ struct IntroduceExplicitGlobalContextPass
                 hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 break;
             case CodeGenTarget::CUDASource:
+            case CodeGenTarget::CUDAHeader:
                 hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
 
                 // One important exception is that CUDA *does* support
@@ -209,7 +210,9 @@ struct IntroduceExplicitGlobalContextPass
                     switch (m_target)
                     {
                     case CodeGenTarget::CUDASource:
+                    case CodeGenTarget::CUDAHeader:
                     case CodeGenTarget::CPPSource:
+                    case CodeGenTarget::CPPHeader:
                         {
                             auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
                             SLANG_ASSERT(layoutDecor);
