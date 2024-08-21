@@ -53,6 +53,14 @@
       "cacheVariables": {
         "SLANG_SLANG_LLVM_FLAVOR": "USE_SYSTEM_LLVM"
       }
+    },
+    {
+      "name": "generators",
+      "inherits": "default",
+      "description": "Build the compile time generators used in building Slang",
+      "cacheVariables": {
+        "SLANG_SLANG_LLVM_FLAVOR": "DISABLE"
+      }
     }
   ],
   "buildPresets": [
@@ -69,7 +77,7 @@
     {
       "name": "generators",
       "inherits": "release",
-      "configurePreset": "default",
+      "configurePreset": "generators",
       "targets": [
         "all-generators"
       ]
@@ -115,7 +123,7 @@
     {
       "name": "generators",
       "inherits": "release",
-      "configurePreset": "default",
+      "configurePreset": "generators",
       "variables": {
         "CPACK_PACKAGE_FILE_NAME": "slang-generators",
         "CPACK_COMPONENTS_ALL": "generators"
@@ -171,7 +179,7 @@
       "steps": [
         {
           "type": "configure",
-          "name": "default"
+          "name": "generators"
         },
         {
           "type": "build",
