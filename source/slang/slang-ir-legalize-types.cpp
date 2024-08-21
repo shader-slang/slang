@@ -343,20 +343,7 @@ struct LegalCallBuilder
                 // result type of the function, so we know that
                 // the legalization funciton/call will use a `void`
                 // result type.
-
-                // If our call is in global scope (initializer) we should
-                // hoist the call into the start of every entry-point 
-                if (!m_context->builder->getInsertLoc().getInst()->getParent()
-                    || m_context->builder->getInsertLoc().getInst()->getParent()->getOp() == kIROp_Module)
-                {
-                    for (auto i : m_context->getEntryPoints())
-                    {
-                        m_context->builder->setInsertBefore(i->getFirstOrdinaryInst());
-                        _emitCall(m_context->builder->getVoidType());
-                    }
-                }
-                else
-                    _emitCall(m_context->builder->getVoidType());
+                _emitCall(m_context->builder->getVoidType());
                 return resultVal;
             }
             break;
@@ -376,25 +363,22 @@ private:
         {
         case LegalType::Flavor::simple:
             {
-                // In the leaf case we have a simple type, and
-                // we just want to declare a local variable based on it.
-                //
+                // Here we emit a local/global var which will be assigned as an out-parameter argument, then we 'Load' this var
+                // and use that 'Load' as the result of simplification.
+                
                 auto simpleType = resultType.getSimple();
                 auto builder = m_context->builder;
 
-                // Recall that a variable in our IR represents a *pointer*
-                // to storage of the appropriate type.
-                //
+                // If we were going to emit an IRVar in global scope we have 1 important case to resolve: when IRVar is a resource
+                // and is assigned something in global scope. This is important since this means we need to make an IRGlobalVar 
+                // instead of IRVar.
+                // A later pass will handle any out-parameter hoisting into IRGlobalVar init block logic
+
                 IRInst* varPtr = nullptr;
-                if (m_call->parent->getOp() == kIROp_Module)
-                {
-                    // If we were going to emit an IRVar in global scope, emit a GlobalVar instead 
+                if (!builder->getInsertLoc().getParent() || builder->getInsertLoc().getParent()->getOp() == kIROp_Module)
                     varPtr = builder->createGlobalVar(simpleType);
-                }
                 else
-                {
                     varPtr = builder->emitVar(simpleType);
-                }
                 // We need to pass that pointer as an argument to our new
                 // `call` instruction, so that it can receive the value
                 // written by the callee.
@@ -402,23 +386,16 @@ private:
                 m_args.add(varPtr);
 
                 // Note: Because `varPtr` is a pointer to the value we want,
-                // we have the small problem of needing to return a `LegalVal`
-                // that has dereferenced the value after the call.
-                //
-                // We solve this problem by inserting as `load` from our
-                // new variable immediately after the call, before going
-                // and resetting the insertion point to continue inserting
-                // stuff before the call (which is where we wnat the local
-                // variable declarations to go).
-                //
-                // TODO: Confirm that this logic can't go awry if (somehow)
-                // there is no instruction after `m_call`. That should not
-                // be possible inside of a function body, but it could in
-                // theory be a problem if we ever have top-level module-scope
-                // code representing initialization of constants and/or globals.
-                //
+                // but we want a value, we need to 'Load' the 'varPtr' result
+                // after our m_call.
+                // 
+                // Since we may have more than 1 parameter we 'setInsertBefore(m_call);'
                 builder->setInsertBefore(m_call->getNextInst());
-                auto val = builder->emitLoad(simpleType, varPtr);
+                IRInst* val = nullptr;
+                if (as<IRGlobalVar>(varPtr))
+                    val = varPtr;
+                else
+                    val = builder->emitLoad(simpleType, varPtr);
                 builder->setInsertBefore(m_call);
 
                 return LegalVal::simple(val);
