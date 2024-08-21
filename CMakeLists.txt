@@ -137,7 +137,7 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     # If the user didn't specify a URL, find the best one now
     if(NOT SLANG_SLANG_LLVM_BINARY_URL)
         get_best_slang_binary_release_url(url)
-        if(NOT url)
+        if(NOT DEFINED url)
             message(FATAL_ERROR "Unable to find binary release for slang-llvm, please set a different SLANG_SLANG_LLVM_FLAVOR or set SLANG_SLANG_LLVM_BINARY_URL manually")
         endif()
     endif()

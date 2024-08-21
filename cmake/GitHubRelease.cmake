@@ -31,9 +31,9 @@ function(check_release_and_get_latest owner repo version os arch out_var)
             set(${out_var} "${version}" PARENT_SCOPE)
             return()
         endif()
-        message(WARNING "Failed to find ${desired_zip} in release assets for ${version} from ${version_url}.\nFalling back to latest version if it differs")
+        message(WARNING "Failed to find ${desired_zip} in release assets for ${version} from ${version_url}\nFalling back to latest version if it differs")
     else()
-        message(WARNING "Failed to download release info for version ${version} from ${version_url}.\nFalling back to latest version if it differs")
+        message(WARNING "Failed to download release info for version ${version} from ${version_url}\nFalling back to latest version if it differs")
     endif()
 
 
@@ -94,6 +94,7 @@ function(get_best_slang_binary_release_url out_var)
     set(repo "slang")
 
     check_release_and_get_latest(${owner} ${repo} ${SLANG_VERSION_NUMERIC} ${os} ${arch} release_version)
-
-    set(${out_var} "https://github.com/${owner}/${repo}/releases/download/v${release_version}/slang-${release_version}-${os}-${arch}.zip" PARENT_SCOPE)
+    if(DEFINED release_version)
+      set(${out_var} "https://github.com/${owner}/${repo}/releases/download/v${release_version}/slang-${release_version}-${os}-${arch}.zip" PARENT_SCOPE)
+    endif()
 endfunction()
