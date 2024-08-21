@@ -3928,6 +3928,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 baseVal.val));
     }
 
+    LoweredValInfo visitDetachExpr(DetachExpr* expr)
+    {
+        auto baseVal = lowerRValueExpr(context, expr->inner);
+
+        return LoweredValInfo::simple(
+            getBuilder()->emitDetachDerivative(
+                lowerType(context, expr->type),
+                getSimpleVal(context, baseVal)));
+    }
+
     LoweredValInfo visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->baseFunction);

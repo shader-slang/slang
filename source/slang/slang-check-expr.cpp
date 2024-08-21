@@ -3188,6 +3188,13 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsExprVisitor::visitDetachExpr(DetachExpr* expr)
+    {
+        expr->inner = CheckTerm(expr->inner);
+        expr->type = expr->inner->type;
+        return expr;
+    }
+
 
     static bool _isSizeOfType(Type* type)
     {
