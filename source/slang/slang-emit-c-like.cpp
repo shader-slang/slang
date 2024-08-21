@@ -1830,7 +1830,7 @@ void CLikeSourceEmitter::emitRateQualifiers(IRInst* value)
     const auto rate = value->getRate();
     if (rate)
     {
-        emitRateQualifiersAndAddressSpaceImpl(rate, -1);
+        emitRateQualifiersAndAddressSpaceImpl(rate, AddressSpace::Generic);
     }
 }
 
@@ -1838,8 +1838,8 @@ void CLikeSourceEmitter::emitRateQualifiersAndAddressSpace(IRInst* value)
 {
     const auto rate = value->getRate();
     const auto ptrTy = composeGetters<IRPtrTypeBase>(value, &IRInst::getDataType);
-    const auto addressSpace = ptrTy ? ptrTy->getAddressSpace() : -1;
-    if (rate || addressSpace != -1)
+    const auto addressSpace = ptrTy ? ptrTy->getAddressSpace() : AddressSpace::Generic;
+    if (rate || addressSpace != AddressSpace::Generic)
     {
         emitRateQualifiersAndAddressSpaceImpl(rate, addressSpace);
     }
@@ -2582,10 +2582,15 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
         break;
     }
+
+    case kIROp_ImageSubscript:
+        // We should have legalized ImageSubscript before emit for metal targets
+        if (isMetalTarget(this->getTargetReq()))
+            getSink()->diagnose(inst, Diagnostics::unimplemented, "kIROp_ImageSubscript is unimplemented for Metal, expected legalization beforehand");
+        [[fallthrough]];
     case kIROp_GetElement:
     case kIROp_MeshOutputRef:
     case kIROp_GetElementPtr:
-    case kIROp_ImageSubscript:
         // HACK: deal with translation of GLSL geometry shader input arrays.
         if(auto decoration = inst->getOperand(0)->findDecoration<IRGLSLOuterArrayDecoration>())
         {
@@ -2898,6 +2903,9 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugLine:
     case kIROp_DebugVar:
     case kIROp_DebugValue:
+        break;
+
+    case kIROp_Unmodified:
         break;
 
         // Insts that needs to be emitted as code blocks.

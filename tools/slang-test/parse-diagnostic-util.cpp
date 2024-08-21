@@ -5,7 +5,7 @@
 #include "../../source/core/slang-hex-dump-util.h"
 #include "../../source/core/slang-type-text-util.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-byte-encode-util.h"

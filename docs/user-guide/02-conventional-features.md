@@ -111,12 +111,52 @@ In some cases the element count is then inferred from the initial value of a var
 int a[] = { 1, 2, 3 };
 ```
 
-In other cases, the result is a _runtime-sized_ array, where the actual element count will be determined later:
+In other cases, the result is a _unsized_ array, where the actual element count will be determined later:
 
 ```hlsl
 // the type of `b` is `int[]`
 void f( int b[] )
 { ... }
+```
+
+It is allowed to pass a sized array as argument to an unsized array parameter when calling a function.
+
+Array types has a `getCount()` memeber function that returns the length of the array.
+
+```hlsl
+int f( int b[] )
+{
+    return b.getCount(); // Note: all arguments to `b` must be resolvable to sized arrays.
+}
+
+void test()
+{
+    int arr[3] = { 1, 2, 3 };
+    int x = f(arr); // OK, passing sized array to unsized array parameter, x will be 3.
+}
+```
+
+Please note that if a function calls `getCount()` method on an unsized array parameter, then all
+calls to that function must provide a sized array argument, otherwise the compiler will not be able
+to resolve the size and will report an error. The following code shows an example of valid and
+invalid cases.
+
+```hlsl
+int f( int b[] )
+{
+    return b.getCount();
+}
+int g( int b[] )
+{
+    return f(b); // transitive calls are allowed.
+}
+uniform int unsizedParam[];
+void test()
+{
+    g(unsizedParam); // Not OK, `unsizedParam` doesn't have a known size at compile time.
+    int arr[3];
+    g(arr); // OK.
+}
 ```
 
 There are more limits on how runtime-sized arrays can be used than on arrays of statically-known element count.
@@ -451,6 +491,11 @@ Slang supports a C-style preprocessor with the following directives;
 * `#pragma`, including `#pragma once`
 
 Variadic macros are supported by the Slang preprocessor.
+
+> #### Note ####
+> The use of `#include` in new code is discouraged as this functionality has
+> been superseded by the module system, please refer to
+> [./04-modules-and-access-control.md](./04-modules-and-access-control.md)
 
 Attributes
 ----------

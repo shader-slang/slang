@@ -1170,6 +1170,17 @@ IRFunc* cloneFuncImpl(
     return clonedFunc;
 }
 
+// Can an inst with `opcode` contain basic blocks as children?
+bool canInstContainBasicBlocks(IROp opcode)
+{
+    switch (opcode)
+    {
+    case kIROp_Expand:
+        return true;
+    default:
+        return false;
+    }
+}
 
 IRInst* cloneInst(
     IRSpecContextBase*              context,
@@ -1238,7 +1249,10 @@ IRInst* cloneInst(
         argCount, newArgs.getArrayView().getBuffer());
     builder->addInst(clonedInst);
     registerClonedValue(context, clonedInst, originalValues);
-    cloneDecorationsAndChildren(context, clonedInst, originalInst);
+    if (canInstContainBasicBlocks(clonedInst->getOp()))
+        cloneGlobalValueWithCodeCommon(context, (IRGlobalValueWithCode*)clonedInst, (IRGlobalValueWithCode*)originalInst, originalValues);
+    else
+        cloneDecorationsAndChildren(context, clonedInst, originalInst);
     cloneExtraDecorations(context, clonedInst, originalValues);
     return clonedInst;
 }

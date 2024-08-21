@@ -738,7 +738,7 @@ void CUDASourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
 }
 
-void CUDASourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] IRIntegerValue addressSpace)
+void CUDASourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] AddressSpace addressSpace)
 {
     if (as<IRGroupSharedRate>(rate))
     {

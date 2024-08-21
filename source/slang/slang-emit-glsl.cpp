@@ -228,7 +228,6 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     HLSLAppendStructuredBufferType                  - Write
     HLSLConsumeStructuredBufferType                 - TODO (JS): Its possible that this can be readonly, but we currently don't support on GLSL
     */
-    _emitMemoryQualifierDecorations(varDecl);
     if (as<IRHLSLStructuredBufferType>(structuredBufferType))
     {
         m_writer->emit("readonly ");
@@ -2638,9 +2637,9 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type");
 }
 
-void GLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace)
+void GLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace)
 {
-    if(addressSpace == SpvStorageClassTaskPayloadWorkgroupEXT)
+    if(addressSpace == AddressSpace::TaskPayloadWorkgroup)
     {
         m_writer->emit("taskPayloadSharedEXT ");
     }

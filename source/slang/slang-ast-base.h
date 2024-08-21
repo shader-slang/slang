@@ -743,7 +743,7 @@ public:
     bool isChildOf(Decl* other) const;
 
     // Track the decl reference that caused the requirement of a capability atom.
-    SLANG_UNREFLECTED Dictionary<CapabilityAtom, DeclReferenceWithLoc> capabilityRequirementProvenance;
+    SLANG_UNREFLECTED List<DeclReferenceWithLoc> capabilityRequirementProvenance;
 private:
     SLANG_UNREFLECTED DeclRefBase* m_defaultDeclRef = nullptr;
     SLANG_UNREFLECTED Index m_defaultDeclRefEpoch = -1;

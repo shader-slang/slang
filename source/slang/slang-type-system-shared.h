@@ -1,7 +1,7 @@
 #ifndef SLANG_TYPE_SYSTEM_SHARED_H
 #define SLANG_TYPE_SYSTEM_SHARED_H
 
-#include "../../slang.h"
+#include "slang.h"
 
 namespace Slang
 {
@@ -58,6 +58,53 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
     const int kStdlibTextureIsShadowParameterIndex = 6;
     const int kStdlibTextureIsCombinedParameterIndex = 7;
     const int kStdlibTextureFormatParameterIndex = 8;
+
+    enum class AddressSpace : uint64_t
+    {
+        Generic = 0x7fffffff,
+        // Corresponds to SPIR-V's SpvStorageClassPrivate
+        ThreadLocal = 1,
+        Global,
+        // Corresponds to SPIR-V's SpvStorageClassWorkgroup
+        GroupShared,
+        // Corresponds to SPIR-V's SpvStorageClassUniform
+        Uniform,
+        // specific address space for payload data in metal
+        MetalObjectData,
+        // Corresponds to SPIR-V's SpvStorageClassInput
+        Input,
+        // Corresponds to SPIR-V's SpvStorageClassOutput
+        Output,
+        // Corresponds to SPIR-V's SpvStorageClassTaskPayloadWorkgroupEXT
+        TaskPayloadWorkgroup,
+        // Corresponds to SPIR-V's SpvStorageClassFunction
+        Function,
+        // Corresponds to SPIR-V's SpvStorageClassStorageBuffer
+        StorageBuffer,
+        // Corresponds to SPIR-V's SpvStorageClassPushConstant,
+        PushConstant,
+        // Corresponds to SPIR-V's SpvStorageClassRayPayloadKHR,
+        RayPayloadKHR,
+        // Corresponds to SPIR-V's SpvStorageClassIncomingRayPayloadKHR,
+        IncomingRayPayload,
+        // Corresponds to SPIR-V's SpvStorageClassCallableDataKHR
+        CallableDataKHR,
+        // Corresponds to SPIR-V's SpvStorageClassIncomingCallableDataKHR
+        IncomingCallableData,
+        // Corresponds to SPIR-V's SpvStorageClassHitObjectAttributeNV,
+        HitObjectAttribute,
+        // Corresponds to SPIR-V's SpvStorageClassHitAttributeKHR,
+        HitAttribute,
+        // Corresponds to SPIR-V's SpvStorageClassShaderRecordBufferKHR,
+        ShaderRecordBuffer,
+        // Corresponds to SPIR-V's SpvStorageClassUniformConstant,
+        UniformConstant,
+        // Corresponds to SPIR-V's SpvStorageClassImage
+        Image,
+
+        // Default address space for a user-defined pointer
+        UserPointer = 0x100000001ULL,
+    };
 }
 
 #endif

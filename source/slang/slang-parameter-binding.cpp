@@ -10,7 +10,7 @@
 
 #include "slang-ir-string-hash.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 namespace Slang {
 
@@ -480,8 +480,8 @@ static bool isDigit(char c)
     return (c >= '0') && (c <= '9');
 }
 
-void splitNameAndIndex(
-    UnownedStringSlice const&       text,
+bool splitNameAndIndex(
+    UnownedStringSlice const& text,
     UnownedStringSlice& outName,
     UnownedStringSlice& outDigits)
 {
@@ -489,14 +489,20 @@ void splitNameAndIndex(
     char const* digitsEnd = text.end();
 
     char const* nameEnd = digitsEnd;
+    // ExplicitIndex is when a semantic has an index at the end of its name
+    // "SV_TARGET1" has an ExplicitIndex
+    // "SV_TARGET" does not have an ExplicitIndex
+    bool hasExplicitIndex = false;
     while( nameEnd != nameBegin && isDigit(*(nameEnd - 1)) )
     {
+        hasExplicitIndex = true;
         nameEnd--;
     }
     char const* digitsBegin = nameEnd;
 
     outName = UnownedStringSlice(nameBegin, nameEnd);
     outDigits = UnownedStringSlice(digitsBegin, digitsEnd);
+    return hasExplicitIndex;
 }
 
 LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerClassName)
@@ -3887,7 +3893,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     }
 
     // Try to find rules based on the selected code-generation target
-    auto layoutContext = getInitialLayoutContextForTarget(targetReq, programLayout);
+    auto layoutContext = getInitialLayoutContextForTarget(targetReq, programLayout, slang::LayoutRules::Default);
 
     // If there was no target, or there are no rules for the target,
     // then bail out here.
@@ -4092,6 +4098,8 @@ RefPtr<ProgramLayout> generateParameterBindings(
             if( varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
             {
                 needDefaultConstantBuffer = true;
+                if(varLayout->varDecl.getDecl()->hasModifier<GLSLBindingAttribute>() || varLayout->varDecl.getDecl()->hasModifier<GLSLLocationLayoutModifier>())
+                    sink->diagnose(varLayout->varDecl, Diagnostics::explicitUniformLocation, as<VarDecl>(varLayout->varDecl).getDecl()->getType());
                 diagnoseGlobalUniform(&sharedContext, as<VarDeclBase>(varLayout->varDecl.getDecl()));
             }
         }

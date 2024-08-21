@@ -929,9 +929,13 @@ namespace Slang
                 if (checkCapabilityName(arg, capName))
                 {
                     capabilityNames.add(capName);
+                    if(isInternalCapabilityName(capName))
+                        maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, attr, Diagnostics::usingInternalCapabilityName, attr, capName);
                 }
             }
             requireCapAttr->capabilitySet = CapabilitySet(capabilityNames);
+            if (requireCapAttr->capabilitySet.isInvalid())
+                maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, attr, Diagnostics::unexpectedCapability, attr, CapabilityName::Invalid);
         }
         else if (auto requirePreludeAttr = as<RequirePreludeAttribute>(attr))
         {

@@ -135,9 +135,9 @@ public:
     NS::SharedPtr<MTL::Device> m_device;
     NS::SharedPtr<MTL::CommandQueue> m_commandQueue;
 
-    //DescriptorSetAllocator descriptorSetAllocator;
-
     uint32_t m_queueAllocCount;
+
+    bool m_hasArgumentBufferTier2 = false;
 
     // A list to hold objects that may have a strong back reference to the device
     // instance. Because of the pipeline cache in `RendererBase`, there could be a reference
@@ -150,8 +150,6 @@ public:
     // worrying the `ShaderProgramImpl` object getting destroyed after the completion of
     // `DeviceImpl::~DeviceImpl()'.
     ChunkedList<RefPtr<RefObject>, 1024> m_deviceObjectsWithPotentialBackReferences;
-
-    //RefPtr<FramebufferImpl> m_emptyFramebuffer;
 };
 
 } // namespace metal

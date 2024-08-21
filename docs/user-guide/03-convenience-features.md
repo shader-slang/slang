@@ -354,6 +354,53 @@ int test()
 }
 ```
 
+## Tuple Types
+
+Tuple types can hold collection of values of different types.
+Tuples types are defined in Slang with the `Tuple<...>` syntax, and
+constructed with either a constructor or the `makeTuple` function:
+```csharp
+Tuple<int, float, bool> t0 = Tuple<int, float, bool>(5, 2.0f, false);
+Tuple<int, float, bool> t1 = makeTuple(3, 1.0f, true);
+```
+
+Tuple elements can be accessed with `_0`, `_1` member names:
+```csharp
+int i = t0._0; // 5
+bool b = t1._2; // true
+```
+
+You can use the swizzle syntax similar to vectors and matrices to form new
+tuples:
+
+```csharp
+t0._0_0_1 // evaluates to (5, 5, 2.0f)
+```
+
+You can concatenate two tuples:
+
+```csharp
+concat(t0, t1) // evaluates to (5, 2.0f, false, 3, 1.0f, true)
+```
+
+If all element types of a tuple conforms to `IComparable`, then the tuple itself
+will conform to `IComparable`, and you can use comparison operators on the tuples
+to compare them:
+
+```csharp
+let cmp = t0 < t1; // false
+```
+
+You can use `countof()` on a tuple type or a tuple value to obtain the number of
+elements in a tuple. This is considered a compile-time constant.
+```csharp
+int n = countof(Tuple<int, float>); // 2
+int n1 = countof(makeTuple(1,2,3)); // 3
+```
+
+All tuple types will be translated to `struct` types, and receive the same layout
+as `struct` types.
+
 ## `Optional<T>` type
 
 Slang supports the `Optional<T>` type to represent a value that may not exist.
@@ -380,6 +427,23 @@ int caller()
     useVal(v);  // OK to pass `MyType` to `Optional<MyType>`.
     useVal(none);  // OK to pass `none` to `Optional<MyType>`.
     return 0;
+}
+```
+
+## `if_let` syntax
+Slang supports `if (let name = expr)` syntax to simplify the code when working with `Optional<T>` value. The syntax is similar to Rust's
+`if let` syntax, the value expression must be an `Optional<T>` type, for example:
+
+```csharp
+Optional<int> getOptInt() { ... }
+
+void test()
+{
+    if (let x = getOptInt())
+    {
+          // if we are here, `getOptInt` returns a value `int`.
+          // and `x` represents the `int` value.
+    }
 }
 ```
 
@@ -613,3 +677,28 @@ __file_decl
     }
 }
 ```
+
+User Defined Attributes (Experimental)
+-------------------
+
+In addition to many system defined attributes, users can define their own custom attribute types to be used in the `[UserDefinedAttribute(args...)]` syntax. The following example shows how to define a custom attribute type.
+
+```csharp
+[__AttributeUsage(_AttributeTargets.Var)]
+struct MaxValueAttribute
+{
+    int value;
+    string description;
+};
+
+[MaxValue(12, "the scale factor")]
+uniform int scaleFactor;
+```
+
+In the above code, the `MaxValueAttribute` struct type is decorated with the `[__AttributeUsage]` attribute, which informs that `MaxValueAttribute` type should be interpreted as a definiton for a user-defined attribute, `[MaxValue]`, that can be used to decorate all variables or fields. The members of the struct defines the argument list for the attribute.
+
+The `scaleFactor` uniform parameter is declared with the user defined `[MaxValue]` attribute, providing two arguments for `value` and `description`.
+
+The `_AttributeTargets` enum is used to restrict the type of decls the attribute can apply. Possible values of `_AttributeTargets` can be `Function`, `Param`, `Struct` or `Var`.
+
+The usage of user-defined attributes can be queried via Slang's reflection API through `TypeReflection` or `VariableReflection`'s `getUserAttributeCount`, `getUserAttributeByIndex` and `findUserAttributeByName` methods. 

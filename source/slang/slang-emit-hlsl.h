@@ -35,7 +35,7 @@ protected:
     
     virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
 
-    virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace) SLANG_OVERRIDE;
+    virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace) SLANG_OVERRIDE;
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsets) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) SLANG_OVERRIDE;

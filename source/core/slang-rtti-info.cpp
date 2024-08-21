@@ -1,6 +1,6 @@
 #include "slang-rtti-info.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "slang-rtti-util.h"
 

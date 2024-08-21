@@ -195,6 +195,13 @@ function(set_default_compile_options target)
         )
     endif()
 
+    if(SLANG_ENABLE_IR_BREAK_ALLOC)
+        target_compile_definitions(
+            ${target}
+            PRIVATE SLANG_ENABLE_IR_BREAK_ALLOC
+        )
+    endif()
+
     if(SLANG_ENABLE_DX_ON_VK)
         target_compile_definitions(${target} PRIVATE SLANG_CONFIG_DX_ON_VK)
     endif()

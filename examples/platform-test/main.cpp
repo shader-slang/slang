@@ -1,4 +1,4 @@
-#include <slang.h>
+#include "slang.h"
 #include "tools/platform/window.h"
 #include "examples/example-base/example-base.h"
 

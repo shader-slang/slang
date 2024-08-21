@@ -1,4 +1,4 @@
-#include "../../slang.h"
+#include "slang.h"
 
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
@@ -26,6 +26,8 @@
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
 #include "slang-type-layout.h"
+#include "slang-lookup.h"
+
 #
 #include "slang-options.h"
 
@@ -47,7 +49,7 @@
 
 #include "slang-check-impl.h"
 
-#include "../../slang-tag-version.h"
+#include "slang-tag-version.h"
 
 #include <sys/stat.h>
 
@@ -124,7 +126,7 @@ namespace Slang {
 
 const char* getBuildTagString()
 {
-    if (UnownedStringSlice(SLANG_TAG_VERSION) == "unknown")
+    if (UnownedStringSlice(SLANG_TAG_VERSION) == "0.0.0-unknown")
     {
         // If the tag is unknown, then we will try to get the timestamp of the shared library
         // and use that as the version string, so that we can at least return something
@@ -140,7 +142,7 @@ void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
 
-    
+
     _initCodeGenTransitionMap();
 
     ::memset(m_downstreamCompilerLocators, 0, sizeof(m_downstreamCompilerLocators));
@@ -546,11 +548,23 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
     return SLANG_OK;
 }
 
-ISlangUnknown* Session::getInterface(const Guid& guid)
+SLANG_NO_THROW SlangResult SLANG_MCALL Session::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    if(guid == ISlangUnknown::getTypeGuid() || guid == IGlobalSession::getTypeGuid())
-        return asExternal(this);
-    return nullptr;
+    if (uuid == Session::getTypeGuid())
+    {
+        addReference();
+        *outObject = static_cast<Session*>(this);
+        return SLANG_OK;
+    }
+
+    if (uuid == ISlangUnknown::getTypeGuid() && uuid == IGlobalSession::getTypeGuid())
+    {
+        addReference();
+        *outObject = static_cast<slang::IGlobalSession*>(this);
+        return SLANG_OK;
+    }
+
+    return SLANG_E_NO_INTERFACE;
 }
 
 static size_t _getStructureSize(const uint8_t* src)
@@ -1357,7 +1371,7 @@ SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     //
     SLANG_UNUSED(rules);
 
-    auto typeLayout = target->getTypeLayout(type);
+    auto typeLayout = target->getTypeLayout(type, rules);
 
     // TODO: We currently don't have a path for capturing
     // errors that occur during layout (e.g., types that
@@ -1819,7 +1833,7 @@ CapabilitySet TargetRequest::getTargetCaps()
 }
 
 
-TypeLayout* TargetRequest::getTypeLayout(Type* type)
+TypeLayout* TargetRequest::getTypeLayout(Type* type, slang::LayoutRules rules)
 {
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
@@ -1833,13 +1847,14 @@ TypeLayout* TargetRequest::getTypeLayout(Type* type)
     // parameter instead (leaving the user to figure out how that
     // maps to the ordering via some API on the program layout).
     //
-    auto layoutContext = getInitialLayoutContextForTarget(this, nullptr);
+    auto layoutContext = getInitialLayoutContextForTarget(this, nullptr, rules);
 
     RefPtr<TypeLayout> result;
-    if (getTypeLayouts().tryGetValue(type, result))
+    auto key = TypeLayoutKey{ type, rules };
+    if (getTypeLayouts().tryGetValue(key, result))
         return result.Ptr();
     result = createTypeLayout(layoutContext, type);
-    getTypeLayouts()[type] = result;
+    getTypeLayouts()[key] = result;
     return result.Ptr();
 }
 
@@ -2233,6 +2248,138 @@ Type* ComponentType::getTypeFromString(
     return type;
 }
 
+DeclRef<Decl> ComponentType::findDeclFromString(
+    String const& name,
+    DiagnosticSink* sink)
+{
+    // If we've looked up this type name before,
+   // then we can re-use it.
+   //
+    DeclRef<Decl> result;
+    if (m_decls.tryGetValue(name, result))
+        return result;
+
+
+    // TODO(JS): For now just used the linkages ASTBuilder to keep on scope
+    //
+    // The parseTermString uses the linkage ASTBuilder for it's parsing.
+    //
+    // It might be possible to just create a temporary ASTBuilder - the worry though is
+    // that the parsing sets a member variable in AST node to one of these scopes, and then
+    // it become a dangling pointer. So for now we go with the linkages.
+    auto astBuilder = getLinkage()->getASTBuilder();
+
+    // Otherwise, we need to start looking in
+    // the modules that were directly or
+    // indirectly referenced.
+    //
+    Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
+
+    auto linkage = getLinkage();
+
+    SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+
+    Expr* expr = linkage->parseTermString(name, scope);
+
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        nullptr,
+        sink);
+    SemanticsContext context(&sharedSemanticsContext);
+    context = context.allowStaticReferenceToNonStaticMember();
+
+    SemanticsVisitor visitor(context);
+
+    auto checkedExpr = visitor.CheckExpr(expr);
+    if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
+    {
+        result = declRefExpr->declRef;
+    }
+
+    m_decls[name] = result;
+    return result;
+}
+
+DeclRef<Decl> ComponentType::findDeclFromStringInType(
+    Type* type,
+    String const& name,
+    LookupMask mask,
+    DiagnosticSink* sink)
+{
+    DeclRef<Decl> result;
+
+    // Only look up in the type if it is a DeclRefType
+    if (!as<DeclRefType>(type))
+        return DeclRef<Decl>();
+
+    // TODO(JS): For now just used the linkages ASTBuilder to keep on scope
+    //
+    // The parseTermString uses the linkage ASTBuilder for it's parsing.
+    //
+    // It might be possible to just create a temporary ASTBuilder - the worry though is
+    // that the parsing sets a member variable in AST node to one of these scopes, and then
+    // it become a dangling pointer. So for now we go with the linkages.
+    auto astBuilder = getLinkage()->getASTBuilder();
+
+    // Otherwise, we need to start looking in
+    // the modules that were directly or
+    // indirectly referenced.
+    //
+    Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
+
+    auto linkage = getLinkage();
+
+    SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+
+    Expr* expr = linkage->parseTermString(name, scope);
+
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        nullptr,
+        sink);
+    SemanticsContext context(&sharedSemanticsContext);
+    context = context.allowStaticReferenceToNonStaticMember();
+
+    SemanticsVisitor visitor(context);
+
+    GenericAppExpr* genericOuterExpr = nullptr;
+    if (as<GenericAppExpr>(expr))
+    {
+        // Unwrap the generic application, and re-wrap it around the static-member expr
+        genericOuterExpr = as<GenericAppExpr>(expr);
+        expr = genericOuterExpr->functionExpr;
+    }
+
+    if (!as<VarExpr>(expr))
+        return result;
+
+    auto rs = astBuilder->create<StaticMemberExpr>();
+    auto typeExpr = astBuilder->create<SharedTypeExpr>();
+    auto typetype = astBuilder->getOrCreate<TypeType>(type);
+    typeExpr->type = typetype;
+    rs->baseExpression = typeExpr;
+    rs->name = as<VarExpr>(expr)->name;
+
+    expr = rs;
+
+    // If we have a generic-app expression, re-wrap the static-member expr
+    if (genericOuterExpr)
+    {
+        genericOuterExpr->functionExpr = expr;
+        expr = genericOuterExpr;
+    }
+    
+    auto checkedTerm = visitor.CheckTerm(expr);
+    auto resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+
+    if (auto declRefExpr = as<DeclRefExpr>(resolvedTerm))
+    {
+        result = declRefExpr->declRef;
+    }
+
+    return result;
+}
+
 static void collectExportedConstantInContainer(
     Dictionary<String, IntVal*>& dict,
     ASTBuilder* builder,
@@ -2599,6 +2746,7 @@ static void _outputIncludes(const List<SourceFile*>& sourceFiles, SourceManager*
 void FrontEndCompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
+    SLANG_PROFILE;
     if (translationUnit->isChecked)
         return;
 
@@ -2781,6 +2929,7 @@ void FrontEndCompileRequest::checkAllTranslationUnits()
 
 void FrontEndCompileRequest::generateIR()
 {
+    SLANG_PROFILE;
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
     // Our task in this function is to generate IR code
@@ -2878,6 +3027,7 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 
 SlangResult FrontEndCompileRequest::executeActionsInner()
 {
+    SLANG_PROFILE_SECTION(frontEndExecute);
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
     for (TranslationUnitRequest* translationUnit : translationUnits)
@@ -2903,7 +3053,11 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         return SLANG_FAIL;
 
     // Perform semantic checking on the whole collection
-    checkAllTranslationUnits();
+    {
+        SLANG_PROFILE_SECTION(SemanticChecking);
+        checkAllTranslationUnits();
+    }
+
     if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -3029,6 +3183,7 @@ void EndToEndCompileRequest::init()
 
 SlangResult EndToEndCompileRequest::executeActionsInner()
 {
+    SLANG_PROFILE_SECTION(endToEndActions);
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.
     //
@@ -3089,6 +3244,24 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         SLANG_RETURN_ON_FAIL(maybeWriteContainer(m_containerOutputPath));
 
         return SLANG_OK;
+    }
+
+    // If requested, attempt to compile the translation unit all the way down to the target language
+    // and stash the result blob in an IR op.
+    for (auto targetReq : getLinkage()->targets)
+    {
+        if (targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+        {
+            auto frontEndReq = getFrontEndReq();
+
+            for (auto translationUnit : frontEndReq->translationUnits)
+            {
+                SlangCompileTarget target = SlangCompileTarget(targetReq->getTarget());
+                translationUnit->getModule()->precompileForTarget(
+                    target,
+                    nullptr);
+            }
+        }
     }
 
     // If codegen is enabled, we need to move along to
@@ -3673,8 +3846,14 @@ RefPtr<Module> Linkage::findOrImportModule(
 
 
     // Look for a precompiled module first, if not exist, load from source.
-    for (int checkBinaryModule = 1; checkBinaryModule >= 0; checkBinaryModule--)
+    bool shouldCheckBinaryModuleSettings[2] = { true, false };
+
+    for (auto checkBinaryModule : shouldCheckBinaryModuleSettings)
     {
+        // When in language server, we always prefer to use source module if it is available.
+        if (isInLanguageServer())
+            checkBinaryModule = !checkBinaryModule;
+
         // Try without translating `_` to `-` first, if that fails, try translating.
         for (int translateUnderScore = 0; translateUnderScore <= 1; translateUnderScore++)
         {
@@ -4019,6 +4198,11 @@ void Module::buildHash(DigestBuilder<SHA1>& builder)
     builder.append(computeDigest());
 }
 
+slang::DeclReflection* Module::getModuleReflection()
+{
+    return (slang::DeclReflection*)m_moduleDecl;
+}
+
 SHA1::Digest Module::computeDigest()
 {
     if (m_digest == SHA1::Digest())
@@ -4072,7 +4256,6 @@ RefPtr<EntryPoint> Module::findEntryPointByName(UnownedStringSlice const& name)
 
     return nullptr;
 }
-
 
 RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
     UnownedStringSlice const& name,
@@ -5690,6 +5873,16 @@ void EndToEndCompileRequest::setTargetMatrixLayoutMode(int targetIndex, SlangMat
     getTargetOptionSet(targetIndex).setMatrixLayoutMode(MatrixLayoutMode(mode));
 }
 
+void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
+}
+
+void EndToEndCompileRequest::setTargetEmbedDXIL(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDXIL, value);
+}
+
 void EndToEndCompileRequest::setTargetLineDirectiveMode(
     SlangInt targetIndex,
     SlangLineDirectiveMode mode)
@@ -6122,6 +6315,7 @@ SlangResult EndToEndCompileRequest::compile()
     if (getOptionSet().getBoolOption(CompilerOptionName::ReportDownstreamTime))
     {
         getSession()->getCompilerElapsedTime(&totalStartTime, &downstreamStartTime);
+        PerformanceProfiler::getProfiler()->clear();
     }
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
@@ -6136,6 +6330,7 @@ SlangResult EndToEndCompileRequest::compile()
 
     try
     {
+        SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
     }
     catch (const AbortCompilationException& e)

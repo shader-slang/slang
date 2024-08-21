@@ -1814,11 +1814,21 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     }
 }
 
-TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq, ProgramLayout* programLayout)
+TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq, ProgramLayout* programLayout, slang::LayoutRules rules)
 {
     auto astBuilder = targetReq->getLinkage()->getASTBuilder();
 
-    LayoutRulesFamilyImpl* rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq);
+    LayoutRulesFamilyImpl* rulesFamily;
+    switch (rules)
+    {
+    case slang::LayoutRules::Default:
+    default:
+        rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq);
+        break;
+    case slang::LayoutRules::MetalArgumentBufferTier2:
+        rulesFamily = &kCPULayoutRulesFamilyImpl;
+        break;
+    }
 
     TypeLayoutContext context;
     context.astBuilder = astBuilder;
@@ -4386,6 +4396,84 @@ static TypeLayoutResult _createTypeLayout(
         ptrLayout->valueTypeLayout = valueTypeLayout.layout;
 
         return result;
+    }
+    else if (as<DynamicResourceType>(type))
+    {
+        return createSimpleTypeLayout(
+            SimpleLayoutInfo(LayoutResourceKind::DescriptorTableSlot, 1),
+            type,
+            rules);
+    }
+    else if (auto tupleType = as<TupleType>(type))
+    {
+        // A `Tuple` type is laid out exactly the same way as a `struct` type,
+        // except that we want have a declref to the field.
+        
+        StructTypeLayoutBuilder typeLayoutBuilder;
+        StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
+
+        typeLayoutBuilder.beginLayout(type, rules);
+        auto typeLayout = typeLayoutBuilder.getTypeLayout();
+
+        _addLayout(context, type, typeLayout);
+        for (Index i = 0; i < tupleType->getMemberCount(); i++)
+        {
+            // The members of a `Tuple` type may include existential (interface)
+            // types (including as nested sub-fields), and any types present
+            // in those fields will need to be specialized based on the
+            // input arguments being passed to `_createTypeLayout`.
+            //
+            // We won't know how many type slots each field consumes until
+            // we process it, but we can figure out the starting index for
+            // the slots its will consume by looking at the layout we've
+            // computed so far.
+            //
+            Int baseExistentialSlotIndex = 0;
+            if (auto resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
+                baseExistentialSlotIndex = Int(resInfo->count.getFiniteValue());
+            //
+            // When computing the layout for the field, we will give it access
+            // to all the incoming specialized type slots that haven't already
+            // been consumed/claimed by preceding fields.
+            //
+            auto fieldLayoutContext = context.withSpecializationArgsOffsetBy(baseExistentialSlotIndex);
+
+            auto elementType = tupleType->getMember(i);
+            TypeLayoutResult fieldResult = _createTypeLayout(
+                fieldLayoutContext,
+                elementType,
+                nullptr);
+            auto fieldTypeLayout = fieldResult.layout;
+
+            auto fieldVarLayout = typeLayoutBuilder.addField(DeclRef<VarDeclBase>(), fieldResult);
+
+            // If any of the members of the `Tuple` type had existential/interface
+            // type, then we need to compute a second `StructTypeLayout` that
+            // represents the layout and resource using for the "pending data"
+            // that this type needs to have stored somewhere, but which can't
+            // be laid out in the layout of the type itself.
+            //
+            if (auto fieldPendingDataTypeLayout = fieldTypeLayout->pendingDataTypeLayout)
+            {
+                // We only create this secondary layout on-demand, so that
+                // we don't end up with a bunch of empty structure type layouts
+                // created for no reason.
+                //
+                pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(type, rules);
+                auto fieldPendingVarLayout = pendingDataTypeLayoutBuilder.addField(DeclRef<VarDeclBase>(), fieldPendingDataTypeLayout);
+                fieldVarLayout->pendingVarLayout = fieldPendingVarLayout;
+            }
+        }
+
+        typeLayoutBuilder.endLayout();
+        pendingDataTypeLayoutBuilder.endLayout();
+
+        if (auto pendingDataTypeLayout = pendingDataTypeLayoutBuilder.getTypeLayout())
+        {
+            typeLayout->pendingDataTypeLayout = pendingDataTypeLayout;
+        }
+
+        return _updateLayout(context, type, typeLayoutBuilder.getTypeLayoutResult());
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {

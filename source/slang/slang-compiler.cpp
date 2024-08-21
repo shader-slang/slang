@@ -3,6 +3,7 @@
 #include "../core/slang-basic.h"
 #include "../core/slang-platform.h"
 #include "../core/slang-io.h"
+#include "../core/slang-performance-profiler.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-hex-dump-util.h"
 #include "../core/slang-riff.h"
@@ -11,6 +12,7 @@
 #include "../core/slang-castable.h"
 
 #include "slang-check.h"
+#include "slang-check-impl.h"
 #include "slang-compiler.h"
 
 #include "../compiler-core/slang-lexer.h"
@@ -764,6 +766,11 @@ namespace Slang
 #   pragma warning(pop)
 #endif
 
+    SlangResult CodeGenContext::emitTranslationUnit(ComPtr<IArtifact>& outArtifact)
+    {
+        return emitWithDownstreamForEntryPoints(outArtifact);
+    }
+
     String GetHLSLProfileName(Profile profile)
     {
         switch( profile.getFamily() )
@@ -1087,6 +1094,23 @@ namespace Slang
         return SLANG_OK;
     }
 
+    bool CodeGenContext::isPrecompiled()
+    {
+        auto program = getProgram();
+
+        bool allPrecompiled = true;
+        program->enumerateIRModules([&](IRModule* irModule)
+            {
+                // TODO: Conditionalize this on target
+                if (!irModule->precompiledDXIL)
+                {
+                    allPrecompiled = false;
+                }
+            });
+
+        return allPrecompiled;
+    }
+
     SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact)
     {
         outArtifact.setNull();
@@ -1248,12 +1272,15 @@ namespace Slang
         }
         else
         {
-            CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
+            if (!isPrecompiled())
+            {
+                CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
 
-            SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
-            sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
+                SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
+                sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
 
-            sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
+                sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
+            }
         }
 
         if (sourceArtifact)
@@ -1542,6 +1569,25 @@ namespace Slang
 
             // Add all of the module libraries
             libraries.addRange(linkage->m_libModules.getBuffer(), linkage->m_libModules.getCount());
+        }
+
+        if (isPrecompiled())
+        {
+            auto program = getProgram();
+            program->enumerateIRModules([&](IRModule* irModule)
+                {
+                    // TODO: conditionalize on target
+                    if (irModule->precompiledDXIL)
+                    {
+                        ArtifactDesc desc = ArtifactDescUtil::makeDescForCompileTarget(SLANG_DXIL);
+                        desc.kind = ArtifactKind::Library;
+
+                        auto library = ArtifactUtil::createArtifact(desc);
+
+                        library->addRepresentationUnknown(irModule->precompiledDXIL);
+                        libraries.add(library);
+                    }
+                });
         }
 
         options.compilerSpecificArguments = allocator.allocate(compilerSpecificArguments);
@@ -1997,7 +2043,10 @@ namespace Slang
             {                
                 if (auto artifact = targetProgram->getExistingWholeProgramResult())
                 {
-                    artifacts.add(ComPtr<IArtifact>(artifact));
+                    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+                    {
+                        artifacts.add(ComPtr<IArtifact>(artifact));
+                    }
                 }
             }
             else
@@ -2256,8 +2305,9 @@ namespace Slang
 
     void EndToEndCompileRequest::generateOutput()
     {
+        SLANG_PROFILE;
         generateOutput(getSpecializedGlobalAndEntryPointsComponentType());
-        
+
         // If we are in command-line mode, we might be expected to actually
         // write output to one or more files here.
 
@@ -2512,24 +2562,8 @@ namespace Slang
                 continue;
 
             Profile profile;
-
-            auto entryPointAttr = funcDecl->findModifier<EntryPointAttribute>();
-            if (entryPointAttr)
-            {
-                // We've discovered a valid entry point. It is a function (possibly
-                // generic) that has a `[shader(...)]` attribute to mark it as an
-                // entry point.
-                //
-                // We will now register that entry point as an `EntryPoint`
-                // with an appropriately chosen profile.
-                //
-                // The profile will only include a stage, so that the profile "family"
-                // and "version" are left unspecified. Downstream code will need
-                // to be able to handle this case.
-                //
-                profile.setStage(entryPointAttr->stage);
-            }
-            else
+            bool resolvedStageOfProfileWithEntryPoint = resolveStageOfProfileWithEntryPoint(profile, getLinkage()->m_optionSet, targets, funcDecl, sink);
+            if(!resolvedStageOfProfileWithEntryPoint)
             {
                 // If there isn't a [shader] attribute, look for a [numthreads] attribute
                 // since that implicitly means a compute shader. We'll not do this when compiling for

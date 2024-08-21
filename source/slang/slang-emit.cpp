@@ -15,6 +15,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-check-recursive-type.h"
+#include "slang-ir-check-shader-parameter-type.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-header-export.h"
@@ -51,7 +52,9 @@
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-legalize-extract-from-texture-access.h"
 #include "slang-ir-legalize-image-subscript.h"
+#include "slang-ir-legalize-is-texture-access.h"
 #include "slang-ir-legalize-vector-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
@@ -243,6 +246,7 @@ struct RequiredLoweringPassSet
     bool glslGlobalVar;
     bool glslSSBO;
     bool byteAddressBuffer;
+    bool dynamicResource;
 };
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -345,6 +349,9 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
     case kIROp_HLSLRWByteAddressBufferType:
     case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
+        break;
+    case kIROp_DynamicResourceType:
+        result.dynamicResource = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -722,6 +729,10 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.autodiff)
         finalizeAutoDiffPass(targetProgram, irModule);
 
+    // Remove auto-diff related decorations.
+    // We may have an autodiff decoration regardless of if autodiff is being used.
+    stripAutoDiffDecorations(irModule);
+
     finalizeSpecialization(irModule);
 
     requiredLoweringPassSet = {};
@@ -746,7 +757,14 @@ Result linkAndOptimizeIR(
     }
 
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
+    {
         checkForRecursiveTypes(irModule, sink);
+
+        // For some targets, we are more restrictive about what types are allowed
+        // to be used as shader parameters in ConstantBuffer/ParameterBlock.
+        // We will check for these restrictions here.
+        checkForInvalidShaderParameterType(targetRequest, irModule, sink);
+    }
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
@@ -925,6 +943,9 @@ Result linkAndOptimizeIR(
 
     legalizeVectorTypes(irModule, sink);
 
+    // Legalize `__isTextureAccess` and related.
+    legalizeIsTextureAccess(irModule, sink);
+
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
     // to see if we can clean up any temporaries created by legalization.
@@ -952,13 +973,13 @@ Result linkAndOptimizeIR(
     specializeResourceUsage(codeGenContext, irModule);
     specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
 
-    // For GLSL targets, we also want to specialize calls to functions that
-    // takes array parameters if possible, to avoid performance issues on
-    // those platforms.
-    if (isKhronosTarget(targetRequest))
-    {
-        specializeArrayParameters(codeGenContext, irModule);
-    }
+    // We also want to specialize calls to functions that
+    // takes unsized array parameters if possible.
+    // Moreover, for Khronos targets, we also want to specialize calls to functions
+    // that takes arrays/structs containing arrays as parameters with the actual
+    // global array object to avoid loading big arrays into SSA registers, which seems
+    // to cause performance issues.
+    specializeArrayParameters(codeGenContext, irModule);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER RESOURCE SPECIALIZATION");
@@ -1052,6 +1073,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
             byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            byteAddressBufferOptions.treatGetEquivalentStructuredBufferAsGetThis = true;
             byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             break;
@@ -1150,6 +1172,8 @@ Result linkAndOptimizeIR(
     break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalHeader:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
     {
         legalizeIRForMetal(irModule, sink);
     }
@@ -1177,9 +1201,17 @@ Result linkAndOptimizeIR(
     if(isD3DTarget(targetRequest))
         legalizeNonStructParameterToStructForHLSL(irModule);
 
+    // Create aliases for all dynamic resource parameters.
+    if(requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
+        legalizeDynamicResourcesForGLSL(codeGenContext, irModule);
+    
+    legalizeExtractFromTextureAccess(irModule);
+
     // Legalize `ImageSubscript` loads.
     switch (target)
     {
+    case CodeGenTarget::MetalLibAssembly:
+    case CodeGenTarget::MetalLib:
     case CodeGenTarget::Metal:
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
@@ -1212,9 +1244,17 @@ Result linkAndOptimizeIR(
     default:
         break;
     case CodeGenTarget::GLSL:
+        moveGlobalVarInitializationToEntryPoints(irModule);
+        break;
+    // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         moveGlobalVarInitializationToEntryPoints(irModule);
+        if(targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EnableExperimentalPasses))
+            introduceExplicitGlobalContext(irModule, target);
+    #if 0
+        dumpIRIfEnabled(codeGenContext, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
+    #endif
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalHeader:
@@ -1283,15 +1323,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.meshOutput)
         legalizeMeshOutputTypes(irModule);
 
-    if (options.shouldLegalizeExistentialAndResourceTypes)
-    {
-        if (!isMetalTarget(targetRequest))
-        {
-            // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
-            // a simple storage type that has target independent layout based on the kind of buffer resource.
-            lowerBufferElementTypeToStorageType(targetProgram, irModule);
-        }
-    }
+    lowerBufferElementTypeToStorageType(targetProgram, irModule);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
@@ -1720,6 +1752,26 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         PassThroughMode::SpirvOpt, codeGenContext->getSink());
     if (compiler)
     {
+        if (!codeGenContext->shouldSkipSPIRVValidation())
+        {
+            StringBuilder runSpirvValEnvVar;
+            PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"), runSpirvValEnvVar);
+            if (runSpirvValEnvVar.getUnownedSlice() == "1")
+            {
+                if (SLANG_FAILED(compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount()/4))))
+                {
+                    String err;
+                    String dis;
+                    disassembleSPIRV(spirv, err, dis);
+                    codeGenContext->getSink()->diagnoseWithoutSourceView(
+                        SourceLoc{},
+                        Diagnostics::spirvValidationFailed,
+                        dis
+                    );
+                }
+            }
+        }
+
         ComPtr<IArtifact> optimizedArtifact;
         DownstreamCompileOptions downstreamOptions;
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);

@@ -1656,6 +1656,7 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     {
         disableIRValidationAtInsert();
         auto simplifyOptions = IRSimplificationOptions::getDefault(nullptr);
+        simplifyOptions.removeRedundancy = true;
         simplifyFunc(autoDiffSharedContext->targetProgram, func, simplifyOptions);
         enableIRValidationAtInsert();
     }
@@ -1943,6 +1944,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_DebugLine:
     case kIROp_DebugVar:
     case kIROp_DebugValue:
+    case kIROp_GetArrayLength:
+    case kIROp_SizeOf:
+    case kIROp_AlignOf:
         return transcribeNonDiffInst(builder, origInst);
 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,

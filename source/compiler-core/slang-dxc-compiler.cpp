@@ -2,7 +2,7 @@
 #include "slang-dxc-compiler.h"
 
 #include "../core/slang-common.h"
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
 #include "../core/slang-blob.h"
 
@@ -381,18 +381,24 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 
     CompileOptions options = getCompatibleVersion(&inOptions);
 
-    // This compiler can only deal with a single artifact
-    if (options.sourceArtifacts.count != 1)
+    // This compiler can only deal at most, a single source code artifact
+    // Should be okay to link together multiple libraries without any source artifacts (assuming that means source code)
+    if (options.sourceArtifacts.count > 1)
     {
         return SLANG_FAIL;
     }
 
-    IArtifact* sourceArtifact = options.sourceArtifacts[0];
+    bool hasSource = options.sourceArtifacts.count > 0;
 
-    if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_HLSL || options.targetType != SLANG_DXIL)
+    IArtifact* sourceArtifact = hasSource ? options.sourceArtifacts[0] : nullptr;
+
+    if (hasSource)
     {
-        SLANG_ASSERT(!"Can only compile HLSL to DXIL");
-        return SLANG_FAIL;
+        if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_HLSL || options.targetType != SLANG_DXIL)
+        {
+            SLANG_ASSERT(!"Can only compile HLSL to DXIL");
+            return SLANG_FAIL;
+        }
     }
 
     // Find all of the libraries
@@ -416,16 +422,19 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     ComPtr<IDxcLibrary> dxcLibrary;
     SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcLibrary, __uuidof(dxcLibrary), (LPVOID*)dxcLibrary.writeRef()));
 
+    ComPtr<IDxcBlobEncoding> dxcSourceBlob = nullptr;
     ComPtr<ISlangBlob> sourceBlob;
-    SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, sourceBlob.writeRef()));
+    if (hasSource)
+    {
+        SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, sourceBlob.writeRef()));
 
-    // Create blob from the string
-    ComPtr<IDxcBlobEncoding> dxcSourceBlob;
-    SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned(
-        (LPBYTE)sourceBlob->getBufferPointer(),
-        (UINT32)sourceBlob->getBufferSize(),
-        0,
-        dxcSourceBlob.writeRef()));
+        // Create blob from the string
+        SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned(
+            (LPBYTE)sourceBlob->getBufferPointer(),
+            (UINT32)sourceBlob->getBufferSize(),
+            0,
+            dxcSourceBlob.writeRef()));
+    }
 
     List<const WCHAR*> args;
 
@@ -508,7 +517,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 
     String profileName = asString(options.profileName);
     // If we are going to link we have to compile in the lib profile style
-    if (libraries.getCount())
+    if (libraries.getCount() && hasSource)
     {
         if (!profileName.startsWith("lib"))
         {
@@ -561,28 +570,30 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     }
 #endif
 
-    String sourcePath = ArtifactUtil::findPath(sourceArtifact);
-    OSString wideSourcePath = sourcePath.toWString();
-
-    DxcIncludeHandler includeHandler(&searchDirectories, options.fileSystemExt, options.sourceManager);
-
-    ComPtr<IDxcOperationResult> dxcOperationResult;
-    SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
-        wideSourcePath.begin(),
-        wideEntryPointName.begin(),
-        wideProfileName.begin(),
-        args.getBuffer(),
-        UINT32(args.getCount()),
-        nullptr,            // `#define`s
-        0,                  // `#define` count
-        &includeHandler,    // `#include` handler
-        dxcOperationResult.writeRef()));
-
+    String sourcePath;
+    ComPtr<IDxcBlob> dxcResultBlob = nullptr;
     auto diagnostics = ArtifactDiagnostics::create();
-    
-    ComPtr<IDxcBlob> dxcResultBlob;
+    ComPtr<IDxcOperationResult> dxcOperationResult = nullptr;
+    if (hasSource)
+    {
+        sourcePath = ArtifactUtil::findPath(sourceArtifact);
+        OSString wideSourcePath = sourcePath.toWString();
 
-    SLANG_RETURN_ON_FAIL(_handleOperationResult(dxcOperationResult, diagnostics, dxcResultBlob));
+        DxcIncludeHandler includeHandler(&searchDirectories, options.fileSystemExt, options.sourceManager);
+
+        SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
+            wideSourcePath.begin(),
+            wideEntryPointName.begin(),
+            wideProfileName.begin(),
+            args.getBuffer(),
+            UINT32(args.getCount()),
+            nullptr,            // `#define`s
+            0,                  // `#define` count
+            &includeHandler,    // `#include` handler
+            dxcOperationResult.writeRef()));
+
+        SLANG_RETURN_ON_FAIL(_handleOperationResult(dxcOperationResult, diagnostics, dxcResultBlob));
+    }
 
     // If we have libraries then we need to link...
     if (libraries.getCount())
@@ -604,26 +615,30 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
             libraryNames.add(String(_addName(library, pool)).toWString());
         }
 
-        // Add the compiled blob name
-        String name;
-        if (options.modulePath.count)
+        if (hasSource)
         {
-            name = Path::getFileNameWithoutExt(asString(options.modulePath));
-        }
-        else if (sourcePath.getLength())
-        {
-            name = Path::getFileNameWithoutExt(sourcePath);
-        }
+            // Add the compiled blob name
+            String name;
+            if (options.modulePath.count)
+            {
+                name = Path::getFileNameWithoutExt(asString(options.modulePath));
+            }
+            else if (sourcePath.getLength())
+            {
+                name = Path::getFileNameWithoutExt(sourcePath);
+            }
 
-        // Add the blob with name
-        {
-            auto blob = (ISlangBlob*)dxcResultBlob.get();
-            libraryBlobs.add(ComPtr<ISlangBlob>(blob));
-            libraryNames.add(String(_addName(name.getUnownedSlice(), pool)).toWString());
+            // Add the blob with name
+            {
+                auto blob = (ISlangBlob*)dxcResultBlob.get();
+                libraryBlobs.add(ComPtr<ISlangBlob>(blob));
+                libraryNames.add(String(_addName(name.getUnownedSlice(), pool)).toWString());
+            }
         }
 
         const Index librariesCount = libraryNames.getCount();
         SLANG_ASSERT(libraryBlobs.getCount() == librariesCount);
+        SLANG_ASSERT(libraryNames.getCount() == librariesCount);
 
         List<const wchar_t*> linkLibraryNames;
         

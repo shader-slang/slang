@@ -82,7 +82,6 @@ C:\git\slang> cmake.exe --preset vs2019 # For VisualStudio 2019
 ```
 
 Open `build/slang.sln` with VisualStudio IDE and build it for "x64".
-> Warning: there is another file, `slang.sln`, at the root directory. When you use cmake workflow, you must use one in the `build` directory.
 
 Or you can build with a following command:
 ```
@@ -106,13 +105,53 @@ Build with a following command:
 $ cmake --build --preset release
 ```
 
+#### MacOS
+Install XCode from AppStore.
+
+Install CMake and Ninja; we recommend using [homebrew](https://brew.sh/) for installing them.
+```
+brew install ninja
+brew install cmake
+```
+
+Run CMake with a following command to generate Makefile:
+```
+$ cmake --preset default
+```
+
+Build with a following command:
+```
+$ cmake --build --preset release
+```
+
+#### MacOS with slang-llvm local build
+slang-llvm is required to run slang-test properly.
+Depending on your hardware, your slang-llvm may need to be locally rebuilt with the following command.
+```
+external/build-llvm.sh --source-dir=build/slang-llvm_src --install-prefix=build/slang-llvm_install
+```
+
+You need to use the following command to re-generate Makefile,
+```
+$ cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DLLVM_DIR=build/slang-llvm_install/lib/cmake/llvm -DClang_DIR=build/slang-llvm_install/lib/cmake/clang
+```
+
+Build with a following command:
+```
+$ cmake --build --preset release
+```
+
 ### Making Changes
 Make your changes and ensure to follow our [Design Decisions](docs/design/README.md).
 
 ### Testing
-Test your changes thoroughly to ensure they do not introduce new issues. This is done by building and running a slang-test from the repository root directory. For more details about slang-test, please refer to a [Documentation on testing](tools/slang-test/README.md).
+Test your changes thoroughly to ensure they do not introduce new issues. This is done by building and running a "slang-test" from the repository root directory. For more details about "slang-test", please refer to a [Documentation on testing](tools/slang-test/README.md).
 
-If you are familiar with Workflow/Actions in github, you can check [Our Workflows](.github/workflows). [Windows-selfhosted.yml](.github/workflows/windows-selfhosted.yml) is a good starting point.
+> Note: slang-test is meant to launch from the root of the repository. It uses a hard-coded directory name "tests/" that is expected to exist in the current working directory.
+
+> Note: One of the options for `slang-test.exe` is `-api`, and it takes an additional keyword to specify which API to test. When the option is `-api all-cpu`, as an example, it means it tests all APIs except CPU. The minus sign (-) after `all` means "exclude" and you can "include" with plus sign (+) like `-api gl+dx11`.
+
+If you are familiar with Workflow/Actions in github, you can check [Our Workflows](.github/workflows). "Test Slang" section in [ci.yml](.github/workflows/ci.yml) is where "slang-test" runs.
 
 For a quick reference, follow the instructions below.
 
@@ -124,8 +163,9 @@ For a quick reference, follow the instructions below.
    ```
 1. Run slang-test with multiple threads. This may take 10 minutes or less depending on the performance of your computer.
    ```
-   C:\git\slang> bin\windows-x64\release\slang-test.exe -use-test-server -server-count 8
+   C:\git\slang> build\Release\bin\slang-test.exe -use-test-server -server-count 8
    ```
+   > Note: if you increase `-server-count` more than 16, you may find some of tests randomly fail. This is a known issue on the graphics driver side.
 1. Check whether the test is finished as expected.
 
 #### Linux
@@ -136,7 +176,7 @@ For a quick reference, follow the instructions below.
    ```
 1. Run slang-test with multiple threads. This may take 10 minutes or less depending on the performance of your computer.
    ```
-   $ ./bin/linux-x64/release/slang-test  -use-test-server -server-count 8
+   $ ./build/Release/bin/slang-test -use-test-server -server-count 8
    ```
 1. Check whether the test is finished as expected.
 

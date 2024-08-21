@@ -490,7 +490,7 @@ public:
 
     virtual void beforeComputeEmitActions(IRModule* module) { SLANG_UNUSED(module); };
 
-    virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace) { SLANG_UNUSED(rate); SLANG_UNUSED(addressSpace); }
+    virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace) { SLANG_UNUSED(rate); SLANG_UNUSED(addressSpace); }
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout) { SLANG_UNUSED(inst); SLANG_UNUSED(allowOffsetLayout); }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
     virtual void emitSimpleFuncParamsImpl(IRFunc* func);

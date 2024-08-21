@@ -10,13 +10,13 @@ buffer MyBlockName
 } outputBuffer;
 
 // CHECK_GLSL-DAG: rayPayloadEXT
-// CHECK_SPV-DAG: RayPayloadNV
+// CHECK_SPV-DAG: RayPayload{{NV|KHR}}
 layout(location = 2) rayPayloadEXT vec4 payload;
 // CHECK_GLSL-DAG: hitObjectAttributeNV
 // CHECK_SPV-DAG: HitObjectAttributeNV
 layout(location = 2) hitObjectAttributeNV vec4 attrMain;
 // CHECK_GLSL-DAG: callableDataEXT
-// CHECK_SPV-DAG: CallableDataNV
+// CHECK_SPV-DAG: CallableData{{NV|KHR}}
 layout(location = 0) callableDataEXT vec4 outcall;
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>

@@ -3,11 +3,12 @@
 #include "../core/slang-basic.h"
 #include "slang-syntax.h"
 
-#include "../../slang.h"
+#include "slang.h"
 
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
 #include "slang-syntax.h"
+#include "slang-check.h"
 #include <assert.h>
 
 // Don't signal errors for stuff we don't implement here,
@@ -55,14 +56,36 @@ static inline SpecializationParamLayout* convert(SlangReflectionTypeParameter * 
     return (SpecializationParamLayout*) typeParam;
 }
 
-static inline Decl* convert(SlangReflectionVariable* var)
+static inline DeclRef<Decl> convert(SlangReflectionVariable* var)
 {
-    return (Decl*) var;
+    return DeclRef<Decl>((DeclRefBase*) var);
 }
 
-static inline SlangReflectionVariable* convert(Decl* var)
+static inline SlangReflectionVariable* convert(DeclRef<Decl> var)
 {
-    return (SlangReflectionVariable*) var;
+    return (SlangReflectionVariable*) var.declRefBase;
+}
+
+static inline DeclRef<FunctionDeclBase> convert(SlangReflectionFunction* func)
+{
+    DeclRefBase* declBase = (DeclRefBase*)func;
+    return DeclRef<FunctionDeclBase>(declBase);
+}
+
+static inline SlangReflectionFunction* convert(DeclRef<FunctionDeclBase> func)
+{
+    return (SlangReflectionFunction*)func.declRefBase;
+}
+
+static inline DeclRef<Decl> convertGenericToDeclRef(SlangReflectionGeneric* func)
+{
+    DeclRefBase* declBase = (DeclRefBase*)func;
+    return DeclRef<Decl>(declBase);
+}
+
+static inline SlangReflectionGeneric* convertDeclToGeneric(DeclRef<Decl> func)
+{
+    return (SlangReflectionGeneric*)func.declRefBase;
 }
 
 static inline VarLayout* convert(SlangReflectionVariableLayout* var)
@@ -372,6 +395,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_POINTER;
     }
+    else if (const auto dynamicResourceType = as<DynamicResourceType>(type))
+    {
+        return SLANG_TYPE_KIND_DYNAMIC_RESOURCE;
+    }
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE)                          \
     else if(as<TYPE>(type)) do {          \
@@ -467,7 +494,7 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflect
             auto fields = getFields(
                 getModule(declRef.getDecl())->getLinkage()->getASTBuilder(), structDeclRef, MemberFilterStyle::Instance);
             auto fieldDeclRef = fields[index];
-            return (SlangReflectionVariable*) fieldDeclRef.getDecl();
+            return convert(fieldDeclRef);
         }
     }
 
@@ -729,10 +756,91 @@ SLANG_API char const* spReflectionType_GetName(SlangReflectionType* inType)
         auto decl = declRef.getDecl();
         if(decl->hasModifier<ImplicitParameterGroupElementTypeModifier>())
             return nullptr;
-
         return getText(declRef.getName()).begin();
     }
 
+    return nullptr;
+}
+
+SLANG_API SlangResult spReflectionType_GetFullName(SlangReflectionType* inType, ISlangBlob** outNameBlob)
+{
+    auto type = convert(inType);
+
+    if (!type) return SLANG_FAIL;
+
+    StringBuilder sb;
+    type->toText(sb);
+    *outNameBlob = StringUtil::createStringBlob(sb.produceString()).detach();
+    return SLANG_OK;
+}
+
+SLANG_API SlangReflectionFunction* spReflection_FindFunctionByName(SlangReflection* reflection, char const* name)
+{
+    auto programLayout = convert(reflection);
+    auto program = programLayout->getProgram();
+
+    // TODO: We should extend this API to support getting error messages
+    // when type lookup fails.
+    //
+    Slang::DiagnosticSink sink(
+        programLayout->getTargetReq()->getLinkage()->getSourceManager(),
+        Lexer::sourceLocationLexer);
+
+    try
+    {
+        auto result = program->findDeclFromString(name, &sink);
+        if (auto funcDeclRef = result.as<FunctionDeclBase>())
+            return convert(funcDeclRef);
+    }
+    catch (...)
+    {
+    }
+    return nullptr;
+}
+
+SLANG_API SlangReflectionFunction* spReflection_FindFunctionByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name)
+{
+    auto programLayout = convert(reflection);
+    auto program = programLayout->getProgram();
+
+    auto type = convert(reflType);
+
+    Slang::DiagnosticSink sink(
+        programLayout->getTargetReq()->getLinkage()->getSourceManager(),
+        Lexer::sourceLocationLexer);
+    
+    try
+    {
+        auto result = program->findDeclFromStringInType(type, name, LookupMask::Function, &sink);
+        if (auto funcDeclRef = result.as<FunctionDeclBase>())
+            return convert(funcDeclRef);
+    }
+    catch (...)
+    {
+    }
+    return nullptr;
+}
+
+SLANG_API SlangReflectionVariable* spReflection_FindVarByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name)
+{
+    auto programLayout = convert(reflection);
+    auto program = programLayout->getProgram();
+
+    auto type = convert(reflType);
+
+    Slang::DiagnosticSink sink(
+        programLayout->getTargetReq()->getLinkage()->getSourceManager(),
+        Lexer::sourceLocationLexer);
+    
+    try
+    {
+        auto result = program->findDeclFromStringInType(type, name, LookupMask::Value, &sink);
+        if (auto varDeclRef = result.as<VarDeclBase>())
+            return convert(varDeclRef.as<Decl>());
+    }
+    catch (...)
+    {
+    }
     return nullptr;
 }
 
@@ -761,16 +869,45 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
     }
 }
 
+SlangReflectionGeneric* getInnermostGenericParent(DeclRef<Decl> declRef)
+{
+    auto decl = declRef.getDecl();
+    auto astBuilder = getModule(decl)->getLinkage()->getASTBuilder();
+    auto parentDecl = decl;
+    while(parentDecl)
+    {
+        if(parentDecl->parentDecl && as<GenericDecl>(parentDecl->parentDecl))
+            return convertDeclToGeneric(
+                substituteDeclRef(
+                    SubstitutionSet(declRef),
+                    astBuilder,
+                    createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, DeclRef(parentDecl))));
+        parentDecl = parentDecl->parentDecl;
+    }
+
+    return nullptr;
+}
+
+SLANG_API SlangReflectionGeneric* spReflectionType_GetGenericContainer(SlangReflectionType* type)
+{
+    auto declRefType = as<DeclRefType>(convert(type));
+    if (!declRefType)
+        return nullptr;
+
+    auto declRef = declRefType->getDeclRef();
+    return getInnermostGenericParent(declRef);
+}
+
 SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
     SlangReflection* reflection,
     SlangReflectionType* inType,
-    SlangLayoutRules /*rules*/)
+    SlangLayoutRules rules)
 {
     auto context = convert(reflection);
     auto type = convert(inType);
     auto targetReq = context->getTargetReq();
 
-    auto typeLayout = targetReq->getTypeLayout(type);
+    auto typeLayout = targetReq->getTypeLayout(type, (slang::LayoutRules)rules);
     return convert(typeLayout);
 }
 
@@ -1829,6 +1966,7 @@ namespace Slang
                     case LayoutResourceKind::DescriptorTableSlot:
                     case LayoutResourceKind::Uniform:
                     case LayoutResourceKind::ConstantBuffer: // for metal
+                    case LayoutResourceKind::MetalArgumentBufferElement:
                         resInfo = info;
                         break;
                     }
@@ -2177,7 +2315,7 @@ SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeLeafVar
         return 0;
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
-    return convert(bindingRange.leafVariable);
+    return convert(DeclRef<Decl>(bindingRange.leafVariable));
 }
 
 
@@ -2520,7 +2658,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeSpaceO
 
 SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* inVar)
 {
-    auto var = convert(inVar);
+    auto var = convert(inVar).getDecl();
     if (as<InheritanceDecl>(var))
         return "$base";
 
@@ -2538,17 +2676,26 @@ SLANG_API SlangReflectionType* spReflectionVariable_GetType(SlangReflectionVaria
 {
     auto var = convert(inVar);
 
-    if (auto inheritanceDecl = as<InheritanceDecl>(var))
-        return convert(inheritanceDecl->base.type);
-
     if(!var) return nullptr;
 
-    return  convert(as<VarDeclBase>(var)->getType());
+    auto astBuilder = getModule(var.getDecl())->getLinkage()->getASTBuilder();
+
+    if (auto inheritanceDecl = as<InheritanceDecl>(var.getDecl()))
+        return convert(inheritanceDecl->base.type);
+
+    if (auto varDecl = as<VarDeclBase>(var.getDecl()))
+        return convert(
+            substituteType(
+                SubstitutionSet(var),
+                astBuilder,
+                varDecl->getType()));
+    
+    return nullptr;
 }
 
 SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflectionVariable* inVar, SlangModifierID modifierID)
 {
-    auto var = convert(inVar);
+    auto var = convert(inVar).getDecl();
 
     if(!var) return nullptr;
 
@@ -2558,7 +2705,36 @@ SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflec
     case SLANG_MODIFIER_SHARED:
         modifier = var->findModifier<HLSLEffectSharedModifier>();
         break;
-
+    case SLANG_MODIFIER_CONST:
+        modifier = var->findModifier<ConstModifier>();
+        break;
+    case SLANG_MODIFIER_NO_DIFF:
+        modifier = var->findModifier<NoDiffModifier>();
+        break;
+    case SLANG_MODIFIER_STATIC:
+        modifier = var->findModifier<HLSLStaticModifier>();
+        break;
+    case SLANG_MODIFIER_EXPORT:
+        modifier = var->findModifier<HLSLExportModifier>();
+        break;
+    case SLANG_MODIFIER_EXTERN:
+        modifier = var->findModifier<ExternModifier>();
+        break;
+    case SLANG_MODIFIER_DIFFERENTIABLE:
+        modifier = var->findModifier<DifferentiableAttribute>();
+        break;
+    case SLANG_MODIFIER_MUTATING:
+        modifier = var->findModifier<MutatingAttribute>();
+        break;
+    case SLANG_MODIFIER_IN:
+        modifier = var->findModifier<InModifier>();
+        break;
+    case SLANG_MODIFIER_OUT:
+        modifier = var->findModifier<OutModifier>();
+        break;
+    case SLANG_MODIFIER_INOUT:
+        modifier = var->findModifier<InOutModifier>();
+        break;
     default:
         return nullptr;
     }
@@ -2568,21 +2744,38 @@ SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflec
 
 SLANG_API unsigned int spReflectionVariable_GetUserAttributeCount(SlangReflectionVariable* inVar)
 {
-    auto varDecl = convert(inVar);
+    auto varDecl = convert(inVar).getDecl();
     if (!varDecl) return 0;
     return getUserAttributeCount(varDecl);
 }
 SLANG_API SlangReflectionUserAttribute* spReflectionVariable_GetUserAttribute(SlangReflectionVariable* inVar, unsigned int index)
 {
-    auto varDecl = convert(inVar);
+    auto varDecl = convert(inVar).getDecl();
     if (!varDecl) return 0;
     return getUserAttributeByIndex(varDecl, index);
 }
 SLANG_API SlangReflectionUserAttribute* spReflectionVariable_FindUserAttributeByName(SlangReflectionVariable* inVar, SlangSession* session, char const* name)
 {
-    auto varDecl = convert(inVar);
+    auto varDecl = convert(inVar).getDecl();
     if (!varDecl) return 0;
     return findUserAttributeByName(asInternal(session), varDecl, name);
+}
+
+SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar)
+{
+    auto decl = convert(inVar).getDecl();
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        return varDecl->initExpr != nullptr;
+    }
+    
+    return false;
+}
+
+SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(SlangReflectionVariable* var)
+{
+    auto declRef = convert(var);
+    return getInnermostGenericParent(declRef);
 }
 
 // Variable Layout Reflection
@@ -2592,7 +2785,7 @@ SLANG_API SlangReflectionVariable* spReflectionVariableLayout_GetVariable(SlangR
     auto varLayout = convert(inVarLayout);
     if(!varLayout) return nullptr;
 
-    return (SlangReflectionVariable*)(varLayout->varDecl.getDecl());
+    return convert(varLayout->varDecl);
 }
 
 SLANG_API SlangReflectionTypeLayout* spReflectionVariableLayout_GetTypeLayout(SlangReflectionVariableLayout* inVarLayout)
@@ -2729,6 +2922,360 @@ SLANG_API SlangStage spReflectionVariableLayout_getStage(
     return (SlangStage) varLayout->stage;
 }
 
+// Function Reflection
+
+SLANG_API SlangReflectionDecl* spReflectionFunction_asDecl(SlangReflectionFunction* inFunc)
+{
+    auto func = convert(inFunc);
+    if (!func) return nullptr;
+    return (SlangReflectionDecl*)func.getDecl();
+}
+
+SLANG_API char const* spReflectionFunction_GetName(SlangReflectionFunction* inFunc)
+{
+    auto func = convert(inFunc);
+    if (!func) return nullptr;
+    return getText(func.getDecl()->getName()).getBuffer();
+}
+
+SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* inFunc)
+{
+    auto func = convert(inFunc);
+    if (!func) return nullptr;
+
+    auto rawType = func.getDecl()->returnType.type;
+    auto astBuilder = rawType->getASTBuilderForReflection();
+
+    return convert((Type*)rawType->substitute(astBuilder, SubstitutionSet(func.declRefBase)));
+}
+
+SLANG_API SlangReflectionModifier* spReflectionFunction_FindModifier(SlangReflectionFunction* inFunc, SlangModifierID modifierID)
+{
+    auto funcDeclRef = convert(inFunc);
+    auto varRefl = convert(funcDeclRef.as<Decl>());
+    if (!varRefl) return nullptr;
+
+    return spReflectionVariable_FindModifier(varRefl, modifierID);
+}
+
+SLANG_API unsigned int spReflectionFunction_GetUserAttributeCount(SlangReflectionFunction* inFunc)
+{
+    auto func = convert(inFunc);
+    if (!func) return 0;
+    return getUserAttributeCount(func.getDecl());
+}
+
+SLANG_API SlangReflectionUserAttribute* spReflectionFunction_GetUserAttribute(SlangReflectionFunction* inFunc, unsigned int index)
+{
+    auto func = convert(inFunc);
+    if (!func) return nullptr;
+    return getUserAttributeByIndex(func.getDecl(), index);
+}
+
+SLANG_API SlangReflectionUserAttribute* spReflectionFunction_FindUserAttributeByName(SlangReflectionFunction* inFunc, SlangSession* session, char const* name)
+{
+    auto func = convert(inFunc);
+    if (!func) return nullptr;
+    return findUserAttributeByName(asInternal(session), func.getDecl(), name);
+}
+
+SLANG_API unsigned int spReflectionFunction_GetParameterCount(SlangReflectionFunction* inFunc)
+{
+    auto func = convert(inFunc);
+    if (!func) return 0;
+    return (unsigned int)func.getDecl()->getParameters().getCount();
+}
+
+SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameter(SlangReflectionFunction* inFunc, unsigned int index)
+{
+    auto func = convert(inFunc);
+    if (!func) return nullptr;
+
+    auto astBuilder = getModule(func.getDecl())->getLinkage()->getASTBuilder();
+
+    return convert(getParameters(astBuilder, func)[index]);
+}
+
+SLANG_API SlangReflectionGeneric* spReflectionFunction_GetGenericContainer(SlangReflectionFunction* func)
+{
+    auto declRef = convert(func);
+    return getInnermostGenericParent(declRef);
+}
+
+// Abstract decl reflection
+
+SLANG_API unsigned int spReflectionDecl_getChildrenCount(SlangReflectionDecl* parentDecl)
+{
+    Decl* decl = (Decl*)parentDecl;
+    if (as<ContainerDecl>(decl))
+    {
+        return (unsigned int)as<ContainerDecl>(decl)->members.getCount();
+    }
+    
+    return 0;
+}
+
+SLANG_API SlangReflectionDecl* spReflectionDecl_getChild(SlangReflectionDecl* parentDecl, unsigned int index)
+{
+    Decl* decl = (Decl*)parentDecl;
+    if (auto containerDecl = as<ContainerDecl>(decl))
+    {
+        if (containerDecl->members.getCount() > index)
+            return (SlangReflectionDecl*)containerDecl->members[index];
+    }
+
+    return nullptr;
+}
+
+SLANG_API SlangDeclKind spReflectionDecl_getKind(SlangReflectionDecl* decl)
+{
+    Decl* slangDecl = (Decl*)decl;
+    if (as<StructDecl>(slangDecl))
+    {
+        return SLANG_DECL_KIND_STRUCT;
+    }
+    else if (as<VarDeclBase>(slangDecl))
+    {
+        return SLANG_DECL_KIND_VARIABLE;
+    }
+    else if (as<GenericDecl>(slangDecl))
+    {
+        return SLANG_DECL_KIND_GENERIC;
+    }
+    else if (as<FunctionDeclBase>(slangDecl))
+    {
+        return SLANG_DECL_KIND_FUNC;
+    }
+    else if (as<ModuleDecl>(slangDecl))
+    {
+        return SLANG_DECL_KIND_MODULE;
+    }
+    else
+        return SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION;
+}
+
+SLANG_API SlangReflectionFunction* spReflectionDecl_castToFunction(SlangReflectionDecl* decl)
+{
+    Decl* slangDecl = (Decl*) decl;
+    if (auto funcDecl = as<FunctionDeclBase>(slangDecl))
+    {
+        return convert(DeclRef<FunctionDeclBase>(funcDecl->getDefaultDeclRef()));
+    }
+
+    // Improper cast
+    return nullptr;
+}
+
+SLANG_API SlangReflectionVariable* spReflectionDecl_castToVariable(SlangReflectionDecl* decl)
+{
+    Decl* slangDecl = (Decl*) decl;
+    if (auto varDecl = as<VarDeclBase>(slangDecl))
+    {
+        return convert(DeclRef(varDecl));
+    }
+
+    // Improper cast
+    return nullptr;
+}
+
+SLANG_API SlangReflectionGeneric* spReflectionDecl_castToGeneric(SlangReflectionDecl* decl)
+{
+    Decl* slangDecl = (Decl*) decl;
+    if (auto genericInnerDecl = as<GenericDecl>(slangDecl)->inner)
+    {
+        return convertDeclToGeneric(genericInnerDecl);
+    }
+
+    // Improper cast
+    return nullptr;
+}
+
+SLANG_API SlangReflectionType* spReflection_getTypeFromDecl(SlangReflectionDecl* decl)
+{
+    Decl* slangDecl = (Decl*)decl;
+
+    ASTBuilder* builder = getModule(slangDecl)->getLinkage()->getASTBuilder();
+    // TODO: create default substitutions
+    if (auto type = DeclRefType::create(builder, slangDecl->getDefaultDeclRef()))
+    {
+        return convert(type);
+    }
+
+    // Couldn't create a type from the decl
+    return nullptr;
+}
+
+SLANG_API SlangReflectionDecl* spReflectionDecl_getParent(SlangReflectionDecl* decl)
+{
+    Decl* slangDecl = (Decl*)decl;
+    if (auto parentDecl = slangDecl->parentDecl)
+    {
+        return (SlangReflectionDecl*)parentDecl;
+    }
+
+    return nullptr;
+}
+
+// Generic Reflection
+
+SLANG_API SlangReflectionDecl* spReflectionGeneric_asDecl(SlangReflectionGeneric* generic)
+{
+    return (SlangReflectionDecl*) convertGenericToDeclRef(generic).getDecl()->parentDecl;
+}
+
+SLANG_API char const* spReflectionGeneric_GetName(SlangReflectionGeneric* generic)
+{
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return nullptr;
+    return getText(slangGeneric.getDecl()->getName()).getBuffer();
+}
+
+SLANG_API unsigned int spReflectionGeneric_GetTypeParameterCount(SlangReflectionGeneric* generic)
+{
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return 0;
+    auto astBuilder = getModule(slangGeneric.getDecl())->getLinkage()->getASTBuilder();
+
+    return (unsigned int) getMembersOfType<GenericTypeParamDecl>(astBuilder, slangGeneric.getDecl()->parentDecl).getCount();
+}
+
+SLANG_API SlangReflectionVariable* spReflectionGeneric_GetTypeParameter(SlangReflectionGeneric* generic, unsigned index)
+{
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return nullptr;
+    auto astBuilder = getModule(slangGeneric.getDecl())->getLinkage()->getASTBuilder();
+
+    auto paramDeclRef = getMembersOfType<GenericTypeParamDecl>(astBuilder, slangGeneric.getDecl()->parentDecl)[index];
+
+    return convert(substituteDeclRef(SubstitutionSet(slangGeneric), astBuilder, paramDeclRef));
+}
+
+SLANG_API unsigned int spReflectionGeneric_GetValueParameterCount(SlangReflectionGeneric* generic)
+{
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return 0;
+    auto astBuilder = getModule(slangGeneric.getDecl())->getLinkage()->getASTBuilder();
+
+    return (unsigned int) getMembersOfType<GenericValueParamDecl>(astBuilder, slangGeneric.getDecl()->parentDecl).getCount();
+}
+
+SLANG_API SlangReflectionVariable* spReflectionGeneric_GetValueParameter(SlangReflectionGeneric* generic, unsigned index)
+{
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return nullptr;
+    auto astBuilder = getModule(slangGeneric.getDecl())->getLinkage()->getASTBuilder();
+
+    auto paramDeclRef = getMembersOfType<GenericValueParamDecl>(astBuilder, slangGeneric.getDecl()->parentDecl)[index];
+
+    return convert(substituteDeclRef(SubstitutionSet(slangGeneric), astBuilder, paramDeclRef));
+}
+
+SLANG_API unsigned int spReflectionGeneric_GetTypeParameterConstraintCount(SlangReflectionGeneric* generic, SlangReflectionVariable* typeParam)
+{
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return 0;
+    auto astBuilder = getModule(slangGeneric.getDecl())->getLinkage()->getASTBuilder();
+
+    if (auto typeParamDecl = as<GenericTypeParamDecl>(convert(typeParam).getDecl()))
+    {
+        auto constraints = getCanonicalGenericConstraints(
+            astBuilder, 
+            DeclRef<GenericDecl>(slangGeneric.getDecl()->parentDecl));
+        return (unsigned int)(constraints[typeParamDecl]).getValue().getCount();
+    }
+
+    return 0;
+}
+
+SLANG_API SlangReflectionType* spReflectionGeneric_GetTypeParameterConstraintType(SlangReflectionGeneric* generic, SlangReflectionVariable* typeParam, unsigned index)
+{
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return nullptr;
+    auto astBuilder = getModule(slangGeneric.getDecl())->getLinkage()->getASTBuilder();
+
+    if (auto typeParamDecl = as<GenericTypeParamDecl>(convert(typeParam).getDecl()))
+    {
+        auto constraints = getCanonicalGenericConstraints(
+            astBuilder,
+            DeclRef<GenericDecl>(slangGeneric.getDecl()->parentDecl));
+        if (auto constraint = (constraints[typeParamDecl]).getValue()[index])
+        {
+            return convert(substituteType(SubstitutionSet(slangGeneric), astBuilder, constraint));
+        }
+    }
+
+    return nullptr;
+}
+
+SLANG_API SlangDeclKind spReflectionGeneric_GetInnerKind(SlangReflectionGeneric* generic)
+{
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION;
+
+    return spReflectionDecl_getKind((SlangReflectionDecl*)slangGeneric.getDecl());
+}
+
+SLANG_API SlangReflectionDecl* spReflectionGeneric_GetInnerDecl(SlangReflectionGeneric* generic)
+{
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return nullptr;
+
+    return (SlangReflectionDecl*)slangGeneric.getDecl();
+}
+
+SLANG_API SlangReflectionGeneric* spReflectionGeneric_GetOuterGenericContainer(SlangReflectionGeneric* generic)
+{
+    auto declRef = convertGenericToDeclRef(generic);
+    
+    auto astBuilder = getModule(declRef.getDecl())->getLinkage()->getASTBuilder();
+
+    return getInnermostGenericParent(
+        substituteDeclRef(
+            SubstitutionSet(declRef),
+            astBuilder,
+            createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, DeclRef(declRef.getDecl()->parentDecl))));
+}
+
+SLANG_API SlangReflectionType* spReflectionGeneric_GetConcreteType(SlangReflectionGeneric* generic, SlangReflectionVariable* typeParam)
+{
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return nullptr;
+    auto astBuilder = getModule(slangGeneric.getDecl())->getLinkage()->getASTBuilder();
+    
+    auto genericType = DeclRefType::create(astBuilder, convert(typeParam));
+
+    auto substType = substituteType(SubstitutionSet(slangGeneric), astBuilder, genericType);
+
+    if (genericType != substType)
+    {
+        return convert(substType);
+    }
+
+    return nullptr;
+}
+
+SLANG_API int64_t spReflectionGeneric_GetConcreteIntVal(SlangReflectionGeneric* generic, SlangReflectionVariable* valueParam)
+{
+    auto slangGeneric = convertGenericToDeclRef(generic);
+    if (!slangGeneric) return 0;
+    auto astBuilder = getModule(slangGeneric.getDecl())->getLinkage()->getASTBuilder();
+
+    auto valueParamDeclRef = convert(valueParam);
+
+    Val* valResult = astBuilder->getOrCreate<GenericParamIntVal>(
+                    valueParamDeclRef.substitute(astBuilder, as<GenericValueParamDecl>(valueParamDeclRef.getDecl())->getType()),
+                    valueParamDeclRef);
+    valResult = valResult->substitute(astBuilder, SubstitutionSet(slangGeneric));
+
+    auto intVal = as<ConstantIntVal>(valResult);
+    if (intVal)
+    {
+        return intVal->getValue();
+    }
+
+    return 0;
+}
+
 
 // Shader Parameter Reflection
 
@@ -2784,6 +3331,16 @@ SLANG_API char const* spReflectionEntryPoint_getNameOverride(SlangReflectionEntr
             return entryPointLayout->nameOverride.getBuffer();
         else
             return getCstr(entryPointLayout->name);
+    }
+    return nullptr;
+}
+
+SLANG_API SlangReflectionFunction* spReflectionEntryPoint_GetFunction(SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    if (entryPointLayout)
+    {
+        return convert(entryPointLayout->entryPoint.as<FunctionDeclBase>());
     }
     return nullptr;
 }

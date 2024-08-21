@@ -101,6 +101,7 @@ INST(Nop, nop, 0, 0)
     //
     /* Kind */
         INST(TypeKind, Type, 0, HOISTABLE)
+        INST(TypeParameterPackKind, TypeParameterPack, 0, HOISTABLE)
         INST(RateKind, Rate, 0, HOISTABLE)
         INST(GenericKind, Generic, 0, HOISTABLE)
     INST_RANGE(Kind, TypeKind, GenericKind)
@@ -223,6 +224,9 @@ INST(Nop, nop, 0, 0)
 INST(RayQueryType, RayQuery, 1, HOISTABLE)
 INST(HitObjectType, HitObject, 0, HOISTABLE)
 
+// Opaque type that can be dynamically cast to other resource types.
+INST(DynamicResourceType, DynamicResource, 0, HOISTABLE)
+
 // A user-defined structure declaration at the IR level.
 // Unlike in the AST where there is a distinction between
 // a `StructDecl` and a `DeclRefType` that refers to it,
@@ -241,6 +245,8 @@ INST(RTTIType, rtti_type, 0, HOISTABLE)
 INST(RTTIHandleType, rtti_handle_type, 0, HOISTABLE)
 INST(TupleType, tuple_type, 0, HOISTABLE)
 INST(TargetTupleType, TargetTuple, 0, HOISTABLE)
+INST(TypePack, TypePack, 0, HOISTABLE)
+INST(ExpandTypeOrVal, ExpandTypeOrVal, 1, HOISTABLE)
 
 // A type that identifies it's contained type as being emittable as `spirv_literal.
 INST(SPIRVLiteralType, spirvLiteralType, 1, HOISTABLE)
@@ -276,6 +282,8 @@ INST(StructKey, key, 0, GLOBAL)
 INST(GlobalGenericParam, global_generic_param, 0, GLOBAL)
 INST(WitnessTable, witness_table, 0, 0)
 
+INST(IndexedFieldKey, indexedFieldKey, 2, HOISTABLE)
+
 // A placeholder witness that ThisType implements the enclosing interface.
 // Used only in interface definitions.
 INST(ThisTypeWitness, thisTypeWitness, 1, 0)
@@ -291,6 +299,7 @@ INST(Block, block, 0, PARENT)
     INST(FloatLit, float_constant, 0, 0)
     INST(PtrLit, ptr_constant, 0, 0)
     INST(StringLit, string_constant, 0, 0)
+    INST(BlobLit, string_constant, 0, 0)
     INST(VoidLit, void_constant, 0, 0)
 INST_RANGE(Constant, BoolLit, VoidLit)
 
@@ -337,8 +346,12 @@ INST(MakeArrayFromElement, makeArrayFromElement, 1, 0)
 INST(MakeStruct, makeStruct, 0, 0)
 INST(MakeTuple, makeTuple, 0, 0)
 INST(MakeTargetTuple, makeTuple, 0, 0)
+INST(MakeValuePack, makeValuePack, 0, 0)
 INST(GetTargetTupleElement, getTargetTupleElement, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
+INST(MakeWitnessPack, MakeWitnessPack, 0, HOISTABLE)
+INST(Expand, Expand, 1, 0)
+INST(Each, Each, 1, HOISTABLE)
 INST(MakeResultValue, makeResultValue, 1, 0)
 INST(MakeResultError, makeResultError, 1, 0)
 INST(IsResultError, isResultError, 1, 0)
@@ -402,6 +415,8 @@ INST(GetElementPtr, getElementPtr, 2, 0)
 // Pointer offset: computes pBase + offset_in_elements
 INST(GetOffsetPtr, getOffsetPtr, 2, 0) 
 INST(GetAddr, getAddr, 1, 0)
+
+INST(CastDynamicResource, castDynamicResource, 1, 0)
 
 // Get an unowned NativeString from a String.
 INST(getNativeStr, getNativeStr, 1, 0)
@@ -560,6 +575,7 @@ INST(SwizzledStore, swizzledStore, 2, 0)
 /* IRTerminatorInst */
 
     INST(Return, return_val, 1, 0)
+    INST(Yield, yield, 1, 0)
     /* IRUnconditionalBranch */
         // unconditionalBranch <target>
         INST(unconditionalBranch, unconditionalBranch, 1, 0)
@@ -686,6 +702,13 @@ INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, 0)
 
 INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
 INST(MetalAtomicCast, MetalAtomicCast, 1, 0)
+
+INST(IsTextureAccess, IsTextureAccess, 1, 0)
+INST(IsTextureScalarAccess, IsTextureScalarAccess, 1, 0)
+INST(IsTextureArrayAccess, IsTextureArrayAccess, 1, 0)
+INST(ExtractTextureFromTextureAccess, ExtractTextureFromTextureAccess, 1, 0)
+INST(ExtractCoordFromTextureAccess, ExtractCoordFromTextureAccess, 1, 0)
+INST(ExtractArrayCoordFromTextureAccess, ExtractArrayCoordFromTextureAccess, 1, 0)
 
 INST(MakeArrayList, makeArrayList, 0, 0)
 INST(MakeTensorView, makeTensorView, 0, 0)
@@ -891,7 +914,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(AlwaysFoldIntoUseSiteDecoration, alwaysFold, 0, 0)
 
     INST(GlobalOutputDecoration, output, 0, 0)
-    INST(GlobalInputDecoration, output, 0, 0)
+    INST(GlobalInputDecoration, input, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
@@ -917,6 +940,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST_RANGE(StageAccessDecoration, StageReadAccessDecoration, StageWriteAccessDecoration)
 
     INST(SemanticDecoration, semantic, 2, 0)
+    INST(ConstructorDecoration, constructor, 1, 0)
+    INST(MethodDecoration, method, 0, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
 
         // Reflection metadata for a shader parameter that provides the original type name.
@@ -1080,6 +1105,7 @@ INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
 INST(BitCast,                           bitCast,                    1, 0)
 INST(Reinterpret,                       reinterpret,                1, 0)
+INST(Unmodified,                        unmodified,                1, 0)
 INST(OutImplicitCast,                   outImplicitCast,           1, 0)
 INST(InOutImplicitCast,                 inOutImplicitCast,         1, 0)
 INST(IntCast, intCast, 1, 0)
@@ -1095,7 +1121,9 @@ INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
 INST(AlignOf,                           alignOf,                    1, 0)
+INST(CountOf, countOf, 1, 0)
 
+INST(GetArrayLength,                    GetArrayLength,             1, 0)
 INST(IsType, IsType, 3, 0)
 INST(TypeEquals, TypeEquals, 2, 0)
 INST(IsInt, IsInt, 1, 0)
@@ -1157,6 +1185,7 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
     INST(UNormAttr, unorm, 0, HOISTABLE)
     INST(SNormAttr, snorm, 0, HOISTABLE)
     INST(NoDiffAttr, no_diff, 0, HOISTABLE)
+    INST(NonUniformAttr, nonuniform, 0, HOISTABLE)
 
     /* SemanticAttr */
         INST(UserSemanticAttr, userSemantic, 2, HOISTABLE)
@@ -1191,6 +1220,9 @@ INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)
 INST(DebugVar, DebugVar, 4, 0)
 INST(DebugValue, DebugValue, 2, 0)
+
+/* Embedded Precompiled Libraries */
+INST(EmbeddedDXIL, EmbeddedDXIL, 1, 0)
 
 /* Inline assembly */
 

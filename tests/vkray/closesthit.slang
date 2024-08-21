@@ -43,20 +43,20 @@ void main(
 
 // CHECK: OpCapability RayTracing
 // CHECK: OpCapability RayTracingPositionFetchKHR
-// CHECK: OpEntryPoint ClosestHitNV %main "main"
+// CHECK: OpEntryPoint ClosestHit{{NV|KHR}} %main "main"
 // CHECK-DAG: OpDecorate %[[INSTANCE_ID:[A-Za-z0-9_]+]] BuiltIn InstanceId
-// CHECK-DAG: OpDecorate %[[INSTANCE_INDEX:[A-Za-z0-9_]+]] BuiltIn InstanceCustomIndexNV
+// CHECK-DAG: OpDecorate %[[INSTANCE_INDEX:[A-Za-z0-9_]+]] BuiltIn InstanceCustomIndex{{NV|KHR}}
 // CHECK-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId
-// CHECK-DAG: OpDecorate %{{.*}} BuiltIn HitKindNV
-// CHECK-DAG: OpDecorate %{{.*}} BuiltIn RayTmaxNV
-// CHECK-DAG: OpDecorate %{{.*}} BuiltIn RayTminNV
+// CHECK-DAG: OpDecorate %{{.*}} BuiltIn HitKind{{NV|KHR}}
+// CHECK-DAG: OpDecorate %{{.*}} BuiltIn RayTmax{{NV|KHR}}
+// CHECK-DAG: OpDecorate %{{.*}} BuiltIn RayTmin{{NV|KHR}}
 // CHECK-DAG: OpDecorate %{{.*}} BuiltIn HitTriangleVertexPositionsKHR
-// CHECK-DAG: %ShaderRecord{{.*}} = OpVariable %_ptr_ShaderRecordBufferNV{{.*}} ShaderRecordBufferNV
-// CHECK-DAG: %{{.*}} = OpVariable %_ptr_IncomingRayPayloadNV_ReflectionRay{{.*}} IncomingRayPayloadNV
+// CHECK-DAG: %ShaderRecord{{.*}} = OpVariable %_ptr_ShaderRecordBuffer{{.*}} ShaderRecordBuffer{{NV|KHR}}
+// CHECK-DAG: %{{.*}} = OpVariable %_ptr_IncomingRayPayload{{NV|KHR}}_ReflectionRay{{.*}} IncomingRayPayload{{NV|KHR}}
 // CHECK-DAG: %{{.*}} = OpLoad %{{u?}}int %[[INSTANCE_ID]]
 // CHECK-DAG: %{{.*}} = OpLoad %{{u?}}int %[[INSTANCE_INDEX]]
-// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_ShaderRecordBufferNV_uint %ShaderRecord{{.*}} %int_0
-// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_IncomingRayPayloadNV_v4float %{{.*}} %int_0
+// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_ShaderRecordBuffer{{NV|KHR}}_uint %ShaderRecord{{.*}} %int_0
+// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_IncomingRayPayload{{NV|KHR}}_v4float %{{.*}} %int_0
 // CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_0
 // CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_1
 // CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_2

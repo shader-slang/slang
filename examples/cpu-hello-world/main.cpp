@@ -16,12 +16,12 @@
 // Of course, in order to use the Slang API, we need to include
 // its header. We have set up the build options for this project
 // so that it is as simple as:
-#include <slang.h>
+#include "slang.h"
 
 // Allows use of ComPtr - which we can use to scope any 'com-like' pointers easily
-#include <slang-com-ptr.h>
+#include "slang-com-ptr.h"
 // Provides macros for handling SlangResult values easily 
-#include <slang-com-helper.h>
+#include "slang-com-helper.h"
 
 // This includes a useful small function for setting up the prelude (described more further below).
 #include "../../source/core/slang-test-tool-util.h"

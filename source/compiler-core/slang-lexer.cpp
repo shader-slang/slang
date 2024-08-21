@@ -5,9 +5,9 @@
 // input bytes and turning it into semantically useful tokens.
 //
 
+#include "core/slang-char-encode.h"
 #include "slang-name.h"
 #include "slang-source-loc.h"
-
 #include "slang-core-diagnostics.h"
 
 namespace Slang
@@ -173,38 +173,55 @@ namespace Slang
 
     // Look ahead one code point, dealing with complications like
     // escaped newlines.
-    static int _peek(Lexer* lexer)
+    static int _peek(Lexer* lexer, int offset = 0)
     {
-        // Look at the next raw byte, and decide what to do
-        int c = _peekRaw(lexer);
+        int pos = 0;
+        int c = kEOF;
 
-        if(c == '\\')
+        do
         {
-            // We might have a backslash-escaped newline.
-            // Look at the next byte (if any) to see.
-            //
-            // Note(tfoley): We are assuming a null-terminated input here,
-            // so that we can safely look at the next byte without issue.
-            int d = lexer->m_cursor[1];
-            switch (d)
+            if (lexer->m_cursor + pos == lexer->m_end)
+                return kEOF;
+
+            c = lexer->m_cursor[pos++];
+
+            while (c == '\\')
             {
-            case '\r': case '\n':
+                // We might have a backslash-escaped newline.
+                // Look at the next byte (if any) to see.
+                //
+                // Note(tfoley): We are assuming a null-terminated input here,
+                // so that we can safely look at the next byte without issue.
+                int d = lexer->m_cursor[pos++];
+                switch (d)
+                {
+                case '\r': case '\n':
                 {
                     // The newline was escaped, so return the code point after *that*
-
-                    int e = lexer->m_cursor[2];
+                    int e = lexer->m_cursor[pos++];
                     if ((d ^ e) == ('\r' ^ '\n'))
-                        return lexer->m_cursor[3];
-                    return e;
+                        c = lexer->m_cursor[pos++];
+                    else
+                        c = e;
+                    continue;
+                }
+                default:
+                    break;
                 }
 
-            default:
+                // Only continue this while loop in the case where we consumed
+                // some newlines
                 break;
             }
-        }
-        // TODO: handle UTF-8 encoding for non-ASCII code points here
+            if (isUtf8LeadingByte((Byte)c))
+            {
+                // Consume all unicode characters.
+                pos--;
+                c = getUnicodePointFromUTF8([&]() {return lexer->m_cursor[pos++]; });
+            }
+            // Default case is to just hand along the byte we read as an ASCII code point.
+        } while (offset--);
 
-        // Default case is to just hand along the byte we read as an ASCII code point.
         return c;
     }
 
@@ -248,7 +265,12 @@ namespace Slang
                 }
             }
 
-            // TODO: Need to handle non-ASCII code points.
+            // Consume all unicode characters.
+            if (isUtf8LeadingByte((Byte)c))
+            {
+                lexer->m_cursor--;
+                c = getUnicodePointFromUTF8([&]() {return *lexer->m_cursor++; });
+            }
 
             // Default case is to return the raw byte we saw.
             return c;
@@ -326,6 +348,11 @@ namespace Slang
         }
     }
 
+    static bool isNonAsciiCodePoint(unsigned int codePoint)
+    {
+        return codePoint != 0xFFFFFFFF && codePoint >= 0x80;
+    }
+
     static void _lexIdentifier(Lexer* lexer)
     {
         for(;;)
@@ -334,12 +361,12 @@ namespace Slang
             if(('a' <= c ) && (c <= 'z')
                 || ('A' <= c) && (c <= 'Z')
                 || ('0' <= c) && (c <= '9')
-                || (c == '_'))
+                || (c == '_')
+                || isNonAsciiCodePoint((unsigned int)c))
             {
                 _advance(lexer);
                 continue;
             }
-
             return;
         }
     }
@@ -494,10 +521,19 @@ namespace Slang
 
         if( _peek(lexer) == '.' )
         {
-            tokenType = TokenType::FloatingPointLiteral;
+            switch (_peek(lexer, 1))
+            {
+                // 123.xxxx or 123.rrrr
+            case 'x':
+            case 'r':
+                break;
 
-            _advance(lexer);
-            _lexDigits(lexer, base);
+            default:
+                tokenType = TokenType::FloatingPointLiteral;
+
+                _advance(lexer);
+                _lexDigits(lexer, base);
+            }
         }
 
         if( _maybeLexNumberExponent(lexer, base))
@@ -1029,7 +1065,8 @@ namespace Slang
 
     static TokenType _lexTokenImpl(Lexer* lexer)
     {
-        switch(_peek(lexer))
+        int nextCodePoint = _peek(lexer);
+        switch(nextCodePoint)
         {
         default:
             break;
@@ -1089,8 +1126,16 @@ namespace Slang
                     return _maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
 
                 case '.':
-                    _advance(lexer);
-                    return _lexNumberAfterDecimalPoint(lexer, 10);
+                    switch (_peek(lexer, 1))
+                    {
+                        // 0.xxxx or 0.rrrr
+                    case 'x':
+                    case 'r':
+                        return _maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
+                    default:
+                        _advance(lexer);
+                        return _lexNumberAfterDecimalPoint(lexer, 10);
+                    }
 
                 case 'x': case 'X':
                     _advance(lexer);
@@ -1327,10 +1372,12 @@ namespace Slang
 
         }
 
-        // TODO(tfoley): If we ever wanted to support proper Unicode
-        // in identifiers, etc., then this would be the right place
-        // to perform a more expensive dispatch based on the actual
-        // code point (and not just the first byte).
+        // We treat all unicode characters as a part of an identifier.
+        if (isNonAsciiCodePoint(nextCodePoint))
+        {
+            _lexIdentifier(lexer);
+            return TokenType::Identifier;
+        }
 
         {
             // If none of the above cases matched, then we have an
@@ -1345,6 +1392,10 @@ namespace Slang
                 {
                     char buffer[] = { (char) c, 0 };
                     sink->diagnose(loc, LexerDiagnostics::illegalCharacterPrint, buffer);
+                }
+                else if(c == kEOF)
+                {
+                    sink->diagnose(loc, LexerDiagnostics::unexpectedEndOfInput);
                 }
                 else
                 {

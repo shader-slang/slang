@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../slang.h"
+#include "slang.h"
 #include "../core/slang-basic.h"
 #include "slang-ast-all.h"
 #include "slang-syntax.h"

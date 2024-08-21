@@ -150,6 +150,8 @@ namespace Slang
                 continue;
             if (!nameLoc.loc.isValid())
                 continue;
+            if (child->hasModifier<SynthesizedModifier>() || child->hasModifier<ToBeSynthesizedModifier>())
+                continue;
             auto humaneLoc = srcManager->getHumaneLoc(nameLoc.loc, SourceLocType::Actual);
             if (humaneLoc.line == 0)
                 continue;
@@ -165,7 +167,7 @@ namespace Slang
                 sym.selectionRange.start.line = (int)line;
                 sym.selectionRange.start.character = (int)col;
                 sym.selectionRange.end.line = (int)line;
-                sym.selectionRange.end.character = (int)(col + nameLoc.name->text.getLength());
+                sym.selectionRange.end.character = (int)(col + (int)UTF8Util::calcUTF16CharCount(nameLoc.name->text.getUnownedSlice()));
                 sym.range.start.line = (int)line;
                 sym.range.start.character = 0;
                 sym.range.end.line = (int)line;

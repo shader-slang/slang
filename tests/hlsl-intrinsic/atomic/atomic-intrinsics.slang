@@ -1,6 +1,8 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12):-slang -compute -dx12 -profile cs_6_0 -use-dxil -shaderobj -output-using-type -xslang -DDX12
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-via-glsl -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK -xslang -minimum-slang-optimization
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-via-glsl -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 
@@ -9,8 +11,8 @@ RWStructuredBuffer<uint> uintBuffer;
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=intBuffer
 RWStructuredBuffer<int> intBuffer;
 
-groupshared uint shareMemUI[4] = { 0, 0, 0, 0 };
-groupshared int shareMemI[4] = { 0, 0, 0, 0 };
+groupshared uint shareMemUI[4];
+groupshared int shareMemI[4];
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -18,6 +20,9 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_DispatchThreadID)
 {
+    shareMemUI = { 0, 0, 0, 0 };
+    shareMemI = { 0, 0, 0, 0 };
+    AllMemoryBarrierWithGroupSync();
     int idx = dispatchThreadID.x;
     float val = 0.0f;
 

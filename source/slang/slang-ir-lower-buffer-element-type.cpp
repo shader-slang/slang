@@ -578,7 +578,7 @@ namespace Slang
                 {
                     if (auto ptrType = as<IRPtrType>(globalInst))
                     {
-                        if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+                        if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
                             elementType = ptrType->getValueType();
                     }
                 }
@@ -703,7 +703,7 @@ namespace Slang
                                         for (UInt i = 0; i < user->getOperandCount(); i++)
                                             args.add(user->getOperand(i));
                                         auto newArrayPtrVal = builder.emitFieldAddress(
-                                            getLoweredPtrLikeType(ptrVal->getDataType(), loweredElementTypeInfo.loweredInnerArrayType),
+                                            builder.getPtrType(loweredElementTypeInfo.loweredInnerArrayType),
                                             ptrVal,
                                             loweredElementTypeInfo.loweredInnerStructKey);
                                         builder.replaceOperand(use, newArrayPtrVal);
@@ -877,7 +877,9 @@ namespace Slang
     void lowerBufferElementTypeToStorageType(TargetProgram* target, IRModule* module, bool lowerBufferPointer)
     {
         SlangMatrixLayoutMode defaultMatrixMode = (SlangMatrixLayoutMode)target->getOptionSet().getMatrixLayoutMode();
-        if (defaultMatrixMode == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+        if ((isCPUTarget(target->getTargetReq()) || isCUDATarget(target->getTargetReq()) || isMetalTarget(target->getTargetReq())))
+            defaultMatrixMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+        else if (defaultMatrixMode == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
             defaultMatrixMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
         LoweredElementTypeContext context(target, lowerBufferPointer, defaultMatrixMode);
         context.processModule(module);

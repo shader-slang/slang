@@ -23,6 +23,13 @@ IRType* getVectorElementType(IRType* type)
     return type;
 }
 
+IRType* getMatrixElementType(IRType* type)
+{
+    if (auto matrixType = as<IRMatrixType>(type))
+        return matrixType->getElementType();
+    return type;
+}
+
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType)
 {
     Dictionary<IRInst*, IRInst*> result;
@@ -1550,10 +1557,24 @@ void hoistInstOutOfASMBlocks(IRBlock* block)
 IRType* getSPIRVSampledElementType(IRInst* sampledType)
 {
     auto sampledElementType = getVectorElementType((IRType*)sampledType);
-    if (sampledElementType->getOp() == kIROp_HalfType)
+    
+    IRBuilder builder(sampledType);
+    switch (sampledElementType->getOp())
     {
-        IRBuilder builder(sampledType);
+    case kIROp_HalfType:
         sampledElementType = builder.getBasicType(BaseType::Float);
+        break;
+    case kIROp_UInt16Type:
+    case kIROp_UInt8Type:
+    case kIROp_CharType:
+        sampledElementType = builder.getBasicType(BaseType::UInt);
+        break;
+    case kIROp_Int8Type:
+    case kIROp_Int16Type:
+        sampledElementType = builder.getBasicType(BaseType::Int);
+        break;
+    default:
+        break;
     }
     return sampledElementType;
 }

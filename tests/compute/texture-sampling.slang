@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type
 //TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -vk
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -mtl
 
 
 //TEST_INPUT: Texture1D(size=4, content = one):name=t1D
@@ -104,7 +104,7 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
     val += tCubeArray.Sample(samplerState, float4(uv, 0.5, 0.0));
     val += tCube.Sample(samplerState, float3(uv, 0.5));
 
-    val += t2D.Load(int3(0), int2(0));
+    val += t2D.Load(int3(0));
     val += t2dArray.Load(int4(0));
 
     val += t3D[int3(0)];
