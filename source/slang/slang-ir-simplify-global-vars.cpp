@@ -7,9 +7,8 @@
 
 namespace Slang
 {
-    void tryToSimplifyUseOfGlobalVar(IRGlobalVar* globalVar, IRUse* use, List<IRInst*>& toDestroy)
+    void tryToSimplifyUseOfGlobalVar(IRInst* user, List<IRInst*>& toDestroy)
     {
-        auto user = use->getUser();
         switch (user->getOp())
         {
         case kIROp_Store:
@@ -54,9 +53,10 @@ namespace Slang
             bool onlyGlobalSideEffects = true;
             traverseUses(globalVar, [&](IRUse* use)
                 {
-                    tryToSimplifyUseOfGlobalVar(globalVar, use, toDestroy);
-                    if (use->getUser()->getParent()->getOp() != kIROp_Module
-                        && use->getUser()->mightHaveSideEffects())
+                    auto user = use->getUser();
+                    tryToSimplifyUseOfGlobalVar(user, toDestroy);
+                    if (user->getParent()->getOp() != kIROp_Module
+                        && user->mightHaveSideEffects())
                         onlyGlobalSideEffects = false;
                 });
             for (auto i : toDestroy)
