@@ -31,9 +31,9 @@ function(check_release_and_get_latest owner repo version os arch out_var)
             set(${out_var} "${version}" PARENT_SCOPE)
             return()
         endif()
-        message(WARNING "Failed to find ${desired_zip} in release assets for ${version} from ${version_url}.\nFalling back to latest version if it differs")
+        message(WARNING "Failed to find ${desired_zip} in release assets for ${version} from ${version_url}\nFalling back to latest version if it differs")
     else()
-        message(WARNING "Failed to download release info for version ${version} from ${version_url}.\nFalling back to latest version if it differs")
+        message(WARNING "Failed to download release info for version ${version} from ${version_url}\nFalling back to latest version if it differs")
     endif()
 
 
