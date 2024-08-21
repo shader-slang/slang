@@ -77,7 +77,7 @@ namespace Slang
                     funcChanged = false;
                     funcChanged |= applySparseConditionalConstantPropagation(func, sink);
                     funcChanged |= peepholeOptimize(target, func);
-                    if (!options.minimalOptimization)
+                    if (options.removeRedundancy)
                         funcChanged |= removeRedundancyInFunc(func);
                     funcChanged |= simplifyCFG(func, options.cfgOptions);
                     // Note: we disregard the `changed` state from dead code elimination pass since

@@ -6281,6 +6281,23 @@ namespace Slang
         return alignOfExpr;
     }
 
+    static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
+    {
+        // We could have a type or a variable or an expression
+        CountOfExpr* countOfExpr = parser->astBuilder->create<CountOfExpr>();
+
+        parser->ReadMatchingToken(TokenType::LParent);
+
+        // The return type is always an Int
+        countOfExpr->type = parser->astBuilder->getIntType();
+
+        countOfExpr->value = parser->ParseExpression();
+
+        parser->ReadMatchingToken(TokenType::RParent);
+
+        return countOfExpr;
+    }
+
     static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
     {
         auto tryExpr = parser->astBuilder->create<TryExpr>();
@@ -7549,7 +7566,7 @@ namespace Slang
     {
         ExpandExpr* expandExpr = parser->astBuilder->create<ExpandExpr>();
         expandExpr->loc = loc;
-        expandExpr->baseExpr = parser->ParseExpression();
+        expandExpr->baseExpr = parser->ParseArgExpr();
         return expandExpr;
     }
 
@@ -7557,7 +7574,7 @@ namespace Slang
     {
         EachExpr* eachExpr = parser->astBuilder->create<EachExpr>();
         eachExpr->loc = loc;
-        eachExpr->baseExpr = parser->ParseExpression();
+        eachExpr->baseExpr = parser->ParseLeafExpression();
         return eachExpr;
     }
 
@@ -8515,6 +8532,7 @@ namespace Slang
         _makeParseExpr("__dispatch_kernel", parseDispatchKernel),
         _makeParseExpr("sizeof", parseSizeOfExpr),
         _makeParseExpr("alignof", parseAlignOfExpr),
+        _makeParseExpr("countof", parseCountOfExpr),
     };
 
     ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

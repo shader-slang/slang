@@ -2857,6 +2857,11 @@ struct IRMakeTuple : IRInst
     IR_LEAF_ISA(MakeTuple)
 };
 
+struct IRMakeValuePack : IRInst
+{
+    IR_LEAF_ISA(MakeValuePack)
+};
+
 struct IRMakeWitnessPack : IRInst
 {
     IR_LEAF_ISA(MakeWitnessPack)
@@ -3509,6 +3514,8 @@ public:
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2, IRType* type3);
 
+    IRTypePack* getTypePack(UInt count, IRType* const* types);
+
     IRExpandType* getExpandTypeOrVal(IRType* type, IRInst* pattern, ArrayView<IRInst*> capture);
 
     IRResultType* getResultType(IRType* valueType, IRType* errorType);
@@ -3530,10 +3537,9 @@ public:
     IRRefType*  getRefType(IRType* valueType, AddressSpace addrSpace);
     IRConstRefType* getConstRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
+    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRInst* addressSpace);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace) { return getPtrType(op, valueType, (IRIntegerValue)addressSpace); }
-    IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace) { return getPtrType(kIROp_PtrType, valueType, (IRIntegerValue)addressSpace); }
+    IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace) { return getPtrType(kIROp_PtrType, valueType, addressSpace); }
 
     IRTextureTypeBase* getTextureType(
         IRType* elementType,
@@ -3668,6 +3674,14 @@ public:
         List<IRAttr*>   attributes)
     {
         return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
+    }
+
+    IRInst* getIndexedFieldKey(
+        IRInst* baseType,
+        UInt            fieldIndex)
+    {
+        IRInst* args[] = { baseType, getIntValue(getIntType(), fieldIndex) };
+        return emitIntrinsicInst(getVoidType(), kIROp_IndexedFieldKey, 2, args);
     }
 
     IRMetalMeshGridPropertiesType* getMetalMeshGridPropertiesType()
@@ -3872,6 +3886,9 @@ public:
         return emitMakeTuple(SLANG_COUNT_OF(args), args);
     }
 
+    IRInst* emitMakeValuePack(IRType* type, UInt count, IRInst* const* args);
+    IRInst* emitMakeValuePack(UInt count, IRInst* const* args);
+
     IRInst* emitMakeWitnessPack(IRType* type, ArrayView<IRInst*> args)
     {
         return emitIntrinsicInst(type, kIROp_MakeWitnessPack, (UInt)args.getCount(), args.getBuffer());
@@ -4012,7 +4029,7 @@ public:
         IRType* valueType);
     IRGlobalVar* createGlobalVar(
         IRType*         valueType,
-        IRIntegerValue  addressSpace);
+        AddressSpace   addressSpace);
     IRGlobalParam* createGlobalParam(
         IRType* valueType);
     
@@ -4106,7 +4123,7 @@ public:
         IRType* type);
     IRVar* emitVar(
         IRType* type,
-        IRIntegerValue addressSpace);
+        AddressSpace addressSpace);
 
     IRInst* emitLoad(
         IRType* type,
@@ -4363,6 +4380,8 @@ public:
 
     IRInst* emitAlignOf(
         IRInst* sizedType);
+
+    IRInst* emitCountOf(IRType* type, IRInst* sizedType);
 
     IRInst* emitCastPtrToBool(IRInst* val);
     IRInst* emitCastPtrToInt(IRInst* val);

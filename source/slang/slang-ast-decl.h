@@ -550,6 +550,9 @@ class GenericDecl : public ContainerDecl
 class GenericTypeParamDeclBase : public SimpleTypeDecl
 {
     SLANG_AST_CLASS(GenericTypeParamDeclBase)
+
+    // The index of the generic parameter.
+    Index parameterIndex = -1;
 };
 
 class GenericTypeParamDecl : public GenericTypeParamDeclBase
@@ -587,6 +590,9 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
 class GenericValueParamDecl : public VarDeclBase
 {
     SLANG_AST_CLASS(GenericValueParamDecl)
+
+    // The index of the generic parameter.
+    Index parameterIndex = 0;
 };
 
 // An empty declaration (which might still have modifiers attached).

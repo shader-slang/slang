@@ -336,11 +336,8 @@ struct SwizzledLValueInfo : ExtendedValueInfo
     // The base expression (this should be an l-value)
     LoweredValInfo  base;
 
-    // The number of elements in the swizzle
-    UInt            elementCount;
-
     // THe indices for the elements being swizzled
-    UInt            elementIndices[4];
+    ShortList<UInt, 4> elementIndices;
 };
 
 // Represents the result of a matrix swizzle operation in an l-value context.
@@ -1183,8 +1180,8 @@ top:
             return LoweredValInfo::simple(builder->emitSwizzle(
                 swizzleInfo->type,
                 getSimpleVal(context, swizzleInfo->base),
-                swizzleInfo->elementCount,
-                swizzleInfo->elementIndices));
+                swizzleInfo->elementIndices.getCount(),
+                swizzleInfo->elementIndices.getArrayView().getBuffer()));
         }
 
     case LoweredValInfo::Flavor::SwizzledMatrixLValue:
@@ -1656,6 +1653,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(resultVal);
     }
 
+    LoweredValInfo visitCountOfIntVal(CountOfIntVal* val)
+    {
+        auto irBuilder = getBuilder();
+        auto type = lowerType(context, val->getType());
+        auto typeArg = lowerType(context, as<Type>(val->getTypeArg()));
+        auto count = irBuilder->emitCountOf(type, typeArg);
+        return LoweredValInfo::simple(count);
+    }
+
     LoweredValInfo visitConcreteTypePack(ConcreteTypePack* typePack)
     {
         ShortList<IRType*> types;
@@ -1665,7 +1671,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             types.add(loweredType);
         }
         auto irBuilder = getBuilder();
-        IRType* irTypePack = irBuilder->getTupleType((UInt)types.getCount(), types.getArrayView().getBuffer());
+        IRType* irTypePack = irBuilder->getTypePack((UInt)types.getCount(), types.getArrayView().getBuffer());
         return LoweredValInfo::simple(irTypePack);
     }
 
@@ -4038,6 +4044,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         const auto size = naturalLayoutContext.calcSize(sizeOfLikeExpr->sizedType);
 
         auto builder = getBuilder();
+        auto resultType = lowerType(context, sizeOfLikeExpr->type);
 
         if (!size)
         {
@@ -4051,9 +4058,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 inst = builder->emitAlignOf(sizedType);
             }
-            else
+            else if (as<SizeOfExpr>(sizeOfLikeExpr))
             {
                 inst = builder->emitSizeOf(sizedType);
+            }
+            else
+            {
+                
+                inst = builder->emitCountOf(resultType, sizedType);
             }
 
             return LoweredValInfo::simple(inst);
@@ -4064,7 +4076,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 size.size : 
                 size.alignment;
 
-        return LoweredValInfo::simple(getBuilder()->getIntValue(builder->getUIntType(), value));
+        return LoweredValInfo::simple(getBuilder()->getIntValue(resultType, value));
     }
 
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
@@ -4422,7 +4434,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             irArgs.add(getSimpleVal(context, lowerSubExpr(arg)));
         }
-        auto irMakeTuple = getBuilder()->emitMakeTuple(irArgs);
+        auto irMakeTuple = getBuilder()->emitMakeValuePack((UInt)irArgs.getCount(), irArgs.getBuffer());
         return LoweredValInfo::simple(irMakeTuple);
     }
 
@@ -5367,10 +5379,10 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
     {
         auto irType = lowerType(context, expr->type);
         auto loweredBase = lowerLValueExpr(context, expr->base);
-        UInt elementCount = (UInt)expr->elementCount;
+        UInt elementCount = (UInt)expr->elementIndices.getCount();
 
         // Assign to 'bs' the elements from 'as' according to the first 'n' indices in 'is'
-        auto backpermute = [](UInt n, const auto* as, const int* is, auto* bs)
+        auto backpermute = [](UInt n, const auto as, const auto is, auto bs)
         {
             for(UInt i = 0; i < n; ++i)
             {
@@ -5397,7 +5409,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo;
             swizzledLValue->type = irType;
             swizzledLValue->base = baseSwizzleInfo->base;
-            swizzledLValue->elementCount = elementCount;
+            swizzledLValue->elementIndices = elementCount;
 
             // Take the swizzle element of the "outer" swizzle, as it was
             // written by the user. In our running example of `foo[i].zw.y`
@@ -5406,7 +5418,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             // Use that original element index to figure out which of the
             // elements of the original swizzle this should map to.
             backpermute(
-                swizzledLValue->elementCount,
+                swizzledLValue->elementIndices.getCount(),
                 baseSwizzleInfo->elementIndices,
                 expr->elementIndices,
                 swizzledLValue->elementIndices);
@@ -5439,17 +5451,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo;
             swizzledLValue->type = irType;
             swizzledLValue->base = loweredBase;
-            swizzledLValue->elementCount = elementCount;
-
-            // In the default case, we can just copy the indices being
-            // used for the swizzle over directly from the expression,
-            // and use the base as-is.
-            //
-            for (UInt ii = 0; ii < elementCount; ++ii)
-            {
-                swizzledLValue->elementIndices[ii] = (UInt) expr->elementIndices[ii];
-            }
-
+            swizzledLValue->elementIndices = expr->elementIndices;
             context->shared->extValues.add(swizzledLValue);
             return LoweredValInfo::swizzledLValue(swizzledLValue);
         }
@@ -5460,8 +5462,6 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
 {
     static bool _isLValueContext() { return false; }
 
-    // A matrix swizzle in an r-value context can save time by just
-    // emitting the matrix swizzle instructions directly.
     LoweredValInfo visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)
     {
         auto resultType = lowerType(context, expr->type);
@@ -5517,9 +5517,9 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
 
         auto irIntType = getIntType(context);
 
-        UInt elementCount = (UInt)expr->elementCount;
-        IRInst* irElementIndices[4];
-        for (UInt ii = 0; ii < elementCount; ++ii)
+        ShortList<IRInst*, 4> irElementIndices;
+        irElementIndices.setCount(expr->elementIndices.getCount());
+        for (UInt ii = 0; ii < (UInt)expr->elementIndices.getCount(); ++ii)
         {
             irElementIndices[ii] = builder->getIntValue(
                 irIntType,
@@ -5529,7 +5529,7 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
         auto irSwizzle = builder->emitSwizzle(
             irType,
             irBase,
-            elementCount,
+            (UInt)irElementIndices.getCount(),
             &irElementIndices[0]);
 
         return LoweredValInfo::simple(irSwizzle);
@@ -6926,7 +6926,7 @@ LoweredValInfo tryGetAddress(
             auto originalSwizzleInfo = val.getSwizzledLValueInfo();
             auto originalBase = originalSwizzleInfo->base;
 
-            UInt elementCount = originalSwizzleInfo->elementCount;
+            UInt elementCount = (UInt)originalSwizzleInfo->elementIndices.getCount();
 
             auto newBase = tryGetAddress(context, originalBase, TryGetAddressMode::Aggressive);
             if (newBase.flavor == LoweredValInfo::Flavor::Ptr && elementCount == 1)
@@ -6942,7 +6942,7 @@ LoweredValInfo tryGetAddress(
 
             newSwizzleInfo->base = newBase;
             newSwizzleInfo->type = originalSwizzleInfo->type;
-            newSwizzleInfo->elementCount = elementCount;
+            newSwizzleInfo->elementIndices.setCount(elementCount);
             for(UInt ee = 0; ee < elementCount; ++ee)
                 newSwizzleInfo->elementIndices[ee] = originalSwizzleInfo->elementIndices[ee];
 
@@ -7124,8 +7124,8 @@ top:
                         irLeftVal->getDataType(),
                         irLeftVal,
                         irRightVal,
-                        swizzleInfo->elementCount,
-                        swizzleInfo->elementIndices);
+                        (UInt)swizzleInfo->elementIndices.getCount(),
+                        swizzleInfo->elementIndices.getArrayView().getBuffer());
 
                     // And finally, store the value back where we got it.
                     //
@@ -7158,8 +7158,8 @@ top:
                     swizzledStore(
                         loweredBase.val,
                         irRightVal,
-                        swizzleInfo->elementCount,
-                        swizzleInfo->elementIndices);
+                        (UInt)swizzleInfo->elementIndices.getCount(),
+                        swizzleInfo->elementIndices.getArrayView().getBuffer());
                 }
                 break;
             }
@@ -9304,15 +9304,46 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     auto typeGeneric = typeBuilder.emitGeneric();
                     typeGeneric->setFullType(typeBuilder.getGenericKind());
                     typeBuilder.setInsertInto(typeGeneric);
-                    typeBuilder.emitBlock();
+                    auto block = typeBuilder.emitBlock();
                     
+                    struct ParamCloneInfo
+                    {
+                        IRParam* originalParam;
+                        IRParam* clonedParam;
+                    };
+                    ShortList<ParamCloneInfo> paramCloneInfos;
+
                     for (auto child : parentGeneric->getFirstBlock()->getChildren())
                     {
                         if (valuesToClone.contains(child))
                         {
-                            cloneInst(&cloneEnv, &typeBuilder, child);
+                            if (child->getOp() == kIROp_Param)
+                            {
+                                // Params may have forward references in its type and
+                                // decorations, so we just create a placeholder for it
+                                // in this first pass.
+                                IRParam* clonedParam = typeBuilder.emitParam(nullptr);
+                                cloneEnv.mapOldValToNew[child] = clonedParam;
+                                paramCloneInfos.add({ (IRParam*)child, clonedParam });
+                            }
+                            else
+                            {
+                                cloneInst(&cloneEnv, &typeBuilder, child);
+                            }
                         }
                     }
+
+                    // In a second pass, clone the types and decorations on params which may
+                    // contain forward references.
+                    for (auto param : paramCloneInfos)
+                    {
+                        typeBuilder.setInsertInto(param.clonedParam);
+                        param.clonedParam->setFullType((IRType*)cloneInst(&cloneEnv, &typeBuilder, param.originalParam->getFullType()));
+                        cloneInstDecorationsAndChildren(&cloneEnv, typeBuilder.getModule(), param.originalParam, param.clonedParam);
+                    }
+
+                    typeBuilder.setInsertInto(block);
+
                     IRInst* clonedReturnType = nullptr;
                     cloneEnv.mapOldValToNew.tryGetValue(returnType, clonedReturnType);
                     if (clonedReturnType)
@@ -11525,7 +11556,7 @@ IRTypeLayout* lowerTypeLayout(
     else if( auto structTypeLayout = as<StructTypeLayout>(typeLayout) )
     {
         IRStructTypeLayout::Builder builder(context->irBuilder);
-
+        int fieldIndex = 0;
         for( auto fieldLayout : structTypeLayout->fields )
         {
             auto fieldDecl = fieldLayout->varDecl;
@@ -11573,11 +11604,24 @@ IRTypeLayout* lowerTypeLayout(
                     context->mapEntryPointParamToKey.add(paramDecl.getDecl(), irFieldKey);
                 }
             }
-            else
+            else if (fieldDecl.getDecl())
             {
                 irFieldKey = getSimpleVal(context,
                     ensureDecl(context, fieldDecl.getDecl()));
             }
+            else
+            {
+                // If we don't have a concrete field decl for the field in the layout,
+                // it could be that the field in the layout is for a member of a tuple
+                // type that hasn't been materialized into a struct decl yet.
+                // We will use a `IndexFieldKey(type, memberIndex)` inst as a placeholder
+                // for the field key.
+                // This placeholder can be replaced with the actual field key when the
+                // tuple type is materialized into a struct type.
+                auto irType = lowerType(context, typeLayout->getType());
+                irFieldKey = context->irBuilder->getIndexedFieldKey(irType, fieldIndex);
+            }
+            fieldIndex++;
             SLANG_ASSERT(irFieldKey);
 
             auto irFieldLayout = lowerVarLayout(context, fieldLayout);
