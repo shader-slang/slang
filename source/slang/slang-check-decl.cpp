@@ -1856,7 +1856,10 @@ namespace Slang
             ctor->members.add(param);
         }
         addVisibilityModifier(m_astBuilder, ctor, visibility);
-        addModifier(ctor, m_astBuilder->create<BackwardDifferentiableAttribute>());
+
+        if (visitor->isTypeDifferentiable(ctor->returnType.type))
+            addModifier(ctor, m_astBuilder->create<BackwardDifferentiableAttribute>());
+
         decl->addMember(ctor);
         return ctor;
     }
@@ -8058,11 +8061,10 @@ namespace Slang
                 }
 
                 // Check for differentiability, if we cannot diff this member attach a no_diff attribute.
-                if (( !this->isTypeDifferentiable(member->type) || !member->hasModifier<DerivativeMemberAttribute>()) && !param->hasModifier<NoDiffModifier>())
+                if (!member->hasModifier<DerivativeMemberAttribute>() || member->hasModifier<NoDiffModifier>())
                     addModifier(param, m_astBuilder->create<NoDiffModifier>());
 
-                //Manage CUDA host modifier based on inheritance
-                //containsType
+                // Manage CUDA host modifier based on inheritance
                 if (!foundCudaHostModifier && containsTargetType<TorchTensorType>(m_astBuilder, member->type.type))
                 {
                     foundCudaHostModifier = true;

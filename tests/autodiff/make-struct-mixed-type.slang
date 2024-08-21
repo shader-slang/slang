@@ -27,8 +27,10 @@ float f(MixedType m)
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     MixedType v = { 0, 2.0 };
-    MixedType.Differential dv = { 0.0 };
+    MixedType.Differential dv = { 0.0, 0.0 };
+
     var p = diffPair(v, dv);
     __bwd_diff(f)(p, 1.0);
     outputBuffer[0] = p.d.field;
+    outputBuffer[1] = dv.noDiffField;
 }
