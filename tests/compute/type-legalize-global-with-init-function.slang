@@ -16,11 +16,16 @@ static const RWStructuredBuffer<uint> gBuffer = inputBuffer;
 
 struct Stuff
 {
+    __init(RWStructuredBuffer<uint> inA, RWStructuredBuffer<uint> inB)
+    {
+        a = inA;
+        b = inB;
+    }
     RWStructuredBuffer<uint> a;
     RWStructuredBuffer<uint> b;
 }
 
-static const Stuff gStuff = { inputBuffer, inputBuffer };
+static const Stuff gStuff = Stuff( inputBuffer, inputBuffer );
 
 uint test(uint x)
 {
@@ -41,4 +46,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 //BUF: 432
 //BUF: 543
 //BUF: 654
-

@@ -343,8 +343,20 @@ struct LegalCallBuilder
                 // result type of the function, so we know that
                 // the legalization funciton/call will use a `void`
                 // result type.
-                //
-                _emitCall(m_context->builder->getVoidType());
+
+                // If our call is in global scope (initializer) we should
+                // hoist the call into the start of every entry-point 
+                if (!m_context->builder->getInsertLoc().getInst()->getParent()
+                    || m_context->builder->getInsertLoc().getInst()->getParent()->getOp() == kIROp_Module)
+                {
+                    for (auto i : m_context->getEntryPoints())
+                    {
+                        m_context->builder->setInsertBefore(i->getFirstOrdinaryInst());
+                        _emitCall(m_context->builder->getVoidType());
+                    }
+                }
+                else
+                    _emitCall(m_context->builder->getVoidType());
                 return resultVal;
             }
             break;
@@ -370,11 +382,19 @@ private:
                 auto simpleType = resultType.getSimple();
                 auto builder = m_context->builder;
 
-                // Recall that a local variable in our IR represents a *pointer*
+                // Recall that a variable in our IR represents a *pointer*
                 // to storage of the appropriate type.
                 //
-                auto varPtr = builder->emitVar(simpleType);
-
+                IRInst* varPtr = nullptr;
+                if (m_call->parent->getOp() == kIROp_Module)
+                {
+                    // If we were going to emit an IRVar in global scope, emit a GlobalVar instead 
+                    varPtr = builder->createGlobalVar(simpleType);
+                }
+                else
+                {
+                    varPtr = builder->emitVar(simpleType);
+                }
                 // We need to pass that pointer as an argument to our new
                 // `call` instruction, so that it can receive the value
                 // written by the callee.
