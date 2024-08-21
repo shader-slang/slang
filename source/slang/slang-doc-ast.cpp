@@ -48,7 +48,6 @@ namespace Slang {
     }
 }
 
-
 bool shouldDocumentDecl(Decl* decl)
 {
     return !getText(decl->getName()).startsWith("$__syn") && !decl->hasModifier<SynthesizedModifier>();

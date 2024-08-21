@@ -1858,8 +1858,12 @@ namespace Slang
         addVisibilityModifier(m_astBuilder, ctor, visibility);
 
         if (visitor->isTypeDifferentiable(ctor->returnType.type))
+        {
             addModifier(ctor, m_astBuilder->create<BackwardDifferentiableAttribute>());
-
+            addModifier(ctor, m_astBuilder->create<ForwardDifferentiableAttribute>());
+        }
+        else
+            addModifier(ctor, m_astBuilder->create<TreatAsDifferentiableAttribute>());
         decl->addMember(ctor);
         return ctor;
     }
@@ -8060,8 +8064,9 @@ namespace Slang
                     member = members[memberIndex++].getDecl();
                 }
 
-                // Check for differentiability, if we cannot diff this member attach a no_diff attribute.
-                if (!member->hasModifier<DerivativeMemberAttribute>() || member->hasModifier<NoDiffModifier>())
+                // Check for differentiability of member. 'no_diff' and 'DerivativeMemberAttribute' additions
+                // are handled by checking all 'InheritanceDecl's earlier in 'visitAggTypeDecl'
+                if (!member->hasModifier<DerivativeMemberAttribute>())
                     addModifier(param, m_astBuilder->create<NoDiffModifier>());
 
                 // Manage CUDA host modifier based on inheritance

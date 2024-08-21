@@ -343,20 +343,8 @@ struct LegalCallBuilder
                 // result type of the function, so we know that
                 // the legalization funciton/call will use a `void`
                 // result type.
-
-                // If our call is in global scope (initializer) we should
-                // hoist the call into the start of every entry-point 
-                if (!m_context->builder->getInsertLoc().getInst()->getParent()
-                    || m_context->builder->getInsertLoc().getInst()->getParent()->getOp() == kIROp_Module)
-                {
-                    for (auto i : m_context->getEntryPoints())
-                    {
-                        m_context->builder->setInsertBefore(i->getFirstOrdinaryInst());
-                        _emitCall(m_context->builder->getVoidType());
-                    }
-                }
-                else
-                    _emitCall(m_context->builder->getVoidType());
+                //
+                _emitCall(m_context->builder->getVoidType());
                 return resultVal;
             }
             break;
