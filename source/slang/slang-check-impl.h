@@ -2104,6 +2104,7 @@ namespace Slang
         };
 
         Type* TryJoinVectorAndScalarType(
+            ConstraintSystem* constraints,
             VectorExpressionType* vectorType,
             BasicExpressionType*  scalarType);
 
@@ -2198,11 +2199,13 @@ namespace Slang
         ConversionCost getConversionCost(Type* toType, QualType fromType);
 
         Type* _tryJoinTypeWithInterface(
+            ConstraintSystem* constraints,
             Type*                   type,
             Type*                   interfaceType);
 
         // Try to compute the "join" between two types
         Type* TryJoinTypes(
+            ConstraintSystem* constraints,
             QualType  left,
             QualType  right);
 
@@ -2639,6 +2642,8 @@ namespace Slang
             IntVal*        baseElementRowCount,
             IntVal*        baseElementColCount);
 
+        Expr* checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType* baseTupleType);
+
         Expr* CheckSwizzleExpr(
             MemberExpr* memberRefExpr,
             Type*      baseElementType,
@@ -2648,6 +2653,10 @@ namespace Slang
             MemberExpr*	memberRefExpr,
             Type*		baseElementType,
             IntVal*				baseElementCount);
+
+        // Check a member expr as a general member lookup.
+        // This is the default/fallback behavior if the base type isn't swizzlable.
+        Expr* checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType);
 
             /// Perform semantic checking of an assignment where the operands have already been checked.
         Expr* checkAssignWithCheckedOperands(AssignExpr* expr);

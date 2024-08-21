@@ -89,7 +89,7 @@ struct ASTMarkupUtil
     static SlangResult extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, ASTMarkup* outMarkup, bool searchOrindaryComments = false);
 };
 
-bool doWeDocDecl(Decl* decl);
+bool shouldDocumentDecl(Decl* decl);
 
 } // namespace Slang
 

@@ -1070,7 +1070,7 @@ void DocMarkdownWriter::writeAggType(const ASTMarkup::Entry& entry, AggTypeDeclB
         List<Decl*> uniqueMethods;
         for (const auto& [_, decl] : memberDict)
         {
-            if (!doWeDocDecl(decl))
+            if (!shouldDocumentDecl(decl))
                 continue;
             CallableDecl* callableDecl = as<CallableDecl>(decl);
             if (callableDecl && isVisible(callableDecl))

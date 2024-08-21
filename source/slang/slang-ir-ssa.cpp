@@ -146,7 +146,8 @@ bool allUsesLeadToLoads(IRInst* inst)
 // Is the given variable one that we can promote to SSA form?
 bool isPromotableVar(
     ConstructSSAContext*    /*context*/,
-    IRVar*                  var)
+    IRVar*                  var,
+    HashSet<IRBlock*>       &knownBlocks)
 {
     // We want to identify variables such that we can always
     // determine what they will contain at a point in the
@@ -226,7 +227,12 @@ bool isPromotableVar(
             }
             break;
         }
+
+        // If the use is outside of known blocks, then we can't promote it.
+        if (!knownBlocks.contains(getBlock(user)))
+            return false;
     }
+
 
     // If all of the uses passed our checking, then
     // we are good to go.
@@ -237,6 +243,12 @@ bool isPromotableVar(
 void identifyPromotableVars(
     ConstructSSAContext* context)
 {
+    HashSet<IRBlock*> knownBlocks;
+    for (auto bb = context->globalVal->getFirstBlock(); bb; bb = bb->getNextBlock())
+    {
+        knownBlocks.add(bb);
+    }
+
     for (auto bb = context->globalVal->getFirstBlock(); bb; bb = bb->getNextBlock())
     {
         for (auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst())
@@ -246,7 +258,7 @@ void identifyPromotableVars(
 
             IRVar* var = (IRVar*)ii;
 
-            if (isPromotableVar(context, var))
+            if (isPromotableVar(context, var, knownBlocks))
             {
                 context->promotableVars.add(var);
             }

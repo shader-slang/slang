@@ -1534,6 +1534,81 @@ Val* FuncCallIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitutio
     return this;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CountOfIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void CountOfIntVal::_toTextOverride(StringBuilder& out)
+{
+    out << "countof(";
+    getTypeArg()->toText(out);
+    out << ")";
+}
+
+Val* CountOfIntVal::tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType)
+{
+    if (auto typePack = as<ConcreteTypePack>(newType))
+    {
+        bool anyAbstract = false;
+        for (Index i = 0; i < typePack->getTypeCount(); i++)
+        {
+            if (isAbstractTypePack(typePack->getElementType(i)))
+            {
+                anyAbstract = true;
+                break;
+            }
+        }
+        if (!anyAbstract)
+        {
+            auto result = astBuilder->getIntVal(intType, typePack->getTypeCount());
+            return result;
+        }
+    }
+    else if (auto tupleType = as<TupleType>(newType))
+    {
+        bool anyAbstract = false;
+        for (Index i = 0; i < tupleType->getMemberCount(); i++)
+        {
+            if (isAbstractTypePack(tupleType->getMember(i)))
+            {
+                anyAbstract = true;
+                break;
+            }
+        }
+        if (!anyAbstract)
+        {
+            auto result = astBuilder->getIntVal(intType, tupleType->getMemberCount());
+            return result;
+        }
+    }
+    return nullptr;
+}
+
+Val* CountOfIntVal::tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType)
+{
+    if (auto result = tryFoldOrNull(astBuilder, intType, newType))
+        return result;
+    auto result = astBuilder->getOrCreate<CountOfIntVal>(intType, newType);
+    return result;
+}
+
+Val* CountOfIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    auto newType = as<Type>(getTypeArg()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    return tryFold(astBuilder, getType(), newType);
+}
+
+Val* CountOfIntVal::_resolveImplOverride()
+{
+    auto resolvedTypeArg = getTypeArg()->resolve();
+    if (resolvedTypeArg == getTypeArg())
+        return this;
+    return tryFold(getCurrentASTBuilder(), getType(), as<Type>(resolvedTypeArg));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! WitnessLookupIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void WitnessLookupIntVal::_toTextOverride(StringBuilder& out)
