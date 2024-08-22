@@ -4,32 +4,55 @@ Slang Documentation
 This directory contains documentation for the Slang system.
 Some of the documentation is intended for users of the language and compiler, while other documentation is intended for developers contributing to the project.
 
-Getting Started
----------------
+* historical
 
-The Slang [User's Guide](https://shader-slang.github.io/slang/user-guide/) provides an introduction to the Slang language and its major features, as well as the compilation and reflection API.
-
-There is also documentation specific to using the [`slangc`](command-line-slangc.md) command-line tool.
-
-Advanced Users
---------------
-
-For the benefit of advanced users we provide detailed documentation on how Slang compiles code for specific platforms.
-The [target compatibility guide](target-compatibility.md) gives an overview of feature compatibility for targets. 
-
-The [CPU target guide](cpu-target.md) gives information on compiling Slang or C++ source into shared libraries/executables or functions that can be directly executed. It also covers how to generate C++ code from Slang source.  
-
-The [CUDA target guide](cuda-target.md) provides information on compiling Slang/HLSL or CUDA source. Slang can compile to equivalent CUDA source, as well as to PTX via the nvrtc CUDA complier.
-
-Contributors
-------------
-
-For contributors to the Slang project, the information under the [`design/`](design/) directory may help explain the rationale behind certain design decisions and help when ramping up in the codebase.
-
-Research
+Language
 --------
 
-The Slang project is based on a long history of research work. While understanding this research is not necessary for working with Slang, it may be instructive for understanding the big-picture goals of the language, as well as why certain critical decisions were made.
+The Slang language [User's Guide](https://shader-slang.github.io/slang/user-guide/) provides an introduction to the Slang language and its major features, as well as the compilation and reflection API.
 
-A [paper](http://graphics.cs.cmu.edu/projects/slang/) on the Slang system was accepted into SIGGRAPH 2018, and it provides an overview of the language and the compiler implementation.
-Yong He's [dissertation](http://graphics.cs.cmu.edu/projects/renderergenerator/yong_he_thesis.pdf) provided more detailed discussion of the design of the Slang system.
+Work is in progress on a more detailed [reference](language/reference) for the Slang language, but that documentation is not ready for general consumption.
+
+Compiler
+--------
+
+The command-line Slang compiler, `slangc`, has its own separate [user's guide](compiler/command-line/guide) and [reference](compiler/command-line/reference).
+
+Slang Standard Library
+----------------------
+
+A [reference](stdlib/reference) for all of the built-in types, functions, etc. supported by Slang is generated from the content of the Slang standard library.
+The quality of this documentation is currently lacking.
+
+Supported GPU Features
+----------------------
+
+Documentation of individual GPU hardware and API features supported by Slang is organized under [`gpu-feature`](gpu-feature/).
+The documents there typically describe how a feature is exposed in the Slang standard library, how those constructs map to each of the targets that supports a given feature, and any caveats that users should be aware of.
+
+Supported Targets
+-----------------
+
+When compiling for multiple targets, the [Feature Stability Table](target/feature-stability.md) gives an overview of which targets support which GPU features.
+
+Detailed guides for individual targets are collected under [`target/`](target/).
+
+Proposals
+---------
+
+Proposals for changes to the Slang language, standard library, API, or tools are organized under [`proposals/`](proposals/).
+Proposals are used to iterate on the design of new features before they are finalized.
+
+For Contributors
+----------------
+
+For contributors to the Slang project, the information under the [`contributor/`](contributor/) directory may be relevant to building the project, interacting with our CI process, etc.
+
+In addition, the documents under [`compiler/implementation/`](compiler/implementation/) are intended to provide developers working on the project with explanations of how certain subsystems of the compiler have been designed and implemented.
+Proposals for implementation improvements and changes may be checked in under [`compiler/implementation/proposals`](compiler/implementation/proposals); these documents do *not* reflect the current status of the codebase, but may guide future development.
+
+The `gfx` GPU Library
+---------------------
+
+The Slang system provides a (completely optional) GPU API abstraction layer, called `gfx`.
+The `gfx` library has its own [documentation](gfx), separate from the Slang language and compiler.
