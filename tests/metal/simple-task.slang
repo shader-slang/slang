@@ -88,6 +88,7 @@ void meshMain(
     if (tig < numPrimitives)
     {
         triangles[tig] = tig * 3 + uint3(0, 1, 2);
+        primitives[tig] = { tig };
     }
 }
 

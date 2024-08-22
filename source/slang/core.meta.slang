@@ -1331,7 +1331,7 @@ struct OutputVertices
     static void _metalSetVertex(uint index, T val);
 
     __intrinsic_op($(kIROp_MeshOutputSet))
-    static void _setVertex(This v, uint index, T val);
+    static T* _setVertex(This v, uint index, T val);
 
     __subscript(uint index) -> T
     {
@@ -1340,6 +1340,7 @@ struct OutputVertices
         // buffer, or part of the output buffer at a time.
 
         [mutating]
+        [require(glsl_hlsl_metal_spirv, meshshading)]
         set
         {
             __target_switch
@@ -1372,6 +1373,7 @@ struct OutputIndices
     __subscript(uint index) -> T
     {
         [mutating]
+        [require(glsl_hlsl_metal_spirv, meshshading)]
         set
         {
             __target_switch
@@ -1395,11 +1397,12 @@ struct OutputPrimitives
     static void __metalSetPrimitive(uint index, T val);
 
     __intrinsic_op($(kIROp_MeshOutputSet))
-    void __setPrimitive(This v, uint index, T val);
+    static T* __setPrimitive(This v, uint index, T val);
 
     __subscript(uint index)->T
     {
         [mutating]
+        [require(glsl_hlsl_metal_spirv, meshshading)]
         set
         {
             __target_switch
