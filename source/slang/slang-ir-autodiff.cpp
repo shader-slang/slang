@@ -44,7 +44,7 @@ IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementK
                 return entry->getRequirementVal();
         }
     }
-    else if (auto makeWitnessPack = as<IRMakeWitnessPack>(witness))
+    else if (as<IRMakeWitnessPack>(witness))
     {
         // We are looking up a witness from a type pack.
         // This is only allowed if we are looking up a differential type.
