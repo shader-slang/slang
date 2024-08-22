@@ -116,7 +116,7 @@ void WindowedAppBase::mainLoop()
     gTransientHeaps[frameBufferIndex]->finish();
 }
 
-void WindowedAppBase::OfflineRender()
+void WindowedAppBase::offlineRender()
 {
     gTransientHeaps[0]->synchronizeAndReset();
     renderFrame(0);

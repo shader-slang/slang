@@ -48,7 +48,7 @@ protected:
 public:
     platform::Window* getWindow() { return gWindow.Ptr(); }
     virtual void finalize() { gQueue->waitOnHost(); }
-    void OfflineRender();
+    void offlineRender();
 };
 
 struct ExampleResources {
@@ -128,7 +128,7 @@ int innerMain(int argc, char** argv)
     }
     else
     {
-        app.OfflineRender();
+        app.offlineRender();
     }
 
     app.finalize();

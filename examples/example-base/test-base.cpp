@@ -3,37 +3,29 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
-int TestBase::parseOption(int argc, char** argv)
-{
-    wchar_t** szArglist;
-    int nArgs;
-    int i;
+#endif
 
-    szArglist = CommandLineToArgvW(GetCommandLineW(), &nArgs);
-    for (i = 0; i < nArgs; i++)
-    {
-        if (wcscmp(szArglist[i], L"--test-mode") == 0)
-        {
-            m_isTestMode = true;
-        }
-    }
-
-    return 0;
-}
-#else
 int TestBase::parseOption(int argc, char** argv)
 {
     // We only make the parse in a very loose way for only extracting the test option.
-    for (int i = 1; i < argc; i++)
+#ifdef _WIN32
+    wchar_t** szArglist;
+    szArglist = CommandLineToArgvW(GetCommandLineW(), &argc);
+#endif
+
+    for (int i = 0; i < argc; i++)
     {
+#ifdef _WIN32
+        if (wcscmp(szArglist[i], L"--test-mode") == 0)
+#else
         if (strcmp(argv[i], "--test-mode") == 0)
+#endif
         {
             m_isTestMode = true;
         }
     }
     return 0;
 }
-#endif //#ifdef _WIN32
 
 void TestBase::printEntrypointHashes(int entryPointCount, int targetCount, ComPtr<slang::IComponentType>& composedProgram)
 {
