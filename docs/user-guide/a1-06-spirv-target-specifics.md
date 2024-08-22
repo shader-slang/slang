@@ -193,29 +193,42 @@ Same as `shaderRecordEXT` layout qualifier in [GL_EXT_ray_tracing extension](htt
 It can be used on a buffer block that represents a buffer within a shader record as defined in the Ray Tracing API.
 
 ### [vk::aliased_pointer]
-TODO
+When two memory pointers point to a same memory location, they are considered `aliased`. Compiler needs to be informed of such cases in order to generate the code that produces a consistant outcome. Slang can figure out whether a pointer needs to be treated as aliased or not, but you can explicitly mark a variable as aliased.
 
-### [vk_restrict_pointer]
-TODO
+### [vk::restrict_pointer]
+Opposite to [vk::aliased_pointer] in a way that it tells the compiler to treat the variable as not-aliased.
 
 ### [vk::spirv_instruction(op : int, set : String = "")]
 When applied to a function, the function will use the `op` value corresponding to a SPIR-V instruction. You can also specify which instruction set you want to use as a second argument. E.G., `[[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]`
 
 
 Multiple entry points support
----------------------------
+-----------------------------
 
 Slang supports mutiple entry points when targeting SPIR-V.
 It is same to HLSL and SPIR-V that allows a shader source to have multiple entry points.
 Note that GLSL requires the entry point to be named, "main", and a shader source can have only one entry point.
 
 
-Memory pointer
---------------
+Memory pointer is experimental
+------------------------------
 
-TODO: Describe any information when using memory pointers for SPIR-V
+SPIR-V currently supports five types of `Addressing model`-s, and it can be grouped as Logical addressing model and non-local addressing model.
 
-TODO: ConstBufferPointer
+The logical addressing model means that the pointers are abstract, and they have no physical size nor numeric value.
+
+The non-Logical addressing models allow physical pointers to be formed. When a pointer is declared, it is declared internally with a specific `Storage Class`.  SPIR-V has a limitation that "Pointers for one Storage Class must not be used to access objects in another Storage Class."
+
+Slang supports the Logical and non-Logical addressing models with the limitations from SPIR-V and addional limitations. See more [explanation and an example](convenience-features.html#pointers-limited).
+
+Some examples of the `Storage class` are listed below:
+- UniformConstant: is for uniform constant variables as read-only.
+- Uniform: is for uniform buffer as read-only.
+- StorageBuffer: is for UAV/structuredBuffer/ShaderStorageBuffer as read-write.
+- PhysicalStorageBuffer: same as StorageBuffer but it follows non-logical addressing model.
+- PushConstant: is for variables as read-only stored in the buffer that has `push_constant` layout.
+
+Note that only ones starting with `Physical-` follows the non-logical addressing model.
 
 
 Difference between `std140` layout and `std430` layout
@@ -256,7 +269,43 @@ TODO: For example, we allow using resource types in structs, we allow functions 
 Tessellation
 ------------
 
-TODO: how we translate tessellation shaders to SPIRV. Like DXC, we will merge both the patch function and the domain shader into a single tessellation control shader.
+In HLSL and Slang, Hull shader requires two functions: a Hull shader and patch function.
+A typical example of a Hull shader will look like the following.
+```
+// Hull Shader (HS)
+[domain("quad")]
+[patchconstantfunc("constants")]
+HS_OUT main(InputPatch<VS_OUT, 4> patch, uint i : SV_OutputControlPointID)
+{
+  ...
+}
+HSC_OUT constants(InputPatch<VS_OUT, 4> patch)
+{
+  ...
+}
+```
+
+When targeting SPIR-V, the patch function is merged as a part of the Hull shader, because GLSL nor SPIR-V differentiates them like how HLSL does.
+
+As an example, a Hull shader will be emitted as following,
+```
+void main() {
+    // Set tessellation levels
+    if (gl_InvocationID == 0) {
+        gl_TessLevelOuter[0] = ...;
+        gl_TessLevelOuter[1] = ...;
+        gl_TessLevelOuter[2] = ...;
+        gl_TessLevelOuter[3] = ...;
+
+        gl_TessLevelInner[0] = ...;
+        gl_TessLevelInner[1] = ...;
+    }
+
+    out_POSITION[gl_InvocationID] = in_POSITION[gl_InvocationID];
+}
+```
+
+This behavior is same to how DXC translates from HLSL to SPIR-V.
 
 
 Summary
