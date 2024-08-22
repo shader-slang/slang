@@ -4,12 +4,13 @@
 #include "tools/platform/window.h"
 #include "source/core/slang-basic.h"
 #include "source/core/slang-io.h"
+#include "test-base.h"
 
 #ifdef _WIN32
 void _Win32OutputDebugString(const char* str);
 #endif
 
-struct WindowedAppBase
+struct WindowedAppBase : public TestBase
 {
 protected:
     static const int kSwapchainImageCount = 2;
@@ -32,8 +33,13 @@ protected:
         int width,
         int height,
         gfx::DeviceType deviceType = gfx::DeviceType::Default);
+
+    void createFramebuffers(uint32_t width, uint32_t height, gfx::Format colorFormat, uint32_t frameBufferCount);
     void createSwapchainFramebuffers();
+    void createOfflineFramebuffers();
+
     void mainLoop();
+
     Slang::ComPtr<gfx::IResourceView> createTextureFromFile(Slang::String fileName, int& textureWidth, int& textureHeight);
     virtual void windowSizeChanged();
 
@@ -42,6 +48,7 @@ protected:
 public:
     platform::Window* getWindow() { return gWindow.Ptr(); }
     virtual void finalize() { gQueue->waitOnHost(); }
+    void offlineRender();
 };
 
 struct ExampleResources {
@@ -103,18 +110,26 @@ inline void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 void initDebugCallback();
 
 template<typename TApp>
-int innerMain()
+int innerMain(int argc, char** argv)
 {
     initDebugCallback();
 
     TApp app;
 
+    app.parseOption(argc, argv);
     if (SLANG_FAILED(app.initialize()))
     {
         return -1;
     }
 
-    platform::Application::run(app.getWindow());
+    if (!app.isTestMode())
+    {
+        platform::Application::run(app.getWindow());
+    }
+    else
+    {
+        app.offlineRender();
+    }
 
     app.finalize();
     return 0;

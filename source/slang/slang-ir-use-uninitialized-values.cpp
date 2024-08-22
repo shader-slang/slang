@@ -110,6 +110,7 @@ namespace Slang
         case kIROp_FieldAddress:
         case kIROp_GetElement:
         case kIROp_GetElementPtr:
+        case kIROp_InOutImplicitCast:
             return true;
         default:
             break;
@@ -179,6 +180,8 @@ namespace Slang
             // Avoid the recursive step if its a
             // recursive structure like a linked list
             IRType* ptype = ptr->getValueType();
+            if(auto resolvedType = as<IRType>(getResolvedInstForDecorations(ptype)))
+                ptype = resolvedType;
             return (ptype != upper) && canIgnoreType(ptype, upper);
         }
 

@@ -124,11 +124,11 @@ Build with a following command:
 $ cmake --build --preset release
 ```
 
-#### MacOS with slang-llvm local build
+#### Building with a local build of slang-llvm
 slang-llvm is required to run slang-test properly.
-Depending on your hardware, your slang-llvm may need to be locally rebuilt with the following command.
+Follow the instructions below if you wish to build slang-llvm locally.
 ```
-external/build-llvm.sh --source-dir=build/slang-llvm_src --install-prefix=build/slang-llvm_install
+$ external/build-llvm.sh --source-dir build/slang-llvm_src --install-prefix build/slang-llvm_install
 ```
 
 You need to use the following command to re-generate Makefile,

@@ -142,6 +142,18 @@ class GetArrayLengthExpr : public Expr
     Expr* arrayExpr = nullptr;
 };
 
+class ExpandExpr : public Expr
+{
+    SLANG_AST_CLASS(ExpandExpr)
+    Expr* baseExpr = nullptr;
+};
+
+class EachExpr : public Expr
+{
+    SLANG_AST_CLASS(EachExpr)
+    Expr* baseExpr = nullptr;
+};
+
 // A base class for expressions with arguments
 class ExprWithArgsBase : public Expr
 {
@@ -279,8 +291,7 @@ class SwizzleExpr: public Expr
 {
     SLANG_AST_CLASS(SwizzleExpr)
     Expr* base = nullptr;
-    int elementCount;
-    int elementIndices[4];
+    ShortList<UInt, 4> elementIndices;
     SourceLoc memberOpLoc;
 };
 
@@ -411,6 +422,11 @@ class SizeOfExpr : public SizeOfLikeExpr
 class AlignOfExpr : public SizeOfLikeExpr
 {
     SLANG_AST_CLASS(AlignOfExpr);
+};
+
+class CountOfExpr : public SizeOfLikeExpr
+{
+    SLANG_AST_CLASS(CountOfExpr);
 };
 
 class MakeOptionalExpr : public Expr
@@ -668,6 +684,17 @@ public:
 
         /// A substitution that includes the generic arguments known so far
     List<Val*> knownGenericArgs;
+};
+
+   
+    /// An expression that holds a set of argument exprs that got matched to a pack parameter
+    /// during overload resolution.
+    ///
+class PackExpr : public Expr
+{
+    SLANG_AST_CLASS(PackExpr)
+
+    List<Expr*> args;
 };
 
 class SPIRVAsmOperand

@@ -674,6 +674,20 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::createSwizzleCan
             }
         }
     }
+    else if (auto tupleType = as<TupleType>(type))
+    {
+        auto count = Math::Min((int)elementCount[0], 4);
+        for (int i = 0; i < count; i++)
+        {
+            LanguageServerProtocol::CompletionItem item;
+            item.data = 0;
+            if (tupleType->getMember(i))
+                item.detail = tupleType->getMember(i)->toString();
+            item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
+            item.label = String("_") + String(i);
+            result.add(item);
+        }
+    }
     for (auto& item : result)
     {
         for (auto ch : getCommitChars())

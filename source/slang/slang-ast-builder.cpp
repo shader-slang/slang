@@ -525,12 +525,73 @@ FuncType* ASTBuilder::getFuncType(ArrayView<Type*> parameters, Type* result, Typ
 
 TupleType* ASTBuilder::getTupleType(List<Type*>& types)
 {
-    return getOrCreate<TupleType>(types.getArrayView());
+    // The canonical form of a tuple type is always a DeclRefType(GenAppDeclRef(TupleDecl, ConcreteTypePack(types...))).
+    // If `types` is already a single ConcreteTypePack, then we can use that directly.
+    if (types.getCount() == 1)
+    {
+        if (isTypePack(types[0]))
+        {
+            return as<TupleType>(getSpecializedBuiltinType(types[0], "TupleType"));
+        }
+    }
+
+    // Otherwise, we need to create a ConcreteTypePack to hold the types.
+    auto typePack = getTypePack(types.getArrayView());
+    return as<TupleType>(getSpecializedBuiltinType(typePack, "TupleType"));
 }
 
 TypeType* ASTBuilder::getTypeType(Type* type)
 {
     return getOrCreate<TypeType>(type);
+}
+
+Type* ASTBuilder::getEachType(Type* baseType)
+{
+    // each expand T ==> T
+    if (auto expandType = as<ExpandType>(baseType))
+    {
+        return expandType->getPatternType();
+    }
+
+    // each Tuple<X> ==> each X, because we know that Tuple type must be in the form of Tuple<ConcreteTypePack<...>>.
+    if (auto tupleType = as<TupleType>(baseType))
+    {
+        return getEachType(tupleType->getTypePack());
+    }
+    SLANG_ASSERT(!as<EachType>(baseType));
+    return getOrCreate<EachType>(baseType);
+}
+
+Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Type*> capturedPacks)
+{
+    // expand each T ==> T
+    if (auto eachType = as<EachType>(pattern))
+    {
+        return eachType->getElementType();
+    }
+    return getOrCreate<ExpandType>(pattern, capturedPacks);
+}
+
+void flattenTypeList(ShortList<Type*>& flattenedList, Type* type)
+{
+    if (auto typePack = as<ConcreteTypePack>(type))
+    {
+        for (Index i = 0; i < typePack->getTypeCount(); i++)
+            flattenTypeList(flattenedList, typePack->getElementType(i));
+    }
+    else
+    {
+        flattenedList.add(type);
+    }
+}
+
+ConcreteTypePack* ASTBuilder::getTypePack(ArrayView<Type*> types)
+{
+    // Flatten all type packs in the type list.
+    ShortList<Type*> flattenedTypes;
+    for (auto type : types)
+        flattenTypeList(flattenedTypes, type);
+    return getOrCreate<ConcreteTypePack>(flattenedTypes.getArrayView().arrayView);
 }
 
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(
@@ -539,6 +600,27 @@ TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(
     return getOrCreate<TypeEqualityWitness>(type, type);
 }
 
+TypePackSubtypeWitness* ASTBuilder::getSubtypeWitnessPack(
+    Type* subType, Type* superType, ArrayView<SubtypeWitness*> witnesses)
+{
+    return getOrCreate<TypePackSubtypeWitness>(subType, superType, witnesses);
+}
+
+SubtypeWitness* ASTBuilder::getExpandSubtypeWitness(
+    Type* subType, Type* superType, SubtypeWitness* patternWitness)
+{
+    if (auto eachWitness = as<EachSubtypeWitness>(patternWitness))
+        return eachWitness->getPatternTypeWitness();
+    return getOrCreate<ExpandSubtypeWitness>(subType, superType, patternWitness);
+}
+
+SubtypeWitness* ASTBuilder::getEachSubtypeWitness(
+    Type* subType, Type* superType, SubtypeWitness* patternWitness)
+{
+    if (auto expandWitness = as<ExpandSubtypeWitness>(patternWitness))
+        return expandWitness->getPatternTypeWitness();
+    return getOrCreate<EachSubtypeWitness>(subType, superType, patternWitness);
+}
 
 DeclaredSubtypeWitness* ASTBuilder::getDeclaredSubtypeWitness(
     Type*                   subType,
@@ -649,6 +731,48 @@ top:
             cType,
             getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfConjunction),
             indexOfCInConjunction);
+    }
+
+    // If left hand is a TypePackSubtypeWitness, then we should also return a TypePackSubtypeWitness
+    // where each witness in the pack is the transitive subtype witness of the corresponding
+    // witness in the original pack.
+    //
+    if (auto witnessPack = as<TypePackSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        List<SubtypeWitness*> newWitnesses;
+        for (Index i = 0; i < witnessPack->getCount(); i++)
+        {
+            newWitnesses.add(getTransitiveSubtypeWitness(witnessPack->getWitness(i), bIsSubtypeOfCWitness));
+        }
+        return getSubtypeWitnessPack(
+            aType,
+            cType,
+            newWitnesses.getArrayView());
+    }
+
+    // If left hand is a ExpandSubtypeWitness, then we want to perform the transitive lookup
+    // on the pattern witness, and then form a new ExpandSubtypeWitness with the result.
+    //
+    if (auto expandWitness = as<ExpandSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        auto innerTransitiveWitness = getTransitiveSubtypeWitness(expandWitness->getPatternTypeWitness(), bIsSubtypeOfCWitness);
+        return getExpandSubtypeWitness(expandWitness->getSub(), cType, innerTransitiveWitness);
+    }
+
+    // If left hand is a DeclaredWitness for a type pack parameter T, then we want to perform the
+    // transitive lookup on `each T`, and then form a new ExpandSubtypeWitness with the result.
+    //
+    if (auto declaredWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        if (auto declRefType = as<DeclRefType>(declaredWitness->getSub()))
+        {
+            if (declRefType->getDeclRef().as<GenericTypePackParamDecl>())
+            {
+                auto newLeftHandWitness = getEachSubtypeWitness(getEachType(declaredWitness->getSub()), declaredWitness->getSup(), declaredWitness);
+                auto transitiveWitness = getTransitiveSubtypeWitness(newLeftHandWitness, bIsSubtypeOfCWitness);
+                return getExpandSubtypeWitness(aType, cType, transitiveWitness);
+            }
+        }
     }
 
     // If none of the above special cases applied, then we are just going to create

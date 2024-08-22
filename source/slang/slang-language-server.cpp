@@ -245,6 +245,10 @@ String getDeclKindString(DeclRef<Decl> declRef)
     {
         return "(generic type parameter) ";
     }
+    else if (declRef.as<GenericTypePackParamDecl>())
+    {
+        return "(generic type pack parameter) ";
+    }
     else if (declRef.as<GenericValueParamDecl>())
     {
         return "(generic value parameter) ";
@@ -697,6 +701,40 @@ SlangResult LanguageServer::hover(
             }
             fillLoc(expr->loc);
         }
+        else if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        {
+            if (expr->type && swizzleExpr->base && swizzleExpr->base->type)
+            {
+                bool isTupleType = as<TupleType>(swizzleExpr->base->type) != nullptr;
+                sb << "```\n";
+                swizzleExpr->type->toText(sb);
+                sb << " ";
+                swizzleExpr->base->type->toText(sb);
+                sb << ".";
+                for (auto index : swizzleExpr->elementIndices)
+                {
+                    if (isTupleType || index > 4)
+                        sb << "_" << index;
+                    else
+                        sb << "xyzw"[index];
+                }
+                sb << "\n```\n";
+                fillLoc(expr->loc);
+            }
+        }
+        else if (auto countOfExpr = as<CountOfExpr>(expr))
+        {
+            if (countOfExpr->sizedType)
+            {
+                if (auto foldedVal = as<ConstantIntVal>(CountOfIntVal::tryFoldOrNull(version->linkage->getASTBuilder(), expr->type.type, countOfExpr->sizedType)))
+                {
+                    sb << "```\n" << "countof(";
+                    countOfExpr->sizedType->toText(sb);
+                    sb << ") = " << foldedVal->getValue() << "\n```\n";
+                    fillLoc(expr->loc);
+                }
+            }
+        }
         if (const auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
         {
             String documentation;
@@ -735,6 +773,14 @@ SlangResult LanguageServer::hover(
     else if (auto thisExprExpr = as<ThisExpr>(leafNode))
     {
         fillExprHoverInfo(thisExprExpr);
+    }
+    else if (auto countOfExpr = as<CountOfExpr>(leafNode))
+    {
+        fillExprHoverInfo(countOfExpr);
+    }
+    else if (auto swizzleExpr = as<SwizzleExpr>(leafNode))
+    {
+        fillExprHoverInfo(swizzleExpr);
     }
     else if (auto importDecl = as<ImportDecl>(leafNode))
     {

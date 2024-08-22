@@ -77,7 +77,7 @@ private:
     // Dictionary for looking up members by name.
     // This is built on demand before performing lookup.
     Dictionary<Name*, Decl*> memberDictionary;
-    
+
     // A list of transparent members, to be used in lookup
     // Note: this is only valid if `memberDictionaryIsValid` is true
     List<TransparentMemberInfo> transparentMembers;
@@ -281,7 +281,7 @@ class SimpleTypeDecl : public Decl
 class TypeDefDecl : public SimpleTypeDecl
 {
     SLANG_AST_CLASS(TypeDefDecl)
-   
+
     TypeExp type;
 };
 
@@ -339,7 +339,7 @@ class CallableDecl : public ContainerDecl
     }
 
     TypeExp returnType;
-        
+
     // If this callable throws an error code, `errorType` is the type of the error code.
     TypeExp errorType;
 
@@ -371,7 +371,7 @@ class FunctionDeclBase : public CallableDecl
 class ConstructorDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(ConstructorDecl)
-   
+
     // Indicates whether the declaration was synthesized by
     // slang and not actually provided by the user
     bool isSynthesized = false;
@@ -383,7 +383,7 @@ class SubscriptDecl : public CallableDecl
     SLANG_AST_CLASS(SubscriptDecl)
 };
 
-    /// A property declaration that abstracts over storage with a getter/setter/etc.
+/// A property declaration that abstracts over storage with a getter/setter/etc.
 class PropertyDecl : public ContainerDecl
 {
     SLANG_AST_CLASS(PropertyDecl)
@@ -449,7 +449,7 @@ class ModuleDecl : public NamespaceDeclBase
         ///
         /// This mapping is filled in during semantic checking, as the decl declarations get checked or generated.
         ///
-    OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> mapDeclToAssociatedDecls;
+        OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> mapDeclToAssociatedDecls;
 
         /// Whether the module is defined in legacy language.
         /// The legacy Slang language does not have visibility modifiers and everything is treated as
@@ -476,16 +476,16 @@ class FileDecl : public ContainerDecl
     SLANG_AST_CLASS(FileDecl);
 };
 
-    /// A declaration that brings members of another declaration or namespace into scope
+/// A declaration that brings members of another declaration or namespace into scope
 class UsingDecl : public Decl
 {
     SLANG_AST_CLASS(UsingDecl)
 
-        /// An expression that identifies the entity (e.g., a namespace) to be brought into `scope`
+    /// An expression that identifies the entity (e.g., a namespace) to be brought into `scope`
     Expr* arg = nullptr;
 
     SLANG_UNREFLECTED
-        /// The scope that the entity named by `arg` will be brought into
+    /// The scope that the entity named by `arg` will be brought into
     Scope* scope = nullptr;
 };
 
@@ -547,15 +547,28 @@ class GenericDecl : public ContainerDecl
     Decl* inner = nullptr;
 };
 
-class GenericTypeParamDecl : public SimpleTypeDecl
+class GenericTypeParamDeclBase : public SimpleTypeDecl
+{
+    SLANG_AST_CLASS(GenericTypeParamDeclBase)
+
+    // The index of the generic parameter.
+    Index parameterIndex = -1;
+};
+
+class GenericTypeParamDecl : public GenericTypeParamDeclBase
 {
     SLANG_AST_CLASS(GenericTypeParamDecl)
     // The bound for the type parameter represents a trait that any
     // type used as this parameter must conform to
-//            TypeExp bound;
+    //            TypeExp bound;
 
     // The "initializer" for the parameter represents a default value
     TypeExp initType;
+};
+
+class GenericTypePackParamDecl : public GenericTypeParamDeclBase
+{
+    SLANG_AST_CLASS(GenericTypePackParamDecl)
 };
 
 // A constraint placed as part of a generic declaration
@@ -577,6 +590,9 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
 class GenericValueParamDecl : public VarDeclBase
 {
     SLANG_AST_CLASS(GenericValueParamDecl)
+
+    // The index of the generic parameter.
+    Index parameterIndex = 0;
 };
 
 // An empty declaration (which might still have modifiers attached).

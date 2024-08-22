@@ -359,9 +359,17 @@ DIAGNOSTIC(30097, Error, functionNotMarkedAsDifferentiable, "function '$0' is no
 DIAGNOSTIC(30098, Error, nonStaticMemberFunctionNotAllowedAsDiffOperand, "non-static function reference '$0' is not allowed here.")
 
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
+DIAGNOSTIC(30083, Error, countOfArgumentIsInvalid, "argument to countof can only be a type pack or tuple")
+
 
 DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
 DIAGNOSTIC(30102, Error, differentiableMemberShouldHaveCorrespondingFieldInDiffType, "differentiable member '$0' should have a corresponding field in '$1'. Use [DerivativeMember($1.<field-name>)] or mark as no_diff")
+
+DIAGNOSTIC(30103, Error, expectTypePackAfterEach, "expected a type pack or a tuple after 'each'.")
+DIAGNOSTIC(30104, Error, eachExprMustBeInsideExpandExpr, "'each' expression must be inside 'expand' expression.")
+DIAGNOSTIC(30105, Error, expandTermCapturesNoTypePacks, "'expand' term captures no type packs. At least one type pack must be referenced via an 'each' term inside an 'expand' term.")
+DIAGNOSTIC(30106, Error, improperUseOfType, "type '$0' cannot be used in this context.")
+DIAGNOSTIC(30107, Error, parameterPackMustBeConst, "a parameter pack must be declared as 'const'.")
 
 
 // Include
