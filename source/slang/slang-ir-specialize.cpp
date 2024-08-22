@@ -2430,6 +2430,9 @@ struct SpecializationContext
         return newInst;
     }
 
+    // A helper function to emit a MakeWitnessPack, MakeTypePack or MakeValuePack inst from
+    // a collection of elements, dependending on `type`.
+    //
     IRInst* makeSpecializedPack(IRBuilder& builder, IRType* type, ArrayView<IRInst*> elements)
     {
         IRInst* resultPack = nullptr;
@@ -2625,6 +2628,15 @@ struct SpecializationContext
     // If `func` has any parameters whose types are `IRTypePack`, then we will expand them
     // into multiple parameters, so that the function has no parameters of type `IRTypePack`.
     // returns true if changes are made.
+    // For example, this function turns `int f(TypePack<int, float> v)` into
+    // ```
+    // int f(int v0, float v1)
+    // {
+    //     v = MakeValuePack(v0,. v1);
+    //     ...
+    // }
+    // ```
+    //
     bool tryExpandParameterPack(IRFunc* func, bool* outIsFullyExpanded = nullptr)
     {
         if (!func)
@@ -2671,6 +2683,8 @@ struct SpecializationContext
 
     // If any arguments in a call is a value pack, we will expand them into the argument list,
     // so that the call has no arguments of type `IRTypePack`.
+    // For example, we will turn `f(MakeValuePack(a, b))` into `f(a, b)`.
+    //
     IRCall* tryExpandArgPack(IRCall* call)
     {
         bool anyArgPack = false;

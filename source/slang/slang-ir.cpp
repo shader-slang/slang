@@ -4114,12 +4114,17 @@ namespace Slang
         // `getTupleElement(makeTuple(a_0, a_1, ... a_N), i)` then we should
         // just return `a_i`, provided that the index is properly in range.
         //
-        if( as<IRMakeTuple>(tuple) || as<IRMakeValuePack>(tuple) )
+        switch(tuple->getOp())
         {
+        case kIROp_MakeTuple:
+        case kIROp_MakeValuePack:
+        case kIROp_MakeWitnessPack:
+        case kIROp_TypePack:
             if( element < tuple->getOperandCount() )
             {
                 return tuple->getOperand(element);
             }
+            break;
         }
         return emitGetTupleElement(type, tuple, getIntValue(getIntType(), element));
     }
