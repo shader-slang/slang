@@ -1486,6 +1486,9 @@ struct DiffTransposePass
                 return transposeMakeStruct(builder, fwdInst, revValue);
             case kIROp_MakeArray:
                 return transposeMakeArray(builder, fwdInst, revValue);
+            case kIROp_MakeTuple:
+            case kIROp_MakeValuePack:
+                return transposeMakeTuple(builder, fwdInst, revValue);
             case kIROp_MakeArrayFromElement:
                 return transposeMakeArrayFromElement(builder, fwdInst, revValue);
 
@@ -1895,6 +1898,30 @@ struct DiffTransposePass
         }
 
         // (A = float3(X, Y, Z)) -> [(dX += dA), (dY += dA), (dZ += dA)]
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeMakeTuple(IRBuilder* builder, IRInst* fwdMakeTuple, IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+        auto type = fwdMakeTuple->getDataType();
+        for (UInt ii = 0; ii < type->getOperandCount(); ii++)
+        {
+            auto elementType = (IRType*)type->getOperand(ii);
+            auto gradAtField = builder->emitGetTupleElement(
+                elementType,
+                revValue,
+                ii);
+            SLANG_RELEASE_ASSERT(ii < fwdMakeTuple->getOperandCount());
+            gradients.add(RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdMakeTuple->getOperand(ii),
+                gradAtField,
+                fwdMakeTuple));
+            ii++;
+        }
+
+        // (A = MakeTuple(F1, F2, F3)) -> [(dF1 += dA.F1), (dF2 += dA.F2), (dF3 += dA.F3)]
         return TranspositionResult(gradients);
     }
 
@@ -2429,24 +2456,37 @@ struct DiffTransposePass
         auto baseType = firstFwdSwizzleInst->getBase()->getDataType();
 
         IRIntegerValue elementCount = 0;
-        IRType* elementType = nullptr;
-        IRType* primalElementType = nullptr;
+        List<IRType*> elementTypes;
+        List<IRType*> primalElementTypes;
         bool isVectorType = false;
-
+        bool isTupleType = false;
         if (auto vectorType = as<IRVectorType>(baseType))
         {
             IRInst* elementCountInst = vectorType->getElementCount();
-            elementType = vectorType->getElementType();
-            primalElementType = as<IRVectorType>(aggPrimalType)->getElementType();
-            SLANG_ASSERT(as<IRIntLit>(elementCountInst));
             elementCount = as<IRIntLit>(elementCountInst)->getValue();
+            for (IRIntegerValue i = 0; i < elementCount; i++)
+            {
+                elementTypes.add(vectorType->getElementType());
+                primalElementTypes.add(as<IRVectorType>(aggPrimalType)->getElementType());
+            }
+            SLANG_ASSERT(as<IRIntLit>(elementCountInst));
             isVectorType = true;
         }
         else if (auto basicType = as<IRBasicType>(baseType))
         {
-            elementType = basicType;
-            primalElementType = aggPrimalType;
+            elementTypes.add(basicType);
+            primalElementTypes.add(aggPrimalType);
             elementCount = 1;
+        }
+        else if (as<IRTupleType>(baseType) || as<IRTypePack>(baseType))
+        {
+            isTupleType = true;
+            for (UInt i = 0; i < baseType->getOperandCount(); i++)
+            {
+                elementTypes.add((IRType*)baseType->getOperand(i));
+                primalElementTypes.add((IRType*)(aggPrimalType->getOperand(i)));
+            }
+            elementCount = baseType->getOperandCount();
         }
         else
         {
@@ -2456,18 +2496,22 @@ struct DiffTransposePass
         IRInst* targetInst = firstGradient.targetInst;
 
         // Make a list of zeros of the base type.
-        auto zeroElement = emitDZeroOfDiffInstType(builder, primalElementType);
 
         List<IRInst*> elementGrads;
+        List<IRInst*> zeroElements;
         for (Index i = 0; i < elementCount; ++i)
+        {
+            auto zeroElement = emitDZeroOfDiffInstType(builder, primalElementTypes[i]);
             elementGrads.add(zeroElement);
+            zeroElements.add(zeroElement);
+        }
         
         auto accGrad = [&](UIndex i, IRInst* grad)
         {
-            if (elementGrads[i] == zeroElement)
+            if (elementGrads[i] == zeroElements[i])
                 elementGrads[i] = grad;
             else
-                elementGrads[i] = emitDAddOfDiffInstType(builder, primalElementType, elementGrads[i], grad);
+                elementGrads[i] = emitDAddOfDiffInstType(builder, primalElementTypes[i], elementGrads[i], grad);
         };
 
         for (auto gradient : gradients)
@@ -2493,11 +2537,17 @@ struct DiffTransposePass
                 else if (isVectorType)
                     accGrad((UIndex)targetIndex,
                         builder->emitElementExtract(
-                            elementType,
+                            elementTypes[(UIndex)targetIndex],
                             gradient.revGradInst,
                             builder->getIntValue(
                                 builder->getIntType(),
                                 sourceIndex)));
+                else if (isTupleType)
+                    accGrad((UIndex)targetIndex,
+                        builder->emitGetTupleElement(
+                            elementTypes[(UIndex)targetIndex],
+                            gradient.revGradInst,
+                            (UInt)sourceIndex));
                 // Case 3: Swizzled input is a scalar.
                 else
                     accGrad((UIndex)targetIndex, gradient.revGradInst);
@@ -2509,6 +2559,17 @@ struct DiffTransposePass
                 targetInst,
                 builder->emitMakeVector(baseType, (UInt)elementCount, elementGrads.getBuffer()),
                 nullptr);
+        else if (isTupleType)
+        {
+            return RevGradient(
+                targetInst,
+                builder->emitIntrinsicInst(
+                    baseType,
+                    baseType->getOp()==kIROp_TupleType ? kIROp_MakeTuple : kIROp_MakeValuePack,
+                    (UInt)elementCount,
+                    elementGrads.getBuffer()),
+                nullptr);
+        }
         else
             return RevGradient(
                 targetInst,

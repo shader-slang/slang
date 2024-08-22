@@ -8,6 +8,7 @@
 #include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-util.h"
 #include "../core/slang-performance-profiler.h"
 
 namespace Slang
@@ -41,6 +42,9 @@ IRInst* specializeGenericImpl(
     IRSpecialize* specializeInst,
     IRModule* module,
     SpecializationContext* context);
+
+IRCall* tryExpandArgPack(IRCall* call);
+bool tryExpandParameterPack(IRFunc* func, bool* outIsFullyExpanded = nullptr);
 
 struct SpecializationContext
 {
@@ -286,11 +290,6 @@ struct SpecializationContext
         // do one-off specialization.
         //
         IRInst* specializedVal = specializeGenericImpl(genericVal, specializeInst, module, this);
-
-        // The body of the specialized generic may expose more specialization opportunities, so
-        // we add the children to workList.
-        for (auto child : specializedVal->getDecorationsAndChildren())
-            addToWorkList(child);
 
         // The value that was returned from evaluating
         // the generic is the specialized value, and we
@@ -605,6 +604,14 @@ struct SpecializationContext
 
         case kIROp_CountOf:
             return maybeSpecializeCountOf(inst);
+
+        case kIROp_Func:
+            if (tryExpandParameterPack(as<IRFunc>(inst)))
+            {
+                addUsersToWorkList(inst);
+                return true;
+            }
+            return false;
         }
     }
 
@@ -1208,6 +1215,14 @@ struct SpecializationContext
         // the same way as a `load` inst.
         if (maybeSpecializeBufferLoadCall(inst))
             return false;
+
+        // If any arguments are value packs, we need to flatten them.
+        bool isCalleeFullyExpanded = false;
+        tryExpandParameterPack(as<IRFunc>(inst->getCallee()), &isCalleeFullyExpanded);
+        if (isCalleeFullyExpanded)
+        {
+            inst = tryExpandArgPack((IRCall*)inst);
+        }
 
         // We can only specialize a call when the callee function is known.
         //
@@ -2736,6 +2751,93 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
+// If `func` has any parameters whose types are `IRTypePack`, then we will expand them
+// into multiple parameters, so that the function has no parameters of type `IRTypePack`.
+// returns true if changes are made.
+bool tryExpandParameterPack(IRFunc* func, bool* outIsFullyExpanded)
+{
+    if (!func)
+        return false;
+    if (outIsFullyExpanded)
+        *outIsFullyExpanded = true;
+    ShortList<IRInst*> params;
+    for (auto param : func->getParams())
+    {
+        if (as<IRTypePack>(param->getDataType()))
+            params.add(param);
+        if (as<IRExpandType>(param->getDataType()))
+        {
+            if (outIsFullyExpanded)
+                *outIsFullyExpanded = false;
+            return false;
+        }
+    }
+    if (params.getCount() == 0)
+        return false;
+
+    IRBuilder builder(func);
+    for (auto param : params)
+    {
+        builder.setInsertBefore(param);
+        auto typePack = as<IRTypePack>(param->getDataType());
+        ShortList<IRInst*> newParams;
+        for (UInt i = 0; i < typePack->getOperandCount(); i++)
+        {
+            auto newParam = builder.createParam((IRType*)typePack->getOperand(i));
+            newParam->insertBefore(param);
+            newParams.add(newParam);
+        }
+        setInsertBeforeOrdinaryInst(&builder, param);
+        auto val = builder.emitMakeValuePack(typePack, (UInt)newParams.getCount(), newParams.getArrayView().getBuffer());
+        param->replaceUsesWith(val);
+        param->removeAndDeallocate();
+    }
+    fixUpFuncType(func);
+    return true;
+}
+
+// If any arguments in a call is a value pack, we will expand them into the argument list,
+// so that the call has no arguments of type `IRTypePack`.
+IRCall* tryExpandArgPack(IRCall* call)
+{
+    bool anyArgPack = false;
+    for (UInt i = 0; i < call->getArgCount(); i++)
+    {
+        auto arg = call->getArg(i);
+        if (as<IRTypePack>(arg->getDataType()))
+        {
+            anyArgPack = true;
+            break;
+        }
+    }
+    if (!anyArgPack)
+        return call;
+    IRBuilder builder(call);
+    builder.setInsertBefore(call);
+    List<IRInst*> newArgs;
+    for (UInt i = 0; i < call->getArgCount(); i++)
+    {
+        auto arg = call->getArg(i);
+        if (auto typePack = as<IRTypePack>(arg->getDataType()))
+        {
+            for (UInt elementIndex = 0; elementIndex < typePack->getOperandCount(); elementIndex++)
+            {
+                auto newArg = builder.emitGetTupleElement((IRType*)typePack->getOperand(elementIndex), arg, elementIndex);
+                newArgs.add(newArg);
+            }
+        }
+        else
+        {
+            newArgs.add(arg);
+        }
+    }
+    auto newCall = builder.emitCallInst(call->getFullType(), call->getCallee(), newArgs.getArrayView());
+    call->replaceUsesWith(newCall);
+    call->transferDecorationsTo(newCall);
+    call->removeAndDeallocate();
+    return newCall;
+}
+
 IRInst* specializeGenericImpl(
     IRGeneric* genericVal,
     IRSpecialize* specializeInst,
@@ -2785,6 +2887,9 @@ IRInst* specializeGenericImpl(
     IRBuilder* builder = &builderStorage;
     builder->setInsertBefore(genericVal);
 
+    List<IRInst*> pendingWorkList;
+    SLANG_DEFER(for (Index ii = pendingWorkList.getCount() - 1; ii >= 0; ii--) context->addToWorkList(pendingWorkList[ii]));
+
     // Now we will run through the body of the generic and
     // clone each of its instructions into the global scope,
     // until we reach a `return` instruction.
@@ -2825,10 +2930,12 @@ IRInst* specializeGenericImpl(
                 {
                     if (auto func = as<IRFunc>(specializedVal))
                     {
+                        tryExpandParameterPack(func);
                         simplifyFunc(context->targetProgram, func, IRSimplificationOptions::getFast(context->targetProgram));
                     }
                 }
 
+                pendingWorkList.add(specializedVal);
                 return specializedVal;
             }
 
@@ -2848,7 +2955,7 @@ IRInst* specializeGenericImpl(
             //
             if (context)
             {
-                context->addToWorkList(clonedInst);
+                pendingWorkList.add(clonedInst);
             }
         }
     }
