@@ -1342,6 +1342,19 @@ namespace Slang
                     SLANG_ASSERT(vertexType);
 
                     verticesParam = param;
+                    auto vertStruct = as<IRStructType>(vertexType);
+                    for(auto field : vertStruct->getFields())
+                    {
+                        auto key = field->getKey();
+                        if(auto deco = key->findDecoration<IRSemanticDecoration>())
+                        {
+                            if(deco->getSemanticName().caseInsensitiveEquals(toSlice("sv_position")))
+                            {
+                                IRBuilder builder(func);
+                                builder.addTargetSystemValueDecoration(key, toSlice("position"));
+                            }
+                        }
+                    }
                 }
                 if(param->findDecorationImpl(kIROp_IndicesDecoration))
                 {
@@ -1361,6 +1374,19 @@ namespace Slang
                     SLANG_ASSERT(primitiveType);
 
                     primitivesParam = param;
+                    auto primStruct = as<IRStructType>(primitiveType);
+                    for(auto field : primStruct->getFields())
+                    {
+                        auto key = field->getKey();
+                        if(auto deco = key->findDecoration<IRSemanticDecoration>())
+                        {
+                            if(deco->getSemanticName().caseInsensitiveEquals(toSlice("sv_primitiveid")))
+                            {
+                                IRBuilder builder(func);
+                                builder.addTargetSystemValueDecoration(key, toSlice("primitive_id"));
+                            }
+                        }
+                    }
                 }
             }
             if(primitiveType == nullptr)
@@ -1371,13 +1397,14 @@ namespace Slang
             
             auto meshParam = builder.emitParam(builder.getMetalMeshType(vertexType, primitiveType, maxVertices, maxPrimitives, topologyConst));
             builder.addExternCppDecoration(meshParam, toSlice("_slang_mesh"));
-            //This doesnt actually do anything yet, i hardcoded the refs to be the metal variants in the core.meta.slang, idk why this doesnt work
-            
+
+
             verticesParam->removeFromParent();
             verticesParam->removeAndDeallocate();
             
             indicesParam->removeFromParent();
             indicesParam->removeAndDeallocate();
+
             if(primitivesParam != nullptr) {
                 primitivesParam->removeFromParent();
                 primitivesParam->removeAndDeallocate();
