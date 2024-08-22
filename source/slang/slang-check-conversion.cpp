@@ -564,13 +564,11 @@ namespace Slang
 
                         InvokeExpr* constructorExpr = m_astBuilder->create<InvokeExpr>();
                         constructorExpr->loc = fromInitializerListExpr->loc;
-                        constructorExpr->functionExpr = CheckTerm(callee);
+                        constructorExpr->functionExpr = callee;
                         constructorExpr->arguments.addRange(coercedArgs);
                         constructorExpr->type = toType;
 
-                        //TODO:
-
-                        *outToExpr = CheckInvokeExprWithCheckedOperands(constructorExpr);
+                        *outToExpr = CheckTerm(constructorExpr);
                     }
                     return true;
                 }

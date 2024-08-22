@@ -2756,12 +2756,12 @@ namespace Slang
         // deal with this cases here, even if they are no-ops.
         //
 
+        // Do not error and just return since a term may
+        // be checked so it can be resolved into a valid
+        // term (argument of an 'Invoke' for example)
     #define CASE(NAME)                                                                           \
         Expr* visit##NAME(NAME* expr)                                                            \
         {                                                                                        \
-            if (!getShared()->isInLanguageServer())                                              \
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax"); \
-            expr->type = m_astBuilder->getErrorType();                                           \
             return expr;                                                                         \
         }
 
