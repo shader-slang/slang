@@ -47,7 +47,7 @@ struct IntroduceExplicitGlobalContextPass
             case CodeGenTarget::SPIRVAssembly:
                 hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
                 requiresFuncTypeCorrectionPass = true;
-                addressSpaceOfLocals = (AddressSpace)SpvStorageClassFunction;
+                addressSpaceOfLocals = AddressSpace::Function;
                 hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 break;
             case CodeGenTarget::CUDASource:
@@ -284,7 +284,7 @@ struct IntroduceExplicitGlobalContextPass
         // The context will usually be passed around by pointer,
         // so we get and cache that pointer type up front.
         //
-        m_contextStructPtrType = builder.getPtrType(kIROp_PtrType, m_contextStructType, (IRIntegerValue)getAddressSpaceOfLocal());
+        m_contextStructPtrType = builder.getPtrType(kIROp_PtrType, m_contextStructType, getAddressSpaceOfLocal());
 
 
         // The first step will be to create fields in the `KernelContext`
@@ -505,7 +505,7 @@ struct IntroduceExplicitGlobalContextPass
             auto fieldInfo = m_mapInstToContextFieldInfo[globalVar];
             if (fieldInfo.needDereference)
             {
-                auto var = builder.emitVar(globalVar->getDataType()->getValueType(), (IRIntegerValue)AddressSpace::GroupShared);
+                auto var = builder.emitVar(globalVar->getDataType()->getValueType(), AddressSpace::GroupShared);
                 if (auto nameDecor = globalVar->findDecoration<IRNameHintDecoration>())
                 {
                     builder.addNameHintDecoration(var, nameDecor->getName());

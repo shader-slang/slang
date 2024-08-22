@@ -742,7 +742,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 m_writer->emit("const ");
             }
             emitType((IRType*)ptrType->getValueType());
-            switch ((AddressSpace)ptrType->getAddressSpace())
+            switch (ptrType->getAddressSpace())
             {
             case AddressSpace::Global:
                 m_writer->emit(" device");

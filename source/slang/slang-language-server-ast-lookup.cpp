@@ -118,6 +118,27 @@ public:
         return dispatchIfNotNull(subscriptExpr->baseExpression);
     }
 
+    bool visitSizeOfLikeExpr(SizeOfLikeExpr* expr)
+    {
+        int tokenLength = 0;
+        if (as<CountOfExpr>(expr))
+            tokenLength = 7; // strlen("countof");
+        else if (as<SizeOfExpr>(expr))
+            tokenLength = 6; // strlen("sizeof");
+        else if (as<AlignOfExpr>(expr))
+            tokenLength = 7; // strlen("alignof");
+
+        if (_isLocInRange(context, expr->loc, tokenLength))
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
+            return true;
+        }
+        return dispatchIfNotNull(expr->value);
+    }
+
     bool visitParenExpr(ParenExpr* expr)
     {
         return dispatchIfNotNull(expr->base);
@@ -225,7 +246,10 @@ public:
     }
     bool visitSwizzleExpr(SwizzleExpr* expr)
     {
-        if (_isLocInRange(context, expr->memberOpLoc, 0))
+        Index tokenLength = expr->elementIndices.getCount();
+        if (expr->base && as<TupleType>(expr->base->type))
+            tokenLength *= 2;
+        if (_isLocInRange(context, expr->loc, tokenLength))
         {
             ASTLookupResult result;
             result.path = context->nodePath;

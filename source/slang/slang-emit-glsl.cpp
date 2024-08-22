@@ -2639,7 +2639,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
 void GLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace)
 {
-    if(addressSpace == (AddressSpace)SpvStorageClassTaskPayloadWorkgroupEXT)
+    if(addressSpace == AddressSpace::TaskPayloadWorkgroup)
     {
         m_writer->emit("taskPayloadSharedEXT ");
     }

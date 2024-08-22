@@ -2505,6 +2505,13 @@ struct IRReturn : IRTerminatorInst
     IRInst* getVal() { return getOperand(0); }
 };
 
+struct IRYield : IRTerminatorInst
+{
+    IR_LEAF_ISA(Yield);
+
+    IRInst* getVal() { return getOperand(0); }
+};
+
 struct IRDiscard : IRTerminatorInst
 {};
 
@@ -2846,10 +2853,39 @@ struct IRBindGlobalGenericParam : IRInst
     IR_LEAF_ISA(BindGlobalGenericParam)
 };
 
+struct IRExpand : IRInst
+{
+    IR_LEAF_ISA(Expand)
+    UInt getCaptureCount() { return getOperandCount(); }
+    IRInst* getCapture(UInt index) { return getOperand(index); }
+    IRInstList<IRBlock> getBlocks()
+    {
+        return IRInstList<IRBlock>(getChildren());
+    }
+};
+
+
+struct IREach : IRInst
+{
+    IR_LEAF_ISA(Each)
+
+    IRInst* getElement() { return getOperand(0); }
+};
+
 // An Instruction that creates a tuple value.
 struct IRMakeTuple : IRInst
 {
     IR_LEAF_ISA(MakeTuple)
+};
+
+struct IRMakeValuePack : IRInst
+{
+    IR_LEAF_ISA(MakeValuePack)
+};
+
+struct IRMakeWitnessPack : IRInst
+{
+    IR_LEAF_ISA(MakeWitnessPack)
 };
 
 struct IRGetTupleElement : IRInst
@@ -3349,7 +3385,7 @@ public:
 
     // Get the current function (or other value with code)
     // that we are inserting into (if any).
-    IRGlobalValueWithCode*  getFunc() { return m_insertLoc.getFunc(); }
+    IRInst*  getFunc() { return m_insertLoc.getFunc(); }
 
     void setInsertInto(IRInst* insertInto) { setInsertLoc(IRInsertLoc::atEnd(insertInto)); }
     void setInsertBefore(IRInst* insertBefore) { setInsertLoc(IRInsertLoc::before(insertBefore)); }
@@ -3499,6 +3535,10 @@ public:
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2, IRType* type3);
 
+    IRTypePack* getTypePack(UInt count, IRType* const* types);
+
+    IRExpandType* getExpandTypeOrVal(IRType* type, IRInst* pattern, ArrayView<IRInst*> capture);
+
     IRResultType* getResultType(IRType* valueType, IRType* errorType);
     IROptionalType* getOptionalType(IRType* valueType);
 
@@ -3506,6 +3546,7 @@ public:
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
     IRWitnessTableIDType* getWitnessTableIDType(IRType* baseType);
     IRType* getTypeType() { return getType(IROp::kIROp_TypeType); }
+    IRType* getTypeParameterPackKind() { return getType(IROp::kIROp_TypeParameterPackKind); }
     IRType* getKeyType() { return nullptr; }
 
     IRTypeKind*     getTypeKind();
@@ -3517,10 +3558,9 @@ public:
     IRRefType*  getRefType(IRType* valueType, AddressSpace addrSpace);
     IRConstRefType* getConstRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
+    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRInst* addressSpace);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace) { return getPtrType(op, valueType, (IRIntegerValue)addressSpace); }
-    IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace) { return getPtrType(kIROp_PtrType, valueType, (IRIntegerValue)addressSpace); }
+    IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace) { return getPtrType(kIROp_PtrType, valueType, addressSpace); }
 
     IRTextureTypeBase* getTextureType(
         IRType* elementType,
@@ -3657,6 +3697,14 @@ public:
         return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
     }
 
+    IRInst* getIndexedFieldKey(
+        IRInst* baseType,
+        UInt            fieldIndex)
+    {
+        IRInst* args[] = { baseType, getIntValue(getIntType(), fieldIndex) };
+        return emitIntrinsicInst(getVoidType(), kIROp_IndexedFieldKey, 2, args);
+    }
+
     IRMetalMeshGridPropertiesType* getMetalMeshGridPropertiesType()
     {
         return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
@@ -3741,6 +3789,9 @@ public:
     {
         return emitSpecializeInst(type, genericVal, args.getCount(), args.begin());
     }
+
+    IRInst* emitExpandInst(IRType* type, UInt capturedArgCount, IRInst* const* capturedArgs);
+    IRInst* emitEachInst(IRType* type, IRInst* base, IRInst* indexArg = nullptr);
 
     IRInst* emitLookupInterfaceMethodInst(
         IRType* type,
@@ -3841,6 +3892,13 @@ public:
 
     IRInst* emitMakeTuple(IRType* type, List<IRInst*> const& args)
     {
+        if (args.getCount() == 1)
+        {
+            if (args[0]->getOp() == kIROp_Expand)
+            {
+                return args[0];
+            }
+        }
         return emitMakeTuple(type, args.getCount(), args.getBuffer());
     }
 
@@ -3855,11 +3913,25 @@ public:
         return emitMakeTuple(SLANG_COUNT_OF(args), args);
     }
 
+    IRInst* emitMakeValuePack(IRType* type, UInt count, IRInst* const* args);
+    IRInst* emitMakeValuePack(UInt count, IRInst* const* args);
+
+    IRInst* emitMakeWitnessPack(IRType* type, ArrayView<IRInst*> args)
+    {
+        return emitIntrinsicInst(type, kIROp_MakeWitnessPack, (UInt)args.getCount(), args.getBuffer());
+    }
+
     IRInst* emitMakeString(IRInst* nativeStr);
 
     IRInst* emitGetNativeString(IRInst* str);
 
+    IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, int element)
+    {
+        return emitGetTupleElement(type, tuple, (UInt)element);
+    }
+
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, UInt element);
+    IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, IRInst* element);
 
     IRInst* emitMakeResultError(IRType* resultType, IRInst* errorVal);
     IRInst* emitMakeResultValue(IRType* resultType, IRInst* val);
@@ -3984,7 +4056,7 @@ public:
         IRType* valueType);
     IRGlobalVar* createGlobalVar(
         IRType*         valueType,
-        IRIntegerValue  addressSpace);
+        AddressSpace   addressSpace);
     IRGlobalParam* createGlobalParam(
         IRType* valueType);
     
@@ -4078,7 +4150,7 @@ public:
         IRType* type);
     IRVar* emitVar(
         IRType* type,
-        IRIntegerValue addressSpace);
+        AddressSpace addressSpace);
 
     IRInst* emitLoad(
         IRType* type,
@@ -4213,6 +4285,9 @@ public:
     IRInst* emitReturn(
         IRInst*    val);
 
+    IRInst* emitYield(
+        IRInst* val);
+
     IRInst* emitReturn();
 
     IRInst* emitThrow(IRInst* val);
@@ -4332,6 +4407,8 @@ public:
 
     IRInst* emitAlignOf(
         IRInst* sizedType);
+
+    IRInst* emitCountOf(IRType* type, IRInst* sizedType);
 
     IRInst* emitCastPtrToBool(IRInst* val);
     IRInst* emitCastPtrToInt(IRInst* val);
