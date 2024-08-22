@@ -3652,6 +3652,10 @@ namespace Slang
             if (!isTypePack(baseType) && !as<TupleType>(baseType))
                 goto error;
         }
+        
+        if (auto tupleType = as<TupleType>(baseType))
+            baseType = tupleType->getTypePack();
+
         {
             SLANG_ASSERT(m_capturedTypePacks);
             if (auto baseExpandType = as<ExpandType>(baseType))
