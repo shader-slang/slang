@@ -8047,6 +8047,7 @@ namespace Slang
                 paramExpr->type = paramType;
                 paramExpr->loc = param->loc;
 
+                bool treatCtorAsDifferentiable = ctor->hasModifier<TreatAsDifferentiableAttribute>();
                 // Do not map a variable which is not visible
                 // Do not map a read-only variable for default-init
                 // Do not map compiler generated 'internal processing' variable
@@ -8063,7 +8064,7 @@ namespace Slang
 
                 // Check for differentiability of member. 'no_diff' and 'DerivativeMemberAttribute' additions
                 // are handled by checking all 'InheritanceDecl's earlier in 'visitAggTypeDecl'
-                if (!member->hasModifier<DerivativeMemberAttribute>())
+                if (!treatCtorAsDifferentiable && !member->hasModifier<DerivativeMemberAttribute>())
                     addModifier(param, m_astBuilder->create<NoDiffModifier>());
 
                 // Manage CUDA host modifier based on inheritance
