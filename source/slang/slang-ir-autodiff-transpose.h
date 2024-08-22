@@ -1918,7 +1918,6 @@ struct DiffTransposePass
                 fwdMakeTuple->getOperand(ii),
                 gradAtField,
                 fwdMakeTuple));
-            ii++;
         }
 
         // (A = MakeTuple(F1, F2, F3)) -> [(dF1 += dA.F1), (dF2 += dA.F2), (dF3 += dA.F3)]
