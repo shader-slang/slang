@@ -1349,32 +1349,32 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
 }
 
 
-DeclRef<Decl> Linkage:: specializeGeneric(
+DeclRef<Decl> Linkage::specializeGeneric(
         DeclRef<Decl>                       declRef,
         Dictionary<Decl*, Val*>             argMap,
         DiagnosticSink*                     sink)
 {
     SLANG_AST_BUILDER_RAII(getASTBuilder());
-    
-    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+    SLANG_ASSERT(declRef);
 
     SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     // Create substituted parent decl ref.
-    auto innerDecl = declRef.getDecl();
+    auto decl = declRef.getDecl();
 
-    while (!as<GenericDecl>(innerDecl))
+    while (!as<GenericDecl>(decl))
     {
-        innerDecl = innerDecl->parentDecl;
+        decl = decl->parentDecl;
     }
-    
-    auto genericDecl = innerDecl;
-    auto parentDeclRef = createDefaultSubstitutionsIfNeeded(getASTBuilder(), &visitor, DeclRef(genericDecl)).as<GenericDecl>();
 
-    auto substSet = makeSubstitutionFromIncompleteSet(getASTBuilder(), &visitor, parentDeclRef, argMap, sink);
+    auto genericDecl = as<GenericDecl>(decl);
+    auto genericDeclRef = substituteDeclRef(SubstitutionSet(declRef), getASTBuilder(), DeclRef(genericDecl));
+    genericDeclRef = createDefaultSubstitutionsIfNeeded(getASTBuilder(), &visitor, genericDeclRef).as<GenericDecl>();
 
-    return substituteDeclRef(substSet, getASTBuilder(), parentDeclRef);
+    auto substSet = makeSubstitutionFromIncompleteSet(getASTBuilder(), &visitor, genericDeclRef.as<GenericDecl>(), argMap, sink);
+
+    return substituteDeclRef(substSet, getASTBuilder(), declRef);
 }
 
 SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
@@ -2402,7 +2402,26 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
         result = declRefExpr->declRef;
     }
 
+    if (auto genericDeclRef = result.as<GenericDecl>())
+    {   
+        result = createDefaultSubstitutionsIfNeeded(
+            astBuilder, &visitor, DeclRef(genericDeclRef.getDecl()->inner));
+        result = substituteDeclRef(SubstitutionSet(genericDeclRef), astBuilder, result);
+    }
+
     return result;
+}
+
+bool ComponentType::isSubType(Type* subType, Type* superType)
+{
+    SharedSemanticsContext sharedSemanticsContext(
+        getLinkage(),
+        nullptr,
+        nullptr);
+    SemanticsContext context(&sharedSemanticsContext);
+    SemanticsVisitor visitor(context);
+
+    return (visitor.isSubtype(subType, superType, IsSubTypeOptions::None) != nullptr);
 }
 
 static void collectExportedConstantInContainer(

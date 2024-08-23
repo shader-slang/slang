@@ -7127,9 +7127,10 @@ namespace Slang
         Dictionary<Decl*, Val*> paramArgMap,
         DiagnosticSink* sink)
     {
+        SLANG_UNUSED(sink);
         GenericDecl* genericDecl = genericDeclRef.getDecl();
         List<Val*> args;
-        List<Val*> defaultArgs = getDefaultSubstitutionArgs(astBuilder, semantics, genericDecl);
+        List<Val*> currentArgs = getDefaultSubstitutionArgs(astBuilder, semantics, genericDecl);
 
         UIndex argIndex = 0;
         for (auto mm : genericDecl->members)
@@ -7142,7 +7143,7 @@ namespace Slang
                 }
                 else
                 {
-                    args.add(defaultArgs[argIndex]);
+                    args.add(currentArgs[argIndex]);
                 }
             }
             else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
@@ -7153,14 +7154,17 @@ namespace Slang
                 }
                 else
                 {
-                    args.add(defaultArgs[argIndex]);
+                    args.add(currentArgs[argIndex]);
                 }
             }
 
             argIndex++;
         }
-
-        // create default substitution arguments for constraints
+        
+        // Fill in witnesses for constraints, using the user-provided arguments if they exist,
+        // otherwise use the default arguments.
+        // TODO: need to throw proper error messages if the user-provided arguments do not satisfy the constraints.
+        //
         for (auto mm : genericDecl->members)
         {
             if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(mm))
@@ -7187,7 +7191,7 @@ namespace Slang
                         }
                         else
                         {
-                            args.add(defaultArgs[argIndex]);
+                            args.add(currentArgs[argIndex]);
                         }
                     }
                     else

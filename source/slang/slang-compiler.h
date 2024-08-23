@@ -426,6 +426,8 @@ namespace Slang
             String const& name,
             LookupMask mask,
             DiagnosticSink* sink);
+        
+        bool isSubType(Type* subType, Type* superType);
 
         Dictionary<String, IntVal*>& getMangledNameToIntValMap();
         ConstantIntVal* tryFoldIntVal(IntVal* intVal);

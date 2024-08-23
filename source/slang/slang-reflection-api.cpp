@@ -670,6 +670,17 @@ SLANG_API SlangReflectionUserAttribute* spReflectionType_FindUserAttributeByName
     return 0;
 }
 
+SLANG_API SlangReflectionType* spReflectionType_applySpecializations(SlangReflectionType* inType, SlangReflectionGeneric* generic)
+{
+    auto type = convert(inType);
+    auto genericDeclRef = convertGenericToDeclRef(generic);
+    
+    if (!type || !genericDeclRef)
+        return nullptr;
+    
+    return convert(substituteType(SubstitutionSet(genericDeclRef), type->getASTBuilderForReflection(), type));
+}
+
 SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionType* inType)
 {
     auto type = convert(inType);
@@ -859,9 +870,53 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
     try
     {
         Type* result = program->getTypeFromString(name, &sink);
+
+        ASTBuilder* astBuilder = program->getLinkage()->getASTBuilder();
+
+        if (auto genericType = as<GenericDeclRefType>(result))
+        {
+            auto genericDeclRef = genericType->getDeclRef();
+            auto innerDeclRef = substituteDeclRef(
+                SubstitutionSet(genericDeclRef), astBuilder, genericDeclRef.getDecl()->inner);
+            return convert(
+                DeclRefType::create(
+                    astBuilder, 
+                    createDefaultSubstitutionsIfNeeded(
+                        astBuilder, nullptr, innerDeclRef)));
+        }
+
         if (as<ErrorType>(result))
             return nullptr;
         return (SlangReflectionType*)result;
+    }
+    catch( ... )
+    {
+        return nullptr;
+    }
+}
+
+
+SLANG_API bool spReflection_IsSubType(
+    SlangReflection * reflection,
+    SlangReflectionType* subType,
+    SlangReflectionType* superType)
+{
+    auto programLayout = convert(reflection);
+    auto program = programLayout->getProgram();
+
+    // TODO: We should extend this API to support getting error messages
+    // when type lookup fails.
+    //
+    Slang::DiagnosticSink sink(
+        programLayout->getTargetReq()->getLinkage()->getSourceManager(),
+        Lexer::sourceLocationLexer);
+
+    try
+    {
+        auto sub = convert(subType);
+        auto super = convert(superType);
+
+        return program->isSubType(sub, super);
     }
     catch( ... )
     {
@@ -890,12 +945,17 @@ SlangReflectionGeneric* getInnermostGenericParent(DeclRef<Decl> declRef)
 
 SLANG_API SlangReflectionGeneric* spReflectionType_GetGenericContainer(SlangReflectionType* type)
 {
-    auto declRefType = as<DeclRefType>(convert(type));
-    if (!declRefType)
-        return nullptr;
+    auto slangType = convert(type);
+    if (auto declRefType = as<DeclRefType>(slangType))
+    {
+        return getInnermostGenericParent(declRefType->getDeclRef());
+    }
+    else if (auto genericDeclRefType = as<GenericDeclRefType>(slangType))
+    {
+        return getInnermostGenericParent(genericDeclRefType->getDeclRef());
+    }
 
-    auto declRef = declRefType->getDeclRef();
-    return getInnermostGenericParent(declRef);
+    return nullptr;
 }
 
 SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
@@ -2778,6 +2838,19 @@ SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(Slang
     return getInnermostGenericParent(declRef);
 }
 
+SLANG_API SlangReflectionVariable* spReflectionVariable_applySpecializations(SlangReflectionVariable* var, SlangReflectionGeneric* generic)
+{
+    auto declRef = convert(var);
+    auto genericDeclRef = convertGenericToDeclRef(generic);
+    if (!declRef || !genericDeclRef)
+        return nullptr;
+    
+    auto astBuilder = getModule(declRef.getDecl())->getLinkage()->getASTBuilder();
+
+    auto substDeclRef = substituteDeclRef(SubstitutionSet(genericDeclRef), astBuilder, declRef);
+    return convert(substDeclRef);
+}
+
 // Variable Layout Reflection
 
 SLANG_API SlangReflectionVariable* spReflectionVariableLayout_GetVariable(SlangReflectionVariableLayout* inVarLayout)
@@ -3000,6 +3073,19 @@ SLANG_API SlangReflectionGeneric* spReflectionFunction_GetGenericContainer(Slang
 {
     auto declRef = convert(func);
     return getInnermostGenericParent(declRef);
+}
+
+SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(SlangReflectionFunction* func, SlangReflectionGeneric* generic)
+{
+    auto declRef = convert(func);
+    auto genericDeclRef = convertGenericToDeclRef(generic);
+    if (!declRef || !genericDeclRef)
+        return nullptr;
+
+    auto astBuilder = getModule(declRef.getDecl())->getLinkage()->getASTBuilder();
+
+    auto substDeclRef = substituteDeclRef(SubstitutionSet(genericDeclRef), astBuilder, declRef);
+    return convert(substDeclRef.as<FunctionDeclBase>());
 }
 
 // Abstract decl reflection
@@ -3288,6 +3374,19 @@ SLANG_API int64_t spReflectionGeneric_GetConcreteIntVal(SlangReflectionGeneric* 
     }
 
     return 0;
+}
+
+SLANG_API SlangReflectionGeneric* spReflectionGeneric_applySpecializations(SlangReflectionGeneric* currGeneric, SlangReflectionGeneric* generic)
+{
+    auto declRef = convertGenericToDeclRef(currGeneric);
+    auto genericDeclRef = convertGenericToDeclRef(generic);
+    if (!declRef || !genericDeclRef)
+        return nullptr;
+
+    auto astBuilder = getModule(declRef.getDecl())->getLinkage()->getASTBuilder();
+
+    auto substDeclRef = substituteDeclRef(SubstitutionSet(genericDeclRef), astBuilder, declRef);
+    return convertDeclToGeneric(substDeclRef);
 }
 
 
@@ -3697,12 +3796,12 @@ SLANG_API  SlangReflectionType* spReflection_specializeType(
 
 
 SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
-                SlangReflection*            inProgramLayout,
-                SlangReflectionGeneric*         generic,
-                unsigned int                    argCount,
-                SlangReflectionVariable* const* params,
-                SlangReflectionGenericArg*      args,
-                ISlangBlob**                    outDiagnostics)
+                SlangReflection*                 inProgramLayout,
+                SlangReflectionGeneric*          generic,
+                SlangInt                         argCount,
+                SlangReflectionVariable* const*  params,
+                SlangReflectionGenericArg const* args,
+                ISlangBlob**                     outDiagnostics)
 {
     auto programLayout = convert(inProgramLayout);
     auto slangGeneric = convertGenericToDeclRef(generic);
@@ -3714,7 +3813,7 @@ SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
 
     Dictionary<Decl*, Val*> argMap;
-    for (unsigned int i = 0; i < argCount; ++i)
+    for (SlangInt i = 0; i < argCount; ++i)
     {
         auto param = convert(params[i]);
         auto arg = args[i];
