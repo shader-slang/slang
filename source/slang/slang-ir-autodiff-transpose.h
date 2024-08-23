@@ -2480,12 +2480,12 @@ struct DiffTransposePass
         else if (as<IRTupleType>(baseType) || as<IRTypePack>(baseType))
         {
             isTupleType = true;
+            elementCount = baseType->getOperandCount();
             for (UInt i = 0; i < baseType->getOperandCount(); i++)
             {
                 elementTypes.add((IRType*)baseType->getOperand(i));
                 primalElementTypes.add((IRType*)(aggPrimalType->getOperand(i)));
             }
-            elementCount = baseType->getOperandCount();
         }
         else
         {
@@ -2541,13 +2541,14 @@ struct DiffTransposePass
                             builder->getIntValue(
                                 builder->getIntType(),
                                 sourceIndex)));
+                // Case 3: swizzled output is a tuple.
                 else if (isTupleType)
                     accGrad((UIndex)targetIndex,
                         builder->emitGetTupleElement(
                             elementTypes[(UIndex)targetIndex],
                             gradient.revGradInst,
                             (UInt)sourceIndex));
-                // Case 3: Swizzled input is a scalar.
+                // Case 4: Swizzled input is a scalar.
                 else
                     accGrad((UIndex)targetIndex, gradient.revGradInst);
             }
