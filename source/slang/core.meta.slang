@@ -1450,8 +1450,11 @@ struct OutputIndices
     __intrinsic_op($(kIROp_MetalSetIndices))
     static void __metalSetIndices(uint index, T val);
 
+    // for some reason only here in the indices array it uses the return value as an actual
+    // operand, while the others use the value of the instruction (the return value) to access
+    // the type of the vertex, as when using the ref there is no third operand
     __intrinsic_op($(kIROp_MeshOutputSet))
-    void __setIndices(This v, uint index, T val);
+    static void __setIndices(This v, uint index, T val);
 
     __subscript(uint index) -> T
     {
