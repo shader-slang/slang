@@ -2737,7 +2737,7 @@ extern "C"
         SlangReflectionGenericArg const* args,
         ISlangBlob**                     outDiagnostics);
     
-    SLANG_API bool spReflection_IsSubType(
+    SLANG_API bool spReflection_isSubType(
         SlangReflection * reflection,
         SlangReflectionType* subType,
         SlangReflectionType* superType);
@@ -3663,20 +3663,6 @@ namespace slang
         {
             return (GenericReflection*)spReflectionGeneric_applySpecializations((SlangReflectionGeneric*)this, (SlangReflectionGeneric*)generic);
         }
-
-        /*GenericReflection* specializeGenericTypeParameter(
-            GenericReflection*           generic,
-            uint32_t                     argCount,
-            const VariableReflection*    params,
-            const GenericArgReflection*  args)
-        {
-            return (GenericReflection*)spReflectionGeneric_SpecializeGenericTypeParameter(
-                (SlangReflectionGeneric*)this,
-                (SlangReflectionGeneric*)generic,
-                argCount,
-                (SlangReflectionVariable* const*)params,
-                (SlangReflectionGenericArg* const*)args);
-        }*/
     };
 
     struct EntryPointReflection
@@ -3918,7 +3904,7 @@ namespace slang
             TypeReflection* subType,
             TypeReflection* superType)
         {
-            return spReflection_IsSubType(
+            return spReflection_isSubType(
                 (SlangReflection*) this,
                 (SlangReflectionType*) subType,
                 (SlangReflectionType*) superType);

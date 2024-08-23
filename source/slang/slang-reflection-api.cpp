@@ -896,7 +896,7 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
 }
 
 
-SLANG_API bool spReflection_IsSubType(
+SLANG_API bool spReflection_isSubType(
     SlangReflection * reflection,
     SlangReflectionType* subType,
     SlangReflectionType* superType)

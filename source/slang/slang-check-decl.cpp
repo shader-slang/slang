@@ -7128,6 +7128,7 @@ namespace Slang
         DiagnosticSink* sink)
     {
         SLANG_UNUSED(sink);
+
         GenericDecl* genericDecl = genericDeclRef.getDecl();
         List<Val*> args;
         List<Val*> currentArgs = getDefaultSubstitutionArgs(astBuilder, semantics, genericDecl);
