@@ -321,6 +321,10 @@ static SlangResult triangleExample(UnitTestContext* context)
     return SLANG_OK;
 }
 
+// Those examples all depend on the Vulkan, so we only run them on non-Apple platforms.
+// In the future, we may be able to modify the examples further to remove all the render APIs
+// such that it can be ran on Apple platforms.
+#if !(SLANG_APPLE_FAMILY)
 SLANG_UNIT_TEST(RecordReplay_HelloWorld)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(helloworldExample(unitTestContext)));
@@ -330,3 +334,5 @@ SLANG_UNIT_TEST(RecordReplay_Triangle)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(triangleExample(unitTestContext)));
 }
+
+#endif
