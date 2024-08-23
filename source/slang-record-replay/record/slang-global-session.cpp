@@ -29,11 +29,6 @@ namespace SlangRecord
         m_recordManager->apendOutput();
     }
 
-    GlobalSessionRecorder::~GlobalSessionRecorder()
-    {
-        m_actualGlobalSession->release();
-    }
-
     SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::queryInterface(SlangUUID const& uuid, void** outObject) 
     {
         if (uuid == Session::getTypeGuid())
