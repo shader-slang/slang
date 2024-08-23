@@ -86,6 +86,7 @@ struct SpecializationContext
         {
         case kIROp_GlobalGenericParam:
         case kIROp_LookupWitness:
+        case kIROp_GetTupleElement:
             return false;
         case kIROp_Specialize:
             // The `specialize` instruction is a bit sepcial,
