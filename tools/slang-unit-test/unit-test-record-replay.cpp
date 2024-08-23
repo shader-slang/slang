@@ -12,7 +12,12 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
+#else
+#include <ftw.h>
 #endif
+
+#include <chrono>
+#include <thread>
 
 using namespace Slang;
 
@@ -100,36 +105,37 @@ static SlangResult parseHashes(List<String> const& lines, List<entryHashInfo>& o
     return res;
 }
 
-static int writeEnvironmentVariable(char* var)
+static int writeEnvironmentVariable(const char* key, const char* val)
 {
 #ifdef _WIN32
-    return _putenv(var);
+    String var = String(key) + "=" + val;
+    return _putenv(var.getBuffer());
 #else
-    return putenv(var);
+    return setenv(key, val, 1);
 #endif
 }
 
 static bool enableRecordLayer()
 {
-    int retCode = writeEnvironmentVariable("SLANG_RECORD_LAYER=1");
+    int retCode = writeEnvironmentVariable("SLANG_RECORD_LAYER", "1");
     return retCode == 0;
 }
 
 static bool disableRecordLayer()
 {
-    int retCode = writeEnvironmentVariable("SLANG_RECORD_LAYER=0");
+    int retCode = writeEnvironmentVariable("SLANG_RECORD_LAYER", "0");
     return retCode == 0;
 }
 
 static bool enableLogInReplayer()
 {
-    int retCode = writeEnvironmentVariable("SLANG_RECORD_LOG_LEVEL=3");
+    int retCode = writeEnvironmentVariable("SLANG_RECORD_LOG_LEVEL", "3");
     return retCode == 0;
 }
 
 static bool disableLogInReplayer()
 {
-    int retCode = writeEnvironmentVariable("SLANG_RECORD_LOG_LEVEL=0");
+    int retCode = writeEnvironmentVariable("SLANG_RECORD_LOG_LEVEL", "0");
     return retCode == 0;
 }
 
@@ -251,10 +257,11 @@ static SlangResult resultCompare(List<entryHashInfo> const& expectHashes, List<e
     return SLANG_OK;
 }
 
-static void cleanupRecordFiles()
+static SlangResult cleanupRecordFiles()
 {
+    // Path::remove() doesn't support remove a non-empty directory, so we need to implement
+    // a simple function to remove the directory recursively.
 #ifdef _WIN32
-    // Path::remove doesn't support remove a non-empty directory
     // https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationa
     SHFILEOPSTRUCTA file_op = {
         NULL,
@@ -269,8 +276,25 @@ static void cleanupRecordFiles()
         "" };
     SHFileOperationA(&file_op);
 #else
-    Path::remove("slang-record");
+    auto unlink_cb = [](const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) -> int
+    {
+        int rv = ::remove(fpath);
+        if (rv)
+        {
+            perror(fpath);
+        }
+        return rv;
+    };
+    // https://linux.die.net/man/3/nftw
+    int ret = nftw("slang-record", unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
+    if (ret)
+    {
+        fprintf(stderr, "fail to remove 'slang-record' dir, error: %d, %s\n", errno, strerror(errno));
+        return SLANG_FAIL;
+    }
 #endif
+
+    return SLANG_OK;
 }
 
 static SlangResult helloworldExample(UnitTestContext* context)
@@ -281,7 +305,7 @@ static SlangResult helloworldExample(UnitTestContext* context)
     SLANG_RETURN_ON_FAIL(replayExamples(context, resultHashes));
     SLANG_RETURN_ON_FAIL(resultCompare(expectHashes, resultHashes));
 
-    cleanupRecordFiles();
+    SLANG_RETURN_ON_FAIL(cleanupRecordFiles());
     return SLANG_OK;
 }
 
@@ -293,7 +317,7 @@ static SlangResult triangleExample(UnitTestContext* context)
     SLANG_RETURN_ON_FAIL(replayExamples(context, resultHashes));
     SLANG_RETURN_ON_FAIL(resultCompare(expectHashes, resultHashes));
 
-    cleanupRecordFiles();
+    SLANG_RETURN_ON_FAIL(cleanupRecordFiles());
     return SLANG_OK;
 }
 
