@@ -19,7 +19,6 @@ namespace SlangRecord
         ISlangUnknown* getInterface(const Guid& guid);
 
         explicit CompositeComponentTypeRecorder(slang::IComponentType* componentType, RecordManager* recordManager);
-        ~CompositeComponentTypeRecorder();
 
         // Interfaces for `IComponentType`
         virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override;
