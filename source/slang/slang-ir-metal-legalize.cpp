@@ -1269,12 +1269,7 @@ namespace Slang
         {
             auto func = entryPoint.entryPointFunc;
 
-            if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Mesh)
-            {
-                return;
-            }
-
-            IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
+            IRBuilder builder{ func->getModule() };
             for (auto param : func->getParams())
             {
                 if(param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
@@ -1285,7 +1280,7 @@ namespace Slang
                     auto paramVarLayout = varLayoutBuilder.build();
                     builder.addLayoutDecoration(param, paramVarLayout);
 
-                    IRConstRefType* type = as<IRConstRefType>(param->getDataType());
+                    IRPtrTypeBase* type = as<IRPtrTypeBase>(param->getDataType());
                     
                     const auto annotatedPayloadType =
                         builder.getPtrType(
@@ -1298,17 +1293,30 @@ namespace Slang
                 }
             }
             IROutputTopologyDecoration* outputDeco = entryPoint.entryPointFunc->findDecoration<IROutputTopologyDecoration>();
+            if(outputDeco == nullptr)
+            {
+                SLANG_UNEXPECTED("Mesh shader output decoration missing");
+                return;
+            }
             const auto topology = outputDeco->getTopology();
             const auto topStr = topology->getStringSlice();
             UInt topologyEnum = 0;
-            if(topStr.caseInsensitiveEquals(toSlice("point"))){
+            if(topStr.caseInsensitiveEquals(toSlice("point")))
+            {
                 topologyEnum = 1;
-            } else if(topStr.caseInsensitiveEquals(toSlice("line"))) {
+            } 
+            else if(topStr.caseInsensitiveEquals(toSlice("line"))) 
+            {
                 topologyEnum = 2;
-            } else if(topStr.caseInsensitiveEquals(toSlice("triangle"))) {
+            } 
+            else if(topStr.caseInsensitiveEquals(toSlice("triangle"))) 
+            {
                 topologyEnum = 3;
-            } else {
-                // abort, idk how
+            } 
+            else 
+            {
+                SLANG_UNEXPECTED("unknown topology");
+                return;
             }
 
             IRInst* topologyConst = builder.getIntValue(builder.getIntType(), topologyEnum);
@@ -1335,8 +1343,8 @@ namespace Slang
                 }
                 if(param->findDecorationImpl(kIROp_VerticesDecoration))
                 {
-                    auto vertexRefType = (IRConstRefType*)param->getDataType();
-                    auto vertexOutputType = (IRVerticesType*)vertexRefType->getValueType();
+                    auto vertexRefType = as<IRPtrTypeBase>(param->getDataType());
+                    auto vertexOutputType = as<IRVerticesType>(vertexRefType->getValueType());
                     vertexType = vertexOutputType->getElementType();
                     maxVertices = vertexOutputType->getMaxElementCount();
                     SLANG_ASSERT(vertexType);
@@ -1350,7 +1358,6 @@ namespace Slang
                         {
                             if(deco->getSemanticName().caseInsensitiveEquals(toSlice("sv_position")))
                             {
-                                IRBuilder builder(func);
                                 builder.addTargetSystemValueDecoration(key, toSlice("position"));
                             }
                         }
@@ -1382,7 +1389,6 @@ namespace Slang
                         {
                             if(deco->getSemanticName().caseInsensitiveEquals(toSlice("sv_primitiveid")))
                             {
-                                IRBuilder builder(func);
                                 builder.addTargetSystemValueDecoration(key, toSlice("primitive_id"));
                             }
                         }
@@ -1405,7 +1411,8 @@ namespace Slang
             indicesParam->removeFromParent();
             indicesParam->removeAndDeallocate();
 
-            if(primitivesParam != nullptr) {
+            if(primitivesParam != nullptr)
+            {
                 primitivesParam->removeFromParent();
                 primitivesParam->removeAndDeallocate();
             }
@@ -1413,10 +1420,6 @@ namespace Slang
 
         void legalizeDispatchMeshPayloadForMetal(EntryPointInfo entryPoint)
         {
-            if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Amplification)
-            {
-                return;
-            }
             // Find out DispatchMesh function
             IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
             for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
@@ -1723,8 +1726,17 @@ namespace Slang
             wrapReturnValueInStruct(entryPoint);
 
             //Other Legalize
-            legalizeMeshEntryPoint(entryPoint);
-            legalizeDispatchMeshPayloadForMetal(entryPoint);
+            switch(entryPoint.entryPointDecor->getProfile().getStage()) 
+            {
+            case Stage::Amplification:
+                legalizeDispatchMeshPayloadForMetal(entryPoint);
+                break;
+            case Stage::Mesh:
+                legalizeMeshEntryPoint(entryPoint);
+                break;
+            default:
+                break;
+            }
         }
     };
 
