@@ -311,7 +311,7 @@ namespace Slang
                     isColMajor?matrixType->getRowCount():matrixType->getColumnCount());
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(target->getOptionSet(), rules, vectorType, &elementSizeAlignment);
-                elementSizeAlignment = rules->alignCompositeElement(elementSizeAlignment);
+                elementSizeAlignment = rules->alignCompositeElementOfAggregate(elementSizeAlignment);
 
                 auto arrayType = builder.getArrayType(
                     vectorType,
@@ -351,7 +351,7 @@ namespace Slang
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(target->getOptionSet(), rules, loweredInnerTypeInfo.loweredType, &elementSizeAlignment);
-                elementSizeAlignment = rules->alignCompositeElement(elementSizeAlignment);
+                elementSizeAlignment = rules->alignCompositeElementOfAggregate(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
                     loweredInnerTypeInfo.loweredType,
                     arrayType->getElementCount(),
@@ -898,6 +898,16 @@ namespace Slang
         // If the user specified a scalar buffer layout, then just use that.
         if (target->getOptionSet().shouldUseScalarLayout())
             return IRTypeLayoutRules::getNatural();
+
+        if (target->getOptionSet().shouldUseDXLayout())
+        {
+            if (as<IRUniformParameterGroupType>(bufferType))
+            {
+                return IRTypeLayoutRules::getConstantBuffer();
+            }
+            else
+                return IRTypeLayoutRules::getNatural();
+        }
 
         // The default behavior is to use std140 for constant buffers and std430 for other buffers.
         switch (bufferType->getOp())

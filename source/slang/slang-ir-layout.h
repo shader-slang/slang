@@ -56,14 +56,25 @@ struct IRSizeAndAlignment
 
 struct IRTypeLayoutRules
 {
+private:
+    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize) = 0;
+
 public:
     IRTypeLayoutRuleName ruleName;
-    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize) = 0;
+    virtual IRSizeAndAlignment alignCompositeElementOfNonAggregate(IRSizeAndAlignment elementSize)
+    {
+        return alignCompositeElement(elementSize);
+    }
+    virtual IRSizeAndAlignment alignCompositeElementOfAggregate(IRSizeAndAlignment elementSize)
+    {
+        return alignCompositeElement(elementSize);
+    }
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(IRSizeAndAlignment element, IRIntegerValue count) = 0;
     virtual IRIntegerValue adjustOffsetForNextAggregateMember(IRIntegerValue currentSize, IRIntegerValue lastElementAlignment) = 0;
     static IRTypeLayoutRules* getStd430();
     static IRTypeLayoutRules* getStd140();
     static IRTypeLayoutRules* getNatural();
+    static IRTypeLayoutRules* getConstantBuffer();
     static IRTypeLayoutRules* get(IRTypeLayoutRuleName name);
 };
 

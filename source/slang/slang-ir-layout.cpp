@@ -71,7 +71,7 @@ static Result _calcArraySizeAndAlignment(
     IRSizeAndAlignment elementTypeLayout;
     SLANG_RETURN_ON_FAIL(getSizeAndAlignment(optionSet, rules, elementType, &elementTypeLayout));
 
-    elementTypeLayout = rules->alignCompositeElement(elementTypeLayout);
+    elementTypeLayout = rules->alignCompositeElementOfAggregate(elementTypeLayout);
     *outSizeAndAlignment = IRSizeAndAlignment(
         elementTypeLayout.getStride() * (elementCount - 1) + elementTypeLayout.size,
         elementTypeLayout.alignment);
@@ -193,7 +193,7 @@ case kIROp_##TYPE##Type:                                        \
                 offset = rules->adjustOffsetForNextAggregateMember(offset, fieldTypeLayout.alignment);
             }
         }
-        *outSizeAndAlignment = rules->alignCompositeElement(structLayout);
+        *outSizeAndAlignment = rules->alignCompositeElementOfAggregate(structLayout);
         return SLANG_OK;
     }
     break;
@@ -234,7 +234,7 @@ case kIROp_##TYPE##Type:                                        \
         auto anyValType = cast<IRAnyValueType>(type);
         outSizeAndAlignment->size = getIntVal(anyValType->getSize());
         outSizeAndAlignment->alignment = 4;
-        *outSizeAndAlignment = rules->alignCompositeElement(*outSizeAndAlignment);
+        *outSizeAndAlignment = rules->alignCompositeElementOfNonAggregate(*outSizeAndAlignment);
         return SLANG_OK;
     }
     break;
@@ -250,7 +250,7 @@ case kIROp_##TYPE##Type:                                        \
             resultLayout.size = align(resultLayout.size, fieldTypeLayout.alignment);
             resultLayout.alignment = std::max(resultLayout.alignment, fieldTypeLayout.alignment);
         }
-        *outSizeAndAlignment = rules->alignCompositeElement(resultLayout);
+        *outSizeAndAlignment = rules->alignCompositeElementOfNonAggregate(resultLayout);
         return SLANG_OK;
     }
     break;
@@ -272,7 +272,7 @@ case kIROp_##TYPE##Type:                                        \
         IRSizeAndAlignment resultLayout;
         resultLayout.size = size;
         resultLayout.alignment = 4;
-        *outSizeAndAlignment = rules->alignCompositeElement(resultLayout);
+        *outSizeAndAlignment = rules->alignCompositeElementOfNonAggregate(resultLayout);
         return SLANG_OK;
     }
     break;
@@ -443,6 +443,38 @@ struct NaturalLayoutRules : IRTypeLayoutRules
     }
 };
 
+struct ConstantBufferLayoutRules : IRTypeLayoutRules
+{
+    ConstantBufferLayoutRules()
+    {
+        ruleName = IRTypeLayoutRuleName::ConstantBuffer;
+    }
+
+    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
+    {
+        return elementSize;
+    }
+
+    /// Next member only aligns to 16 if the next member is an array/matrix/struct
+    virtual IRSizeAndAlignment alignCompositeElementOfAggregate(IRSizeAndAlignment currentSize)
+    {
+        // Matrix/Array/Struct should be aligned on a new register
+        return IRSizeAndAlignment(currentSize.size, 16);
+    }
+
+    virtual IRIntegerValue adjustOffsetForNextAggregateMember(IRIntegerValue currentSize, IRIntegerValue lastElementAlignment)
+    {
+        SLANG_UNUSED(lastElementAlignment);
+        return currentSize;
+    }
+
+    virtual IRSizeAndAlignment getVectorSizeAndAlignment(IRSizeAndAlignment element, IRIntegerValue count)
+    {
+        IRIntegerValue countForAlignment = count;
+        return IRSizeAndAlignment((int)(element.size * count), (int)(element.size * countForAlignment));
+    }
+};
+
 struct Std430LayoutRules : IRTypeLayoutRules
 {
     Std430LayoutRules()
@@ -534,6 +566,13 @@ IRTypeLayoutRules* IRTypeLayoutRules::getNatural()
     static NaturalLayoutRules rules;
     return &rules;
 }
+
+IRTypeLayoutRules* IRTypeLayoutRules::getConstantBuffer()
+{
+    static ConstantBufferLayoutRules rules;
+    return &rules;
+}
+
 IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
 {
     switch (name)
@@ -541,6 +580,7 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         case IRTypeLayoutRuleName::Std430: return getStd430();
         case IRTypeLayoutRuleName::Std140: return getStd140();
         case IRTypeLayoutRuleName::Natural: return getNatural();
+        case IRTypeLayoutRuleName::ConstantBuffer: return getConstantBuffer();
         default: return nullptr;
     }
 }

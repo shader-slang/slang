@@ -3967,7 +3967,7 @@ struct SPIRVEmitContext
                         SpvDecorationRowMajor);
 
                     auto vectorSize = rule->getVectorSizeAndAlignment(elementSizeAlignment, getIntVal(matrixType->getRowCount()));
-                    vectorSize = rule->alignCompositeElement(vectorSize);
+                    vectorSize = rule->alignCompositeElementOfNonAggregate(vectorSize);
                     matrixStride = vectorSize.getStride();
                 }
                 else
@@ -3980,7 +3980,7 @@ struct SPIRVEmitContext
                         SpvDecorationColMajor);
 
                     auto vectorSize = rule->getVectorSizeAndAlignment(elementSizeAlignment, getIntVal(matrixType->getColumnCount()));
-                    vectorSize = rule->alignCompositeElement(vectorSize);
+                    vectorSize = rule->alignCompositeElementOfNonAggregate(vectorSize);
                     matrixStride = vectorSize.getStride();
                 }
 

@@ -346,6 +346,11 @@ namespace Slang
             return getBoolOption(CompilerOptionName::GLSLForceScalarLayout);
         }
 
+        bool shouldUseDXLayout()
+        {
+            return getBoolOption(CompilerOptionName::ForceDXLayout);
+        }
+
         bool shouldDumpIntermediates()
         {
             return getBoolOption(CompilerOptionName::DumpIntermediates);

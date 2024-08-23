@@ -295,6 +295,12 @@ struct Std430LayoutRulesImpl : GLSLBaseLayoutRulesImpl
     // base/common GLSL layout rules.
 };
 
+/// The GLSL fvk-use-dx-layout
+struct FXCShaderResourceLayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    // Currently this FXC layout is equal to how we compute 'DefaultLayoutRulesImpl'
+};
+
     /// The GLSL `std430` layout rules.
 struct Std140LayoutRulesImpl : GLSLBaseLayoutRulesImpl
 {
@@ -343,12 +349,16 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
-        if(elementInfo.kind == LayoutResourceKind::Uniform)
-        {
-            if (elementInfo.alignment < 16)
-                elementInfo.alignment = 16;
-        }
-        return Super::GetArrayLayout(elementInfo, elementCount);
+        auto elementSize = elementInfo.size.getFiniteValue();
+        auto elementStride = _roundToAlignment(elementSize, 16);
+        auto arraySize = (elementStride * (elementCount-1)) + elementSize;
+    
+        SimpleArrayLayoutInfo arrayInfo;
+        arrayInfo.kind = elementInfo.kind;
+        arrayInfo.size = arraySize;
+        arrayInfo.alignment = 16;
+        arrayInfo.elementStride = elementStride;
+        return arrayInfo;
     }
 
     SimpleLayoutInfo GetPointerLayout() override
@@ -378,9 +388,6 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
         // Skip zero-size fields
         if(fieldInfo.size == 0)
             return ioStructInfo->size;
-
-        ioStructInfo->alignment = std::max(ioStructInfo->alignment, fieldInfo.alignment);
-        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, fieldInfo.alignment);
 
         LayoutSize fieldOffset = ioStructInfo->size;
         LayoutSize fieldSize = fieldInfo.size;
@@ -894,6 +901,7 @@ struct CUDARayTracingLayoutRulesImpl : DefaultVaryingLayoutRulesImpl
 DefaultLayoutRulesImpl kDefaultLayoutRulesImpl;
 Std140LayoutRulesImpl kStd140LayoutRulesImpl;
 Std430LayoutRulesImpl kStd430LayoutRulesImpl;
+FXCShaderResourceLayoutRulesImpl kFXCShaderResourceLayoutRulesImpl;
 HLSLConstantBufferLayoutRulesImpl kHLSLConstantBufferLayoutRulesImpl;
 HLSLStructuredBufferLayoutRulesImpl kHLSLStructuredBufferLayoutRulesImpl;
 
@@ -1206,6 +1214,18 @@ LayoutRulesImpl kScalarLayoutRulesImpl_ = {
     &kGLSLObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kFXCShaderResourceLayoutRulesFamilyImpl = {
+    &kGLSLLayoutRulesFamilyImpl,
+    &kFXCShaderResourceLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kFXCConstantBufferLayoutRulesFamilyImpl = {
+    &kGLSLLayoutRulesFamilyImpl,
+    &kHLSLConstantBufferLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
 LayoutRulesImpl kGLSLAnyValueLayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl,
     &kDefaultLayoutRulesImpl,
@@ -1300,6 +1320,9 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptio
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+
     return &kStd140LayoutRulesImpl_;
 }
 
@@ -1307,6 +1330,9 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptio
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+
     return &kStd140LayoutRulesImpl_;
 }
 
@@ -1324,6 +1350,9 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOption
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+
     return &kStd430LayoutRulesImpl_;
 
 }
@@ -1347,6 +1376,9 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(Compiler
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCShaderResourceLayoutRulesFamilyImpl;
+
     return &kStd430LayoutRulesImpl_;
 }
 
@@ -1365,10 +1397,13 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
     return &kGLSLHitAttributesParameterLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet& options)
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet& compilerOptions)
 {
-    if (options.shouldUseScalarLayout())
+    if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCShaderResourceLayoutRulesFamilyImpl;
+
     return &kGLSLStructuredBufferLayoutRulesImpl_;
 }
 

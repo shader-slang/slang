@@ -439,7 +439,12 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     {
         // uniform is implicitly read only
         m_writer->emit("layout(");
-        m_writer->emit(getTargetProgram()->getOptionSet().shouldUseScalarLayout() ? "scalar" : "std140");
+        if (getTargetProgram()->getOptionSet().shouldUseScalarLayout())
+            m_writer->emit("scalar");
+        else if (getTargetProgram()->getOptionSet().shouldUseDXLayout())
+            m_writer->emit("std430");
+        else
+            m_writer->emit("std140");
         m_writer->emit(") uniform ");
     }
 

@@ -400,6 +400,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::GLSLForceScalarLayout,
          "-force-glsl-scalar-layout,-fvk-use-scalar-layout", nullptr,
          "Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV."},
+        { OptionKind::ForceDXLayout, "-fvk-use-dx-layout", nullptr, "Pack members using FXCs member packing rules when targeting GLSL or SPIRV." },
         { OptionKind::VulkanBindShift, vkShiftNames.getBuffer(), "-fvk-<vulkan-shift>-shift <N> <space>", 
         "For example '-fvk-b-shift <N> <space>' shifts by N the inferred binding numbers for all resources in 'b' registers of space <space>. "
         "For a resource attached with :register(bX, <space>) but not [vk::binding(...)], "
@@ -2054,6 +2055,11 @@ SlangResult OptionsParser::_parse(
                 getCurrentTarget()->optionSet.add(CompilerOptionName::GLSLForceScalarLayout, true);
                 break;
             }
+            case OptionKind::ForceDXLayout:
+            {
+                getCurrentTarget()->optionSet.add(CompilerOptionName::ForceDXLayout, true);
+                break;
+            }
             case OptionKind::EnableEffectAnnotations:
             {
                 m_compileRequest->setEnableEffectAnnotations(true);
@@ -2778,6 +2784,11 @@ SlangResult OptionsParser::_parse(
             if (rawTarget.optionSet.shouldUseScalarLayout())
             {
                 m_compileRequest->setTargetForceGLSLScalarBufferLayout(targetID, true);
+            }
+
+            if (rawTarget.optionSet.shouldUseDXLayout())
+            {
+                m_compileRequest->setTargetForceDXLayout(targetID, true);
             }
 
             if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))

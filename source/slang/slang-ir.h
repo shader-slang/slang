@@ -564,6 +564,7 @@ enum class IRTypeLayoutRuleName
     Scalar = Natural,
     Std430,
     Std140,
+    ConstantBuffer,
     _Count,
 };
 
