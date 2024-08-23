@@ -2447,6 +2447,7 @@ extern "C"
     SLANG_API unsigned int spReflectionType_GetUserAttributeCount(SlangReflectionType* type);
     SLANG_API SlangReflectionUserAttribute* spReflectionType_GetUserAttribute(SlangReflectionType* type, unsigned int index);
     SLANG_API SlangReflectionUserAttribute* spReflectionType_FindUserAttributeByName(SlangReflectionType* type, char const* name);
+    SLANG_API SlangReflectionType* spReflectionType_applySpecializations(SlangReflectionType* type, SlangReflectionGeneric* generic);
 
     SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* type);
     SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflectionType* type, unsigned index);
@@ -2563,6 +2564,7 @@ extern "C"
     SLANG_API SlangReflectionUserAttribute* spReflectionVariable_FindUserAttributeByName(SlangReflectionVariable* var, SlangSession * globalSession, char const* name);
     SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar);
     SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(SlangReflectionVariable* var);
+    SLANG_API SlangReflectionVariable* spReflectionVariable_applySpecializations(SlangReflectionVariable* var, SlangReflectionGeneric* generic);
 
     // Variable Layout Reflection
 
@@ -2589,6 +2591,7 @@ extern "C"
     SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameter(SlangReflectionFunction* func, unsigned index);
     SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* func);
     SLANG_API SlangReflectionGeneric* spReflectionFunction_GetGenericContainer(SlangReflectionFunction* func);
+    SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(SlangReflectionFunction* func, SlangReflectionGeneric* generic);
 
     // Abstract Decl Reflection
 
@@ -2617,6 +2620,7 @@ extern "C"
     SLANG_API SlangReflectionGeneric* spReflectionGeneric_GetOuterGenericContainer(SlangReflectionGeneric* generic);
     SLANG_API SlangReflectionType* spReflectionGeneric_GetConcreteType(SlangReflectionGeneric* generic, SlangReflectionVariable* typeParam);
     SLANG_API int64_t spReflectionGeneric_GetConcreteIntVal(SlangReflectionGeneric* generic, SlangReflectionVariable* valueParam);
+    SLANG_API SlangReflectionGeneric* spReflectionGeneric_applySpecializations(SlangReflectionGeneric* currGeneric, SlangReflectionGeneric* generic);
 
 
     /** Get the stage that a variable belongs to (if any).
@@ -2718,12 +2722,25 @@ extern "C"
     SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* reflection);
     SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
 
-    SLANG_API  SlangReflectionType* spReflection_specializeType(
+    SLANG_API SlangReflectionType* spReflection_specializeType(
         SlangReflection*            reflection,
         SlangReflectionType*        type,
         SlangInt                    specializationArgCount,
         SlangReflectionType* const* specializationArgs,
         ISlangBlob**                outDiagnostics);
+    
+    SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
+        SlangReflection*                 inProgramLayout,
+        SlangReflectionGeneric*          generic,
+        SlangInt                         argCount,
+        SlangReflectionVariable* const*  params,
+        SlangReflectionGenericArg const* args,
+        ISlangBlob**                     outDiagnostics);
+    
+    SLANG_API bool spReflection_IsSubType(
+        SlangReflection * reflection,
+        SlangReflectionType* subType,
+        SlangReflectionType* superType);
 
         /// Get the number of hashed strings
     SLANG_API SlangUInt spReflection_getHashedStringCount(
@@ -2769,6 +2786,12 @@ namespace slang
     struct VariableReflection;
     struct FunctionReflection;
     struct GenericReflection;
+    
+    union GenericArgReflection
+    {
+        TypeReflection* type;
+        int64_t intVal;
+    };
     
     struct UserAttribute
     {
@@ -2939,18 +2962,25 @@ namespace slang
         {
             return spReflectionType_GetUserAttributeCount((SlangReflectionType*)this);
         }
+
         UserAttribute* getUserAttributeByIndex(unsigned int index)
         {
             return (UserAttribute*)spReflectionType_GetUserAttribute((SlangReflectionType*)this, index);
         }
+
         UserAttribute* findUserAttributeByName(char const* name)
         {
             return (UserAttribute*)spReflectionType_FindUserAttributeByName((SlangReflectionType*)this, name);
         }
 
-        SlangReflectionGeneric* getGenericContainer()
+        TypeReflection* applySpecializations(GenericReflection* generic)
         {
-            return (SlangReflectionGeneric*) spReflectionType_GetGenericContainer((SlangReflectionType*) this);
+            return (TypeReflection*)spReflectionType_applySpecializations((SlangReflectionType*)this, (SlangReflectionGeneric*)generic);
+        }
+
+        GenericReflection* getGenericContainer()
+        {
+            return (GenericReflection*) spReflectionType_GetGenericContainer((SlangReflectionType*) this);
         }
     };
 
@@ -3419,6 +3449,11 @@ namespace slang
         {
             return (GenericReflection*)spReflectionVariable_GetGenericContainer((SlangReflectionVariable*)this);
         }
+
+        VariableReflection* applySpecializations(GenericReflection* generic)
+        {
+            return (VariableReflection*)spReflectionVariable_applySpecializations((SlangReflectionVariable*)this, (SlangReflectionGeneric*)generic);
+        }
     };
 
     struct VariableLayoutReflection
@@ -3549,6 +3584,11 @@ namespace slang
         {
             return (GenericReflection*)spReflectionFunction_GetGenericContainer((SlangReflectionFunction*)this);
         }
+
+        FunctionReflection* applySpecializations(GenericReflection* generic)
+        {
+            return (FunctionReflection*)spReflectionFunction_applySpecializations((SlangReflectionFunction*)this, (SlangReflectionGeneric*)generic);
+        }
     };
 
     struct GenericReflection
@@ -3619,13 +3659,12 @@ namespace slang
             return spReflectionGeneric_GetConcreteIntVal((SlangReflectionGeneric*)this, (SlangReflectionVariable*)valueParam);
         }
 
-        union GenericArgReflection
+        GenericReflection* applySpecializations(GenericReflection* generic)
         {
-            TypeReflection* type;
-            int64_t intVal;
-        };
+            return (GenericReflection*)spReflectionGeneric_applySpecializations((SlangReflectionGeneric*)this, (SlangReflectionGeneric*)generic);
+        }
 
-        GenericReflection* specializeGenericTypeParameter(
+        /*GenericReflection* specializeGenericTypeParameter(
             GenericReflection*           generic,
             uint32_t                     argCount,
             const VariableReflection*    params,
@@ -3637,7 +3676,7 @@ namespace slang
                 argCount,
                 (SlangReflectionVariable* const*)params,
                 (SlangReflectionGenericArg* const*)args);
-        }
+        }*/
     };
 
     struct EntryPointReflection
@@ -3857,6 +3896,32 @@ namespace slang
                 specializationArgCount,
                 (SlangReflectionType* const*) specializationArgs,
                 outDiagnostics);
+        }
+
+        GenericReflection* specializeGeneric(
+            GenericReflection* generic,
+            SlangInt specializationArgCount,
+            VariableReflection* const* specializationArgs,
+            GenericArgReflection const* specializationArgVals,
+            ISlangBlob** outDiagnostics)
+        {
+            return (GenericReflection*) spReflection_specializeGeneric(
+                (SlangReflection*) this,
+                (SlangReflectionGeneric*) generic,
+                specializationArgCount,
+                (SlangReflectionVariable* const*) specializationArgs,
+                (SlangReflectionGenericArg const*) specializationArgVals,
+                outDiagnostics);
+        }
+
+        bool isSubType(
+            TypeReflection* subType,
+            TypeReflection* superType)
+        {
+            return spReflection_IsSubType(
+                (SlangReflection*) this,
+                (SlangReflectionType*) subType,
+                (SlangReflectionType*) superType);
         }
 
         SlangUInt getHashedStringCount() const { return spReflection_getHashedStringCount((SlangReflection*)this); }
