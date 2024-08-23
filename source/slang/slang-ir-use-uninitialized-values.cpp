@@ -434,12 +434,55 @@ namespace Slang
         return false;
     }
 
+    static bool isWrittenTo(IRInst* inst)
+    {
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        for (auto alias : getAliasableInstructions(inst))
+        {
+            for (auto use = alias->firstUse; use; use = use->nextUse)
+            {
+                IRInst* user = use->getUser();
+                collectLoadStore(stores, loads, user, alias);
+
+                // ...we will ignore the rest...
+                if (stores.getCount())
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    static bool isDirectlyWrittenTo(IRInst* inst)
+    {
+        List<IRInst*> stores;
+        List<IRInst*> loads;
+
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            IRInst* user = use->getUser();
+            collectLoadStore(stores, loads, user, inst);
+
+            // ...we will ignore the rest...
+            if (stores.getCount())
+                return true;
+        }
+
+        return false;
+    }
+
     static List<IRStructField*> checkFieldsFromExit(ReachabilityContext& reachability, IRReturn* ret, IRStructType* type)
     {
         IRInst* origin = traceInstOrigin(ret->getVal());
 
         // We don't want to warn on delegated construction
         if (!isUninitializedValue(origin))
+            return {};
+        
+        // Check if the origin instruction is ever written to
+        if (isDirectlyWrittenTo(origin))
             return {};
 
         // Now we can look for all references to fields
@@ -545,21 +588,8 @@ namespace Slang
         }
 
         // If there is at least one write...
-        List<IRInst*> stores;
-        List<IRInst*> loads;
-
-        for (auto alias : getAliasableInstructions(param))
-        {
-            for (auto use = alias->firstUse; use; use = use->nextUse)
-            {
-                IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user, alias);
-
-                // ...we will ignore the rest...
-                if (stores.getCount())
-                    return;
-            }
-        }
+        if (isWrittenTo(param))
+            return;
 
         // ...or if there is an intrinsic_asm instruction
         for (const auto& b : func->getBlocks())
