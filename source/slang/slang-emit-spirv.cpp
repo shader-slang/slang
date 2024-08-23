@@ -324,7 +324,6 @@ struct SpvSnippetEmitContext
     bool isResultTypeFloat;
     // True if resultType is signed.
     bool isResultTypeSigned;
-    Dictionary<SpvStorageClass, IRInst*> qualifiedResultTypes;
     List<SpvWord> argumentIds;
 };
 
@@ -1223,17 +1222,59 @@ struct SPIRVEmitContext
         return m_NonSemanticDebugPrintfExtInst;
     }
 
-    SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
+    static SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
     {
+        SLANG_EXHAUSTIVE_SWITCH_BEGIN
         switch (addrSpace)
         {
         case AddressSpace::Generic:
             return SpvStorageClassMax;
+        case AddressSpace::ThreadLocal:
+            return SpvStorageClassPrivate;
+        case AddressSpace::GroupShared:
+            return SpvStorageClassWorkgroup;
+        case AddressSpace::Uniform:
+            return SpvStorageClassUniform;
+        case AddressSpace::Input:
+            return SpvStorageClassInput;
+        case AddressSpace::Output:
+            return SpvStorageClassOutput;
+        case AddressSpace::TaskPayloadWorkgroup:
+            return SpvStorageClassTaskPayloadWorkgroupEXT;
+        case AddressSpace::Function:
+            return SpvStorageClassFunction;
+        case AddressSpace::StorageBuffer:
+            return SpvStorageClassStorageBuffer;
+        case AddressSpace::PushConstant:
+            return SpvStorageClassPushConstant;
+        case AddressSpace::RayPayloadKHR:
+            return SpvStorageClassRayPayloadKHR;
+        case AddressSpace::IncomingRayPayload:
+            return SpvStorageClassIncomingRayPayloadKHR;
+        case AddressSpace::CallableDataKHR:
+            return SpvStorageClassCallableDataKHR;
+        case AddressSpace::IncomingCallableData:
+            return SpvStorageClassIncomingCallableDataKHR;
+        case AddressSpace::HitObjectAttribute:
+            return SpvStorageClassHitObjectAttributeNV;
+        case AddressSpace::HitAttribute:
+            return SpvStorageClassHitAttributeKHR;
+        case AddressSpace::ShaderRecordBuffer:
+            return SpvStorageClassShaderRecordBufferKHR;
+        case AddressSpace::UniformConstant:
+            return SpvStorageClassUniformConstant;
+        case AddressSpace::Image:
+            return SpvStorageClassImage;
         case AddressSpace::UserPointer:
             return SpvStorageClassPhysicalStorageBuffer;
-        default:
-            return (SpvStorageClass)addrSpace;
+        case AddressSpace::Global:
+        case AddressSpace::MetalObjectData:
+            // msvc is limiting us from putting the UNEXPECTED macro here, so
+            // just fall out
+            ;
         }
+        SLANG_UNEXPECTED("Unhandled AddressSpace in addressSpaceToStorageClass");
+        SLANG_EXHAUSTIVE_SWITCH_END
     }
 
     // Now that we've gotten the core infrastructure out of the way,
@@ -1829,7 +1870,7 @@ struct SPIRVEmitContext
         SpvStorageClass storageClass = SpvStorageClassFunction;
         if (ptrType && ptrType->hasAddressSpace())
         {
-            storageClass = (SpvStorageClass)ptrType->getAddressSpace();
+            storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         }
         return storageClass;
     }
@@ -2369,7 +2410,7 @@ struct SPIRVEmitContext
         if (auto ptrType = as<IRPtrTypeBase>(param->getDataType()))
         {
             if (ptrType->hasAddressSpace())
-                storageClass = (SpvStorageClass)ptrType->getAddressSpace();
+                storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         }
         if (auto systemValInst = maybeEmitSystemVal(param))
         {
@@ -2398,7 +2439,7 @@ struct SPIRVEmitContext
         if (auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType()))
         {
             if (ptrType->hasAddressSpace())
-                storageClass = (SpvStorageClass)ptrType->getAddressSpace();
+                storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         }
         auto varInst = emitOpVariable(
             getSection(SpvLogicalSectionID::GlobalVariables),
@@ -2418,7 +2459,7 @@ struct SPIRVEmitContext
         const auto kind = (SpvBuiltIn)(getIntVal(spvAsmBuiltinVar->getOperand(0)));
         IRBuilder builder(spvAsmBuiltinVar);
         builder.setInsertBefore(spvAsmBuiltinVar);
-        auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, spvAsmBuiltinVar->getDataType(), SpvStorageClassInput), kind, spvAsmBuiltinVar);
+        auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, spvAsmBuiltinVar->getDataType(), AddressSpace::Input), kind, spvAsmBuiltinVar);
         registerInst(spvAsmBuiltinVar, varInst);
         return varInst;
     }
@@ -2719,6 +2760,7 @@ struct SPIRVEmitContext
         case kIROp_Specialize:
         case kIROp_MissingReturn:
         case kIROp_StaticAssert:
+        case kIROp_Unmodified:
             break;
         case kIROp_Var:
             result = emitVar(parent, inst);
@@ -3372,7 +3414,7 @@ struct SPIRVEmitContext
                                     if (auto ptrType = as<IRPtrTypeBase>(globalInst->getDataType()))
                                     {
                                         auto addrSpace = ptrType->getAddressSpace();
-                                        if (addrSpace != AddressSpace(SpvStorageClassInput) && addrSpace != AddressSpace(SpvStorageClassOutput))
+                                        if (addrSpace != AddressSpace::Input && addrSpace != AddressSpace::Output)
                                             continue;
                                     }
                                 }
@@ -4075,7 +4117,7 @@ struct SPIRVEmitContext
         if (!ptrType)
             return;
         auto addrSpace = ptrType->getAddressSpace();
-        if (addrSpace == AddressSpace(SpvStorageClassInput))
+        if (addrSpace == AddressSpace::Input)
         {
             if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
             {
@@ -4090,7 +4132,7 @@ struct SPIRVEmitContext
         SpvInst* result = nullptr;
         auto ptrType = as<IRPtrTypeBase>(type);
         SLANG_ASSERT(ptrType && "`getBuiltinGlobalVar`: `type` must be ptr type.");
-        auto storageClass = static_cast<SpvStorageClass>(ptrType->getAddressSpace());
+        auto storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         auto key = BuiltinSpvVarKey(builtinVal, storageClass);
         if (m_builtinGlobalVars.tryGetValue(key, result))
         {
@@ -4102,7 +4144,7 @@ struct SPIRVEmitContext
             getSection(SpvLogicalSectionID::GlobalVariables),
             nullptr,
             type,
-            static_cast<SpvStorageClass>(ptrType->getAddressSpace())
+            addressSpaceToStorageClass(ptrType->getAddressSpace())
         );
         emitOpDecorateBuiltIn(
             getSection(SpvLogicalSectionID::Annotations),
@@ -4651,15 +4693,8 @@ struct SPIRVEmitContext
         {
             IRBuilder builder(m_irModule);
             builder.setInsertBefore(inst);
-            for (auto storageClass : snippet->usedPtrResultTypeStorageClasses)
-            {
-                auto newPtrType = builder.getPtrType(
-                    kIROp_PtrType,
-                    inst->getDataType(),
-                    storageClass
-                );
-                context.qualifiedResultTypes[storageClass] = newPtrType;
-            }
+            if(snippet->usedPtrResultTypeStorageClasses.getCount())
+                SLANG_UNIMPLEMENTED_X("specifying storage classes in __target_intrinsic modifiers");
         }
         return emitSpvSnippet(parent, inst, context, snippet);
     }
@@ -4779,11 +4814,6 @@ struct SPIRVEmitContext
                     emitOperand(kResultID);
                     break;
                 case SpvSnippet::ASMOperandType::ResultTypeId:
-                    if (operand.content != 0xFFFFFFFF)
-                    {
-                        emitOperand(context.qualifiedResultTypes.getValue((SpvStorageClass)operand.content));
-                    }
-                    else
                     {
                         emitOperand(context.resultType);
                     }
@@ -5066,9 +5096,9 @@ struct SPIRVEmitContext
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
         auto destPtrType = as<IRPtrTypeBase>(inst->getDest()->getDataType());
-        SpvStorageClass addrSpace = SpvStorageClassFunction;
+        auto addrSpace = AddressSpace::Function;
         if (destPtrType->hasAddressSpace())
-            addrSpace = (SpvStorageClass)destPtrType->getAddressSpace();
+            addrSpace = destPtrType->getAddressSpace();
         auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace);
         for (UInt i = 0; i < inst->getElementCount(); i++)
         {
@@ -5116,8 +5146,8 @@ struct SPIRVEmitContext
         if(ptrTypeWithNoAddressSpace->getAddressSpace() == addressSpace)
             return ptrTypeWithNoAddressSpace;
 
-        // It has an address space, but it doesn't match fail, this indicates a
-        // problem with whatever's creating these types
+        // It has an address space, but it doesn't match then fail, this
+        // indicates a problem with whatever's creating these types
         SLANG_ASSERT(!ptrTypeWithNoAddressSpace->hasAddressSpace());
 
         IRBuilder builder(ptrTypeWithNoAddressSpace);
@@ -5132,12 +5162,12 @@ struct SPIRVEmitContext
     {
         //"%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1;"
         IRBuilder builder(inst);
-        auto storageClass = isSpirv14OrLater()? SpvStorageClassStorageBuffer : SpvStorageClassUniform;
+        auto addressSpace = isSpirv14OrLater() ? AddressSpace::StorageBuffer : AddressSpace::Uniform;
         return emitOpAccessChain(
             parent,
             inst,
             // Make sure the resulting pointer has the correct storage class
-            getPtrTypeWithAddressSpace(cast<IRPtrTypeBase>(inst->getDataType()), AddressSpace(storageClass)),
+            getPtrTypeWithAddressSpace(cast<IRPtrTypeBase>(inst->getDataType()), addressSpace),
             inst->getOperand(0),
             makeArray(emitIntConstant(0, builder.getIntType()), ensureInst(inst->getOperand(1)))
         );
@@ -5942,7 +5972,7 @@ struct SPIRVEmitContext
 
                         SpvStorageClass storageClass = SpvStorageClassFunction;
                         if (fieldPtrType->hasAddressSpace())
-                            storageClass = (SpvStorageClass)fieldPtrType->getAddressSpace();
+                            storageClass = addressSpaceToStorageClass(fieldPtrType->getAddressSpace());
 
                         spvFieldType = emitOpDebugTypePointer(
                             getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -6107,7 +6137,7 @@ struct SPIRVEmitContext
                 SpvInst* debugBaseType = emitDebugType(baseType);
                 SpvStorageClass storageClass = SpvStorageClassFunction;
                 if (ptrType->hasAddressSpace())
-                    storageClass = (SpvStorageClass)ptrType->getAddressSpace();
+                    storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
 
                 return emitOpDebugTypePointer(
                     getSection(SpvLogicalSectionID::ConstantsAndTypes),

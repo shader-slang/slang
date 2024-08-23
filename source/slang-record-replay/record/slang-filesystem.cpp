@@ -18,11 +18,6 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, m_actualFileSystem.get());
     }
 
-    FileSystemRecorder::~FileSystemRecorder()
-    {
-        m_actualFileSystem->release();
-    }
-
     void* FileSystemRecorder::castAs(const Slang::Guid& guid)
     {
         return getInterface(guid);

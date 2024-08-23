@@ -2179,7 +2179,7 @@ static void legalizeMeshPayloadInputParam(
     builder->setInsertInto(builder->getModule());
 
     const auto ptrType = cast<IRPtrTypeBase>(pp->getDataType());
-    const auto g = builder->createGlobalVar(ptrType->getValueType(), SpvStorageClassTaskPayloadWorkgroupEXT);
+    const auto g = builder->createGlobalVar(ptrType->getValueType(), AddressSpace::TaskPayloadWorkgroup);
     g->setFullType(builder->getRateQualifiedType(builder->getGroupSharedRate(), g->getFullType()));
     // moveValueBefore(g, builder->getFunc());
     builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
@@ -3589,7 +3589,7 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                         builder.getPtrType(
                             payloadPtrType->getOp(),
                             payloadPtrType->getValueType(),
-                            SpvStorageClassTaskPayloadWorkgroupEXT
+                            AddressSpace::TaskPayloadWorkgroup
                         )
                     );
                 payload->setFullType(payloadSharedPtrType);
@@ -3601,7 +3601,7 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                 // parameter and store into the value being passed to this
                 // call.
                 builder.setInsertInto(module->getModuleInst());
-                const auto v = builder.createGlobalVar(payloadType, SpvStorageClassTaskPayloadWorkgroupEXT);
+                const auto v = builder.createGlobalVar(payloadType, AddressSpace::TaskPayloadWorkgroup);
                 v->setFullType(builder.getRateQualifiedType(builder.getGroupSharedRate(), v->getFullType()));
                 builder.setInsertBefore(call);
                 builder.emitStore(v, builder.emitLoad(payload));

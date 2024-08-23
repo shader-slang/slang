@@ -4,5 +4,5 @@
 public struct A
 {
     public int state;
-    [mutating] public int next() { return state; }
+    public int next() { return state; }
 };
