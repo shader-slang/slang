@@ -52,6 +52,7 @@ public:
         auto parentScope = getScope(decl);
         decl->ownedScope = m_builder->create<Scope>();
         decl->ownedScope->parent = parentScope;
+        decl->ownedScope->containerDecl = decl;
         pushContainerScope(decl);
     }
 

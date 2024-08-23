@@ -5,12 +5,12 @@
 
 // we should only have 1 'BuiltIn InstanceIndex' since the `Output` and `Input` semantic
 // for `InstanceIndex` should be converted to a non-builtin
-// CHECK-DAG: BuiltIn InstanceIndex
-// CHECK-NOT: BuiltIn InstanceIndex
+// CHECK-DAG: OpDecorate %gl_InstanceIndex BuiltIn InstanceIndex
+// CHECK-NOT: OpDecorate %gl_InstanceIndex BuiltIn InstanceIndex
 
 // We require 1 `Flat` for the fragment input `uint`
-// SPIRV: Flat
-// SPIRV-NOT: Flat
+// CHECK-DAG: OpDecorate %{{[1-9][0-9]*}} Flat
+// CHECK-NOT: OpDecorate %{{[1-9][0-9]*}} Flat
 
 struct VIn
 {

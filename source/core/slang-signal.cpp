@@ -36,7 +36,7 @@ String _getMessage(SignalType type, char const* message)
 
 // One point of having as a single function is a choke point both for handling (allowing different
 // handling scenarios) as well as a choke point to set a breakpoint to catch 'signal' types
-SLANG_RETURN_NEVER void handleSignal(SignalType type, char const* message)
+[[noreturn]] void handleSignal(SignalType type, char const* message)
 {
     StringBuilder buf;
     const char*const typeText = _getSignalTypeAsText(type);

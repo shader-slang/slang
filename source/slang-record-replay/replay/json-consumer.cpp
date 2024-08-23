@@ -1,5 +1,3 @@
-#include <filesystem>
-
 #include "slang.h"
 #include "json-consumer.h"
 #include "../util/record-utility.h"
@@ -335,26 +333,22 @@ namespace SlangRecord
     }
 
 
-    JsonConsumer::JsonConsumer(const std::string& filePath)
+    JsonConsumer::JsonConsumer(const Slang::String& filePath)
     {
-        std::filesystem::path jsonFileDir(filePath);
-        jsonFileDir = std::filesystem::absolute(jsonFileDir);
-
-        if (!Slang::File::exists(jsonFileDir.parent_path().string().c_str()))
+        if (!Slang::File::exists(Slang::Path::getParentDirectory(filePath)))
         {
-            slangRecordLog(LogLevel::Error, "Directory for json file does not exist: %s\n", filePath.c_str());
+            slangRecordLog(LogLevel::Error, "Directory for json file does not exist: %s\n", filePath.getBuffer());
         }
 
-        Slang::String path(filePath.c_str());
         Slang::FileMode fileMode = Slang::FileMode::Create;
         Slang::FileAccess fileAccess = Slang::FileAccess::Write;
         Slang::FileShare fileShare = Slang::FileShare::None;
 
-        SlangResult res = m_fileStream.init(path, fileMode, fileAccess, fileShare);
+        SlangResult res = m_fileStream.init(filePath, fileMode, fileAccess, fileShare);
 
         if (res != SLANG_OK)
         {
-            slangRecordLog(LogLevel::Error, "Failed to open file %s\n", filePath.c_str());
+            slangRecordLog(LogLevel::Error, "Failed to open file %s\n", filePath.getBuffer());
         }
 
         m_isFileValid = true;
@@ -454,7 +448,7 @@ namespace SlangRecord
                     _writePair(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                                 desc.preprocessorMacros[i].name != nullptr ? desc.preprocessorMacros[i].name : "nullptr"));
 
-                    _writePair(builder, indent, "value", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                    _writePairNoComma(builder, indent, "value", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                                 desc.preprocessorMacros[i].value != nullptr ? desc.preprocessorMacros[i].value : "nullptr"));
                 }
             }

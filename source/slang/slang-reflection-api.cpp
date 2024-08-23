@@ -2838,6 +2838,7 @@ SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(Slang
     return getInnermostGenericParent(declRef);
 }
 
+<<<<<<< HEAD
 SLANG_API SlangReflectionVariable* spReflectionVariable_applySpecializations(SlangReflectionVariable* var, SlangReflectionGeneric* generic)
 {
     auto declRef = convert(var);
@@ -2851,6 +2852,8 @@ SLANG_API SlangReflectionVariable* spReflectionVariable_applySpecializations(Sla
     return convert(substDeclRef);
 }
 
+=======
+>>>>>>> e4088cd602bd4d5a72fea67a787b1319acfc044d
 // Variable Layout Reflection
 
 SLANG_API SlangReflectionVariable* spReflectionVariableLayout_GetVariable(SlangReflectionVariableLayout* inVarLayout)
@@ -3073,6 +3076,7 @@ SLANG_API SlangReflectionGeneric* spReflectionFunction_GetGenericContainer(Slang
 {
     auto declRef = convert(func);
     return getInnermostGenericParent(declRef);
+<<<<<<< HEAD
 }
 
 SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(SlangReflectionFunction* func, SlangReflectionGeneric* generic)
@@ -3086,6 +3090,8 @@ SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(Sla
 
     auto substDeclRef = substituteDeclRef(SubstitutionSet(genericDeclRef), astBuilder, declRef);
     return convert(substDeclRef.as<FunctionDeclBase>());
+=======
+>>>>>>> e4088cd602bd4d5a72fea67a787b1319acfc044d
 }
 
 // Abstract decl reflection
@@ -3376,6 +3382,7 @@ SLANG_API int64_t spReflectionGeneric_GetConcreteIntVal(SlangReflectionGeneric* 
     return 0;
 }
 
+<<<<<<< HEAD
 SLANG_API SlangReflectionGeneric* spReflectionGeneric_applySpecializations(SlangReflectionGeneric* currGeneric, SlangReflectionGeneric* generic)
 {
     auto declRef = convertGenericToDeclRef(currGeneric);
@@ -3389,6 +3396,8 @@ SLANG_API SlangReflectionGeneric* spReflectionGeneric_applySpecializations(Slang
     return convertDeclToGeneric(substDeclRef);
 }
 
+=======
+>>>>>>> e4088cd602bd4d5a72fea67a787b1319acfc044d
 
 // Shader Parameter Reflection
 

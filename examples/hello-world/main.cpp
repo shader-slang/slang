@@ -12,12 +12,14 @@
 
 #include "vulkan-api.h"
 #include "examples/example-base/example-base.h"
+#include "examples/example-base/test-base.h"
+#include "source/core/slang-string-util.h"
 
 using Slang::ComPtr;
 
 static const ExampleResources resourceBase("hello-world");
 
-struct HelloWorldExample
+struct HelloWorldExample : public TestBase
 {
     // The Vulkan functions pointers result from loading the vulkan library.
     VulkanAPI vkAPI;
@@ -66,10 +68,11 @@ struct HelloWorldExample
 
 };
 
-int main()
+int main(int argc, char* argv[])
 {
     initDebugCallback();
     HelloWorldExample example;
+    example.parseOption(argc, argv);
     return example.run();
 }
 
@@ -204,6 +207,11 @@ int HelloWorldExample::createComputePipelineFromShader()
             0, 0, spirvCode.writeRef(), diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         RETURN_ON_FAIL(result);
+
+        if (isTestMode())
+        {
+            printEntrypointHashes(1, 1, composedProgram);
+        }
     }
 
     // The following steps are all Vulkan API calls to create a pipeline.

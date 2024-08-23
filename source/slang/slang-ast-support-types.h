@@ -147,6 +147,9 @@ namespace Slang
         // Cost of converting an integer to a half type
         kConversionCost_IntegerToHalfConversion = 500,
 
+        // Cost of using a concrete argument pack
+        kConversionCost_ParameterPack = 500,
+
         // Default case (usable for user-defined conversions)
         kConversionCost_Default = 500,
 
@@ -677,6 +680,14 @@ namespace Slang
     struct SubstitutionSet
     {
         DeclRefBase* declRef = nullptr;
+
+        // The element index if the substitution is happening inside a pack expansion.
+        // For example, if we are substituting the pattern type of `expand each T`, where
+        // `T` is a type pack, then packExpansionIndex will have a value starting from 0
+        // to the count of the type pack during expansion of the `expand` type when we
+        // substitute `each T` with the element of `T` at index `packExpansionIndex`.
+        Index packExpansionIndex = -1;
+
         SubstitutionSet() = default;
         SubstitutionSet(DeclRefBase* declRefBase)
             :declRef(declRefBase)

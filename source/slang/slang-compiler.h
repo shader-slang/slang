@@ -426,8 +426,11 @@ namespace Slang
             String const& name,
             LookupMask mask,
             DiagnosticSink* sink);
+<<<<<<< HEAD
         
         bool isSubType(Type* subType, Type* superType);
+=======
+>>>>>>> e4088cd602bd4d5a72fea67a787b1319acfc044d
 
         Dictionary<String, IntVal*>& getMangledNameToIntValMap();
         ConstantIntVal* tryFoldIntVal(IntVal* intVal);
@@ -1484,10 +1487,9 @@ namespace Slang
             SlangInt32 index) override;
 
         /// Precompile TU to target language
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTargets(
-            DiagnosticSink* sink,
-            EndToEndCompileRequest* endToEndReq,
-            TargetRequest* targetReq);
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
+            SlangCompileTarget target,
+            slang::IBlob** outDiagnostics) override;
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 

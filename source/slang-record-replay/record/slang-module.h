@@ -21,7 +21,6 @@ namespace SlangRecord
         ISlangUnknown* getInterface(const Guid& guid);
 
         explicit ModuleRecorder(slang::IModule* module, RecordManager* recordManager);
-        ~ModuleRecorder();
 
         // Interfaces for `IModule`
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL findEntryPointByName(
@@ -39,6 +38,9 @@ namespace SlangRecord
         virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDependencyFileCount() override;
         virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
             SlangInt32 index) override;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
+            SlangCompileTarget target,
+            ISlangBlob** outDiagnostics) override;
 
         // Interfaces for `IComponentType`
         virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override;

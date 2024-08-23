@@ -1704,7 +1704,7 @@ namespace Slang
             if (auto ptrType = as<IRPtrTypeBase>(type))
             {
                 if (ptrType->hasAddressSpace())
-                    return (AddressSpace)ptrType->getAddressSpace();
+                    return ptrType->getAddressSpace();
                 return AddressSpace::Global;
             }
             return AddressSpace::Generic;
