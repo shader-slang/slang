@@ -458,7 +458,6 @@ namespace Slang
     {
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
-            IRInst* user = use->getUser();
             InstructionUsageType usage = getInstructionUsageType(use->getUser(), inst);
             if (usage == Store || usage == StoreParent)
                 return true;
