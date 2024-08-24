@@ -214,8 +214,16 @@ namespace Slang
 
         return addresses;
     }
-    
-    static void checkCallUsage(List<IRInst*>& stores, List<IRInst*>& loads, IRCall* call, IRInst* inst)
+
+    enum InstructionUsageType
+    {
+        None,           // Instruction neither stores nor loads from the soruce (e.g. meta operations)
+        Store,          // Instruction acts as a write to the source
+        StoreParent,    // Instruction's parent acts as a write to the source
+        Load            // Instruciton acts as a load from the source
+    };
+
+    static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
     {
         IRInst* callee = call->getCallee();
 
@@ -250,15 +258,63 @@ namespace Slang
             ftype = as<IRFuncType>(ftn->getFullType());
 
         if (!ftype)
-            return;
+            return None;
 
         // Consider it as a store if its passed
         // as an out/inout/ref parameter
         IRType* type = ftype->getParamType(index);
-        if (as<IROutType>(type) || as<IRInOutType>(type) || as<IRRefType>(type))
-            stores.add(call);
-        else
-            loads.add(call);
+        return (as<IROutType>(type) || as<IRInOutType>(type) || as<IRRefType>(type)) ? Store : Load;
+    }
+
+    static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
+    {
+        // Meta intrinsics (which evaluate on type) do nothing
+        if (isMetaOp(user))
+            return None;
+
+        // Ignore instructions generating more aliases
+        if (isAliasable(user))
+            return None;
+
+        switch (user->getOp())
+        {
+        case kIROp_loop:
+        case kIROp_unconditionalBranch:
+            // TODO: Ignore branches for now
+            return None;
+        
+        case kIROp_Call:
+            // Function calls can be either
+            // stores or loads depending on
+            // whether the callee takes it
+            // in as a out parameter or not
+            return getCallUsageType(as<IRCall>(user), inst);
+
+        // These instructions will store data...
+        case kIROp_Store:
+        case kIROp_SwizzledStore:
+        case kIROp_SPIRVAsm:
+            return Store;
+
+        case kIROp_SPIRVAsmOperandInst:
+            // For SPIRV asm instructions, need to check out the entire
+            // block when doing reachability checks
+            return StoreParent;
+
+        case kIROp_MakeExistential:
+        case kIROp_MakeExistentialWithRTTI:
+            // For specializing generic structs
+            return Store;
+        
+        // Miscellaenous cases
+        case kIROp_ManagedPtrAttach:
+        case kIROp_Unmodified:
+            return Store;
+
+        // ... and the rest will load/use them
+        default:
+            return Load;
+        }
     }
 
     static void collectSpecialCaseInstructions(List<IRInst*>& stores, IRBlock* block)
@@ -270,59 +326,14 @@ namespace Slang
         }
     }
 
-    static void collectLoadStore(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user, IRInst* inst)
+    static void collectInstructionByUsage(List<IRInst*>& stores, List<IRInst*>& loads, IRInst* user, IRInst* inst)
     {
-        // Meta intrinsics (which evaluate on type) do nothing
-        if (isMetaOp(user))
-            return;
-
-        // Ignore instructions generating more aliases
-        if (isAliasable(user))
-            return;
-
-        switch (user->getOp())
+        InstructionUsageType usage = getInstructionUsageType(user, inst);
+        switch (usage)
         {
-        case kIROp_loop:
-        case kIROp_unconditionalBranch:
-            // TODO: Ignore branches for now
-            return;
-        
-        case kIROp_Call:
-            // Function calls can be either
-            // stores or loads depending on
-            // whether the callee takes it
-            // in as a out parameter or not
-            return checkCallUsage(stores, loads, as<IRCall>(user), inst);
-
-        // These instructions will store data...
-        case kIROp_Store:
-        case kIROp_SwizzledStore:
-        case kIROp_SPIRVAsm:
-            stores.add(user);
-            break;
-
-        case kIROp_SPIRVAsmOperandInst:
-            // For SPIRV asm instructions, need to check out the entire
-            // block when doing reachability checks
-            stores.add(user->getParent());
-            break;
-
-        case kIROp_MakeExistential:
-        case kIROp_MakeExistentialWithRTTI:
-            // For specializing generic structs
-            stores.add(user);
-            break;
-        
-        // Miscellaenous cases
-        case kIROp_ManagedPtrAttach:
-        case kIROp_Unmodified:
-            stores.add(user);
-            break;
-
-        // ... and the rest will load/use them
-        default:
-            loads.add(user);
-            break;
+        case Load: return loads.add(user);
+        case Store: return stores.add(user);
+        case StoreParent: return stores.add(user->getParent());
         }
     }
 
@@ -349,10 +360,7 @@ namespace Slang
         {
             // TODO: Mark specific parts assigned to for partial initialization checks
             for (auto use = alias->firstUse; use; use = use->nextUse)
-            {
-                IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user, alias);
-            }
+                collectInstructionByUsage(stores, loads, use->getUser(), alias);
         }
     }
 
@@ -400,10 +408,7 @@ namespace Slang
         for (auto alias : getAliasableInstructions(inst))
         {
             for (auto use = alias->firstUse; use; use = use->nextUse)
-            {
-                IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user, alias);
-            }
+                collectInstructionByUsage(stores, loads, use->getUser(), alias);
         }
 
         for (auto store : stores)
@@ -443,8 +448,7 @@ namespace Slang
         {
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
-                IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user, alias);
+                collectInstructionByUsage(stores, loads, use->getUser(), alias);
 
                 // ...we will ignore the rest...
                 if (stores.getCount())
@@ -463,7 +467,7 @@ namespace Slang
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
             IRInst* user = use->getUser();
-            collectLoadStore(stores, loads, user, inst);
+            collectInstructionByUsage(stores, loads, use->getUser(), inst);
 
             // ...we will ignore the rest...
             if (stores.getCount())
@@ -709,8 +713,7 @@ namespace Slang
         {
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
-                IRInst* user = use->getUser();
-                collectLoadStore(stores, loads, user, alias);
+                collectInstructionByUsage(stores, loads, use->getUser(), alias);
 
                 // Disregard if there is at least one store,
                 // since we cannot tell what the control flow is
