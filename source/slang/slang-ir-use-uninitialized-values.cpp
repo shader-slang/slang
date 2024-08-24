@@ -441,17 +441,12 @@ namespace Slang
 
     static bool isWrittenTo(IRInst* inst)
     {
-        List<IRInst*> stores;
-        List<IRInst*> loads;
-
         for (auto alias : getAliasableInstructions(inst))
         {
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
-                collectInstructionByUsage(stores, loads, use->getUser(), alias);
-
-                // ...we will ignore the rest...
-                if (stores.getCount())
+                InstructionUsageType usage = getInstructionUsageType(use->getUser(), alias);
+                if (usage == Store || usage == StoreParent)
                     return true;
             }
         }
@@ -461,16 +456,11 @@ namespace Slang
 
     static bool isDirectlyWrittenTo(IRInst* inst)
     {
-        List<IRInst*> stores;
-        List<IRInst*> loads;
-
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
             IRInst* user = use->getUser();
-            collectInstructionByUsage(stores, loads, use->getUser(), inst);
-
-            // ...we will ignore the rest...
-            if (stores.getCount())
+            InstructionUsageType usage = getInstructionUsageType(use->getUser(), inst);
+            if (usage == Store || usage == StoreParent)
                 return true;
         }
 
@@ -706,21 +696,17 @@ namespace Slang
         
         auto addresses = getAliasableInstructions(variable);
         
-        List<IRInst*> stores;
         List<IRInst*> loads;
-
         for (auto alias : addresses)
         {
             for (auto use = alias->firstUse; use; use = use->nextUse)
             {
-                collectInstructionByUsage(stores, loads, use->getUser(), alias);
-
-                // Disregard if there is at least one store,
-                // since we cannot tell what the control flow is
-                if (stores.getCount())
+                InstructionUsageType usage = getInstructionUsageType(use->getUser(), alias);
+                if (usage == Store || usage == StoreParent)
                     return;
 
-                // TODO: see if we can do better here (another kind of reachability check?)
+                if (usage == Load)
+                    loads.add(use->getUser());
             }
         }
 
