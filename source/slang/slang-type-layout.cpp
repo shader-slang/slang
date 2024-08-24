@@ -295,40 +295,14 @@ struct Std430LayoutRulesImpl : GLSLBaseLayoutRulesImpl
     // base/common GLSL layout rules.
 };
 
-/// The GLSL fvk-use-dx-layout
+/// GLSL fvk-use-dx-layout for `ShaderResource`
 struct FXCShaderResourceLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     // Currently this FXC layout is equal to how we compute 'DefaultLayoutRulesImpl'
 };
 
-    /// The GLSL `std430` layout rules.
-struct Std140LayoutRulesImpl : GLSLBaseLayoutRulesImpl
-{
-    typedef GLSLBaseLayoutRulesImpl Super;
-
-    SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
-    {
-        // The `std140` rules require that array elements
-        // be aligned on 16-byte boundaries.
-        //
-        if(elementInfo.kind == LayoutResourceKind::Uniform)
-        {
-            if (elementInfo.alignment < 16)
-                elementInfo.alignment = 16;
-        }
-        return Super::GetArrayLayout(elementInfo, elementCount);
-    }
-
-    UniformLayoutInfo BeginStructLayout() override
-    {
-        // The `std140` rules require that a `struct` type
-        // be at least 16-byte aligned.
-        //
-        return UniformLayoutInfo(0, 16);
-    }
-};
-
-struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
+/// GLSL fvk-use-dx-layout for `ConstantBuffer`
+struct FXCConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
 
@@ -388,6 +362,111 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
         // Skip zero-size fields
         if(fieldInfo.size == 0)
             return ioStructInfo->size;
+
+        LayoutSize fieldOffset = ioStructInfo->size;
+        LayoutSize fieldSize = fieldInfo.size;
+
+        // Would this field cross a 16-byte boundary?
+        auto registerSize = 16;
+        auto startRegister = fieldOffset / registerSize;
+        auto endRegister = (fieldOffset + fieldSize - 1) / registerSize;
+        if (startRegister != endRegister)
+        {
+            ioStructInfo->size = _roundToAlignment(ioStructInfo->size, size_t(registerSize));
+            fieldOffset = ioStructInfo->size;
+        }
+
+        ioStructInfo->size += fieldInfo.size;
+        return fieldOffset;
+    }
+};
+
+    /// The GLSL `std430` layout rules.
+struct Std140LayoutRulesImpl : GLSLBaseLayoutRulesImpl
+{
+    typedef GLSLBaseLayoutRulesImpl Super;
+
+    SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
+    {
+        // The `std140` rules require that array elements
+        // be aligned on 16-byte boundaries.
+        //
+        if(elementInfo.kind == LayoutResourceKind::Uniform)
+        {
+            if (elementInfo.alignment < 16)
+                elementInfo.alignment = 16;
+        }
+        return Super::GetArrayLayout(elementInfo, elementCount);
+    }
+
+    UniformLayoutInfo BeginStructLayout() override
+    {
+        // The `std140` rules require that a `struct` type
+        // be at least 16-byte aligned.
+        //
+        return UniformLayoutInfo(0, 16);
+    }
+};
+
+struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    typedef DefaultLayoutRulesImpl Super;
+
+    // Similar to GLSL `std140` rules, an HLSL constant buffer requires that
+    // `struct` and array types have 16-byte alignement.
+    //
+    // Unlike GLSL `std140`, the overall size of an array or `struct` type
+    // is *not* rounded up to the alignment, so it is possible for later
+    // fields to sneak into the "tail space" left behind by a preceding
+    // structure or array. E.g., in this example:
+    //
+    //     struct S { float3 a[2]; float b; };
+    //
+    // The stride of the array `a` is 16 bytes per element, but the size
+    // of `a` will only be 28 bytes (not 32), so that `b` can fit into
+    // the space after the last array element and the overall structure
+    // will have a size of 32 bytes.
+
+    SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
+    {
+        if(elementInfo.kind == LayoutResourceKind::Uniform)
+        {
+            if (elementInfo.alignment < 16)
+                elementInfo.alignment = 16;
+        }
+        return Super::GetArrayLayout(elementInfo, elementCount);
+    }
+
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // Not supported on HLSL currently...
+        return SimpleLayoutInfo();
+    }
+
+    UniformLayoutInfo BeginStructLayout() override
+    {
+        return UniformLayoutInfo(0, 16);
+    }
+
+    // HLSL layout rules do *not* impose additional alignment
+    // constraints on vectors (e.g., all of `float`, `float2`,
+    // `float3`, and `float4` have 4-byte alignment), but instead
+    // they impose a rule that any `struct` field must not
+    // "straddle" a 16-byte boundary.
+    //
+    // This has the effect of making it *look* like `float4`
+    // values have 16-byte alignment in practice, but the
+    // effects on `float2` and `float3` are more nuanched and
+    // lead to different result than the GLSL rules.
+    //
+    LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) override
+    {
+        // Skip zero-size fields
+        if(fieldInfo.size == 0)
+            return ioStructInfo->size;
+
+        ioStructInfo->alignment = std::max(ioStructInfo->alignment, fieldInfo.alignment);
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, fieldInfo.alignment);
 
         LayoutSize fieldOffset = ioStructInfo->size;
         LayoutSize fieldSize = fieldInfo.size;
@@ -902,6 +981,7 @@ DefaultLayoutRulesImpl kDefaultLayoutRulesImpl;
 Std140LayoutRulesImpl kStd140LayoutRulesImpl;
 Std430LayoutRulesImpl kStd430LayoutRulesImpl;
 FXCShaderResourceLayoutRulesImpl kFXCShaderResourceLayoutRulesImpl;
+FXCConstantBufferLayoutRulesImpl fFXCConstantBufferLayoutRulesImpl;
 HLSLConstantBufferLayoutRulesImpl kHLSLConstantBufferLayoutRulesImpl;
 HLSLStructuredBufferLayoutRulesImpl kHLSLStructuredBufferLayoutRulesImpl;
 
@@ -1222,7 +1302,7 @@ LayoutRulesImpl kFXCShaderResourceLayoutRulesFamilyImpl = {
 
 LayoutRulesImpl kFXCConstantBufferLayoutRulesFamilyImpl = {
     &kGLSLLayoutRulesFamilyImpl,
-    &kHLSLConstantBufferLayoutRulesImpl,
+    &fFXCConstantBufferLayoutRulesImpl,
     &kGLSLObjectLayoutRulesImpl,
 };
 

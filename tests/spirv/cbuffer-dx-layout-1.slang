@@ -1,5 +1,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -xslang -fvk-use-dx-layout
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry computeMain -stage compute -fvk-use-dx-layout
+//TEST:CROSS_COMPILE(filecheck=SPIRV): -profile sm_5_0 -entry computeMain -target hlsl -spirv -fvk-use-dx-layout
 //TEST_INPUT:cbuffer(data=[1 2.0 3.0 4.0   5 6 7 0   8 9 10 11   12 0 0 0  13 0 0 0   14 0 0 0   15 0 0 0   16 17 18 0   19 20 21 22   23 24 0 0   25 0 0 0   26 0 0 0]):name=Test
 
 cbuffer Test
