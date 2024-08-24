@@ -10,9 +10,10 @@
 
 // SPIRV: OpEntryPoint
 // SPIRV-NOT: BuiltIn InstanceIndex
+
 // We require 1 `Flat` for the fragment input `uint`
-// SPIRV: Flat
-// SPIRV-NOT: Flat
+// SPIRV: OpDecorate %{{[1-9][0-9]*}} Flat
+// SPIRV-NOT: OpDecorate %{{[1-9][0-9]*}} Flat
 
 
 struct PSInput

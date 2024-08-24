@@ -2742,6 +2742,7 @@ static void _outputIncludes(const List<SourceFile*>& sourceFiles, SourceManager*
 void FrontEndCompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
+    SLANG_PROFILE;
     if (translationUnit->isChecked)
         return;
 
@@ -2924,6 +2925,7 @@ void FrontEndCompileRequest::checkAllTranslationUnits()
 
 void FrontEndCompileRequest::generateIR()
 {
+    SLANG_PROFILE;
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
     // Our task in this function is to generate IR code
@@ -3021,6 +3023,7 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 
 SlangResult FrontEndCompileRequest::executeActionsInner()
 {
+    SLANG_PROFILE_SECTION(frontEndExecute);
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
     for (TranslationUnitRequest* translationUnit : translationUnits)
@@ -3046,7 +3049,11 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         return SLANG_FAIL;
 
     // Perform semantic checking on the whole collection
-    checkAllTranslationUnits();
+    {
+        SLANG_PROFILE_SECTION(SemanticChecking);
+        checkAllTranslationUnits();
+    }
+
     if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -3172,6 +3179,7 @@ void EndToEndCompileRequest::init()
 
 SlangResult EndToEndCompileRequest::executeActionsInner()
 {
+    SLANG_PROFILE_SECTION(endToEndActions);
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.
     //
@@ -3244,10 +3252,10 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
 
             for (auto translationUnit : frontEndReq->translationUnits)
             {
-                translationUnit->getModule()->precompileForTargets(
-                    getSink(),
-                    this,
-                    targetReq);
+                SlangCompileTarget target = SlangCompileTarget(targetReq->getTarget());
+                translationUnit->getModule()->precompileForTarget(
+                    target,
+                    nullptr);
             }
         }
     }
@@ -6308,6 +6316,7 @@ SlangResult EndToEndCompileRequest::compile()
     if (getOptionSet().getBoolOption(CompilerOptionName::ReportDownstreamTime))
     {
         getSession()->getCompilerElapsedTime(&totalStartTime, &downstreamStartTime);
+        PerformanceProfiler::getProfiler()->clear();
     }
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
@@ -6322,6 +6331,7 @@ SlangResult EndToEndCompileRequest::compile()
 
     try
     {
+        SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
     }
     catch (const AbortCompilationException& e)

@@ -241,6 +241,9 @@ public:
     template <typename T>
     void getArray(SerialIndex index, List<T>& out);
 
+    template <typename T, int n>
+    void getArray(SerialIndex index, ShortList<T, n>& out);
+
     const void* getArray(SerialIndex index, Index& outCount);
 
     SerialPointer getPointer(SerialIndex index);
@@ -322,6 +325,38 @@ void SerialReader::getArray(SerialIndex index, List<T>& out)
         // If they are the same we can just write out
         out.clear();
         out.insertRange(0, (const T*)serialElements, count);
+    }
+    else
+    {
+        // Else we need to convert
+        out.setCount(count);
+        for (Index i = 0; i < count; ++i)
+        {
+            ElementTypeInfo::toNative(this, (const void*)&serialElements[i], (void*)&out[i]);
+        }
+    }
+}
+
+template <typename T, int n>
+void SerialReader::getArray(SerialIndex index, ShortList<T, n>& out)
+{
+    typedef SerialTypeInfo<T> ElementTypeInfo;
+    typedef typename ElementTypeInfo::SerialType ElementSerialType;
+
+    Index count;
+    auto serialElements = (const ElementSerialType*)getArray(index, count);
+
+    if (count == 0)
+    {
+        out.clear();
+        return;
+    }
+
+    if (std::is_same<T, ElementSerialType>::value)
+    {
+        // If they are the same we can just write out
+        out.clear();
+        out.addRange((const T*)serialElements, count);
     }
     else
     {

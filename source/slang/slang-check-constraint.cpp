@@ -57,6 +57,7 @@
 namespace Slang
 {
     Type* SemanticsVisitor::TryJoinVectorAndScalarType(
+        ConstraintSystem* constraints,
         VectorExpressionType* vectorType,
         BasicExpressionType*  scalarType)
     {
@@ -65,6 +66,7 @@ namespace Slang
         // That is, the join of a vector and a scalar type is
         // a vector type with a joined element type.
         auto joinElementType = TryJoinTypes(
+            constraints,
             vectorType->getElementType(),
             scalarType);
         if(!joinElementType)
@@ -76,6 +78,7 @@ namespace Slang
     }
 
     Type* SemanticsVisitor::_tryJoinTypeWithInterface(
+        ConstraintSystem* constraints,
         Type*                   type,
         Type*                   interfaceType)
     {
@@ -158,6 +161,31 @@ namespace Slang
                 return bestType;
         }
 
+        // If `interfaceType` represents some generic interface type, such as `IFoo<T>`, and `type` conforms to
+        // some `IFoo<X>`, then we should attempt to unify the them to discover constraints for
+        // `T`.
+        if (auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(interfaceType))
+        {
+            if (as<GenericAppDeclRef>(interfaceDeclRef.declRefBase))
+            {
+                auto inheritanceInfo = getShared()->getInheritanceInfo(type);
+                for (auto facet : inheritanceInfo.facets)
+                {
+                    if (facet->origin.declRef.getDecl() == interfaceDeclRef.getDecl())
+                    {
+                        auto unificationResult = TryUnifyTypes(
+                            *constraints,
+                            ValUnificationContext(),
+                            QualType(facet->getType()),
+                            interfaceType);
+
+                        if (unificationResult)
+                            return type;
+                    }
+                }
+            }
+        }
+
         // For all other cases, we will just bail out for now.
         //
         // TODO: In the future we should build some kind of side data structure
@@ -174,6 +202,7 @@ namespace Slang
     }
 
     Type* SemanticsVisitor::TryJoinTypes(
+        ConstraintSystem* constraints,
         QualType left,
         QualType right)
     {
@@ -201,7 +230,7 @@ namespace Slang
             // We can also join a vector and a scalar
             if(auto rightVector = as<VectorExpressionType>(right))
             {
-                return TryJoinVectorAndScalarType(rightVector, leftBasic);
+                return TryJoinVectorAndScalarType(constraints, rightVector, leftBasic);
             }
         }
 
@@ -217,6 +246,7 @@ namespace Slang
 
                 // Try to join the element types
                 auto joinElementType = TryJoinTypes(
+                    constraints,
                     QualType(leftVector->getElementType(), left.isLeftValue),
                     QualType(rightVector->getElementType(), right.isLeftValue));
                 if(!joinElementType)
@@ -230,7 +260,7 @@ namespace Slang
             // We can also join a vector and a scalar
             if(auto rightBasic = as<BasicExpressionType>(right))
             {
-                return TryJoinVectorAndScalarType(leftVector, rightBasic);
+                return TryJoinVectorAndScalarType(constraints, leftVector, rightBasic);
             }
         }
 
@@ -240,7 +270,7 @@ namespace Slang
             if( auto leftInterfaceRef = leftDeclRefType->getDeclRef().as<InterfaceDecl>() )
             {
                 //
-                return _tryJoinTypeWithInterface(right, left);
+                return _tryJoinTypeWithInterface(constraints, right, left);
             }
         }
         if(auto rightDeclRefType = as<DeclRefType>(right))
@@ -248,7 +278,29 @@ namespace Slang
             if( auto rightInterfaceRef = rightDeclRefType->getDeclRef().as<InterfaceDecl>() )
             {
                 //
-                return _tryJoinTypeWithInterface(left, right);
+                return _tryJoinTypeWithInterface(constraints, left, right);
+            }
+        }
+
+        // We can recursively join two TypePacks.
+        if (auto leftTypePack = as<ConcreteTypePack>(left))
+        {
+            if (auto rightTypePack = as<ConcreteTypePack>(right))
+            {
+                if(leftTypePack->getTypeCount() != rightTypePack->getTypeCount())
+                    return nullptr;
+                ShortList<Type*> joinedTypes;
+                for (Index i = 0; i < leftTypePack->getTypeCount(); ++i)
+                {
+                    auto joinedType = TryJoinTypes(
+                        constraints,
+                        QualType(leftTypePack->getElementType(i), left.isLeftValue),
+                        QualType(rightTypePack->getElementType(i), right.isLeftValue));
+                    if(!joinedType)
+                        return nullptr;
+                    joinedTypes.add(joinedType);
+                }
+                return m_astBuilder->getTypePack(joinedTypes.getArrayView().arrayView);
             }
         }
 
@@ -264,6 +316,8 @@ namespace Slang
         ArrayView<Val*>         knownGenericArgs,
         ConversionCost&         outBaseCost)
     {
+        ensureDecl(genericDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
+
         outBaseCost = kConversionCost_None;
 
         // For now the "solver" is going to be ridiculously simplistic.
@@ -285,11 +339,11 @@ namespace Slang
         // that `X<T>.IndexType == T`.
         for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef) )
         {
-            if(!TryUnifyTypes(*system, getSub(m_astBuilder, constraintDeclRef), getSup(m_astBuilder, constraintDeclRef)))
+            if(!TryUnifyTypes(*system, ValUnificationContext(), getSub(m_astBuilder, constraintDeclRef), getSup(m_astBuilder, constraintDeclRef)))
                 return DeclRef<Decl>();
         }
 
-        // Once have built up the full list of constraints we are trying to satisfy,
+        // Once have built up the initial list of constraints we are trying to satisfy,
         // we will attempt to solve for each parameter in a way that satisfies all
         // the constraints that apply to that parameter.
         //
@@ -300,7 +354,7 @@ namespace Slang
         // solution for how to assign the parameters in a way that satisfies all
         // the constraints.
         //
-        List<Val*> args;
+        ShortList<Val*> args;
 
         // If the context is such that some of the arguments are already specified
         // or known, we need to go ahead and use those arguments direclty (whether
@@ -316,129 +370,225 @@ namespace Slang
             }
         }
 
-        // We will then iterate over the explicit parameters of the generic
-        // and try to solve for each.
-        //
-        Count paramCounter = 0;
-        for (auto m : getMembers(m_astBuilder, genericDeclRef))
+        // The state of currently solved arguments.
+        struct SolvedArg
         {
-            if (auto typeParam = m.as<GenericTypeParamDecl>())
+            IntVal* val = nullptr;
+            bool isOptional = true;
+            ShortList<QualType, 8> types;
+        };
+        ShortList<SolvedArg> solvedArgs;
+
+        // We will then iterate over the constraints trying to solve all generic parameters.
+        // Note that we do not use ranged for here, because processing one constraint may lead to
+        // new constraints being discovered.
+        for (Index constraintIndex = 0; constraintIndex < system->constraints.getCount(); constraintIndex++)
+        {
+            // Note: it is important to keep a copy of the constraint here instead of
+            // using a reference, because the constraint list may be modified during the
+            // loop as we discover new constraints.
+            //
+            auto c = system->constraints[constraintIndex];
+            if (auto typeParam = as<GenericTypeParamDeclBase>(c.decl))
             {
+                SLANG_ASSERT(typeParam->parameterIndex != -1);
                 // If the parameter is one where we already know
                 // the argument value to use, we don't bother with
                 // trying to solve for it, and treat any constraints
                 // on such a parameter as implicitly solved-for.
                 //
-                Index paramIndex = paramCounter++;
-                if (paramIndex < knownGenericArgCount)
+                if (typeParam->parameterIndex < knownGenericArgCount)
                 {
-                    for (auto& c : system->constraints)
-                    {
-                        if (c.decl != typeParam.getDecl())
-                            continue;
-
-                        c.satisfied = true;
-                    }
+                    system->constraints[constraintIndex].satisfied = true;
                     continue;
                 }
 
-                QualType type;
-                bool typeConstraintOptional = true;
+                // If the parameter is a type pack, then we may have
+                // constraints that apply to invidual elements of the pack.
+                // We will need to handle the type pack case slightly differently.
+                //
+                bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
 
-                for (auto& c : system->constraints)
+                // We will use a temporary list to hold the resolved types
+                // for this generic parameter.
+                // For normal type parameters, there should be only one type
+                // in the list. For type pack parameters, there can be one type
+                // for each element in the pack.
+                //
+                if (solvedArgs.getCount() <= typeParam->parameterIndex)
                 {
-                    if (c.decl != typeParam.getDecl())
-                        continue;
+                    solvedArgs.setCount(typeParam->parameterIndex + 1);
+                }
+                auto& types = solvedArgs[typeParam->parameterIndex].types;
+                if (!isPack)
+                    types.setCount(1);
 
-                    auto cType = QualType(as<Type>(c.val), c.isUsedAsLValue);
-                    SLANG_RELEASE_ASSERT(cType);
+                bool& typeConstraintOptional = solvedArgs[typeParam->parameterIndex].isOptional;
 
-                    if (!type || (typeConstraintOptional && !c.isOptional))
+                QualType* ptype = nullptr;
+                if (isPack)
+                {
+                    types.setCount(Math::Max(types.getCount(), c.indexInPack + 1));
+                    ptype = &types[c.indexInPack];
+                }
+                else
+                    ptype = &types[0];
+                QualType& type = *ptype;
+
+                auto cType = QualType(as<Type>(c.val), c.isUsedAsLValue);
+                SLANG_RELEASE_ASSERT(cType);
+
+                if (!type || (typeConstraintOptional && !c.isOptional))
+                {
+                    type = cType;
+                    typeConstraintOptional = c.isOptional;
+                }
+                else if (!typeConstraintOptional)
+                {
+                    // If the type parameter is already constrained to a known type,
+                    // we need to make sure our resolved type can satisfy both constraints.
+                    // We do so by updating the resolved type to be the "join" of the current
+                    // solution and the type in the new constraint. If such join cannot be found,
+                    // it means it is not possible to have a compatible solution that meets all
+                    // constraints and we should fail.
+                    //
+                    // Another detail here is that during type joining, we may discover
+                    // new constraints from the base types of the types being joined.
+                    // We will pass the constraint system to `TryJoinTypes` which can
+                    // add new constraints to the system, and we will process the new constraints
+                    // in the next iteration.
+                    //
+                    auto joinType = TryJoinTypes(system, type, cType);
+                    if (!joinType)
                     {
-                        type = cType;
-                        typeConstraintOptional = c.isOptional;
+                        // failure!
+                        return DeclRef<Decl>();
                     }
-                    else if (!typeConstraintOptional)
-                    {
-                        auto joinType = TryJoinTypes(type, cType);
-                        if (!joinType)
-                        {
-                            // failure!
-                            return DeclRef<Decl>();
-                        }
-                        type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
-                    }
-
-                    c.satisfied = true;
+                    type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
                 }
 
-                if (!type)
-                {
-                    // failure!
-                    return DeclRef<Decl>();
-                }
-                args.add(type);
+                c.satisfied = true;
             }
-            else if (auto valParam = m.as<GenericValueParamDecl>())
+            else if (auto valParam = as<GenericValueParamDecl>(c.decl))
             {
+                SLANG_ASSERT(valParam->parameterIndex != -1);
+
                 // If the parameter is one where we already know
                 // the argument value to use, we don't bother with
                 // trying to solve for it, and treat any constraints
                 // on such a parameter as implicitly solved-for.
                 //
-                Index paramIndex = paramCounter++;
-                if (paramIndex < knownGenericArgCount)
+                if (valParam->parameterIndex < knownGenericArgCount)
                 {
-                    for (auto& c : system->constraints)
-                    {
-                        if (c.decl != typeParam.getDecl())
-                            continue;
-
-                        c.satisfied = true;
-                    }
+                    system->constraints[constraintIndex].satisfied = true;
                     continue;
                 }
 
-                // TODO(tfoley): maybe support more than integers some day?
-                // TODO(tfoley): figure out how this needs to interact with
-                // compile-time integers that aren't just constants...
-                IntVal* val = nullptr;
-                bool valOptional = true;
-                for (auto& c : system->constraints)
+                if (solvedArgs.getCount() <= valParam->parameterIndex)
+                    solvedArgs.setCount(valParam->parameterIndex + 1);
+                IntVal*& val = solvedArgs[valParam->parameterIndex].val;
+                bool& valOptional = solvedArgs[valParam->parameterIndex].isOptional;
+
+                auto cVal = as<IntVal>(c.val);
+                SLANG_RELEASE_ASSERT(cVal);
+
+                if (!val || (valOptional && !c.isOptional))
                 {
-                    if (c.decl != valParam.getDecl())
-                        continue;
-
-                    auto cVal = as<IntVal>(c.val);
-                    SLANG_RELEASE_ASSERT(cVal);
-
-                    if (!val || (valOptional && !c.isOptional))
+                    val = cVal;
+                    valOptional = c.isOptional;
+                }
+                else
+                {
+                    if(!valOptional && !val->equals(cVal))
                     {
-                        val = cVal;
-                        valOptional = c.isOptional;
+                        // failure!
+                        return DeclRef<Decl>();
+                    }
+                }
+
+                c.satisfied = true;
+            }
+            system->constraints[constraintIndex].satisfied = c.satisfied;
+        }
+
+        // After we processed all constraints, `solvedTypes` and `solvedVals`
+        // should have been filled with the resolved types and values for the
+        // generic parameters. We can now verify if they are complete and consolidate
+        // them into final argument list.
+        for (auto member : genericDeclRef.getDecl()->members)
+        {
+            if (auto typeParam = as<GenericTypeParamDeclBase>(member))
+            {
+                SLANG_ASSERT(typeParam->parameterIndex != -1);
+
+                if (typeParam->parameterIndex < knownGenericArgCount)
+                    continue;
+                bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
+                if (typeParam->parameterIndex >= solvedArgs.getCount())
+                {
+                    // If the parameter is not a type pack and we don't have a
+                    // resolved type for it, we should fail.
+                    if (!isPack)
+                        return DeclRef<Decl>();
+                    // If the parameter is a type pack, we should add an empty
+                    // type list to solvedTypes.
+                    solvedArgs.setCount(typeParam->parameterIndex + 1);
+                }
+                auto& types = solvedArgs[typeParam->parameterIndex].types;
+                // Fail if any of the resolved type element is empty.
+                for (auto t : types)
+                {
+                    if (!t)
+                        return DeclRef<Decl>();
+                }
+                if (!isPack)
+                {
+                    // If the generic parameter is not a pack, we can simply add the first type.
+                    if (types.getCount() != 1)
+                        return DeclRef<Decl>();
+
+                    args.add(types[0]);
+                }
+                else
+                {
+                    // If the generic parameter is a pack, and we are supplying one single pack argument,
+                    // we can use it as is.
+                    if (types.getCount() == 1 && isTypePack(types[0]))
+                    {
+                        args.add(types[0]);
                     }
                     else
                     {
-                        if(!valOptional && !val->equals(cVal))
+                        // If we are supplying 0 or multiple arguments for the pack, we need to create a type pack
+                        // and add it to the argument list.
+                        ShortList<Type*> typeList;
+                        bool isLVal = true;
+                        for (auto t : types)
                         {
-                            // failure!
-                            return DeclRef<Decl>();
+                            typeList.add(t);
+                            isLVal = isLVal && t.isLeftValue;
                         }
+                        args.add(QualType(m_astBuilder->getTypePack(typeList.getArrayView().arrayView), isLVal));
                     }
-
-                    c.satisfied = true;
                 }
+            }
+            else if (auto valParam = as<GenericValueParamDecl>(member))
+            {
+                SLANG_ASSERT(valParam->parameterIndex != -1);
 
+                if (valParam->parameterIndex < knownGenericArgCount)
+                    continue;
+
+                if (valParam->parameterIndex >= solvedArgs.getCount())
+                    return DeclRef<Decl>();
+
+                auto val = solvedArgs[valParam->parameterIndex].val;
                 if (!val)
                 {
                     // failure!
                     return DeclRef<Decl>();
                 }
                 args.add(val);
-            }
-            else
-            {
-                // ignore anything that isn't a generic parameter
             }
         }
 
@@ -463,7 +613,7 @@ namespace Slang
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
             DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getGenericAppDeclRef(
-                genericDeclRef, args.getArrayView(), constraintDecl).as<GenericTypeConstraintDecl>();
+                genericDeclRef, args.getArrayView().arrayView, constraintDecl).as<GenericTypeConstraintDecl>();
 
             // Extract the (substituted) sub- and super-type from the constraint.
             auto sub = getSub(m_astBuilder, constraintDeclRef);
@@ -472,6 +622,8 @@ namespace Slang
             // Mark sub type as constrained.
             if (auto subDeclRefType = as<DeclRefType>(constraintDeclRef.getDecl()->sub.type))
                 constrainedGenericParams.add(subDeclRefType->getDeclRef().getDecl());
+            else if (auto subEachType = as<EachType>(constraintDeclRef.getDecl()->sub.type))
+                constrainedGenericParams.add(as<DeclRefType>(subEachType->getElementType())->getDeclRef().getDecl());
 
             if (sub->equals(sup))
             {
@@ -521,11 +673,12 @@ namespace Slang
             }
         }
 
-        return m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView());
+        return m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView().arrayView);
     }
 
     bool SemanticsVisitor::TryUnifyVals(
         ConstraintSystem&	constraints,
+        ValUnificationContext unifyCtx,
         Val*			fst,
         bool            fstLVal,
         Val*			snd,
@@ -536,7 +689,7 @@ namespace Slang
         {
             if (auto sndType = as<Type>(snd))
             {
-                return TryUnifyTypes(constraints, QualType(fstType, fstLVal), QualType(sndType, sndLVal));
+                return TryUnifyTypes(constraints, unifyCtx, QualType(fstType, fstLVal), QualType(sndType, sndLVal));
             }
         }
 
@@ -564,9 +717,9 @@ namespace Slang
 
             bool okay = false;
             if (fstParam)
-                okay |= TryUnifyIntParam(constraints, fstParam->getDeclRef(), sndInt);
+                okay |= TryUnifyIntParam(constraints, unifyCtx, fstParam->getDeclRef(), sndInt);
             if (sndParam)
-                okay |= TryUnifyIntParam(constraints, sndParam->getDeclRef(), fstInt);
+                okay |= TryUnifyIntParam(constraints, unifyCtx, sndParam->getDeclRef(), fstInt);
             return okay;
         }
 
@@ -579,6 +732,7 @@ namespace Slang
                 SLANG_ASSERT(constraintDecl1);
                 SLANG_ASSERT(constraintDecl2);
                 return TryUnifyTypes(constraints,
+                    unifyCtx,
                     constraintDecl1.getDecl()->getSup().type,
                     constraintDecl2.getDecl()->getSup().type);
             }
@@ -592,6 +746,7 @@ namespace Slang
             if (auto sndWit = as<SubtypeWitness>(snd))
             {
                 return TryUnifyTypes(constraints,
+                    unifyCtx,
                     fstWit->getSup(),
                     sndWit->getSup());
             }
@@ -605,6 +760,7 @@ namespace Slang
 
     bool SemanticsVisitor::tryUnifyDeclRef(
         ConstraintSystem& constraints,
+        ValUnificationContext unifyCtx,
         DeclRefBase* fst,
         bool fstIsLVal,
         DeclRefBase* snd,
@@ -620,11 +776,12 @@ namespace Slang
             return true;
         if (fstGen == nullptr || sndGen == nullptr)
             return false;
-        return tryUnifyGenericAppDeclRef(constraints, fstGen, fstIsLVal, sndGen, sndIsLVal);
+        return tryUnifyGenericAppDeclRef(constraints, unifyCtx, fstGen, fstIsLVal, sndGen, sndIsLVal);
     }
 
     bool SemanticsVisitor::tryUnifyGenericAppDeclRef(
         ConstraintSystem&           constraints,
+        ValUnificationContext unifyCtx,
         GenericAppDeclRef* fst,
         bool fstIsLVal,
         GenericAppDeclRef* snd,
@@ -645,7 +802,7 @@ namespace Slang
         bool okay = true;
         for (Index aa = 0; aa < argCount; ++aa)
         {
-            if (!TryUnifyVals(constraints, fstGen->getArgs()[aa], fstIsLVal, sndGen->getArgs()[aa], sndIsLVal))
+            if (!TryUnifyVals(constraints, unifyCtx, fstGen->getArgs()[aa], fstIsLVal, sndGen->getArgs()[aa], sndIsLVal))
             {
                 okay = false;
             }
@@ -655,7 +812,7 @@ namespace Slang
         auto fstBase = fst->getBase();
         auto sndBase = snd->getBase();
 
-        if (!tryUnifyDeclRef(constraints, fstBase, fstIsLVal, sndBase, sndIsLVal))
+        if (!tryUnifyDeclRef(constraints, unifyCtx, fstBase, fstIsLVal, sndBase, sndIsLVal))
         {
             okay = false;
         }
@@ -665,13 +822,15 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyTypeParam(
         ConstraintSystem&		constraints,
-        GenericTypeParamDecl*	typeParamDecl,
+        ValUnificationContext unificationContext,
+        GenericTypeParamDeclBase* typeParamDecl,
         QualType			type)
     {
         // We want to constrain the given type parameter
         // to equal the given type.
         Constraint constraint;
         constraint.decl = typeParamDecl;
+        constraint.indexInPack = unificationContext.indexInTypePack;
         constraint.val = type;
         constraint.isUsedAsLValue = type.isLeftValue;
         constraints.constraints.add(constraint);
@@ -681,9 +840,12 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyIntParam(
         ConstraintSystem&               constraints,
+        ValUnificationContext unifyCtx,
         GenericValueParamDecl*	paramDecl,
         IntVal*                  val)
     {
+        SLANG_UNUSED(unifyCtx);
+
         // We only want to accumulate constraints on
         // the parameters of the declarations being
         // specialized (don't accidentially constrain
@@ -704,12 +866,13 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyIntParam(
         ConstraintSystem&       constraints,
+        ValUnificationContext unifyCtx,
         DeclRef<VarDeclBase> const&   varRef,
         IntVal*          val)
     {
         if(auto genericValueParamRef = varRef.as<GenericValueParamDecl>())
         {
-            return TryUnifyIntParam(constraints, genericValueParamRef.getDecl(), val);
+            return TryUnifyIntParam(constraints, unifyCtx, genericValueParamRef.getDecl(), val);
         }
         else
         {
@@ -719,6 +882,7 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
         ConstraintSystem&       constraints,
+        ValUnificationContext unifyCtx,
         QualType  fst,
         QualType  snd)
     {
@@ -728,7 +892,7 @@ namespace Slang
 
             if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
                 if (typeParamDecl->parentDecl == constraints.genericDecl)
-                    return TryUnifyTypeParam(constraints, typeParamDecl, snd);
+                    return TryUnifyTypeParam(constraints, unifyCtx, typeParamDecl, snd);
 
             if (auto sndDeclRefType = as<DeclRefType>(snd))
             {
@@ -736,7 +900,7 @@ namespace Slang
 
                 if (auto typeParamDecl = as<GenericTypeParamDecl>(sndDeclRef.getDecl()))
                     if (typeParamDecl->parentDecl == constraints.genericDecl)
-                        return TryUnifyTypeParam(constraints, typeParamDecl, fst);
+                        return TryUnifyTypeParam(constraints, unifyCtx, typeParamDecl, fst);
 
                 // If they refer to different declarations, we need to check if one type's super type
                 // matches the other type, if so we can unify them.
@@ -775,6 +939,7 @@ namespace Slang
                 // to each declaration reference.
                 if (!tryUnifyDeclRef(
                     constraints,
+                    unifyCtx,
                     fstDeclRef,
                     fst.isLeftValue,
                     sndDeclRef,
@@ -795,18 +960,46 @@ namespace Slang
                     return false;
                 for(Index i = 0; i < numParams; ++i)
                 {
-                    if(!TryUnifyTypes(constraints, fstFunType->getParamType(i), sndFunType->getParamType(i)))
+                    if(!TryUnifyTypes(constraints, unifyCtx, fstFunType->getParamType(i), sndFunType->getParamType(i)))
                         return false;
                 }
-                return TryUnifyTypes(constraints, fstFunType->getResultType(), sndFunType->getResultType());
+                return TryUnifyTypes(constraints, unifyCtx, fstFunType->getResultType(), sndFunType->getResultType());
             }
         }
-
+        else if (auto expandType = as<ExpandType>(fst))
+        {
+            if (auto sndExpandType = as<ExpandType>(snd))
+            {
+                return TryUnifyTypes(constraints, unifyCtx, expandType->getPatternType(), sndExpandType->getPatternType());
+            }
+        }
+        else if (auto eachType = as<EachType>(fst))
+        {
+            if (auto sndEachType = as<EachType>(snd))
+            {
+                return TryUnifyTypes(constraints, unifyCtx, eachType->getElementType(), sndEachType->getElementType());
+            }
+        }
+        else if (auto typePack = as<ConcreteTypePack>(fst))
+        {
+            if (auto sndTypePack = as<ConcreteTypePack>(snd))
+            {
+                if (typePack->getTypeCount() != sndTypePack->getTypeCount())
+                    return false;
+                for (Index i = 0; i < typePack->getTypeCount(); ++i)
+                {
+                    if (!TryUnifyTypes(constraints, unifyCtx, QualType(typePack->getElementType(i), fst.isLeftValue), QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
+                        return false;
+                }
+                return true;
+            }
+        }
         return false;
     }
 
     bool SemanticsVisitor::TryUnifyConjunctionType(
         ConstraintSystem&   constraints,
+        ValUnificationContext unifyCtx,
         QualType            fst,
         QualType            snd)
     {
@@ -820,20 +1013,23 @@ namespace Slang
         //
         if (auto fstAndType = as<AndType>(fst))
         {
-            return TryUnifyTypes(constraints, QualType(fstAndType->getLeft(), fst.isLeftValue), snd)
-                && TryUnifyTypes(constraints, QualType(fstAndType->getRight(), fst.isLeftValue), snd);
+            return TryUnifyTypes(constraints, unifyCtx, QualType(fstAndType->getLeft(), fst.isLeftValue), snd)
+                && TryUnifyTypes(constraints, unifyCtx, QualType(fstAndType->getRight(), fst.isLeftValue), snd);
         }
         else if (auto sndAndType = as<AndType>(snd))
         {
-            return TryUnifyTypes(constraints, fst, QualType(sndAndType->getLeft(), snd.isLeftValue))
-                || TryUnifyTypes(constraints, fst, QualType(sndAndType->getRight(), snd.isLeftValue));
+            return TryUnifyTypes(constraints, unifyCtx, fst, QualType(sndAndType->getLeft(), snd.isLeftValue))
+                || TryUnifyTypes(constraints, unifyCtx, fst, QualType(sndAndType->getRight(), snd.isLeftValue));
         }
         else
             return false;
     }
 
-    void SemanticsVisitor::maybeUnifyUnconstraintIntParam(ConstraintSystem& constraints, IntVal* param, IntVal* arg, bool paramIsLVal)
+    void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
+        ConstraintSystem& constraints, ValUnificationContext unifyCtx, IntVal* param, IntVal* arg, bool paramIsLVal)
     {
+        SLANG_UNUSED(unifyCtx);
+
         // If `param` is an unconstrained integer val param, and `arg` is a const int val,
         // we add a constraint to the system that `param` must be equal to `arg`.
         // If `param` is already constrained, ignore and do nothing.
@@ -857,6 +1053,7 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyTypes(
         ConstraintSystem&       constraints,
+        ValUnificationContext unifyCtx,
         QualType  fst,
         QualType  snd)
     {
@@ -883,7 +1080,49 @@ namespace Slang
         //
         if (as<AndType>(fst) || as<AndType>(snd))
         {
-            return TryUnifyConjunctionType(constraints, fst, snd);
+            return TryUnifyConjunctionType(constraints, unifyCtx, fst, snd);
+        }
+
+        // If one of the types is a type pack, we need to recursively unify the element types.
+        if (auto fstTypePack = as<ConcreteTypePack>(fst))
+        {
+            if (auto sndTypePack = as<ConcreteTypePack>(snd))
+            {
+                if (fstTypePack->getTypeCount() != sndTypePack->getTypeCount())
+                    return false;
+                for (Index i = 0; i < fstTypePack->getTypeCount(); ++i)
+                {
+                    if (!TryUnifyTypes(constraints, unifyCtx,QualType(fstTypePack->getElementType(i), fst.isLeftValue), QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
+                        return false;
+                }
+                return true;
+            }
+            else if (auto sndExpandType = as<ExpandType>(snd))
+            {
+                for (Index i = 0; i < fstTypePack->getTypeCount(); ++i)
+                {
+                    ValUnificationContext subUnifyCtx = unifyCtx;
+                    subUnifyCtx.indexInTypePack = i;
+                    if (!TryUnifyTypes(constraints, subUnifyCtx, QualType(fstTypePack->getElementType(i), fst.isLeftValue), QualType(sndExpandType->getPatternType(), snd.isLeftValue)))
+                        return false;
+                }
+                return true;
+            }
+        }
+
+        if (auto sndTypePack = as<ConcreteTypePack>(snd))
+        {
+            if (auto fstExpandType = as<ExpandType>(fst))
+            {
+                for (Index i = 0; i < sndTypePack->getTypeCount(); ++i)
+                {
+                    ValUnificationContext subUnifyCtx = unifyCtx;
+                    subUnifyCtx.indexInTypePack = i;
+                    if (!TryUnifyTypes(constraints, subUnifyCtx, QualType(fstExpandType->getPatternType(), fst.isLeftValue), QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
+                        return false;
+                }
+                return true;
+            }
         }
 
         // A generic parameter type can unify with anything.
@@ -897,7 +1136,13 @@ namespace Slang
             if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
             {
                 if(typeParamDecl->parentDecl == constraints.genericDecl)
-                    return TryUnifyTypeParam(constraints, typeParamDecl, snd);
+                    return TryUnifyTypeParam(constraints, unifyCtx, typeParamDecl, snd);
+            }
+            else if (auto typePackParamDecl = as<GenericTypePackParamDecl>(fstDeclRef.getDecl()))
+            {
+                if (typePackParamDecl->parentDecl == constraints.genericDecl
+                    && isTypePack(snd))
+                    return TryUnifyTypeParam(constraints, unifyCtx, typePackParamDecl, snd);
             }
         }
 
@@ -905,15 +1150,21 @@ namespace Slang
         {
             auto sndDeclRef = sndDeclRefType->getDeclRef();
 
-            if (auto typeParamDecl = as<GenericTypeParamDecl>(sndDeclRef.getDecl()))
+            if (auto typeParamDecl = as<GenericTypeParamDeclBase>(sndDeclRef.getDecl()))
             {
                 if(typeParamDecl->parentDecl == constraints.genericDecl)
-                    return TryUnifyTypeParam(constraints, typeParamDecl, fst);
+                    return TryUnifyTypeParam(constraints, unifyCtx, typeParamDecl, fst);
+            }
+            else if (auto typePackParamDecl = as<GenericTypePackParamDecl>(sndDeclRef.getDecl()))
+            {
+                if (typePackParamDecl->parentDecl == constraints.genericDecl
+                    && isTypePack(fst))
+                    return TryUnifyTypeParam(constraints, unifyCtx, typePackParamDecl, fst);
             }
         }
 
         // If we can unify the types structurally, then we are golden
-        if(TryUnifyTypesByStructuralMatch(constraints, fst, snd))
+        if(TryUnifyTypesByStructuralMatch(constraints, unifyCtx, fst, snd))
             return true;
 
         // Now we need to consider cases where coercion might
@@ -930,9 +1181,10 @@ namespace Slang
                 // However, we don't want a failed unification to fail the entire generic argument inference,
                 // because a scalar can still be casted into a vector of any length.
                 
-                maybeUnifyUnconstraintIntParam(constraints, fstVectorType->getElementCount(), m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1), fst.isLeftValue);
+                maybeUnifyUnconstraintIntParam(constraints, unifyCtx, fstVectorType->getElementCount(), m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1), fst.isLeftValue);
                 return TryUnifyTypes(
                     constraints,
+                    unifyCtx,
                     QualType(fstVectorType->getElementType(), fst.isLeftValue),
                     QualType(sndScalarType, snd.isLeftValue));
             }
@@ -942,18 +1194,47 @@ namespace Slang
         {
             if(auto sndVectorType = as<VectorExpressionType>(snd))
             {
-                maybeUnifyUnconstraintIntParam(constraints, sndVectorType->getElementCount(), m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1), snd.isLeftValue);
+                maybeUnifyUnconstraintIntParam(constraints, unifyCtx, sndVectorType->getElementCount(), m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1), snd.isLeftValue);
                 return TryUnifyTypes(
                     constraints,
+                    unifyCtx,
                     QualType(fstScalarType, fst.isLeftValue),
                     QualType(sndVectorType->getElementType(), snd.isLeftValue));
             }
         }
 
         if (auto fstUniformParamGroupType = as<UniformParameterGroupType>(fst))
-            return TryUnifyTypes(constraints, QualType(fstUniformParamGroupType->getElementType(), fst.isLeftValue), snd);
+            return TryUnifyTypes(constraints, unifyCtx, QualType(fstUniformParamGroupType->getElementType(), fst.isLeftValue), snd);
         if (auto sndUniformParamGroupType = as<UniformParameterGroupType>(snd))
-            return TryUnifyTypes(constraints, fst, QualType(sndUniformParamGroupType->getElementType(), snd.isLeftValue));
+            return TryUnifyTypes(constraints, unifyCtx, fst, QualType(sndUniformParamGroupType->getElementType(), snd.isLeftValue));
+
+        // Each T can coerce with any DeclRefType.
+        if (auto eachSnd = as<EachType>(snd))
+        {
+            if (auto innerSnd = eachSnd->getElementDeclRefType())
+            {
+                if (auto sndTypePackParamDecl = as<GenericTypePackParamDecl>(innerSnd->getDeclRef().getDecl()))
+                {
+                    if (innerSnd->getDeclRef().getDecl()->parentDecl == constraints.genericDecl)
+                    {
+                        return TryUnifyTypeParam(constraints, unifyCtx, sndTypePackParamDecl, fst);
+                    }
+                }
+            }
+        }
+        if (auto eachFst = as<EachType>(fst))
+        {
+            if (auto innerFst = eachFst->getElementDeclRefType())
+            {
+                if (auto fstTypePackParamDecl = as<GenericTypePackParamDecl>(innerFst->getDeclRef().getDecl()))
+                {
+                    if (innerFst->getDeclRef().getDecl()->parentDecl == constraints.genericDecl)
+                    {
+                        return TryUnifyTypeParam(constraints, unifyCtx, fstTypePackParamDecl, snd);
+                    }
+                }
+            }
+        }
         return false;
     }
 

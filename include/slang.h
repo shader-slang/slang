@@ -368,12 +368,6 @@ convention for interface methods.
 #				define SLANG_OVERRIDE override
 #			endif
 #		endif
-
-// TODO(JS): Not used in previous code. Left here as may be useful on some other version. 
-// #define SLANG_RETURN_NEVER __attribute__((__noreturn__))
-
-#       define SLANG_RETURN_NEVER [[noreturn]]
-
 #	endif // SLANG_GCC_FAMILY
 
 // Visual Studio
@@ -390,9 +384,6 @@ convention for interface methods.
 #	    if _MSC_VER >= 1700
 #		    define SLANG_HAS_ENUM_CLASS 1
 #       endif
-
-#   define SLANG_RETURN_NEVER __declspec(noreturn)
-
 #   endif // SLANG_VC
 
 // Set non set
@@ -407,10 +398,6 @@ convention for interface methods.
 #   endif
 
 #endif // __cplusplus
-
-#ifndef SLANG_RETURN_NEVER
-#   define SLANG_RETURN_NEVER [[noreturn]]
-#endif // SLANG_RETURN_NEVER
 
 /* Macros for detecting processor */
 #if defined(_M_ARM) || defined(__ARM_EABI__)
@@ -5447,6 +5434,10 @@ namespace slang
             SlangInt32 index) = 0;
 
         virtual SLANG_NO_THROW DeclReflection* SLANG_MCALL getModuleReflection() = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
+            SlangCompileTarget target,
+            ISlangBlob** outDiagnostics) = 0;
     };
     
     #define SLANG_UUID_IModule IModule::getTypeGuid()

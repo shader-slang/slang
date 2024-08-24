@@ -203,13 +203,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         traverseUses(cbParamInst, [&](IRUse* use)
         {
             builder.setInsertBefore(use->getUser());
-            auto addr = builder.emitFieldAddress(builder.getPtrType(kIROp_PtrType, innerType, SpvStorageClassUniform), cbParamInst, key);
+            auto addr = builder.emitFieldAddress(builder.getPtrType(kIROp_PtrType, innerType, AddressSpace::Uniform), cbParamInst, key);
             use->set(addr);
         });
         return structType;
     }
 
-    static void insertLoadAtLatestLocation(IRInst* addrInst, IRUse* inUse, SpvStorageClass storageClass)
+    static void insertLoadAtLatestLocation(IRInst* addrInst, IRUse* inUse, AddressSpace addressSpace)
     {
         struct WorkItem { IRInst* addr; IRUse* use; };
         List<WorkItem> workList;
@@ -257,7 +257,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // passing as is, which needs to be a pointer (pass as is).
                 if (user->getDataType()
                     && user->getDataType()->getOp() == kIROp_RefType
-                    && storageClass == SpvStorageClassInput)
+                    && addressSpace == AddressSpace::Input)
                 {
                     builder.replaceOperand(use, addr);
                     continue;
@@ -552,19 +552,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 innerType = arrayType->getElementType();
             }
 
-            SpvStorageClass storageClass = SpvStorageClassPrivate;
+            AddressSpace addressSpace = AddressSpace::ThreadLocal;
             // Figure out storage class based on var layout.
             if (auto layout = getVarLayout(inst))
             {
-                auto cls = getGlobalParamStorageClass(layout);
-                if (cls != SpvStorageClassMax)
-                    storageClass = cls;
+                auto cls = getGlobalParamAddressSpace(layout);
+                if (cls != AddressSpace::Generic)
+                    addressSpace = cls;
                 else if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
                 {
                     String semanticName = systemValueAttr->getName();
                     semanticName = semanticName.toLower();
                     if (semanticName == "sv_pointsize")
-                        storageClass = SpvStorageClassInput;
+                        addressSpace = AddressSpace::Input;
                 }
             }
 
@@ -572,7 +572,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             // placed here then put them in UniformConstant instead
             if (isSpirvUniformConstantType(inst->getDataType()))
             {
-                storageClass = SpvStorageClassUniformConstant;
+                addressSpace = AddressSpace::UniformConstant;
             }
 
             // Strip any HLSL wrappers
@@ -582,8 +582,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (cbufferType || paramBlockType)
             {
                 innerType = as<IRUniformParameterGroupType>(innerType)->getElementType();
-                if (storageClass == SpvStorageClassPrivate)
-                    storageClass = SpvStorageClassUniform;
+                if (addressSpace == AddressSpace::ThreadLocal)
+                    addressSpace = AddressSpace::Uniform;
                 // Constant buffer is already treated like a pointer type, and
                 // we are not adding another layer of indirection when replacing it
                 // with a pointer type. Therefore we don't need to insert a load at
@@ -623,7 +623,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         }
                     }
                 }
-                else if (storageClass == SpvStorageClassPushConstant)
+                else if (addressSpace == AddressSpace::PushConstant)
                 {
                     // Push constant params does not need a VarLayout.
                     varLayoutInst->removeAndDeallocate();
@@ -632,7 +632,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(innerType))
             {
                 innerType = lowerStructuredBufferType(structuredBufferType).structType;
-                storageClass = getStorageBufferStorageClass();
+                addressSpace = getStorageBufferAddressSpace();
                 needLoad = false;
 
                 auto memoryFlags = MemoryQualifierSetModifier::Flags::kNone;
@@ -652,12 +652,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 if (m_sharedContext->isSpirv14OrLater())
                 {
                     builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
-                    storageClass = SpvStorageClassStorageBuffer;
+                    addressSpace = AddressSpace::StorageBuffer;
                 }
                 else
                 {
                     builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBufferBlockDecoration);
-                    storageClass = SpvStorageClassUniform;
+                    addressSpace = AddressSpace::Uniform;
                 }
                 needLoad = false;
             }
@@ -674,14 +674,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // Make a pointer type of storageClass.
             builder.setInsertBefore(inst);
-            ptrType = builder.getPtrType(kIROp_PtrType, innerType, storageClass);
+            ptrType = builder.getPtrType(kIROp_PtrType, innerType, addressSpace);
             inst->setFullType(ptrType);
             if (needLoad)
             {
                 // Insert an explicit load at each use site.
                 traverseUses(inst, [&](IRUse* use)
                     {
-                        insertLoadAtLatestLocation(inst, use, storageClass);
+                        insertLoadAtLatestLocation(inst, use, addressSpace);
                     });
             }
             else if (arrayType)
@@ -694,7 +694,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             // For array resources, getElement(r, index) ==> getElementPtr(r, index).
                             IRBuilder builder(getElement);
                             builder.setInsertBefore(user);
-                            auto newAddr = builder.emitElementAddress(builder.getPtrType(kIROp_PtrType, innerElementType, storageClass), inst, getElement->getIndex());
+                            auto newAddr = builder.emitElementAddress(builder.getPtrType(kIROp_PtrType, innerElementType, addressSpace), inst, getElement->getIndex());
                             user->replaceUsesWith(newAddr);
                             user->removeAndDeallocate();
                             return;
@@ -705,48 +705,48 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         processGlobalVar(inst);
     }
 
-    SpvStorageClass getStorageClassFromGlobalParamResourceKind(LayoutResourceKind kind)
+    AddressSpace getAddressSpaceFromGlobalParamResourceKind(LayoutResourceKind kind)
     {
-        SpvStorageClass storageClass = SpvStorageClassMax;
+        AddressSpace addressSpace = AddressSpace::Generic;
         switch (kind)
         {
         case LayoutResourceKind::Uniform:
         case LayoutResourceKind::DescriptorTableSlot:
         case LayoutResourceKind::ConstantBuffer:
-            storageClass = SpvStorageClassUniform;
+            addressSpace = AddressSpace::Uniform;
             break;
         case LayoutResourceKind::VaryingInput:
-            storageClass = SpvStorageClassInput;
+            addressSpace = AddressSpace::Input;
             break;
         case LayoutResourceKind::VaryingOutput:
-            storageClass = SpvStorageClassOutput;
+            addressSpace = AddressSpace::Output;
             break;
         case LayoutResourceKind::ShaderResource:
         case LayoutResourceKind::UnorderedAccess:
-            storageClass = getStorageBufferStorageClass();
+            addressSpace = getStorageBufferAddressSpace();
             break;
         case LayoutResourceKind::PushConstantBuffer:
-            storageClass = SpvStorageClassPushConstant;
+            addressSpace = AddressSpace::PushConstant;
             break;
         case LayoutResourceKind::RayPayload:
-            storageClass = SpvStorageClassIncomingRayPayloadKHR;
+            addressSpace = AddressSpace::IncomingRayPayload;
             break;
         case LayoutResourceKind::CallablePayload:
-            storageClass = SpvStorageClassIncomingCallableDataKHR;
+            addressSpace = AddressSpace::IncomingCallableData;
             break;
         case LayoutResourceKind::HitAttributes:
-            storageClass = SpvStorageClassHitAttributeKHR;
+            addressSpace = AddressSpace::HitAttribute;
             break;
         case LayoutResourceKind::ShaderRecord:
-            storageClass = SpvStorageClassShaderRecordBufferKHR;
+            addressSpace = AddressSpace::ShaderRecordBuffer;
             break;
         default:
             break;
         }
-        return storageClass;
+        return addressSpace;
     }
 
-    SpvStorageClass getGlobalParamStorageClass(IRVarLayout* varLayout)
+    AddressSpace getGlobalParamAddressSpace(IRVarLayout* varLayout)
     {
         auto typeLayout = varLayout->getTypeLayout()->unwrapArray();
         if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
@@ -754,22 +754,22 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             varLayout = parameterGroupTypeLayout->getContainerVarLayout();
         }
 
-        SpvStorageClass result = SpvStorageClassMax;
+        auto result = AddressSpace::Generic;
         for (auto rr : varLayout->getOffsetAttrs())
         {
-            auto storageClass = getStorageClassFromGlobalParamResourceKind(rr->getResourceKind());
+            auto addressSpace = getAddressSpaceFromGlobalParamResourceKind(rr->getResourceKind());
             // If we haven't inferred a storage class yet, use the one we just found.
-            if (result == SpvStorageClassMax)
-                result = storageClass;
-            else if (result != storageClass)
+            if (result == AddressSpace::Generic)
+                result = addressSpace;
+            else if (result != addressSpace)
             {
-                // If we have inferred a storage class, and it is different from the one we just found,
-                // then we have conflicting uses of the resource, and we cannot infer a storage class.
+                // If we have inferred an address space, and it is different from the one we just found,
+                // then we have conflicting uses of the resource, and we cannot infer an address space.
                 // An exception is that a uniform storage class can be further specialized by PushConstants.
-                if (result == SpvStorageClassUniform)
-                    result = storageClass;
+                if (result == AddressSpace::Uniform)
+                    result = addressSpace;
                 else
-                    SLANG_UNEXPECTED("Var layout contains conflicting resource uses, cannot resolve a storage class.");
+                    SLANG_UNEXPECTED("Var layout contains conflicting resource uses, cannot resolve a storage class address space.");
             }
         }
         return result;
@@ -783,7 +783,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
             auto newPtrType = builder.getPtrType(
-                oldPtrType->getOp(), oldPtrType->getValueType(), SpvStorageClassFunction);
+                oldPtrType->getOp(), oldPtrType->getValueType(), AddressSpace::Function);
             inst->setFullType(newPtrType);
             addUsersToWorkList(inst);
         }
@@ -862,45 +862,45 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             return;
         }
 
-        SpvStorageClass storageClass = SpvStorageClassPrivate;
+        auto addressSpace = AddressSpace::ThreadLocal;
         if (as<IRGroupSharedRate>(inst->getRate()))
         {
-            storageClass = SpvStorageClassWorkgroup;
+            addressSpace = AddressSpace::GroupShared;
         }
         else if (const auto varLayout = getVarLayout(inst))
         {
-            auto cls = getGlobalParamStorageClass(varLayout);
-            if (cls != SpvStorageClassMax)
-                storageClass = cls;
+            auto cls = getGlobalParamAddressSpace(varLayout);
+            if (cls != AddressSpace::Generic)
+                addressSpace = cls;
         }
         for (auto decor : inst->getDecorations())
         {
             switch (decor->getOp())
             {
             case kIROp_VulkanRayPayloadDecoration:
-                storageClass = SpvStorageClassRayPayloadKHR;
+                addressSpace = AddressSpace::RayPayloadKHR;
                 break;
             case kIROp_VulkanRayPayloadInDecoration:
-                storageClass = SpvStorageClassIncomingRayPayloadKHR;
+                addressSpace = AddressSpace::IncomingRayPayload;
                 break;
             case kIROp_VulkanCallablePayloadDecoration:
-                storageClass = SpvStorageClassCallableDataKHR;
+                addressSpace = AddressSpace::CallableDataKHR;
                 break;
             case kIROp_VulkanCallablePayloadInDecoration:
-                storageClass = SpvStorageClassIncomingCallableDataKHR;
+                addressSpace = AddressSpace::IncomingCallableData;
                 break;
             case kIROp_VulkanHitObjectAttributesDecoration:
-                storageClass = SpvStorageClassHitObjectAttributeNV;
+                addressSpace = AddressSpace::HitObjectAttribute;
                 break;
             case kIROp_VulkanHitAttributesDecoration:
-                storageClass = SpvStorageClassHitAttributeKHR;
+                addressSpace = AddressSpace::HitAttribute;
                 break;
             }
         }
         IRBuilder builder(m_sharedContext->m_irModule);
         builder.setInsertBefore(inst);
         auto newPtrType =
-            builder.getPtrType(oldPtrType->getOp(), oldPtrType->getValueType(), storageClass);
+            builder.getPtrType(oldPtrType->getOp(), oldPtrType->getValueType(), addressSpace);
         inst->setFullType(newPtrType);
         addUsersToWorkList(inst);
         return;
@@ -916,22 +916,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (!snippet)
                 return;
             if (snippet->resultStorageClass != SpvStorageClassMax)
-            {
-                auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
-                if (!ptrType)
-                    return;
-                IRBuilder builder(m_sharedContext->m_irModule);
-                builder.setInsertBefore(inst);
-                auto qualPtrType = builder.getPtrType(
-                    ptrType->getOp(), ptrType->getValueType(), snippet->resultStorageClass);
-                List<IRInst*> args;
-                for (UInt i = 0; i < inst->getArgCount(); i++)
-                    args.add(inst->getArg(i));
-                auto newCall = builder.emitCallInst(qualPtrType, funcValue, args);
-                inst->replaceUsesWith(newCall);
-                inst->removeAndDeallocate();
-                addUsersToWorkList(newCall);
-            }
+                SLANG_UNIMPLEMENTED_X("Specifying storage classes in spirv __target_intrinsic snippets");
             return;
         }
 
@@ -1065,7 +1050,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 builder.setInsertBefore(inst);
             else
                 setInsertAfterOrdinaryInst(&builder, x);
-            y = builder.emitVar(x->getDataType(), SpvStorageClassFunction);
+            y = builder.emitVar(x->getDataType(), AddressSpace::Function);
             builder.emitStore(y, x);
             if (x->getParent()->getOp() != kIROp_Module)
                 m_mapArrayValueToVar.set(x, y);
@@ -1152,9 +1137,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    SpvStorageClass getStorageBufferStorageClass()
+    AddressSpace getStorageBufferAddressSpace()
     {
-        return m_sharedContext->isSpirv14OrLater() ? SpvStorageClassStorageBuffer : SpvStorageClassUniform;
+        return m_sharedContext->isSpirv14OrLater() ? AddressSpace::StorageBuffer : AddressSpace::Uniform;
     }
 
     void processStructuredBufferLoad(IRInst* loadInst)
@@ -1165,7 +1150,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(loadInst);
         IRInst* args[] = { sb, index };
         auto addrInst = builder.emitIntrinsicInst(
-            builder.getPtrType(kIROp_PtrType, loadInst->getFullType(), getStorageBufferStorageClass()),
+            builder.getPtrType(kIROp_PtrType, loadInst->getFullType(), getStorageBufferAddressSpace()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             args);
@@ -1184,7 +1169,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(storeInst);
         IRInst* args[] = { sb, index };
         auto addrInst = builder.emitIntrinsicInst(
-            builder.getPtrType(kIROp_PtrType, value->getFullType(), getStorageBufferStorageClass()),
+            builder.getPtrType(kIROp_PtrType, value->getFullType(), getStorageBufferAddressSpace()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             args);
@@ -1324,7 +1309,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto newPtrType = builder.getPtrType(
                 ptrType->getOp(),
                 ptrType->getValueType(),
-                SpvStorageClassImage);
+                AddressSpace::Image);
             subscript->setFullType(newPtrType);
 
             // HACK: assumes the image operand is a load and replace it with
@@ -2175,7 +2160,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (auto ptrType = as<IRPtrTypeBase>(type))
             {
                 if (ptrType->hasAddressSpace())
-                    return (AddressSpace)ptrType->getAddressSpace();
+                    return ptrType->getAddressSpace();
             }
             return AddressSpace::Generic;
         }
@@ -2240,7 +2225,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto lowered = lowerStructuredBufferType(t);
             IRBuilder builder(t);
             builder.setInsertBefore(t);
-            t->replaceUsesWith(builder.getPtrType(kIROp_PtrType, lowered.structType, getStorageBufferStorageClass()));
+            t->replaceUsesWith(builder.getPtrType(kIROp_PtrType, lowered.structType, getStorageBufferAddressSpace()));
         }
         for (auto t : textureFootprintTypes)
         {

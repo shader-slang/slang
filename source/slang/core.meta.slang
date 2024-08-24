@@ -870,6 +870,89 @@ bool operator!=(__none_t noneVal, Optional<T> val)
     return val.hasValue;
 }
 
+__generic<each T>
+__magic_type(TupleType)
+struct Tuple
+{
+    __intrinsic_op($(kIROp_MakeTuple))
+    __init(expand each T);
+}
+
+__intrinsic_op($(kIROp_MakeTuple))
+Tuple<T> makeTuple<each T>(T v);
+
+Tuple<T, U> concat<each T, each U>(Tuple<T> t, Tuple<U> u)
+{
+    return makeTuple(expand each t, expand each u);
+}
+
+
+[__unsafeForceInlineEarly]
+bool __assign(inout bool v, bool newVal)
+{
+    v = newVal;
+    return newVal;
+}
+
+[__unsafeForceInlineEarly]
+void __tupleLessKernel<T : IComparable>(inout bool result, inout bool exit, T a, T b)
+{
+    if (!exit)
+    {
+        if (a.lessThan(b))
+        {
+            result = true;
+            exit = true;
+        }
+        else if (!a.equals(b))
+        {
+            exit = true;
+        }
+    }
+}
+
+[__unsafeForceInlineEarly]
+void __tupleGreaterKernel<T : IComparable>(inout bool result, inout bool exit, T a, T b)
+{
+    if (!exit)
+    {
+        if (!a.lessThanOrEquals(b))
+        {
+            result = true;
+            exit = true;
+        }
+        else if (!a.equals(b))
+        {
+            exit = true;
+        }
+    }
+}
+
+__generic<each T : IComparable>
+extension Tuple<T> : IComparable
+{
+    bool lessThan(Tuple<T> other)
+    {
+        bool result = false;
+        bool exit = false;
+        expand __tupleLessKernel(result, exit, each this, each other);
+        return result;
+    }
+    bool lessThanOrEquals(Tuple<T> other)
+    {
+        bool result = false;
+        bool exit = false;
+        expand __tupleGreaterKernel(result, exit, each this, each other);
+        return !result;
+    }
+    bool equals(Tuple<T> other)
+    {
+        bool result = true;
+        expand result && __assign(result, result && (each this).equals(each other));
+        return result;
+    }
+}
+
 __generic<T>
 __magic_type(NativeRefType)
 __intrinsic_type($(kIROp_NativePtrType))
@@ -2025,12 +2108,19 @@ T reinterpret(U value);
 
 // Use an otherwise unused value
 //
-// This can be used to silence the warning about returning before initializing
-// an out paramter.
+// This can be used to silence the warning about returning before initializing an out paramter.
 __generic<T>
 [__readNone]
 [ForceInline]
+__intrinsic_op($(kIROp_Unmodified))
 void unused(inout T){}
+
+// This can be used to silence the warning about not writing to an inout parameter.
+__generic<T>
+[__readNone]
+[ForceInline]
+__intrinsic_op($(kIROp_Unmodified))
+void unmodified(out T){}
 
 // Specialized function
 
@@ -2166,7 +2256,7 @@ __generic<T : IComparable>
 [OverloadRank(-10)]
 bool operator >=(T v0, T v1)
 {
-    return v1.lessThan(v1);
+    return v1.lessThanOrEquals(v0);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]

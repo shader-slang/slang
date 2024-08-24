@@ -209,7 +209,7 @@ bool isPointerToResourceType(IRType* type)
 {
     while (auto ptrType = as<IRPtrTypeBase>(type))
     {
-        if (ptrType->getAddressSpace() == AddressSpace(SpvStorageClassStorageBuffer) ||
+        if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer ||
             ptrType->getAddressSpace() == AddressSpace::UserPointer)
             return true;
         type = ptrType->getValueType();
@@ -287,6 +287,11 @@ struct TupleTypeBuilder
                 {
                     specialType = legalFieldType;
                 }
+
+                // `void` is currently legalized to simple, but we don't want to add a
+                // `void` field to the struct.
+                if (legalLeafType.getSimple()->getOp() == kIROp_VoidType)
+                    return;
             }
             break;
 
@@ -419,7 +424,6 @@ struct TupleTypeBuilder
 
         bool isSpecialField = context->isSpecialType(fieldType);
         auto legalFieldType = legalizeType(context, fieldType);
-
         addField(
             field->getKey(),
             legalFieldType,
@@ -1385,10 +1389,15 @@ LegalType legalizeTypeImpl(
             context,
             arrayType->getElementType());
 
-        // If element type hasn't change, return original type.
-        if (legalElementType.flavor == LegalType::Flavor::simple &&
-            legalElementType.getSimple() == arrayType->getElementType())
-            return LegalType::simple(arrayType);
+        if (legalElementType.flavor == LegalType::Flavor::simple)
+        {
+            if (legalElementType.getSimple()->getOp() == kIROp_VoidType)
+                return LegalType();
+
+            // If element type hasn't change, return original type.
+            if (legalElementType.getSimple() == arrayType->getElementType())
+                return LegalType::simple(arrayType);
+        }
 
         ArrayLegalTypeWrapper wrapper;
         wrapper.arrayType = arrayType;
