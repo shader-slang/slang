@@ -553,7 +553,7 @@ SlangResult RenderTestApp::initialize(
 
     // We begin by compiling the shader file and entry points that specified via the options.
     //
-    ShaderCompilerUtil::compileWithLayout(device->getSlangSession()->getGlobalSession(), options, input, m_compilationOutput);
+    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(device->getSlangSession()->getGlobalSession(), options, input, m_compilationOutput));
     m_shaderInputLayout = m_compilationOutput.layout;
 
     // Once the shaders have been compiled we load them via the underlying API.
@@ -567,7 +567,6 @@ SlangResult RenderTestApp::initialize(
     // but that's not this.
     if (SLANG_FAILED(result))
     {
-        printf("%s\n", outDiagnostics.get()->getBufferPointer());
         result = (result == SLANG_E_NOT_AVAILABLE) ? SLANG_FAIL : result;
         return result;
     }
