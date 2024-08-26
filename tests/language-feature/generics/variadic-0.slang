@@ -1,4 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -19,7 +21,7 @@ S<T> makeS<T:__BuiltinArithmeticType>(T x)
 }
 bool cmp<T:__BuiltinArithmeticType>(T a, int b)
 {
-    return a > __int_cast<T>(b);
+    return a > T(b);
 }
 void accept<each T>(expand each T value) {}
 
