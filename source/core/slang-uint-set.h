@@ -133,6 +133,8 @@ public:
         /// Returns true if set1 and set2 have a same value set (ie there is an intersection)
     static bool hasIntersection(const UIntSet& set1, const UIntSet& set2);
 
+    Index getLSBZero();
+
     struct Iterator
     {
         friend class UIntSet;

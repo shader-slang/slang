@@ -3,6 +3,24 @@
 namespace Slang
 {
 
+Index UIntSet::getLSBZero()
+{
+    uint64_t offset = 0;
+    for (Element& element : this->m_buffer)
+    {
+        Element flippedElement = ~element;
+        // continue if 0 zero-bits
+        if (flippedElement == 0)
+        {
+            offset += sizeof(Element) * 8;
+            continue;
+        }
+
+        // LSBZero
+        return bitscanForward(flippedElement) + offset;
+    }
+}
+
 UIntSet& UIntSet::operator=(UIntSet&& other)
 {
     m_buffer = _Move(other.m_buffer);
