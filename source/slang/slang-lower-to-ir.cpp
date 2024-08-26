@@ -11,6 +11,7 @@
 #include "slang-check.h"
 #include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-loop-inversion.h"
+#include "slang-ir-lower-expand-type.h"
 #include "slang-ir.h"
 #include "slang-ir-util.h"
 #include "slang-ir-constexpr.h"
@@ -1987,7 +1988,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
         else
         {
-            return lowerType(context, type->getTypePack());
+            return context->irBuilder->getTupleType(lowerType(context, type->getTypePack()));
         }
     }
 
@@ -11089,6 +11090,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // Synthesize some code we want to make sure is inlined and simplified
     synthesizeBitFieldAccessors(module);
+
+    // Lower `IRExpandType` types to use `IRExpand`, where the pattern type
+    // is nested inside the `IRExpand` as its children, instead of being same
+    // level entities as the ExpandType itself.
+    // This will unify the specialization logic for both type and value level
+    // expansion.
+    lowerExpandType(module);
 
     // Generate DebugValue insts to store values into debug variables,
     // if debug symbols are enabled.
