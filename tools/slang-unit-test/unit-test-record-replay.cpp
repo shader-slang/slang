@@ -405,9 +405,7 @@ error:
 
 static SlangResult runTests(UnitTestContext* context)
 {
-    fprintf(stdout, "run something\n");
  const char* testBinaryNames[] = {
-        "hello-world",
         "triangle",
     };
 
