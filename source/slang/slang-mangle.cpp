@@ -608,6 +608,48 @@ namespace Slang
             {
                 emitType(context, getResultType(context->astBuilder, callableDeclRef));
             }
+
+            // Include key modifiers in the mangled name so we never deduplicate
+            // things like a nonmutating method and a mutating method.
+            bool isMutating = false;
+            bool isRefThis = false;
+            bool isFwdDiff = false;
+            bool isBwdDiff = false;
+            bool isNoDiffThis = false;
+            for (auto modifier : callableDeclRef.getDecl()->modifiers)
+            {
+                if (as<MutatingAttribute>(modifier))
+                {
+                    isMutating = true;
+                }
+                else if (as<RefAttribute>(modifier))
+                {
+                    isRefThis = true;
+                }
+                else if (as<ForwardDifferentiableAttribute>(modifier))
+                {
+                    isFwdDiff = true;
+                }
+                else if (as<BackwardDifferentiableAttribute>(modifier))
+                {
+                    isBwdDiff = true;
+                }
+                else if (as<NoDiffThisAttribute>(modifier))
+                {
+                    isNoDiffThis = true;
+                }
+            }
+
+            if (isMutating)
+                emitRaw(context, "m");
+            if (isRefThis)
+                emitRaw(context, "r");
+            if (isFwdDiff)
+                emitRaw(context, "f");
+            if (isBwdDiff)
+                emitRaw(context, "b");
+            if (isNoDiffThis)
+                emitRaw(context, "n");
         }
     }
 
