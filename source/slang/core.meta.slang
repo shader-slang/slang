@@ -1414,7 +1414,7 @@ struct OutputVertices
     static void _metalSetVertex(uint index, T val);
 
     __intrinsic_op($(kIROp_MeshOutputSet))
-    static T* _setVertex(This v, uint index, T val);
+    static void _setVertex(This v, uint index, T val);
 
     __subscript(uint index) -> T
     {
@@ -1483,7 +1483,7 @@ struct OutputPrimitives
     static void __metalSetPrimitive(uint index, T val);
 
     __intrinsic_op($(kIROp_MeshOutputSet))
-    static T* __setPrimitive(This v, uint index, T val);
+    static void __setPrimitive(This v, uint index, T val);
 
     __subscript(uint index)->T
     {
