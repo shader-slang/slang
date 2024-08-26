@@ -19,6 +19,7 @@ Index UIntSet::getLSBZero()
         // LSBZero
         return bitscanForward(flippedElement) + offset;
     }
+    return offset;
 }
 
 UIntSet& UIntSet::operator=(UIntSet&& other)
