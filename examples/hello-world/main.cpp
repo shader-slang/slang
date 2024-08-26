@@ -70,6 +70,7 @@ struct HelloWorldExample : public TestBase
 
 int main(int argc, char* argv[])
 {
+    fprintf(stdout, "Hello, world! Entry Point\n");
     initDebugCallback();
     HelloWorldExample example;
     example.parseOption(argc, argv);
@@ -83,10 +84,19 @@ int main(int argc, char* argv[])
 int HelloWorldExample::run()
 {
     RETURN_ON_FAIL(initVulkanInstanceAndDevice());
+    fprintf(stdout, "initVulkanInstanceAndDevice done\n");
+
     RETURN_ON_FAIL(createComputePipelineFromShader());
+    fprintf(stdout, "createComputePipelineFromShader done\n");
+
     RETURN_ON_FAIL(createInOutBuffers());
+    fprintf(stdout, "createInOutBuffers done\n");
+
     RETURN_ON_FAIL(dispatchCompute());
+    fprintf(stdout, "dispatchCompute done\n");
+
     RETURN_ON_FAIL(printComputeResults());
+    fprintf(stdout, "printComputeResults done\n");
     return 0;
 }
 
