@@ -958,6 +958,7 @@ extern "C"
                                         // precompiled modules if it is up-to-date with its source.
 
             EmbedDXIL,                  // bool
+            ForceDXLayout,              // bool
             CountOf,
         };
 
@@ -4837,6 +4838,8 @@ namespace slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDXIL(
             int                     targetIndex,
             bool                    value) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) = 0;
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()

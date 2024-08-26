@@ -175,6 +175,7 @@ namespace SlangRecord
         CASE(VulkanUseGLLayout);
         CASE(VulkanEmitReflection);
         CASE(GLSLForceScalarLayout);
+        CASE(ForceDXLayout);
         CASE(EnableEffectAnnotations);
         CASE(EmitSpirvViaGLSL);
         CASE(EmitSpirvDirectly);

@@ -88,6 +88,7 @@ Result TestContext::init(const char* inExePath)
     }
     exePath = inExePath;
     SLANG_RETURN_ON_FAIL(TestToolUtil::getExeDirectoryPath(inExePath, exeDirectoryPath));
+    SLANG_RETURN_ON_FAIL(TestToolUtil::getDllDirectoryPath(inExePath, dllDirectoryPath));
 
     SLANG_RETURN_ON_FAIL(locateFileCheck());
 

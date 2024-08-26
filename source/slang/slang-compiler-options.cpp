@@ -110,6 +110,7 @@ namespace Slang
                     break;
                 case CompilerOptionName::EmitSpirvDirectly:
                 case CompilerOptionName::GLSLForceScalarLayout:
+                case CompilerOptionName::ForceDXLayout:
                 case CompilerOptionName::MatrixLayoutRow:
                 case CompilerOptionName::MatrixLayoutColumn:
                 case CompilerOptionName::VulkanInvertY:
