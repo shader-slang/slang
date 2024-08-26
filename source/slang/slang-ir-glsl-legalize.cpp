@@ -265,9 +265,8 @@ struct GLSLLegalizationContext
     Stage                      stage;
     IRFunc*                    entryPointFunc;
     
-    /// This dictionary stores for 'VaryingIn/VaryingOut' ('Dictionary<LayoutResourceKind, ...>') all used
-    /// 'spaces' ('Dictionary<UInt, ...>') with associated 'bindings' ('UIntSet').
-    Dictionary<LayoutResourceKind, Dictionary<UInt, UIntSet>> usedBindingIndex;
+    /// This dictionary stores all bindings of 'VaryingIn/VaryingOut'. We assume 'space' is 0.
+    Dictionary<LayoutResourceKind, UIntSet> usedBindingIndex;
 
     GLSLLegalizationContext()
     {
@@ -868,7 +867,7 @@ void createVarLayoutForLegalizedGlobalParam(
     OuterParamInfoLink* outerParamInfo,
     GLSLSystemValueInfo* systemValueInfo)
 {
-    context->usedBindingIndex[kind][bindingSpace].add(bindingIndex);
+    context->usedBindingIndex[kind].add(bindingIndex);
 
     // We need to construct a fresh layout for the variable, even
     // if the original had its own layout, because it might be
@@ -989,9 +988,9 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(GLSLLegalizationContext* c
                 UInt space = 0;
                 varLayoutForKind->space = space;
 
-                auto unusedBinding = context->usedBindingIndex[LayoutResourceKind::VaryingOutput][space].getLSBZero();
+                auto unusedBinding = context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
                 varLayoutForKind->offset = unusedBinding;
-                context->usedBindingIndex[LayoutResourceKind::VaryingOutput][space].add(unusedBinding);
+                context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(unusedBinding);
             }
             builder.addField(field->getKey(), fieldVarLayoutBuilder.build());
         }
