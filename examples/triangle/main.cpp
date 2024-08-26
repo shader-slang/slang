@@ -187,6 +187,11 @@ gfx::Result loadShaderProgram(
     programDesc.slangGlobalScope = linkedProgram;
     SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
 
+    if (isTestMode())
+    {
+        printEntrypointHashes(entryPointCount, 1, linkedProgram);
+    }
+
     return SLANG_OK;
 }
 
@@ -387,9 +392,12 @@ virtual void renderFrame(int frameBufferIndex) override
     commandBuffer->close();
     gQueue->executeCommandBuffer(commandBuffer);
 
-    // With that, we are done drawing for one frame, and ready for the next.
-    //
-    gSwapchain->present();
+    if (!isTestMode())
+    {
+        // With that, we are done drawing for one frame, and ready for the next.
+        //
+        gSwapchain->present();
+    }
 }
 
 };
