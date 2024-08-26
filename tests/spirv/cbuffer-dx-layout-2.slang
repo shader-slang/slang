@@ -12,6 +12,8 @@
 //TEST_INPUT: set Test.v8 = {23,24};
 //TEST_INPUT: set Test.v9 = {25,26};
 
+//SPIRV_DX: ArrayStride 16
+
 cbuffer Test
 {
 //SPIRV: Offset 0

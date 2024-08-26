@@ -71,7 +71,7 @@ static Result _calcArraySizeAndAlignment(
     IRSizeAndAlignment elementTypeLayout;
     SLANG_RETURN_ON_FAIL(getSizeAndAlignment(optionSet, rules, elementType, &elementTypeLayout));
 
-    elementTypeLayout = rules->alignCompositeElementOfAggregate(elementTypeLayout);
+    elementTypeLayout = rules->alignCompositeElement(elementTypeLayout);
     *outSizeAndAlignment = IRSizeAndAlignment(
         elementTypeLayout.getStride() * (elementCount - 1) + elementTypeLayout.size,
         elementTypeLayout.alignment);
@@ -193,7 +193,7 @@ case kIROp_##TYPE##Type:                                        \
                 offset = rules->adjustOffsetForNextAggregateMember(offset, fieldTypeLayout.alignment);
             }
         }
-        *outSizeAndAlignment = rules->alignCompositeElementOfAggregate(structLayout);
+        *outSizeAndAlignment = rules->alignCompositeElement(structLayout);
         return SLANG_OK;
     }
     break;
@@ -234,7 +234,7 @@ case kIROp_##TYPE##Type:                                        \
         auto anyValType = cast<IRAnyValueType>(type);
         outSizeAndAlignment->size = getIntVal(anyValType->getSize());
         outSizeAndAlignment->alignment = 4;
-        *outSizeAndAlignment = rules->alignCompositeElementOfAggregate(*outSizeAndAlignment);
+        *outSizeAndAlignment = rules->alignCompositeElement(*outSizeAndAlignment);
         return SLANG_OK;
     }
     break;
@@ -250,7 +250,7 @@ case kIROp_##TYPE##Type:                                        \
             resultLayout.size = align(resultLayout.size, fieldTypeLayout.alignment);
             resultLayout.alignment = std::max(resultLayout.alignment, fieldTypeLayout.alignment);
         }
-        *outSizeAndAlignment = rules->alignCompositeElementOfAggregate(resultLayout);
+        *outSizeAndAlignment = rules->alignCompositeElement(resultLayout);
         return SLANG_OK;
     }
     break;
@@ -272,7 +272,7 @@ case kIROp_##TYPE##Type:                                        \
         IRSizeAndAlignment resultLayout;
         resultLayout.size = size;
         resultLayout.alignment = 4;
-        *outSizeAndAlignment = rules->alignCompositeElementOfAggregate(resultLayout);
+        *outSizeAndAlignment = rules->alignCompositeElement(resultLayout);
         return SLANG_OK;
     }
     break;
@@ -450,13 +450,8 @@ struct ConstantBufferLayoutRules : IRTypeLayoutRules
         ruleName = IRTypeLayoutRuleName::D3DConstantBuffer;
     }
 
-    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
-    {
-        return elementSize;
-    }
-
     /// Next member only aligns to 16 if the next member is an array/matrix/struct
-    virtual IRSizeAndAlignment alignCompositeElementOfAggregate(IRSizeAndAlignment currentSize)
+    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment currentSize)
     {
         // Matrix/Array/Struct should be aligned on a new register
         return IRSizeAndAlignment(currentSize.size, 16);

@@ -311,7 +311,7 @@ namespace Slang
                     isColMajor?matrixType->getRowCount():matrixType->getColumnCount());
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(target->getOptionSet(), rules, vectorType, &elementSizeAlignment);
-                elementSizeAlignment = rules->alignCompositeElementOfAggregate(elementSizeAlignment);
+                elementSizeAlignment = rules->alignCompositeElement(elementSizeAlignment);
 
                 auto arrayType = builder.getArrayType(
                     vectorType,
@@ -351,7 +351,7 @@ namespace Slang
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(target->getOptionSet(), rules, loweredInnerTypeInfo.loweredType, &elementSizeAlignment);
-                elementSizeAlignment = rules->alignCompositeElementOfAggregate(elementSizeAlignment);
+                elementSizeAlignment = rules->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
                     loweredInnerTypeInfo.loweredType,
                     arrayType->getElementCount(),

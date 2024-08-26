@@ -56,25 +56,12 @@ struct IRSizeAndAlignment
 
 struct IRTypeLayoutRules
 {
-private:
-    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize) = 0;
-
 public:
     IRTypeLayoutRuleName ruleName;
 
-    /// Align composite member of struct based on rule.
-    /// Do not use for: struct, array, or related type (matrix, anySizeType, etc.)
-    virtual IRSizeAndAlignment alignCompositeElementOfNonAggregate(IRSizeAndAlignment elementSize)
-    {
-        return alignCompositeElement(elementSize);
-    }
-
-    /// Align composite member of struct based on rule.
-    /// Intended for: struct, array, or related type (matrix, anySizeType, etc.)
-    virtual IRSizeAndAlignment alignCompositeElementOfAggregate(IRSizeAndAlignment elementSize)
-    {
-        return alignCompositeElement(elementSize);
-    }
+    /// Align composite based on rule. Type is aligned assuming
+    /// it is apart of a composite (array, struct, matrix, etc...)
+    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize) = 0;
 
     /// Get alignment and size of a vector given components of vector.
     /// This alignment is not assuming this vector is a member of a struct.

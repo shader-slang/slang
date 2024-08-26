@@ -3993,7 +3993,7 @@ struct SPIRVEmitContext
                 auto rule = IRTypeLayoutRules::get(layoutRuleName);
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(m_targetProgram->getOptionSet(), rule, matrixType->getElementType(), &elementSizeAlignment);
-
+                IRIntegerValue matrixMinorVectorCount = 0;
                 // Reminder: the meaning of row/column major layout
                 // in our semantics is the *opposite* of what GLSL/SPIRV
                 // calls them, because what they call "columns"
@@ -4007,10 +4007,7 @@ struct SPIRVEmitContext
                         spvStructID,
                         SpvLiteralInteger::from32(id),
                         SpvDecorationRowMajor);
-
-                    auto vectorSize = rule->getVectorSizeAndAlignment(elementSizeAlignment, getIntVal(matrixType->getRowCount()));
-                    vectorSize = rule->alignCompositeElementOfNonAggregate(vectorSize);
-                    matrixStride = vectorSize.getStride();
+                    matrixMinorVectorCount = getIntVal(matrixType->getRowCount());
                 }
                 else
                 {
@@ -4020,12 +4017,15 @@ struct SPIRVEmitContext
                         spvStructID,
                         SpvLiteralInteger::from32(id),
                         SpvDecorationColMajor);
-
-                    auto vectorSize = rule->getVectorSizeAndAlignment(elementSizeAlignment, getIntVal(matrixType->getColumnCount()));
-                    vectorSize = rule->alignCompositeElementOfNonAggregate(vectorSize);
-                    matrixStride = vectorSize.getStride();
+                    matrixMinorVectorCount = getIntVal(matrixType->getColumnCount());
                 }
 
+                // We need the size of our vector. To get the stride we need to know how 'big'
+                // each vector element is inside an array, due to this we align our vector
+                // as if a composite.
+                auto vectorSize = rule->getVectorSizeAndAlignment(elementSizeAlignment, matrixMinorVectorCount);
+                vectorSize = rule->alignCompositeElement(vectorSize);
+                matrixStride = vectorSize.getStride();
                 emitOpMemberDecorateMatrixStride(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,

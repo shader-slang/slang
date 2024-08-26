@@ -108,7 +108,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         auto elementType = inst->getElementType();
         IRSizeAndAlignment elementSize;
         getSizeAndAlignment(m_sharedContext->m_targetProgram->getOptionSet(), layoutRules, elementType, &elementSize);
-        elementSize = layoutRules->alignCompositeElementOfNonAggregate(elementSize);
+        elementSize = layoutRules->alignCompositeElement(elementSize);
 
         const auto arrayType = builder.getUnsizedArrayType(inst->getElementType(), builder.getIntValue(builder.getIntType(), elementSize.getStride()));
         const auto structType = builder.createStructType();
