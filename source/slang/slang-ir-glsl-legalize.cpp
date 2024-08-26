@@ -986,10 +986,10 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(GLSLLegalizationContext* c
                 auto varLayoutForKind = fieldVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
                 
                 UInt space = 0;
-                fieldVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)->space = space;
+                varLayoutForKind->space = space;
 
                 auto unusedBinding = context->usedBindingIndex[LayoutResourceKind::VaryingOutput][space].getLSBZero();
-                fieldVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)->offset = unusedBinding;
+                varLayoutForKind->offset = unusedBinding;
                 context->usedBindingIndex[LayoutResourceKind::VaryingOutput][space].add(unusedBinding);
             }
             builder.addField(field->getKey(), fieldVarLayoutBuilder.build());
