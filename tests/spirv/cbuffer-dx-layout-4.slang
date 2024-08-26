@@ -1,4 +1,4 @@
-// For some reason CI fails this compute test by not loading data
+// For some reason CI fails this compute test by not loading data correctly
 //IGNORE_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -xslang -fvk-use-dx-layout
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry computeMain -stage compute -fvk-use-dx-layout
 

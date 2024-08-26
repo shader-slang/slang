@@ -234,7 +234,7 @@ case kIROp_##TYPE##Type:                                        \
         auto anyValType = cast<IRAnyValueType>(type);
         outSizeAndAlignment->size = getIntVal(anyValType->getSize());
         outSizeAndAlignment->alignment = 4;
-        *outSizeAndAlignment = rules->alignCompositeElementOfNonAggregate(*outSizeAndAlignment);
+        *outSizeAndAlignment = rules->alignCompositeElementOfAggregate(*outSizeAndAlignment);
         return SLANG_OK;
     }
     break;
@@ -250,7 +250,7 @@ case kIROp_##TYPE##Type:                                        \
             resultLayout.size = align(resultLayout.size, fieldTypeLayout.alignment);
             resultLayout.alignment = std::max(resultLayout.alignment, fieldTypeLayout.alignment);
         }
-        *outSizeAndAlignment = rules->alignCompositeElementOfNonAggregate(resultLayout);
+        *outSizeAndAlignment = rules->alignCompositeElementOfAggregate(resultLayout);
         return SLANG_OK;
     }
     break;
@@ -272,7 +272,7 @@ case kIROp_##TYPE##Type:                                        \
         IRSizeAndAlignment resultLayout;
         resultLayout.size = size;
         resultLayout.alignment = 4;
-        *outSizeAndAlignment = rules->alignCompositeElementOfNonAggregate(resultLayout);
+        *outSizeAndAlignment = rules->alignCompositeElementOfAggregate(resultLayout);
         return SLANG_OK;
     }
     break;
@@ -447,7 +447,7 @@ struct ConstantBufferLayoutRules : IRTypeLayoutRules
 {
     ConstantBufferLayoutRules()
     {
-        ruleName = IRTypeLayoutRuleName::ConstantBuffer;
+        ruleName = IRTypeLayoutRuleName::D3DConstantBuffer;
     }
 
     virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
@@ -580,7 +580,7 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         case IRTypeLayoutRuleName::Std430: return getStd430();
         case IRTypeLayoutRuleName::Std140: return getStd140();
         case IRTypeLayoutRuleName::Natural: return getNatural();
-        case IRTypeLayoutRuleName::ConstantBuffer: return getConstantBuffer();
+        case IRTypeLayoutRuleName::D3DConstantBuffer: return getConstantBuffer();
         default: return nullptr;
     }
 }
