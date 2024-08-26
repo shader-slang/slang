@@ -370,19 +370,10 @@ private:
                 auto simpleType = resultType.getSimple();
                 auto builder = m_context->builder;
 
-                // Recall that a variable in our IR represents a *pointer*
+                // Recall that a local variable in our IR represents a *pointer*
                 // to storage of the appropriate type.
                 //
-                IRInst* varPtr = nullptr;
-                if (m_call->parent->getOp() == kIROp_Module)
-                {
-                    // If we were going to emit an IRVar in global scope, emit a GlobalVar instead 
-                    varPtr = builder->createGlobalVar(simpleType);
-                }
-                else
-                {
-                    varPtr = builder->emitVar(simpleType);
-                }
+                auto varPtr = builder->emitVar(simpleType);
 
                 // We need to pass that pointer as an argument to our new
                 // `call` instruction, so that it can receive the value
