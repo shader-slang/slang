@@ -408,6 +408,7 @@ static SlangResult runTests(UnitTestContext* context)
  const char* testBinaryNames[] = {
         "cpu-hello-world",
         "triangle",
+        "shader-object"
     };
 
     SlangResult finalRes = SLANG_OK;

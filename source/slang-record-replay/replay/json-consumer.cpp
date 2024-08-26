@@ -216,7 +216,7 @@ namespace SlangRecord
                     for(int i = 0; i < specializationArgCount; i++)
                     {
                         bool isLastField = (i == specializationArgCount - 1);
-                        ScopeWritterForKey scopeWritterForArg(&builder, &indent, Slang::StringUtil::makeStringWithFormat("[%d]\n", i), isLastField);
+                        ScopeWritterForKey scopeWritterForArg(&builder, &indent, Slang::StringUtil::makeStringWithFormat("[%d]", i), isLastField);
                         {
                             _writePair(builder, indent, "kind", SpecializationArgKindToString(specializationArgs[i].kind));
                             _writePairNoComma(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", specializationArgs[i].type));
@@ -1228,7 +1228,7 @@ namespace SlangRecord
                 _writePair(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", typeId));
                 _writePair(builder, indent, "rules", LayoutRulesToString(rules));
                 _writePair(builder, indent, "outDiagnostics", outDiagnosticsId);
-                _writePair(builder, indent, "retTypeReflectionId", outTypeLayoutReflectionId);
+                _writePairNoComma(builder, indent, "retTypeReflectionId", outTypeLayoutReflectionId);
             }
         }
 
