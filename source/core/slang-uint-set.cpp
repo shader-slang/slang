@@ -8,15 +8,17 @@ Index UIntSet::getLSBZero()
     uint64_t offset = 0;
     for (Element& element : this->m_buffer)
     {
+        // Flip all bits so bitscanForward can find a 0 bit
         Element flippedElement = ~element;
-        // continue if 0 zero-bits
+
+        // continue if we don't have 0 bits
         if (flippedElement == 0)
         {
             offset += sizeof(Element) * 8;
             continue;
         }
 
-        // LSBZero
+        // Get LSBZero of current Block, add with offset
         return bitscanForward(flippedElement) + offset;
     }
     return offset;

@@ -133,6 +133,7 @@ public:
         /// Returns true if set1 and set2 have a same value set (ie there is an intersection)
     static bool hasIntersection(const UIntSet& set1, const UIntSet& set2);
 
+    /// Get LSB Zero of UIntSet. LSB Zero is the smallest value missing from this UIntSet.
     Index getLSBZero();
 
     struct Iterator
