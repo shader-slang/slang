@@ -243,9 +243,11 @@ INST(AssociatedType, associated_type, 0, HOISTABLE)
 INST(ThisType, this_type, 0, HOISTABLE)
 INST(RTTIType, rtti_type, 0, HOISTABLE)
 INST(RTTIHandleType, rtti_handle_type, 0, HOISTABLE)
-INST(TupleType, tuple_type, 0, HOISTABLE)
+/*TupleTypeBase*/
+    INST(TupleType, tuple_type, 0, HOISTABLE)
+    INST(TypePack, TypePack, 0, HOISTABLE)
+INST_RANGE(TupleTypeBase, TupleType, TypePack)
 INST(TargetTupleType, TargetTuple, 0, HOISTABLE)
-INST(TypePack, TypePack, 0, HOISTABLE)
 INST(ExpandTypeOrVal, ExpandTypeOrVal, 1, HOISTABLE)
 
 // A type that identifies it's contained type as being emittable as `spirv_literal.

@@ -242,7 +242,7 @@ public:
             int /*showCommand*/)                \
         {                                       \
             platform::Application::init();      \
-            auto result = APPLICATION_ENTRY();  \
+            auto result = APPLICATION_ENTRY(0, nullptr);  \
             platform::Application::dispose();   \
             GFX_DUMP_LEAK                       \
             return result;                      \
@@ -251,10 +251,10 @@ public:
 #else
 
 #define PLATFORM_UI_MAIN(APPLICATION_ENTRY) \
-    int main()                              \
+    int main(int argc, char** argv)          \
     {                                       \
         platform::Application::init();      \
-        auto rs = APPLICATION_ENTRY();      \
+        auto rs = APPLICATION_ENTRY(argc, argv);      \
         platform::Application::dispose();   \
         return rs;                          \
     }
