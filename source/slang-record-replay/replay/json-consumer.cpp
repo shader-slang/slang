@@ -473,13 +473,11 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        _writeString(builder, indent, "GlobalFunction::createGlobalSession: {\n");
+
         {
-            indent++;
+            ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::createGlobalSession");
             _writePairNoComma(builder, indent, "outGlobalSession", Slang::StringUtil::makeStringWithFormat("0x%X", outGlobalSessionId));
-            indent--;
         }
-        _writeString(builder, indent, "}\n");
 
         m_fileStream.write(builder.produceString().begin(), builder.produceString().getLength());
         m_fileStream.flush();
@@ -490,7 +488,6 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        _writeString(builder, indent, "IGlobalSession::createSession: {\n");
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::createSession");
@@ -633,14 +630,14 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        _writeString(builder, indent, "IGlobalSession::setLanguagePrelude: {\n");
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::setLanguagePrelude");
             {
                 _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
                 _writePair(builder, indent, "sourceLanguage", SlangSourceLanguageToString(inSourceLanguage));
-                _writePairNoComma(builder, indent, "preludeText", (prelude != nullptr ? prelude : "nullptr"));
+                _writePairNoComma(builder, indent, "preludeText", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                            prelude != nullptr ? prelude : "nullptr"));
             }
         }
 

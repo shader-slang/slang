@@ -1299,15 +1299,15 @@ namespace SlangRecord
     void SlangDecoder::IModule_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         size_t readByte = 0;
-        int64_t entryPointIndex = 0;
-        int64_t targetIndex = 0;
-        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
-        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+        int32_t entryPointIndex = 0;
+        int32_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
 
         ObjectID outSharedLibraryId = 0;
         ObjectID outDiagnosticsId = 0;
         readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
-        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
 
         for (auto consumer: m_consumers)
         {
@@ -1508,15 +1508,15 @@ namespace SlangRecord
     void SlangDecoder::IEntryPoint_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         size_t readByte = 0;
-        int64_t entryPointIndex = 0;
-        int64_t targetIndex = 0;
-        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
-        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+        int32_t entryPointIndex = 0;
+        int32_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
 
         ObjectID outSharedLibraryId = 0;
         ObjectID outDiagnosticsId = 0;
         readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
-        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
 
         for (auto consumer: m_consumers)
         {
@@ -1717,15 +1717,15 @@ namespace SlangRecord
     void SlangDecoder::ICompositeComponentType_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         size_t readByte = 0;
-        int64_t entryPointIndex = 0;
-        int64_t targetIndex = 0;
-        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
-        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+        int32_t entryPointIndex = 0;
+        int32_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
 
         ObjectID outSharedLibraryId = 0;
         ObjectID outDiagnosticsId = 0;
         readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
-        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
 
         for (auto consumer: m_consumers)
         {
@@ -1926,15 +1926,15 @@ namespace SlangRecord
     void SlangDecoder::ITypeConformance_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         size_t readByte = 0;
-        int64_t entryPointIndex = 0;
-        int64_t targetIndex = 0;
-        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
-        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+        int32_t entryPointIndex = 0;
+        int32_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
 
         ObjectID outSharedLibraryId = 0;
         ObjectID outDiagnosticsId = 0;
         readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
-        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
 
         for (auto consumer: m_consumers)
         {

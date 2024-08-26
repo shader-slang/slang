@@ -406,6 +406,7 @@ error:
 static SlangResult runTests(UnitTestContext* context)
 {
  const char* testBinaryNames[] = {
+        "cpu-hello-world",
         "triangle",
     };
 

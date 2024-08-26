@@ -47,6 +47,9 @@ struct UniformState;
 
 static SlangResult _innerMain(int argc, char** argv)
 {
+    TestBase testBase;
+    testBase.parseOption(argc, argv);
+
     // First, we need to create a "session" for interacting with the Slang
     // compiler. This scopes all of our application's interactions
     // with the Slang library. At the moment, creating a session causes
@@ -57,14 +60,15 @@ static SlangResult _innerMain(int argc, char** argv)
     // NOTE that we use attach instead of setting via assignment, as assignment will increase
     // the refcount. spCreateSession returns a IGlobalSession with a refcount of 1.
     ComPtr<slang::IGlobalSession> slangSession;
-    slangSession.attach(spCreateSession(NULL));
+
+    SLANG_RETURN_ON_FAIL(slang::createGlobalSession(slangSession.writeRef()));
 
     // As touched on earlier, in order to generate the final executable code,
     // the slang code is converted into C++, and that C++ needs a 'prelude' which
     // is just definitions that the generated code needed to work correctly.
     // There is a simple default definition of a prelude provided in the prelude
     // directory called 'slang-cpp-prelude.h'.
-    // 
+    //
     // We need to tell slang either the contents of the prelude, or suitable include/s
     // that will work. The actual API call to set the prelude is `setPrelude`
     // and this just sets for a specific language a bit of text placed before generated code.
@@ -75,72 +79,68 @@ static SlangResult _innerMain(int argc, char** argv)
     // is for the prelude code to be an *absolute* path to the 'slang-cpp-prelude.h' - which means
     // this will work wherever the generated code is, and allows accessing other files via relative paths.
     //
-    // Look at the source to TestToolUtil::setSessionDefaultPreludeFromExePath to see what's involed. 
+    // Look at the source to TestToolUtil::setSessionDefaultPreludeFromExePath to see what's involed.
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], slangSession);
 
-    // A compile request represents a single invocation of the compiler,
-    // to process some inputs and produce outputs (or errors).
-    //
-    SlangCompileRequest* slangRequest = spCreateCompileRequest(slangSession);
+    slang::SessionDesc sessionDesc = {};
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SHADER_HOST_CALLABLE;
+    targetDesc.flags = SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM;
 
-    // We would like to request a CPU code that can be executed directly on the host -
-    // which is the 'SLANG_HOST_CALLABLE' target. 
-    // If we wanted a just a shared library/dll, we could have used SLANG_SHARED_LIBRARY.
-    int targetIndex = spAddCodeGenTarget(slangRequest, SLANG_SHADER_HOST_CALLABLE);
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
 
-    // Set the target flag to indicate that we want to compile all the entrypoints in the
-    // slang shader file into a library.
-    spSetTargetFlags(slangRequest, targetIndex, SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
+    ComPtr<slang::ISession> session;
+    SLANG_RETURN_ON_FAIL(slangSession->createSession(sessionDesc, session.writeRef()));
 
-    // A compile request can include one or more "translation units," which more or
-    // less amount to individual source files (think `.c` files, not the `.h` files they
-    // might include).
-    //
-    // For this example, our code will all be in the Slang language. The user may
-    // also specify HLSL input here, but that currently doesn't affect the compiler's
-    // behavior much.
-    //
-    int translationUnitIndex = spAddTranslationUnit(slangRequest, SLANG_SOURCE_LANGUAGE_SLANG, nullptr);
-
-    // We will load source code for our translation unit from the file `shader.slang`.
-    // There are also variations of this API for adding source code from application-provided buffers.
-    //
-    Slang::String path = resourceBase.resolveResource("shader.slang");
-    spAddTranslationUnitSourceFile(slangRequest, translationUnitIndex, path.getBuffer());
-
-    // Once all of the input options for the compiler have been specified,
-    // we can invoke `spCompile` to run the compiler and see if any errors
-    // were detected.
-    //
-    const SlangResult compileRes = spCompile(slangRequest);
-
-    // Even if there were no errors that forced compilation to fail, the
-    // compiler may have produced "diagnostic" output such as warnings.
-    // We will go ahead and print that output here.
-    //
-    if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
+    slang::IModule* slangModule = nullptr;
     {
-        printf("%s", diagnostics);
+        ComPtr<slang::IBlob> diagnosticBlob;
+        Slang::String path = resourceBase.resolveResource("shader.slang");
+        slangModule = session->loadModule(path.getBuffer(), diagnosticBlob.writeRef());
+        diagnoseIfNeeded(diagnosticBlob);
+        if (!slangModule)
+            return -1;
     }
 
-    // If compilation failed, there is no point in continuing any further.
-    if(SLANG_FAILED(compileRes))
+    ComPtr<slang::IEntryPoint> entryPoint;
+    slangModule->findEntryPointByName("computeMain", entryPoint.writeRef());
+
+    Slang::List<slang::IComponentType*> componentTypes;
+    componentTypes.add(slangModule);
+    componentTypes.add(entryPoint);
+
+    ComPtr<slang::IComponentType> composedProgram;
     {
-        spDestroyCompileRequest(slangRequest);
-        return compileRes;
+        ComPtr<slang::IBlob> diagnosticsBlob;
+        SlangResult result = session->createCompositeComponentType(
+            componentTypes.getBuffer(),
+            componentTypes.getCount(),
+            composedProgram.writeRef(),
+            diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        SLANG_RETURN_ON_FAIL(result);
     }
 
     // Get the 'shared library' (note that this doesn't necessarily have to be implemented as a shared library
     // it's just an interface to executable code).
     ComPtr<ISlangSharedLibrary> sharedLibrary;
-    SLANG_RETURN_ON_FAIL(spGetTargetHostCallable(slangRequest, 0, sharedLibrary.writeRef()));
-
+    {
+        ComPtr<slang::IBlob> diagnosticsBlob;
+        SlangResult result = composedProgram->getEntryPointHostCallable(
+            0, 0, sharedLibrary.writeRef(), diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        SLANG_RETURN_ON_FAIL(result);
+        if (testBase.isTestMode())
+        {
+            testBase.printEntrypointHashes(1, 1, composedProgram);
+        }
+    }
     // Once we have the sharedLibrary, we no longer need the request
     // unless we want to use reflection, to for example workout how 'UniformState' and 'UniformEntryPointParams' are laid out
-    // at runtime. We don't do that here - as we hard code the structures. 
-    spDestroyCompileRequest(slangRequest);
+    // at runtime. We don't do that here - as we hard code the structures.
 
-    // Get the function we are going to execute 
+    // Get the function we are going to execute
     const char entryPointName[] = "computeMain";
     CPPPrelude::ComputeFunc func = (CPPPrelude::ComputeFunc)sharedLibrary->findFuncByName(entryPointName);
     if (!func)
