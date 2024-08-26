@@ -48,6 +48,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     InstPair transcribeConstruct(IRBuilder* builder, IRInst* origConstruct);
     InstPair transcribeMakeStruct(IRBuilder* builder, IRInst* origMakeStruct);
 
+    InstPair transcribeMakeTuple(IRBuilder* builder, IRInst* origMakeTuple);
+
     // Differentiating a call instruction here is primarily about generating
     // an appropriate call list based on whichever parameters have differentials 
     // in the current transcription context.
@@ -67,6 +69,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     InstPair transcribeFieldExtract(IRBuilder* builder, IRInst* originalInst);
 
     InstPair transcribeGetElement(IRBuilder* builder, IRInst* origGetElementPtr);
+
+    InstPair transcribeGetTupleElement(IRBuilder* builder, IRInst* origInst);
 
     InstPair transcribeUpdateElement(IRBuilder* builder, IRInst* originalInst);
 
