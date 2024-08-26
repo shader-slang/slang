@@ -265,7 +265,8 @@ struct GLSLLegalizationContext
     Stage                      stage;
     IRFunc*                    entryPointFunc;
     
-    //Dictionary<ResourceType, Dictionary<Space, BindingIndex>>
+    /// This dictionary stores for 'VaryingIn/VaryingOut' ('Dictionary<LayoutResourceKind, ...>') all used
+    /// 'spaces' ('Dictionary<UInt, ...>') with associated 'bindings' ('UIntSet').
     Dictionary<LayoutResourceKind, Dictionary<UInt, UIntSet>> usedBindingIndex;
 
     GLSLLegalizationContext()

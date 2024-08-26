@@ -502,7 +502,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     {
         case kIROp_ControlBarrier:
         {
-            m_writer->emit("GroupMemoryBarrier();\n");
+            m_writer->emit("GroupMemoryBatrierWithGroupSync();\n");
             return true;
         }
         case kIROp_MakeVector:
