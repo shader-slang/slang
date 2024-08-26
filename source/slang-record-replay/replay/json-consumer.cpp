@@ -448,7 +448,7 @@ namespace SlangRecord
                     _writePair(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                                 desc.preprocessorMacros[i].name != nullptr ? desc.preprocessorMacros[i].name : "nullptr"));
 
-                    _writePair(builder, indent, "value", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                    _writePairNoComma(builder, indent, "value", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                                 desc.preprocessorMacros[i].value != nullptr ? desc.preprocessorMacros[i].value : "nullptr"));
                 }
             }
