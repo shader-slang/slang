@@ -5908,6 +5908,11 @@ void EndToEndCompileRequest::setTargetForceGLSLScalarBufferLayout(int targetInde
     getTargetOptionSet(targetIndex).set(CompilerOptionName::GLSLForceScalarLayout, value);
 }
 
+void EndToEndCompileRequest::setTargetForceDXLayout(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::ForceDXLayout, value);
+}
+
 void EndToEndCompileRequest::setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode  mode)
 {
     getTargetOptionSet(targetIndex).set(CompilerOptionName::FloatingPointMode, FloatingPointMode(mode));

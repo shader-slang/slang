@@ -564,6 +564,7 @@ enum class IRTypeLayoutRuleName
     Scalar = Natural,
     Std430,
     Std140,
+    D3DConstantBuffer,
     _Count,
 };
 
@@ -1933,18 +1934,22 @@ struct IRAttributedType : IRType
     IRInst* getAttr() { return getOperand(1); }
 };
 
+struct IRTupleTypeBase : IRType
+{
+    IR_PARENT_ISA(TupleTypeBase)
+};
+
 /// Represents a tuple. Tuples are created by `IRMakeTuple` and its elements
 /// are accessed via `GetTupleElement(tupleValue, IRIntLit)`.
-struct IRTupleType : IRType
+struct IRTupleType : IRTupleTypeBase
 {
     IR_LEAF_ISA(TupleType)
 };
 
-
 /// Represents a type pack. Type packs behave like tuples, but they have a
 /// "flattening" semantics, so that MakeTypePack(MakeTypePack(T1,T2), T3) is
 /// MakeTypePack(T1,T2,T3).
-struct IRTypePack : IRType
+struct IRTypePack : IRTupleTypeBase
 {
     IR_LEAF_ISA(TypePack)
 };

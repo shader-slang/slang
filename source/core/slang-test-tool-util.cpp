@@ -107,6 +107,24 @@ static SlangResult _addCUDAPrelude(const String& rootPath, slang::IGlobalSession
     return SLANG_OK;
 }
 
+/* static */SlangResult TestToolUtil::getDllDirectoryPath(const char* exePath, String& outDllDirectoryPath)
+{
+    String canonicalPath;
+    SLANG_RETURN_ON_FAIL(Path::getCanonical(exePath, canonicalPath));
+
+    // Get the directory
+    String binPath = Path::getParentDirectory(canonicalPath);
+
+    // Windows puts the dlls in the same directory as the exe, while on other platforms they are in a 'lib' directory
+#ifdef _WIN32
+    outDllDirectoryPath = binPath;
+#else
+    String binaryRootPath = Path::getParentDirectory(binPath);
+    outDllDirectoryPath = Path::combine(binaryRootPath, "lib");
+#endif
+    return SLANG_OK;
+}
+
 /* static */SlangResult TestToolUtil::getRootPath(const char* inExePath, String& outExePath)
 {
     // Get the directory holding the exe
