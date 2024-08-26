@@ -2249,8 +2249,8 @@ Type* ComponentType::getTypeFromString(
     //
     // It might be possible to just create a temporary ASTBuilder - the worry though is
     // that the parsing sets a member variable in AST node to one of these scopes, and then
-    auto astBuilder = getLinkage()->getASTBuilder();
     // it become a dangling pointer. So for now we go with the linkages.
+    auto astBuilder = getLinkage()->getASTBuilder();
 
     // Otherwise, we need to start looking in
     // the modules that were directly or
