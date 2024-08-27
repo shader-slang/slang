@@ -23,10 +23,9 @@ struct AddressInstEliminationContext
         default:
             return builder.emitLoad(addr);
         case kIROp_GetElementPtr:
+            return builder.emitElementExtract(getValue(builder, addr->getOperand(0)), addr->getOperand(1));
         case kIROp_FieldAddress:
-            {
-                return builder.emitElementExtract(getValue(builder, addr->getOperand(0)), addr->getOperand(1));
-            }
+            return builder.emitFieldExtract(getValue(builder, addr->getOperand(0)), addr->getOperand(1));
         }
     }
 
