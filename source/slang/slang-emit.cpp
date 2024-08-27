@@ -1137,6 +1137,10 @@ Result linkAndOptimizeIR(
             ? as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker())
             : &glslExtensionTracker;
 
+#if 0
+            dumpIRIfEnabled(codeGenContext, irModule, "PRE GLSL LEGALIZED");
+#endif
+
         legalizeEntryPointsForGLSL(
             session,
             irModule,

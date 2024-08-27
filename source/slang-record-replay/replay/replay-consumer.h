@@ -52,6 +52,7 @@ namespace SlangRecord
         }
 
         Slang::Dictionary<ObjectID, void*>& m_objectMap;
+        uint32_t    m_globalCounter = 0;
     };
 
     class ReplayConsumer : public IDecoderConsumer

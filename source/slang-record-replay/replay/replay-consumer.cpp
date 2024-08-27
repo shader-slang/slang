@@ -118,7 +118,8 @@ namespace SlangRecord
             {
                 uint8_t* buffer = (uint8_t*)outHash->getBufferPointer();
                 Slang::StringBuilder strBuilder;
-                strBuilder << "entrypoint: "<< entryPointIndex << ", target: " << targetIndex << ", hash: ";
+                strBuilder << "callIdx: " << m_globalCounter << ", entrypoint: "<< entryPointIndex << ", target: " << targetIndex << ", hash: ";
+                m_globalCounter++;
 
                 for (size_t i = 0; i < outHash->getBufferSize(); i++)
                 {
