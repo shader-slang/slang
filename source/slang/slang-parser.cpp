@@ -1367,6 +1367,9 @@ namespace Slang
             case TokenType::Comma:
             case TokenType::OpAssign:
                 break;
+            case TokenType::LParent:
+                parser->ReadToken(TokenType::RParent);
+                break;
 
             // Note(tfoley): Even more of a hack!
             case TokenType::QuestionMark:
@@ -1381,6 +1384,9 @@ namespace Slang
                 parser->sink->diagnose(nameToken.loc, Diagnostics::invalidOperator, nameToken);
                 break;
             }
+
+            if (nameToken.type == TokenType::LParent)
+                return NameLoc(getName(parser, "()"), nameToken.loc);
 
             return NameLoc(
                 getName(parser, nameToken.getContent()),
@@ -7051,7 +7057,7 @@ namespace Slang
                 varExpr->scope = parser->currentScope;
                 parser->FillPosition(varExpr);
 
-                auto nameAndLoc = NameLoc(parser->ReadToken());
+                auto nameAndLoc = ParseDeclName(parser);
                 varExpr->name = nameAndLoc.name;
 
                 if(peekTokenType(parser) == TokenType::OpLess)
@@ -7177,7 +7183,7 @@ namespace Slang
                     memberExpr->baseExpression = expr;
                     parser->ReadToken(nextTokenType);
                     parser->FillPosition(memberExpr);
-                    memberExpr->name = expectIdentifier(parser).name;
+                    memberExpr->name = ParseDeclName(parser).name;
                     
                     if (peekTokenType(parser) == TokenType::OpLess)
                         expr = maybeParseGenericApp(parser, memberExpr);

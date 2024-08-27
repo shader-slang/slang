@@ -2699,7 +2699,7 @@ namespace Slang
             // If callee is a value of DeclRefType, then it is a functor.
             // We need to look for `operator()` member within the type and
             // call that instead.
-            auto operatorName = getName("__call");
+            auto operatorName = getName("()");
 
             LookupResult lookupResult = lookUpMember(
                 m_astBuilder,

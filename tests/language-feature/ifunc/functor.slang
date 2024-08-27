@@ -8,7 +8,7 @@ struct Functor : IMutatingFunc<float, float>
     int context;
 
     [mutating]
-    float __call(float p)
+    float operator()(float p)
     {
         context += (int)p;
         return context;
@@ -28,11 +28,13 @@ void computeMain(uint tid: SV_DispatchThreadID)
 {
     Functor f;
     f.context = 0;
-
+    
     f(1.0f);
+    f.operator()(1.0f); // explicit operator () call should also work.
+
     apply(f, 2.0f);
     apply(f, 3.0f);
 
-    // CHECK: 6
+    // CHECK: 7
     outputBuffer[0] = (uint)f.context;
 }

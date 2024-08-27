@@ -956,25 +956,25 @@ extension Tuple<T> : IComparable
 interface IMutatingFunc<TR, each TP>
 {
     [mutating]
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 interface IFunc<TR, each TP> : IMutatingFunc<TR, expand each TP>
 {
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 interface IDifferentiableMutatingFunc<TR : IDifferentiable, each TP : IDifferentiable> : IMutatingFunc<TR, expand each TP>
 {
     [Differentiable]
     [mutating]
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 interface IDifferentiableFunc<TR : IDifferentiable, each TP : IDifferentiable> : IFunc<TR, expand each TP>, IDifferentiableMutatingFunc<TR, expand each TP>
 {
     [Differentiable]
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 __generic<T>
