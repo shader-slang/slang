@@ -57,7 +57,7 @@ namespace SlangRecord
     {
     public:
         JsonConsumer(const Slang::String& filePath);
-
+        virtual ~JsonConsumer() = default;
         virtual void CreateGlobalSession(ObjectID outGlobalSessionId);
         virtual void IGlobalSession_createSession(ObjectID objectId, slang::SessionDesc const&  desc, ObjectID outSessionId);
         virtual void IGlobalSession_findProfile(ObjectID objectId, char const* name);

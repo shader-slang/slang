@@ -42,7 +42,7 @@ namespace SlangRecord
 
         virtual SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL getLayout(
             SlangInt    targetIndex = 0,
-            slang::IBlob**     outDiagnostics = nullptr)
+            slang::IBlob**     outDiagnostics = nullptr) override
         {
             return Super::getLayout(targetIndex, outDiagnostics);
         }
@@ -64,7 +64,7 @@ namespace SlangRecord
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
             SlangInt    targetIndex,
             slang::IBlob** outCode,
-            slang::IBlob** outDiagnostics = nullptr)
+            slang::IBlob** outDiagnostics = nullptr) override
         {
             return Super::getTargetCode(targetIndex, outCode, outDiagnostics);
         }
@@ -143,7 +143,6 @@ namespace SlangRecord
     private:
         SessionRecorder*                        m_sessionRecorder;
         Slang::ComPtr<slang::IEntryPoint>       m_actualEntryPoint;
-        uint64_t                                m_entryPointHandle = 0;
     };
 }
 #endif // SLANG_ENTRY_POINT_H

@@ -439,6 +439,7 @@ static SlangResult runTests(UnitTestContext* context)
         "ray-tracing",
         "ray-tracing-pipeline",
         "autodiff-texture",
+        "gpu-printing"
         // "shader-object", // these examples requires reflection API to replay, we have to disable it for now.
         // "model-viewer",
     };

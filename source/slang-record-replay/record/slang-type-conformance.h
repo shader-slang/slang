@@ -38,7 +38,7 @@ namespace SlangRecord
 
         virtual SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL getLayout(
             SlangInt    targetIndex = 0,
-            slang::IBlob**     outDiagnostics = nullptr)
+            slang::IBlob**     outDiagnostics = nullptr) override
         {
             return Super::getLayout(targetIndex, outDiagnostics);
         }
