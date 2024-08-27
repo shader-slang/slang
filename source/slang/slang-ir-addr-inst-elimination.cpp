@@ -23,9 +23,15 @@ struct AddressInstEliminationContext
         default:
             return builder.emitLoad(addr);
         case kIROp_GetElementPtr:
-            return builder.emitElementExtract(getValue(builder, addr->getOperand(0)), addr->getOperand(1));
         case kIROp_FieldAddress:
-            return builder.emitFieldExtract(getValue(builder, addr->getOperand(0)), addr->getOperand(1));
+            {
+                IRInst* args[] = { getValue(builder, addr->getOperand(0)), addr->getOperand(1) };
+                return builder.emitIntrinsicInst(
+                    cast<IRPtrTypeBase>(addr->getFullType())->getValueType(),
+                    (addr->getOp() == kIROp_GetElementPtr ? kIROp_GetElement : kIROp_FieldExtract),
+                    2,
+                    args);
+            }
         }
     }
 
