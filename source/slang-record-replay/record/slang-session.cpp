@@ -444,8 +444,9 @@ namespace SlangRecord
 
         if (pModule)
         {
-            ModuleRecorder* moduleRecord = m_mapModuleToRecord.tryGetValue(pModule);
-            if (!moduleRecord)
+            ModuleRecorder* moduleRecord = nullptr;
+            bool ret = m_mapModuleToRecord.tryGetValue(pModule, moduleRecord);
+            if (!ret)
             {
                 SLANG_RECORD_ASSERT(!"Module not found in mapModuleToRecord");
             }
@@ -466,12 +467,13 @@ namespace SlangRecord
     ModuleRecorder* SessionRecorder::getModuleRecorder(slang::IModule* module)
     {
         ModuleRecorder* moduleRecord = nullptr;
-        moduleRecord = m_mapModuleToRecord.tryGetValue(module);
-        if (!moduleRecord)
+        bool ret = m_mapModuleToRecord.tryGetValue(module, moduleRecord);
+        if (!ret)
         {
             moduleRecord = new ModuleRecorder(module, m_recordManager);
             Slang::ComPtr<ModuleRecorder> result(moduleRecord);
-            m_mapModuleToRecord.add(module, *result.detach());
+            m_moduleRecordersAlloation.add(result);
+            m_mapModuleToRecord.add(module, result.detach());
         }
         return moduleRecord;
     }
