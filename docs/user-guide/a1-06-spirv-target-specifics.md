@@ -144,13 +144,17 @@ but not [vk::binding(...)], sets its Vulkan descriptor set to <space> and bindin
 shift the inferred binding numbers for more than one space, provide more than one such option. If more than one
 such option is provided for the same space, the last one takes effect. If you need to shift the inferred binding
 numbers for all sets, use 'all' as <space>.
-* [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)
-* [GLSL wiki](https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ#auto-mapped-binding-numbers)
+
+For more information, see the following pages:
+ - [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)
+ - [GLSL wiki](https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ#auto-mapped-binding-numbers)
 
 ### -fvk-bind-globals <N> <descriptor-set>
 Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>.
 It lets you specify the descriptor for the source at a certain register.
-* [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#hlsl-global-variables-and-vulkan-binding)
+
+For more information, see the following pages:
+ - [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#hlsl-global-variables-and-vulkan-binding)
 
 ### -fvk-use-scalar-layout, -force-glsl-scalar-layout
 Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV.
@@ -171,10 +175,7 @@ A path to a specific spirv.core.grammar.json to use when generating SPIR-V outpu
 SPIR-V specific Attributes 
 --------------------------
 
-DXC supports a few attributes and command-line arguments for targeting SPIR-V.
-You can find a document of how DXC supports [the feature mapping to SPIR-V](https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst).
-
-Similar to DXC, Slang supports a few of the attributes as following:
+DXC supports a few attributes and command-line arguments for targeting SPIR-V. Similar to DXC, Slang supports a few of the attributes as following:
 
 ### [[vk::binding(binding: int, set: int = 0)]]
 Similar to `binding` layout qualifier in Vulkan. It specifies the uniform buffer binding point, and the descriptor set for Vulkan.
@@ -196,8 +197,10 @@ Same as `[[vk::image_format("XX")]]` layout qualifier in DXC. Vulkan/GLSL allows
 ```csharp
 [vk::image_format("r32f")] RWTexture2D<float> typicalTexture;
 ```
-It will generate the following GLSL or SPIR-V code.
+It will generate the following GLSL,
 > layout(r32f) uniform image2D typicalTexture_0;
+
+Or it will generate the following SPIR-V code,
 > %18 = OpTypeImage %float 2D 2 0 0 2 R32f
 
 ### [vk::shader_record]
@@ -288,14 +291,15 @@ HSC_OUT constants(InputPatch<VS_OUT, 4> patch)
 }
 ```
 
-When targeting SPIR-V, the patch function is merged as a part of the Hull shader, because GLSL nor SPIR-V differentiates them like how HLSL does.
+When targeting SPIR-V, the patch function is merged as a part of the Hull shader, because SPIR-V doesn't have a same concept as `patchconstantfunc`.
+The function used for `patchconstantfunc` should be called only once for each patch.
 
 As an example, a Hull shader will be emitted as following,
 ```
 void main() {
     ...
     main(patch, gl_InvocationID);
-    barrier();
+    barrier(); // OpControlBarrier
     if (gl_InvocationID == 0)
     {
         constants(path);
@@ -305,10 +309,5 @@ void main() {
 
 This behavior is same to how DXC translates from HLSL to SPIR-V.
 
-
-Summary
--------
-
-This chapter described any specific details for each target.
 
 
