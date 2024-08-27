@@ -7908,17 +7908,38 @@ namespace Slang
         for (auto& ctorInfo : structDeclInfo.m_ctorInfoList)
         {
             auto ctor = ctorInfo.m_ctor;
+            
             ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
             thisExpr->scope = ctor->ownedScope;
             thisExpr->type = ctor->returnType.type;
 
             auto seqStmtChild = m_astBuilder->create<SeqStmt>();
             seqStmtChild->stmts.reserve(structDecl->members.getCount());
+
+            /// Default Ctor's which are *synthisized* must zero-initialize members since otherwise
+            /// '{}' will not work as expected for a user. This variable checks for the ctor attributes
+            bool isDefaultSynthisizedCtor = ctor->containsOption(ConstructorTags::Synthesized) && ctor->getParameters().getCount() == 0;
+
             for (auto varDeclBaseRef : getMembersOfType<VarDeclBase>(m_astBuilder, structDecl, MemberFilterStyle::Instance))
             {
                 auto varDeclBase = varDeclBaseRef.getDecl();
-                if (!varDeclBase->initExpr)
-                    continue;
+                auto varType = varDeclBase->type.type;
+                //bool canCopy = !isOpaqueHandleType(varType)
+                    //&& !(as<DeclRefType>(varType) && as<DeclRefType>(varType)->getDeclRef().getDecl()->findModifier<NonCopyableTypeAttribute>())
+                    //;
+                Expr* initExpr = varDeclBase->initExpr;
+                if (!initExpr)
+                {
+                    if (!isDefaultSynthisizedCtor 
+                        //&& canCopy
+                        )
+                        continue;
+                    auto defaultExpr = m_astBuilder->create<DefaultConstructExpr>();
+                    defaultExpr->type = QualType(varDeclBase->type);
+                    defaultExpr->loc = varDeclBase->loc;
+                    initExpr = defaultExpr;
+                }
+                    
 
                 MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
                 memberExpr->baseExpression = thisExpr;
@@ -7930,7 +7951,7 @@ namespace Slang
 
                 auto assign = m_astBuilder->create<AssignExpr>();
                 assign->left = memberExpr;
-                assign->right = varDeclBase->initExpr;
+                assign->right = initExpr;
                 assign->loc = varDeclBase->loc;
 
                 auto stmt = m_astBuilder->create<ExpressionStmt>();
