@@ -7923,7 +7923,7 @@ namespace Slang
             for (auto varDeclBaseRef : getMembersOfType<VarDeclBase>(m_astBuilder, structDecl, MemberFilterStyle::Instance))
             {
                 auto varDeclBase = varDeclBaseRef.getDecl();
-                auto varType = varDeclBase->type.type;
+                //auto varType = varDeclBase->type.type;
                 //bool canCopy = !isOpaqueHandleType(varType)
                     //&& !(as<DeclRefType>(varType) && as<DeclRefType>(varType)->getDeclRef().getDecl()->findModifier<NonCopyableTypeAttribute>())
                     //;
