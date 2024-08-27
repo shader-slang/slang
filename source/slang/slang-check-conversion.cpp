@@ -626,6 +626,27 @@ namespace Slang
             toInitializerListExpr->type = QualType(toType);
             toInitializerListExpr->args = coercedArgs;
 
+            // Wrap initalizer list args if we're creating a non-differentiable struct within a 
+            // differentiable function.
+            // 
+            if (auto func = getParentFuncOfVisitor())
+            {
+                if (func->findModifier<DifferentiableAttribute>() && 
+                    !isTypeDifferentiable(toType))
+                {
+                    for (auto &arg : toInitializerListExpr->args)
+                    {
+                        if (isTypeDifferentiable(arg->type.type))
+                        {
+                            auto detachedArg = m_astBuilder->create<DetachExpr>();
+                            detachedArg->inner = arg;
+                            detachedArg->type = arg->type;
+                            arg = detachedArg;
+                        }
+                    }
+                }
+            }
+
             *outToExpr = toInitializerListExpr;
         }
 

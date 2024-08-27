@@ -2808,6 +2808,8 @@ namespace Slang
 
         Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr);
 
+        Expr* visitDetachExpr(DetachExpr* expr);
+
         Expr* visitSPIRVAsmExpr(SPIRVAsmExpr*);
 
             /// Perform semantic checking on a `modifier` that is being applied to the given `type`
