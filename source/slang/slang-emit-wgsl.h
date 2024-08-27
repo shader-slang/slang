@@ -29,6 +29,7 @@ public:
         IRInst* inst, const EmitOpInfo& inOuterPrec
     ) SLANG_OVERRIDE;
     virtual void emitSwitchCaseSelectorsImpl(
+        IRBasicType *const switchCondition,
         const SwitchRegion::Case *const currentCase,
         const bool isDefault
     ) SLANG_OVERRIDE;
