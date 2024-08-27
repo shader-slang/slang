@@ -18,7 +18,7 @@ struct MeshPayload
     int exponent;
 };
 
-// CHECK: MeshPayload_0 object_data& _slang_mesh_payload
+// CHECK: MeshPayload_0 object_data* _slang_mesh_payload
 // CHECK: mesh_grid_properties  _slang_mgp
 [numthreads(1,1,1)]
 void taskMain()
