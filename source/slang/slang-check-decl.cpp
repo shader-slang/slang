@@ -2520,18 +2520,22 @@ namespace Slang
         // and likely a crash.
         // 
         // Accessing the members via index side steps the issue.
+
+        Index parameterIndex = 0;
         const auto& members = genericDecl->members;
         for (Index i = 0; i < members.getCount(); ++i)
         {
             Decl* m = members[i];
 
-            if (auto typeParam = as<GenericTypeParamDecl>(m))
+            if (auto typeParam = as<GenericTypeParamDeclBase>(m))
             {
                 ensureDecl(typeParam, DeclCheckState::ReadyForReference);
+                typeParam->parameterIndex = parameterIndex++;
             }
             else if (auto valParam = as<GenericValueParamDecl>(m))
             {
                 ensureDecl(valParam, DeclCheckState::ReadyForReference);
+                valParam->parameterIndex = parameterIndex++;
             }
             else if (auto constraint = as<GenericTypeConstraintDecl>(m))
             {
@@ -3927,7 +3931,7 @@ namespace Slang
     {
         // Our synthesized method will have parameters matching the names
         // and types of those on the requirement, and it will use expressions
-        // that reference those parametesr as arguments for the call expresison
+        // that reference those parameters as arguments for the call expresison
         // that makes up the body.
         //
         for (auto paramDeclRef : getParameters(m_astBuilder, requirement))
@@ -3947,14 +3951,6 @@ namespace Slang
             synParamDecl->parentDecl = synthesized;
             synthesized->members.add(synParamDecl);
 
-            // For each paramter, we will create an argument expression
-            // for the call in the function body.
-            //
-            auto synArg = m_astBuilder->create<VarExpr>();
-            synArg->declRef = makeDeclRef(synParamDecl);
-            synArg->type = paramType;
-            synArgs.add(synArg);
-
             // Add modifiers
             for (auto modifier : paramDeclRef.getDecl()->modifiers)
             {
@@ -3970,6 +3966,33 @@ namespace Slang
                     clonedModifier->keywordName = modifier->keywordName;
                     addModifier(synParamDecl, clonedModifier);
                 }
+            }
+
+            // Create an expression that references the parameter for use in arguments.
+            auto synArg = m_astBuilder->create<VarExpr>();
+            synArg->declRef = makeDeclRef(synParamDecl);
+            synArg->type = paramType;
+
+            if (auto typePack = as<ConcreteTypePack>(paramType))
+            {
+                // If paramType is a concrete type pack, we want to expand it out into
+                // individual arguments.
+                for (Index i = 0; i < typePack->getTypeCount(); i++)
+                {
+                    auto elementType = typePack->getElementType(i);
+                    auto synMemberExpr = m_astBuilder->create<SwizzleExpr>();
+                    synMemberExpr->base = synArg;
+                    synMemberExpr->elementIndices.add((UInt)i);
+                    synMemberExpr->type = elementType;
+                    synArgs.add(synMemberExpr);
+                }
+            }
+            else
+            {
+                // For ordinary non-pack paramters, we will use synArg directly to
+                // referencing the parameter for the call in the function body.
+                //
+                synArgs.add(synArg);
             }
         }
     }
@@ -4152,8 +4175,6 @@ namespace Slang
             addModifier(synFuncDecl, m_astBuilder->create<ForceInlineAttribute>());
 
             synFuncDecl->parentDecl = aggTypeDecl;
-            SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(synFuncDecl));
-            bodyVisitor.registerDifferentiableTypesForFunc(synFuncDecl);
         }
         else
         {
@@ -4276,6 +4297,11 @@ namespace Slang
         // to it to indicate that it should be ignored by things like lookup.
         //
         synFuncDecl->parentDecl = context->parentDecl;
+
+        // If the synthesized func is differentiable, make sure to populate its
+        // differential type dictionary.
+        SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(synFuncDecl));
+        bodyVisitor.registerDifferentiableTypesForFunc(synFuncDecl);
 
         // Once our synthesized declaration is complete, we need
         // to install it as the witness that satifies the given

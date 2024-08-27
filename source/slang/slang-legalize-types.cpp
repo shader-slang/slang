@@ -209,7 +209,7 @@ bool isPointerToResourceType(IRType* type)
 {
     while (auto ptrType = as<IRPtrTypeBase>(type))
     {
-        if (ptrType->getAddressSpace() == AddressSpace(SpvStorageClassStorageBuffer) ||
+        if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer ||
             ptrType->getAddressSpace() == AddressSpace::UserPointer)
             return true;
         type = ptrType->getValueType();

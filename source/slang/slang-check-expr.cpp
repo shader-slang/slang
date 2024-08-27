@@ -16,6 +16,7 @@
 #include "slang-lookup.h"
 #include "slang-lookup-spirv.h"
 #include "slang-ast-print.h"
+#include "core/slang-char-util.h"
 
 namespace Slang
 {
@@ -1173,6 +1174,23 @@ namespace Slang
             }
         }
 
+        if (auto typePack = as<ConcreteTypePack>(type))
+        {
+            bool anyDifferentiableElement = false;
+            List<Type*> diffTypes;
+            for (Index i = 0; i < typePack->getTypeCount(); i++)
+            {
+                auto t = typePack->getElementType(i);
+                auto diffType = tryGetDifferentialType(builder, t);
+                if (!diffType)
+                    diffType = m_astBuilder->getVoidType();
+                else
+                    anyDifferentiableElement = true;
+                diffTypes.add(diffType);
+            }
+            if (anyDifferentiableElement)
+                return builder->getTypePack(diffTypes.getArrayView());
+        }
         return nullptr;
     }
 
@@ -1365,6 +1383,13 @@ namespace Slang
                         maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, typeArg);
                     }
                 });
+            return;
+        }
+
+        if (auto typePack = as<ConcreteTypePack>(type))
+        {
+            for (Index i = 0; i < typePack->getTypeCount(); i++)
+                maybeRegisterDifferentiableTypeImplRecursive(builder, typePack->getElementType(i));
             return;
         }
     }
@@ -1864,6 +1889,13 @@ namespace Slang
                     }
                 }
             }
+        }
+
+        if (auto countOfExpr = expr.as<CountOfExpr>())
+        {
+            auto type = as<Type>(countOfExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
+            if (type)
+                return as<IntVal>(CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
         }
 
         // it is possible that we are referring to a generic value param
@@ -2789,6 +2821,36 @@ namespace Slang
                 return modifiedType->getBase();
         }
 
+        if (auto typePack = as<ConcreteTypePack>(primalType))
+        {
+            // The differential pair of a type pack should be a type pack of differential pairs.
+            List<Type*> diffTypes;
+            for (Index i = 0; i < typePack->getTypeCount(); i++)
+            {
+                auto t = typePack->getElementType(i);
+                diffTypes.add(getDifferentialPairType(t));
+            }
+            return m_astBuilder->getTypePack(diffTypes.getArrayView());
+        }
+        else if (isAbstractTypePack(primalType))
+        {
+            // The differential pair of an abstract type pack P should be `expand DifferentialPair<each P>`.
+            auto eachType = m_astBuilder->getEachType(primalType);
+            auto diffPairEachType = getDifferentialPairType(eachType);
+            if (auto expandType = as<ExpandType>(primalType))
+            {
+                List<Type*> capturedTypePacks;
+                for (Index i = 0; i < expandType->getCapturedTypePackCount(); i++)
+                {
+                    capturedTypePacks.add(expandType->getCapturedTypePack(i));
+                }
+                return m_astBuilder->getExpandType(diffPairEachType, capturedTypePacks.getArrayView());
+            }
+            else
+            {
+                return m_astBuilder->getExpandType(diffPairEachType, makeArrayViewSingle(primalType));
+            }
+        }
         // Get a reference to the builtin 'IDifferentiable' interface
         auto differentiableInterface = getASTBuilder()->getDifferentiableInterfaceType();
 
@@ -3180,6 +3242,13 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsExprVisitor::visitDetachExpr(DetachExpr* expr)
+    {
+        expr->inner = CheckTerm(expr->inner);
+        expr->type = expr->inner->type;
+        return expr;
+    }
+
 
     static bool _isSizeOfType(Type* type)
     {
@@ -3202,6 +3271,31 @@ namespace Slang
             return true;
         }
         
+        return false;
+    }
+
+    static bool _isCountOfType(Type* type)
+    {
+        if (!type)
+        {
+            return false;
+        }
+
+        if (isTypePack(type))
+        {
+            return true;
+        }
+
+        if (as<TupleType>(type))
+        {
+            return true;
+        }
+
+        if (as<ArrayExpressionType>(type))
+        {
+            return true;
+        }
+
         return false;
     }
 
@@ -3229,12 +3323,25 @@ namespace Slang
             type = properType.type;
         }
 
-        if (!_isSizeOfType(type))
+        if (as<CountOfExpr>(sizeOfLikeExpr))
         {
-            getSink()->diagnose(sizeOfLikeExpr, Diagnostics::sizeOfArgumentIsInvalid);
+            if (!_isCountOfType(type))
+            {
+                getSink()->diagnose(sizeOfLikeExpr, Diagnostics::countOfArgumentIsInvalid);
 
-            sizeOfLikeExpr->type = m_astBuilder->getErrorType();
-            return sizeOfLikeExpr;
+                sizeOfLikeExpr->type = m_astBuilder->getErrorType();
+                return sizeOfLikeExpr;
+            }
+        }
+        else
+        {
+            if (!_isSizeOfType(type))
+            {
+                getSink()->diagnose(sizeOfLikeExpr, Diagnostics::sizeOfArgumentIsInvalid);
+
+                sizeOfLikeExpr->type = m_astBuilder->getErrorType();
+                return sizeOfLikeExpr;
+            }
         }
 
         sizeOfLikeExpr->sizedType = type;
@@ -3552,6 +3659,10 @@ namespace Slang
             if (!isTypePack(baseType) && !as<TupleType>(baseType))
                 goto error;
         }
+        
+        if (auto tupleType = as<TupleType>(baseType))
+            baseType = tupleType->getTypePack();
+
         {
             SLANG_ASSERT(m_capturedTypePacks);
             if (auto baseExpandType = as<ExpandType>(baseType))
@@ -3815,6 +3926,108 @@ namespace Slang
         return CreateErrorExpr(memberRefExpr);
     }
 
+    Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType* baseTupleType)
+    {
+        UInt tupleElementCount = (UInt)baseTupleType->getMemberCount();
+        if (tupleElementCount == 0)
+            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+        
+        if (memberExpr->name == getSession()->getCompletionRequestTokenName())
+        {
+            auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+            suggestions.clear();
+            suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
+            suggestions.swizzleBaseType =
+                memberExpr->baseExpression ? memberExpr->baseExpression->type : nullptr;
+            suggestions.elementCount[0] = (Index)tupleElementCount;
+            suggestions.elementCount[1] = 0;
+            return memberExpr;
+        }
+
+        String swizzleText = getText(memberExpr->name);
+        auto span = swizzleText.getUnownedSlice();
+        Index pos = 0;
+
+        ShortList<UInt> elementCoords;
+
+        bool anyDuplicates = false;
+
+        // The contents of the string are 0-terminated
+        // Every update to cursor corresponds to a check against 0-termination
+        while (pos < span.getLength())
+        {
+            UInt elementCoord;
+
+            // Check for the preceding underscore
+            if (span[pos] != '_')
+            {
+                return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+            }
+            pos++;
+
+            // Parse index.
+            if (pos >= span.getLength())
+            {
+                // Unexpected end of swizzle string, fallback to
+                // member lookup.
+                return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+            }
+
+            auto ch = span[pos];
+
+            if (!CharUtil::isDigit(ch))
+            {
+                // An invalid character in the swizzle is an error, fallback to
+                // member lookup.
+                return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+            }
+            elementCoord = (UInt)StringUtil::parseIntAndAdvancePos(span, pos);
+
+            if (elementCoord >= tupleElementCount)
+            {
+                getSink()->diagnose(memberExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseTupleType);
+                return CreateErrorExpr(memberExpr);
+            }
+
+            // Check if we've seen this index before
+            for (int ee = 0; ee < elementCoords.getCount(); ee++)
+            {
+                if (elementCoords[ee] == elementCoord)
+                    anyDuplicates = true;
+            }
+
+            // add to our list...
+            elementCoords.add(elementCoord);
+        }
+
+        SwizzleExpr* swizExpr = m_astBuilder->create<SwizzleExpr>();
+        swizExpr->loc = memberExpr->loc;
+        swizExpr->base = memberExpr->baseExpression;
+        swizExpr->elementIndices = _Move(elementCoords);
+        swizExpr->memberOpLoc = memberExpr->memberOperatorLoc;
+
+        if (swizExpr->elementIndices.getCount() == 1)
+        {
+            // single-component swizzle produces a scalar
+            //
+            swizExpr->type = QualType(baseTupleType->getMember(swizExpr->elementIndices[0]));
+        }
+        else
+        {
+            List<Type*> types;
+            for (auto index : swizExpr->elementIndices)
+            {
+                types.add(baseTupleType->getMember(index));
+            }
+            swizExpr->type = QualType(m_astBuilder->getTupleType(types));
+        }
+
+        // A swizzle can be used as an l-value as long as there
+        // were no duplicates in the list of components
+        swizExpr->type.isLeftValue = !anyDuplicates;
+        return swizExpr;
+    }
+
     Expr* SemanticsVisitor::CheckSwizzleExpr(
         MemberExpr* memberRefExpr,
         Type*      baseElementType,
@@ -3823,15 +4036,10 @@ namespace Slang
         SwizzleExpr* swizExpr = m_astBuilder->create<SwizzleExpr>();
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
-        swizExpr->elementIndices[0] = 0;
-        swizExpr->elementIndices[1] = 0;
-        swizExpr->elementIndices[2] = 0;
-        swizExpr->elementIndices[3] = 0;
         swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
         IntegerLiteralValue limitElement = baseElementCount;
 
-        int elementIndices[4];
-        int elementCount = 0;
+        ShortList<UInt,4> elementIndices;
 
         bool anyDuplicates = false;
         bool anyError = false;
@@ -3875,35 +4083,31 @@ namespace Slang
 
             // If elementCount is already at 4 stop trying to assign a swizzle element and send an error,
             // we cannot have more valid swizzle elements than 4.
-            if (elementCount >= 4)
+            if (elementIndices.getCount() >= 4)
             {
                 anyError = true;
                 break;
             }
 
             // Check if we've seen this index before
-            for (int ee = 0; ee < elementCount; ee++)
+            for (int ee = 0; ee < elementIndices.getCount(); ee++)
             {
-                if (elementIndices[ee] == elementIndex)
+                if (elementIndices[ee] == (UInt)elementIndex)
                     anyDuplicates = true;
             }
 
             // add to our list...
-            elementIndices[elementCount++] = elementIndex;
+            elementIndices.add(elementIndex);
         }
 
-        for (int ee = 0; ee < elementCount; ++ee)
-        {
-            swizExpr->elementIndices[ee] = elementIndices[ee];
-        }
-        swizExpr->elementCount = elementCount;
+        swizExpr->elementIndices = _Move(elementIndices);
 
         if (anyError)
         {
             getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
             return CreateErrorExpr(memberRefExpr);
         }
-        else if (elementCount == 1)
+        else if (swizExpr->elementIndices.getCount() == 1)
         {
             // single-component swizzle produces a scalar
             //
@@ -3918,7 +4122,7 @@ namespace Slang
             // here if the input type had a sugared name...
             swizExpr->type = QualType(createVectorType(
                 baseElementType,
-                m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount)));
+                m_astBuilder->getIntVal(m_astBuilder->getIntType(), swizExpr->elementIndices.getCount())));
         }
 
         // A swizzle can be used as an l-value as long as there
@@ -4255,6 +4459,32 @@ namespace Slang
         return baseExpr;
     }
 
+    Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType)
+    {
+        LookupResult lookupResult = lookUpMember(
+            m_astBuilder,
+            this,
+            expr->name,
+            baseType,
+            m_outerScope);
+        bool diagnosed = false;
+        lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
+        if (!lookupResult.isValid())
+        {
+            return lookupMemberResultFailure(expr, baseType, diagnosed);
+        }
+        if (expr->name == getSession()->getCompletionRequestTokenName())
+        {
+            suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, lookupResult);
+        }
+        return createLookupResultExpr(
+            expr->name,
+            lookupResult,
+            expr->baseExpression,
+            expr->loc,
+            expr);
+    }
+
     Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr * expr)
     {
         bool needDeref = false;
@@ -4279,10 +4509,9 @@ namespace Slang
         // because vectors are also declaration reference types...
         //
         // Also note: the way this is done right now means that the ability
-        // to swizzle vectors interferes with any chance o<f looking up
+        // to swizzle vectors interferes with any chance of looking up
         // members via extension, for vector or scalar types.
         //
-        // TODO: Matrix swizzles probably need to be handled at some point.
         if (auto baseMatrixType = as<MatrixExpressionType>(baseType))
         {
             return CheckMatrixSwizzleExpr(
@@ -4322,34 +4551,17 @@ namespace Slang
         {
             return _lookupStaticMember(expr, expr->baseExpression);
         }
+        else if (auto baseTupleType = as<TupleType>(baseType))
+        {
+            return checkTupleSwizzleExpr(expr, baseTupleType);
+        }
         else if (as<ErrorType>(baseType))
         {
             return CreateErrorExpr(expr);
         }
         else
         {
-            LookupResult lookupResult = lookUpMember(
-                m_astBuilder,
-                this,
-                expr->name,
-                baseType.Ptr(),
-                m_outerScope);
-            bool diagnosed = false;
-            lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
-            if (!lookupResult.isValid())
-            {
-                return lookupMemberResultFailure(expr, baseType, diagnosed);
-            }
-            if (expr->name == getSession()->getCompletionRequestTokenName())
-            {
-                suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, lookupResult);
-            }
-            return createLookupResultExpr(
-                expr->name,
-                lookupResult,
-                expr->baseExpression,
-                expr->loc,
-                expr);
+            return checkGeneralMemberLookupExpr(expr, baseType);
         }
     }
 

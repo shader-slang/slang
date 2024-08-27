@@ -152,6 +152,7 @@ static void _cloneInstDecorationsAndChildren(
     // require the second phase.
     //
     List<IRCloningOldNewPair> pairs;
+    ShortList<IRCloningOldNewPair> paramPairs;
 
     for( auto oldChild : oldInst->getDecorationsAndChildren() )
     {
@@ -172,7 +173,19 @@ static void _cloneInstDecorationsAndChildren(
         // on the child, and register it in our map from
         // old to new values.
         //
-        auto newChild = cloneInstAndOperands(env, builder, oldChild);
+        IRInst* newChild = nullptr;
+        if (oldChild->getOp() == kIROp_Param)
+        {
+            // For parameters, don't clone its type just yet, since
+            // the type might be a forward reference to things defined
+            // later in the block that we haven't cloned and registered yet.
+            newChild = builder->emitParam(nullptr);
+            paramPairs.add({ oldChild, newChild });
+        }
+        else
+        {
+            newChild = cloneInstAndOperands(env, builder, oldChild);
+        }
         env->mapOldValToNew.add(oldChild, newChild);
 
         // If and only if the old child had decorations
@@ -181,10 +194,7 @@ static void _cloneInstDecorationsAndChildren(
         //
         if( oldChild->getFirstDecorationOrChild() )
         {
-            IRCloningOldNewPair pair;
-            pair.oldInst = oldChild;
-            pair.newInst = newChild;
-            pairs.add(pair);
+            pairs.add({ oldChild, newChild });
         }
     }
 
@@ -199,6 +209,17 @@ static void _cloneInstDecorationsAndChildren(
         auto newChild = pair.newInst;
 
         _cloneInstDecorationsAndChildren(env, module, oldChild, newChild);
+    }
+
+    // For params, we can now clone their types since we have done cloning the entire block.
+    for (auto pair : paramPairs)
+    {
+        auto oldParam = pair.oldInst;
+        auto newParam = pair.newInst;
+
+        auto oldType = oldParam->getFullType();
+        auto newType = (IRType*)findCloneForOperand(env, oldType);
+        newParam->setFullType(newType);
     }
 }
 

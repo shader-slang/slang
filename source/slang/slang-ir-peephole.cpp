@@ -327,7 +327,9 @@ struct PeepholeContext : InstPassBase
             switch (inst->getOperand(0)->getOp())
             {
             case kIROp_MakeTuple:
+            case kIROp_MakeValuePack:
             case kIROp_MakeWitnessPack:
+            case kIROp_TypePack:
             {
                 auto element = inst->getOperand(1);
                 if (auto intLit = as<IRIntLit>(element))

@@ -18,7 +18,7 @@ enum class SignalType
 
 
 // Note that message can be passed as nullptr for no message.
-SLANG_RETURN_NEVER void handleSignal(SignalType type, char const* message);
+[[noreturn]] void handleSignal(SignalType type, char const* message);
 
 #define SLANG_UNEXPECTED(reason) \
     ::Slang::handleSignal(::Slang::SignalType::Unexpected, reason)

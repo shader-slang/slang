@@ -1703,6 +1703,7 @@ struct GenericChildrenMigrationContextImpl
                 case kIROp_ClassType:
                 case kIROp_Func:
                 case kIROp_Generic:
+                case kIROp_Expand:
                     return false;
                 default:
                     break;

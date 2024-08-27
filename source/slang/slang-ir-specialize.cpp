@@ -8,6 +8,7 @@
 #include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-util.h"
 #include "../core/slang-performance-profiler.h"
 
 namespace Slang
@@ -85,6 +86,7 @@ struct SpecializationContext
         {
         case kIROp_GlobalGenericParam:
         case kIROp_LookupWitness:
+        case kIROp_GetTupleElement:
             return false;
         case kIROp_Specialize:
             // The `specialize` instruction is a bit sepcial,
@@ -589,12 +591,176 @@ struct SpecializationContext
         case kIROp_Expand:
             return maybeSpecializeExpand(as<IRExpand>(inst));
 
-        case kIROp_ExpandTypeOrVal:
-            return maybeSpecializeExpandTypeOrVal(as<IRExpandType>(inst));
-
         case kIROp_GetTupleElement:
             return maybeSpecializeFoldableInst(inst);
+
+        case kIROp_TypePack:
+        case kIROp_TupleType:
+            return maybeSpecializeTypePackOrTupleType(inst);
+
+        case kIROp_MakeValuePack:
+        case kIROp_MakeTuple:
+            return maybeSpecializeMakeValuePackOrTuple(inst);
+
+        case kIROp_CountOf:
+            return maybeSpecializeCountOf(inst);
+
+        case kIROp_Func:
+
+            if (tryExpandParameterPack(as<IRFunc>(inst)))
+            {
+                addUsersToWorkList(inst);
+                return true;
+            }
+            return false;
         }
+    }
+
+
+    void flattenPackOperand(ShortList<IRInst*>& flattenedList, IRInst* inst)
+    {
+        if (auto makeValuePack = as<IRMakeValuePack>(inst))
+        {
+            for (UInt i = 0; i < makeValuePack->getOperandCount(); i++)
+            {
+                flattenPackOperand(flattenedList, makeValuePack->getOperand(i));
+            }
+        }
+        else if (auto typePack = as<IRTypePack>(inst))
+        {
+            for (UInt i = 0; i < typePack->getOperandCount(); i++)
+            {
+                flattenPackOperand(flattenedList, typePack->getOperand(i));
+            }
+        }
+        else
+        {
+            SLANG_ASSERT(inst);
+            flattenedList.add(inst);
+        }
+    }
+
+    bool maybeSpecializeTypePackOrTupleType(IRInst* inst)
+    {
+        // If any element of the type pack or tuple is a TypePack, we want to
+        // flatten that type pack into the current type pack or tuple.
+
+        bool needProcess = false;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            if (as<IRTypePack>(inst->getOperand(i)))
+            {
+                needProcess = true;
+                break;
+            }
+        }
+        // If none of the operands are MakeValuePack, there is no need to flatten anything.
+        if (!needProcess)
+            return false;
+
+        // We will recursively flatten all MakeValuePack operands.
+        ShortList<IRInst*> flattendOperands;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            auto operand = inst->getOperand(i);
+            flattenPackOperand(flattendOperands, operand);
+        }
+
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+        IRInst* newInst;
+        if (inst->getOp() == kIROp_TypePack)
+            newInst = builder.getTypePack(flattendOperands.getCount(), (IRType* const*)flattendOperands.getArrayView().getBuffer());
+        else
+            newInst = builder.getTupleType(flattendOperands.getCount(), (IRType* const*)flattendOperands.getArrayView().getBuffer());
+        inst->replaceUsesWith(newInst);
+        inst->removeAndDeallocate();
+        addUsersToWorkList(newInst);
+        return true;
+    }
+
+    bool maybeSpecializeMakeValuePackOrTuple(IRInst* inst)
+    {
+        // If any element of the value pack or tuple is a ValuePack, we want to
+        // flatten that value pack into the current value pack or tuple.
+
+        bool needProcess = false;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            if (as<IRMakeValuePack>(inst->getOperand(i)))
+            {
+                needProcess = true;
+                break;
+            }
+        }
+        // If none of the operands are MakeValuePack, there is no need to flatten anything.
+        if (!needProcess)
+            return false;
+
+        // We will recursively flatten all MakeValuePack operands.
+        ShortList<IRInst*> flattendOperands;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            auto operand = inst->getOperand(i);
+            flattenPackOperand(flattendOperands, operand);
+        }
+
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+        IRInst* newInst = nullptr;
+        if (inst->getOp() == kIROp_MakeValuePack)
+            newInst = builder.emitMakeValuePack(inst->getFullType(), flattendOperands.getCount(), flattendOperands.getArrayView().getBuffer());
+        else
+            newInst = builder.emitMakeTuple(inst->getFullType(), flattendOperands.getCount(), flattendOperands.getArrayView().getBuffer());
+
+        inst->replaceUsesWith(newInst);
+        inst->removeAndDeallocate();
+        addUsersToWorkList(newInst);
+        return true;
+    }
+
+    bool maybeSpecializeCountOf(IRInst* inst)
+    {
+        auto operand = inst->getOperand(0);
+        
+        // If operand is a value, make sure we are working on its type.
+
+        switch (operand->getOp())
+        {
+        case kIROp_MakeValuePack:
+        case kIROp_MakeTuple:
+            operand = operand->getDataType();
+            break;
+        }
+
+        // We can only figure out the count of a type pack or tuple type.
+        switch (operand->getOp())
+        {
+        case kIROp_TypePack:
+        case kIROp_TupleType:
+            break;
+        default:
+            return false;
+        }
+
+        // If none of the element type is a TypePack, we can just return the count.
+        for (UInt i = 0; i < operand->getOperandCount(); i++)
+        {
+            switch (operand->getOperand(i)->getOp())
+            {
+            case kIROp_Param:
+            case kIROp_TypePack:
+            case kIROp_ExpandTypeOrVal:
+                return false;
+            }       
+        }
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+        auto newInst = builder.getIntValue(inst->getDataType(), operand->getOperandCount());
+        addUsersToWorkList(inst);
+        inst->replaceUsesWith(newInst);
+        inst->removeAndDeallocate();
+        return true;
     }
 
     // Specializing lookup on witness tables is a general
@@ -606,7 +772,7 @@ struct SpecializationContext
     {
         // Note: While we currently have named the instruction
         // `lookup_witness_method`, the `method` part is a misnomer
-        // and the same instruction can look up *any* interfacemay
+        // and the same instruction can look up *any* interface
         // requirement based on the witness table that provides
         // a conformance, and the "key" that indicates the interface
         // requirement.
@@ -852,6 +1018,9 @@ struct SpecializationContext
                     workList.removeLast();
                     workListSet.remove(inst);
 
+                    if (!inst->getParent() && inst->getOp() != kIROp_Module)
+                        continue;
+
                     // For each instruction we process, we want to perform
                     // a few steps.
                     //
@@ -1024,11 +1193,8 @@ struct SpecializationContext
                     auto newWrapExistential = builder.emitWrapExistential(
                         resultType, newCall, slotOperandCount, slotOperands.getArrayView().getBuffer());
                     inst->replaceUsesWith(newWrapExistential);
-                    workList.remove(inst);
                     inst->removeAndDeallocate();
                     addUsersToWorkList(newWrapExistential);
-
-                    workList.remove(wrapExistential);
                     SLANG_ASSERT(!wrapExistential->hasUses());
                     wrapExistential->removeAndDeallocate();
                     return true;
@@ -1050,6 +1216,14 @@ struct SpecializationContext
         // the same way as a `load` inst.
         if (maybeSpecializeBufferLoadCall(inst))
             return false;
+
+        // If any arguments are value packs, we need to flatten them.
+        bool isCalleeFullyExpanded = false;
+        tryExpandParameterPack(as<IRFunc>(inst->getCallee()), &isCalleeFullyExpanded);
+        if (isCalleeFullyExpanded)
+        {
+            inst = tryExpandArgPack((IRCall*)inst);
+        }
 
         // We can only specialize a call when the callee function is known.
         //
@@ -2244,13 +2418,9 @@ struct SpecializationContext
             break;
         }
         }
-        auto type = clonePatternVal(*subEnv, builder, childInst->getFullType(), index);
-        for (UInt i = 0; i < childInst->getOperandCount(); i++)
-        {
-            clonePatternVal(*subEnv, builder, childInst->getOperand(i), index);
-        }
         auto newInst = cloneInst(subEnv, builder, childInst);
-        newInst = builder->replaceOperand(&newInst->typeUse, type);
+        if (newInst != childInst)
+            addToWorkList(newInst);
         subEnv->mapOldValToNew[childInst] = newInst;
         IRBuilder subBuilder(*builder);
         subBuilder.setInsertInto(newInst);
@@ -2261,6 +2431,32 @@ struct SpecializationContext
         return newInst;
     }
 
+    // A helper function to emit a MakeWitnessPack, MakeTypePack or MakeValuePack inst from
+    // a collection of elements, dependending on `type`.
+    //
+    IRInst* makeSpecializedPack(IRBuilder& builder, IRType* type, ArrayView<IRInst*> elements)
+    {
+        IRInst* resultPack = nullptr;
+        if (as<IRWitnessTableType>(type))
+        {
+            List<IRType*> types;
+            for (auto element : elements)
+                types.add(element->getDataType());
+            auto newTypePack = builder.getTypePack(elements.getCount(), types.getBuffer());
+            resultPack = builder.emitMakeWitnessPack(newTypePack, elements);
+        }
+        else if (as<IRTypeKind>(type) || as<IRTypeType>(type))
+        {
+            auto newTypePack = builder.getTypePack(elements.getCount(), (IRType* const*)elements.getBuffer());
+            resultPack = newTypePack;
+        }
+        else
+        {
+            resultPack = builder.emitMakeValuePack((UInt)elements.getCount(), elements.getBuffer());
+        }
+        return resultPack;
+    }
+
     bool maybeSpecializeExpand(IRExpand* expandInst)
     {
         if (expandInst->getCaptureCount() == 0)
@@ -2268,7 +2464,7 @@ struct SpecializationContext
 
         for (UInt i = 0; i < expandInst->getCaptureCount(); i++)
         {
-            if (!as<IRTupleType>(expandInst->getCapture(i)))
+            if (!as<IRTypePack>(expandInst->getCapture(i)))
                 return false;
         }
 
@@ -2276,50 +2472,63 @@ struct SpecializationContext
         builder.setInsertBefore(expandInst);
         List<IRInst*> elements;
         UInt elementCount = 0;
-        if (auto firstTupleType = as<IRTupleType>(expandInst->getCapture(0)))
+        if (auto firstTypePack = as<IRTypePack>(expandInst->getCapture(0)))
         {
-            elementCount = firstTupleType->getOperandCount();
+            elementCount = firstTypePack->getOperandCount();
         }
         if (elementCount == 0)
         {
-            auto resultTuple = builder.emitMakeTuple(0, (IRInst*const*)nullptr);
-            expandInst->replaceUsesWith(resultTuple);
+            auto resultPack = makeSpecializedPack(builder, expandInst->getDataType(), elements.getArrayView());
+            expandInst->replaceUsesWith(resultPack);
             expandInst->removeAndDeallocate();
-            addUsersToWorkList(resultTuple);
+            addUsersToWorkList(resultPack);
             return true;
         }
+        
+        bool isMultiBlock = as<IRYield>(expandInst->getFirstBlock()->getTerminator()) == nullptr;
 
         for (UInt i = 0; i < elementCount; i++)
         {
             IRCloneEnv cloneEnv;
-            IRBlock* firstBlock = nullptr;
             IRBuilder subBuilder = builder;
-            for (auto childBlock : expandInst->getBlocks())
+            IRBlock* mergeBlock = nullptr;
+            if (isMultiBlock)
             {
-                auto newBlock = subBuilder.emitBlock();
-                if (!firstBlock)
-                    firstBlock = newBlock;
-                cloneEnv.mapOldValToNew[childBlock] = newBlock;
+                IRBlock* firstBlock = nullptr;    
+                for (auto childBlock : expandInst->getBlocks())
+                {
+                    auto newBlock = subBuilder.emitBlock();
+                    if (!firstBlock)
+                        firstBlock = newBlock;
+                    cloneEnv.mapOldValToNew[childBlock] = newBlock;
+                }
+
+                builder.emitBranch(firstBlock);
+
+                mergeBlock = subBuilder.emitBlock();
+                builder.setInsertInto(mergeBlock);
             }
+
             auto indexParam = expandInst->getFirstBlock()->getFirstParam();
             SLANG_ASSERT(indexParam);
             cloneEnv.mapOldValToNew[indexParam] = subBuilder.getIntValue(subBuilder.getIntType(), i);
 
-            builder.emitBranch(firstBlock);
-
-            IRBlock* mergeBlock = subBuilder.emitBlock();
-            builder.setInsertInto(mergeBlock);
-
             for (auto childBlock : expandInst->getBlocks())
             {
-                auto newBlock = cloneEnv.mapOldValToNew[childBlock];
-                subBuilder.setInsertInto(newBlock);
+                if (isMultiBlock)
+                {
+                    auto newBlock = cloneEnv.mapOldValToNew[childBlock];
+                    subBuilder.setInsertInto(newBlock);
+                }
                 for (auto child : childBlock->getChildren())
                 {
                     if (as<IRYield>(child))
                     {
-                        elements.add(cloneEnv.mapOldValToNew[child->getOperand(0)]);
-                        subBuilder.emitBranch(mergeBlock);
+                        auto currentResult = child->getOperand(0);
+                        currentResult = findCloneForOperand(&cloneEnv, currentResult);
+                        elements.add(currentResult);
+                        if (isMultiBlock)
+                            subBuilder.emitBranch(mergeBlock);
                         continue;
                     }
                     specializeExpandChildInst(cloneEnv, &subBuilder, child, i);
@@ -2328,135 +2537,22 @@ struct SpecializationContext
             }
 
         }
-        auto resultTuple = builder.emitMakeTuple(elements);
-        auto currentBlock = builder.getBlock();
-        for (auto nextInst = expandInst->next; nextInst;)
+
+        IRInst* resultPack = makeSpecializedPack(builder, expandInst->getDataType(), elements.getArrayView());
+        if (isMultiBlock)
         {
-            auto next = nextInst->next;
-            nextInst->insertAtEnd(currentBlock);
-            nextInst = next;
+            auto currentBlock = builder.getBlock();
+            for (auto nextInst = expandInst->next; nextInst;)
+            {
+                auto next = nextInst->next;
+                nextInst->insertAtEnd(currentBlock);
+                nextInst = next;
+            }
         }
         addUsersToWorkList(expandInst);
-        expandInst->replaceUsesWith(resultTuple);
+        expandInst->replaceUsesWith(resultPack);
         expandInst->removeAndDeallocate();
         return true;
-    }
-
-    IRInst* clonePatternValImpl(IRCloneEnv& cloneEnv, IRBuilder* builder, IRInst* val, UInt indexInPack)
-    {
-        if (!val)
-            return val;
-
-        switch (val->getOp())
-        {
-        case kIROp_ExpandTypeOrVal:
-            return val;
-        case kIROp_Each:
-        {
-            auto eachInst = as<IREach>(val);
-            auto packInst = eachInst->getElement();
-            if (auto tuple = as<IRTupleType>(packInst))
-            {
-                SLANG_RELEASE_ASSERT(indexInPack < tuple->getOperandCount());
-                return tuple->getOperand(indexInPack);
-            }
-            else if (auto makeTuple = as<IRMakeTuple>(packInst))
-            {
-                SLANG_RELEASE_ASSERT(indexInPack < makeTuple->getOperandCount());
-                return makeTuple->getOperand(indexInPack);
-            }
-            else if (!as<IRTypeKind>(packInst->getDataType()))
-            {
-                auto type = clonePatternVal(cloneEnv, builder, val, indexInPack);
-                return builder->emitGetTupleElement((IRType*)type, packInst, indexInPack);
-            }
-            return val;
-        }
-        default:
-            break;
-        }
-        bool anyChange = false;
-        ShortList<IRInst*> operands;
-        for (UInt i = 0; i < val->getOperandCount(); i++)
-        {
-            auto newOperand = clonePatternVal(cloneEnv, builder, val->getOperand(i), indexInPack);
-            if (newOperand != val->getOperand(i))
-                anyChange = true;
-            operands.add(newOperand);
-        }
-        auto newType = clonePatternVal(cloneEnv, builder, val->getFullType(), indexInPack);
-        if (newType != val->getFullType())
-            anyChange = true;
-        if (!anyChange)
-            return val;
-
-        auto newVal = builder->emitIntrinsicInst((IRType*)newType, val->getOp(), operands.getCount(), operands.getArrayView().getBuffer());
-        if (newVal != val)
-        {
-            cloneInstDecorationsAndChildren(&cloneEnv, module, val, newVal);
-        }
-        return newVal;
-    }
-
-    IRInst* clonePatternVal(IRCloneEnv& cloneEnv, IRBuilder* builder, IRInst* val, UInt indexInPack)
-    {
-        if (auto clonedVal = cloneEnv.mapOldValToNew.tryGetValue(val))
-            return *clonedVal;
-        cloneEnv.mapOldValToNew[val] = val;
-        auto result = clonePatternValImpl(cloneEnv, builder, val, indexInPack);
-        cloneEnv.mapOldValToNew[val] = result;
-        return result;
-    }
-
-    bool maybeSpecializeExpandTypeOrVal(IRExpandType* expandInst)
-    {
-        if (expandInst->getCaptureCount() == 0)
-            return false;
-
-        bool anyAbstractPack = false;
-        for (UInt i = 0; i < expandInst->getCaptureCount(); i++)
-        {
-            if (!as<IRTupleType>(expandInst->getCaptureType(i)))
-            {
-                anyAbstractPack = true;
-                break;
-            }
-        }
-        if (anyAbstractPack)
-            return false;
-        IRBuilder builder(expandInst);
-        builder.setInsertBefore(expandInst);
-        List<IRInst*> elements;
-        UInt elementCount = 0;
-        if (auto firstTupleType = as<IRTupleType>(expandInst->getCaptureType(0)))
-        {
-            elementCount = firstTupleType->getOperandCount();
-        }
-        for (UInt i = 0; i < elementCount; i++)
-        {
-            IRCloneEnv cloneEnv;
-            auto element = clonePatternVal(cloneEnv, &builder, expandInst->getPatternType(), i);
-            elements.add(element);
-        }
-        addUsersToWorkList(expandInst);
-        if (as<IRWitnessTableType>(expandInst->getDataType()))
-        {
-            List<IRType*> types;
-            for (auto element : elements)
-                types.add(element->getDataType());
-            auto newTupleType = builder.getTupleType(types);
-            auto result = builder.emitMakeWitnessPack(newTupleType, elements.getArrayView());
-            expandInst->replaceUsesWith(result);
-            expandInst->removeAndDeallocate();
-            return true;
-        }
-        else
-        {
-            auto newTupleType = builder.getTupleType(elements.getCount(), (IRType*const*)elements.getBuffer());
-            expandInst->replaceUsesWith(newTupleType);
-            expandInst->removeAndDeallocate();
-            return true;
-        }
     }
 
     // The handling of specialization for global generic type
@@ -2528,6 +2624,108 @@ struct SpecializationContext
             }
         }
     }
+
+
+    // If `func` has any parameters whose types are `IRTypePack`, then we will expand them
+    // into multiple parameters, so that the function has no parameters of type `IRTypePack`.
+    // returns true if changes are made.
+    // For example, this function turns `int f(TypePack<int, float> v)` into
+    // ```
+    // int f(int v0, float v1)
+    // {
+    //     v = MakeValuePack(v0,. v1);
+    //     ...
+    // }
+    // ```
+    //
+    bool tryExpandParameterPack(IRFunc* func, bool* outIsFullyExpanded = nullptr)
+    {
+        if (!func)
+            return false;
+        if (outIsFullyExpanded)
+            *outIsFullyExpanded = true;
+        ShortList<IRInst*> params;
+        for (auto param : func->getParams())
+        {
+            if (as<IRTypePack>(param->getDataType()))
+                params.add(param);
+            if (as<IRExpand>(param->getDataType()))
+            {
+                if (outIsFullyExpanded)
+                    *outIsFullyExpanded = false;
+                return false;
+            }
+        }
+        if (params.getCount() == 0)
+            return false;
+
+        IRBuilder builder(func);
+        for (auto param : params)
+        {
+            builder.setInsertBefore(param);
+            auto typePack = as<IRTypePack>(param->getDataType());
+            ShortList<IRInst*> newParams;
+            for (UInt i = 0; i < typePack->getOperandCount(); i++)
+            {
+                auto newParam = builder.createParam((IRType*)typePack->getOperand(i));
+                newParam->insertBefore(param);
+                newParams.add(newParam);
+            }
+            setInsertBeforeOrdinaryInst(&builder, param);
+            auto val = builder.emitMakeValuePack(typePack, (UInt)newParams.getCount(), newParams.getArrayView().getBuffer());
+            param->replaceUsesWith(val);
+            param->removeAndDeallocate();
+            addUsersToWorkList(val);
+        }
+
+        fixUpFuncType(func);
+        return true;
+    }
+
+    // If any arguments in a call is a value pack, we will expand them into the argument list,
+    // so that the call has no arguments of type `IRTypePack`.
+    // For example, we will turn `f(MakeValuePack(a, b))` into `f(a, b)`.
+    //
+    IRCall* tryExpandArgPack(IRCall* call)
+    {
+        bool anyArgPack = false;
+        for (UInt i = 0; i < call->getArgCount(); i++)
+        {
+            auto arg = call->getArg(i);
+            if (as<IRTypePack>(arg->getDataType()))
+            {
+                anyArgPack = true;
+                break;
+            }
+        }
+        if (!anyArgPack)
+            return call;
+        IRBuilder builder(call);
+        builder.setInsertBefore(call);
+        List<IRInst*> newArgs;
+        for (UInt i = 0; i < call->getArgCount(); i++)
+        {
+            auto arg = call->getArg(i);
+            if (auto typePack = as<IRTypePack>(arg->getDataType()))
+            {
+                for (UInt elementIndex = 0; elementIndex < typePack->getOperandCount(); elementIndex++)
+                {
+                    auto newArg = builder.emitGetTupleElement((IRType*)typePack->getOperand(elementIndex), arg, elementIndex);
+                    newArgs.add(newArg);
+                }
+            }
+            else
+            {
+                newArgs.add(arg);
+            }
+        }
+        auto newCall = builder.emitCallInst(call->getFullType(), call->getCallee(), newArgs.getArrayView());
+        call->replaceUsesWith(newCall);
+        call->transferDecorationsTo(newCall);
+        call->removeAndDeallocate();
+        return newCall;
+    }
+
 };
 
 bool specializeModule(
@@ -2633,6 +2831,13 @@ IRInst* specializeGenericImpl(
     IRBuilder* builder = &builderStorage;
     builder->setInsertBefore(genericVal);
 
+    List<IRInst*> pendingWorkList;
+    SLANG_DEFER
+    (
+        for (Index ii = pendingWorkList.getCount() - 1; ii >= 0; ii--)
+            context->addToWorkList(pendingWorkList[ii]);
+    );
+
     // Now we will run through the body of the generic and
     // clone each of its instructions into the global scope,
     // until we reach a `return` instruction.
@@ -2673,10 +2878,11 @@ IRInst* specializeGenericImpl(
                 {
                     if (auto func = as<IRFunc>(specializedVal))
                     {
+                        context->tryExpandParameterPack(func);
                         simplifyFunc(context->targetProgram, func, IRSimplificationOptions::getFast(context->targetProgram));
                     }
                 }
-
+                pendingWorkList.add(specializedVal);
                 return specializedVal;
             }
 
@@ -2696,7 +2902,7 @@ IRInst* specializeGenericImpl(
             //
             if (context)
             {
-                context->addToWorkList(clonedInst);
+                pendingWorkList.add(clonedInst);
             }
         }
     }

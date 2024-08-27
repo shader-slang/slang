@@ -243,7 +243,10 @@ INST(AssociatedType, associated_type, 0, HOISTABLE)
 INST(ThisType, this_type, 0, HOISTABLE)
 INST(RTTIType, rtti_type, 0, HOISTABLE)
 INST(RTTIHandleType, rtti_handle_type, 0, HOISTABLE)
-INST(TupleType, tuple_type, 0, HOISTABLE)
+/*TupleTypeBase*/
+    INST(TupleType, tuple_type, 0, HOISTABLE)
+    INST(TypePack, TypePack, 0, HOISTABLE)
+INST_RANGE(TupleTypeBase, TupleType, TypePack)
 INST(TargetTupleType, TargetTuple, 0, HOISTABLE)
 INST(ExpandTypeOrVal, ExpandTypeOrVal, 1, HOISTABLE)
 
@@ -280,6 +283,8 @@ INST(GlobalConstant, globalConstant, 0, GLOBAL)
 INST(StructKey, key, 0, GLOBAL)
 INST(GlobalGenericParam, global_generic_param, 0, GLOBAL)
 INST(WitnessTable, witness_table, 0, 0)
+
+INST(IndexedFieldKey, indexedFieldKey, 2, HOISTABLE)
 
 // A placeholder witness that ThisType implements the enclosing interface.
 // Used only in interface definitions.
@@ -343,6 +348,7 @@ INST(MakeArrayFromElement, makeArrayFromElement, 1, 0)
 INST(MakeStruct, makeStruct, 0, 0)
 INST(MakeTuple, makeTuple, 0, 0)
 INST(MakeTargetTuple, makeTuple, 0, 0)
+INST(MakeValuePack, makeValuePack, 0, 0)
 INST(GetTargetTupleElement, getTargetTupleElement, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
 INST(MakeWitnessPack, MakeWitnessPack, 0, HOISTABLE)
@@ -1119,6 +1125,8 @@ INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
 INST(AlignOf,                           alignOf,                    1, 0)
+INST(CountOf, countOf, 1, 0)
+
 INST(GetArrayLength,                    GetArrayLength,             1, 0)
 INST(IsType, IsType, 3, 0)
 INST(TypeEquals, TypeEquals, 2, 0)

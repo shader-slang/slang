@@ -2802,6 +2802,11 @@ namespace Slang
         return getTupleType(SLANG_COUNT_OF(operands), operands);
     }
 
+    IRTypePack* IRBuilder::getTypePack(UInt count, IRType* const* types)
+    {
+        return (IRTypePack*)getType(kIROp_TypePack, count, (IRInst* const*)types);
+    }
+
     IRExpandType* IRBuilder::getExpandTypeOrVal(IRType* type, IRInst* pattern, ArrayView<IRInst*> capture)
     {
         ShortList<IRInst*> args;
@@ -2876,9 +2881,9 @@ namespace Slang
             operands);
     }
 
-    IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace)
+    IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
     {
-        return (IRPtrType*)getPtrType(op, valueType, getIntValue(getUInt64Type(), addressSpace));
+        return (IRPtrType*)getPtrType(op, valueType, getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)));
     }
 
     IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRInst* addressSpace)
@@ -4046,6 +4051,21 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitMakeValuePack(IRType* type, UInt count, IRInst* const* args)
+    {
+        return emitIntrinsicInst(type, kIROp_MakeValuePack, count, args);
+    }
+
+    IRInst* IRBuilder::emitMakeValuePack(UInt count, IRInst* const* args)
+    {
+        ShortList<IRType*> types;
+        for (UInt i = 0; i < count; ++i)
+            types.add(args[i]->getFullType());
+
+        auto type = getTypePack((UInt)types.getCount(), types.getArrayView().getBuffer());
+        return emitIntrinsicInst(type, kIROp_MakeValuePack, count, args);
+    }
+
     IRInst* IRBuilder::emitMakeTuple(IRType* type, UInt count, IRInst* const* args)
     {
         return emitIntrinsicInst(type, kIROp_MakeTuple, count, args);
@@ -4094,12 +4114,17 @@ namespace Slang
         // `getTupleElement(makeTuple(a_0, a_1, ... a_N), i)` then we should
         // just return `a_i`, provided that the index is properly in range.
         //
-        if( auto makeTuple = as<IRMakeTuple>(tuple) )
+        switch(tuple->getOp())
         {
-            if( element < makeTuple->getOperandCount() )
+        case kIROp_MakeTuple:
+        case kIROp_MakeValuePack:
+        case kIROp_MakeWitnessPack:
+        case kIROp_TypePack:
+            if( element < tuple->getOperandCount() )
             {
-                return makeTuple->getOperand(element);
+                return tuple->getOperand(element);
             }
+            break;
         }
         return emitGetTupleElement(type, tuple, getIntValue(getIntType(), element));
     }
@@ -4510,7 +4535,7 @@ namespace Slang
 
     IRGlobalVar* IRBuilder::createGlobalVar(
         IRType*         valueType,
-        IRIntegerValue  addressSpace)
+        AddressSpace  addressSpace)
     {
         auto ptrType = getPtrType(kIROp_PtrType, valueType, addressSpace);
         IRGlobalVar* globalVar = createInst<IRGlobalVar>(
@@ -4787,7 +4812,7 @@ namespace Slang
 
     IRVar* IRBuilder::emitVar(
         IRType*         type,
-        IRIntegerValue  addressSpace)
+        AddressSpace  addressSpace)
     {
         auto allocatedType = getPtrType(kIROp_PtrType, type, addressSpace);
         auto inst = createInst<IRVar>(
@@ -5773,6 +5798,19 @@ namespace Slang
             this,
             kIROp_AlignOf,
             getUIntType(),
+            sizedType);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitCountOf(
+        IRType* type,
+        IRInst* sizedType)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_CountOf,
+            type,
             sizedType);
         addInst(inst);
         return inst;
@@ -8312,6 +8350,7 @@ namespace Slang
         case kIROp_DifferentialPairGetDifferential:
         case kIROp_MakeDifferentialPair:
         case kIROp_MakeTuple:
+        case kIROp_MakeValuePack:
         case kIROp_GetTupleElement:
         case kIROp_StructuredBufferLoad:
         case kIROp_RWStructuredBufferLoad:

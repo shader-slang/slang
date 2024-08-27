@@ -4256,7 +4256,7 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
     ComPtr<ISlangSharedLibrary> moduleLibrary;
 
     SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(
-        Path::combine(context->exeDirectoryPath, moduleName).getBuffer(),
+        Path::combine(context->dllDirectoryPath, moduleName).getBuffer(),
         moduleLibrary.writeRef()));
 
     UnitTestGetModuleFunc getModuleFunc =

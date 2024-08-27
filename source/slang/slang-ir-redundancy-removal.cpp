@@ -8,6 +8,19 @@ namespace Slang
 struct RedundancyRemovalContext
 {
     RefPtr<IRDominatorTree> dom;
+    bool isSingleIterationLoop(IRLoop* loop)
+    {
+        int useCount = 0;
+        for (auto use = loop->getBreakBlock()->firstUse; use; use = use->nextUse)
+        {
+            if (use->getUser() == loop)
+                continue;
+            useCount++;
+            if (useCount > 1)
+                return false;
+        }
+        return true;
+    }
 
     bool tryHoistInstToOuterMostLoop(IRGlobalValueWithCode* func, IRInst* inst)
     {
@@ -17,7 +30,8 @@ struct RedundancyRemovalContext
              parentBlock = dom->getImmediateDominator(parentBlock))
         {
             auto terminatorInst = parentBlock->getTerminator();
-            if (terminatorInst->getOp() == kIROp_loop)
+            if (terminatorInst->getOp() == kIROp_loop &&
+                !isSingleIterationLoop(as<IRLoop>(terminatorInst)))
             {
                 // Consider hoisting the inst into this block.
                 // This is only possible if all operands of the inst are dominating `parentBlock`.

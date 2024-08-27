@@ -14,11 +14,6 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, typeConformance);
     }
 
-    TypeConformanceRecorder::~TypeConformanceRecorder()
-    {
-        m_actualTypeConformance->release();
-    }
-
     ISlangUnknown* TypeConformanceRecorder::getInterface(const Guid& guid)
     {
         if (guid == TypeConformanceRecorder::getTypeGuid())
@@ -67,7 +62,7 @@ namespace SlangRecord
         slang::ProgramLayout* programLayout = m_actualTypeConformance->getLayout(targetIndex, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(programLayout);
             m_recordManager->apendOutput();
         }
@@ -102,7 +97,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outCode);
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             m_recordManager->apendOutput();
         }
 
@@ -127,7 +122,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outCode);
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             m_recordManager->apendOutput();
         }
 
@@ -202,7 +197,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outSpecializedComponentType);
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             m_recordManager->apendOutput();
         }
 
@@ -225,7 +220,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outLinkedComponentType);
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             m_recordManager->apendOutput();
         }
 
@@ -252,7 +247,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outSharedLibrary);
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             m_recordManager->apendOutput();
         }
 
@@ -301,7 +296,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outLinkedComponentType);
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             m_recordManager->apendOutput();
         }
 

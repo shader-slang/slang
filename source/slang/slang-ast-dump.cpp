@@ -203,6 +203,27 @@ struct ASTDumpContext
         m_writer->emit("}");
     }
 
+    template <typename T, int n>
+    void dump(const ShortList<T, n>& list)
+    {
+        m_writer->emit(" { \n");
+        m_writer->indent();
+        for (Index i = 0; i < list.getCount(); ++i)
+        {
+            dump(list[i]);
+            if (i < list.getCount() - 1)
+            {
+                m_writer->emit(",\n");
+            }
+            else
+            {
+                m_writer->emit("\n");
+            }
+        }
+        m_writer->dedent();
+        m_writer->emit("}");
+    }
+
     void dump(SourceLoc sourceLoc)
     {
         if (m_dumpFlags & ASTDumpUtil::Flag::HideSourceLoc)
@@ -284,6 +305,10 @@ struct ASTDumpContext
     void dump(uint32_t v)
     {
         m_writer->emit(UInt(v));
+    }
+    void dump(UInt v)
+    {
+        m_writer->emit(v);
     }
     void dump(int32_t v)
     {
