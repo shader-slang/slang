@@ -191,6 +191,8 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* getArrayWitness(IRBuilder* builder, IRArrayType* pairType);
 
+    IRInst* getTupleWitness(IRBuilder* builder, IRInst* tupleType);
+
     IRInst* getExtractExistensialTypeWitness(IRBuilder* builder, IRExtractExistentialType* extractExistentialType);
 
     IRType* getOrCreateDiffPairType(IRBuilder* builder, IRInst* primalType, IRInst* witness);
@@ -239,6 +241,11 @@ struct DifferentiableTypeConformanceContext
             return builder->getArrayType(
                 diffElementType,
                 as<IRArrayType>(origType)->getElementCount());
+        }
+        case kIROp_TupleType:
+        case kIROp_TypePack:
+        {
+            return differentiateType(builder, origType);
         }
         case kIROp_DifferentialPairUserCodeType:
         {

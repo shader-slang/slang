@@ -1,5 +1,3 @@
-#include <filesystem>
-
 #include "slang.h"
 #include "json-consumer.h"
 #include "../util/record-utility.h"
@@ -218,7 +216,7 @@ namespace SlangRecord
                     for(int i = 0; i < specializationArgCount; i++)
                     {
                         bool isLastField = (i == specializationArgCount - 1);
-                        ScopeWritterForKey scopeWritterForArg(&builder, &indent, Slang::StringUtil::makeStringWithFormat("[%d]\n", i), isLastField);
+                        ScopeWritterForKey scopeWritterForArg(&builder, &indent, Slang::StringUtil::makeStringWithFormat("[%d]", i), isLastField);
                         {
                             _writePair(builder, indent, "kind", SpecializationArgKindToString(specializationArgs[i].kind));
                             _writePairNoComma(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", specializationArgs[i].type));
@@ -335,26 +333,22 @@ namespace SlangRecord
     }
 
 
-    JsonConsumer::JsonConsumer(const std::string& filePath)
+    JsonConsumer::JsonConsumer(const Slang::String& filePath)
     {
-        std::filesystem::path jsonFileDir(filePath);
-        jsonFileDir = std::filesystem::absolute(jsonFileDir);
-
-        if (!Slang::File::exists(jsonFileDir.parent_path().string().c_str()))
+        if (!Slang::File::exists(Slang::Path::getParentDirectory(filePath)))
         {
-            slangRecordLog(LogLevel::Error, "Directory for json file does not exist: %s\n", filePath.c_str());
+            slangRecordLog(LogLevel::Error, "Directory for json file does not exist: %s\n", filePath.getBuffer());
         }
 
-        Slang::String path(filePath.c_str());
         Slang::FileMode fileMode = Slang::FileMode::Create;
         Slang::FileAccess fileAccess = Slang::FileAccess::Write;
         Slang::FileShare fileShare = Slang::FileShare::None;
 
-        SlangResult res = m_fileStream.init(path, fileMode, fileAccess, fileShare);
+        SlangResult res = m_fileStream.init(filePath, fileMode, fileAccess, fileShare);
 
         if (res != SLANG_OK)
         {
-            slangRecordLog(LogLevel::Error, "Failed to open file %s\n", filePath.c_str());
+            slangRecordLog(LogLevel::Error, "Failed to open file %s\n", filePath.getBuffer());
         }
 
         m_isFileValid = true;
@@ -454,7 +448,7 @@ namespace SlangRecord
                     _writePair(builder, indent, "name", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                                 desc.preprocessorMacros[i].name != nullptr ? desc.preprocessorMacros[i].name : "nullptr"));
 
-                    _writePair(builder, indent, "value", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                    _writePairNoComma(builder, indent, "value", Slang::StringUtil::makeStringWithFormat("\"%s\"",
                                 desc.preprocessorMacros[i].value != nullptr ? desc.preprocessorMacros[i].value : "nullptr"));
                 }
             }
@@ -479,13 +473,11 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        _writeString(builder, indent, "GlobalFunction::createGlobalSession: {\n");
+
         {
-            indent++;
+            ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::createGlobalSession");
             _writePairNoComma(builder, indent, "outGlobalSession", Slang::StringUtil::makeStringWithFormat("0x%X", outGlobalSessionId));
-            indent--;
         }
-        _writeString(builder, indent, "}\n");
 
         m_fileStream.write(builder.produceString().begin(), builder.produceString().getLength());
         m_fileStream.flush();
@@ -496,7 +488,6 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        _writeString(builder, indent, "IGlobalSession::createSession: {\n");
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::createSession");
@@ -639,14 +630,14 @@ namespace SlangRecord
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        _writeString(builder, indent, "IGlobalSession::setLanguagePrelude: {\n");
 
         {
             ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::setLanguagePrelude");
             {
                 _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
                 _writePair(builder, indent, "sourceLanguage", SlangSourceLanguageToString(inSourceLanguage));
-                _writePairNoComma(builder, indent, "preludeText", (prelude != nullptr ? prelude : "nullptr"));
+                _writePairNoComma(builder, indent, "preludeText", Slang::StringUtil::makeStringWithFormat("\"%s\"",
+                            prelude != nullptr ? prelude : "nullptr"));
             }
         }
 
@@ -1237,7 +1228,7 @@ namespace SlangRecord
                 _writePair(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", typeId));
                 _writePair(builder, indent, "rules", LayoutRulesToString(rules));
                 _writePair(builder, indent, "outDiagnostics", outDiagnosticsId);
-                _writePair(builder, indent, "retTypeReflectionId", outTypeLayoutReflectionId);
+                _writePairNoComma(builder, indent, "retTypeReflectionId", outTypeLayoutReflectionId);
             }
         }
 

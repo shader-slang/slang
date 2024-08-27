@@ -872,7 +872,7 @@ namespace SlangRecord
         ObjectID outDiagnosticsId = 0;
         ObjectID outTypeReflectionId = 0;
 
-        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize, outDiagnosticsId);
         readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outTypeReflectionId);
 
         for (auto consumer: m_consumers)
@@ -895,7 +895,7 @@ namespace SlangRecord
 
         ObjectID outDiagnosticsId = 0;
         ObjectID outTypeLayoutReflectionId = 0;
-        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize, outDiagnosticsId);
         readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outTypeLayoutReflectionId);
 
         for (auto consumer: m_consumers)
@@ -916,7 +916,7 @@ namespace SlangRecord
 
         ObjectID outDiagnosticsId = 0;
         ObjectID outTypeReflectionId = 0;
-        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize, outDiagnosticsId);
         readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outTypeReflectionId);
 
         for (auto consumer: m_consumers)
@@ -1005,7 +1005,7 @@ namespace SlangRecord
 
         ObjectID outDiagnosticsId = 0;
         ObjectID outConformanceId = 0;
-        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outConformanceId);
+        readByte  = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize, outConformanceId);
         readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
 
         for (auto consumer: m_consumers)
@@ -1256,8 +1256,8 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Error, "%s: The shader reflection interfaces are not recordd\n", __PRETTY_FUNCTION__);
 
         size_t readByte = 0;
-        uint32_t specializationArgCount = 0;
-        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
+        int64_t specializationArgCount = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
 
         std::vector<slang::SpecializationArg> specializationArgs;
 
@@ -1299,15 +1299,15 @@ namespace SlangRecord
     void SlangDecoder::IModule_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         size_t readByte = 0;
-        int64_t entryPointIndex = 0;
-        int64_t targetIndex = 0;
-        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
-        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+        int32_t entryPointIndex = 0;
+        int32_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
 
         ObjectID outSharedLibraryId = 0;
         ObjectID outDiagnosticsId = 0;
         readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
-        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
 
         for (auto consumer: m_consumers)
         {
@@ -1465,8 +1465,8 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Error, "%s: The shader reflection interfaces are not recordd\n", __PRETTY_FUNCTION__);
 
         size_t readByte = 0;
-        uint32_t specializationArgCount = 0;
-        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
+        int64_t specializationArgCount = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
 
         std::vector<slang::SpecializationArg> specializationArgs;
 
@@ -1508,15 +1508,15 @@ namespace SlangRecord
     void SlangDecoder::IEntryPoint_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         size_t readByte = 0;
-        int64_t entryPointIndex = 0;
-        int64_t targetIndex = 0;
-        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
-        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+        int32_t entryPointIndex = 0;
+        int32_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
 
         ObjectID outSharedLibraryId = 0;
         ObjectID outDiagnosticsId = 0;
         readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
-        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
 
         for (auto consumer: m_consumers)
         {
@@ -1674,8 +1674,8 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Error, "%s: The shader reflection interfaces are not recordd\n", __PRETTY_FUNCTION__);
 
         size_t readByte = 0;
-        uint32_t specializationArgCount = 0;
-        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
+        int64_t specializationArgCount = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
 
         std::vector<slang::SpecializationArg> specializationArgs;
 
@@ -1717,15 +1717,15 @@ namespace SlangRecord
     void SlangDecoder::ICompositeComponentType_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         size_t readByte = 0;
-        int64_t entryPointIndex = 0;
-        int64_t targetIndex = 0;
-        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
-        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+        int32_t entryPointIndex = 0;
+        int32_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
 
         ObjectID outSharedLibraryId = 0;
         ObjectID outDiagnosticsId = 0;
         readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
-        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
 
         for (auto consumer: m_consumers)
         {
@@ -1883,8 +1883,8 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Error, "%s: The shader reflection interfaces are not recordd\n", __PRETTY_FUNCTION__);
 
         size_t readByte = 0;
-        uint32_t specializationArgCount = 0;
-        readByte = ParameterDecoder::decodeUint32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
+        int64_t specializationArgCount = 0;
+        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, specializationArgCount);
 
         std::vector<slang::SpecializationArg> specializationArgs;
 
@@ -1926,15 +1926,15 @@ namespace SlangRecord
     void SlangDecoder::ITypeConformance_getEntryPointHostCallable(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         size_t readByte = 0;
-        int64_t entryPointIndex = 0;
-        int64_t targetIndex = 0;
-        readByte = ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
-        readByte += ParameterDecoder::decodeInt64(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
+        int32_t entryPointIndex = 0;
+        int32_t targetIndex = 0;
+        readByte = ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, entryPointIndex);
+        readByte += ParameterDecoder::decodeInt32(parameterBlock.parameterBuffer + readByte, parameterBlock.parameterBufferSize - readByte, targetIndex);
 
         ObjectID outSharedLibraryId = 0;
         ObjectID outDiagnosticsId = 0;
         readByte = ParameterDecoder::decodeAddress(parameterBlock.outputBuffer, parameterBlock.outputBufferSize, outSharedLibraryId);
-        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.parameterBufferSize - readByte, outDiagnosticsId);
+        readByte += ParameterDecoder::decodeAddress(parameterBlock.outputBuffer + readByte, parameterBlock.outputBufferSize - readByte, outDiagnosticsId);
 
         for (auto consumer: m_consumers)
         {

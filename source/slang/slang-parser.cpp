@@ -112,6 +112,10 @@ namespace Slang
 
         bool hasSeenCompletionToken = false;
 
+        // Track whether or not we are inside a generics that has variadic parameters.
+        // If so we will enable the new `expand` and `each` keyword.
+        bool isInVariadicGenerics = false;
+
         TokenReader tokenReader;
         DiagnosticSink* sink;
         SourceLoc lastErrorLoc;
@@ -1476,41 +1480,50 @@ namespace Slang
             }
             return paramDecl;
         }
+        Decl* paramDecl = nullptr;
+        if (AdvanceIf(parser, "each"))
+        {
+            // A type pack parameter.
+            paramDecl = parser->astBuilder->create<GenericTypePackParamDecl>();
+            parser->FillPosition(paramDecl);
+            paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+        }
         else
         {
             // default case is a type parameter
-            GenericTypeParamDecl* paramDecl = parser->astBuilder->create<GenericTypeParamDecl>();
+            paramDecl = parser->astBuilder->create<GenericTypeParamDecl>();
             parser->FillPosition(paramDecl);
             paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-            if (AdvanceIf(parser, TokenType::Colon))
-            {
-                // The user is apply a constraint to this type parameter...
+        }
+        if (AdvanceIf(parser, TokenType::Colon))
+        {
+            // The user is apply a constraint to this type parameter...
 
-                auto paramConstraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
-                parser->FillPosition(paramConstraint);
+            auto paramConstraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
+            parser->FillPosition(paramConstraint);
 
-                auto paramType = DeclRefType::create(
-                    parser->astBuilder,
-                    DeclRef<Decl>(paramDecl));
+            auto paramType = DeclRefType::create(
+                parser->astBuilder,
+                DeclRef<Decl>(paramDecl));
 
-                auto paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
-                paramTypeExpr->loc = paramDecl->loc;
-                paramTypeExpr->base.type = paramType;
-                paramTypeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
+            auto paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
+            paramTypeExpr->loc = paramDecl->loc;
+            paramTypeExpr->base.type = paramType;
+            paramTypeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
 
-                paramConstraint->sub = TypeExp(paramTypeExpr);
-                paramConstraint->sup = parser->ParseTypeExp();
+            paramConstraint->sub = TypeExp(paramTypeExpr);
+            paramConstraint->sup = parser->ParseTypeExp();
 
-                AddMember(genericDecl, paramConstraint);
-
-
-            }
+            AddMember(genericDecl, paramConstraint);
+        }
+        if (auto typeParameter = as<GenericTypeParamDecl>(paramDecl))
+        {
             if (AdvanceIf(parser, TokenType::OpAssign))
             {
-                paramDecl->initType = parser->ParseTypeExp();
+                typeParameter->initType = parser->ParseTypeExp();
             }
-            return paramDecl;
         }
+        return paramDecl;
     }
 
     template<typename TFunc>
@@ -1519,6 +1532,9 @@ namespace Slang
     {
         parser->ReadToken(TokenType::OpLess);
         parser->genericDepth++;
+        bool oldIsInVariadicGenerics = parser->isInVariadicGenerics;
+        SLANG_DEFER(parser->isInVariadicGenerics = oldIsInVariadicGenerics);
+
         for (;;)
         {
             const TokenType tokenType = parser->tokenReader.peekTokenType();
@@ -1530,7 +1546,13 @@ namespace Slang
 
             auto currentCursor = parser->tokenReader.getCursor();
 
-            AddMember(decl, ParseGenericParamDecl(parser, decl));
+            auto genericParam = ParseGenericParamDecl(parser, decl);
+            AddMember(decl, genericParam);
+
+            if (as<GenericTypePackParamDecl>(genericParam))
+            {
+                parser->isInVariadicGenerics = true;
+            }
 
             // Make sure we make forward progress.
             if (parser->tokenReader.getCursor() == currentCursor)
@@ -2203,6 +2225,7 @@ namespace Slang
             case TokenType::OpEql:
             case TokenType::OpNeq:
             case TokenType::OpGreater:
+            case TokenType::EndOfFile:
             {
                 return parseGenericApp(parser, base);
             }
@@ -2564,6 +2587,11 @@ namespace Slang
             auto decl = parseEnumDecl(parser);
             typeSpec.decl = decl;
             typeSpec.expr = createDeclRefType(parser, decl);
+            return typeSpec;
+        }
+        else if (parser->LookAheadToken("expand") || parser->LookAheadToken("each"))
+        {
+            typeSpec.expr = parser->ParseExpression();
             return typeSpec;
         }
         // Uncomment should we decide to enable (a,b,c) tuple types
@@ -6160,65 +6188,6 @@ namespace Slang
     {
         auto expr = ParseLeafExpression();
         return parseInfixExprWithPrecedence(this, expr, level);
-
-#if 0
-
-        if (level == Precedence::Prefix)
-            return ParseLeafExpression();
-        if (level == Precedence::TernaryConditional)
-        {
-            // parse select clause
-            auto condition = ParseExpression(Precedence(level + 1));
-            if (LookAheadToken(TokenType::QuestionMark))
-            {
-                SelectExpr* select = new SelectExpr();
-                FillPosition(select.Ptr());
-
-                select->Arguments.add(condition);
-
-                select->FunctionExpr = parseOperator(this);
-
-                select->Arguments.add(ParseExpression(level));
-                ReadToken(TokenType::Colon);
-                select->Arguments.add(ParseExpression(level));
-                return select;
-            }
-            else
-                return condition;
-        }
-        else
-        {
-            if (GetAssociativityFromLevel(level) == Associativity::Left)
-            {
-                auto left = ParseExpression(Precedence(level + 1));
-                while (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
-                {
-                    OperatorExpr* tmp = new InfixExpr();
-                    tmp->FunctionExpr = parseOperator(this);
-
-                    tmp->Arguments.add(left);
-                    FillPosition(tmp.Ptr());
-                    tmp->Arguments.add(ParseExpression(Precedence(level + 1)));
-                    left = tmp;
-                }
-                return left;
-            }
-            else
-            {
-                auto left = ParseExpression(Precedence(level + 1));
-                if (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
-                {
-                    OperatorExpr* tmp = new InfixExpr();
-                    tmp->Arguments.add(left);
-                    FillPosition(tmp.Ptr());
-                    tmp->FunctionExpr = parseOperator(this);
-                    tmp->Arguments.add(ParseExpression(level));
-                    left = tmp;
-                }
-                return left;
-            }
-        }
-#endif
     }
 
     // We *might* be looking at an application of a generic to arguments,
@@ -6310,6 +6279,23 @@ namespace Slang
         parser->ReadMatchingToken(TokenType::RParent);
 
         return alignOfExpr;
+    }
+
+    static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
+    {
+        // We could have a type or a variable or an expression
+        CountOfExpr* countOfExpr = parser->astBuilder->create<CountOfExpr>();
+
+        parser->ReadMatchingToken(TokenType::LParent);
+
+        // The return type is always an Int
+        countOfExpr->type = parser->astBuilder->getIntType();
+
+        countOfExpr->value = parser->ParseExpression();
+
+        parser->ReadMatchingToken(TokenType::RParent);
+
+        return countOfExpr;
     }
 
     static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
@@ -7548,10 +7534,10 @@ namespace Slang
         return ret;
     }
 
-    static Expr* parseSPIRVAsmExpr(Parser* parser)
+    static Expr* parseSPIRVAsmExpr(Parser* parser, SourceLoc loc)
     {
         SPIRVAsmExpr* asmExpr = parser->astBuilder->create<SPIRVAsmExpr>();
-        parser->FillPosition(asmExpr);
+        asmExpr->loc = loc;
         parser->ReadToken(TokenType::LBrace);
         while(!parser->tokenReader.isAtEnd())
         {
@@ -7576,6 +7562,22 @@ namespace Slang
         return asmExpr;
     }
 
+    static Expr* parseExpandExpr(Parser* parser, SourceLoc loc)
+    {
+        ExpandExpr* expandExpr = parser->astBuilder->create<ExpandExpr>();
+        expandExpr->loc = loc;
+        expandExpr->baseExpr = parser->ParseArgExpr();
+        return expandExpr;
+    }
+
+    static Expr* parseEachExpr(Parser* parser, SourceLoc loc)
+    {
+        EachExpr* eachExpr = parser->astBuilder->create<EachExpr>();
+        eachExpr->loc = loc;
+        eachExpr->baseExpr = parser->ParseLeafExpression();
+        return eachExpr;
+    }
+
     static Expr* parsePrefixExpr(Parser* parser)
     {
         auto tokenType = peekTokenType(parser);
@@ -7583,13 +7585,11 @@ namespace Slang
         {
         case TokenType::Identifier:
         {
-            auto identifierToken = peekToken(parser);
-            const auto identifierTokenContent = identifierToken.getContent();
-            if (identifierTokenContent == toSlice("new"))
+            auto tokenLoc = peekToken(parser).getLoc();
+            if (AdvanceIf(parser, "new"))
             {
                 NewExpr* newExpr = parser->astBuilder->create<NewExpr>();
-                parser->FillPosition(newExpr);
-                parser->ReadToken();
+                newExpr->loc = tokenLoc;
                 auto subExpr = parsePostfixExpr(parser);
                 if (as<VarExpr>(subExpr) || as<GenericAppExpr>(subExpr))
                 {
@@ -7610,9 +7610,21 @@ namespace Slang
             }
             else if (AdvanceIf(parser, "spirv_asm"))
             {
-                return parseSPIRVAsmExpr(parser);
+                return parseSPIRVAsmExpr(parser, tokenLoc);
             }
-
+            else if (parser->isInVariadicGenerics)
+            {
+                // If we are inside a variadic generic, we also need to recognize
+                // the new `expand` and `each` keyword for dealing with variadic packs.
+                if (AdvanceIf(parser, "expand"))
+                {
+                    return parseExpandExpr(parser, tokenLoc);
+                }
+                else if (AdvanceIf(parser, "each"))
+                {
+                    return parseEachExpr(parser, tokenLoc);
+                }
+            }
             return parsePostfixExpr(parser);
         }
         default:
@@ -8520,6 +8532,7 @@ namespace Slang
         _makeParseExpr("__dispatch_kernel", parseDispatchKernel),
         _makeParseExpr("sizeof", parseSizeOfExpr),
         _makeParseExpr("alignof", parseAlignOfExpr),
+        _makeParseExpr("countof", parseCountOfExpr),
     };
 
     ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

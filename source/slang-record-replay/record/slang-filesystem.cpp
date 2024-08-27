@@ -18,11 +18,6 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, m_actualFileSystem.get());
     }
 
-    FileSystemRecorder::~FileSystemRecorder()
-    {
-        m_actualFileSystem->release();
-    }
-
     void* FileSystemRecorder::castAs(const Slang::Guid& guid)
     {
         return getInterface(guid);
@@ -52,25 +47,22 @@ namespace SlangRecord
         // know something wrong with the loadFile call if we can't find the file in the record directory.
         if ((res == SLANG_OK) && (*outBlob != nullptr) && ((*outBlob)->getBufferSize() != 0))
         {
-            std::filesystem::path filePath = m_recordManager->getRecordFileDirectory();
-            filePath = filePath / path;
-
-            if (!File::exists(filePath.parent_path().string().c_str()))
+            Slang::String filePath = Slang::Path::combine(m_recordManager->getRecordFileDirectory(), path);
+            Slang::String dirPath = Slang::Path::getParentDirectory(filePath);
+            if (!File::exists(dirPath))
             {
                 slangRecordLog(LogLevel::Debug, "Create directory: %s to save captured shader file: %s\n",
-                    filePath.parent_path().string().c_str(), filePath.filename().string().c_str());
+                    dirPath.getBuffer(), filePath.getBuffer());
 
-                std::error_code ec;
-                // std::filesystem::create_directories can create the directory recursively.
-                if (!std::filesystem::create_directories(filePath.parent_path(), ec))
+                if (!Path::createDirectoryRecursive(dirPath))
                 {
-                    slangRecordLog(LogLevel::Error, "Fail to create directory: %s, error (%d): %s\n",
-                        filePath.parent_path().string().c_str(), ec.value(), ec.message().c_str());
+                    slangRecordLog(LogLevel::Error, "Fail to create directory: %s\n",
+                        dirPath.getBuffer());
                     return SLANG_FAIL;
                 }
             }
 
-            FileOutputStream fileStream(filePath.string().c_str());
+            FileOutputStream fileStream(filePath);
 
             fileStream.write((*outBlob)->getBufferPointer(), (*outBlob)->getBufferSize());
             fileStream.flush();

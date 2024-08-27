@@ -106,7 +106,6 @@ namespace SlangRecord
     SlangResult CommonInterfaceReplayer::getEntryPointHash(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outHashId)
     {
         InputObjectSanityCheck(objectId);
-        OutputObjectSanityCheck(outHashId);
 
         SlangResult res = SLANG_OK;
         slang::IComponentType* pObj = getObjectPointer(objectId);
@@ -115,16 +114,18 @@ namespace SlangRecord
 
         if (outHash)
         {
-            m_objectMap.add(outHashId, outHash);
             if (outHash->getBufferSize())
             {
                 uint8_t* buffer = (uint8_t*)outHash->getBufferPointer();
                 Slang::StringBuilder strBuilder;
+                strBuilder << "callIdx: " << m_globalCounter << ", entrypoint: "<< entryPointIndex << ", target: " << targetIndex << ", hash: ";
+                m_globalCounter++;
+
                 for (size_t i = 0; i < outHash->getBufferSize(); i++)
                 {
-                    strBuilder<<Slang::StringUtil::makeStringWithFormat("%.2X ", buffer[i]);
+                    strBuilder<<Slang::StringUtil::makeStringWithFormat("%.2X", buffer[i]);
                 }
-                slangRecordLog(LogLevel::Verbose, "getEntryPointHash: %s\n", strBuilder.begin());
+                slangRecordLog(LogLevel::Verbose, "%s\n", strBuilder.begin());
             }
             else
             {

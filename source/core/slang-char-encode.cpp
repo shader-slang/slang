@@ -211,4 +211,27 @@ CharEncoding* CharEncoding::UTF32 = &_utf32Encoding;
     return count;
 }
 
+Index UTF8Util::calcUTF16CharCount(const UnownedStringSlice& in)
+{
+    Index count = 0;
+    Index readPtr = 0;
+    for (;;)
+    {
+        int c = getUnicodePointFromUTF8([&]() -> Byte
+            {
+                if (readPtr < in.getLength())
+                    return in[readPtr++];
+                else
+                    return 0;
+            });
+        if (c == 0)
+            break;
+        Char16 buffer[2];
+        count += encodeUnicodePointToUTF16(c, buffer);
+        if (readPtr >= in.getLength())
+            break;
+    }
+    return count;
+}
+
 } // namespace Slang

@@ -140,7 +140,7 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     builder.setInsertInto(loop->getParent());
 
     const auto s = as<IRBlock>(loop->getParent());
-    auto domTree = computeDominatorTree(s->getParent());
+    auto domTree = computeDominatorTree((IRGlobalValueWithCode*)s->getParent());
     SLANG_ASSERT(s);
     const auto c1 = loop->getTargetBlock();
     const auto c1Terminator = as<IRIfElse>(c1->getTerminator());

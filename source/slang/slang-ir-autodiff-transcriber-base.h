@@ -91,10 +91,6 @@ struct AutoDiffTranscriberBase
 
     void maybeMigrateDifferentiableDictionaryFromDerivativeFunc(IRBuilder* builder, IRInst* origFunc);
 
-    // Get or construct `:IDifferentiable` conformance for a DifferentiablePair.
-    IRWitnessTable* getDifferentialPairWitness(IRBuilder* builder, IRInst* inOriginalDiffPairType, IRInst* inPrimalDiffPairType);
-    IRWitnessTable* getArrayWitness(IRBuilder* builder, IRInst* inOriginalArrayType, IRInst* inPrimalArrayType);
-
     IRInst* tryGetDifferentiableWitness(IRBuilder* builder, IRInst* originalType);
 
     IRType* getOrCreateDiffPairType(IRBuilder* builder, IRInst* primalType, IRInst* witness);
@@ -123,8 +119,14 @@ struct AutoDiffTranscriberBase
 
     InstPair transcribeBlock(IRBuilder* builder, IRBlock* origBlock)
     {
-        HashSet<IRInst*> emptySet;
-        return transcribeBlockImpl(builder, origBlock, emptySet);
+        HashSet<IRInst*> ignore;
+        for (auto inst = origBlock->getFirstInst(); inst; inst = inst->next)
+        {
+            if (inst->m_op == kIROp_Unmodified)
+                ignore.add(inst);
+        }
+
+        return transcribeBlockImpl(builder, origBlock, ignore);
     }
 
     // Transcribe a generic definition

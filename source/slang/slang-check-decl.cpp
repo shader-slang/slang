@@ -1561,7 +1561,7 @@ namespace Slang
             // A variable with an explicit type is simpler, for the
             // most part.
             SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
-            TypeExp typeExp = subVisitor.CheckUsableType(varDecl->type);
+            TypeExp typeExp = subVisitor.CheckUsableType(varDecl->type, varDecl);
             varDecl->type = typeExp;
             if (varDecl->type.equals(m_astBuilder->getVoidType()))
             {
@@ -1922,9 +1922,58 @@ namespace Slang
         checkVisibility(classDecl);
     }
 
+    bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
+    {
+        // find groupshared modifier
+        if (varDecl->findModifier<HLSLGroupSharedModifier>())
+        {
+            if (sink && varDecl->initExpr)
+                sink->diagnose(varDecl, Diagnostics::cannotHaveInitializer, varDecl, "groupshared");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool isDefaultInitializable(VarDeclBase* varDecl)
+    {
+        if (!DiagnoseIsAllowedInitExpr(varDecl, nullptr))
+            return false;
+
+        // Find struct and modifiers associated with varDecl
+        StructDecl* structDecl = as<StructDecl>(varDecl);
+        if (auto declRefType = as<DeclRefType>(varDecl->getType()))
+        {
+            if (auto genericAppRefDecl = as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
+            {
+                auto baseGenericRefType = genericAppRefDecl->getBase()->getDecl();
+                if (auto baseTypeStruct = as<StructDecl>(baseGenericRefType))
+                {
+                    structDecl = baseTypeStruct;
+                }
+                else if (auto genericDecl = as<GenericDecl>(baseGenericRefType))
+                {
+                    if(auto innerTypeStruct = as<StructDecl>(genericDecl->inner))
+                        structDecl = innerTypeStruct;
+                }
+            }
+        }
+        if (structDecl)
+        {
+            // find if a type is non-copyable
+            if (structDecl->findModifier<NonCopyableTypeAttribute>())
+                return false;
+        }
+
+        return true;
+    }
+
     static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
     {
         if (!varDecl->type || !varDecl->type.type)
+            return nullptr;
+        
+        if (!isDefaultInitializable(varDecl))
             return nullptr;
 
         ConstructorDecl* defaultCtor = nullptr;
@@ -1951,8 +2000,11 @@ namespace Slang
             return defaultCall;
         }
     }
+
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
+        DiagnoseIsAllowedInitExpr(varDecl, getSink());
+
         // if zero initialize is true, set everything to a default
         if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) 
             && !varDecl->initExpr
@@ -2468,18 +2520,22 @@ namespace Slang
         // and likely a crash.
         // 
         // Accessing the members via index side steps the issue.
+
+        Index parameterIndex = 0;
         const auto& members = genericDecl->members;
         for (Index i = 0; i < members.getCount(); ++i)
         {
             Decl* m = members[i];
 
-            if (auto typeParam = as<GenericTypeParamDecl>(m))
+            if (auto typeParam = as<GenericTypeParamDeclBase>(m))
             {
                 ensureDecl(typeParam, DeclCheckState::ReadyForReference);
+                typeParam->parameterIndex = parameterIndex++;
             }
             else if (auto valParam = as<GenericValueParamDecl>(m))
             {
                 ensureDecl(valParam, DeclCheckState::ReadyForReference);
+                valParam->parameterIndex = parameterIndex++;
             }
             else if (auto constraint = as<GenericTypeConstraintDecl>(m))
             {
@@ -3875,7 +3931,7 @@ namespace Slang
     {
         // Our synthesized method will have parameters matching the names
         // and types of those on the requirement, and it will use expressions
-        // that reference those parametesr as arguments for the call expresison
+        // that reference those parameters as arguments for the call expresison
         // that makes up the body.
         //
         for (auto paramDeclRef : getParameters(m_astBuilder, requirement))
@@ -3895,14 +3951,6 @@ namespace Slang
             synParamDecl->parentDecl = synthesized;
             synthesized->members.add(synParamDecl);
 
-            // For each paramter, we will create an argument expression
-            // for the call in the function body.
-            //
-            auto synArg = m_astBuilder->create<VarExpr>();
-            synArg->declRef = makeDeclRef(synParamDecl);
-            synArg->type = paramType;
-            synArgs.add(synArg);
-
             // Add modifiers
             for (auto modifier : paramDeclRef.getDecl()->modifiers)
             {
@@ -3918,6 +3966,33 @@ namespace Slang
                     clonedModifier->keywordName = modifier->keywordName;
                     addModifier(synParamDecl, clonedModifier);
                 }
+            }
+
+            // Create an expression that references the parameter for use in arguments.
+            auto synArg = m_astBuilder->create<VarExpr>();
+            synArg->declRef = makeDeclRef(synParamDecl);
+            synArg->type = paramType;
+
+            if (auto typePack = as<ConcreteTypePack>(paramType))
+            {
+                // If paramType is a concrete type pack, we want to expand it out into
+                // individual arguments.
+                for (Index i = 0; i < typePack->getTypeCount(); i++)
+                {
+                    auto elementType = typePack->getElementType(i);
+                    auto synMemberExpr = m_astBuilder->create<SwizzleExpr>();
+                    synMemberExpr->base = synArg;
+                    synMemberExpr->elementIndices.add((UInt)i);
+                    synMemberExpr->type = elementType;
+                    synArgs.add(synMemberExpr);
+                }
+            }
+            else
+            {
+                // For ordinary non-pack paramters, we will use synArg directly to
+                // referencing the parameter for the call in the function body.
+                //
+                synArgs.add(synArg);
             }
         }
     }
@@ -4100,8 +4175,6 @@ namespace Slang
             addModifier(synFuncDecl, m_astBuilder->create<ForceInlineAttribute>());
 
             synFuncDecl->parentDecl = aggTypeDecl;
-            SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(synFuncDecl));
-            bodyVisitor.registerDifferentiableTypesForFunc(synFuncDecl);
         }
         else
         {
@@ -4224,6 +4297,11 @@ namespace Slang
         // to it to indicate that it should be ignored by things like lookup.
         //
         synFuncDecl->parentDecl = context->parentDecl;
+
+        // If the synthesized func is differentiable, make sure to populate its
+        // differential type dictionary.
+        SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(synFuncDecl));
+        bodyVisitor.registerDifferentiableTypesForFunc(synFuncDecl);
 
         // Once our synthesized declaration is complete, we need
         // to install it as the witness that satifies the given
@@ -7076,6 +7154,11 @@ namespace Slang
             {
                 args.add(DeclRefType::create(astBuilder, astBuilder->getDirectDeclRef(genericTypeParamDecl)));
             }
+            else if (auto genericTypePackParamDecl = as<GenericTypePackParamDecl>(mm))
+            {
+                auto packType = DeclRefType::create(astBuilder, astBuilder->getDirectDeclRef(genericTypePackParamDecl));
+                args.add(packType);
+            }
             else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
             {
                 if (semantics)
@@ -7522,7 +7605,7 @@ namespace Slang
         if(typeExpr.exp)
         {
             SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(paramDecl));
-            typeExpr = subVisitor.CheckUsableType(typeExpr);
+            typeExpr = subVisitor.CheckUsableType(typeExpr, paramDecl);
             paramDecl->type = typeExpr;
             checkMeshOutputDecl(paramDecl);
         }
@@ -7568,6 +7651,27 @@ namespace Slang
                     else
                         newModifiers[i]->next = nullptr;
                 }
+            }
+        }
+        else if (isTypePack(paramDecl->type.type))
+        {
+            // For now, we only allow parameter packs to be `const`.
+            bool hasConstModifier = false;
+            for (auto modifier : paramDecl->modifiers)
+            {
+                if (as<OutModifier>(modifier) || as<InOutModifier>(modifier) || as<RefModifier>(modifier) || as<ConstRefModifier>(modifier))
+                {
+                    getSink()->diagnose(modifier, Diagnostics::parameterPackMustBeConst);
+                }
+                else if (as<ConstModifier>(modifier))
+                {
+                    hasConstModifier = true;
+                }
+            }
+            if (!hasConstModifier)
+            {
+                auto constModifier = this->getASTBuilder()->create<ConstModifier>();
+                addModifier(paramDecl, constModifier);
             }
         }
 
@@ -8361,7 +8465,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
     {
-        decl->returnType = CheckUsableType(decl->returnType);
+        decl->returnType = CheckUsableType(decl->returnType, decl);
 
         visitAbstractStorageDeclCommon(decl);
 
@@ -8371,7 +8475,7 @@ namespace Slang
     void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
     {
         SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
-        decl->type = subVisitor.CheckUsableType(decl->type);
+        decl->type = subVisitor.CheckUsableType(decl->type, decl);
         visitAbstractStorageDeclCommon(decl);
         checkVisibility(decl);
     }
@@ -8587,7 +8691,7 @@ namespace Slang
                 return createDefaultSubstitutionsIfNeeded(m_astBuilder, this, extDeclRef).as<ExtensionDecl>();
             }
 
-            if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
+            if (!TryUnifyTypes(constraints, ValUnificationContext(), extDecl->targetType.Ptr(), type))
                 return DeclRef<ExtensionDecl>();
 
             ConversionCost baseCost;
@@ -9502,12 +9606,12 @@ namespace Slang
             outTypeList.add(type);
         }
     }
-    OrderedDictionary<GenericTypeParamDecl*, List<Type*>> getCanonicalGenericConstraints(
+    OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericConstraints(
         ASTBuilder* astBuilder,
         DeclRef<ContainerDecl> genericDecl)
     {
-        OrderedDictionary<GenericTypeParamDecl*, List<Type*>> genericConstraints;
-        for (auto mm : getMembersOfType<GenericTypeParamDecl>(astBuilder, genericDecl))
+        OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> genericConstraints;
+        for (auto mm : getMembersOfType<GenericTypeParamDeclBase>(astBuilder, genericDecl))
         {
             genericConstraints[mm.getDecl()] = List<Type*>();
         }
@@ -9522,7 +9626,7 @@ namespace Slang
             constraintTypes->add(genericTypeConstraintDecl.getDecl()->getSup().type);
         }
 
-        OrderedDictionary<GenericTypeParamDecl*, List<Type*>> result;
+        OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> result;
         for (auto& constraints : genericConstraints)
         {
             List<Type*> typeList;

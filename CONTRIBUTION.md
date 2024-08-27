@@ -105,6 +105,42 @@ Build with a following command:
 $ cmake --build --preset release
 ```
 
+#### MacOS
+Install XCode from AppStore.
+
+Install CMake and Ninja; we recommend using [homebrew](https://brew.sh/) for installing them.
+```
+brew install ninja
+brew install cmake
+```
+
+Run CMake with a following command to generate Makefile:
+```
+$ cmake --preset default
+```
+
+Build with a following command:
+```
+$ cmake --build --preset release
+```
+
+#### Building with a local build of slang-llvm
+slang-llvm is required to run slang-test properly.
+Follow the instructions below if you wish to build slang-llvm locally.
+```
+$ external/build-llvm.sh --source-dir build/slang-llvm_src --install-prefix build/slang-llvm_install
+```
+
+You need to use the following command to re-generate Makefile,
+```
+$ cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DLLVM_DIR=build/slang-llvm_install/lib/cmake/llvm -DClang_DIR=build/slang-llvm_install/lib/cmake/clang
+```
+
+Build with a following command:
+```
+$ cmake --build --preset release
+```
+
 ### Making Changes
 Make your changes and ensure to follow our [Design Decisions](docs/design/README.md).
 
