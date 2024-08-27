@@ -920,7 +920,7 @@ SLANG_API bool spReflection_isSubType(
     }
     catch( ... )
     {
-        return nullptr;
+        return false;
     }
 }
 
