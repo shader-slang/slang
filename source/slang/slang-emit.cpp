@@ -416,6 +416,53 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
     return false;
 }
 
+// Return SLANG_OK if the result has any functions left.
+static SlangResult removeNonEmbeddableDXIL(IRModule* irModule)
+{
+    bool hasFunctions = false;
+    List<IRInst*> removeList;
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (inst->getOp() == kIROp_Func)
+        {
+            bool dxilLibFriendly = true;
+
+            // DXIL does not permit HLSLStructureBufferType in exported functions
+            // or sadly Matrices (https://github.com/shader-slang/slang/issues/4880)
+            auto type = as<IRFuncType>(inst->getFullType());
+            auto argCount = type->getOperandCount();
+            for (UInt aa = 0; aa < argCount; ++aa)
+            {
+                auto operand = type->getOperand(aa);
+                if (operand->getOp() == kIROp_HLSLStructuredBufferType ||
+                    operand->getOp() == kIROp_MatrixType)
+                {
+                    dxilLibFriendly = false;
+                    break;
+                }
+            }
+
+            if (!dxilLibFriendly)
+            {
+                removeList.add(inst);
+            }
+            else
+            {
+                hasFunctions = true;
+            }
+        }
+    }
+    for (auto inst : removeList)
+    {
+        inst->removeAndDeallocate();
+    }
+    if (!hasFunctions)
+    {
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 Result linkAndOptimizeIR(
     CodeGenContext*                         codeGenContext,
     LinkingAndOptimizationOptions const&    options,
@@ -1459,6 +1506,13 @@ Result linkAndOptimizeIR(
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         checkUnsupportedInst(codeGenContext->getTargetReq(), irModule, sink);
 
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+    {
+        // We need to remove all the functions that can't be represented
+        // in a DXIL library, eg. with resources.
+        SLANG_RETURN_ON_FAIL(removeNonEmbeddableDXIL(irModule));
+    }
+
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 }
 
@@ -1591,6 +1645,9 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             linkedIR));
         
         auto irModule = linkedIR.module;
+
+        // TODO: How to store this in the artifact?
+        this->getProgram()->linkedIRModule = irModule;
         
         // Perform final simplifications to help emit logic to generate more compact code.
         simplifyForEmit(irModule, targetRequest);

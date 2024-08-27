@@ -159,20 +159,28 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
     return result;
 }
 
-// Remove all [AvailableInDXIL] functions when compiling DXIL.
+// Remove IR definitions from all [AvailableInDXIL] functions when compiling DXIL,
+// as these functions are already defined in the embedded precompiled DXIL library.
 void removeAvailableInDXIL(IRModule* module)
 {
     List<IRInst*> toRemove;
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (!as<IRFunc>(globalInst))
+        auto funcInst = as<IRFunc>(globalInst);
+        if (!funcInst)
         {
             continue;
         }
         if (globalInst->findDecoration<IRAvailableInDXILDecoration>())
         {
-            globalInst->findDecoration<IRNameHintDecoration>()->dump();
-            toRemove.add(globalInst);
+            // Gut the function definition, turning it into a declaration
+            for (auto inst : funcInst->getChildren())
+            {
+                if (inst->getOp() == kIROp_Block)
+                {
+                    toRemove.add(inst);
+                }
+            }
         }
     }
     for (auto inst : toRemove)

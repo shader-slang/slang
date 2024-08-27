@@ -3300,19 +3300,16 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
 
     // If requested, attempt to compile the translation unit all the way down to the target language
     // and stash the result blob in an IR op.
-    for (auto targetReq : getLinkage()->targets)
+    if (getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
     {
-        if (targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
-        {
-            auto frontEndReq = getFrontEndReq();
+        auto frontEndReq = getFrontEndReq();
 
-            for (auto translationUnit : frontEndReq->translationUnits)
-            {
-                SlangCompileTarget target = SlangCompileTarget(targetReq->getTarget());
-                translationUnit->getModule()->precompileForTarget(
-                    target,
-                    nullptr);
-            }
+        for (auto translationUnit : frontEndReq->translationUnits)
+        {
+            SlangCompileTarget target = SlangCompileTarget(SlangCompileTarget::SLANG_DXIL);
+            translationUnit->getModule()->precompileForTarget(
+                target,
+                nullptr);
         }
     }
 
@@ -5935,9 +5932,9 @@ void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool
     getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
 }
 
-void EndToEndCompileRequest::setTargetEmbedDXIL(int targetIndex, bool value)
+void EndToEndCompileRequest::setEmbedDXIL(bool value)
 {
-    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDXIL, value);
+    getOptionSet().set(CompilerOptionName::EmbedDXIL, value);
 }
 
 void EndToEndCompileRequest::setTargetLineDirectiveMode(

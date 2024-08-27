@@ -1461,7 +1461,7 @@ static bool _isHLSLExported(IRInst* inst)
     for (auto decoration : inst->getDecorations())
     {
         const auto op = decoration->getOp();
-        if (op == kIROp_HLSLExportDecoration)
+        if (op == kIROp_HLSLExportDecoration || op == kIROp_TransientExportDecoration)
         {
             return true;
         }

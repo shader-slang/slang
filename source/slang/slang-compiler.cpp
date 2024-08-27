@@ -763,7 +763,7 @@ namespace Slang
 #   pragma warning(pop)
 #endif
 
-    SlangResult CodeGenContext::emitTranslationUnit(ComPtr<IArtifact>& outArtifact)
+    SlangResult CodeGenContext::emitPrecompiledDXIL(ComPtr<IArtifact>& outArtifact)
     {
         return emitWithDownstreamForEntryPoints(outArtifact);
     }

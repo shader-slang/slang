@@ -556,6 +556,8 @@ namespace Slang
             ///
         Scope* _getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder);
 
+        // TODO: What is proper way to get linked IR after emitPrecompiledDXIL?
+        RefPtr<IRModule> linkedIRModule;
     protected:
         ComponentType(Linkage* linkage);
 
@@ -2732,7 +2734,7 @@ namespace Slang
 
         SlangResult emitEntryPoints(ComPtr<IArtifact>& outArtifact);
 
-        SlangResult emitTranslationUnit(ComPtr<IArtifact>& outArtifact);
+        SlangResult emitPrecompiledDXIL(ComPtr<IArtifact>& outArtifact);
 
         void maybeDumpIntermediate(IArtifact* artifact);
 
@@ -2815,7 +2817,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(int targetIndex, bool value) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDXIL(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setEmbedDXIL(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;
