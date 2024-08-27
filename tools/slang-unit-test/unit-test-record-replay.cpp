@@ -189,6 +189,16 @@ static SlangResult launchProcessAndReadStdout(UnitTestContext* context, const Li
         return res;
     }
 
+    if (exeRes.resultCode != 0)
+    {
+        msgBuilder << "'" << exampleName << "' exits with failure\n";
+        msgBuilder << "Process ret code: " << exeRes.resultCode << "\n";
+        msgBuilder << "Standard output:\n" << exeRes.standardOutput;
+        msgBuilder << "Standard error:\n" << exeRes.standardError;
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        return SLANG_FAIL;
+    }
+
     if (exeRes.standardOutput.getLength() == 0)
     {
         msgBuilder << "No stdout found in '" << exampleName << "'\n";
@@ -300,12 +310,20 @@ static SlangResult replayExample(UnitTestContext* context, List<entryHashInfo>& 
 
 static SlangResult resultCompare(List<entryHashInfo> const& expectHashes, List<entryHashInfo> const& resultHashes)
 {
-    if (expectHashes.getCount() != resultHashes.getCount())
+    if (expectHashes.getCount() == 0)
     {
+        getTestReporter()->message(TestMessageType::TestFailure, "No hash found\n");
         return SLANG_FAIL;
     }
 
     StringBuilder msgBuilder;
+    if (expectHashes.getCount() != resultHashes.getCount())
+    {
+        msgBuilder << "The number of hashes doesn't match, expect: " << expectHashes.getCount() << ", actual: " << resultHashes.getCount() << "\n";
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        return SLANG_FAIL;
+    }
+
     for (Index i = 0; i < expectHashes.getCount(); i++)
     {
         if (expectHashes[i].targetIndex != resultHashes[i].targetIndex)
@@ -438,7 +456,7 @@ static SlangResult runTests(UnitTestContext* context)
         }
     }
 
-    return SLANG_OK;
+    return finalRes;
 }
 
 // Those examples all depend on the Vulkan, so we only run them on non-Apple platforms.
