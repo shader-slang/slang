@@ -70,6 +70,15 @@ SLANG_UNIT_TEST(declTreeReflection)
             T j<let N : int>(T x, out int o) { o = N; return x; }
         }
 
+
+        namespace MyNamespace
+        {
+            struct MyStruct
+            {
+                int x;
+            }
+        }
+
         )";
 
     auto moduleName = "moduleG" + String(Process::getId());
@@ -101,7 +110,7 @@ SLANG_UNIT_TEST(declTreeReflection)
     auto moduleDeclReflection = module->getModuleReflection();
     SLANG_CHECK(moduleDeclReflection != nullptr);
     SLANG_CHECK(moduleDeclReflection->getKind() == slang::DeclReflection::Kind::Module);
-    SLANG_CHECK(moduleDeclReflection->getChildrenCount() == 7);
+    SLANG_CHECK(moduleDeclReflection->getChildrenCount() == 8);
 
     // First declaration should be a struct with 1 variable
     auto firstDecl = moduleDeclReflection->getChild(0);
@@ -179,6 +188,11 @@ SLANG_UNIT_TEST(declTreeReflection)
 
     auto innerStruct = genericReflection->getInnerDecl();
     SLANG_CHECK(innerStruct->getKind() == slang::DeclReflection::Kind::Struct);
+
+    // Check that the seventh declaration is a namespace
+    auto seventhDecl = moduleDeclReflection->getChild(6);
+    SLANG_CHECK(seventhDecl->getKind() == slang::DeclReflection::Kind::Namespace);
+    SLANG_CHECK(UnownedStringSlice(seventhDecl->getName()) == "MyNamespace");
 
 
     // Check type-lookup-by-name
@@ -262,7 +276,108 @@ SLANG_UNIT_TEST(declTreeReflection)
         SLANG_CHECK(UnownedStringSlice(valueParam->getName()) == "N"); // generic name
         SLANG_CHECK(specializationInfo->getConcreteIntVal(valueParam) == 10);
     }
+    
+    // Check specializeGeneric() and applySpecializations()
+    {
+        auto unspecializedType = compositeProgram->getLayout()->findTypeByName("MyGenericType");
+        SLANG_CHECK(unspecializedType != nullptr);
+        auto halfType = compositeProgram->getLayout()->findTypeByName("half");
+        SLANG_CHECK(halfType != nullptr);
+        
+        slang::GenericReflection* genericContainer = unspecializedType->getGenericContainer();
+        SLANG_CHECK(genericContainer != nullptr);
+        //auto typeParamT = genericContainer->getTypeParameter(0);
+        
+        List<slang::GenericArgType> argTypes;
+        List<slang::GenericArgReflection> args;
+        argTypes.add(slang::GenericArgType::SLANG_GENERIC_ARG_TYPE);
+        args.add({halfType});
+        auto specializedContainer = compositeProgram->getLayout()->specializeGeneric(
+            genericContainer, argTypes.getCount(), argTypes.getBuffer(), args.getBuffer(), nullptr);
+        
+        SLANG_CHECK(specializedContainer != nullptr);
 
+        auto specializedType = unspecializedType->applySpecializations(specializedContainer);
+        SLANG_CHECK(specializedType != nullptr);
+        SLANG_CHECK(getTypeFullName(specializedType) == "MyGenericType<half>");
+        
+    }
+
+    // Check specializeGeneric() and applySpecializations() on multiple levels (generic function nested in a generic struct)
+    {
+        auto unspecializedType = compositeProgram->getLayout()->findTypeByName("MyGenericType");
+        auto unspecializedFunc = compositeProgram->getLayout()->findFunctionByNameInType(unspecializedType, "j");
+
+        SLANG_CHECK(unspecializedFunc != nullptr);
+        auto halfType = compositeProgram->getLayout()->findTypeByName("half");
+        SLANG_CHECK(halfType != nullptr);
+        
+        slang::GenericReflection* genericFuncContainer = unspecializedFunc->getGenericContainer();
+        SLANG_CHECK(genericFuncContainer != nullptr);
+        slang::GenericReflection* genericStructContainer = genericFuncContainer->getOuterGenericContainer();
+        SLANG_CHECK(genericStructContainer != nullptr);
+
+        // Specialize the outer container with half
+        List<slang::GenericArgType> argTypes;
+        List<slang::GenericArgReflection> args;
+        argTypes.add(slang::GenericArgType::SLANG_GENERIC_ARG_TYPE);
+        args.add({halfType});
+        auto specializedStructContainer = compositeProgram->getLayout()->specializeGeneric(
+            genericStructContainer, argTypes.getCount(), argTypes.getBuffer(), args.getBuffer(), nullptr);
+        SLANG_CHECK(specializedStructContainer != nullptr);
+
+        // apply T=half. N is still left unspecialized.
+        genericFuncContainer = genericFuncContainer->applySpecializations(specializedStructContainer);
+
+        // Specialize the inner container with 10 separately..
+        argTypes.clear();
+        args.clear();
+
+        slang::GenericArgReflection argN;
+        argN.intVal = 10;
+        argTypes.add(slang::GenericArgType::SLANG_GENERIC_ARG_INT);
+        args.add(argN);
+
+        auto specializedFuncContainer = compositeProgram->getLayout()->specializeGeneric(
+            genericFuncContainer, argTypes.getCount(), argTypes.getBuffer(), args.getBuffer(), nullptr);
+
+        auto specializedFunc = unspecializedFunc->applySpecializations(specializedFuncContainer);
+        SLANG_CHECK(specializedFunc != nullptr);
+        
+        // ------ check the specialized function
+        auto specializationInfo = specializedFunc->getGenericContainer();
+        SLANG_CHECK(specializationInfo != nullptr);
+        SLANG_CHECK(UnownedStringSlice(specializationInfo->getName()) == "j");
+        SLANG_CHECK(specializationInfo->asDecl()->getKind() == slang::DeclReflection::Kind::Generic);
+        SLANG_CHECK(specializationInfo->getValueParameterCount() == 1);
+        auto valueParam = specializationInfo->getValueParameter(0);
+        SLANG_CHECK(UnownedStringSlice(valueParam->getName()) == "N"); // generic name
+        SLANG_CHECK(specializationInfo->getConcreteIntVal(valueParam) == 10);
+
+        // check outer container
+        specializationInfo = specializationInfo->getOuterGenericContainer();
+        SLANG_CHECK(specializationInfo != nullptr);
+        SLANG_CHECK(UnownedStringSlice(specializationInfo->getName()) == "MyGenericType");
+        SLANG_CHECK(specializationInfo->asDecl()->getKind() == slang::DeclReflection::Kind::Generic);
+        // Check type parameters
+        SLANG_CHECK(specializationInfo->getTypeParameterCount() == 1);
+        auto typeParam = specializationInfo->getTypeParameter(0);
+        SLANG_CHECK(UnownedStringSlice(typeParam->getName()) == "T"); // generic name
+        SLANG_CHECK(getTypeFullName(specializationInfo->getConcreteType(typeParam)) == "half");
+    }
+
+    // Check sub-type relations
+    {
+        auto floatType = compositeProgram->getLayout()->findTypeByName("float");
+        SLANG_CHECK(floatType != nullptr);
+        auto diffType = compositeProgram->getLayout()->findTypeByName("IDifferentiable");
+        SLANG_CHECK(diffType != nullptr);
+
+        SLANG_CHECK(compositeProgram->getLayout()->isSubType(floatType, diffType) == true);
+
+        auto uintType = compositeProgram->getLayout()->findTypeByName("uint");
+        SLANG_CHECK(compositeProgram->getLayout()->isSubType(uintType, diffType) == false);
+    }
 
     // Check iterators
     {
@@ -271,7 +386,7 @@ SLANG_UNIT_TEST(declTreeReflection)
         {
             count++;
         }
-        SLANG_CHECK(count == 7);
+        SLANG_CHECK(count == 8);
 
         count = 0;
         for (auto* child : moduleDeclReflection->getChildrenOfKind<slang::DeclReflection::Kind::Func>())
@@ -289,6 +404,13 @@ SLANG_UNIT_TEST(declTreeReflection)
 
         count = 0;
         for (auto* child : moduleDeclReflection->getChildrenOfKind<slang::DeclReflection::Kind::Generic>())
+        {
+            count++;
+        }
+        SLANG_CHECK(count == 1);
+
+        count = 0;
+        for (auto* child : moduleDeclReflection->getChildrenOfKind<slang::DeclReflection::Kind::Namespace>())
         {
             count++;
         }

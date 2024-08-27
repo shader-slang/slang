@@ -58,12 +58,19 @@ struct IRTypeLayoutRules
 {
 public:
     IRTypeLayoutRuleName ruleName;
+
+    /// Align composite based on rule. Type is aligned assuming
+    /// it is apart of a composite (array, struct, matrix, etc...)
     virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize) = 0;
+
+    /// Get alignment and size of a vector given components of vector.
+    /// This alignment is not assuming this vector is a member of a struct.
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(IRSizeAndAlignment element, IRIntegerValue count) = 0;
     virtual IRIntegerValue adjustOffsetForNextAggregateMember(IRIntegerValue currentSize, IRIntegerValue lastElementAlignment) = 0;
     static IRTypeLayoutRules* getStd430();
     static IRTypeLayoutRules* getStd140();
     static IRTypeLayoutRules* getNatural();
+    static IRTypeLayoutRules* getConstantBuffer();
     static IRTypeLayoutRules* get(IRTypeLayoutRuleName name);
 };
 

@@ -88,8 +88,9 @@ namespace SlangRecord
 
         if (*outEntryPoint)
         {
-            EntryPointRecorder* entryPointRecord = m_mapEntryPointToRecord.tryGetValue(*outEntryPoint);
-            if (!entryPointRecord)
+            EntryPointRecorder* entryPointRecord = nullptr;
+            bool ret = m_mapEntryPointToRecord.tryGetValue(*outEntryPoint, entryPointRecord);
+            if (!ret)
             {
                 SLANG_RECORD_ASSERT(!"Entrypoint not found in mapEntryPointToRecord");
             }
@@ -490,12 +491,14 @@ namespace SlangRecord
     EntryPointRecorder* ModuleRecorder::getEntryPointRecorder(slang::IEntryPoint* entryPoint)
     {
         EntryPointRecorder* entryPointRecord = nullptr;
-        entryPointRecord = m_mapEntryPointToRecord.tryGetValue(entryPoint);
-        if (!entryPointRecord)
+        bool ret = m_mapEntryPointToRecord.tryGetValue(entryPoint, entryPointRecord);
+        if (!ret)
         {
             entryPointRecord = new EntryPointRecorder(entryPoint, m_recordManager);
             Slang::ComPtr<EntryPointRecorder> result(entryPointRecord);
-            m_mapEntryPointToRecord.add(entryPoint, *result.detach());
+
+            m_entryPointsRecordAllocation.add(result);
+            m_mapEntryPointToRecord.add(entryPoint, result.detach());
         }
         return entryPointRecord;
     }

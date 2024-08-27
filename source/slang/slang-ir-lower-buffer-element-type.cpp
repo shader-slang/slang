@@ -899,6 +899,16 @@ namespace Slang
         if (target->getOptionSet().shouldUseScalarLayout())
             return IRTypeLayoutRules::getNatural();
 
+        if (target->getOptionSet().shouldUseDXLayout())
+        {
+            if (as<IRUniformParameterGroupType>(bufferType))
+            {
+                return IRTypeLayoutRules::getConstantBuffer();
+            }
+            else
+                return IRTypeLayoutRules::getNatural();
+        }
+
         // The default behavior is to use std140 for constant buffers and std430 for other buffers.
         switch (bufferType->getOp())
         {
