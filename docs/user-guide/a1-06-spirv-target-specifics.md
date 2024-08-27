@@ -258,6 +258,7 @@ For the given example above, when targeting SPIR-V, Slang emits a matrix that co
 
 An alternative way to emit SPIR-V code is to emit four vectors and each vector has three elements. Slang doesn't do this but this is a more direct translation because SPIR-V spec defines OpTypeMatrix to take "Column Count" not row.
 ```
+; NOT SLANG EMITTED CODE
 %v3float = OpTypeVector %float 3 ; <= float3 type
 %mat4v3float = OpTypeMatrix %v3float 4 ; <= four of float3
 ```
