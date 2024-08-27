@@ -14,6 +14,17 @@ Experimental support for the older versions of SPIR-V
 Support for SPIR-V 1.0, 1.1 and 1.2 is still experimental. When targeting the older SPIR-V profiles, Slang may produce SPIR-V that uses the instructions and keywords that were introduced in the later versions of SPIR-V.
 
 
+Combined texture sampler
+------------------------
+Slang supports Combined texture sampler such as `Sampler2D`.
+Slang emits SPIR-V code with `OpTypeSampledImage` instruction.
+
+You can specify two different register numbers for each: one for the texture register and another for the sampler register.
+```
+Sampler2D explicitBindingSampler : register(t4): register(s3);
+```
+
+
 Behavior of `discard` after SPIR-V 1.6
 --------------------------------------
 
@@ -62,8 +73,8 @@ Slang ignores the keywords above and all of them are treated as `highp`.
 
 Supported atomic types for each target
 --------------------------------------
-HLSL 6.2 introduced [16-bit scalar types](https://github.com/microsoft/DirectXShaderCompiler/wiki/16-Bit-Scalar-Types) such as float16 and int16_t, but they didn't come with any atomic operations.
-HLSL 6.6 introduced [atomic operations for 64-bit integer types and bitwise atomic operations for 32-bit float type](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_Int64_and_Float_Atomics.html), but 16-bit integer types and 16-bit float types are not a part of it.
+Shader Model 6.2 introduced [16-bit scalar types](https://github.com/microsoft/DirectXShaderCompiler/wiki/16-Bit-Scalar-Types) such as float16 and int16_t, but they didn't come with any atomic operations.
+Shader Model 6.6 introduced [atomic operations for 64-bit integer types and bitwise atomic operations for 32-bit float type](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_Int64_and_Float_Atomics.html), but 16-bit integer types and 16-bit float types are not a part of it.
 
 [GLSL 4.3](https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.30.pdf) introduced atomic operations for 32-bit integer types.
 GLSL 4.4 with [GL_EXT_shader_atomic_int64](https://github.com/KhronosGroup/GLSL/blob/main/extensions/ext/GL_EXT_shader_atomic_int64.txt) can use atomic operations for 64-bit integer types.
@@ -89,15 +100,20 @@ Each member in a `ConstantBuffer` will be emitted as `uniform` parameter.
 StructuredBuffer and ByteAddressBuffer are translated to a shader storage buffer with `readonly` layout.
 RWStructuredBuffer and RWByteAddressBuffer are translated to a shader storage buffer with `read-write` layout.
 
+If you need to apply a different buffer layout for indivisual StructuredBuffer, you can specify the layout as a second generic argument to StructuredBuffer. E.g., StructuredBuffer<T, Std140Layout>, StructuredBuffer<T, Std430Layout> or StructuredBuffer<T, ScalarLayout>.
+
+Note that there are compiler options, "-fvk-use-scalar-layout" and "-force-glsl-scalar-layout".
+These options do the same but they are applied globally.
 
 ParameterBlock for SPIR-V target
 --------------------------------
 
 `ParameterBlock` is a Slang generic type for binding uniform parameters.
-It is similar to `ConstantBuffer` in HLSL, but `ParameterBlock` can include not only constant parameters but also descriptors such as Texture2D or StructuredBuffer.
+It is similar to `ConstantBuffer` in HLSL, and `ParameterBlock` can include not only constant parameters but also descriptors such as Texture2D or StructuredBuffer.
 
-Because the Vulkan API doesn't natively support `ParameterBlock` that has a mixture of descriptors and constants, Slang emits each member as an individual parameter.
-When targeting SPIR-V, the individual parameter will be emitted as either `uniform` or `buffer`.
+`ParameterBlock` is designed specifically for d3d/vulkan/metal, so that parameters are laid out more naturally on these platforms. For Vulkan, when a ParameterBlock doesn't contain nested parameter block fields, it always maps to a single descriptor set, with a dedicated set number and every resources is placed into the set with binding index starting from 0.
+
+When both ordinary data fields and resource typed fields exist in a parameter block, all ordinary data fields will be grouped together into a uniform buffer and appear as a binding 0 of the resulting descriptor set.
 
 
 SPIR-V specific Compiler options
@@ -110,7 +126,7 @@ Generate SPIR-V output directly (default)
 It cannot be used with -emit-spirv-via-glsl
 
 ### -emit-spirv-via-glsl
-Generate SPIR-V output by compiling generated GLSL with glslang
+Generate SPIR-V output by compiling to glsl source first, then use glslang compiler to produce SPIRV from the glsl.
 It cannot be used with -emit-spirv-directly
 
 ### -g
@@ -119,9 +135,7 @@ When targeting SPIR-V, this option emits [SPIR-V NonSemantic Shader DebugInfo In
 
 ### -O<optimization-level>
 Set the optimization level.
-When targeting SPIR-V, this option applies to the downstream compiler.
-"-O0" option can help to identify issues when the problem is from the optimization step of the downstream compiler.
-Compared to the macro inlining, the specialization helps debugging with "-O0" option, because the specialization preserves the code structure much more than the macro inlining.
+Under `-O0` option, Slang will not perform extensive inlining for all functions calls, instead it will preserve the call graph as much as possible to help with understanding the SPIRV structure and diagnosing any downstream toolchain issues.
 
 ### -fvk-{b|s|t|u}-shift <N> <space>
 For example '-fvk-b-shift <N> <space>' shifts by N the inferred binding
@@ -140,8 +154,6 @@ It lets you specify the descriptor for the source at a certain register.
 
 ### -fvk-use-scalar-layout, -force-glsl-scalar-layout
 Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV.
-These options will be applied globally.
-If you need to apply a different buffer layout for indivisual StructuredBuffer, you can specify the layout as a second generic argument to StructuredBuffer. E.g., StructuredBuffer<T, Std140Layout>
 
 ### -fvk-use-gl-layout
 Use std430 layout instead of D3D buffer layout for raw buffer load/stores.
@@ -192,78 +204,69 @@ It will generate the following GLSL or SPIR-V code.
 Same as `shaderRecordEXT` layout qualifier in [GL_EXT_ray_tracing extension](https://github.com/KhronosGroup/GLSL/blob/main/extensions/ext/GLSL_EXT_ray_tracing.txt).
 It can be used on a buffer block that represents a buffer within a shader record as defined in the Ray Tracing API.
 
-### [vk::aliased_pointer]
-When two memory pointers point to a same memory location, they are considered `aliased`. Compiler needs to be informed of such cases in order to generate the code that produces a consistant outcome. Slang can figure out whether a pointer needs to be treated as aliased or not, but you can explicitly mark a variable as aliased.
-
-### [vk::restrict_pointer]
-Opposite to [vk::aliased_pointer] in a way that it tells the compiler to treat the variable as not-aliased.
-
-### [vk::spirv_instruction(op : int, set : String = "")]
-When applied to a function, the function will use the `op` value corresponding to a SPIR-V instruction. You can also specify which instruction set you want to use as a second argument. E.G., `[[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]`
-
 
 Multiple entry points support
 -----------------------------
 
-Slang supports mutiple entry points when targeting SPIR-V.
-It is same to HLSL and SPIR-V that allows a shader source to have multiple entry points.
-Note that GLSL requires the entry point to be named, "main", and a shader source can have only one entry point.
+To use multiple entry points, you will need to use a compiler option, `-fvk-use-entrypoint-name`.
+
+Because GLSL requires the entry point to be named, "main", a GLSL shader can have only one entry point.
+The default behavior of Slang is to rename all entry points to "main" when targeting SPIR-V.
+
+When there are more than one entry point, the default behavior will prevent a shader from having more than one entry point.
+To generate a valid SPIR-V with multiple entry points, use `-fvk-use-entrypoint-name` compiler option to disable the renaming behavior and preserve the entry point names.
 
 
 Memory pointer is experimental
 ------------------------------
 
-SPIR-V currently supports five types of `Addressing model`-s, and it can be grouped as Logical addressing model and non-local addressing model.
+Slang supports memory pointers when targetting SPIRV. See [an example and explanation](convenience-features.html#pointers-limited).
 
-The logical addressing model means that the pointers are abstract, and they have no physical size nor numeric value.
-
-The non-Logical addressing models allow physical pointers to be formed. When a pointer is declared, it is declared internally with a specific `Storage Class`.  SPIR-V has a limitation that "Pointers for one Storage Class must not be used to access objects in another Storage Class."
-
-Slang supports the Logical and non-Logical addressing models with the limitations from SPIR-V and addional limitations. See more [explanation and an example](convenience-features.html#pointers-limited).
-
-Some examples of the `Storage class` are listed below:
-- UniformConstant: is for uniform constant variables as read-only.
-- Uniform: is for uniform buffer as read-only.
-- StorageBuffer: is for UAV/structuredBuffer/ShaderStorageBuffer as read-write.
-- PhysicalStorageBuffer: same as StorageBuffer but it follows non-logical addressing model.
-- PushConstant: is for variables as read-only stored in the buffer that has `push_constant` layout.
-
-Note that only ones starting with `Physical-` follows the non-logical addressing model.
-
-
-Difference between `std140` layout and `std430` layout
-------------------------------------------------------
-
-When constant parameters are send to the shader, there are different rules applied to the alignment and paddings.
-`std140` requires alignment of 16 bytes on `struct` types and it adds padding to round up to 16 bytes for each member.
-`std430` requires a natural alignment, which means that the required alignment is same as its size.
+When a memory pointer points to a physical memory location, the pointer will be translated to a PhysicalStorageBuffer storage class in SPIRV.
+When a slang module uses a pointer, the resulting SPIRV will be using the SpvAddressingModelPhysicalStorageBuffer64 addressing mode. Modules with pointers but they don't point to a physical memory location will use SpvAddressingModelLogical addressing mode.
 
 
 Matrix type translation
 -----------------------
 
-When targeting SPIR-V, Slang assumes Row-Major matrix, which is same behavior as HLSL/DXC.
-You can change the behavior to Column-major with a compiler option, "-matrix-layout-column-major".
+TODO: Quickly summarize what DXC does as described in [HLSL to SPIR-V Feature Mapping Manual](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#appendix-a-matrix-representation) and say Slang follows the same behavior.
 
-One of frequently asked questions is that "GLSL/OpenGL uses Column-major and why Slang uses Row-major for targeting SPIR-V?"
-GLSL specification says that "Initialization of matrix values is done with constructors in column-major order", and also says "(In Matrix,) two subscripts select a column and then a row."
-Although it is considered "Column-major", when we access the matrix as 2-dimensional array, the first subscript selects "column" and not "row".
-This is effectively same to a Row-major system when the first subscript selects row and the second subscript selects column.
+TODO: Then we can go for the reasoning behind this design, in that what hlsl calls a row is what glsl will call a column. Essentially, a hlsl row or glsl column is:
+ - what matrix[i] returns.
+ - what matrices can be constructed from float3x4(v1, v2, v3), or mat3x4(v1,v2,v3).
 
-The actual difference is on the fact that the "memory layout" is in Column-major when OpenGL sends the matrix data to shader.
-When the shader reads the data from the memory, it needs to know how to handle.
-That's why you can specify `row_major` and `column_major` for uniform parameters as their `layout` qualifier in GLSL.
-By default, OpenGL sends the matrix data in Column-major layout, but it is up-to the application to decide how to layout the matrix data.
+TODO: If we map it the other way, simple operations like matrix[i] or construction will become very messy code that may lead to slower performance.
 
-For more detailed explanation, please checkout another document [a1-01-matrix-layout](a1-01-matrix-layout.md)
+TODO: The only consequence of mapping float3x4 to matrix(vector4, 3) (or mat3x4, a 3-"column"-by-4-"row" matrix in spirv terminology) is that matrix-vector and matrix-matrix multiplication operations needs to have their operand ordering swapped, which is what slang will do:
+```
+mul(m, v) ==> v*m
+```
+
+TODO: Once we talk about this, then there is the row-major and column-major layout. Note that the decision to use row-major or column-major layout has nothing to do with how the matrix type itself is defined in hlsl or spirv. It really just a data layout modifier just like std140 or std430.
+
+By default, Slang uses row-major layout as opposed to defaulting to column major layout in dxc.
+Please see more details in [a1-01-matrix-layout](a1-01-matrix-layout.md).
 
 
-Legalization (Need to use a more user friendly word)
+Legalization
 ------------
 
-TODO: We should also have sections to talk about type legalization and mention all the cases that we enable with our legalization passes.
+Legalization is a process where Slang applies slightly different approach to translate the input Slang shader to the target.
+This process allows Slang shaders to be written in a syntax that SPIR-V may not be able to achieve natively.
 
-TODO: For example, we allow using resource types in structs, we allow functions that return resource types as return type or out parameter, as long as things are statically resolvable. We allow functions that return arrays, we allow putting scalar/vector/matrix/array types directly as element type of a constant buffer or structured buffers. Make sure to go over our legalization passes to build a list of allowed things that people are unsure whether it is allowed.
+Slang allows to use opaque resource types as members of a struct.
+
+Slang allows functions that return any resource types as return type or `out` parameter as long as things are statically resolvable.
+
+Slang allows functions that return arrays.
+
+Slang allows putting scalar/vector/matrix/array types directly as element type of a constant buffer or structured buffers.
+
+When RasterizerOrder resources are used, the order of the rasterization is guaranteed by the instructions from `SPV_EXT_fragment_shader_interlock` extension.
+
+A `StructuredBuffer` with a primitive type such as `StructuredBuffer<int> v` is translated to a buffer with a struct that has the primitive type, which is more like `struct Temp { int v; }; StructuredBuffer<Temp> v;`. It is because, SPIR-V requires buffer variables to be declared within a named buffer block.
+
+When `pervertex` keyword is used, the given type for the varying input will be translated into an array of the given type whose element size is 3. It is because each triangle consists of three vertices.
 
 
 Tessellation
@@ -290,18 +293,13 @@ When targeting SPIR-V, the patch function is merged as a part of the Hull shader
 As an example, a Hull shader will be emitted as following,
 ```
 void main() {
-    // Set tessellation levels
-    if (gl_InvocationID == 0) {
-        gl_TessLevelOuter[0] = ...;
-        gl_TessLevelOuter[1] = ...;
-        gl_TessLevelOuter[2] = ...;
-        gl_TessLevelOuter[3] = ...;
-
-        gl_TessLevelInner[0] = ...;
-        gl_TessLevelInner[1] = ...;
+    ...
+    main(patch, gl_InvocationID);
+    barrier();
+    if (gl_InvocationID == 0)
+    {
+        constants(path);
     }
-
-    out_POSITION[gl_InvocationID] = in_POSITION[gl_InvocationID];
 }
 ```
 
