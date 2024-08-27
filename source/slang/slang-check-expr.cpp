@@ -2693,6 +2693,39 @@ namespace Slang
             return newExpr;
 
         expr->functionExpr = CheckTerm(expr->functionExpr);
+
+        if (auto baseType = as<DeclRefType>(expr->functionExpr->type))
+        {
+            // If callee is a value of DeclRefType, then it is a functor.
+            // We need to look for `operator()` member within the type and
+            // call that instead.
+            auto operatorName = getName("__call");
+
+            LookupResult lookupResult = lookUpMember(
+                m_astBuilder,
+                this,
+                operatorName,
+                baseType,
+                m_outerScope,
+                LookupMask::Default,
+                LookupOptions::NoDeref);
+            bool diagnosed = false;
+            lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
+            if (!lookupResult.isValid())
+            {
+                if (!diagnosed)
+                    getSink()->diagnose(expr, Diagnostics::subscriptNonArray, baseType);
+                return CreateErrorExpr(expr);
+            }
+            auto callFuncExpr = createLookupResultExpr(
+                operatorName,
+                lookupResult,
+                expr->functionExpr,
+                expr->loc,
+                expr->functionExpr);
+            expr->functionExpr = callFuncExpr;
+        }
+
         m_treatAsDifferentiableExpr = treatAsDifferentiableExpr;
 
         // If we are in a differentiable function, register differential witness tables involved in
