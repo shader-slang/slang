@@ -420,7 +420,9 @@ static SlangResult runTests(UnitTestContext* context)
         "triangle",
         "shader-object",
         "ray-tracing",
-        "ray-tracing-pipeline"
+        "ray-tracing-pipeline",
+        "model-viewer",
+        "autodiff-texture"
     };
 
     SlangResult finalRes = SLANG_OK;
