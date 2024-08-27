@@ -2113,8 +2113,16 @@ extern "C"
     
     union SlangReflectionGenericArg
     {
-        SlangReflectionType* type;
-        int64_t intValue;
+        SlangReflectionType* typeVal;
+        int64_t intVal;
+        bool boolVal;
+    };
+
+    enum SlangReflectionGenericArgType
+    {
+        SLANG_GENERIC_ARG_TYPE = 0,
+        SLANG_GENERIC_ARG_INT = 1,
+        SLANG_GENERIC_ARG_BOOL = 2
     };
 
     /*
@@ -2718,12 +2726,12 @@ extern "C"
         ISlangBlob**                outDiagnostics);
     
     SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
-        SlangReflection*                 inProgramLayout,
-        SlangReflectionGeneric*          generic,
-        SlangInt                         argCount,
-        SlangReflectionVariable* const*  params,
-        SlangReflectionGenericArg const* args,
-        ISlangBlob**                     outDiagnostics);
+        SlangReflection*                        inProgramLayout,
+        SlangReflectionGeneric*                 generic,
+        SlangInt                                argCount,
+        SlangReflectionGenericArgType const*    argTypes,
+        SlangReflectionGenericArg const*        args,
+        ISlangBlob**                            outDiagnostics);
     
     SLANG_API bool spReflection_isSubType(
         SlangReflection * reflection,
@@ -2777,8 +2785,9 @@ namespace slang
     
     union GenericArgReflection
     {
-        TypeReflection* type;
+        TypeReflection* typeVal;
         int64_t intVal;
+        bool boolVal;
     };
     
     struct UserAttribute
@@ -3753,6 +3762,7 @@ namespace slang
     };
 
     typedef struct ShaderReflection ProgramLayout;
+    typedef enum SlangReflectionGenericArgType GenericArgType;
 
     struct ShaderReflection
     {
@@ -3875,7 +3885,7 @@ namespace slang
         GenericReflection* specializeGeneric(
             GenericReflection* generic,
             SlangInt specializationArgCount,
-            VariableReflection* const* specializationArgs,
+            GenericArgType const* specializationArgTypes,
             GenericArgReflection const* specializationArgVals,
             ISlangBlob** outDiagnostics)
         {
@@ -3883,7 +3893,7 @@ namespace slang
                 (SlangReflection*) this,
                 (SlangReflectionGeneric*) generic,
                 specializationArgCount,
-                (SlangReflectionVariable* const*) specializationArgs,
+                (SlangReflectionGenericArgType const*) specializationArgTypes,
                 (SlangReflectionGenericArg const*) specializationArgVals,
                 outDiagnostics);
         }

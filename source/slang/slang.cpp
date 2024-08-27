@@ -1351,7 +1351,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
 
 DeclRef<Decl> Linkage::specializeGeneric(
         DeclRef<Decl>                       declRef,
-        Dictionary<Decl*, Val*>             argMap,
+        List<Expr*>                         argExprs,
         DiagnosticSink*                     sink)
 {
     SLANG_AST_BUILDER_RAII(getASTBuilder());
@@ -1369,12 +1369,20 @@ DeclRef<Decl> Linkage::specializeGeneric(
     }
 
     auto genericDecl = as<GenericDecl>(decl);
-    auto genericDeclRef = substituteDeclRef(SubstitutionSet(declRef), getASTBuilder(), DeclRef(genericDecl));
-    genericDeclRef = createDefaultSubstitutionsIfNeeded(getASTBuilder(), &visitor, genericDeclRef).as<GenericDecl>();
+    auto genericDeclRef = createDefaultSubstitutionsIfNeeded(getASTBuilder(), &visitor, DeclRef(genericDecl)).as<GenericDecl>();
+    genericDeclRef = substituteDeclRef(SubstitutionSet(declRef), getASTBuilder(), genericDeclRef).as<GenericDecl>();
 
-    auto substSet = makeSubstitutionFromIncompleteSet(getASTBuilder(), &visitor, genericDeclRef.as<GenericDecl>(), argMap, sink);
 
-    return substituteDeclRef(substSet, getASTBuilder(), declRef);
+    DeclRefExpr* declRefExpr = getASTBuilder()->create<DeclRefExpr>();
+    declRefExpr->declRef = genericDeclRef;
+
+    GenericAppExpr* genericAppExpr = getASTBuilder()->create<GenericAppExpr>();
+    genericAppExpr->functionExpr = declRefExpr;
+    genericAppExpr->arguments = argExprs;
+
+    auto specializedDeclRef = as<DeclRefExpr>(visitor.checkGenericAppWithCheckedArgs(genericAppExpr))->declRef;
+
+    return specializedDeclRef;
 }
 
 SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(

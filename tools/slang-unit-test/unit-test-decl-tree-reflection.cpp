@@ -286,14 +286,14 @@ SLANG_UNIT_TEST(declTreeReflection)
         
         slang::GenericReflection* genericContainer = unspecializedType->getGenericContainer();
         SLANG_CHECK(genericContainer != nullptr);
-        auto typeParamT = genericContainer->getTypeParameter(0);
+        //auto typeParamT = genericContainer->getTypeParameter(0);
         
-        List<slang::VariableReflection*> params;
+        List<slang::GenericArgType> argTypes;
         List<slang::GenericArgReflection> args;
-        params.add(typeParamT);
+        argTypes.add(slang::GenericArgType::SLANG_GENERIC_ARG_TYPE);
         args.add({halfType});
         auto specializedContainer = compositeProgram->getLayout()->specializeGeneric(
-            genericContainer, params.getCount(), params.getBuffer(), args.getBuffer(), nullptr);
+            genericContainer, argTypes.getCount(), argTypes.getBuffer(), args.getBuffer(), nullptr);
         
         SLANG_CHECK(specializedContainer != nullptr);
 
@@ -318,29 +318,28 @@ SLANG_UNIT_TEST(declTreeReflection)
         SLANG_CHECK(genericStructContainer != nullptr);
 
         // Specialize the outer container with half
-        List<slang::VariableReflection*> params;
+        List<slang::GenericArgType> argTypes;
         List<slang::GenericArgReflection> args;
-        auto typeParamT = genericStructContainer->getTypeParameter(0);
-        params.add(typeParamT);
+        argTypes.add(slang::GenericArgType::SLANG_GENERIC_ARG_TYPE);
         args.add({halfType});
         auto specializedStructContainer = compositeProgram->getLayout()->specializeGeneric(
-            genericStructContainer, params.getCount(), params.getBuffer(), args.getBuffer(), nullptr);
+            genericStructContainer, argTypes.getCount(), argTypes.getBuffer(), args.getBuffer(), nullptr);
         SLANG_CHECK(specializedStructContainer != nullptr);
 
         // apply T=half. N is still left unspecialized.
         genericFuncContainer = genericFuncContainer->applySpecializations(specializedStructContainer);
 
         // Specialize the inner container with 10 separately..
-        params.clear();
+        argTypes.clear();
         args.clear();
-        auto valueParamN = genericFuncContainer->getValueParameter(0);
-        params.add(valueParamN);
+
         slang::GenericArgReflection argN;
         argN.intVal = 10;
+        argTypes.add(slang::GenericArgType::SLANG_GENERIC_ARG_INT);
         args.add(argN);
 
         auto specializedFuncContainer = compositeProgram->getLayout()->specializeGeneric(
-            genericFuncContainer, params.getCount(), params.getBuffer(), args.getBuffer(), nullptr);
+            genericFuncContainer, argTypes.getCount(), argTypes.getBuffer(), args.getBuffer(), nullptr);
 
         auto specializedFunc = unspecializedFunc->applySpecializations(specializedFuncContainer);
         SLANG_CHECK(specializedFunc != nullptr);

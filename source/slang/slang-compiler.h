@@ -2165,8 +2165,8 @@ namespace Slang
         void setFileSystem(ISlangFileSystem* fileSystem);
 
         DeclRef<Decl> specializeGeneric(
-            DeclRef<Decl>                       inUnspecializedGeneric,
-            Dictionary<Decl*, Val*>             argMap,
+            DeclRef<Decl>                       declRef,
+            List<Expr*>                         argExprs,
             DiagnosticSink*                     sink);
 
         DiagnosticSink::Flags diagnosticSinkFlags = 0;
@@ -2814,6 +2814,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDXIL(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;

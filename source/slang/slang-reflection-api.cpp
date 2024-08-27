@@ -3796,12 +3796,12 @@ SLANG_API  SlangReflectionType* spReflection_specializeType(
 
 
 SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
-                SlangReflection*                 inProgramLayout,
-                SlangReflectionGeneric*          generic,
-                SlangInt                         argCount,
-                SlangReflectionVariable* const*  params,
-                SlangReflectionGenericArg const* args,
-                ISlangBlob**                     outDiagnostics)
+                SlangReflection*                        inProgramLayout,
+                SlangReflectionGeneric*                 generic,
+                SlangInt                                argCount,
+                SlangReflectionGenericArgType const*    argTypes,
+                SlangReflectionGenericArg const*        args,
+                ISlangBlob**                            outDiagnostics)
 {
     auto programLayout = convert(inProgramLayout);
     auto slangGeneric = convertGenericToDeclRef(generic);
@@ -3812,30 +3812,47 @@ SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
 
-    Dictionary<Decl*, Val*> argMap;
+    List<Expr*> argExprs;
     for (SlangInt i = 0; i < argCount; ++i)
     {
-        auto param = convert(params[i]);
+        auto argType = argTypes[i];
         auto arg = args[i];
 
-        if (param.as<GenericTypeParamDecl>())
+        switch (argType)
         {
-            Type* type = convert(arg.type);
-            argMap[param.getDecl()] = type;
-        }
-        else if (param.as<GenericValueParamDecl>())
-        {
-            int64_t intVal = arg.intValue;
-            argMap[param.getDecl()] = astBuilder->getIntVal(astBuilder->getUIntType(), (IntegerLiteralValue)intVal);
-        }
-        else
-        {
-            // abort (TODO: throw a proper error)
-            return nullptr;
+            case SLANG_GENERIC_ARG_TYPE:
+            {
+                auto type = convert(arg.typeVal);
+                auto declRefType = as<DeclRefType>(type);
+                auto declRefExpr = astBuilder->create<DeclRefExpr>();
+                declRefExpr->declRef = declRefType->getDeclRef();
+                declRefExpr->type.type = astBuilder->getOrCreate<TypeType>(type);
+                argExprs.add(declRefExpr);
+                break;
+            }
+            case SLANG_GENERIC_ARG_INT:
+            {
+                auto literalExpr = astBuilder->create<IntegerLiteralExpr>();
+                literalExpr->value = args[i].intVal;
+                literalExpr->type = astBuilder->getIntType();
+                argExprs.add(literalExpr);
+                break;
+            }
+            case SLANG_GENERIC_ARG_BOOL:
+            {
+                auto literalExpr = astBuilder->create<BoolLiteralExpr>();
+                literalExpr->value = args[i].boolVal;
+                literalExpr->type = astBuilder->getBoolType();
+                argExprs.add(literalExpr);
+                break;
+            }
+            default:
+                // abort (TODO: throw a proper error)
+                return nullptr;
         }
     }
 
-    auto specialized = linkage->specializeGeneric(slangGeneric, argMap, &sink);
+    auto specialized = linkage->specializeGeneric(slangGeneric, argExprs, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
 
     return convertDeclToGeneric(specialized);
