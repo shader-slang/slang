@@ -2714,7 +2714,7 @@ namespace Slang
             if (!lookupResult.isValid())
             {
                 if (!diagnosed)
-                    getSink()->diagnose(expr, Diagnostics::subscriptNonArray, baseType);
+                    getSink()->diagnose(expr, Diagnostics::callOperatorNotFound, baseType);
                 return CreateErrorExpr(expr);
             }
             auto callFuncExpr = createLookupResultExpr(
