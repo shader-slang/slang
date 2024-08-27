@@ -180,6 +180,13 @@ namespace Slang
 
     List<Val*> getDefaultSubstitutionArgs(ASTBuilder* astBuilder, SemanticsVisitor* semantics, GenericDecl* genericDecl);
 
+    SubstitutionSet makeSubstitutionFromIncompleteSet(
+        ASTBuilder* astBuilder,
+        SemanticsVisitor* semantics,
+        DeclRef<GenericDecl> genericDeclRef,
+        Dictionary<Decl*, Val*> paramArgMap,
+        DiagnosticSink* sink);
+
     Val::OperandView<Val> findInnerMostGenericArgs(SubstitutionSet subst);
 
     ParameterDirection getParameterDirection(VarDeclBase* varDecl);
