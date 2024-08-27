@@ -25,12 +25,7 @@ struct AddressInstEliminationContext
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
             {
-                IRInst* args[] = {getValue(builder, addr->getOperand(0)), addr->getOperand(1)};
-                return builder.emitIntrinsicInst(
-                    cast<IRPtrTypeBase>(addr->getFullType())->getValueType(),
-                    (addr->getOp() == kIROp_GetElementPtr ? kIROp_GetElement : kIROp_FieldExtract),
-                    2,
-                    args);
+                return builder.emitElementExtract(getValue(builder, addr->getOperand(0)), addr->getOperand(1));
             }
         }
     }
@@ -60,7 +55,7 @@ struct AddressInstEliminationContext
         if (accessChain.getCount())
         {
             auto lastVal = builder.emitLoad(lastAddr);
-            auto update = builder.emitUpdateElement(lastVal, accessChain, val);
+            auto update = builder.emitUpdateElement(lastVal, accessChain.getArrayView(), val);
             builder.emitStore(lastAddr, update);
         }
         else

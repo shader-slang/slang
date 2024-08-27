@@ -5391,6 +5391,8 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             }
         };
 
+        LoweredValInfo result;
+
         // As required by the implementation of 'assign' and as a small
         // optimization, we will detect if the base expression has also lowered
         // into a swizzle and only return a single swizzle instead of nested
@@ -5425,7 +5427,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
                 swizzledLValue->elementIndices);
 
             context->shared->extValues.add(swizzledLValue);
-            return LoweredValInfo::swizzledLValue(swizzledLValue);
+            result = LoweredValInfo::swizzledLValue(swizzledLValue);
         }
         else if(loweredBase.flavor == LoweredValInfo::Flavor::SwizzledMatrixLValue)
         {
@@ -5445,7 +5447,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
                 swizzledLValue->elementCoords);
 
             context->shared->extValues.add(swizzledLValue);
-            return LoweredValInfo::swizzledMatrixLValue(swizzledLValue);
+            result = LoweredValInfo::swizzledMatrixLValue(swizzledLValue);
         }
         else
         {
@@ -5454,8 +5456,20 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             swizzledLValue->base = loweredBase;
             swizzledLValue->elementIndices = expr->elementIndices;
             context->shared->extValues.add(swizzledLValue);
-            return LoweredValInfo::swizzledLValue(swizzledLValue);
+            result = LoweredValInfo::swizzledLValue(swizzledLValue);
         }
+
+        // For a one-element swizzle on a tuple, we can just return the pointer to the member
+        // instead of a SwizzledLValue because they can't follow the same folding logic as
+        // vectors and matrices.
+        //
+        bool shouldUseSimpleLVal = elementCount == 1 && as<TupleType>(expr->base->type) != nullptr;
+        if (shouldUseSimpleLVal)
+        {
+            auto addr = getAddress(context, result, expr->loc);
+            return LoweredValInfo::ptr(addr);
+        }
+        return result;
     }
 };
 

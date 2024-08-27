@@ -1164,7 +1164,7 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
     auto primalVal = findOrTranscribePrimalInst(builder, origVal);
 
     IRInst* primalUpdateField =
-        builder->emitUpdateElement(primalBase, primalAccessChain, primalVal);
+        builder->emitUpdateElement(primalBase, primalAccessChain.getArrayView(), primalVal);
 
     IRInst* diffUpdateElement = nullptr;
     List<IRInst*> diffAccessChain;
@@ -1198,7 +1198,7 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
             auto primalElementType = primalVal->getDataType();
 
             diffUpdateElement = builder->emitUpdateElement(
-                diffBase, diffAccessChain, diffVal);
+                diffBase, diffAccessChain.getArrayView(), diffVal);
             builder->addPrimalElementTypeDecoration(diffUpdateElement, primalElementType);
         }
         else
@@ -1206,7 +1206,7 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
             auto primalElementType = primalVal->getDataType();
             auto zeroElementDiff = getDifferentialZeroOfType(builder, primalElementType);
             diffUpdateElement = builder->emitUpdateElement(
-                diffBase, diffAccessChain, zeroElementDiff);
+                diffBase, diffAccessChain.getArrayView(), zeroElementDiff);
             builder->addPrimalElementTypeDecoration(diffUpdateElement, primalElementType);
         }
     }

@@ -4012,7 +4012,7 @@ namespace Slang
             {
                 types.add(baseTupleType->getMember(index));
             }
-            swizExpr->type = QualType(m_astBuilder->getTupleType(types));
+            swizExpr->type = QualType(m_astBuilder->getTupleType(types.getArrayView()));
         }
 
         // A swizzle can be used as an l-value as long as there
@@ -4862,7 +4862,7 @@ namespace Slang
         types.reserve(expr->members.getCount());
         for(auto t : expr->members)
             types.add(t.type);
-        auto tupleType = m_astBuilder->getTupleType(types);
+        auto tupleType = m_astBuilder->getTupleType(types.getArrayView());
         expr->type = m_astBuilder->getTypeType(tupleType);
 
         return expr;

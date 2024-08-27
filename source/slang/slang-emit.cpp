@@ -718,6 +718,8 @@ Result linkAndOptimizeIR(
     stripAutoDiffDecorations(irModule);
 
     finalizeSpecialization(irModule);
+    
+    lowerTuples(irModule, sink);
 
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
