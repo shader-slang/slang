@@ -419,7 +419,8 @@ static SlangResult runTests(UnitTestContext* context)
         "cpu-hello-world",
         "triangle",
         "shader-object",
-        "ray-tracing"
+        "ray-tracing",
+        "ray-tracing-pipeline"
     };
 
     SlangResult finalRes = SLANG_OK;
