@@ -2188,12 +2188,16 @@ void releaseNullDifferentialType(AutoDiffSharedContext* context)
     {
         if (auto keepAliveDecoration = nullStruct->findDecoration<IRKeepAliveDecoration>())
             keepAliveDecoration->removeAndDeallocate();
+        if (auto exportDecoration = nullStruct->findDecoration<IRHLSLExportDecoration>())
+            exportDecoration->removeAndDeallocate();
     }
 
     if (auto nullWitness = context->nullDifferentialWitness)
     {
         if (auto keepAliveDecoration = nullWitness->findDecoration<IRKeepAliveDecoration>())
             keepAliveDecoration->removeAndDeallocate();
+        if (auto exportDecoration = nullWitness->findDecoration<IRHLSLExportDecoration>())
+            nullWitness->removeAndDeallocate();
     }
 }
 
