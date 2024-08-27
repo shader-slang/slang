@@ -560,7 +560,7 @@ namespace Slang
                         ctorToInvoke->scope = toStructDecl->ownedScope;
                         ctorToInvoke->name = getName(String(toStructDecl->getName()->text));
                         ctorToInvoke->type = toType;
-                        Expr* callee = ctorToInvoke;
+                        Expr* callee = CheckExpr(ctorToInvoke);
 
                         InvokeExpr* constructorExpr = m_astBuilder->create<InvokeExpr>();
                         constructorExpr->loc = fromInitializerListExpr->loc;
@@ -568,7 +568,7 @@ namespace Slang
                         constructorExpr->arguments.addRange(coercedArgs);
                         constructorExpr->type = toType;
 
-                        *outToExpr = CheckTerm(constructorExpr);
+                        *outToExpr = CheckInvokeExprWithCheckedOperands(constructorExpr);//ResolveInvoke(constructorExpr);
                     }
                     return true;
                 }
