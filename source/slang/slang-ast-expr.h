@@ -544,6 +544,13 @@ class OpenRefExpr : public Expr
     Expr* innerExpr = nullptr;
 };
 
+class DetachExpr : public Expr
+{
+    SLANG_AST_CLASS(DetachExpr)
+
+    Expr* inner = nullptr;
+};
+
     /// Base class for higher-order function application
     /// Eg: foo(fn) where fn is a function expression.
     ///
@@ -563,6 +570,7 @@ class DifferentiateExpr : public HigherOrderInvokeExpr
 {
     SLANG_ABSTRACT_AST_CLASS(DifferentiateExpr)
 };
+
     /// An expression of the form `__fwd_diff(fn)` to access the 
     /// forward-mode derivative version of the function `fn`
     ///
