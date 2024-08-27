@@ -224,7 +224,9 @@ When a slang module uses a pointer, the resulting SPIRV will be using the SpvAdd
 Matrix type translation
 -----------------------
 
-As an example, a Slang shader can iterate each element of a `float3x4` matrix as following,
+A m-row-by-n-column matrix in Slang, represented as float`m`x`n` or matrix<T, m, n>, is translated to OpTypeMatrix (OpTypeVector(T, n), m) in SPIRV. Note that in SPIR-V terminology, this type is referred to a m-column-by-n-row matrix.
+
+The swap of row and column terminology may seem to be confusing at first, but this is the only translation without needing extra operations that may have negative performance consequences. For example, consider the following Slang code:
 ```
 float3x4 v;
 for (int i = 0; i < 3; ++i)
@@ -235,7 +237,7 @@ for (int i = 0; i < 3; ++i)
   }
 }
 ```
-This is similar to how a multi-dimensional array is handled in C and HLSL. When a matrix type is `float3x4`, the first indexing, `i`, corresponds to the first value specified in the matrix type `3`. And the second indexing, `j`, corresponds to the second value specified in the matrix type `4`.
+The Slang shader above can iterate each element of a `float3x4` matrix. This is similar to how a multi-dimensional array is handled in C and HLSL. When a matrix type is `float3x4`, the first dimension indexing, `i`, corresponds to the first value specified in the matrix type `3`. And the second dimension indexing, `j`, corresponds to the second value specified in the matrix type `4`.
 
 A matrix in Slang can be also seen as an array of a vector type. And the following code is same as above.
 ```
@@ -261,9 +263,9 @@ An alternative way to emit SPIR-V code is to emit four vectors and each vector h
 ```
 However, this results in a more complicated access pattern to the elements in a matrix, because `v[i]` will no longer correspond to a vector natively when emitted to SPIR-V.
 
-Another way to put, Slang treats column as row and row as column when targeting GLSL or SPIR-V, although SPIR-V and GLSL use Column-major matrix. This is same to [how DXC handles a matrix when emitting SPIR-V](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#appendix-a-matrix-representation).
+Another way to put, Slang treats column as row and row as column when targeting GLSL or SPIR-V. This is same to [how DXC handles a matrix when emitting SPIR-V](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#appendix-a-matrix-representation).
 
-Due to the swap of row and column, the matrix multiplication needs to be performed little differently. Slang translates a matrix multiplication, `mul(mat1, mat2)`, to `transpose(mul(transpose(mat2), transpose(mat1)))` when targeting SPIR-V.
+Due to the swap of row and column in terminology, the matrix multiplication needs to be performed little differently. Slang translates a matrix multiplication, `mul(mat1, mat2)`, to `transpose(mul(transpose(mat2), transpose(mat1)))` when targeting SPIR-V.
 
 Note that the matrix translation explained above is orthogoal to the memory layout of a matrix. The memory layout is related to how CPU places matrix values in the memory and how GPU reads them. It is like how `std140` or `std430` works. DXC by default uses `column_major` memory layout and Slang uses row-major memory layout. For more information about the matrix memory layout, please see [a1-01-matrix-layout](a1-01-matrix-layout.md).
 
