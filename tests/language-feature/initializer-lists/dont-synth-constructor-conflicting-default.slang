@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=PASS): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
 
 struct Test
 {
@@ -12,7 +12,7 @@ struct Test
 
 RWStructuredBuffer<uint> outputBuffer;
 
-//PASS: computeMain
+//CHECK: computeMain
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)

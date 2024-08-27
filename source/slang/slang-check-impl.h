@@ -2948,6 +2948,8 @@ namespace Slang
     bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink);
     bool isDefaultInitializable(Type* varDeclType, VarDeclBase* associatedDecl);
     Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, TypeExp varDeclType, VarDeclBase* decl);
+    Expr* constructZeroInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType);
+    FuncDecl* findZeroInitListFunc(StructDecl* structDecl);
 
     DeclRefBase* _getDeclRefFromVal(Val* val);
 

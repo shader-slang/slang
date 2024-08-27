@@ -146,5 +146,47 @@ namespace Slang
             return defaultCall;
         }
     }
+
+    FuncDecl* findZeroInitListFunc(StructDecl* structDecl)
+    {
+        for (auto funcDecl : structDecl->getMembersOfType<FuncDecl>())
+        {
+            if (!funcDecl->findModifier<ZeroInitModifier>())
+                continue;
+            return funcDecl;
+        }
+        return nullptr;
+    }
+
+    Expr* constructZeroInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType)
+    {
+        SLANG_ASSERT(structDecl);
+
+        // Try to get $ZeroInit
+        if (auto zeroInitListFunc = findZeroInitListFunc(structDecl))
+        {
+            auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
+            auto member = visitor->getASTBuilder()->getMemberDeclRef(structDecl->getDefaultDeclRef(), zeroInitListFunc);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, zeroInitListFunc->loc, nullptr);
+            invoke->type = structDeclType;
+            return invoke;
+        }
+
+        // Try to get default-ctor
+        if (auto defaultCtor = _getDefaultCtor(structDecl))
+        {
+            auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
+            auto member = visitor->getASTBuilder()->getMemberDeclRef(structDecl->getDefaultDeclRef(), defaultCtor);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
+            invoke->type = structDeclType;
+            return invoke;
+        }
+
+
+        // return DefaultConstructExpr
+        auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();
+        defaultCall->type = QualType(structDeclType);
+        return defaultCall;
+    }
 }
 

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=PASS): -target hlsl -allow-glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -allow-glsl -entry computeMain -stage compute
 
 struct Test
 {
@@ -6,8 +6,7 @@ struct Test
     writeonly uint b;
 };
 
-//PASS: computeMain
-//PASS-NOT 
+//CHECK: computeMain
 
 RWStructuredBuffer<uint> outputBuffer;
 

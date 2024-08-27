@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=PASS): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
 
-//PASS: computeMain
+//CHECK: computeMain
 
 RWStructuredBuffer<uint> outputBuffer;
 

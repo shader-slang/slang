@@ -480,7 +480,7 @@ namespace Slang
                 {
                     if (outToExpr)
                     {
-                        *outToExpr = constructDefaultInitExprForVar(this, (TypeExp)toType, nullptr);
+                        *outToExpr = constructZeroInitListFunc(this, toStructDecl, toType);
                         (*outToExpr)->loc = fromInitializerListExpr->loc;
                     }
                     return true;
