@@ -37,7 +37,8 @@ void TestBase::printEntrypointHashes(int entryPointCount, int targetCount, ComPt
             composedProgram->getEntryPointHash(entryPointIndex, targetIndex, entryPointHashBlob.writeRef());
 
             Slang::StringBuilder strBuilder;
-            strBuilder << "entrypoint: "<< entryPointIndex << ", target: " << targetIndex << ", hash: ";
+            strBuilder << "callIdx: " << m_globalCounter << ", entrypoint: "<< entryPointIndex << ", target: " << targetIndex << ", hash: ";
+            m_globalCounter++;
 
             uint8_t* buffer = (uint8_t*)entryPointHashBlob->getBufferPointer();
             for (size_t i = 0; i < entryPointHashBlob->getBufferSize(); i++)

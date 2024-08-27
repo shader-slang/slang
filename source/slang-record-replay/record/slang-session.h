@@ -101,7 +101,8 @@ namespace SlangRecord
         Slang::ComPtr<slang::ISession> m_actualSession;
         uint64_t                       m_sessionHandle = 0;
 
-        Dictionary<slang::IModule*, ModuleRecorder> m_mapModuleToRecord;
+        Dictionary<slang::IModule*, ModuleRecorder*> m_mapModuleToRecord;
+        List<ComPtr<ModuleRecorder>>                m_moduleRecordersAlloation;
         RecordManager*                m_recordManager = nullptr;
     };
 }

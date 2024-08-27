@@ -21,6 +21,8 @@ using namespace gfx;
 
 static const ExampleResources resourceBase("shader-object");
 
+static TestBase testBase;
+
 // Loads the shader code defined in `shader-object.slang` for use by the `gfx` layer.
 //
 Result loadShaderProgram(
@@ -108,6 +110,11 @@ Result loadShaderProgram(
         diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     SLANG_RETURN_ON_FAIL(result);
+    if (testBase.isTestMode())
+    {
+        testBase.printEntrypointHashes(1, 1, composedProgram);
+    }
+
     slangReflection = composedProgram->getLayout();
 
     // At this point, `composedProgram` represents the shader program
@@ -124,8 +131,10 @@ Result loadShaderProgram(
 }
 
 // Main body of the example.
-int main()
+int main(int argc, char* argv[])
 {
+    testBase.parseOption(argc, argv);
+
     // Creates a `gfx` renderer, which provides the main interface for
     // interacting with the graphics API.
     Slang::ComPtr<gfx::IDevice> device;
