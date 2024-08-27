@@ -8187,6 +8187,7 @@ namespace Slang
                 defaultConstructExpr->loc = seqStmt->loc;
 
                 auto structVarDecl = m_astBuilder->create<VarDecl>();
+                addModifier(structVarDecl, m_astBuilder->create<LocalTempVarModifier>());
                 structVarDecl->type = TypeExp(structDeclType);
                 structVarDecl->initExpr = defaultConstructExpr;
                 structVarDecl->parentDecl = zeroInitListFunc;
@@ -8198,9 +8199,8 @@ namespace Slang
                 structVarDeclExpr->name = structVarDecl->getName();
                 structVarDeclExpr->loc = structVarDecl->loc;
                 structVarDeclExpr->type = GetTypeForDeclRef(structVarDecl, structVarDecl->loc);
-
                 structVarDeclExpr->type.isLeftValue = true;
-                structVarDeclExpr->scope = zeroInitListFunc->ownedScope;
+                structVarDeclExpr->scope = block->scopeDecl->ownedScope;
 
                 auto structAssignExpr = m_astBuilder->create<AssignExpr>();
                 structAssignExpr->left = structVarDeclExpr;
@@ -8215,18 +8215,9 @@ namespace Slang
                 {
                     if (auto baseStructDecl = as<StructDecl>(baseStructInfo->m_inheritanceBaseDecl))
                     {
-                        MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
-                        memberExpr->baseExpression = structVarDeclExpr;
-                        memberExpr->declRef = baseStructInfo->m_inheritanceDecl->getDefaultDeclRef();
-                        memberExpr->scope = zeroInitListFunc->ownedScope;
-                        memberExpr->loc = baseStructInfo->m_inheritanceDecl->loc;
-                        memberExpr->name = baseStructInfo->m_inheritanceDecl->getName();
-                        memberExpr->type = GetTypeForDeclRef(baseStructInfo->m_inheritanceDecl, baseStructInfo->m_inheritanceDecl->loc);
-                        auto checkedMemberVarExpr = CheckTerm(memberExpr);
-
-                        Expr* zeroInitFunc = constructZeroInitListFunc(this, baseStructDecl, DeclRefType::create(m_astBuilder, baseStructInfo->m_inheritanceDecl));
+                        Expr* zeroInitFunc = constructZeroInitListFunc(this, baseStructDecl, baseStructInfo->m_inheritanceDecl->base.type);
                         auto assign = m_astBuilder->create<AssignExpr>();
-                        assign->left = checkedMemberVarExpr;
+                        assign->left = coerce(CoercionSite::Initializer, zeroInitFunc->type, structVarDeclExpr);
                         assign->right = zeroInitFunc;
                         auto stmt = m_astBuilder->create<ExpressionStmt>();
                         stmt->expression = assign;
