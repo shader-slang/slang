@@ -453,7 +453,6 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
                     // tuple/typepack itself.
                     if (auto witnessPack = as<IRMakeWitnessPack>(witness))
                     {
-                        SLANG_ASSERT(witnessPack);
 
                         for (UInt i = 0; i < concreteType->getOperandCount(); i++)
                         {

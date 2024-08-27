@@ -41,7 +41,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     A.Differential dout = makeTuple(1.0, makeTuple(1.0, 1.0));
     
-    __bwd_diff(f)(dpa, dout);
+    bwd_diff(f)(dpa, dout);
     // CHECK: 13
     outputBuffer[0] = dpa.d._1._0; // Expect: 13
     // CHECK: 0
