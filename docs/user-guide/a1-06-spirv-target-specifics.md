@@ -54,12 +54,6 @@ Slang supports the following HLSL feature sets when targeting SPIR-V.
  - and more
 
 
-Unsupported HLSL features when targeting SPIR-V
------------------------------------------------
-
-Due to the limitations and differences on SPIR-V, there are [HLSL features known to be unsupported](https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#unsupported-hlsl-features) when targeting SPIR-V.
-
-
 Unsupported GLSL keywords when targeting SPIR-V
 -----------------------------------------------
 
@@ -84,13 +78,11 @@ GLSL 4.6 with [GLSL_EXT_shader_atomic_float2](https://github.com/KhronosGroup/GL
 SPIR-V 1.5 with [SPV_EXT_shader_atomic_float_add](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/EXT/SPV_EXT_shader_atomic_float_add.asciidoc) and [SPV_EXT_shader_atomic_float_min_max](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/EXT/SPV_EXT_shader_atomic_float_min_max.asciidoc) can use atomic operations for 32-bit float type and 64-bit float type.
 SPIR-V 1.5 with [SPV_EXT_shader_atomic_float16_add](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/EXT/SPV_EXT_shader_atomic_float16_add.asciidoc) can use atomic operations for 16-bit float type
 
-+--------+-----------------+-----------------+-----------------------+------------------+------------------+
 |        |  32-bit integer | 64-bit integer  |      32-bit float     |  64-bit float    |   16-bit float   |
-+--------+-----------------+-----------------+-----------------------+------------------+------------------+
-| HLSL   |   Yes (SM5.0)   |   Yes (SM6.6)   | Only bit-wise (SM6.6) |       No         |      No
-| GLSL   |   Yes (GL4.3)   | Yes (GL4.4+ext) |    Yes (GL4.6+ext)    | Yes (GL4.6+ext)  | Yes (GL4.6+ext)
-| SPIR-V |   Yes           |     Yes         |    Yes (SPV1.5+ext)   | Yes (SPV1.5+ext) | Yes (SPV1.5+ext)
-+--------+-----------------+-----------------+-----------------------+------------------+------------------+
+|--------|-----------------|-----------------|-----------------------|------------------|------------------|
+| HLSL   |   Yes (SM5.0)   |   Yes (SM6.6)   | Only bit-wise (SM6.6) |       No         |      No          |
+| GLSL   |   Yes (GL4.3)   | Yes (GL4.4+ext) |    Yes (GL4.6+ext)    | Yes (GL4.6+ext)  | Yes (GL4.6+ext)  |
+| SPIR-V |   Yes           |     Yes         |    Yes (SPV1.5+ext)   | Yes (SPV1.5+ext) | Yes (SPV1.5+ext) |
 
 
 ConstantBuffer, (RW)StructuredBuffer (RW)ByteAddressBuffer
