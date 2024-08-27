@@ -2701,11 +2701,14 @@ namespace Slang
             // call that instead.
             auto operatorName = getName("()");
 
+            bool needDeref = false;
+            expr->functionExpr = maybeInsertImplicitOpForMemberBase(expr->functionExpr, needDeref);
+
             LookupResult lookupResult = lookUpMember(
                 m_astBuilder,
                 this,
                 operatorName,
-                baseType,
+                expr->functionExpr->type,
                 m_outerScope,
                 LookupMask::Default,
                 LookupOptions::NoDeref);
@@ -4433,12 +4436,8 @@ namespace Slang
         return expr;
     }
 
-    Expr* SemanticsVisitor::checkBaseForMemberExpr(Expr* inBaseExpr, bool& outNeedDeref)
+    Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(Expr* baseExpr, bool& outNeedDeref)
     {
-        auto baseExpr = inBaseExpr;
-
-        baseExpr = CheckTerm(baseExpr);
-
         auto derefExpr = MaybeDereference(baseExpr);
 
         if (derefExpr != baseExpr)
@@ -4490,6 +4489,13 @@ namespace Slang
         }
 
         return baseExpr;
+    }
+
+    Expr* SemanticsVisitor::checkBaseForMemberExpr(Expr* inBaseExpr, bool& outNeedDeref)
+    {
+        auto baseExpr = inBaseExpr;
+        baseExpr = CheckTerm(baseExpr);
+        return maybeInsertImplicitOpForMemberBase(baseExpr, outNeedDeref);
     }
 
     Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType)

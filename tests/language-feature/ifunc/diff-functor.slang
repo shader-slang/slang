@@ -6,7 +6,7 @@
 struct DiffFunctor : IDifferentiableFunc<float, float>
 {
     [Differentiable]
-    float __call(float p)
+    float operator()(float p)
     {
         return p + 1;
     }
@@ -14,19 +14,19 @@ struct DiffFunctor : IDifferentiableFunc<float, float>
 
 float apply(IMutatingFunc<float, float> f, float p)
 {
-    return f.__call(p);
+    return f(p);
 }
 
 [Differentiable]
 float applyDiff(IDifferentiableFunc<float, float> f, float p)
 {
-    return f.__call(p);
+    return f(p);
 }
 
 [Differentiable]
 TR applyDiffGen<TR : IDifferentiable, each TP : IDifferentiable>(IDifferentiableFunc<TR, TP> f, expand each TP p)
 {
-    return f.__call(expand each p);
+    return f(expand each p);
 }
 
 //TEST_INPUT:ubuffer(data=[0 3 2 2], stride=4):out,name=outputBuffer
