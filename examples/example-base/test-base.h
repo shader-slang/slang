@@ -17,5 +17,6 @@ public:
     bool isTestMode() const { return m_isTestMode; }
 
 private:
-    bool m_isTestMode = false;
+    bool        m_isTestMode = false;
+    uint64_t    m_globalCounter = 0;
 };
