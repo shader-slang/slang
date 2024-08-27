@@ -224,23 +224,48 @@ When a slang module uses a pointer, the resulting SPIRV will be using the SpvAdd
 Matrix type translation
 -----------------------
 
-TODO: Quickly summarize what DXC does as described in [HLSL to SPIR-V Feature Mapping Manual](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#appendix-a-matrix-representation) and say Slang follows the same behavior.
-
-TODO: Then we can go for the reasoning behind this design, in that what hlsl calls a row is what glsl will call a column. Essentially, a hlsl row or glsl column is:
- - what matrix[i] returns.
- - what matrices can be constructed from float3x4(v1, v2, v3), or mat3x4(v1,v2,v3).
-
-TODO: If we map it the other way, simple operations like matrix[i] or construction will become very messy code that may lead to slower performance.
-
-TODO: The only consequence of mapping float3x4 to matrix(vector4, 3) (or mat3x4, a 3-"column"-by-4-"row" matrix in spirv terminology) is that matrix-vector and matrix-matrix multiplication operations needs to have their operand ordering swapped, which is what slang will do:
+As an example, a Slang shader can iterate each element of a `float3x4` matrix as following,
 ```
-mul(m, v) ==> v*m
+float3x4 v;
+for (int i = 0; i < 3; ++i)
+{
+  for (int j = 0; j < 4; ++j)
+  {
+    v[i][j] = i * 4 + j;
+  }
+}
+```
+This is similar to how a multi-dimensional array is handled in C and HLSL. When a matrix type is `float3x4`, the first indexing, `i`, corresponds to the first value specified in the matrix type `3`. And the second indexing, `j`, corresponds to the second value specified in the matrix type `4`.
+
+A matrix in Slang can be also seen as an array of a vector type. And the following code is same as above.
+```
+float3x4 v;
+for (int i = 0; i < 3; ++i)
+{
+  v[i] = float4(0, 1, 2, 3);
+  v[i] += i * 4;
+}
 ```
 
-TODO: Once we talk about this, then there is the row-major and column-major layout. Note that the decision to use row-major or column-major layout has nothing to do with how the matrix type itself is defined in hlsl or spirv. It really just a data layout modifier just like std140 or std430.
+For the given example above, when targeting SPIR-V, Slang emits a matrix that consists of three vectors each of which has four elements,
+```
+%float = OpTypeFloat 32
+%v4float = OpTypeVector %float 4 ; <= float4 type
+%mat3v4float = OpTypeMatrix %v4float 3 ; <= three of float4
+```
 
-By default, Slang uses row-major layout as opposed to defaulting to column major layout in dxc.
-Please see more details in [a1-01-matrix-layout](a1-01-matrix-layout.md).
+An alternative way to emit SPIR-V code is to emit four vectors and each vector has three elements. Slang doesn't do this but this is a more direct translation because SPIR-V spec defines OpTypeMatrix to take "Column Count" not row.
+```
+%v3float = OpTypeVector %float 3 ; <= float3 type
+%mat4v3float = OpTypeMatrix %v3float 4 ; <= four of float3
+```
+However, this results in a more complicated access pattern to the elements in a matrix, because `v[i]` will no longer correspond to a vector natively when emitted to SPIR-V.
+
+Another way to put, Slang treats column as row and row as column when targeting GLSL or SPIR-V, although SPIR-V and GLSL use Column-major matrix. This is same to [how DXC handles a matrix when emitting SPIR-V](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#appendix-a-matrix-representation).
+
+Due to the swap of row and column, the matrix multiplication needs to be performed little differently. Slang translates a matrix multiplication, `mul(mat1, mat2)`, to `transpose(mul(transpose(mat2), transpose(mat1)))` when targeting SPIR-V.
+
+Note that the matrix translation explained above is orthogoal to the memory layout of a matrix. The memory layout is related to how CPU places matrix values in the memory and how GPU reads them. It is like how `std140` or `std430` works. DXC by default uses `column_major` memory layout and Slang uses row-major memory layout. For more information about the matrix memory layout, please see [a1-01-matrix-layout](a1-01-matrix-layout.md).
 
 
 Legalization
@@ -299,7 +324,7 @@ void main() {
 }
 ```
 
-This behavior is same to how DXC translates from HLSL to SPIR-V.
+This behavior is same to [how DXC translates Hull shader from HLSL to SPIR-V](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#patch-constant-function).
 
 
 
