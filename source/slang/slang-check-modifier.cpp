@@ -587,7 +587,7 @@ namespace Slang
             {
                 // always diagnose this error since nothing can compile with an invalid capability
                 getSink()->diagnose(attr, Diagnostics::unknownCapability, capNameString);
-                return nullptr;
+                return false;
             }
         }
         else if ((as<DomainAttribute>(attr)) ||
