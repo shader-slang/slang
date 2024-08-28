@@ -126,7 +126,7 @@ public:
     SLANG_NO_THROW virtual Slice<ShaderBindingRange> SLANG_MCALL getUsedBindingRanges() = 0;
 
         /// Get the list of functions that were exported in the linked IR
-    SLANG_NO_THROW virtual Slice<UnownedStringSlice> SLANG_MCALL getExportedFunctionMangledNames() = 0;
+    SLANG_NO_THROW virtual Slice<String> SLANG_MCALL getExportedFunctionMangledNames() = 0;
 };
 
 } // namespace Slang

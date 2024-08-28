@@ -155,7 +155,7 @@ public:
     
     // IArtifactPostEmitMetadata
     SLANG_NO_THROW virtual Slice<ShaderBindingRange> SLANG_MCALL getUsedBindingRanges() SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual Slice<UnownedStringSlice> SLANG_MCALL getExportedFunctionMangledNames() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Slice<String> SLANG_MCALL getExportedFunctionMangledNames() SLANG_OVERRIDE;
 
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
@@ -163,7 +163,7 @@ public:
     static ComPtr<IArtifactPostEmitMetadata> create() { return ComPtr<IArtifactPostEmitMetadata>(new ThisType); }
 
     List<ShaderBindingRange> m_usedBindings;
-    List<UnownedStringSlice> m_exportedFunctionMangledNames;
+    List<String> m_exportedFunctionMangledNames;
 };
 
 } // namespace Slang

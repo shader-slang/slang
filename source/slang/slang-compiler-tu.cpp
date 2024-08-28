@@ -146,7 +146,7 @@ namespace Slang
         // of function name to IRInst* for later reference. After linking is done, we'll scan
         // the linked result to see which functions survived the pruning and are included in the
         // precompiled blob.
-        Dictionary<UnownedStringSlice, IRInst*> nameToFunction;
+        Dictionary<String, IRInst*> nameToFunction;
         bool hasAtLeastOneFunction = false;
         for (auto inst : module->getGlobalInsts())
         {
