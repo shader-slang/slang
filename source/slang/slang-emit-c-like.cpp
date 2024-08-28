@@ -657,7 +657,7 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     bool needParens = (prec.leftPrecedence <= outerPrec.leftPrecedence)
         || (prec.rightPrecedence <= outerPrec.rightPrecedence);
 
-    // While Slang correctly removes some of parentheses, DXC prints warnings
+    // While Slang correctly removes some of parentheses, many compilers print warnings
     // for common mistakes when parentheses are not used with certain combinations
     // of the operations. We emit parentheses to avoid the warnings.
     //
@@ -682,6 +682,12 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     // a + b << c => (a + b) << c
     else if (prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right
         && outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Shift_Left)
+    {
+        needParens = true;
+    }
+    // a + b & c => (a + b) & c
+    else if (prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right
+        && outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitAnd_Left)
     {
         needParens = true;
     }
