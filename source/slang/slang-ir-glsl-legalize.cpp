@@ -2372,9 +2372,8 @@ static void legalizeMeshOutputParam(
             else if(auto set = as<IRMeshOutputSet>(s))
             {
                 auto elemType = composeGetters<IRType>(
-                    set,
-                    &IRInst::getFullType,
-                    &IRPtrTypeBase::getValueType);
+                    set->getElementValue(),
+                    &IRInst::getFullType);
                 auto d_ = getSubscriptVal(builder, elemType, d, set->getIndex());
                 assign(builder, d_, ScalarizedVal::value(set->getElementValue()));
                 set->removeAndDeallocate();
