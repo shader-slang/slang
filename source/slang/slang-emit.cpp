@@ -1645,9 +1645,6 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             linkedIR));
         
         auto irModule = linkedIR.module;
-
-        // TODO: How to store this in the artifact?
-        this->getProgram()->linkedIRModule = irModule;
         
         // Perform final simplifications to help emit logic to generate more compact code.
         simplifyForEmit(irModule, targetRequest);

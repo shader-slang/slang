@@ -81,10 +81,10 @@ namespace Slang
     * - (DXIL) Functions that return or take a HLSLStructuredBufferType
     * - (DXIL) Functions that return or take a Matrix type
     *
-    * The linked IR corresponding to the precompiled blob is scanned for
-    * functions with TransientExportDecoration, indicating that they survived
-    * the second phase of pruning and are therefore included in the
-    * precompiled blob.
+    * emitPrecompiled* produces the output artifact containing target language
+    * blob, and as metadata, the list of functions which survived the second
+    * phase of filtering.
+    *
     * The original module IR functions matching those are then marked with
     * "AvailableIn*" (e.g. AvailableInDXILDecoration) to indicate to future
     * module users which functions are present in the precompiled blob.
@@ -174,19 +174,18 @@ namespace Slang
             return res;
         }
 
-        for (auto linkedInst : tp.getProgram()->linkedIRModule->getGlobalInsts())
+        auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(outArtifact);
+        if (!metadata)
         {
-            if (linkedInst->getOp() == kIROp_Func)
-            {
-                if (linkedInst->findDecoration<IRTransientExportDecoration>())
-                {
-                    auto mangledName = linkedInst->findDecoration<IRExportDecoration>()->getMangledName();
-                    auto moduleInst = nameToFunction[mangledName];
-                    auto moduleDec = moduleInst->findDecoration<IRTransientExportDecoration>();
-                    builder.addDecoration(moduleInst, kIROp_AvailableInDXILDecoration);
-                    moduleDec->removeAndDeallocate();
-                }
-            }
+            return SLANG_E_NOT_AVAILABLE;
+        }
+
+        for (const auto& mangledName : metadata->getExportedFunctionMangledNames())
+        {
+            auto moduleInst = nameToFunction[mangledName];
+            builder.addDecoration(moduleInst, kIROp_AvailableInDXILDecoration);
+            auto moduleDec = moduleInst->findDecoration<IRTransientExportDecoration>();
+            moduleDec->removeAndDeallocate();
         }
 
         // Finally, clean up the transient export decorations left over in the module. These are

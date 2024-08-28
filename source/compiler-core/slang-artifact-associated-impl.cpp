@@ -308,4 +308,9 @@ Slice<ShaderBindingRange> ArtifactPostEmitMetadata::getUsedBindingRanges()
     return Slice<ShaderBindingRange>(m_usedBindings.getBuffer(), m_usedBindings.getCount()); 
 }
 
+Slice<UnownedStringSlice> ArtifactPostEmitMetadata::getExportedFunctionMangledNames()
+{
+    return Slice<UnownedStringSlice>(m_exportedFunctionMangledNames.getBuffer(), m_exportedFunctionMangledNames.getCount());
+}
+
 } // namespace Slang

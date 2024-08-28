@@ -555,9 +555,6 @@ namespace Slang
             /// and parsing via Slang reflection, and is not recommended for future APIs to use.
             ///
         Scope* _getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder);
-
-        // TODO: What is proper way to get linked IR after emitPrecompiledDXIL?
-        RefPtr<IRModule> linkedIRModule;
     protected:
         ComponentType(Linkage* linkage);
 
