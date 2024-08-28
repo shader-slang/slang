@@ -48,7 +48,7 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
         auto func = as<IRFunc>(inst);
         if (func)
         {
-            if (func->findDecoration<IRTransientExportDecoration>())
+            if (func->findDecoration<IRDownstreamModuleExportDecoration>())
             {
                 auto name = func->findDecoration<IRExportDecoration>()->getMangledName();
                 outMetadata.m_exportedFunctionMangledNames.add(name);

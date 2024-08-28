@@ -796,7 +796,7 @@ Result linkAndOptimizeIR(
 
     if (codeGenContext->removeAvailableInDXIL)
     {
-        removeAvailableInDXIL(irModule);
+        removeAvailableInDownstreamModuleDecorations(irModule);
     }
 
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())

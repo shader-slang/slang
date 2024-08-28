@@ -72,7 +72,7 @@ namespace Slang
     * - Functions that define or use generics
     *
     * The functions not rejected up front are marked with
-    * TransientExportDecoration which indicates functions we're trying to
+    * DownstreamModuleExportDecoration which indicates functions we're trying to
     * export for precompilation, and this also helps to identify the functions
     * in the linked IR which survived the additional pruning.
     *
@@ -153,7 +153,7 @@ namespace Slang
             if (attemptPrecompiledExport(inst))
             {
                 hasAtLeastOneFunction = true;
-                builder.addDecoration(inst, kIROp_TransientExportDecoration);
+                builder.addDecoration(inst, kIROp_DownstreamModuleExportDecoration);
                 nameToFunction[inst->findDecoration<IRExportDecoration>()->getMangledName()] = inst;
             }
         }
@@ -184,7 +184,7 @@ namespace Slang
         {
             auto moduleInst = nameToFunction[mangledName];
             builder.addDecoration(moduleInst, kIROp_AvailableInDXILDecoration);
-            auto moduleDec = moduleInst->findDecoration<IRTransientExportDecoration>();
+            auto moduleDec = moduleInst->findDecoration<IRDownstreamModuleExportDecoration>();
             moduleDec->removeAndDeallocate();
         }
 
@@ -194,7 +194,7 @@ namespace Slang
         {
             if (moduleInst->getOp() == kIROp_Func)
             {
-                if (auto dec = moduleInst->findDecoration<IRTransientExportDecoration>())
+                if (auto dec = moduleInst->findDecoration<IRDownstreamModuleExportDecoration>())
                 {
                     dec->removeAndDeallocate();
                 }

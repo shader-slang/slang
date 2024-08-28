@@ -161,7 +161,7 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
 
 // Remove IR definitions from all [AvailableInDXIL] functions when compiling DXIL,
 // as these functions are already defined in the embedded precompiled DXIL library.
-void removeAvailableInDXIL(IRModule* module)
+void removeAvailableInDownstreamModuleDecorations(IRModule* module)
 {
     List<IRInst*> toRemove;
     for (auto globalInst : module->getGlobalInsts())

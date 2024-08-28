@@ -11,5 +11,5 @@ namespace Slang
 
     bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func);
 
-    void removeAvailableInDXIL(IRModule* module);
+    void removeAvailableInDownstreamModuleDecorations(IRModule* module);
 }

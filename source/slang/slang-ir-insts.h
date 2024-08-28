@@ -431,7 +431,7 @@ IR_SIMPLE_DECORATION(HLSLMeshPayloadDecoration)
 IR_SIMPLE_DECORATION(GlobalInputDecoration)
 IR_SIMPLE_DECORATION(GlobalOutputDecoration)
 IR_SIMPLE_DECORATION(AvailableInDXILDecoration)
-IR_SIMPLE_DECORATION(TransientExportDecoration)
+IR_SIMPLE_DECORATION(DownstreamModuleExportDecoration)
 
 struct IRGLSLLocationDecoration : IRDecoration
 {
