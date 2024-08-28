@@ -418,7 +418,7 @@ namespace Slang
     {
         for(auto entry : kStages)
         {
-            if(name == entry.name)
+            if("_" + name == entry.name)
             {
                 return entry.stage;
             }
