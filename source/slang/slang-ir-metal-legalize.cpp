@@ -549,7 +549,7 @@ namespace Slang
             }
             case SystemValueSemanticName::PrimitiveID:
             {
-                result.metalSystemValueName = toSlice("patch_id");
+                result.metalSystemValueName = toSlice("primitive_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt16));
                 break;
