@@ -172,40 +172,14 @@ def compute : stage;
 def hull : stage;
 def domain : stage;
 def geometry : stage;
-def raygen : stage;
-def intersection : stage;
-def anyhit : stage;
-def closesthit: stage;
-def miss : stage;
-def mesh : stage;
-def amplification : stage;
-def callable : stage;
-alias any_stage = vertex | fragment | compute | hull | domain | geometry 
-                 | raygen | intersection | anyhit | closesthit | miss | mesh
-                 | amplification | callable
-                 ;
-
-// shader stage alias's
-alias pixel = fragment;
-alias raygeneration = raygen;
-alias tesscontrol = hull;
-alias tesseval = domain;
-alias amplification_mesh = amplification | mesh;
-alias raytracing_stages = raygen | intersection | anyhit | closesthit | miss | callable;
-alias anyhit_closesthit = anyhit | closesthit;
-alias raygen_closesthit_miss = raygen | closesthit | miss;
-alias anyhit_closesthit_intersection = anyhit | closesthit | intersection;
-alias anyhit_closesthit_intersection_miss = anyhit | closesthit | intersection | miss;
-alias raygen_closesthit_miss_callable = raygen | closesthit | miss | callable;
-alias compute_tesscontrol_tesseval = compute | tesscontrol | tesseval;
-alias compute_fragment = compute | fragment;
-alias compute_fragment_geometry_vertex = compute | fragment | geometry | vertex;
-alias domain_hull = domain | hull;
-alias raytracingstages_fragment = raytracing_stages | fragment;
-alias raytracingstages_compute = raytracing_stages | compute;
-alias raytracingstages_compute_amplification_mesh = raytracingstages_compute | amplification_mesh;
-alias raytracingstages_compute_fragment = raytracing_stages | compute_fragment;
-alias raytracingstages_compute_fragment_geometry_vertex = raytracing_stages | compute_fragment_geometry_vertex;
+def _raygen : stage;
+def _intersection : stage;
+def _anyhit : stage;
+def _closesthit: stage;
+def _callable : stage;
+def _miss : stage;
+def _mesh : stage;
+def _amplification : stage;
 
 // SPIRV extensions.
 
@@ -403,7 +377,7 @@ alias GL_NV_shader_invocation_reorder = _GL_NV_shader_invocation_reorder + _GL_E
 alias GL_NV_shader_subgroup_partitioned = _GL_NV_shader_subgroup_partitioned | spvGroupNonUniformPartitionedNV;
 alias GL_NV_shader_texture_footprint = _GL_NV_shader_texture_footprint | spvImageFootprintNV;
 
-// Define feature names
+// Define feature names not reliant on shader stages
 
 alias nvapi = hlsl_nvapi;
 alias raytracing = GL_EXT_ray_tracing | _sm_6_3 | cuda;
@@ -413,19 +387,65 @@ alias rayquery = GL_EXT_ray_query | _sm_6_3;
 alias raytracing_motionblur =  raytracing + motionblur | cuda;
 alias ser_motion = ser + motionblur;
 alias shaderclock = GL_EXT_shader_realtime_clock | hlsl_nvapi | cpp | cuda;
-alias meshshading_internal = GL_EXT_mesh_shader | _sm_6_5 | metal;
-alias meshshading = amplification_mesh + meshshading_internal;
+alias _meshshading = GL_EXT_mesh_shader | _sm_6_5 | metal;
 alias fragmentshaderinterlock = _GL_ARB_fragment_shader_interlock | hlsl_nvapi | spvFragmentShaderPixelInterlockEXT;
 alias atomic64 = GL_EXT_shader_atomic_int64 | _sm_6_6 | cpp | cuda;
 alias atomicfloat = GL_EXT_shader_atomic_float | _sm_6_0 + hlsl_nvapi | cpp | cuda;
 alias atomicfloat2 = GL_EXT_shader_atomic_float2 | _sm_6_6 + hlsl_nvapi | cpp | cuda;
 alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
 alias shadermemorycontrol = glsl | _spirv_1_0 | _sm_5_0;
-alias shadermemorycontrol_compute = raytracingstages_compute + shadermemorycontrol;
-alias subpass = fragment + _sm_6_0 | fragment + any_gfx_target;
 alias waveprefix = _sm_6_5 | _cuda_sm_7_0 | GL_KHR_shader_subgroup_arithmetic;
 alias bufferreference = GL_EXT_buffer_reference;
 alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmetic_types_int64;
+
+// non-internal shader stages
+
+alias pixel = fragment;
+
+alias tesscontrol = hull;
+alias tesseval = domain;
+
+alias _raygeneration = _raygen;
+alias raygen = _raygen + raytracing;
+alias raygeneration = _raygeneration + raytracing;
+alias intersection = _intersection + raytracing;
+alias anyhit = _anyhit + raytracing;
+alias closesthit = _closesthit + raytracing;
+alias callable = _callable + raytracing;
+alias miss = _miss + raytracing;
+
+alias mesh = _mesh + _meshshading;
+alias amplification = _amplification + _meshshading;
+
+// shader stage groups
+
+alias any_stage = vertex | fragment | compute | hull | domain | geometry 
+                 | raygen | intersection | anyhit | closesthit | miss | mesh
+                 | amplification | callable
+                 ;
+alias amplification_mesh = amplification | mesh;
+alias raytracing_stages = raygen | intersection | anyhit | closesthit | miss | callable;
+alias anyhit_closesthit = anyhit | closesthit;
+alias raygen_closesthit_miss = raygen | closesthit | miss;
+alias anyhit_closesthit_intersection = anyhit | closesthit | intersection;
+alias anyhit_closesthit_intersection_miss = anyhit | closesthit | intersection | miss;
+alias raygen_closesthit_miss_callable = raygen | closesthit | miss | callable;
+alias compute_tesscontrol_tesseval = compute | tesscontrol | tesseval;
+alias compute_fragment = compute | fragment;
+alias compute_fragment_geometry_vertex = compute | fragment | geometry | vertex;
+alias domain_hull = domain | hull;
+alias raytracingstages_fragment = raytracing_stages | fragment;
+alias raytracingstages_compute = raytracing_stages | compute;
+alias raytracingstages_compute_amplification_mesh = raytracingstages_compute | amplification_mesh;
+alias raytracingstages_compute_fragment = raytracing_stages | compute_fragment;
+alias raytracingstages_compute_fragment_geometry_vertex = raytracing_stages | compute_fragment_geometry_vertex;
+
+// Define feature names reliant on shader stages
+
+alias meshshading = amplification_mesh + _meshshading;
+
+alias shadermemorycontrol_compute = raytracingstages_compute + shadermemorycontrol;
+alias subpass = fragment + _sm_6_0 | fragment + any_gfx_target;
 
 // Define what each shader model means on different targets.
 
