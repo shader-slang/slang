@@ -387,7 +387,7 @@ alias rayquery = GL_EXT_ray_query | _sm_6_3;
 alias raytracing_motionblur =  raytracing + motionblur | cuda;
 alias ser_motion = ser + motionblur;
 alias shaderclock = GL_EXT_shader_realtime_clock | hlsl_nvapi | cpp | cuda;
-alias meshshading_internal = GL_EXT_mesh_shader | _sm_6_5 | metal;
+alias _meshshading = GL_EXT_mesh_shader | _sm_6_5 | metal;
 alias fragmentshaderinterlock = _GL_ARB_fragment_shader_interlock | hlsl_nvapi | spvFragmentShaderPixelInterlockEXT;
 alias atomic64 = GL_EXT_shader_atomic_int64 | _sm_6_6 | cpp | cuda;
 alias atomicfloat = GL_EXT_shader_atomic_float | _sm_6_0 + hlsl_nvapi | cpp | cuda;
@@ -414,8 +414,8 @@ alias closesthit = _closesthit + raytracing;
 alias callable = _callable + raytracing;
 alias miss = _miss + raytracing;
 
-alias mesh = _mesh + meshshading_internal;
-alias amplification = _amplification + meshshading_internal;
+alias mesh = _mesh + _meshshading;
+alias amplification = _amplification + _meshshading;
 
 // shader stage groups
 
@@ -442,7 +442,7 @@ alias raytracingstages_compute_fragment_geometry_vertex = raytracing_stages | co
 
 // Define feature names reliant on shader stages
 
-alias meshshading = amplification_mesh + meshshading_internal;
+alias meshshading = amplification_mesh + _meshshading;
 
 alias shadermemorycontrol_compute = raytracingstages_compute + shadermemorycontrol;
 alias subpass = fragment + _sm_6_0 | fragment + any_gfx_target;
