@@ -1797,6 +1797,21 @@ namespace Slang
                     }
                 }
             }
+            for(auto inst : block->getChildren())
+            {
+                if(auto write = as<IRImageStore>(inst))
+                {
+                    auto originalValue = write->getValue();
+                    auto valueBaseType = originalValue->getDataType();
+                    auto valueVectorType = as<IRVectorType>(valueBaseType);
+                    auto fourComponentVectorType = builder.getVectorType(valueVectorType->getElementType(), 4);
+                    List<IRInst*> components;
+                    
+                    builder.setInsertBefore(write);
+                    builder.emitMakeVector(fourComponentVectorType, components);
+                    assert(valueVectorType);
+                }
+            }
         }
     }
 
