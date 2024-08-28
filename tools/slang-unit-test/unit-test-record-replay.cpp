@@ -37,6 +37,7 @@ static SlangResult createProcess(UnitTestContext* context, const char* processNa
 
 struct entryHashInfo
 {
+    int64_t callIdx = -1;
     int64_t targetIndex = -1;
     int64_t entryPointIndex = -1;
     String hash;
@@ -60,7 +61,7 @@ static SlangResult parseHashes(List<String> const& lines, List<entryHashInfo>& o
         }
         StringUtil::split(UnownedStringSlice(line.getBuffer() + skipCharacters), ',', tokens);
 
-        if (tokens.getCount() != 3)
+        if (tokens.getCount() != 4)
         {
             return SLANG_FAIL;
         }
@@ -83,7 +84,7 @@ static SlangResult parseHashes(List<String> const& lines, List<entryHashInfo>& o
             SLANG_RETURN_ON_FAIL(extractToken(tokens[0], ':', subToken));
             int64_t outNumer = 0;
             StringUtil::parseInt64(subToken, outNumer);
-            hashInfo.entryPointIndex = outNumer;
+            hashInfo.callIdx = outNumer;
         }
 
         {
@@ -91,12 +92,21 @@ static SlangResult parseHashes(List<String> const& lines, List<entryHashInfo>& o
             SLANG_RETURN_ON_FAIL(extractToken(tokens[1], ':', subToken));
             int64_t outNumer = 0;
             StringUtil::parseInt64(subToken, outNumer);
-            hashInfo.targetIndex = outNumer;
+            hashInfo.entryPointIndex = outNumer;
         }
 
         {
             UnownedStringSlice subToken;
             SLANG_RETURN_ON_FAIL(extractToken(tokens[2], ':', subToken));
+            int64_t outNumer = 0;
+            StringUtil::parseInt64(subToken, outNumer);
+            hashInfo.targetIndex = outNumer;
+        }
+
+        {
+            UnownedStringSlice subToken;
+            SLANG_RETURN_ON_FAIL(extractToken(tokens[3], ':', subToken));
+            // remove the white space after ":"
             hashInfo.hash = subToken.begin() + 1;
         }
 
@@ -406,7 +416,10 @@ error:
 static SlangResult runTests(UnitTestContext* context)
 {
  const char* testBinaryNames[] = {
+        "cpu-hello-world",
         "triangle",
+        "shader-object",
+        "ray-tracing"
     };
 
     SlangResult finalRes = SLANG_OK;

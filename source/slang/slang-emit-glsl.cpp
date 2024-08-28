@@ -1727,6 +1727,11 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
+        case kIROp_ControlBarrier:
+        {
+            m_writer->emit("barrier();\n");
+            return true;
+        }
         case kIROp_MakeVectorFromScalar:
         case kIROp_MatrixReshape:
         {

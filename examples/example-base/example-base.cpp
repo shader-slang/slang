@@ -34,6 +34,16 @@ Slang::Result WindowedAppBase::initializeBase(
 
     windowWidth = width;
     windowHeight = height;
+
+    IFramebufferLayout::TargetLayout renderTargetLayout = {gfx::Format::R8G8B8A8_UNORM, 1};
+    IFramebufferLayout::TargetLayout depthLayout = {gfx::Format::D32_FLOAT, 1};
+    IFramebufferLayout::Desc framebufferLayoutDesc;
+    framebufferLayoutDesc.renderTargetCount = 1;
+    framebufferLayoutDesc.renderTargets = &renderTargetLayout;
+    framebufferLayoutDesc.depthStencil = &depthLayout;
+    SLANG_RETURN_ON_FAIL(
+        gDevice->createFramebufferLayout(framebufferLayoutDesc, gFramebufferLayout.writeRef()));
+
     // Do not create swapchain and windows in test mode, because there won't be any display.
     if (!isTestMode())
     {
@@ -64,17 +74,7 @@ Slang::Result WindowedAppBase::initializeBase(
         gSwapchain = gDevice->createSwapchain(swapchainDesc, windowHandle);
         createSwapchainFramebuffers();
     }
-
-    IFramebufferLayout::TargetLayout renderTargetLayout = {gfx::Format::R8G8B8A8_UNORM, 1};
-    IFramebufferLayout::TargetLayout depthLayout = {gfx::Format::D32_FLOAT, 1};
-    IFramebufferLayout::Desc framebufferLayoutDesc;
-    framebufferLayoutDesc.renderTargetCount = 1;
-    framebufferLayoutDesc.renderTargets = &renderTargetLayout;
-    framebufferLayoutDesc.depthStencil = &depthLayout;
-    SLANG_RETURN_ON_FAIL(
-        gDevice->createFramebufferLayout(framebufferLayoutDesc, gFramebufferLayout.writeRef()));
-
-    if (isTestMode())
+    else
     {
         createOfflineFramebuffers();
     }

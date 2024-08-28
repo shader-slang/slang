@@ -54,7 +54,10 @@ namespace SlangRecord
         template <typename T>
         static size_t decodeValueArray(const uint8_t* buffer, int64_t bufferSize, ValueDecoder<T>* valueArray, size_t count)
         {
-            SLANG_RECORD_ASSERT((buffer != nullptr) && (bufferSize > 0));
+            if (count == 0 && bufferSize == 0)
+            {
+                return 0;
+            }
 
             size_t readByte = 0;
             for (size_t i = 0; i < count; ++i)
@@ -66,6 +69,10 @@ namespace SlangRecord
 
         static size_t decodeStringArray(const uint8_t* buffer, int64_t bufferSize, char** outputArray, size_t count)
         {
+            if (count == 0 && bufferSize == 0)
+            {
+                return 0;
+            }
             SLANG_RECORD_ASSERT((buffer != nullptr) && (bufferSize > 0));
 
             size_t readByte = 0;
@@ -83,6 +90,10 @@ namespace SlangRecord
         template <typename T>
         static size_t decodeStructArray(const uint8_t* buffer, int64_t bufferSize, T* outputArray, size_t count)
         {
+            if (count == 0 && bufferSize == 0)
+            {
+                return 0;
+            }
             SLANG_RECORD_ASSERT((buffer != nullptr) && (bufferSize > 0));
 
             size_t bufferRead = 0;
@@ -97,6 +108,10 @@ namespace SlangRecord
 
         static size_t decodeAddressArray(const uint8_t* buffer, int64_t bufferSize, uint64_t* addressArray, size_t count)
         {
+            if (count == 0 && bufferSize == 0)
+            {
+                return 0;
+            }
             SLANG_RECORD_ASSERT((buffer != nullptr) && (bufferSize > 0));
 
             size_t bufferRead = 0;
