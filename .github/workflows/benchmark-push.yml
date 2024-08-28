@@ -47,11 +47,15 @@ jobs:
           python compile.py --samples 16 --target dxil --ci
       - name: Push results
         run: |
-          cp tests/mdl/benchmarks.json C:\slang-material-modules-benchmark
+          cp tools/benchmark/benchmarks.json C:\slang-material-modules-benchmark
+          ls
           echo $(Invoke-Expression "git log -1 --pretty=%s") > C:\slang-material-modules-benchmark\commit
           echo $(Invoke-Expression "git log -1 --pretty=%H") > C:\slang-material-modules-benchmark\commit-hash
           echo $(Invoke-Expression "git log -1 --pretty=%s") > C:\slang-material-modules-benchmark\current
           echo $(Invoke-Expression "git log -1 --pretty=%H") >> C:\slang-material-modules-benchmark\current
+          cd C:\slang-material-modules-benchmark
+          ls
           git add benchmarks.json current
           git commit -m "$(cat commit)" -m "https://github.com/shader-slang/slang/commit/$(cat commit-hash)"
           git log
+          git push
