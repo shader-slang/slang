@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -allow-glsl -profile sm_5_0
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -allow-glsl -stage raygeneration -profile sm_6_5
 
-// Our code does not warn here since we specify profile 'sm_5_0' and a raygen shader.
-// raygen implicitly uses "raygen + raytracing" capabilities
-//CHECK: warning 36113
+// Our code compiles here since 'raygeneration' stage implies 'raygen+raytracing' capabilities
+//CHECK-NOT: warning 36113
+//CHECK: main
 struct RayPayload
 {
     uint data;
@@ -10,7 +10,7 @@ struct RayPayload
 
 uniform RaytracingAccelerationStructure sceneBVH;
 RWStructuredBuffer<uint> outputBuffer;
-[shader("_raygen")]
+
 void main()
 {
     RayDesc ray;
