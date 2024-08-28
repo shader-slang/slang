@@ -7880,10 +7880,10 @@ namespace Slang
                     continue;
 
                 auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-                ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
-                ctorToInvoke->name = declInfo.defaultCtor->getName();
-                ctorToInvoke->loc = declInfo.defaultCtor->loc;
-                ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), structDeclInfo.defaultCtor->returnType.type);
+                ctorToInvoke->declRef = declInfo.m_defaultCtor->getDefaultDeclRef();
+                ctorToInvoke->name = declInfo.m_defaultCtor->getName();
+                ctorToInvoke->loc = declInfo.m_defaultCtor->loc;
+                ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), structDeclInfo.m_defaultCtor->returnType.type);
 
                 auto invoke = m_astBuilder->create<InvokeExpr>();
                 invoke->functionExpr = ctorToInvoke;
