@@ -697,6 +697,7 @@ struct Ptr
     __generic<TInt : __BuiltinIntegerType>
     __subscript(TInt index) -> T
     {
+        // If a 'Ptr[index]' is referred to by a '__ref', call 'kIROp_GetOffsetPtr(index)'
         __intrinsic_op($(kIROp_GetOffsetPtr))
         ref;
     }
@@ -956,25 +957,25 @@ extension Tuple<T> : IComparable
 interface IMutatingFunc<TR, each TP>
 {
     [mutating]
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 interface IFunc<TR, each TP> : IMutatingFunc<TR, expand each TP>
 {
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 interface IDifferentiableMutatingFunc<TR : IDifferentiable, each TP : IDifferentiable> : IMutatingFunc<TR, expand each TP>
 {
     [Differentiable]
     [mutating]
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 interface IDifferentiableFunc<TR : IDifferentiable, each TP : IDifferentiable> : IFunc<TR, expand each TP>, IDifferentiableMutatingFunc<TR, expand each TP>
 {
     [Differentiable]
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 __generic<T>
@@ -1459,6 +1460,8 @@ struct OutputVertices
             }
         }
         
+        //
+        // If a 'OutputVertices[index]' is referred to by a '__ref', call 'kIROp_MeshOutputRef(index)'
         [require(glsl_hlsl_spirv, meshshading)]
         __intrinsic_op($(kIROp_MeshOutputRef))
         ref;
@@ -1524,6 +1527,7 @@ struct OutputPrimitives
             }
         }
 
+        // If a 'OutputPrimitives[index]' is referred to by a '__ref', call 'kIROp_MeshOutputRef(index)'
         [require(glsl_hlsl_spirv, meshshading)]
         __intrinsic_op($(kIROp_MeshOutputRef))
         ref;
@@ -2941,8 +2945,16 @@ attribute_syntax [payload] : PayloadAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
 
+enum SideEffectBehavior
+{
+    /// Causes a warning if the method is detected to have side-effects
+    Warn = 0,
+
+    /// Suppresses the warning
+    Allow = 1
+};
 __attributeTarget(FunctionDeclBase)
-attribute_syntax [PreferRecompute] : PreferRecomputeAttribute;
+attribute_syntax[PreferRecompute(behavior: SideEffectBehavior = SideEffectBehavior.Warn)] : PreferRecomputeAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
