@@ -45,8 +45,7 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
     // and exported functions.
     for (const auto& inst : irModule->getGlobalInsts())
     {
-        auto func = as<IRFunc>(inst);
-        if (func)
+        if (auto func = as<IRFunc>(inst))
         {
             if (func->findDecoration<IRDownstreamModuleExportDecoration>())
             {

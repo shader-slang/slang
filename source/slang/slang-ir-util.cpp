@@ -248,7 +248,7 @@ bool isSimpleHLSLDataType(IRInst* inst)
 {
     // TODO: Add criteria
     // https://github.com/shader-slang/slang/issues/4792
-    (void)inst; // avoid unused param error
+    SLANG_UNUSED(inst);
     return true;
 }
 
