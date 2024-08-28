@@ -20,9 +20,3 @@ public int resource_in_struct_parameter(ResourceStruct rs)
 {
     return rs.buffer[0];
 }
-
-public StructuredBuffer<int> returns_resource()
-{
-    StructuredBuffer<int> buffer;
-    return buffer;
-}
