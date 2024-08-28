@@ -188,16 +188,14 @@ namespace Slang
             if(((UInt)options & (UInt)ConstructZeroInitListOptions::CheckToAvoidRecursion))
             {
                 auto callingScope = visitor->getOuterScope();
-                if (callingScope)
+                while (callingScope)
                 {
-                    do
+                    if (callingScope->containerDecl == defaultCtor)
                     {
-                        if (callingScope->containerDecl == defaultCtor)
-                        {
-                            canCreateCtor = false;
-                            break;
-                        }
-                    } while (callingScope = callingScope->parent);
+                        canCreateCtor = false;
+                        break;
+                    }
+                    callingScope = callingScope->parent;
                 }
             }
             if(canCreateCtor)
