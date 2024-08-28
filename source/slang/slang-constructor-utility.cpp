@@ -158,9 +158,50 @@ namespace Slang
         return nullptr;
     }
 
-    Expr* constructZeroInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType)
+    Expr* _constructZeroInitListFuncMakeDefaultCtorInvoke(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructorDecl* defaultCtor)
+    {
+            auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
+            auto member = visitor->getASTBuilder()->getMemberDeclRef(structDecl->getDefaultDeclRef(), defaultCtor);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
+            invoke->type = structDeclType;
+            return invoke;
+    }
+    Expr* constructZeroInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructZeroInitListOptions options)
     {
         SLANG_ASSERT(structDecl);
+
+        // 1. Prefer non-synth default-ctor 
+        //  * Skip this option if `ConstructZeroInitListOptions::PreferZeroInitFunc` is true
+        //  * Skip this option if `ConstructZeroInitListOptions::CheckToAvoidRecursion` detects recursion
+        //      * Only user-defined ctor will try and have recursion of `{}`
+        // 2. Prefer $ZeroInit
+        // 3. Prefer any default-ctor
+        // 4. Use `DefaultConstructExpr`
+
+        auto defaultCtor = _getDefaultCtor(structDecl);
+        if(defaultCtor
+            && !defaultCtor->containsOption(ConstructorTags::Synthesized)
+            && !((UInt)options & (UInt)ConstructZeroInitListOptions::PreferZeroInitFunc))
+        {
+            bool canCreateCtor = true;
+            if(((UInt)options & (UInt)ConstructZeroInitListOptions::CheckToAvoidRecursion))
+            {
+                auto callingScope = visitor->getOuterScope();
+                if (callingScope)
+                {
+                    do
+                    {
+                        if (callingScope->containerDecl == defaultCtor)
+                        {
+                            canCreateCtor = false;
+                            break;
+                        }
+                    } while (callingScope = callingScope->parent);
+                }
+            }
+            if(canCreateCtor)
+                return _constructZeroInitListFuncMakeDefaultCtorInvoke(visitor, structDecl, structDeclType, defaultCtor);
+        }
 
         // Try to get $ZeroInit
         if (auto zeroInitListFunc = findZeroInitListFunc(structDecl))
@@ -174,14 +215,7 @@ namespace Slang
 
         // Try to get default-ctor
         if (auto defaultCtor = _getDefaultCtor(structDecl))
-        {
-            auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
-            auto member = visitor->getASTBuilder()->getMemberDeclRef(structDecl->getDefaultDeclRef(), defaultCtor);
-            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
-            invoke->type = structDeclType;
-            return invoke;
-        }
-
+            return _constructZeroInitListFuncMakeDefaultCtorInvoke(visitor, structDecl, structDeclType, defaultCtor);
 
         // return DefaultConstructExpr
         auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();

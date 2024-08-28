@@ -8162,114 +8162,105 @@ namespace Slang
             if (destroyedDefaultCtor)
             {
                 structDecl->members.remove(structDeclInfo.m_defaultCtor);
-                if (auto zeroInitListFunc = findZeroInitListFunc(structDecl))
-                    structDecl->members.remove(zeroInitListFunc);
-
                 structDecl->invalidateMemberDictionary();
                 structDecl->buildMemberDictionary();
-
             }
         }
 
-        // Only generate '$ZeroInit' if synthisized `__init()` exists
-        if (!destroyedDefaultCtor)
+        if (auto zeroInitListFunc = findZeroInitListFunc(structDecl))
         {
-            if (auto zeroInitListFunc = findZeroInitListFunc(structDecl))
+            SLANG_ASSERT(zeroInitListFunc->getParameters().getCount() == 0);
+            SLANG_ASSERT(zeroInitListFunc->findModifier<HLSLStaticModifier>());
+
+            SLANG_ASSERT(as<BlockStmt>(zeroInitListFunc->body));
+            auto block = as<BlockStmt>(zeroInitListFunc->body);
+            SLANG_ASSERT(as<SeqStmt>(block->body));
+            auto seqStmt = as<SeqStmt>(block->body);
+
+            bool foundCudaHostModifier = false;
+
+            auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
+            defaultConstructExpr->type = structDeclType;
+            defaultConstructExpr->loc = seqStmt->loc;
+
+            auto structVarDecl = m_astBuilder->create<VarDecl>();
+            addModifier(structVarDecl, m_astBuilder->create<LocalTempVarModifier>());
+            structVarDecl->type = TypeExp(structDeclType);
+            structVarDecl->initExpr = defaultConstructExpr;
+            structVarDecl->parentDecl = zeroInitListFunc;
+            structVarDecl->loc = seqStmt->loc;
+            ensureDecl(structVarDecl, DeclCheckState::DefaultConstructorReadyForUse);
+
+            auto structVarDeclExpr = m_astBuilder->create<VarExpr>();
+            structVarDeclExpr->declRef = structVarDecl->getDefaultDeclRef();
+            structVarDeclExpr->name = structVarDecl->getName();
+            structVarDeclExpr->loc = structVarDecl->loc;
+            structVarDeclExpr->type = GetTypeForDeclRef(structVarDecl, structVarDecl->loc);
+            structVarDeclExpr->type.isLeftValue = true;
+            structVarDeclExpr->scope = block->scopeDecl->ownedScope;
+
+            auto structAssignExpr = m_astBuilder->create<AssignExpr>();
+            structAssignExpr->left = structVarDeclExpr;
+            structAssignExpr->right = defaultConstructExpr;
+            auto structAssignExprStmt = m_astBuilder->create<ExpressionStmt>();
+            structAssignExprStmt->expression = structAssignExpr;
+            structAssignExprStmt->loc = seqStmt->loc;
+            seqStmt->stmts.add(structAssignExprStmt);
+
+            // Assign $ZeroInit of inheritanceDecl
+            if (baseStructInfo)
             {
-                SLANG_ASSERT(zeroInitListFunc->getParameters().getCount() == 0);
-                SLANG_ASSERT(zeroInitListFunc->findModifier<HLSLStaticModifier>());
-
-                SLANG_ASSERT(as<BlockStmt>(zeroInitListFunc->body));
-                auto block = as<BlockStmt>(zeroInitListFunc->body);
-                SLANG_ASSERT(as<SeqStmt>(block->body));
-                auto seqStmt = as<SeqStmt>(block->body);
-
-                bool foundCudaHostModifier = false;
-
-                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
-                defaultConstructExpr->type = structDeclType;
-                defaultConstructExpr->loc = seqStmt->loc;
-
-                auto structVarDecl = m_astBuilder->create<VarDecl>();
-                addModifier(structVarDecl, m_astBuilder->create<LocalTempVarModifier>());
-                structVarDecl->type = TypeExp(structDeclType);
-                structVarDecl->initExpr = defaultConstructExpr;
-                structVarDecl->parentDecl = zeroInitListFunc;
-                structVarDecl->loc = seqStmt->loc;
-                ensureDecl(structVarDecl, DeclCheckState::DefaultConstructorReadyForUse);
-
-                auto structVarDeclExpr = m_astBuilder->create<VarExpr>();
-                structVarDeclExpr->declRef = structVarDecl->getDefaultDeclRef();
-                structVarDeclExpr->name = structVarDecl->getName();
-                structVarDeclExpr->loc = structVarDecl->loc;
-                structVarDeclExpr->type = GetTypeForDeclRef(structVarDecl, structVarDecl->loc);
-                structVarDeclExpr->type.isLeftValue = true;
-                structVarDeclExpr->scope = block->scopeDecl->ownedScope;
-
-                auto structAssignExpr = m_astBuilder->create<AssignExpr>();
-                structAssignExpr->left = structVarDeclExpr;
-                structAssignExpr->right = defaultConstructExpr;
-                auto structAssignExprStmt = m_astBuilder->create<ExpressionStmt>();
-                structAssignExprStmt->expression = structAssignExpr;
-                structAssignExprStmt->loc = seqStmt->loc;
-                seqStmt->stmts.add(structAssignExprStmt);
-
-                // Assign $ZeroInit of inheritanceDecl
-                if (baseStructInfo)
+                if (auto baseStructDecl = as<StructDecl>(baseStructInfo->m_inheritanceBaseDecl))
                 {
-                    if (auto baseStructDecl = as<StructDecl>(baseStructInfo->m_inheritanceBaseDecl))
-                    {
-                        Expr* zeroInitFunc = constructZeroInitListFunc(this, baseStructDecl, baseStructInfo->m_inheritanceDecl->base.type);
-                        auto assign = m_astBuilder->create<AssignExpr>();
-                        assign->left = coerce(CoercionSite::Initializer, zeroInitFunc->type, structVarDeclExpr);
-                        assign->right = zeroInitFunc;
-                        auto stmt = m_astBuilder->create<ExpressionStmt>();
-                        stmt->expression = assign;
-                        stmt->loc = seqStmt->loc;
-                        seqStmt->stmts.add(stmt);
-                    }
-                }
-
-                // Assign initExpr to all members
-                for (auto memberRef : membersOfStructDeclInstance)
-                {
-                    auto member = memberRef.getDecl();
-                    auto initExpr = member->initExpr;
-                    if (!initExpr)
-                        continue;
-
-                    MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
-                    memberExpr->baseExpression = structVarDeclExpr;
-                    memberExpr->declRef = member->getDefaultDeclRef();
-                    memberExpr->scope = zeroInitListFunc->ownedScope;
-                    memberExpr->loc = member->loc;
-                    memberExpr->name = member->getName();
-                    memberExpr->type = GetTypeForDeclRef(member, member->loc);
-                    auto checkedMemberVarExpr = CheckTerm(memberExpr);
-                    if (!checkedMemberVarExpr->type.isLeftValue)
-                        continue;
-
+                    Expr* zeroInitFunc = constructZeroInitListFunc(this, baseStructDecl, baseStructInfo->m_inheritanceDecl->base.type, ConstructZeroInitListOptions::PreferZeroInitFunc);
                     auto assign = m_astBuilder->create<AssignExpr>();
-                    assign->left = checkedMemberVarExpr;
-                    assign->right = initExpr;
-                    assign->loc = checkedMemberVarExpr->loc;
-
+                    assign->left = coerce(CoercionSite::Initializer, zeroInitFunc->type, structVarDeclExpr);
+                    assign->right = zeroInitFunc;
                     auto stmt = m_astBuilder->create<ExpressionStmt>();
                     stmt->expression = assign;
-                    stmt->loc = assign->loc;
-
-                    addCudaHostModifierIfRequired(zeroInitListFunc, member, foundCudaHostModifier);
+                    stmt->loc = seqStmt->loc;
                     seqStmt->stmts.add(stmt);
                 }
-
-                auto returnStmt = m_astBuilder->create<ReturnStmt>();
-                returnStmt->loc = structVarDeclExpr->loc;
-                returnStmt->expression = structVarDeclExpr;
-
-                seqStmt->stmts.add(returnStmt);
             }
-        }
 
+            // Assign initExpr to all members
+            for (auto memberRef : membersOfStructDeclInstance)
+            {
+                auto member = memberRef.getDecl();
+                auto initExpr = member->initExpr;
+                if (!initExpr)
+                    continue;
+
+                MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
+                memberExpr->baseExpression = structVarDeclExpr;
+                memberExpr->declRef = member->getDefaultDeclRef();
+                memberExpr->scope = zeroInitListFunc->ownedScope;
+                memberExpr->loc = member->loc;
+                memberExpr->name = member->getName();
+                memberExpr->type = GetTypeForDeclRef(member, member->loc);
+                auto checkedMemberVarExpr = CheckTerm(memberExpr);
+                if (!checkedMemberVarExpr->type.isLeftValue)
+                    continue;
+
+                auto assign = m_astBuilder->create<AssignExpr>();
+                assign->left = checkedMemberVarExpr;
+                assign->right = initExpr;
+                assign->loc = checkedMemberVarExpr->loc;
+
+                auto stmt = m_astBuilder->create<ExpressionStmt>();
+                stmt->expression = assign;
+                stmt->loc = assign->loc;
+
+                addCudaHostModifierIfRequired(zeroInitListFunc, member, foundCudaHostModifier);
+                seqStmt->stmts.add(stmt);
+            }
+
+            auto returnStmt = m_astBuilder->create<ReturnStmt>();
+            returnStmt->loc = structVarDeclExpr->loc;
+            returnStmt->expression = structVarDeclExpr;
+
+            seqStmt->stmts.add(returnStmt);
+        }
     }
 
     void SemanticsDeclHeaderVisitor::cloneModifiers(Decl* dest, Decl* src)
@@ -10535,44 +10526,51 @@ namespace Slang
 
     void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
     {
-        // Add an empty default-Ctor and $ZeroInit if missing.
+        // Add an empty default-ctor if missing a real default-ctor.
         ConstructorDecl* defaultCtor = nullptr;
         List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, structDecl, &defaultCtor);
         if (!defaultCtor)
         {
             defaultCtor = _createCtor(this, m_astBuilder, structDecl, {}, getDeclVisibility(structDecl));
             ctorList.add(defaultCtor);
+        }
 
-            // $ZeroInit is a synthisized static-function only used if a user does not define a 
-            // default ctor. Use of $ZeroInit is only for `{}` to avoid hacks.
-            auto zeroInitFunc = m_astBuilder->create<FuncDecl>();
-            auto ctorName = getName("$ZeroInit");
-            zeroInitFunc->ownedScope = m_astBuilder->create<Scope>();
-            zeroInitFunc->ownedScope->containerDecl = zeroInitFunc;
-            zeroInitFunc->ownedScope->parent = getScope(structDecl);
-            zeroInitFunc->parentDecl = structDecl;
-            zeroInitFunc->loc = structDecl->loc;
-            zeroInitFunc->closingSourceLoc = zeroInitFunc->loc;
-            zeroInitFunc->nameAndLoc.name = ctorName;
-            zeroInitFunc->nameAndLoc.loc = zeroInitFunc->loc;
-            zeroInitFunc->returnType.type = calcThisType(makeDeclRef(structDecl));
-            auto body = m_astBuilder->create<BlockStmt>();
-            body->scopeDecl = m_astBuilder->create<ScopeDecl>();
-            body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
-            body->scopeDecl->ownedScope->parent = getScope(zeroInitFunc);
-            body->scopeDecl->parentDecl = zeroInitFunc;
-            body->scopeDecl->loc = zeroInitFunc->loc;
-            body->scopeDecl->closingSourceLoc = zeroInitFunc->loc;
-            body->closingSourceLoc = zeroInitFunc->closingSourceLoc;
-            zeroInitFunc->body = body;
-            body->body = m_astBuilder->create<SeqStmt>();
+        {
+            if (getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance).getCount() != 0)
+            {
+                // $ZeroInit is a synthisized static-function only used In 2 cases:
+                //     1. if `{}` is used inside a `__init()`
+                //     2. if `{}` is used and a user has a 'synthisized __init()` 
+                // Use of $ZeroInit is only for functionality of `{}` to avoid hacks.
+                auto zeroInitFunc = m_astBuilder->create<FuncDecl>();
+                auto ctorName = getName("$ZeroInit");
+                zeroInitFunc->ownedScope = m_astBuilder->create<Scope>();
+                zeroInitFunc->ownedScope->containerDecl = zeroInitFunc;
+                zeroInitFunc->ownedScope->parent = getScope(structDecl);
+                zeroInitFunc->parentDecl = structDecl;
+                zeroInitFunc->loc = structDecl->loc;
+                zeroInitFunc->closingSourceLoc = zeroInitFunc->loc;
+                zeroInitFunc->nameAndLoc.name = ctorName;
+                zeroInitFunc->nameAndLoc.loc = zeroInitFunc->loc;
+                zeroInitFunc->returnType.type = calcThisType(makeDeclRef(structDecl));
+                auto body = m_astBuilder->create<BlockStmt>();
+                body->scopeDecl = m_astBuilder->create<ScopeDecl>();
+                body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
+                body->scopeDecl->ownedScope->parent = getScope(zeroInitFunc);
+                body->scopeDecl->parentDecl = zeroInitFunc;
+                body->scopeDecl->loc = zeroInitFunc->loc;
+                body->scopeDecl->closingSourceLoc = zeroInitFunc->loc;
+                body->closingSourceLoc = zeroInitFunc->closingSourceLoc;
+                zeroInitFunc->body = body;
+                body->body = m_astBuilder->create<SeqStmt>();
 
-            addAutoDiffModifiersToFunc(this, m_astBuilder, zeroInitFunc);
-            addModifier(zeroInitFunc, m_astBuilder->create<SynthesizedModifier>());
-            addModifier(zeroInitFunc, m_astBuilder->create<HLSLStaticModifier>());
-            addModifier(zeroInitFunc, m_astBuilder->create<PublicModifier>());
-            addModifier(zeroInitFunc, m_astBuilder->create<ZeroInitModifier>());
-            structDecl->addMember(zeroInitFunc);
+                addAutoDiffModifiersToFunc(this, m_astBuilder, zeroInitFunc);
+                addModifier(zeroInitFunc, m_astBuilder->create<SynthesizedModifier>());
+                addModifier(zeroInitFunc, m_astBuilder->create<HLSLStaticModifier>());
+                addModifier(zeroInitFunc, m_astBuilder->create<PublicModifier>());
+                addModifier(zeroInitFunc, m_astBuilder->create<ZeroInitModifier>());
+                structDecl->addMember(zeroInitFunc);
+            }
         }
 
         // Add an empty constructor for all combinations of visibility and access
