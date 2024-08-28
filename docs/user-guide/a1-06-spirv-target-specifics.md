@@ -317,7 +317,7 @@ HSC_OUT constants(InputPatch<VS_OUT, 4> patch)
 When targeting SPIR-V, the patch function is merged as a part of the Hull shader, because SPIR-V doesn't have a same concept as `patchconstantfunc`.
 The function used for `patchconstantfunc` should be called only once for each patch.
 
-As an example, a Hull shader will be emitted as following,
+As an example, the Hull shader above will be emitted as following,
 ```
 void main() {
     ...
