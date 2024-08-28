@@ -12,7 +12,7 @@ void aggregate(inout int v, int u)
 
 T test<T:IInteger, each U : IInteger>(T t, expand each U u)
 {
-    int v = 0;
+    int v = 1;
     expand aggregate(v, (each u).toInt());
     return t + T(v);
 }
