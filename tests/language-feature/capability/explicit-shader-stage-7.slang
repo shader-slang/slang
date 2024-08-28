@@ -3,14 +3,14 @@
 
 // Our code will stillwarn about spirv version being below 'spirv 1.3'. This is Because we are still using `Profile` internally.
 // 'Profile' is an issue which needs to be refactored out since it only stores the info in a single integer through 'profileRaw'
-//CHECK_PASS-NOT: warning 50011
+//CHECK_PASS: warning 50011
 //
 // Our code does not warn about capabilities here since we specify profile 'sm_5_0' and a 'ser_motion_raygen' shader.
 // 'ser_motion_raygen' implicitly uses "raygen + raytracing_motion + ser" capabilities.
 //CHECK_PASS: main
 
 // On the contrary, our code will warn without 'ser_motion_raygen'.
-//CHECK_WARN-NOT: warning 41012 
+//CHECK_WARN: warning 41012 
 //CHECK_WARN: warning 50011
 
 
