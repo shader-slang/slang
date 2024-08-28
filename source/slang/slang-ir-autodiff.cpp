@@ -1123,17 +1123,31 @@ IRInst* DifferentiableTypeConformanceContext::getExtractExistensialTypeWitness(
     return nullptr;
 }
 
-
 void copyCheckpointHints(IRBuilder* builder, IRGlobalValueWithCode* oldInst, IRGlobalValueWithCode* newInst)
 {
     for (auto decor = oldInst->getFirstDecoration(); decor; decor = decor->getNextDecoration())
     {
         if (auto chkHint = as<IRCheckpointHintDecoration>(decor))
         {
-            SLANG_ASSERT(chkHint->getOperandCount() == 0);
-            builder->addDecoration(newInst, chkHint->getOp());
+            cloneCheckpointHint(builder, chkHint, newInst);
         }
     }
+}
+
+void cloneCheckpointHint(IRBuilder* builder, IRCheckpointHintDecoration* chkHint, IRGlobalValueWithCode* target)
+{
+    // Grab all the operands
+    List<IRInst*> operands;
+    for (UCount operand = 0; operand < chkHint->getOperandCount(); operand++)
+    {
+        operands.add(chkHint->getOperand(operand));
+    }
+
+    builder->addDecoration(
+        target,
+        chkHint->getOp(),
+        operands.getBuffer(),
+        operands.getCount());
 }
 
 void stripDerivativeDecorations(IRInst* inst)
@@ -2095,6 +2109,46 @@ protected:
     DifferentialPairTypeBuilder     pairBuilderStorage;
 
 };
+
+void checkAutodiffPatterns(
+    TargetProgram* target,
+    IRModule*                           module,
+    DiagnosticSink*                     sink)
+{
+    SLANG_UNUSED(target);
+    
+    enum SideEffectBehavior
+    {
+        Warn = 0,
+        Allow = 1,
+    };
+
+    // For now, we have only 1 check to see if methods that have side-effects 
+    // are marked with prefer-recompute
+    // 
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(inst))
+        {
+            if (func->sourceLoc.isValid() && // Don't diagnose for synthesized functions
+                func->findDecoration<IRPreferRecomputeDecoration>() &&
+                !func->findDecoration<IRNoSideEffectDecoration>())
+            {
+                auto preferRecomputeDecor = func->findDecoration<IRPreferRecomputeDecoration>();
+                auto sideEffectBehavior = as<IRIntLit>(preferRecomputeDecor->getOperand(0))->getValue();
+
+                if (sideEffectBehavior == SideEffectBehavior::Allow)
+                    continue;
+
+                // Find function name. (don't diagnose on nameless functions)
+                if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
+                {
+                    sink->diagnose(func, Diagnostics::potentialIssuesWithPreferRecomputeOnSideEffectMethod, nameHint->getName());
+                }
+            }
+        }
+    }
+}
 
 bool processAutodiffCalls(
     TargetProgram* target,
