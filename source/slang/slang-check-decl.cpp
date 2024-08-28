@@ -7938,7 +7938,6 @@ namespace Slang
                 if (!initExpr)
                     continue;
 
-
                 MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
                 memberExpr->baseExpression = thisExpr;
                 memberExpr->declRef = varDeclBase->getDefaultDeclRef();
@@ -8000,8 +7999,6 @@ namespace Slang
                     foundCudaHostModifier = true;
                     addModifier(func, m_astBuilder->create<CudaHostAttribute>());
                 }
-                //
-
             };
 
 
@@ -8069,7 +8066,7 @@ namespace Slang
                         ctorToInvokeExpr->declRef = baseCtor->getDefaultDeclRef();
                         ctorToInvokeExpr->name = baseCtor->getName();
                         ctorToInvokeExpr->loc = baseCtor->loc;
-                        ctorToInvokeExpr->type = baseCtor->returnType.type;
+                        ctorToInvokeExpr->type = m_astBuilder->getFuncType(ArrayView<Type*>(), baseCtor->returnType.type);
 
                         auto invoke = m_astBuilder->create<InvokeExpr>();
                         invoke->functionExpr = ctorToInvokeExpr;
