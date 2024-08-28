@@ -163,7 +163,7 @@ namespace Slang
             auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
             auto member = visitor->getASTBuilder()->getMemberDeclRef(structDecl->getDefaultDeclRef(), defaultCtor);
             invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
-            invoke->type = structDeclType;
+            invoke->type = visitor->getASTBuilder()->getFuncType(ArrayView<Type*>(), structDeclType);
             return invoke;
     }
     Expr* constructZeroInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructZeroInitListOptions options)
@@ -206,9 +206,15 @@ namespace Slang
         if (auto zeroInitListFunc = findZeroInitListFunc(structDecl))
         {
             auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
-            auto member = visitor->getASTBuilder()->getMemberDeclRef(structDecl->getDefaultDeclRef(), zeroInitListFunc);
+            DeclRef<Decl> member;
+            auto declRefType = as<DeclRefType>(structDeclType);
+            if(declRefType && as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
+                member = visitor->getASTBuilder()->getMemberDeclRef(as<GenericAppDeclRef>(declRefType->getDeclRefBase()), zeroInitListFunc);
+            else
+                member = visitor->getASTBuilder()->getMemberDeclRef(structDecl, zeroInitListFunc);
+
             invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, zeroInitListFunc->loc, nullptr);
-            invoke->type = structDeclType;
+            invoke->type = visitor->getASTBuilder()->getFuncType(ArrayView<Type*>(), structDeclType);
             return invoke;
         }
 

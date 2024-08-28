@@ -568,7 +568,7 @@ namespace Slang
                         constructorExpr->arguments.addRange(coercedArgs);
                         constructorExpr->type = toType;
 
-                        *outToExpr = CheckInvokeExprWithCheckedOperands(constructorExpr);//ResolveInvoke(constructorExpr);
+                        *outToExpr = CheckInvokeExprWithCheckedOperands(constructorExpr);
                     }
                     return true;
                 }

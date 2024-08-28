@@ -8227,6 +8227,8 @@ namespace Slang
             for (auto memberRef : membersOfStructDeclInstance)
             {
                 auto member = memberRef.getDecl();
+                addCudaHostModifierIfRequired(zeroInitListFunc, member, foundCudaHostModifier);
+
                 auto initExpr = member->initExpr;
                 if (!initExpr)
                     continue;
@@ -8250,8 +8252,6 @@ namespace Slang
                 auto stmt = m_astBuilder->create<ExpressionStmt>();
                 stmt->expression = assign;
                 stmt->loc = assign->loc;
-
-                addCudaHostModifierIfRequired(zeroInitListFunc, member, foundCudaHostModifier);
                 seqStmt->stmts.add(stmt);
             }
 
