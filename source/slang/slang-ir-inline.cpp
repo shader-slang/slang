@@ -277,6 +277,17 @@ struct InliningPassBase
         if(!isDefinition(calleeFunc))
             return false;
 
+        // We cannot inline a call inside an `IRExpand`.
+        // Because this will make the cfg inside the `IRExpand` too complex,
+        // and our expand specialization logic isn't general enough to deal
+        // with that yet.
+        for (auto parent = call->getParent(); parent; parent = parent->getParent())
+        {
+            if (as<IRExpand>(parent))
+                return false;
+            if (as<IRGlobalValueWithCode>(parent))
+                break;
+        }
         return true;
     }
 
@@ -888,10 +899,16 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
             {
                 switch (inst->getOp())
                 {
+                // Avoid inlining functions that have derivative instructions.
                 case kIROp_ForwardDifferentiate:
                 case kIROp_BackwardDifferentiate:
                 case kIROp_BackwardDifferentiatePrimal:
                 case kIROp_BackwardDifferentiatePropagate:
+                    canInline = false;
+                    goto end;
+                
+                // Also avoid inlining functions with inline-asm instructions.
+                case kIROp_SPIRVAsm:
                     canInline = false;
                     goto end;
                 }

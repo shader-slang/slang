@@ -17,11 +17,6 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Verbose, "%s: %p\n", "SessionRecorder create:", session);
     }
 
-    SessionRecorder::~SessionRecorder()
-    {
-        m_actualSession->release();
-    }
-
     ISlangUnknown* SessionRecorder::getInterface(const Guid& guid)
     {
         if(guid == ISlangUnknown::getTypeGuid() || guid == ISession::getTypeGuid())
@@ -54,7 +49,7 @@ namespace SlangRecord
         slang::IModule* pModule = m_actualSession->loadModule(moduleName, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pModule);
             m_recordManager->apendOutput();
         }
@@ -83,7 +78,7 @@ namespace SlangRecord
         slang::IModule* pModule = m_actualSession->loadModuleFromIRBlob(moduleName, path, source, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pModule);
             m_recordManager->apendOutput();
         }
@@ -112,7 +107,7 @@ namespace SlangRecord
         slang::IModule* pModule = m_actualSession->loadModuleFromSource(moduleName, path, source, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pModule);
             m_recordManager->apendOutput();
         }
@@ -142,7 +137,7 @@ namespace SlangRecord
 
         {
             // TODO: Not sure if we need to record the diagnostics blob.
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pModule);
             m_recordManager->apendOutput();
         }
@@ -179,7 +174,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outCompositeComponentType);
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             m_recordManager->apendOutput();
         }
 
@@ -213,7 +208,7 @@ namespace SlangRecord
         slang::TypeReflection* pTypeReflection = m_actualSession->specializeType(type, specializationArgs, specializationArgCount, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pTypeReflection);
             m_recordManager->apendOutput();
         }
@@ -241,7 +236,7 @@ namespace SlangRecord
         slang::TypeLayoutReflection* pTypeLayoutReflection = m_actualSession->getTypeLayout(type, targetIndex, rules, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pTypeLayoutReflection);
             m_recordManager->apendOutput();
         }
@@ -267,7 +262,7 @@ namespace SlangRecord
         slang::TypeReflection* pTypeReflection = m_actualSession->getContainerType(elementType, containerType, outDiagnostics);
 
         {
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             recorder->recordAddress(pTypeReflection);
             m_recordManager->apendOutput();
         }
@@ -386,7 +381,7 @@ namespace SlangRecord
 
         {
             recorder->recordAddress(*outConformance);
-            recorder->recordAddress(*outDiagnostics);
+            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
             m_recordManager->apendOutput();
         }
 
@@ -449,8 +444,9 @@ namespace SlangRecord
 
         if (pModule)
         {
-            ModuleRecorder* moduleRecord = m_mapModuleToRecord.tryGetValue(pModule);
-            if (!moduleRecord)
+            ModuleRecorder* moduleRecord = nullptr;
+            bool ret = m_mapModuleToRecord.tryGetValue(pModule, moduleRecord);
+            if (!ret)
             {
                 SLANG_RECORD_ASSERT(!"Module not found in mapModuleToRecord");
             }
@@ -471,12 +467,13 @@ namespace SlangRecord
     ModuleRecorder* SessionRecorder::getModuleRecorder(slang::IModule* module)
     {
         ModuleRecorder* moduleRecord = nullptr;
-        moduleRecord = m_mapModuleToRecord.tryGetValue(module);
-        if (!moduleRecord)
+        bool ret = m_mapModuleToRecord.tryGetValue(module, moduleRecord);
+        if (!ret)
         {
             moduleRecord = new ModuleRecorder(module, m_recordManager);
             Slang::ComPtr<ModuleRecorder> result(moduleRecord);
-            m_mapModuleToRecord.add(module, *result.detach());
+            m_moduleRecordersAlloation.add(result);
+            m_mapModuleToRecord.add(module, result.detach());
         }
         return moduleRecord;
     }

@@ -20,7 +20,6 @@ namespace SlangRecord
         ISlangUnknown* getInterface(const Guid& guid);
 
         explicit SessionRecorder(slang::ISession* session, RecordManager* recordManager);
-        ~SessionRecorder();
 
         SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL getGlobalSession() override;
         SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModule(
@@ -102,7 +101,8 @@ namespace SlangRecord
         Slang::ComPtr<slang::ISession> m_actualSession;
         uint64_t                       m_sessionHandle = 0;
 
-        Dictionary<slang::IModule*, ModuleRecorder> m_mapModuleToRecord;
+        Dictionary<slang::IModule*, ModuleRecorder*> m_mapModuleToRecord;
+        List<ComPtr<ModuleRecorder>>                m_moduleRecordersAlloation;
         RecordManager*                m_recordManager = nullptr;
     };
 }

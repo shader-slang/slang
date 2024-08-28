@@ -191,6 +191,8 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* getArrayWitness(IRBuilder* builder, IRArrayType* pairType);
 
+    IRInst* getTupleWitness(IRBuilder* builder, IRInst* tupleType);
+
     IRInst* getExtractExistensialTypeWitness(IRBuilder* builder, IRExtractExistentialType* extractExistentialType);
 
     IRType* getOrCreateDiffPairType(IRBuilder* builder, IRInst* primalType, IRInst* witness);
@@ -239,6 +241,11 @@ struct DifferentiableTypeConformanceContext
             return builder->getArrayType(
                 diffElementType,
                 as<IRArrayType>(origType)->getElementCount());
+        }
+        case kIROp_TupleType:
+        case kIROp_TypePack:
+        {
+            return differentiateType(builder, origType);
         }
         case kIROp_DifferentialPairUserCodeType:
         {
@@ -356,6 +363,11 @@ struct IRAutodiffPassOptions
     // Nothing for now...
 };
 
+void checkAutodiffPatterns(
+    TargetProgram* target,
+    IRModule*                           module,
+    DiagnosticSink*                     sink);
+
 bool processAutodiffCalls(
     TargetProgram* target,
     IRModule*                           module,
@@ -367,6 +379,8 @@ bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module);
 // Utility methods
 
 void copyCheckpointHints(IRBuilder* builder, IRGlobalValueWithCode* oldInst, IRGlobalValueWithCode* newInst);
+
+void cloneCheckpointHint(IRBuilder* builder, IRCheckpointHintDecoration* oldInst, IRGlobalValueWithCode* code);
 
 void stripDerivativeDecorations(IRInst* inst);
 

@@ -19,6 +19,7 @@ namespace Slang
         IRDeadCodeEliminationOptions deadCodeElimOptions;
 
         bool minimalOptimization = false;
+        bool removeRedundancy = false;
 
         static IRSimplificationOptions getDefault(TargetProgram* targetProgram);
 

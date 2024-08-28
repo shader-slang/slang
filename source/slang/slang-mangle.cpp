@@ -266,6 +266,23 @@ namespace Slang
             emitType(context, andType->getLeft());
             emitType(context, andType->getRight());
         }
+        else if (auto expandType = as<ExpandType>(type))
+        {
+            emitRaw(context, "Tx");
+            emitType(context, expandType->getPatternType());
+        }
+        else if (auto eachType = as<EachType>(type))
+        {
+            emitRaw(context, "Te");
+            emitType(context, eachType->getElementType());
+        }
+        else if (auto typePack = as<ConcreteTypePack>(type))
+        {
+            emitRaw(context, "Tp");
+            emit(context, typePack->getTypeCount());
+            for (Index i = 0; i < typePack->getTypeCount(); i++)
+                emitType(context, typePack->getElementType(i));
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in type mangling");
@@ -492,6 +509,10 @@ namespace Slang
                     {
                         genericParameterCount++;
                     }
+                    else if (mm.is<GenericTypePackParamDecl>())
+                    {
+                        genericParameterCount++;
+                    }
                     else
                     {
                     }
@@ -499,12 +520,16 @@ namespace Slang
 
                 emit(context, genericParameterCount);
 
-                OrderedDictionary<GenericTypeParamDecl*, List<Type*>> genericConstraints;
+                OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> genericConstraints;
                 for (auto mm : getMembers(context->astBuilder, parentGenericDeclRef))
                 {
                     if (auto genericTypeParamDecl = mm.as<GenericTypeParamDecl>())
                     {
                         emitRaw(context, "T");
+                    }
+                    if (auto genericTypePackParamDecl = mm.as<GenericTypePackParamDecl>())
+                    {
+                        emitRaw(context, "TP");
                     }
                     else if (auto genericValueParamDecl = mm.as<GenericValueParamDecl>())
                     {
@@ -583,6 +608,48 @@ namespace Slang
             {
                 emitType(context, getResultType(context->astBuilder, callableDeclRef));
             }
+
+            // Include key modifiers in the mangled name so we never deduplicate
+            // things like a nonmutating method and a mutating method.
+            bool isMutating = false;
+            bool isRefThis = false;
+            bool isFwdDiff = false;
+            bool isBwdDiff = false;
+            bool isNoDiffThis = false;
+            for (auto modifier : callableDeclRef.getDecl()->modifiers)
+            {
+                if (as<MutatingAttribute>(modifier))
+                {
+                    isMutating = true;
+                }
+                else if (as<RefAttribute>(modifier))
+                {
+                    isRefThis = true;
+                }
+                else if (as<ForwardDifferentiableAttribute>(modifier))
+                {
+                    isFwdDiff = true;
+                }
+                else if (as<BackwardDifferentiableAttribute>(modifier))
+                {
+                    isBwdDiff = true;
+                }
+                else if (as<NoDiffThisAttribute>(modifier))
+                {
+                    isNoDiffThis = true;
+                }
+            }
+
+            if (isMutating)
+                emitRaw(context, "m");
+            if (isRefThis)
+                emitRaw(context, "r");
+            if (isFwdDiff)
+                emitRaw(context, "f");
+            if (isBwdDiff)
+                emitRaw(context, "b");
+            if (isNoDiffThis)
+                emitRaw(context, "n");
         }
     }
 
