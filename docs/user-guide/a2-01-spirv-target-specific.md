@@ -1,6 +1,6 @@
 ---
 layout: user-guide
-permalink: /user-guide/target-specifics
+permalink: /user-guide/spirv-target-specific
 ---
 
 SPIR-V specific functionalities
