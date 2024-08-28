@@ -26,11 +26,49 @@ Sampler2D explicitBindingSampler : register(t4): register(s3);
 ```
 
 
-`SV_*` semantics
+System-Value semantics
 ----------------
 
-TODO : we need to document how every SV_ semantic are translated to spirv builtins.
-In addition, we added spirv specific system semantics like SV_PointSize.
+The system-value semantics are translated to the following SPIR-V code.
+
+TODO: Found a similar page on [DXC document](https://github.com/microsoft/DirectXShaderCompiler/blob/b766b432678cf5f7a93567d253bb5f7fd8a0b2c7/docs/SPIR-V.rst#implicit-location-number-assignment)
+
+| SV semantic name | SPIR-V code |
+|--|--|
+| SV_Barycentrics | BuiltIn BaryCoord..KHR ??TODO?? |
+| SV_ClipDistance<N> | BuiltIn ClipDistance ??TODO?? |
+| SV_CullDistance<N> | BuiltIn CullDistance ??TODO?? |
+| SV_Coverage | BuiltIn SampleMask |
+| SV_CullPrimitive | BuiltIn CullPrimitiveEXT |
+| SV_Depth | BuiltIn FragDepth |
+| SV_DepthGreaterEqual | BuiltIn FragDepth |
+| SV_DepthLessEqual | BuiltIn FragDepth |
+| SV_DispatchThreadID | BuiltIn GlobalInvocationId |
+| SV_DomainLocation | BuiltIn TessCoord |
+| SV_GSInstanceID | BuiltIn InvocationId |
+| SV_GroupID | BuiltIn WorkgroupId |
+| SV_GroupIndex | BuiltIn LocalInvocationIndex |
+| SV_GroupThreadID | BuiltIn LocalInvocationId |
+| SV_InnerCoverage | BuiltIn FullyCoveredEXT |
+| SV_InsideTessFactor | BuiltIn TessLevelInner |
+| SV_InstanceID | BuiltIn ??TODO?? |
+| SV_IntersectionAttributes | ??TODO?? |
+| SV_IsFrontFace | BuiltIn FrontFacing |
+| SV_OutputControlPointID | BuiltIn InvocationId |
+| SV_PointSize | ??TODO?? |
+| SV_Position | BuiltIn Position/FragCoord |
+| SV_PrimitiveID | BuiltIn PrimitiveId |
+| SV_RenderTargetArrayIndex | BuiltIn Layer |
+| SV_SampleIndex | BuiltIn SampleId |
+| SV_ShadingRate | BuiltIn PrimitiveShadingRateKHR |
+| SV_StartVertexLocation | Not supported |
+| SV_StartInstanceLocation | Not suported |
+| SV_StencilRef | BuiltIn FragStencilRefEXT |
+| SV_Target<N> | ??TODO?? Location |
+| SV_TessFactor | BuiltIn TessLevelOuter |
+| SV_VertexID | BuiltIn VertexIndex |
+| SV_ViewID | BuiltIn ViewIndex |
+| SV_ViewportArrayIndex | BuiltIn ViewportIndex
 
 
 Behavior of `discard` after SPIR-V 1.6
