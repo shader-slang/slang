@@ -83,7 +83,7 @@ __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
 struct ByteAddressBuffer
 {
     [__readNone]
-    [__unsafeForceInlineEarly]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer)]
     void GetDimensions(out uint dim)
     {
@@ -3071,7 +3071,10 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
             }
         }
 
-        __intrinsic_op($(kIROp_ImageSubscript)) ref;
+        // If a 'Texture[location]' is referred to by a '__ref', call 'kIROp_ImageSubscript(location)'.
+        // This allows call's to stay aware that the input is from a 'Texture'.
+        __intrinsic_op($(kIROp_ImageSubscript)) 
+        ref;
     }
 }
 
@@ -3211,7 +3214,10 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
             }
         }
 
-        __intrinsic_op($(kIROp_ImageSubscript)) ref;
+        // If a 'Texture[location, sampleIndex]' is referred to by a '__ref', call 'kIROp_ImageSubscript(location, sampleIndex)'.
+        // This allows call's to stay aware that the input is from a 'Texture'.
+        __intrinsic_op($(kIROp_ImageSubscript))
+        ref;
     }
 }
 
@@ -3839,7 +3845,7 @@ __intrinsic_type($(kIROp_HLSLStructuredBufferType))
 struct StructuredBuffer
 {
     [__readNone]
-    [__unsafeForceInlineEarly]
+    [ForceInline]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -3956,7 +3962,7 @@ struct $(item.name)
     // Note(tfoley): supports all operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
 
-    [__unsafeForceInlineEarly]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
     void GetDimensions(out uint dim)
     {
@@ -5285,7 +5291,7 @@ struct $(item.name)
     uint DecrementCounter();
 
     [__readNone]
-    [__unsafeForceInlineEarly]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
     void GetDimensions(
         out uint numStructs,
@@ -5314,6 +5320,9 @@ struct $(item.name)
     __generic<TIndex : __BuiltinIntegerType>
     __subscript(TIndex index) -> T
     {
+        // If a 'Buffer[index]' is referred to by a '__ref', call 'kIROp_RWStructuredBufferGetElementPtr(index)'.
+        //
+        // This allows call's to stay aware that the input is from a 'Buffer'.
         [__NoSideEffect]
         __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
         ref;
@@ -15420,6 +15429,8 @@ ${{{{
                 }
             }
 
+            // If a 'Texture[index]' is referred to by a '__ref', call 'kIROp_ImageSubscript(index)'.
+            // This allows call's to stay aware that the input is from a 'Texture'.
             __intrinsic_op($(kIROp_ImageSubscript))
             ref;
 ${{{{

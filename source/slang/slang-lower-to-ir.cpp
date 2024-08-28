@@ -10203,9 +10203,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addDecoration(irFunc, kIROp_PreferCheckpointDecoration);
             }
-            else if (as<PreferRecomputeAttribute>(modifier))
+            else if (auto attr = as<PreferRecomputeAttribute>(modifier))
             {
-                getBuilder()->addDecoration(irFunc, kIROp_PreferRecomputeDecoration);
+                getBuilder()->addDecoration(
+                    irFunc,
+                    kIROp_PreferRecomputeDecoration,
+                    getBuilder()->getIntValue(
+                        getBuilder()->getIntType(),
+                        attr->sideEffectBehavior));
             }
             else if (auto extensionMod = as<RequiredGLSLExtensionModifier>(modifier))
                 getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.getContent());
