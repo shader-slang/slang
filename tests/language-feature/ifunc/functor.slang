@@ -3,28 +3,21 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
 
-struct Functor : IFunc<int, int, bool>
+struct Functor : IMutatingFunc<float, float>
 {
-    int operator()(int p, bool t)
-    {
-        return p + 1;
-    }
-}
+    int context;
 
-struct MutatingFunctor : IMutatingFunc<int, int, bool>
-{
-    int data = 0;
     [mutating]
-    int operator()(int p, bool t)
+    float operator()(float p)
     {
-        data++;
-        return p + 1;
+        context += (int)p;
+        return context;
     }
 }
 
-int apply(IMutatingFunc<int, int, bool> f, int p)
+float apply<T:IMutatingFunc<float,float>>(inout T f, float p)
 {
-    return f(p, true);
+    return f(p);
 }
 
 //TEST_INPUT:ubuffer(data=[0 3 2 2], stride=4):out,name=outputBuffer
@@ -33,8 +26,15 @@ RWStructuredBuffer<uint> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain(uint tid: SV_DispatchThreadID)
 {
-    // CHECK: 2
-    outputBuffer[0] = apply(MutatingFunctor(), 1);
-    // CHECK: 3
-    outputBuffer[1] = apply(Functor(), 2);
+    Functor f;
+    f.context = 0;
+    
+    f(1.0f);
+    f.operator()(1.0f); // explicit operator () call should also work.
+
+    apply(f, 2.0f);
+    apply(f, 3.0f);
+
+    // CHECK: 7
+    outputBuffer[0] = (uint)f.context;
 }

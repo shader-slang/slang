@@ -870,6 +870,16 @@ namespace Slang
             else if (auto primalOfAttr = as<PrimalSubstituteOfAttribute>(attr))
                 primalOfAttr->funcExpr = attr->args[0];
         }
+        else if (auto preferRecomputeAttr = as<PreferRecomputeAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+            SLANG_ASSERT(as<Decl>(attrTarget));
+
+            auto val = checkConstantIntVal(attr->args[0]);
+            if (!val) return false;
+
+            preferRecomputeAttr->sideEffectBehavior = (PreferRecomputeAttribute::SideEffectBehavior) val->getValue();
+        }
         else if (auto comInterfaceAttr = as<ComInterfaceAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
