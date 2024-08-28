@@ -64,15 +64,15 @@ PROFILE_STAGE(Geometry, geometry,   SLANG_STAGE_GEOMETRY)
 PROFILE_STAGE(Pixel,    pixel,      SLANG_STAGE_FRAGMENT)
 PROFILE_STAGE(Compute,	compute,    SLANG_STAGE_COMPUTE)
 
-PROFILE_STAGE(RayGeneration,    _raygeneration,  SLANG_STAGE_RAY_GENERATION)
-PROFILE_STAGE(Intersection,     _intersection,   SLANG_STAGE_INTERSECTION)
-PROFILE_STAGE(AnyHit,           _anyhit,         SLANG_STAGE_ANY_HIT)
-PROFILE_STAGE(ClosestHit,       _closesthit,     SLANG_STAGE_CLOSEST_HIT)
-PROFILE_STAGE(Miss,             _miss,           SLANG_STAGE_MISS)
-PROFILE_STAGE(Callable,         _callable,       SLANG_STAGE_CALLABLE)
+PROFILE_STAGE(RayGeneration,    raygeneration,  SLANG_STAGE_RAY_GENERATION)
+PROFILE_STAGE(Intersection,     intersection,   SLANG_STAGE_INTERSECTION)
+PROFILE_STAGE(AnyHit,           anyhit,         SLANG_STAGE_ANY_HIT)
+PROFILE_STAGE(ClosestHit,       closesthit,     SLANG_STAGE_CLOSEST_HIT)
+PROFILE_STAGE(Miss,             miss,           SLANG_STAGE_MISS)
+PROFILE_STAGE(Callable,         callable,       SLANG_STAGE_CALLABLE)
 
-PROFILE_STAGE(Mesh,             _mesh,           SLANG_STAGE_MESH)
-PROFILE_STAGE(Amplification,    _amplification,  SLANG_STAGE_AMPLIFICATION)
+PROFILE_STAGE(Mesh,             mesh,           SLANG_STAGE_MESH)
+PROFILE_STAGE(Amplification,    amplification,  SLANG_STAGE_AMPLIFICATION)
 
 
 // Note: HLSL and Direct3D convention erroneously uses the term "Pixel Shader"
