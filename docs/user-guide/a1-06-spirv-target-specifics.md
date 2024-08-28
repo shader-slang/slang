@@ -11,7 +11,8 @@ This chapter provides information for SPIR-V specific functionalities and behavi
 Experimental support for the older versions of SPIR-V
 -----------------------------------------------------
 
-Support for SPIR-V 1.0, 1.1 and 1.2 is still experimental. When targeting the older SPIR-V profiles, Slang may produce SPIR-V that uses the instructions and keywords that were introduced in the later versions of SPIR-V.
+Slang's SPIRV backend is stable when emitting SPIRV 1.3 and later, however, support for SPIR-V 1.0, 1.1 and 1.2 is still experimental.
+When targeting the older SPIR-V profiles, Slang may produce SPIR-V that uses the instructions and keywords that were introduced in the later versions of SPIR-V.
 
 
 Combined texture sampler
@@ -39,8 +40,8 @@ slangc.exe test.slang -target spirv -capability SPV_EXT_demote_to_helper_invocat
 ```
 
 
-Support HLSL features when targeting SPIR-V
---------------------------------------------
+Supported HLSL features when targeting SPIR-V
+---------------------------------------------
 
 Slang supports the following HLSL feature sets when targeting SPIR-V.
  - ray tracing,
@@ -85,17 +86,19 @@ SPIR-V 1.5 with [SPV_EXT_shader_atomic_float16_add](https://github.com/KhronosGr
 | SPIR-V |   Yes           |     Yes         |    Yes (SPV1.5+ext)   | Yes (SPV1.5+ext) | Yes (SPV1.5+ext) |
 
 
-ConstantBuffer, (RW)StructuredBuffer (RW)ByteAddressBuffer
-----------------------------------------------------------
+ConstantBuffer, (RW/RasterizerOrdered)StructuredBuffer, (RW/RasterizerOrdered)ByteAddressBuffer
+-----------------------------------------------------------------------------------------------
 
 Each member in a `ConstantBuffer` will be emitted as `uniform` parameter.
 StructuredBuffer and ByteAddressBuffer are translated to a shader storage buffer with `readonly` layout.
 RWStructuredBuffer and RWByteAddressBuffer are translated to a shader storage buffer with `read-write` layout.
+RasterizerOrderedStructuredBuffer and RasterizerOrderedByteAddressBuffer will use an extension, `SPV_EXT_fragment_shader_interlock`.
 
 If you need to apply a different buffer layout for indivisual StructuredBuffer, you can specify the layout as a second generic argument to StructuredBuffer. E.g., StructuredBuffer<T, Std140Layout>, StructuredBuffer<T, Std430Layout> or StructuredBuffer<T, ScalarLayout>.
 
 Note that there are compiler options, "-fvk-use-scalar-layout" and "-force-glsl-scalar-layout".
 These options do the same but they are applied globally.
+
 
 ParameterBlock for SPIR-V target
 --------------------------------
