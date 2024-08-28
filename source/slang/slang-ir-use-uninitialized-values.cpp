@@ -232,10 +232,13 @@ namespace Slang
         IRFuncType* ftype = nullptr;
         if (auto spec = as<IRSpecialize>(callee))
             ftn = as<IRFunc>(resolveSpecialization(spec));
-        else if (auto fwd = as<IRForwardDifferentiate>(callee))
-            ftn = as<IRFunc>(fwd->getBaseFn());
-        else if (auto rev = as<IRBackwardDifferentiate>(callee))
-            ftn = as<IRFunc>(rev->getBaseFn());
+    
+        // Differentiable functions are mostly ignored, treated as having inout parameters
+        else if (as<IRForwardDifferentiate>(callee))
+            return Store;
+        else if (as<IRBackwardDifferentiate>(callee))
+            return Store;
+
         else if (auto wit = as<IRLookupWitnessMethod>(callee))
             ftype = as<IRFuncType>(wit->getFullType());
         else
