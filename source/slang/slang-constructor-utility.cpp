@@ -178,6 +178,7 @@ namespace Slang
         // 3. Prefer any default-ctor
         // 4. Use `DefaultConstructExpr`
 
+        // 1.
         auto defaultCtor = _getDefaultCtor(structDecl);
         if(defaultCtor
             && !defaultCtor->containsOption(ConstructorTags::Synthesized)
@@ -203,7 +204,7 @@ namespace Slang
                 return _constructZeroInitListFuncMakeDefaultCtorInvoke(visitor, structDecl, structDeclType, defaultCtor);
         }
 
-        // Try to get $ZeroInit
+        // 2.
         if (auto zeroInitListFunc = findZeroInitListFunc(structDecl))
         {
             auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
@@ -213,11 +214,11 @@ namespace Slang
             return invoke;
         }
 
-        // Try to get default-ctor
-        if (auto defaultCtor = _getDefaultCtor(structDecl))
+        // 3.
+        if (defaultCtor)
             return _constructZeroInitListFuncMakeDefaultCtorInvoke(visitor, structDecl, structDeclType, defaultCtor);
 
-        // return DefaultConstructExpr
+        // 4.
         auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();
         defaultCall->type = QualType(structDeclType);
         return defaultCall;
