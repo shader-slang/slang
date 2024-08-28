@@ -3,6 +3,7 @@
 #include "slang-entrypoint.h"
 #include "slang-composite-component-type.h"
 #include "slang-type-conformance.h"
+#include "slang-component-type.h"
 
 namespace SlangRecord
 {
@@ -54,7 +55,7 @@ namespace SlangRecord
             m_recordManager->apendOutput();
         }
 
-        ModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
+        IModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
         return static_cast<slang::IModule*>(pModuleRecorder);
     }
 
@@ -83,7 +84,7 @@ namespace SlangRecord
             m_recordManager->apendOutput();
         }
 
-        ModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
+        IModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
         return static_cast<slang::IModule*>(pModuleRecorder);
     }
 
@@ -112,7 +113,7 @@ namespace SlangRecord
             m_recordManager->apendOutput();
         }
 
-        ModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
+        IModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
         return static_cast<slang::IModule*>(pModuleRecorder);
     }
 
@@ -142,7 +143,7 @@ namespace SlangRecord
             m_recordManager->apendOutput();
         }
 
-        ModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
+        IModuleRecorder* pModuleRecorder = getModuleRecorder(pModule);
         return static_cast<slang::IModule*>(pModuleRecorder);
     }
 
@@ -387,8 +388,8 @@ namespace SlangRecord
 
         if (SLANG_OK != result)
         {
-            TypeConformanceRecorder* conformanceRecord = new TypeConformanceRecorder(*outConformance, m_recordManager);
-            Slang::ComPtr<TypeConformanceRecorder> resultRecord(conformanceRecord);
+            ITypeConformanceRecorder* conformanceRecord = new TypeConformanceRecorder(*outConformance, m_recordManager);
+            Slang::ComPtr<ITypeConformanceRecorder> resultRecord(conformanceRecord);
             *outConformance = resultRecord.detach();
         }
 
@@ -444,7 +445,7 @@ namespace SlangRecord
 
         if (pModule)
         {
-            ModuleRecorder* moduleRecord = nullptr;
+            IModuleRecorder* moduleRecord = nullptr;
             bool ret = m_mapModuleToRecord.tryGetValue(pModule, moduleRecord);
             if (!ret)
             {
@@ -464,14 +465,14 @@ namespace SlangRecord
         return result;
     }
 
-    ModuleRecorder* SessionRecorder::getModuleRecorder(slang::IModule* module)
+    IModuleRecorder* SessionRecorder::getModuleRecorder(slang::IModule* module)
     {
-        ModuleRecorder* moduleRecord = nullptr;
+        IModuleRecorder* moduleRecord = nullptr;
         bool ret = m_mapModuleToRecord.tryGetValue(module, moduleRecord);
         if (!ret)
         {
             moduleRecord = new ModuleRecorder(module, m_recordManager);
-            Slang::ComPtr<ModuleRecorder> result(moduleRecord);
+            Slang::ComPtr<IModuleRecorder> result(moduleRecord);
             m_moduleRecordersAlloation.add(result);
             m_mapModuleToRecord.add(module, result.detach());
         }
@@ -488,16 +489,32 @@ namespace SlangRecord
             slang::IComponentType* const& componentType = componentTypes[i];
             void* outObj = nullptr;
 
-            if (componentType->queryInterface(ModuleRecorder::getTypeGuid(), &outObj) == SLANG_OK)
+            if (componentType->queryInterface(IModuleRecorder::getTypeGuid(), &outObj) == SLANG_OK)
             {
                 ModuleRecorder* moduleRecord = static_cast<ModuleRecorder*>(outObj);
                 outActualComponentTypes.add(moduleRecord->getActualModule());
             }
-            else if (componentType->queryInterface(EntryPointRecorder::getTypeGuid(), &outObj) == SLANG_OK)
+            else if (componentType->queryInterface(IEntryPointRecorder::getTypeGuid(), &outObj) == SLANG_OK)
             {
                 EntryPointRecorder* entrypointRecord = static_cast<EntryPointRecorder*>(outObj);
                 outActualComponentTypes.add(entrypointRecord->getActualEntryPoint());
             }
+            else if (componentType->queryInterface(CompositeComponentTypeRecorder::getTypeGuid(), &outObj) == SLANG_OK)
+            {
+                CompositeComponentTypeRecorder* compositeComponentTypeRecord = static_cast<CompositeComponentTypeRecorder*>(outObj);
+                outActualComponentTypes.add(compositeComponentTypeRecord->getActualCompositeComponentType());
+            }
+            else if (componentType->queryInterface(ComponentTypeRecorder::getTypeGuid(), &outObj) == SLANG_OK)
+            {
+                ComponentTypeRecorder* componentTypeRecorder = static_cast<ComponentTypeRecorder*>(outObj);
+                outActualComponentTypes.add(componentTypeRecorder->getActualComponentType());
+            }
+            else if (componentType->queryInterface(ITypeConformanceRecorder::getTypeGuid(), &outObj) == SLANG_OK)
+            {
+                TypeConformanceRecorder* typeConformanceRecorder = static_cast<TypeConformanceRecorder*>(outObj);
+                outActualComponentTypes.add(typeConformanceRecorder->getActualTypeConformance());
+            }
+
             // will fall back to the actual component type, it means that we didn't record this type.
             else
             {
