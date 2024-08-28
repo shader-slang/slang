@@ -899,10 +899,16 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
             {
                 switch (inst->getOp())
                 {
+                // Avoid inlining functions that have derivative instructions.
                 case kIROp_ForwardDifferentiate:
                 case kIROp_BackwardDifferentiate:
                 case kIROp_BackwardDifferentiatePrimal:
                 case kIROp_BackwardDifferentiatePropagate:
+                    canInline = false;
+                    goto end;
+                
+                // Also avoid inlining functions with inline-asm instructions.
+                case kIROp_SPIRVAsm:
                     canInline = false;
                     goto end;
                 }
