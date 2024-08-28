@@ -2016,7 +2016,7 @@ struct DiffTransposePass
         SLANG_ASSERT(diffZero);
         auto revRest = builder->emitUpdateElement(
             revValue,
-            accessChain,
+            accessChain.getArrayView(),
             diffZero);
         gradients.add(RevGradient(
             RevGradient::Flavor::Simple,
