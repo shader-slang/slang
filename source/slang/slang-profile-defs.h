@@ -64,7 +64,7 @@ PROFILE_STAGE(Geometry, geometry,   SLANG_STAGE_GEOMETRY)
 PROFILE_STAGE(Pixel,    pixel,      SLANG_STAGE_FRAGMENT)
 PROFILE_STAGE(Compute,	compute,    SLANG_STAGE_COMPUTE)
 
-PROFILE_STAGE(RayGeneration,    _raygen,         SLANG_STAGE_RAY_GENERATION)
+PROFILE_STAGE(RayGen,           _raygen,         SLANG_STAGE_RAY_GENERATION)
 PROFILE_STAGE(Intersection,     _intersection,   SLANG_STAGE_INTERSECTION)
 PROFILE_STAGE(AnyHit,           _anyhit,         SLANG_STAGE_ANY_HIT)
 PROFILE_STAGE(ClosestHit,       _closesthit,     SLANG_STAGE_CLOSEST_HIT)
@@ -82,6 +82,7 @@ PROFILE_STAGE(Amplification,    _amplification,  SLANG_STAGE_AMPLIFICATION)
 // name and `fragment` as an alias for it here, because the lower-case stage
 // names are used to drive output HLSL generation.
 //
+PROFILE_STAGE_ALIAS(RayGeneration, _raygeneration, RayGen)
 PROFILE_STAGE_ALIAS(Fragment, fragment, Pixel)
 
 // Profile families

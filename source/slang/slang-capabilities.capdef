@@ -401,15 +401,19 @@ alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmeti
 // non-internal shader stages
 
 alias pixel = fragment;
+
 alias tesscontrol = hull;
 alias tesseval = domain;
+
+alias _raygeneration = _raygen;
 alias raygen = _raygen + raytracing;
-alias raygeneration = raygen;
+alias raygeneration = _raygeneration + raytracing;
 alias intersection = _intersection + raytracing;
 alias anyhit = _anyhit + raytracing;
 alias closesthit = _closesthit + raytracing;
 alias callable = _callable + raytracing;
 alias miss = _miss + raytracing;
+
 alias mesh = _mesh + meshshading_internal;
 alias amplification = _amplification + meshshading_internal;
 
