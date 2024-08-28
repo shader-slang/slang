@@ -2669,6 +2669,10 @@ namespace Slang
             /// Perform checking operations required for the "base" expression of a member-reference like `base.someField`
         Expr* checkBaseForMemberExpr(Expr* baseExpr, bool& outNeedDeref);
 
+            /// Prepare baseExpr for use as the base of a member expr.
+            /// This include inserting implicit open-existential operations as needed.
+        Expr* maybeInsertImplicitOpForMemberBase(Expr* baseExpr, bool& outNeedDeref);
+
         Expr* lookupMemberResultFailure(
             DeclRefExpr*     expr,
             QualType const& baseType,
