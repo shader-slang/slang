@@ -1210,6 +1210,31 @@ extension Array<T, N> : IDifferentiable
     }
 }
 
+__generic<each T : IDifferentiable>
+extension Tuple<T> : IDifferentiable
+{
+    typealias Differential = Tuple<expand(each T).Differential>;
+
+    [__unsafeForceInlineEarly]
+    static Differential dzero()
+    {
+        return makeTuple(expand (each T).dzero());
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return makeTuple(expand(each T).dadd(each a, each b));
+    }
+
+    __generic<U : __BuiltinRealType>
+    [__unsafeForceInlineEarly]
+    static Differential dmul(U a, Differential b)
+    {
+        return makeTuple(expand(each T).dmul(a, each b));
+    }
+}
+
 // Matrix transpose
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [ForceInline]

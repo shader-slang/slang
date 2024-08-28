@@ -508,7 +508,7 @@ public:
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
 
-    TupleType* getTupleType(List<Type*>& types);
+    TupleType* getTupleType(ArrayView<Type*> types);
 
     FuncType* getFuncType(ArrayView<Type*> parameters, Type* result, Type* errorType = nullptr);
 
