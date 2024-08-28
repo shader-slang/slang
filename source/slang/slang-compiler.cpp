@@ -418,7 +418,12 @@ namespace Slang
     {
         for(auto entry : kStages)
         {
-            if("_" + name == entry.name || name == entry.name)
+            // do not compare for '_' 
+            auto nameToComp = entry.name;
+            if(nameToComp[0] == '_')
+                nameToComp = &nameToComp[1];
+
+            if(name == nameToComp)
             {
                 return entry.stage;
             }
