@@ -1810,6 +1810,20 @@ namespace Slang
         }
     }
 
+    static void addAutoDiffModifiersToFunc(
+        SemanticsDeclVisitorBase* visitor,
+        ASTBuilder* m_astBuilder,
+        FunctionDeclBase* func)
+    {
+        if (visitor->isTypeDifferentiable(func->returnType.type))
+        {
+            addModifier(func, m_astBuilder->create<BackwardDifferentiableAttribute>());
+            addModifier(func, m_astBuilder->create<ForwardDifferentiableAttribute>());
+        }
+        else
+            addModifier(func, m_astBuilder->create<TreatAsDifferentiableAttribute>());
+    }
+
     static ConstructorDecl* _createCtor(
         SemanticsDeclVisitorBase* visitor,
         ASTBuilder* m_astBuilder,
@@ -1856,14 +1870,7 @@ namespace Slang
             ctor->members.add(param);
         }
         addVisibilityModifier(m_astBuilder, ctor, visibility);
-
-        if (visitor->isTypeDifferentiable(ctor->returnType.type))
-        {
-            addModifier(ctor, m_astBuilder->create<BackwardDifferentiableAttribute>());
-            addModifier(ctor, m_astBuilder->create<ForwardDifferentiableAttribute>());
-        }
-        else
-            addModifier(ctor, m_astBuilder->create<TreatAsDifferentiableAttribute>());
+        addAutoDiffModifiersToFunc(visitor, m_astBuilder, ctor);
         decl->addMember(ctor);
         return ctor;
     }
@@ -10562,6 +10569,8 @@ namespace Slang
             body->closingSourceLoc = zeroInitFunc->closingSourceLoc;
             zeroInitFunc->body = body;
             body->body = m_astBuilder->create<SeqStmt>();
+
+            addAutoDiffModifiersToFunc(this, m_astBuilder, zeroInitFunc);
             addModifier(zeroInitFunc, m_astBuilder->create<SynthesizedModifier>());
             addModifier(zeroInitFunc, m_astBuilder->create<HLSLStaticModifier>());
             addModifier(zeroInitFunc, m_astBuilder->create<PublicModifier>());
