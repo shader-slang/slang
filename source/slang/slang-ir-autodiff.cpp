@@ -1177,6 +1177,7 @@ void stripDerivativeDecorations(IRInst* inst)
 
 void stripAutoDiffDecorationsFromChildren(IRInst* parent)
 {
+    bool shouldRemoveKeepAliveDecorations = false;
     for (auto inst : parent->getChildren())
     {
         for (auto decor = inst->getFirstDecoration(); decor; )
@@ -1204,10 +1205,32 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_IntermediateContextFieldDifferentialTypeDecoration:
                 decor->removeAndDeallocate();
                 break;
+            case kIROp_AutoDiffBuiltinDecoration:
+                // Remove the builtin decoration, and also remove any export/keep-alive
+                // decorations.
+                shouldRemoveKeepAliveDecorations = true;
+                decor->removeAndDeallocate();
             default:
                 break;
             }
             decor = next;
+        }
+
+        if (shouldRemoveKeepAliveDecorations)
+        {
+            for (auto decor = inst->getFirstDecoration(); decor; )
+            {
+                auto next = decor->getNextDecoration();
+                switch (decor->getOp())
+                {
+                case kIROp_ExportDecoration:
+                case kIROp_HLSLExportDecoration:
+                case kIROp_KeepAliveDecoration:
+                    decor->removeAndDeallocate();
+                    break;
+                }
+                decor = next;
+            }
         }
 
         if (inst->getFirstChild() != nullptr)
@@ -2273,11 +2296,6 @@ bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
     lowerNullCheckInsts(module, &autodiffContext);
 
     stripNoDiffTypeAttribute(module);
-
-    // Remove keep-alive decorations from null-differential type
-    // so it can be DCE'd if unused.
-    // 
-    releaseNullDifferentialType(&autodiffContext);
 
     return modified;
 }

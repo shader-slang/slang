@@ -1171,6 +1171,12 @@ class BuiltinAttribute : public Attribute
 {
     SLANG_AST_CLASS(BuiltinAttribute)
 };
+    
+    /// An attribute that marks a decl as a compiler built-in object for the autodiff system.
+class AutoDiffBuiltinAttribute : public Attribute
+{
+    SLANG_AST_CLASS(AutoDiffBuiltinAttribute)
+};
 
     /// An attribute that defines the size of `AnyValue` type to represent a polymoprhic value that conforms to
     /// the decorated interface type.
