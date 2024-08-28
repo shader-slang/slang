@@ -1177,9 +1177,9 @@ void stripDerivativeDecorations(IRInst* inst)
 
 void stripAutoDiffDecorationsFromChildren(IRInst* parent)
 {
-    bool shouldRemoveKeepAliveDecorations = false;
     for (auto inst : parent->getChildren())
     {
+        bool shouldRemoveKeepAliveDecorations = false;
         for (auto decor = inst->getFirstDecoration(); decor; )
         {
             auto next = decor->getNextDecoration();
