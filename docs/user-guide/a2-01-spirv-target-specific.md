@@ -26,6 +26,13 @@ Sampler2D explicitBindingSampler : register(t4): register(s3);
 ```
 
 
+`SV_*` semantics
+----------------
+
+TODO : we need to document how every SV_ semantic are translated to spirv builtins.
+In addition, we added spirv specific system semantics like SV_PointSize.
+
+
 Behavior of `discard` after SPIR-V 1.6
 --------------------------------------
 
