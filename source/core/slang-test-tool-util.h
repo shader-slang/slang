@@ -66,6 +66,8 @@ struct TestToolUtil
 
         /// Returns true if the StdLib should not be initialized immediately (eg when doing a -load-stdlib).
     static bool hasDeferredStdLib(Index numArgs, const char*const* args);
+
+    static SlangResult getDllDirectoryPath(const char* exePath, String& outDllDirectoryPath);
 };
 
 } // namespace Slang

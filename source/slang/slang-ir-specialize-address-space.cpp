@@ -155,7 +155,7 @@ namespace Slang
                         {
                             if (ptrType->hasAddressSpace())
                             {
-                                mapInstToAddrSpace[inst] = (AddressSpace)ptrType->getAddressSpace();
+                                mapInstToAddrSpace[inst] = ptrType->getAddressSpace();
                                 continue;
                             }
                         }

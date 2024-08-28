@@ -637,6 +637,13 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
+
+    if (requiredLoweringPassSet.autodiff)
+    {
+        // Generate warnings for potentially incorrect or badly-performing autodiff patterns.
+        checkAutodiffPatterns(targetProgram, irModule, sink);
+    }
+    
     // Next, we need to ensure that the code we emit for
     // the target doesn't contain any operations that would
     // be illegal on the target platform. For example,
@@ -1136,6 +1143,10 @@ Result linkAndOptimizeIR(
         GLSLExtensionTracker* glslExtensionTrackerPtr = options.sourceEmitter
             ? as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker())
             : &glslExtensionTracker;
+
+#if 0
+            dumpIRIfEnabled(codeGenContext, irModule, "PRE GLSL LEGALIZED");
+#endif
 
         legalizeEntryPointsForGLSL(
             session,

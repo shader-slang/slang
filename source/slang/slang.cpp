@@ -1348,6 +1348,43 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     return asExternal(specializedType);
 }
 
+
+DeclRef<Decl> Linkage::specializeGeneric(
+        DeclRef<Decl>                       declRef,
+        List<Expr*>                         argExprs,
+        DiagnosticSink*                     sink)
+{
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+    SLANG_ASSERT(declRef);
+
+    SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
+    SemanticsVisitor visitor(&sharedSemanticsContext);
+
+    // Create substituted parent decl ref.
+    auto decl = declRef.getDecl();
+
+    while (!as<GenericDecl>(decl))
+    {
+        decl = decl->parentDecl;
+    }
+
+    auto genericDecl = as<GenericDecl>(decl);
+    auto genericDeclRef = createDefaultSubstitutionsIfNeeded(getASTBuilder(), &visitor, DeclRef(genericDecl)).as<GenericDecl>();
+    genericDeclRef = substituteDeclRef(SubstitutionSet(declRef), getASTBuilder(), genericDeclRef).as<GenericDecl>();
+
+
+    DeclRefExpr* declRefExpr = getASTBuilder()->create<DeclRefExpr>();
+    declRefExpr->declRef = genericDeclRef;
+
+    GenericAppExpr* genericAppExpr = getASTBuilder()->create<GenericAppExpr>();
+    genericAppExpr->functionExpr = declRefExpr;
+    genericAppExpr->arguments = argExprs;
+
+    auto specializedDeclRef = as<DeclRefExpr>(visitor.checkGenericAppWithCheckedArgs(genericAppExpr))->declRef;
+
+    return specializedDeclRef;
+}
+
 SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     slang::TypeReflection*  inType,
     SlangInt                targetIndex,
@@ -2373,7 +2410,26 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
         result = declRefExpr->declRef;
     }
 
+    if (auto genericDeclRef = result.as<GenericDecl>())
+    {   
+        result = createDefaultSubstitutionsIfNeeded(
+            astBuilder, &visitor, DeclRef(genericDeclRef.getDecl()->inner));
+        result = substituteDeclRef(SubstitutionSet(genericDeclRef), astBuilder, result);
+    }
+
     return result;
+}
+
+bool ComponentType::isSubType(Type* subType, Type* superType)
+{
+    SharedSemanticsContext sharedSemanticsContext(
+        getLinkage(),
+        nullptr,
+        nullptr);
+    SemanticsContext context(&sharedSemanticsContext);
+    SemanticsVisitor visitor(context);
+
+    return (visitor.isSubtype(subType, superType, IsSubTypeOptions::None) != nullptr);
 }
 
 static void collectExportedConstantInContainer(
@@ -3252,10 +3308,10 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
 
             for (auto translationUnit : frontEndReq->translationUnits)
             {
-                translationUnit->getModule()->precompileForTargets(
-                    getSink(),
-                    this,
-                    targetReq);
+                SlangCompileTarget target = SlangCompileTarget(targetReq->getTarget());
+                translationUnit->getModule()->precompileForTarget(
+                    target,
+                    nullptr);
             }
         }
     }
@@ -5852,6 +5908,11 @@ void EndToEndCompileRequest::setTargetFlags(int targetIndex, SlangTargetFlags fl
 void EndToEndCompileRequest::setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value)
 {
     getTargetOptionSet(targetIndex).set(CompilerOptionName::GLSLForceScalarLayout, value);
+}
+
+void EndToEndCompileRequest::setTargetForceDXLayout(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::ForceDXLayout, value);
 }
 
 void EndToEndCompileRequest::setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode  mode)

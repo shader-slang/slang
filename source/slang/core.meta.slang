@@ -870,6 +870,113 @@ bool operator!=(__none_t noneVal, Optional<T> val)
     return val.hasValue;
 }
 
+__generic<each T>
+__magic_type(TupleType)
+struct Tuple
+{
+    __intrinsic_op($(kIROp_MakeTuple))
+    __init(expand each T);
+}
+
+__intrinsic_op($(kIROp_MakeTuple))
+Tuple<T> makeTuple<each T>(T v);
+
+Tuple<T, U> concat<each T, each U>(Tuple<T> t, Tuple<U> u)
+{
+    return makeTuple(expand each t, expand each u);
+}
+
+
+[__unsafeForceInlineEarly]
+bool __assign(inout bool v, bool newVal)
+{
+    v = newVal;
+    return newVal;
+}
+
+[__unsafeForceInlineEarly]
+void __tupleLessKernel<T : IComparable>(inout bool result, inout bool exit, T a, T b)
+{
+    if (!exit)
+    {
+        if (a.lessThan(b))
+        {
+            result = true;
+            exit = true;
+        }
+        else if (!a.equals(b))
+        {
+            exit = true;
+        }
+    }
+}
+
+[__unsafeForceInlineEarly]
+void __tupleGreaterKernel<T : IComparable>(inout bool result, inout bool exit, T a, T b)
+{
+    if (!exit)
+    {
+        if (!a.lessThanOrEquals(b))
+        {
+            result = true;
+            exit = true;
+        }
+        else if (!a.equals(b))
+        {
+            exit = true;
+        }
+    }
+}
+
+__generic<each T : IComparable>
+extension Tuple<T> : IComparable
+{
+    bool lessThan(Tuple<T> other)
+    {
+        bool result = false;
+        bool exit = false;
+        expand __tupleLessKernel(result, exit, each this, each other);
+        return result;
+    }
+    bool lessThanOrEquals(Tuple<T> other)
+    {
+        bool result = false;
+        bool exit = false;
+        expand __tupleGreaterKernel(result, exit, each this, each other);
+        return !result;
+    }
+    bool equals(Tuple<T> other)
+    {
+        bool result = true;
+        expand result && __assign(result, result && (each this).equals(each other));
+        return result;
+    }
+}
+
+interface IMutatingFunc<TR, each TP>
+{
+    [mutating]
+    TR __call(expand each TP p);
+}
+
+interface IFunc<TR, each TP> : IMutatingFunc<TR, expand each TP>
+{
+    TR __call(expand each TP p);
+}
+
+interface IDifferentiableMutatingFunc<TR : IDifferentiable, each TP : IDifferentiable> : IMutatingFunc<TR, expand each TP>
+{
+    [Differentiable]
+    [mutating]
+    TR __call(expand each TP p);
+}
+
+interface IDifferentiableFunc<TR : IDifferentiable, each TP : IDifferentiable> : IFunc<TR, expand each TP>, IDifferentiableMutatingFunc<TR, expand each TP>
+{
+    [Differentiable]
+    TR __call(expand each TP p);
+}
+
 __generic<T>
 __magic_type(NativeRefType)
 __intrinsic_type($(kIROp_NativePtrType))
@@ -2173,7 +2280,7 @@ __generic<T : IComparable>
 [OverloadRank(-10)]
 bool operator >=(T v0, T v1)
 {
-    return v1.lessThan(v1);
+    return v1.lessThanOrEquals(v0);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
@@ -2777,8 +2884,16 @@ attribute_syntax [payload] : PayloadAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
 
+enum SideEffectBehavior
+{
+    /// Causes a warning if the method is detected to have side-effects
+    Warn = 0,
+
+    /// Suppresses the warning
+    Allow = 1
+};
 __attributeTarget(FunctionDeclBase)
-attribute_syntax [PreferRecompute] : PreferRecomputeAttribute;
+attribute_syntax[PreferRecompute(behavior: SideEffectBehavior = SideEffectBehavior.Warn)] : PreferRecomputeAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;

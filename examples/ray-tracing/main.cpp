@@ -195,6 +195,11 @@ gfx::Result loadShaderProgram(
     diagnoseIfNeeded(diagnosticsBlob);
     SLANG_RETURN_ON_FAIL(result);
 
+    if (isTestMode())
+    {
+        printEntrypointHashes(componentTypes.getCount() - 1, 1, linkedProgram);
+    }
+
     gfx::IShaderProgram::Desc programDesc = {};
     programDesc.slangGlobalScope = linkedProgram;
     SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
@@ -288,11 +293,15 @@ void onMouseUp(platform::MouseEventArgs args) { isMouseDown = false; }
 Slang::Result initialize()
 {
     initializeBase("Ray Tracing", 1024, 768);
-    gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { onMouseMove(e); };
-    gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
-    gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { onMouseDown(e); };
-    gWindow->events.keyDown = [this](const platform::KeyEventArgs& e) { onKeyDown(e); };
-    gWindow->events.keyUp = [this](const platform::KeyEventArgs& e) { onKeyUp(e); };
+
+    if (!isTestMode())
+    {
+        gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { onMouseMove(e); };
+        gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
+        gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { onMouseDown(e); };
+        gWindow->events.keyDown = [this](const platform::KeyEventArgs& e) { onKeyDown(e); };
+        gWindow->events.keyUp = [this](const platform::KeyEventArgs& e) { onKeyUp(e); };
+    }
 
     IBufferResource::Desc vertexBufferDesc;
     vertexBufferDesc.type = IResource::Type::Buffer;
@@ -635,9 +644,13 @@ virtual void renderFrame(int frameBufferIndex) override
         presentCommandBuffer->close();
         gQueue->executeCommandBuffer(presentCommandBuffer);
     }
-    // With that, we are done drawing for one frame, and ready for the next.
-    //
-    gSwapchain->present();
+
+    if (!isTestMode())
+    {
+        // With that, we are done drawing for one frame, and ready for the next.
+        //
+        gSwapchain->present();
+    }
 }
 
 };
