@@ -21,7 +21,6 @@ namespace SlangRecord
         ISlangUnknown* getInterface(const Guid& guid);
 
         explicit ModuleRecorder(slang::IModule* module, RecordManager* recordManager);
-        ~ModuleRecorder();
 
         // Interfaces for `IModule`
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL findEntryPointByName(
@@ -98,7 +97,8 @@ namespace SlangRecord
         // `IEntryPoint` can only be created from 'IModule', so we need to record it in
         // this class, and create a map such that we don't create new `EntryPointRecorder`
         // for the same `IEntryPoint`.
-        Dictionary<slang::IEntryPoint*, EntryPointRecorder> m_mapEntryPointToRecord;
+        Dictionary<slang::IEntryPoint*, EntryPointRecorder*> m_mapEntryPointToRecord;
+        List<ComPtr<EntryPointRecorder>> m_entryPointsRecordAllocation;
     };
 } // namespace SlangRecord
 

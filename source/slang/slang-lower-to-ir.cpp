@@ -11,6 +11,7 @@
 #include "slang-check.h"
 #include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-loop-inversion.h"
+#include "slang-ir-lower-expand-type.h"
 #include "slang-ir.h"
 #include "slang-ir-util.h"
 #include "slang-ir-constexpr.h"
@@ -1987,7 +1988,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
         else
         {
-            return lowerType(context, type->getTypePack());
+            return context->irBuilder->getTupleType(lowerType(context, type->getTypePack()));
         }
     }
 
@@ -3926,6 +3927,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             getBuilder()->emitForwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
+    }
+
+    LoweredValInfo visitDetachExpr(DetachExpr* expr)
+    {
+        auto baseVal = lowerRValueExpr(context, expr->inner);
+
+        return LoweredValInfo::simple(
+            getBuilder()->emitDetachDerivative(
+                lowerType(context, expr->type),
+                getSimpleVal(context, baseVal)));
     }
 
     LoweredValInfo visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr)
@@ -10192,9 +10203,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addDecoration(irFunc, kIROp_PreferCheckpointDecoration);
             }
-            else if (as<PreferRecomputeAttribute>(modifier))
+            else if (auto attr = as<PreferRecomputeAttribute>(modifier))
             {
-                getBuilder()->addDecoration(irFunc, kIROp_PreferRecomputeDecoration);
+                getBuilder()->addDecoration(
+                    irFunc,
+                    kIROp_PreferRecomputeDecoration,
+                    getBuilder()->getIntValue(
+                        getBuilder()->getIntType(),
+                        attr->sideEffectBehavior));
             }
             else if (auto extensionMod = as<RequiredGLSLExtensionModifier>(modifier))
                 getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.getContent());
@@ -11079,6 +11095,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // Synthesize some code we want to make sure is inlined and simplified
     synthesizeBitFieldAccessors(module);
+
+    // Lower `IRExpandType` types to use `IRExpand`, where the pattern type
+    // is nested inside the `IRExpand` as its children, instead of being same
+    // level entities as the ExpandType itself.
+    // This will unify the specialization logic for both type and value level
+    // expansion.
+    lowerExpandType(module);
 
     // Generate DebugValue insts to store values into debug variables,
     // if debug symbols are enabled.

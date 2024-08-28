@@ -953,6 +953,30 @@ extension Tuple<T> : IComparable
     }
 }
 
+interface IMutatingFunc<TR, each TP>
+{
+    [mutating]
+    TR __call(expand each TP p);
+}
+
+interface IFunc<TR, each TP> : IMutatingFunc<TR, expand each TP>
+{
+    TR __call(expand each TP p);
+}
+
+interface IDifferentiableMutatingFunc<TR : IDifferentiable, each TP : IDifferentiable> : IMutatingFunc<TR, expand each TP>
+{
+    [Differentiable]
+    [mutating]
+    TR __call(expand each TP p);
+}
+
+interface IDifferentiableFunc<TR : IDifferentiable, each TP : IDifferentiable> : IFunc<TR, expand each TP>, IDifferentiableMutatingFunc<TR, expand each TP>
+{
+    [Differentiable]
+    TR __call(expand each TP p);
+}
+
 __generic<T>
 __magic_type(NativeRefType)
 __intrinsic_type($(kIROp_NativePtrType))
@@ -2860,8 +2884,16 @@ attribute_syntax [payload] : PayloadAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
 
+enum SideEffectBehavior
+{
+    /// Causes a warning if the method is detected to have side-effects
+    Warn = 0,
+
+    /// Suppresses the warning
+    Allow = 1
+};
 __attributeTarget(FunctionDeclBase)
-attribute_syntax [PreferRecompute] : PreferRecomputeAttribute;
+attribute_syntax[PreferRecompute(behavior: SideEffectBehavior = SideEffectBehavior.Warn)] : PreferRecomputeAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
