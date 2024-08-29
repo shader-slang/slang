@@ -2935,6 +2935,9 @@ __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;
 
 __attributeTarget(DeclBase)
+attribute_syntax[__AutoDiffBuiltin] : AutoDiffBuiltinAttribute;
+
+__attributeTarget(DeclBase)
 attribute_syntax [__requiresNVAPI] : RequiresNVAPIAttribute;
 
 __attributeTarget(AggTypeDecl)

@@ -4998,6 +4998,11 @@ public:
         addDecoration(value, kIROp_DynamicUniformDecoration);
     }
 
+    void addAutoDiffBuiltinDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_AutoDiffBuiltinDecoration);
+    }
+
         /// Add a decoration that indicates that the given `inst` depends on the given `dependency`.
         ///
         /// This decoration can be used to ensure that a value that an instruction
