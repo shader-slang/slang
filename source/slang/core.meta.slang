@@ -156,6 +156,8 @@ interface IInteger : IArithmetic, ILogical
     int64_t toInt64();
     uint toUInt();
     uint64_t toUInt64();
+    __init(int val);
+    __init(int64_t val);
 }
 
 interface IFloat : IArithmetic, IDifferentiable
@@ -220,7 +222,7 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 /// A type that can represent integers
 [sealed]
 [builtin]
-interface __BuiltinIntegerType : __BuiltinArithmeticType
+interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger
 {}
 
 /// A type that can represent non-integers
@@ -2926,6 +2928,9 @@ attribute_syntax [Specialize] : SpecializeAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax[__AutoDiffBuiltin] : AutoDiffBuiltinAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [__requiresNVAPI] : RequiresNVAPIAttribute;
