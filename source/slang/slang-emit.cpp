@@ -1490,19 +1490,19 @@ Result linkAndOptimizeIR(
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
 
-    collectMetadata(irModule, *metadata);
-
-    outLinkedIR.metadata = metadata;
-
-    if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
-        checkUnsupportedInst(codeGenContext->getTargetReq(), irModule, sink);
-
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
     {
         // We need to make sure that we don't try to export any functions that can't
         // be part of a DXIL library interface, eg. with resources.
         unexportNonEmbeddableDXIL(irModule);
     }
+
+    collectMetadata(irModule, *metadata);
+
+    outLinkedIR.metadata = metadata;
+
+    if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
+        checkUnsupportedInst(codeGenContext->getTargetReq(), irModule, sink);
 
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 }
