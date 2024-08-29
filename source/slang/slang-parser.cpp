@@ -8231,7 +8231,7 @@ namespace Slang
                 else if (auto specConstAttr = as<VkConstantIdAttribute>(modifier))
                 {
                     parser->ReadToken(TokenType::OpAssign);
-                    specConstAttr->args.add(parser->ParseArgExpr());
+                    specConstAttr->location = (int)getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral));
                 }
 
                 listBuilder.add(modifier);

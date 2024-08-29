@@ -1148,8 +1148,7 @@ static void addExplicitParameterBindings_GLSL(
 
         if (auto layoutAttr = varDecl.getDecl()->findModifier<VkConstantIdAttribute>())
         {
-            if (auto constVal = as<ConstantIntVal>(layoutAttr->intArgVals[0]))
-                info[kResInfo].semanticInfo.index = constVal->getValue();
+            info[kResInfo].semanticInfo.index = layoutAttr->location;
         }
         else if (auto glslLocationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
         {

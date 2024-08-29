@@ -837,6 +837,14 @@ namespace Slang
 
             hitObjectAttributesAttr->location = (int32_t)val->getValue();
         }
+        else if (auto constantIdAttr = as<VkConstantIdAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+            auto val = checkConstantIntVal(attr->args[0]);
+
+            if (!val) return nullptr;
+            constantIdAttr->location = (int32_t)val->getValue();
+        }
         else if (as<UserDefinedDerivativeAttribute>(attr) || as<PrimalSubstituteAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);

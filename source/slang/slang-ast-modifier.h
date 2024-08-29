@@ -738,6 +738,7 @@ class SpecializationConstantAttribute : public Attribute
 class VkConstantIdAttribute : public Attribute
 {
     SLANG_AST_CLASS(VkConstantIdAttribute)
+    int location;
 };
 
 // [[vk_shader_record]] [[shader_record]]
