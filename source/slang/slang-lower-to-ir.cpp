@@ -8029,6 +8029,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // the underlying storage.
         context->setGlobalValue(decl, paramVal);
 
+        if (decl->initExpr)
+        {
+            auto initVal = getSimpleVal(context, lowerRValueExpr(context, decl->initExpr));
+            builder->addDefaultValueDecoration(irParam, initVal);
+        }
+
         irParam->moveToEnd();
 
         return paramVal;

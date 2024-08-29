@@ -703,6 +703,23 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
             type);
     }
 
+    if (varDecl->hasModifier<SpecializationConstantAttribute>() ||
+        varDecl->hasModifier<GLSLConstantIDLayoutModifier>())
+    {
+        auto specializationConstantRule = rules->getSpecializationConstantRules();
+        if (!specializationConstantRule)
+        {
+            // If the target doesn't support specialization constants, then we will
+            // layout them as ordinary uniform data.
+            specializationConstantRule = rules->getConstantBufferRules(context->getTargetRequest()->getOptionSet());
+        }
+        return createTypeLayoutWith(
+            layoutContext,
+            specializationConstantRule,
+            type);
+    }
+#if 0
+
     // TODO: The cases below for detecting globals that aren't actually
     // shader parameters should be redundant now that the semantic
     // checking logic is responsible for populating the list of
@@ -717,6 +734,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     // HLSL `groupshared` modifier indicates "thread-group local"
     if(varDecl->hasModifier<HLSLGroupSharedModifier>())
         return nullptr;
+#endif
 
     // TODO(tfoley): there may be other cases that we need to handle here
 
@@ -1145,9 +1163,14 @@ static void addExplicitParameterBindings_GLSL(
         info[kResInfo].resInfo = foundSpecializationConstant;
         DeclRef<Decl> varDecl2(varDecl);
 
-        // Try to find `constant_id` binding
-        if(!findLayoutArg<GLSLConstantIDLayoutModifier>(varDecl2, &info[kResInfo].semanticInfo.index))
+        if (auto glslLocationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
+        {
+            info[kResInfo].semanticInfo.index = glslLocationAttr->value;
+        }
+        else if (!findLayoutArg<GLSLConstantIDLayoutModifier>(varDecl2, &info[kResInfo].semanticInfo.index))
+        {
             return;
+        }
     }
 
 

@@ -627,7 +627,7 @@ namespace Slang
                 getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
             }
         }
-        else if (as<PushConstantAttribute>(attr))
+        else if (as<VkSpecialConstantAttributeBase>(attr))
         {
             // Has no args
             SLANG_ASSERT(attr->args.getCount() == 0);

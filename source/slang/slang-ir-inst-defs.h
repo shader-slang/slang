@@ -783,6 +783,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
     INST(HasExplicitHLSLBindingDecoration, HasExplicitHLSLBinding, 0, 0)
 
+    INST(DefaultValueDecoration,            DefaultValue,           1, 0)
     INST(ReadNoneDecoration,                readNone,               0, 0)
     INST(VulkanCallablePayloadDecoration,   vulkanCallablePayload,  0, 0)
     INST(VulkanCallablePayloadInDecoration, vulkanCallablePayloadIn,  0, 0)
@@ -953,6 +954,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(ConstructorDecoration, constructor, 1, 0)
     INST(MethodDecoration, method, 0, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
+    INST(SpecializationConstantDecoration, SpecializationConstantDecoration, 1, 0)
 
         // Reflection metadata for a shader parameter that provides the original type name.
     INST(UserTypeNameDecoration, UserTypeName, 1, 0)

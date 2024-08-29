@@ -385,6 +385,15 @@ void GLSLSourceEmitter::_emitGLSLSSBO(IRGlobalParam* varDecl, IRGLSLShaderStorag
     m_writer->emit(";\n");
 }
 
+void GLSLSourceEmitter::emitGlobalParamDefaultVal(IRGlobalParam* param)
+{
+    if (auto defaultValDecor = param->findDecoration<IRDefaultValueDecoration>())
+    {
+        m_writer->emit(" = ");
+        emitInstExpr(defaultValDecor->getOperand(0), EmitOpInfo());
+    }
+}
+
 void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     auto varLayout = getVarLayout(varDecl);
@@ -418,6 +427,8 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     }
 
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
+    bool isSpecializationConstant = _emitGLSLLayoutQualifier(LayoutResourceKind::SpecializationConstant, &containerChain);
+
     bool isShaderRecord = _emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
     if (isShaderRecord)
@@ -743,9 +754,6 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifierWithBindingKinds(LayoutResourceK
             m_writer->emit(")\n");
             break;
 
-        case LayoutResourceKind::PushConstantBuffer:
-            m_writer->emit("layout(push_constant)\n");
-            break;
         case LayoutResourceKind::ShaderRecord:
             m_writer->emit("layout(shaderRecordEXT)\n");
             break;

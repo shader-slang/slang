@@ -2702,6 +2702,11 @@ attribute_syntax [vk_push_constant]									: PushConstantAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [push_constant]									: PushConstantAttribute;
 
+__attributeTarget(DeclBase)
+attribute_syntax[vk_specialization_constant] : SpecializationConstantAttribute;
+__attributeTarget(DeclBase)
+attribute_syntax[specialization_constant] : SpecializationConstantAttribute;
+
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
 

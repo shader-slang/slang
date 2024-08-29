@@ -726,12 +726,22 @@ class FlagsAttribute : public Attribute
     SLANG_AST_CLASS(FlagsAttribute);
 };
 
+class VkSpecialConstantAttributeBase : public Attribute
+{
+    SLANG_AST_CLASS(VkSpecialConstantAttributeBase);
+};
+
 // [[vk_push_constant]] [[push_constant]]
-class PushConstantAttribute : public Attribute 
+class PushConstantAttribute : public VkSpecialConstantAttributeBase
 {
     SLANG_AST_CLASS(PushConstantAttribute)
 };
 
+// [[vk_specialization_constant]] [[specialization_constant]]
+class SpecializationConstantAttribute : public VkSpecialConstantAttributeBase
+{
+    SLANG_AST_CLASS(SpecializationConstantAttribute)
+};
 
 // [[vk_shader_record]] [[shader_record]]
 class ShaderRecordAttribute : public Attribute 
