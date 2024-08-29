@@ -1144,20 +1144,11 @@ static void addExplicitParameterBindings_GLSL(
     else if(auto foundSpecializationConstant = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant))
     {
         info[kResInfo].resInfo = foundSpecializationConstant;
-        DeclRef<Decl> varDecl2(varDecl);
 
         if (auto layoutAttr = varDecl.getDecl()->findModifier<VkConstantIdAttribute>())
-        {
             info[kResInfo].semanticInfo.index = layoutAttr->location;
-        }
-        else if (auto glslLocationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
-        {
-            info[kResInfo].semanticInfo.index = glslLocationAttr->value;
-        }
         else
-        {
             return;
-        }
     }
 
 
