@@ -1370,10 +1370,6 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     List<Type*>         argTypes,
     DiagnosticSink*     sink)
 {
-
-    // TODO: We should cache and re-use specialized types
-    // when the exact same arguments are provided again later.
-
     SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
