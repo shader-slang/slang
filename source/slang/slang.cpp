@@ -3307,9 +3307,9 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         for (auto translationUnit : frontEndReq->translationUnits)
         {
             SlangCompileTarget target = SlangCompileTarget(SlangCompileTarget::SLANG_DXIL);
-            translationUnit->getModule()->precompileForTarget(
+            SLANG_RETURN_ON_FAIL(translationUnit->getModule()->precompileForTarget(
                 target,
-                nullptr);
+                nullptr));
         }
     }
 

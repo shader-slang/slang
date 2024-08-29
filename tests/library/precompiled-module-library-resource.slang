@@ -20,3 +20,14 @@ public int resource_in_struct_parameter(ResourceStruct rs)
 {
     return rs.buffer[0];
 }
+
+internal int matrix_in_parameter_internal(int1x1 matrix)
+{
+    return matrix[0][0];
+}
+
+public int matrix_in_parameter_public(int a)
+{
+    int1x1 matrix = {a};
+    return matrix_in_parameter_internal(matrix);
+}

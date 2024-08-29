@@ -416,17 +416,12 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
     return false;
 }
 
-// Return SLANG_OK if the result has any functions left.
-static SlangResult removeNonEmbeddableDXIL(IRModule* irModule)
+static void unexportNonEmbeddableDXIL(IRModule* irModule)
 {
-    bool hasFunctions = false;
-    List<IRInst*> removeList;
     for (auto inst : irModule->getGlobalInsts())
     {
         if (inst->getOp() == kIROp_Func)
         {
-            bool dxilLibFriendly = true;
-
             // DXIL does not permit HLSLStructureBufferType in exported functions
             // or sadly Matrices (https://github.com/shader-slang/slang/issues/4880)
             auto type = as<IRFuncType>(inst->getFullType());
@@ -437,30 +432,19 @@ static SlangResult removeNonEmbeddableDXIL(IRModule* irModule)
                 if (operand->getOp() == kIROp_HLSLStructuredBufferType ||
                     operand->getOp() == kIROp_MatrixType)
                 {
-                    dxilLibFriendly = false;
+                    if (auto dec = inst->findDecoration<IRPublicDecoration>())
+                    {
+                        dec->removeAndDeallocate();
+                    }
+                    if (auto dec = inst->findDecoration<IRDownstreamModuleExportDecoration>())
+                    {
+                        dec->removeAndDeallocate();
+                    }
                     break;
                 }
             }
-
-            if (!dxilLibFriendly)
-            {
-                removeList.add(inst);
-            }
-            else
-            {
-                hasFunctions = true;
-            }
         }
     }
-    for (auto inst : removeList)
-    {
-        inst->removeAndDeallocate();
-    }
-    if (!hasFunctions)
-    {
-        return SLANG_FAIL;
-    }
-    return SLANG_OK;
 }
 
 Result linkAndOptimizeIR(
@@ -1515,9 +1499,9 @@ Result linkAndOptimizeIR(
 
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
     {
-        // We need to remove all the functions that can't be represented
-        // in a DXIL library, eg. with resources.
-        SLANG_RETURN_ON_FAIL(removeNonEmbeddableDXIL(irModule));
+        // We need to make sure that we don't try to export any functions that can't
+        // be part of a DXIL library interface, eg. with resources.
+        unexportNonEmbeddableDXIL(irModule);
     }
 
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
