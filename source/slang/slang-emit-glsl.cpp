@@ -427,7 +427,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     }
 
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
-    bool isSpecializationConstant = _emitGLSLLayoutQualifier(LayoutResourceKind::SpecializationConstant, &containerChain);
+    _emitGLSLLayoutQualifier(LayoutResourceKind::SpecializationConstant, &containerChain);
 
     bool isShaderRecord = _emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
