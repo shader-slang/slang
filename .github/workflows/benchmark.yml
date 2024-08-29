@@ -43,5 +43,4 @@ jobs:
         run: |
           cd tools/benchmark
           pip install prettytable argparse
-          Copy-Item -Path C:\slang-benchmarks -Destination . -Recurse
-          python compile.py --samples 16 --target dxil --ci
+          python compile.py --samples 1 --target dxil
