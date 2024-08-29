@@ -92,11 +92,14 @@ namespace Slang
         if(isEffectivelyScalarForInitializerLists(fromExpr->type))
             return false;
 
+        if (toType->equals(fromExpr->type))
+            return true;
+
         // Once the above cases are handled, the main thing
         // we want to check for is whether a direct initialization
         // is possible (a type conversion exists).
         //
-        return canCoerce(toType, fromExpr->type, fromExpr);
+        return false;
     }
 
     bool SemanticsVisitor::_readValueFromInitializerList(
@@ -490,7 +493,7 @@ namespace Slang
 
                     for (auto index = coercedArgs.getCount(); index < parametersCount; index++)
                     {
-                        // If we ran out of elements and allow using a c-style-partial-initialization-list-constructor, end early.
+                        // If we ran out of elements and allow using a c-style-partial-initialization-list, end early.
                         if ((Index)ioArgIndexCandidate > fromInitializerListExpr->args.getCount())
                             break;
 

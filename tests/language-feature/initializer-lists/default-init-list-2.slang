@@ -1,5 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -shaderobj
+// NOTE: 'warning of uninitialized values system' does not handle assignments to `this`.
+// For example, `this = {};`.
+
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute -Wno-41020
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -shaderobj -xslang -Wno-41020
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
