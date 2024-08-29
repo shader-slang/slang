@@ -1550,6 +1550,15 @@ SIMPLE_IR_TYPE(VerticesType, MeshOutputType)
 SIMPLE_IR_TYPE(IndicesType, MeshOutputType)
 SIMPLE_IR_TYPE(PrimitivesType, MeshOutputType)
 
+struct IRMetalMeshType : IRType
+{
+    IRType* getVerticesType() { return (IRType*)getOperand(0); }
+    IRType* getPrimitivesType() { return (IRType*)getOperand(1); }
+    IRInst* getNumVertices() { return (IRInst*)getOperand(2); }
+    IRInst* getNumPrimitives() { return (IRInst*)getOperand(3); }
+    IRIntLit* getTopology() { return (IRIntLit*)getOperand(4); }
+};
+
 SIMPLE_IR_TYPE(MetalMeshGridPropertiesType, Type)
 
 SIMPLE_IR_TYPE(GLSLInputAttachmentType, Type)
