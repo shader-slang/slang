@@ -117,15 +117,15 @@ def compile_cmd(file, output, stage=None, entry=None, emit=False):
 
 hit = 'hit.slang'
 
-cmd = compile_cmd(hit, f'targets/dxr-ch-mono', stage='closesthit', emit=True)
+cmd = compile_cmd(hit, f'targets/dxr-ch-mono', stage='closesthit', entry='MdlRadianceClosestHitProgram', emit=True)
 run(cmd, f'full/{target_ext}/mono/closesthit')
 print(f'[I] compiled shadow (monolithic)')
 
-cmd = compile_cmd(hit, f'targets/dxr-ah-mono', stage='anyhit', emit=True)
+cmd = compile_cmd(hit, f'targets/dxr-ah-mono', stage='anyhit', entry='MdlRadianceAnyHitProgram', emit=True)
 run(cmd, f'full/{target_ext}/mono/anyhit')
 print(f'[I] compiled shadow (monolithic)')
 
-cmd = compile_cmd(hit, f'targets/dxr-sh-mono', stage='anyhit', entry='shadow', emit=True)
+cmd = compile_cmd(hit, f'targets/dxr-sh-mono', stage='anyhit', entry='MdlShadowAnyHitProgram', emit=True)
 run(cmd, f'full/{target_ext}/mono/shadow')
 print(f'[I] compiled shadow (monolithic)')
 
@@ -141,15 +141,15 @@ for file in glob.glob(f'*.slang'):
 
 ### Module whole compilation ###
 
-cmd = compile_cmd(hit, f'targets/dxr-ch-modules', stage='closesthit', emit=True)
+cmd = compile_cmd(hit, f'targets/dxr-ch-modules', stage='closesthit', entry='MdlRadianceClosestHitProgram', emit=True)
 run(cmd, f'full/{target_ext}/module/closesthit')
 print(f'[I] compiled closesthit (module)')
 
-cmd = compile_cmd(hit, f'targets/dxr-ah-modules', stage='anyhit', emit=True)
+cmd = compile_cmd(hit, f'targets/dxr-ah-modules', stage='anyhit', entry='MdlRadianceAnyHitProgram', emit=True)
 run(cmd, f'full/{target_ext}/module/anyhit')
 print(f'[I] compiled anyhit (module)')
 
-cmd = compile_cmd(hit, f'targets/dxr-sh-modules', stage='anyhit', entry='shadow', emit=True)
+cmd = compile_cmd(hit, f'targets/dxr-sh-modules', stage='anyhit', entry='MdlShadowAnyHitProgram', emit=True)
 run(cmd, f'full/{target_ext}/module/shadow')
 print(f'[I] compiled shadow (module)')
 
