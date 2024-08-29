@@ -490,8 +490,8 @@ namespace Slang
 
                     for (auto index = coercedArgs.getCount(); index < parametersCount; index++)
                     {
-                        // If we ran out of elements (and are using a c-style-constructor, end early.
-                        if (ioArgIndexCandidate > fromInitializerListExpr->args.getCount())
+                        // If we ran out of elements and allow using a c-style-partial-initialization-list-constructor, end early.
+                        if ((Index)ioArgIndexCandidate > fromInitializerListExpr->args.getCount())
                             break;
 
                         auto ctorParam = parameters[index];
