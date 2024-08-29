@@ -390,7 +390,7 @@ namespace Slang
                 auto intValue = checkLinkTimeConstantIntVal(arg);
                 if (!intValue)
                 {
-                    return false;
+                    return nullptr;
                 }
                 if (auto constIntVal = as<ConstantIntVal>(intValue))
                 {
