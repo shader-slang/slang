@@ -2522,9 +2522,12 @@ struct SPIRVEmitContext
     SpvInst* emitGlobalParam(IRGlobalParam* param)
     {
         auto layout = getVarLayout(param);
-        if (auto offset = layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
+        if (layout)
         {
-            return emitSpecializationConstant(param, offset);
+            if (auto offset = layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
+            {
+                return emitSpecializationConstant(param, offset);
+            }
         }
         auto storageClass = SpvStorageClassUniform;
         if (auto ptrType = as<IRPtrTypeBase>(param->getDataType()))
