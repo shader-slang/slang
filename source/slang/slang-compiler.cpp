@@ -361,7 +361,7 @@ namespace Slang
         return lookUp(UnownedTerminatedStringSlice(name));
     }
 
-    List<CapabilityName> Profile::getCapabilityName()
+    CapabilitySet Profile::getCapabilityName()
     {
         List<CapabilityName> result;
         switch (getVersion())
@@ -378,7 +378,11 @@ namespace Slang
         default:
             break;
         }
-        return result;
+
+        CapabilitySet resultSet = CapabilitySet(result);
+        for(auto i : this->additionalCapabilities)
+            resultSet.join(i);
+        return resultSet;
     }
 
     char const* Profile::getName()
@@ -451,21 +455,21 @@ namespace Slang
             return Stage::Fragment;
         case CapabilityAtom::compute:
             return Stage::Compute;
-        case CapabilityAtom::mesh:
+        case CapabilityAtom::_mesh:
             return Stage::Mesh;
-        case CapabilityAtom::amplification:
+        case CapabilityAtom::_amplification:
             return Stage::Amplification;
-        case CapabilityAtom::anyhit:
+        case CapabilityAtom::_anyhit:
             return Stage::AnyHit;
-        case CapabilityAtom::closesthit:
+        case CapabilityAtom::_closesthit:
             return Stage::ClosestHit;
-        case CapabilityAtom::intersection:
+        case CapabilityAtom::_intersection:
             return Stage::Intersection;
-        case CapabilityAtom::raygen:
+        case CapabilityAtom::_raygen:
             return Stage::RayGeneration;
-        case CapabilityAtom::miss:
+        case CapabilityAtom::_miss:
             return Stage::Miss;
-        case CapabilityAtom::callable:
+        case CapabilityAtom::_callable:
             return Stage::Callable;
         default:
             SLANG_UNEXPECTED("unknown stage atom");

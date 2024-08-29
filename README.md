@@ -78,7 +78,7 @@ Limitations and Support
 ### Target support
 |   Direct3D 11   |  Direct3D 12   |     Vulkan      |                             Metal                       |         CUDA        |    OptiX    |      CPU Compute      |
 |:---------------:|:--------------:|:---------------:|:-------------------------------------------------------:|:-------------------:|:-----------:|:---------------------:|
-|     HLSL        |    HLSL        |  GLSL & SPIR-V  | Metal Shading Language (Vertex/Fragment/Compute stages) |  C++ (compute-only) |  C++ (WIP)  |  C++ (compute-only)   |
+|     HLSL        |    HLSL        |  GLSL & SPIR-V  | Metal Shading Language (Vertex/Fragment/Mesh/Compute stages) |  C++ (compute-only) |  C++ (WIP)  |  C++ (compute-only)   |
 
 *for greater detail, see the [Supported Compilation Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the [User Guide](https://shader-slang.github.io/slang/user-guide/)
 
