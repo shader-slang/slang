@@ -213,29 +213,6 @@ namespace Slang
         return nullptr;
     }
 
-    bool _allowCStyleInitList(List<ConstructorDecl*> ctorList)
-    {
-        bool foundNonDefaultInit = false;
-        for (auto i : ctorList)
-        {
-            // Default ctor do not affect this logic.
-            if (i->getParameters().getCount() == 0)
-                continue;
-
-            // Cannot contain user defined ctor which is a non default ctor
-            if (!i->containsOption(ConstructorTags::Synthesized))
-                return false;
-
-            // Cannot contain 2+ non-default init's, this is ambigious for a c-style init list:
-            // `MyStruct[3] tmp = {1,2, 1,2, 1,2};`
-            // if `__init(int, int)` and `__init(int)` were both defined we would have ambiguity.
-            if (foundNonDefaultInit)
-                return false;
-            foundNonDefaultInit = true;
-        }
-        return true;
-    }
-
     bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         Type*                inToType,
         Expr**               outToExpr,
@@ -473,7 +450,7 @@ namespace Slang
                 ensureDecl(toStructDecl, DeclCheckState::DefaultConstructorReadyForUse);
 
                 List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, toStructDecl, nullptr);
-                bool allowCStyleInitList = _allowCStyleInitList(ctorList);
+                bool allowCStyleInitList = checkIfCStyleStruct(this, toStructDecl);
 
                 // Easy case of default constructor or equivalent
                 if (argCount == 0)
@@ -502,7 +479,7 @@ namespace Slang
                     ioArgIndexCandidate = ioArgIndexMirror;
                     ioArgIndex = ctorParamCount;
                     
-                    // if allowCStyleInitList, process any ctor which comes next. ioArgIndex may not be 0
+                    // if allowCStyleInitList, process any ctor which comes next using the most members possible. ioArgIndex may not be 0.
                     // if !allowCStyleInitList, process any ctor that exactly matched our argument count. ioArgIndex must start at 0.
                     if (!allowCStyleInitList && ctorParamCount != Index(argCount))
                         continue;
@@ -513,6 +490,10 @@ namespace Slang
 
                     for (auto index = coercedArgs.getCount(); index < parametersCount; index++)
                     {
+                        // If we ran out of elements (and are using a c-style-constructor, end early.
+                        if (ioArgIndexCandidate > fromInitializerListExpr->args.getCount())
+                            break;
+
                         auto ctorParam = parameters[index];
                         auto paramType = ctorParam.getDecl()->type.type;
                         for (auto i : getMembersOfType<VarDecl>(m_astBuilder, toStructDeclRef, MemberFilterStyle::Instance))
@@ -532,7 +513,7 @@ namespace Slang
                             break;
                     }
 
-                    if (maybeArgList.getCount() != ctorParamCount)
+                    if (!allowCStyleInitList && maybeArgList.getCount() != ctorParamCount)
                         continue;
 
                     // Skip non-visible constructors.
@@ -1053,9 +1034,7 @@ namespace Slang
             }
             if (outToExpr)
             {
-                auto* defaultExpr = getASTBuilder()->create<DefaultConstructExpr>();
-                defaultExpr->type = QualType(toType);
-                *outToExpr = defaultExpr;
+                *outToExpr = createDefaultConstructExprForType(getASTBuilder(), QualType(toType), {});
             }
             return true;
         }

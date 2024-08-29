@@ -712,6 +712,14 @@ namespace Slang
             m_mapTypePairToImplicitCastMethod[key] = candidate;
         }
 
+        void cacheIsCStyleStruct(StructDecl* structDecl, bool isCStyleStruct)
+        {
+            m_isCStyleStruct[structDecl] = isCStyleStruct;
+        }
+        bool* tryGetIsCStyleStructFromCache(StructDecl* structDecl)
+        {
+            return m_isCStyleStruct.tryGetValue(structDecl);
+        }
     private:
             /// Mapping from type declarations to the known extensiosn that apply to them
         Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
@@ -831,6 +839,7 @@ namespace Slang
         Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
         Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
         Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
+        Dictionary<StructDecl*, bool> m_isCStyleStruct;
     };
 
         /// Local/scoped state of the semantic-checking system
@@ -2963,6 +2972,10 @@ namespace Slang
     };
     Expr* constructZeroInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructZeroInitListOptions options);
     FuncDecl* findZeroInitListFunc(StructDecl* structDecl);
+
+    bool checkIfCStyleStruct(SemanticsVisitor* visitor, StructDecl* decl);
+
+    DefaultConstructExpr* createDefaultConstructExprForType(ASTBuilder* m_astBuilder, QualType type, SourceLoc loc);
 
     DeclRefBase* _getDeclRefFromVal(Val* val);
 

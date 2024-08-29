@@ -3,6 +3,15 @@
 
 namespace Slang
 {
+
+    DefaultConstructExpr* createDefaultConstructExprForType(ASTBuilder* m_astBuilder, QualType type, SourceLoc loc)
+    {
+        auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
+        defaultConstructExpr->type = type;
+        defaultConstructExpr->loc = loc;
+        return defaultConstructExpr;
+    }
+
     ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
     {
         for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
@@ -42,7 +51,9 @@ namespace Slang
                 if (!ctor)
                     return;
                 ctorList.add(ctor);
-                if (ctor->members.getCount() != 0 && !allParamHaveInitExpr(ctor) || !defaultCtorOut)
+                if (ctor->members.getCount() != 0
+                    && !allParamHaveInitExpr(ctor)
+                    || !defaultCtorOut)
                     return;
                 *defaultCtorOut = ctor;
             };
@@ -141,9 +152,7 @@ namespace Slang
         }
         else
         {
-            auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();
-            defaultCall->type = QualType(varDeclType.type);
-            return defaultCall;
+            return createDefaultConstructExprForType(visitor->getASTBuilder(), QualType(varDeclType.type), {});
         }
     }
 
@@ -223,9 +232,66 @@ namespace Slang
             return _constructZeroInitListFuncMakeDefaultCtor(visitor, structDecl, structDeclType, defaultCtor);
 
         // 4.
-        auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();
-        defaultCall->type = QualType(structDeclType);
-        return defaultCall;
+        return createDefaultConstructExprForType(visitor->getASTBuilder(), QualType(structDeclType), {});
+    }
+
+    bool checkIfCStyleStruct(SemanticsVisitor* visitor, StructDecl* structDecl)
+    {
+        // CStyleStruct follows the following rules:
+        // 1. Does not contain a non 'Synthesized' Ctor (excluding 'DefaultCtor')
+        //
+        // 2. Only contains 1 'non-default' ctor regardless of synthisis or not, else 
+        //    `__init(int, int)` and `__init(int)` would have ambiguity for 
+        //    c-style-initialization of `MyStruct[3] tmp = {1,2, 1,2, 1,2};`
+        // 
+        // 3. Every `VarDeclBase*` member has the same visibility
+
+        auto isCStyleStruct = visitor->getShared()->tryGetIsCStyleStructFromCache(structDecl);
+
+        if (isCStyleStruct)
+            return *isCStyleStruct;
+
+        // Add to IsCStyleStruct cache
+        auto ctorList = _getCtorList(visitor->getASTBuilder(), visitor, structDecl, nullptr);
+        int nonDefaultInitCount = 0;
+        for (auto i : ctorList)
+        {
+            // Default ctor is always fine
+            if (i->getParameters().getCount() == 0)
+                continue;
+
+            // Cannot contain user defined ctor which is a non default ctor
+            if (!i->containsOption(ConstructorTags::Synthesized))
+            {
+                visitor->getShared()->cacheIsCStyleStruct(structDecl, false);
+                return false;
+            }
+
+            // Cannot contain 2+ non-default init's
+            nonDefaultInitCount++;
+            if (nonDefaultInitCount > 1)
+            {
+                visitor->getShared()->cacheIsCStyleStruct(structDecl, false);
+                return false;
+            }
+        }
+
+        // We need this additional check if we did not resolve all ctor's based on visibility yet
+        if (!structDecl->isChecked(DeclCheckState::AttributesChecked))
+        {
+            HashSet<DeclVisibility> visibilities;
+            for (auto i : getMembersOfType<VarDeclBase>(visitor->getASTBuilder(), structDecl, MemberFilterStyle::Instance))
+            {
+                visibilities.add(getDeclVisibility(i.getDecl()));
+                if (visibilities.getCount() != 1)
+                {
+                    visitor->getShared()->cacheIsCStyleStruct(structDecl, false);
+                    return false;
+                }
+            }
+        }
+        
+        visitor->getShared()->cacheIsCStyleStruct(structDecl, true);
+        return true;
     }
 }
-
