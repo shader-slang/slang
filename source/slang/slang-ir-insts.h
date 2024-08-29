@@ -3840,6 +3840,7 @@ public:
         /// If `fallback` is true, will emit `DefaultConstruct` inst on unknown types.
         /// Otherwise, returns nullptr if we can't materialize the inst.
     IRInst* emitDefaultConstruct(IRType* type, bool fallback = true);
+    IRInst* _emitDefaultConstruct(IRType* type, bool fallback, HashSet<IRType*> visitedTypes);
 
         /// Emits a raw `DefaultConstruct` opcode without attempting to fold/materialize
         /// the inst.
