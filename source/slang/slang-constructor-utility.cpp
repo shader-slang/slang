@@ -158,12 +158,12 @@ namespace Slang
         return nullptr;
     }
 
-    Expr* _constructZeroInitListFuncMakeDefaultCtorInvoke(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructorDecl* defaultCtor)
+    Expr* _constructZeroInitListFuncMakeDefaultCtor(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructorDecl* defaultCtor)
     {
             auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
             auto member = visitor->getASTBuilder()->getMemberDeclRef(structDecl->getDefaultDeclRef(), defaultCtor);
             invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
-            invoke->type = visitor->getASTBuilder()->getFuncType(ArrayView<Type*>(), structDeclType);
+            invoke->type = structDeclType;
             return invoke;
     }
     Expr* constructZeroInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructZeroInitListOptions options)
@@ -199,7 +199,7 @@ namespace Slang
                 }
             }
             if(canCreateCtor)
-                return _constructZeroInitListFuncMakeDefaultCtorInvoke(visitor, structDecl, structDeclType, defaultCtor);
+                return _constructZeroInitListFuncMakeDefaultCtor(visitor, structDecl, structDeclType, defaultCtor);
         }
 
         // 2.
@@ -220,7 +220,7 @@ namespace Slang
 
         // 3.
         if (defaultCtor)
-            return _constructZeroInitListFuncMakeDefaultCtorInvoke(visitor, structDecl, structDeclType, defaultCtor);
+            return _constructZeroInitListFuncMakeDefaultCtor(visitor, structDecl, structDeclType, defaultCtor);
 
         // 4.
         auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();

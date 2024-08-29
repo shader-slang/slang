@@ -10567,7 +10567,7 @@ namespace Slang
                 addAutoDiffModifiersToFunc(this, m_astBuilder, zeroInitFunc);
                 addModifier(zeroInitFunc, m_astBuilder->create<SynthesizedModifier>());
                 addModifier(zeroInitFunc, m_astBuilder->create<HLSLStaticModifier>());
-                addModifier(zeroInitFunc, m_astBuilder->create<PublicModifier>());
+                addVisibilityModifier(m_astBuilder, zeroInitFunc, getDeclVisibility(structDecl));
                 addModifier(zeroInitFunc, m_astBuilder->create<ZeroInitModifier>());
                 structDecl->addMember(zeroInitFunc);
             }
