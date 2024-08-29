@@ -1227,8 +1227,8 @@ namespace SlangRecord
                 _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%X", objectId));
                 _writePair(builder, indent, "type", Slang::StringUtil::makeStringWithFormat("0x%X", typeId));
                 _writePair(builder, indent, "rules", LayoutRulesToString(rules));
-                _writePair(builder, indent, "outDiagnostics", outDiagnosticsId);
-                _writePairNoComma(builder, indent, "retTypeReflectionId", outTypeLayoutReflectionId);
+                _writePair(builder, indent, "outDiagnostics", Slang::StringUtil::makeStringWithFormat("0x%X", outDiagnosticsId));
+                _writePairNoComma(builder, indent, "retTypeReflectionId", Slang::StringUtil::makeStringWithFormat("0x%X", outTypeLayoutReflectionId));
             }
         }
 
