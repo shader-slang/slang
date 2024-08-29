@@ -1477,6 +1477,27 @@ struct IRMeshOutputSet : public IRInst
     IRInst* getElementValue() { return getOperand(2); }
 };
 
+struct IRMetalSetVertex : public IRInst
+{
+    IR_LEAF_ISA(MetalSetVertex)
+    IRInst* getIndex() { return getOperand(0); }
+    IRInst* getElementValue() { return getOperand(1); }
+};
+
+struct IRMetalSetPrimitive : public IRInst
+{
+    IR_LEAF_ISA(MetalSetPrimitive)
+    IRInst* getIndex() { return getOperand(0); }
+    IRInst* getElementValue() { return getOperand(1); }
+};
+
+struct IRMetalSetIndices : public IRInst
+{
+    IR_LEAF_ISA(MetalSetIndices)
+    IRInst* getIndex() { return getOperand(0); }
+    IRInst* getElementValue() { return getOperand(1); }
+};
+
     /// An attribute that can be attached to another instruction as an operand.
     ///
     /// Attributes serve a similar role to decorations, in that both are ways
@@ -3689,6 +3710,12 @@ public:
         return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
     }
 
+    IRMetalMeshType* getMetalMeshType(IRType* vertexType, IRType* primitiveType, IRInst* numVertices, IRInst* numPrimitives, IRInst* topology)
+    {
+        IRInst* ops[5] = {vertexType, primitiveType, numVertices, numPrimitives, topology};
+        return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
+    }
+
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
     IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex = nullptr);
@@ -4441,6 +4468,11 @@ public:
     IRInst* emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index);
 
     IRInst* emitNonUniformResourceIndexInst(IRInst* val);
+
+    IRMetalSetVertex* emitMetalSetVertex(IRInst* index, IRInst* vertex);
+    IRMetalSetPrimitive* emitMetalSetPrimitive(IRInst* index, IRInst* primitive);
+    IRMetalSetIndices* emitMetalSetIndices(IRInst* index, IRInst* indices);
+
     //
     // Decorations
     //

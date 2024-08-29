@@ -924,17 +924,15 @@ class InstanceAttribute : public Attribute
     int32_t value;
 };
 
-// A `[shader("stageName")]` attribute, which marks an entry point
-// to be compiled, and specifies the stage for that entry point
-class EntryPointAttribute : public Attribute 
+// A `[shader("stageName")]`/`[shader("capability")]` attribute which
+// marks an entry point for compiling. This attribute also specifies 
+// the 'capabilities' implicitly supported by an entry point
+class EntryPointAttribute : public Attribute
 {
     SLANG_AST_CLASS(EntryPointAttribute)
- 
-    // The resolved stage that the entry point is targetting.
-    //
-    // TODO: This should be an accessor that uses the
-    // ordinary `args` list, rather than side data.
-    Stage stage;
+
+    // The resolved capailities for our entry point.
+    CapabilitySet capabilitySet;
 };
 
 // A `[__vulkanRayPayload(location)]` attribute, which is used in the
