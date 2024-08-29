@@ -8021,15 +8021,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         addTargetIntrinsicDecorations(nullptr, irParam, decl);
-        if (decl->findModifier<HLSLLayoutSemantic>())
+        
+        bool hasLayoutSemantic = false;
+        bool isSpecializationConstant = false;
+        for (auto modifier : decl->modifiers)
         {
-            builder->addHasExplicitHLSLBindingDecoration(irParam);
+            if (as<HLSLLayoutSemantic>(modifier))
+            {
+                hasLayoutSemantic = true;
+            }
+            else if (as<SpecializationConstantAttribute>(modifier) || as<GLSLConstantIDLayoutModifier>(modifier))
+            {
+                isSpecializationConstant = true;
+            }
         }
+        if (hasLayoutSemantic)
+            builder->addHasExplicitHLSLBindingDecoration(irParam);
+
         // A global variable's SSA value is a *pointer* to
         // the underlying storage.
         context->setGlobalValue(decl, paramVal);
 
-        if (decl->initExpr)
+        if (isSpecializationConstant && decl->initExpr)
         {
             auto initVal = getSimpleVal(context, lowerRValueExpr(context, decl->initExpr));
             builder->addDefaultValueDecoration(irParam, initVal);
