@@ -51,10 +51,14 @@ struct RendererContext
     slang::TypeReflection* perViewShaderType;
     slang::TypeReflection* perModelShaderType;
 
-    Result init(IDevice* inDevice)
+    TestBase *pTestBase;
+
+    Result init(IDevice* inDevice, TestBase* inTestBase)
     {
         device = inDevice;
         ComPtr<ISlangBlob> diagnostic;
+        pTestBase = inTestBase;
+
         Slang::String path = resourceBase.resolveResource("shaders.slang").getBuffer();
         shaderModule = device->getSlangSession()->loadModule(
             path.getBuffer(),
@@ -108,6 +112,12 @@ struct RendererContext
             diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
+
+        if (pTestBase && pTestBase->isTestMode())
+        {
+            pTestBase->printEntrypointHashes(componentTypes.getCount() - 1, 1, composedProgram);
+        }
+
         slangReflection = composedProgram->getLayout();
 
         // At this point, `composedProgram` represents the shader program
@@ -740,14 +750,18 @@ void onMouseUp(platform::MouseEventArgs args)
 Result initialize()
 {
     initializeBase("Model Viewer", 1024, 768);
-    gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { onMouseMove(e); };
-    gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
-    gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { onMouseDown(e); };
-    gWindow->events.keyDown = [this](const platform::KeyEventArgs& e) { onKeyDown(e); };
-    gWindow->events.keyUp = [this](const platform::KeyEventArgs& e) { onKeyUp(e); };
+    if (!isTestMode())
+    {
+        gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { onMouseMove(e); };
+        gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
+        gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { onMouseDown(e); };
+        gWindow->events.keyDown = [this](const platform::KeyEventArgs& e) { onKeyDown(e); };
+        gWindow->events.keyUp = [this](const platform::KeyEventArgs& e) { onKeyUp(e); };
+    }
 
     // Initialize `RendererContext`, which loads the shader module from file.
-    SLANG_RETURN_ON_FAIL(context.init(gDevice));
+    SLANG_RETURN_ON_FAIL(context.init(gDevice, this));
+
 
     InputElementDesc inputElements[] = {
         {"POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Model::Vertex, position) },
@@ -817,7 +831,17 @@ void renderFrame(int frameIndex) override
     // to set up our various transformation matrices.
     //
     glm::mat4x4 identity = glm::mat4x4(1.0f);
-    auto clientRect = getWindow()->getClientRect();
+
+    platform::Rect clientRect{};
+    if (isTestMode())
+    {
+        clientRect.width = 1024;
+        clientRect.height = 768;
+    }
+    else
+    {
+        clientRect = getWindow()->getClientRect();
+    }
     if (clientRect.height == 0)
         return;
     glm::mat4x4 projection = glm::perspectiveRH_ZO(
@@ -933,7 +957,10 @@ void renderFrame(int frameIndex) override
     drawCommandBuffer->close();
     gQueue->executeCommandBuffer(drawCommandBuffer);
 
-    gSwapchain->present();
+    if (!isTestMode())
+    {
+        gSwapchain->present();
+    }
 }
 
 };
