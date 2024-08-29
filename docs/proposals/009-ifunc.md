@@ -10,9 +10,11 @@ Status
 
 Author: Yong He
 
-Implementation: Planned.
+Status: Implemented.
 
-Reviewed by: N/A
+Implementation: [PR 4905](https://github.com/shader-slang/slang/pull/4905) [PR 4926](https://github.com/shader-slang/slang/pull/4926)
+
+Reviewed by: Kai Zhang, Jay Kwak
 
 Background
 ----------
@@ -57,49 +59,50 @@ eliminating the need for defining interfaces and wrapper types.
 Proposed Approach
 -----------------
 
-We propose `IFunc` and `IMutatingFunc` that is defined as follows:
-
+We should support overloading of `operator()`, and use the function call syntax to call the `operator()` member, similar to C++:
 ```
-// Function objects that does not have a mutating state.
-interface IFunc<TResult, each TParams>
+struct Functor
 {
-    TResult __call(expand each TParams params);
+    int operator()(float p) {}
 }
-
-// Function objects with a mutating state.
-interface IMutatingFunc<TFunc, each TParams>
-{
-    [mutating]
-    TResult __call(expand each TParams params);
-}
-```
-
-Ordinary functions are treated as conforming to `IFunc` and `IMutatingFunc` automatically,
-so the following code is valid:
-
-```
-int countElement(int data[100], IFunc<bool, int> condition)
-{
-    int count = 0;
-    for (int i = 0; i < data.getCount(); i++)
-        if (condition(data[i]))
-            count++;
-    return count;
-}
-
-int myCondition(int x) { return x%2 == 0; } // select all even numbers.
 
 void test()
 {
-    int data[100] = ...;
-    int count = countElement(data, myCondition);
+    Functor f;
+    f(1.0f);
 }
 ```
 
-An ordinary function or static function with type `(T0, T1, ... Tn)->TR` is coerceable to `IFunc<TIR, TI0, TI1, ... TIn>` if
-`TI0, TI1, ... TIn` are coerceable to `T0, T1, ... Tn` and `TR` is coerceable to `TIR`.
-To achieve this, the compiler will synthesize a wrapper struct type conforms to the `IFunc` interface, and calls the original function
-in its `__call` method.
+We propose `IFunc`, `IMutatingFunc`, `IDifferentiableFunc` and `IDiffernetiableMutatingFunc` that is defined as follows:
+
+```
+// Function objects that does not have a mutating state.
+interface IMutatingFunc<TR, each TP>
+{
+    [mutating]
+    TR operator()(expand each TP p);
+}
+
+// Function objects with a mutating state.
+interface IFunc<TR, each TP> : IMutatingFunc<TR, expand each TP>
+{
+    TR operator()(expand each TP p);
+}
+
+// Differentiable functions
+interface IDifferentiableMutatingFunc<TR : IDifferentiable, each TP : IDifferentiable> : IMutatingFunc<TR, expand each TP>
+{
+    [Differentiable]
+    [mutating]
+    TR operator()(expand each TP p);
+}
+
+interface IDifferentiableFunc<TR : IDifferentiable, each TP : IDifferentiable> : IFunc<TR, expand each TP>, IDifferentiableMutatingFunc<TR, expand each TP>
+{
+    [Differentiable]
+    TR operator()(expand each TP p);
+}
+```
 
 The `IMutatingFunc` interface is for defining functors that has a mutable state. The following example demonstrates its use:
 
@@ -115,7 +118,7 @@ struct CounterFunc : IMutatingFunc<void, int>
     int count;
 
     [mutating]
-    void __call(int data)
+    void operator()(int data)
     {
         if (data % 2 == 0)
             count++;
@@ -131,3 +134,9 @@ void test()
     printf("%d", f.count);
 }
 ```
+
+# Coercion of ordinary functions
+
+Eventually, we should allow ordinary functions to be automatically coerceable to `IFunc` interfaces. But this is scoped out
+for the initial `IFunc` work, because we believe the implementation can be simpler if we support lambda function first, then
+implement ordinary function coercion as a special case of lambda expressions.
