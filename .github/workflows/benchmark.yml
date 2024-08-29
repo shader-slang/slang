@@ -41,8 +41,8 @@ jobs:
           cmake --workflow --preset release
       - uses: actions/checkout@v3
         with:
-          repository: 'https://github.com/shader-slang/MDL-SDK'
-          path: 'external'
+          repository: 'shader-slang/MDL-SDK'
+          path: 'external/MDL-SDK'
       - name: Run benchmark
         run: |
           cd tools/benchmark
