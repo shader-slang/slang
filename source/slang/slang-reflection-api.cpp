@@ -797,9 +797,18 @@ SLANG_API SlangReflectionFunction* spReflection_FindFunctionByName(SlangReflecti
         programLayout->getTargetReq()->getLinkage()->getSourceManager(),
         Lexer::sourceLocationLexer);
 
+    auto astBuilder = program->getLinkage()->getASTBuilder();
     try
     {
         auto result = program->findDeclFromString(name, &sink);
+
+        if (auto genericDeclRef = result.as<GenericDecl>())
+        {
+            auto innerDeclRef = substituteDeclRef(
+                SubstitutionSet(genericDeclRef), astBuilder, genericDeclRef.getDecl()->inner);
+            result = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, innerDeclRef);
+        }
+
         if (auto funcDeclRef = result.as<FunctionDeclBase>())
             return convert(funcDeclRef);
     }
@@ -3086,6 +3095,36 @@ SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(Sla
 
     auto substDeclRef = substituteDeclRef(SubstitutionSet(genericDeclRef), astBuilder, declRef);
     return convert(substDeclRef.as<FunctionDeclBase>());
+}
+
+SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(
+    SlangReflectionFunction* func,
+    SlangInt argTypeCount,
+    SlangReflectionType* const* argTypes)
+{
+    auto declRef = convert(func);
+    if (!declRef)
+        return nullptr;
+    
+    
+    auto linkage = getModule(declRef.getDecl())->getLinkage();
+    
+    List<Type*> argTypeList;
+    for (SlangInt ii = 0; ii < argTypeCount; ++ii)
+    {
+        auto argType = convert(argTypes[ii]);
+        argTypeList.add(argType);
+    }
+
+    try 
+    {
+        DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+        return convert(linkage->specializeWithArgTypes(declRef, argTypeList, &sink).as<FunctionDeclBase>());
+    }
+    catch (...)
+    {
+        return nullptr;
+    }
 }
 
 // Abstract decl reflection

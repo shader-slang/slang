@@ -2168,6 +2168,11 @@ namespace Slang
             DeclRef<Decl>                       declRef,
             List<Expr*>                         argExprs,
             DiagnosticSink*                     sink);
+        
+        DeclRef<Decl> specializeWithArgTypes(
+            DeclRef<Decl>   funcDeclRef,
+            List<Type*>         argTypes,
+            DiagnosticSink*     sink);
 
         DiagnosticSink::Flags diagnosticSinkFlags = 0;
 

@@ -28,7 +28,6 @@
 #include "slang-type-layout.h"
 #include "slang-lookup.h"
 
-#
 #include "slang-options.h"
 
 #include "slang-repro.h"
@@ -1348,6 +1347,63 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     return asExternal(specializedType);
 }
 
+DeclRef<GenericDecl> getGenericParentDeclRef(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef)
+{
+    // Create substituted parent decl ref.
+    auto decl = declRef.getDecl();
+
+    while (!as<GenericDecl>(decl))
+    {
+        decl = decl->parentDecl;
+    }
+
+    auto genericDecl = as<GenericDecl>(decl);
+    auto genericDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, DeclRef(genericDecl)).as<GenericDecl>();
+    return substituteDeclRef(SubstitutionSet(declRef), astBuilder, genericDeclRef).as<GenericDecl>();
+}
+
+DeclRef<Decl> Linkage::specializeWithArgTypes(
+    DeclRef<Decl>   funcDeclRef,
+    List<Type*>         argTypes,
+    DiagnosticSink*     sink)
+{
+
+    // TODO: We should cache and re-use specialized types
+    // when the exact same arguments are provided again later.
+
+    SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
+    SemanticsVisitor visitor(&sharedSemanticsContext);
+
+    ASTBuilder* astBuilder = getASTBuilder();
+
+    List<Expr*> argExprs;
+    for (SlangInt aa = 0; aa < argTypes.getCount(); ++aa)
+    {
+        auto argType = argTypes[aa];
+
+        // Create an 'empty' expr with the given type. Ideally, the expression itself should not matter
+        // only its checked type.
+        //
+        auto argExpr = astBuilder->create<VarExpr>();
+        argExpr->type = argType;
+        argExprs.add(argExpr);
+    }
+
+    // Construct invoke expr.
+    auto invokeExpr = astBuilder->create<InvokeExpr>();
+    auto declRefExpr = astBuilder->create<DeclRefExpr>();
+    
+    declRefExpr->declRef = getGenericParentDeclRef(getASTBuilder(), &visitor, funcDeclRef);
+    invokeExpr->functionExpr = declRefExpr;
+    invokeExpr->arguments = argExprs;
+
+    auto checkedInvokeExpr = visitor.CheckInvokeExprWithCheckedOperands(invokeExpr);
+    return as<DeclRefExpr>(as<InvokeExpr>(checkedInvokeExpr)->functionExpr)->declRef;
+}
+
 
 DeclRef<Decl> Linkage::specializeGeneric(
         DeclRef<Decl>                       declRef,
@@ -1360,18 +1416,7 @@ DeclRef<Decl> Linkage::specializeGeneric(
     SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
-    // Create substituted parent decl ref.
-    auto decl = declRef.getDecl();
-
-    while (!as<GenericDecl>(decl))
-    {
-        decl = decl->parentDecl;
-    }
-
-    auto genericDecl = as<GenericDecl>(decl);
-    auto genericDeclRef = createDefaultSubstitutionsIfNeeded(getASTBuilder(), &visitor, DeclRef(genericDecl)).as<GenericDecl>();
-    genericDeclRef = substituteDeclRef(SubstitutionSet(declRef), getASTBuilder(), genericDeclRef).as<GenericDecl>();
-
+    auto genericDeclRef = getGenericParentDeclRef(getASTBuilder(), &visitor, declRef);
 
     DeclRefExpr* declRefExpr = getASTBuilder()->create<DeclRefExpr>();
     declRefExpr->declRef = genericDeclRef;
