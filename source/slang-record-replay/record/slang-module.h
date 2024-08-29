@@ -12,6 +12,7 @@
 namespace SlangRecord
 {
     using namespace Slang;
+    class SessionRecorder;
 
     class IModuleRecorder : public slang::IModule, public RefObject
     {
@@ -27,7 +28,7 @@ namespace SlangRecord
         SLANG_REF_OBJECT_IUNKNOWN_ALL
         ISlangUnknown* getInterface(const Guid& guid);
 
-        explicit ModuleRecorder(slang::IModule* module, RecordManager* recordManager);
+        explicit ModuleRecorder(SessionRecorder* sessionRecorder, slang::IModule* module, RecordManager* recordManager);
 
         // Interfaces for `IModule`
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL findEntryPointByName(
@@ -145,13 +146,22 @@ namespace SlangRecord
         slang::IModule* getActualModule() const { return m_actualModule; }
 
     protected:
+
+        // `IComponentTypeRecorder` interface
         virtual ApiClassId getClassId() override
         {
             return ApiClassId::Class_IModule;
         }
 
+        virtual SessionRecorder* getSessionRecorder() override
+        {
+            return m_sessionRecorder;
+        }
+
     private:
         IEntryPointRecorder* getEntryPointRecorder(slang::IEntryPoint* entryPoint);
+
+        SessionRecorder*              m_sessionRecorder;
         Slang::ComPtr<slang::IModule> m_actualModule;
         uint64_t                      m_moduleHandle = 0;
         RecordManager*                m_recordManager = nullptr;

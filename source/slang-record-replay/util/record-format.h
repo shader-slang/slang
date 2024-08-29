@@ -29,7 +29,6 @@ namespace SlangRecord
         Class_IEntryPoint                = 5,
         Class_ICompositeComponentType    = 6,
         Class_ITypeConformance           = 7,
-        Class_IComponentType             = 8,
         Unknown                          = 0xFFFF
     };
 
@@ -172,19 +171,6 @@ namespace SlangRecord
         ITypeConformance_getEntryPointHostCallable           = makeApiCallId(Class_ITypeConformance, IComponentTypeMethodId::getEntryPointHostCallable),
         ITypeConformance_renameEntryPoint                    = makeApiCallId(Class_ITypeConformance, IComponentTypeMethodId::renameEntryPoint),
         ITypeConformance_linkWithOptions                     = makeApiCallId(Class_ITypeConformance, IComponentTypeMethodId::linkWithOptions),
-
-        IComponentType_getSession                            = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::getSession),
-        IComponentType_getLayout                             = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::getLayout),
-        IComponentType_getSpecializationParamCount           = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::getSpecializationParamCount),
-        IComponentType_getEntryPointCode                     = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::getEntryPointCode),
-        IComponentType_getTargetCode                         = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::getTargetCode),
-        IComponentType_getResultAsFileSystem                 = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::getResultAsFileSystem),
-        IComponentType_getEntryPointHash                     = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::getEntryPointHash),
-        IComponentType_specialize                            = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::specialize),
-        IComponentType_link                                  = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::link),
-        IComponentType_getEntryPointHostCallable             = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::getEntryPointHostCallable),
-        IComponentType_renameEntryPoint                      = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::renameEntryPoint),
-        IComponentType_linkWithOptions                       = makeApiCallId(Class_IComponentType, IComponentTypeMethodId::linkWithOptions),
     };
 
     struct FunctionHeader

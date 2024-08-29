@@ -3,8 +3,9 @@
 
 namespace SlangRecord
 {
-    TypeConformanceRecorder::TypeConformanceRecorder(slang::ITypeConformance* typeConformance, RecordManager* recordManager)
+    TypeConformanceRecorder::TypeConformanceRecorder(SessionRecorder* sessionRecorder, slang::ITypeConformance* typeConformance, RecordManager* recordManager)
         : IComponentTypeRecorder(typeConformance, recordManager),
+          m_sessionRecorder(sessionRecorder),
           m_actualTypeConformance(typeConformance)
     {
         SLANG_RECORD_ASSERT(m_actualTypeConformance != nullptr);

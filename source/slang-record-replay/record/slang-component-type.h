@@ -12,6 +12,8 @@
 namespace SlangRecord
 {
     using namespace Slang;
+    class SessionRecorder;
+
     class IComponentTypeRecorder: public slang::IComponentType
     {
     public:
@@ -61,6 +63,7 @@ namespace SlangRecord
             slang::IBlob** outDiagnostics = nullptr) override;
     protected:
         virtual ApiClassId getClassId() = 0;
+        virtual SessionRecorder* getSessionRecorder() = 0;
         Slang::ComPtr<slang::IComponentType> m_actualComponentType;
         uint64_t                             m_componentHandle = 0;
         RecordManager*                       m_recordManager = nullptr;
@@ -70,36 +73,6 @@ namespace SlangRecord
 
         Dictionary<slang::IComponentType*, IComponentTypeRecorder*>   m_mapComponentTypeToRecorder;
         List<ComPtr<IComponentTypeRecorder>>                          m_componentTypeRecorderAlloation;
-    };
-
-
-    class ComponentTypeRecorder: public IComponentTypeRecorder, public RefObject
-    {
-    public:
-        SLANG_COM_INTERFACE(0x3d7c9db8, 0x11ad, 0x457e, { 0xbc, 0x46, 0x7e, 0x6e, 0xb9, 0x9a, 0x00, 0x1e })
-
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
-        ISlangUnknown* getInterface(const Guid& guid)
-        {
-            if (guid == ComponentTypeRecorder::getTypeGuid())
-            {
-                return static_cast<ISlangUnknown*>(this);
-            }
-            return nullptr;
-        }
-
-        explicit ComponentTypeRecorder(slang::IComponentType* componentType, RecordManager* recordManager)
-            : IComponentTypeRecorder(componentType, recordManager)
-        {
-            slangRecordLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, componentType);
-        }
-
-        slang::IComponentType* getActualComponentType() const { return m_actualComponentType; }
-    protected:
-        virtual ApiClassId getClassId() override
-        {
-            return ApiClassId::Class_IComponentType;
-        }
     };
 }
 

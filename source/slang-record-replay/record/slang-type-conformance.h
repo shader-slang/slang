@@ -13,6 +13,7 @@
 namespace SlangRecord
 {
     using namespace Slang;
+    class SessionRecorder;
 
     class ITypeConformanceRecorder : public slang::ITypeConformance, public RefObject
     {
@@ -27,7 +28,7 @@ namespace SlangRecord
         SLANG_REF_OBJECT_IUNKNOWN_ALL
         ISlangUnknown* getInterface(const Guid& guid);
 
-        explicit TypeConformanceRecorder(slang::ITypeConformance* typeConformance, RecordManager* recordManager);
+        explicit TypeConformanceRecorder(SessionRecorder* sessionRecorder, slang::ITypeConformance* typeConformance, RecordManager* recordManager);
 
         // Interfaces for `IComponentType`
         virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override
@@ -128,7 +129,12 @@ namespace SlangRecord
             return ApiClassId::Class_ITypeConformance;
         }
 
+        virtual SessionRecorder* getSessionRecorder() override
+        {
+            return m_sessionRecorder;
+        }
     private:
+        SessionRecorder*                       m_sessionRecorder = nullptr;
         Slang::ComPtr<slang::ITypeConformance> m_actualTypeConformance;
         uint64_t                               m_typeConformanceHandle = 0;
         RecordManager*                         m_recordManager = nullptr;

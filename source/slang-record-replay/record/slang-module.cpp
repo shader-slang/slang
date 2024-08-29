@@ -1,10 +1,12 @@
 #include "../util/record-utility.h"
 #include "slang-module.h"
+#include "slang-session.h"
 
 namespace SlangRecord
 {
-    ModuleRecorder::ModuleRecorder(slang::IModule* module, RecordManager* recordManager)
+    ModuleRecorder::ModuleRecorder(SessionRecorder* sessionRecorder, slang::IModule* module, RecordManager* recordManager)
         : IComponentTypeRecorder(module, recordManager),
+          m_sessionRecorder(sessionRecorder),
           m_actualModule(module),
           m_recordManager(recordManager)
     {
@@ -227,7 +229,7 @@ namespace SlangRecord
         bool ret = m_mapEntryPointToRecord.tryGetValue(entryPoint, entryPointRecord);
         if (!ret)
         {
-            entryPointRecord = new EntryPointRecorder(entryPoint, m_recordManager);
+            entryPointRecord = new EntryPointRecorder(m_sessionRecorder, entryPoint, m_recordManager);
             Slang::ComPtr<IEntryPointRecorder> result(entryPointRecord);
 
             m_entryPointsRecordAllocation.add(result);

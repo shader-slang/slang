@@ -683,7 +683,8 @@ namespace SlangRecord
             InputObjectSanityCheck(componentTypeIds[i]);
         }
 
-        OutputObjectSanityCheck(outCompositeComponentTypeId);
+        // We don't need to check existence of outCompositeComponentTypeId, because it could be the same object
+        // as the input one
 
         slang::ISession* session = getObjectPointer<slang::ISession>(objectId);
 
@@ -702,7 +703,7 @@ namespace SlangRecord
 
         if (outCompositeComponentType && SLANG_SUCCEEDED(res))
         {
-            m_objectMap.add(outCompositeComponentTypeId, outCompositeComponentType);
+            m_objectMap.addIfNotExists(outCompositeComponentTypeId, outCompositeComponentType);
         }
         else
         {

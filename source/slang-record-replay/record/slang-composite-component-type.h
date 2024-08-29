@@ -13,6 +13,8 @@
 namespace SlangRecord
 {
     using namespace Slang;
+    class SessionRecorder;
+
     class CompositeComponentTypeRecorder: public IComponentTypeRecorder, public RefObject
     {
     public:
@@ -21,7 +23,7 @@ namespace SlangRecord
         SLANG_REF_OBJECT_IUNKNOWN_ALL
         ISlangUnknown* getInterface(const Guid& guid);
 
-        explicit CompositeComponentTypeRecorder(slang::IComponentType* componentType, RecordManager* recordManager);
+        explicit CompositeComponentTypeRecorder(SessionRecorder* sessionRecorder, slang::IComponentType* componentType, RecordManager* recordManager);
 
         slang::IComponentType* getActualCompositeComponentType() const { return m_actualComponentType; }
     protected:
@@ -29,6 +31,13 @@ namespace SlangRecord
         {
             return ApiClassId::Class_ICompositeComponentType;
         }
+
+        virtual SessionRecorder* getSessionRecorder() override
+        {
+            return m_sessionRecorder;
+        }
+    private:
+        SessionRecorder* m_sessionRecorder = nullptr;
     };
 }
 #endif // SLANG_COMPOSITE_COMPONENT_TYPE_H

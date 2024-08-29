@@ -1,6 +1,7 @@
 #include "../util/record-utility.h"
 #include "slang-component-type.h"
 #include "slang-composite-component-type.h"
+#include "slang-session.h"
 
 namespace SlangRecord
 {
@@ -34,7 +35,9 @@ namespace SlangRecord
             m_recordManager->apendOutput();
         }
 
-        return res;
+        // instead of returning the actual session, we need to return the recorder
+        SessionRecorder* sessionRecorder = getSessionRecorder();
+        return static_cast<slang::ISession*>(sessionRecorder);
     }
 
     SLANG_NO_THROW slang::ProgramLayout* IComponentTypeRecorder::getLayout(
@@ -199,7 +202,7 @@ namespace SlangRecord
             m_recordManager->apendOutput();
         }
 
-        if (res)
+        if (SLANG_SUCCEEDED(res))
         {
             // replaced output with our recorder
             *outSpecializedComponentType = getComponentTypeRecorder(*outSpecializedComponentType);
@@ -228,7 +231,7 @@ namespace SlangRecord
             m_recordManager->apendOutput();
         }
 
-        if (res)
+        if (SLANG_SUCCEEDED(res))
         {
             // replaced output with our recorder
             *outLinkedComponentType = getComponentTypeRecorder(*outLinkedComponentType);
@@ -284,6 +287,14 @@ namespace SlangRecord
             m_recordManager->apendOutput();
         }
 
+        // replaced output with our recorder
+        // 'outEntryPoint' is not actually a IEntryPoint type, but a ComponentType type, so we
+        // keep using CompositeComponentTypeRecorder to record it.
+        if (SLANG_SUCCEEDED(res))
+        {
+            // replaced output with our recorder
+            *outEntryPoint = getComponentTypeRecorder(*outEntryPoint);
+        }
         return res;
     }
 
@@ -312,7 +323,7 @@ namespace SlangRecord
             m_recordManager->apendOutput();
         }
 
-        if (res)
+        if (SLANG_SUCCEEDED(res))
         {
             // replaced output with our recorder
             *outLinkedComponentType = getComponentTypeRecorder(*outLinkedComponentType);
@@ -331,10 +342,10 @@ namespace SlangRecord
                 return recorder;
             }
 
-            recorder = new CompositeComponentTypeRecorder(componentTypes, m_recordManager);
+            recorder = new CompositeComponentTypeRecorder(getSessionRecorder(), componentTypes, m_recordManager);
             ComPtr<IComponentTypeRecorder> result(recorder);
             m_componentTypeRecorderAlloation.add(result);
-            m_mapComponentTypeToRecorder.add(componentTypes, result);
+            m_mapComponentTypeToRecorder.add(componentTypes, result.detach());
         }
         return recorder;
     }

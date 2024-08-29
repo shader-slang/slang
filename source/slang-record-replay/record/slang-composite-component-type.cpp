@@ -3,9 +3,11 @@
 
 namespace SlangRecord
 {
-    CompositeComponentTypeRecorder::CompositeComponentTypeRecorder(
-            slang::IComponentType* componentType, RecordManager* recordManager)
-        : IComponentTypeRecorder(componentType, recordManager)
+    CompositeComponentTypeRecorder::CompositeComponentTypeRecorder(SessionRecorder* sessionRecorder,
+            slang::IComponentType* componentType,
+            RecordManager* recordManager)
+        : IComponentTypeRecorder(componentType, recordManager),
+          m_sessionRecorder(sessionRecorder)
     {
         slangRecordLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, componentType);
     }

@@ -182,7 +182,7 @@ namespace SlangRecord
         if (SLANG_OK == result)
         {
             CompositeComponentTypeRecorder* compositeComponentTypeRecord =
-                new CompositeComponentTypeRecorder(*outCompositeComponentType, m_recordManager);
+                new CompositeComponentTypeRecorder(this, *outCompositeComponentType, m_recordManager);
             Slang::ComPtr<CompositeComponentTypeRecorder> resultRecord(compositeComponentTypeRecord);
             *outCompositeComponentType = resultRecord.detach();
         }
@@ -388,7 +388,7 @@ namespace SlangRecord
 
         if (SLANG_OK != result)
         {
-            ITypeConformanceRecorder* conformanceRecord = new TypeConformanceRecorder(*outConformance, m_recordManager);
+            ITypeConformanceRecorder* conformanceRecord = new TypeConformanceRecorder(this, *outConformance, m_recordManager);
             Slang::ComPtr<ITypeConformanceRecorder> resultRecord(conformanceRecord);
             *outConformance = resultRecord.detach();
         }
@@ -471,7 +471,7 @@ namespace SlangRecord
         bool ret = m_mapModuleToRecord.tryGetValue(module, moduleRecord);
         if (!ret)
         {
-            moduleRecord = new ModuleRecorder(module, m_recordManager);
+            moduleRecord = new ModuleRecorder(this, module, m_recordManager);
             Slang::ComPtr<IModuleRecorder> result(moduleRecord);
             m_moduleRecordersAlloation.add(result);
             m_mapModuleToRecord.add(module, result.detach());
@@ -504,17 +504,11 @@ namespace SlangRecord
                 CompositeComponentTypeRecorder* compositeComponentTypeRecord = static_cast<CompositeComponentTypeRecorder*>(outObj);
                 outActualComponentTypes.add(compositeComponentTypeRecord->getActualCompositeComponentType());
             }
-            else if (componentType->queryInterface(ComponentTypeRecorder::getTypeGuid(), &outObj) == SLANG_OK)
-            {
-                ComponentTypeRecorder* componentTypeRecorder = static_cast<ComponentTypeRecorder*>(outObj);
-                outActualComponentTypes.add(componentTypeRecorder->getActualComponentType());
-            }
             else if (componentType->queryInterface(ITypeConformanceRecorder::getTypeGuid(), &outObj) == SLANG_OK)
             {
                 TypeConformanceRecorder* typeConformanceRecorder = static_cast<TypeConformanceRecorder*>(outObj);
                 outActualComponentTypes.add(typeConformanceRecorder->getActualTypeConformance());
             }
-
             // will fall back to the actual component type, it means that we didn't record this type.
             else
             {

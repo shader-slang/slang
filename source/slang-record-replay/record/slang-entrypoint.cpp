@@ -3,8 +3,9 @@
 
 namespace SlangRecord
 {
-    EntryPointRecorder::EntryPointRecorder(slang::IEntryPoint* entryPoint, RecordManager* recordManager)
+    EntryPointRecorder::EntryPointRecorder(SessionRecorder* sessionRecorder, slang::IEntryPoint* entryPoint, RecordManager* recordManager)
         : IComponentTypeRecorder(entryPoint, recordManager),
+          m_sessionRecorder(sessionRecorder),
           m_actualEntryPoint(entryPoint)
     {
         SLANG_RECORD_ASSERT(m_actualEntryPoint != nullptr);
