@@ -214,7 +214,7 @@ namespace Slang
                 member = visitor->getASTBuilder()->getMemberDeclRef(structDecl, zeroInitListFunc);
 
             invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, zeroInitListFunc->loc, nullptr);
-            invoke->type = visitor->getASTBuilder()->getFuncType(ArrayView<Type*>(), structDeclType);
+            invoke->type = structDeclType;
             return invoke;
         }
 
