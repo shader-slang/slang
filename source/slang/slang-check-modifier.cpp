@@ -330,7 +330,7 @@ namespace Slang
         return false;
     }
 
-    bool SemanticsVisitor::validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl, ModifiableSyntaxNode* attrTarget)
+    Modifier* SemanticsVisitor::validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl, ModifiableSyntaxNode* attrTarget)
     {
         if (auto numThreadsAttr = as<NumThreadsAttribute>(attr))
         {
@@ -348,14 +348,14 @@ namespace Slang
                     auto intValue = checkLinkTimeConstantIntVal(arg);
                     if (!intValue)
                     {
-                        return false;
+                        return nullptr;
                     }
                     if (auto constIntVal = as<ConstantIntVal>(intValue))
                     {
                         if (constIntVal->getValue() < 1)
                         {
                             getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, constIntVal->getValue());
-                            return false;
+                            return nullptr;
                         }
                         if (intValue->getType() != m_astBuilder->getIntType())
                         {
@@ -407,7 +407,7 @@ namespace Slang
                     if (!isValidWaveSize)
                     {
                         getSink()->diagnose(attr, Diagnostics::invalidWaveSize, constIntVal->getValue());
-                        return false;
+                        return nullptr;
                     }
                 }
                 value = intValue;
@@ -426,20 +426,20 @@ namespace Slang
 
             if (attr->args.getCount() != 1)
             {
-                return false;
+                return nullptr;
             }
 
             auto value = checkConstantIntVal(attr->args[0]);
             if (value == nullptr)
             {
-                return false;
+                return nullptr;
             }
 
             const IRIntegerValue kMaxAnyValueSize = 0x7FFF;
             if (value->getValue() > kMaxAnyValueSize)
             {
                 getSink()->diagnose(anyValueSizeAttr->loc, Diagnostics::anyValueSizeExceedsLimit, kMaxAnyValueSize);
-                return false;
+                return nullptr;
             }
 
             anyValueSizeAttr->size = int32_t(value->getValue());
@@ -448,16 +448,16 @@ namespace Slang
         {
             if (attr->args.getCount() != 1)
             {
-                return false;
+                return nullptr;
             }
             auto value = checkConstantIntVal(attr->args[0]);
             if (value == nullptr)
             {
-                return false;
+                return nullptr;
             }
             if (value->getValue() < 0)
             {
-                return false;
+                return nullptr;
             }
             glslRequireShaderInputParameter->parameterNumber = int32_t(value->getValue());
         }
@@ -465,23 +465,23 @@ namespace Slang
         {
             if (attr->args.getCount() != 1)
             {
-                return false;
+                return nullptr;
             }
             auto rank = checkConstantIntVal(attr->args[0]);
             if (rank == nullptr)
             {
-                return false;
+                return nullptr;
             }
             overloadRankAttr->rank = int32_t(rank->getValue());
         }
         else if (auto inputAttachmentIndexLayoutAttribute = as<GLSLInputAttachmentIndexLayoutAttribute>(attr))
         {
             if (attr->args.getCount() != 1)
-                return false;
+                return nullptr;
     
             auto location = checkConstantIntVal(attr->args[0]);
             if(!location)
-                return false;
+                return nullptr;
 
             inputAttachmentIndexLayoutAttribute->location = location->getValue();
         }
@@ -492,7 +492,7 @@ namespace Slang
             // in core.meta.slang, but that's not completely implemented. So for now we check here.
             if (attr->args.getCount() != 2)
             {
-                return false;
+                return nullptr;
             }
 
             // TODO(JS): Prior validation currently doesn't ensure both args are ints (as specified in core.meta.slang), so check here
@@ -502,7 +502,7 @@ namespace Slang
 
             if (binding == nullptr || set == nullptr)
             {
-                return false;
+                return nullptr;
             }
 
             bindingAttr->binding = int32_t(binding->getValue());
@@ -515,13 +515,13 @@ namespace Slang
 
             if (attr->args.getCount() != 1)
             {
-                return false;
+                return nullptr;
             }
 
             auto value = checkConstantIntVal(attr->args[0]);
             if (value == nullptr)
             {
-                return false;
+                return nullptr;
             }
 
             simpleLayoutAttr->value = int32_t(value->getValue());
@@ -531,7 +531,7 @@ namespace Slang
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
 
-            if (!val) return false;
+            if (!val) return nullptr;
 
             maxVertexCountAttr->value = (int32_t)val->getValue();
         }
@@ -540,7 +540,7 @@ namespace Slang
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
 
-            if (!val) return false;
+            if (!val) return nullptr;
 
             instanceAttr->value = (int32_t)val->getValue();
         }
@@ -551,7 +551,7 @@ namespace Slang
             String capNameString;
             if (!checkLiteralStringVal(attr->args[0], &capNameString))
             {
-                return false;
+                return nullptr;
             }
 
             CapabilityName capName = findCapabilityName(capNameString.getUnownedSlice());
@@ -587,7 +587,7 @@ namespace Slang
             {
                 // always diagnose this error since nothing can compile with an invalid capability
                 getSink()->diagnose(attr, Diagnostics::unknownCapability, capNameString);
-                return false;
+                return nullptr;
             }
         }
         else if ((as<DomainAttribute>(attr)) ||
@@ -627,21 +627,6 @@ namespace Slang
                 getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
             }
         }
-        else if (as<VkSpecialConstantAttributeBase>(attr))
-        {
-            // Has no args
-            SLANG_ASSERT(attr->args.getCount() == 0);
-        }
-        else if (as<ShaderRecordAttribute>(attr))
-        {
-            // Has no args
-            SLANG_ASSERT(attr->args.getCount() == 0);
-        }
-        else if (as<EarlyDepthStencilAttribute>(attr))
-        {
-            // Has no args
-            SLANG_ASSERT(attr->args.getCount() == 0);
-        }
         else if (auto attrUsageAttr = as<AttributeUsageAttribute>(attr))
         {
             uint32_t targetClassId = (uint32_t)UserDefinedAttributeTargets::None;
@@ -655,13 +640,13 @@ namespace Slang
                 else
                 {
                     getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
-                    return false;
+                    return nullptr;
                 }
             }
             if (!getAttributeTargetSyntaxClasses(attrUsageAttr->targetSyntaxClass, targetClassId))
             {
                 getSink()->diagnose(attr, Diagnostics::invalidAttributeTarget);
-                return false;
+                return nullptr;
             }
         }
         else if (const auto unrollAttr = as<UnrollAttribute>(attr))
@@ -753,7 +738,7 @@ namespace Slang
             String formatName;
             if(!checkLiteralStringVal(attr->args[0], &formatName))
             {
-                return false;
+                return nullptr;
             }
 
             ImageFormat format = ImageFormat::unknown;
@@ -782,7 +767,7 @@ namespace Slang
             String diagnosticName;
             if(!checkLiteralStringVal(attr->args[0], &diagnosticName))
             {
-                return false;
+                return nullptr;
             }
 
             auto diagnosticInfo = findDiagnosticByName(diagnosticName.getUnownedSlice());
@@ -800,14 +785,14 @@ namespace Slang
             String libraryName;
             if (!checkLiteralStringVal(dllImportAttr->args[0], &libraryName))
             {
-                return false;
+                return nullptr;
             }
             dllImportAttr->modulePath = libraryName;
 
             String functionName;
             if (dllImportAttr->args.getCount() == 2 && !checkLiteralStringVal(dllImportAttr->args[1], &functionName))
             {
-                return false;
+                return nullptr;
             }
             dllImportAttr->functionName = functionName;
         }
@@ -816,7 +801,7 @@ namespace Slang
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
 
-            if (!val) return false;
+            if (!val) return nullptr;
 
             rayPayloadAttr->location = (int32_t)val->getValue();
         }
@@ -824,7 +809,7 @@ namespace Slang
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
-            if (!val) return false;
+            if (!val) return nullptr;
             rayPayloadInAttr->location = (int32_t)val->getValue();
         }
         else if (auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(attr))
@@ -832,7 +817,7 @@ namespace Slang
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
 
-            if (!val) return false;
+            if (!val) return nullptr;
 
             callablePayloadAttr->location = (int32_t)val->getValue();
         }
@@ -840,7 +825,7 @@ namespace Slang
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
-            if (!val) return false;
+            if (!val) return nullptr;
             callablePayloadInAttr->location = (int32_t)val->getValue();
         }
         else if (auto hitObjectAttributesAttr = as<VulkanHitObjectAttributesAttribute>(attr))
@@ -848,7 +833,7 @@ namespace Slang
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
 
-            if (!val) return false;
+            if (!val) return nullptr;
 
             hitObjectAttributesAttr->location = (int32_t)val->getValue();
         }
@@ -876,7 +861,7 @@ namespace Slang
             SLANG_ASSERT(as<Decl>(attrTarget));
 
             auto val = checkConstantIntVal(attr->args[0]);
-            if (!val) return false;
+            if (!val) return nullptr;
 
             preferRecomputeAttr->sideEffectBehavior = (PreferRecomputeAttribute::SideEffectBehavior) val->getValue();
         }
@@ -886,7 +871,7 @@ namespace Slang
             String guid;
             if (!checkLiteralStringVal(comInterfaceAttr->args[0], &guid))
             {
-                return false;
+                return nullptr;
             }
             StringBuilder resultGUID;
             for (auto ch : guid)
@@ -902,14 +887,14 @@ namespace Slang
                 else
                 {
                     getSink()->diagnose(attr, Diagnostics::invalidGUID, guid);
-                    return false;
+                    return nullptr;
                 }
             }
             comInterfaceAttr->guid = resultGUID.toString();
             if (comInterfaceAttr->guid.getLength() != 32)
             {
                 getSink()->diagnose(attr, Diagnostics::invalidGUID, guid);
-                return false;
+                return nullptr;
             }
         }
         else if (const auto derivativeMemberAttr = as<DerivativeMemberAttribute>(attr))
@@ -918,7 +903,7 @@ namespace Slang
             if (!varDecl)
             {
                 getSink()->diagnose(attr, Diagnostics::attributeNotApplicable, attr->getKeywordName());
-                return false;
+                return nullptr;
             }
         }
         else if (auto deprecatedAttr = as<DeprecatedAttribute>(attr))
@@ -928,7 +913,7 @@ namespace Slang
             String message;
             if(!checkLiteralStringVal(attr->args[0], &message))
             {
-                return false;
+                return nullptr;
             }
 
             deprecatedAttr->message = message;
@@ -940,7 +925,7 @@ namespace Slang
             String name;
             if(!checkLiteralStringVal(attr->args[0], &name))
             {
-                return false;
+                return nullptr;
             }
 
             knownBuiltinAttr->name = name;
@@ -953,7 +938,7 @@ namespace Slang
             String name;
             if(!checkLiteralStringVal(attr->args[0], &name))
             {
-                return false;
+                return nullptr;
             }
 
             pyExportAttr->name = name;
@@ -980,17 +965,17 @@ namespace Slang
             if (attr->args.getCount() > 2)
             {
                 getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), 0);
-                return false;
+                return nullptr;
             }
             else if (attr->args.getCount() < 2)
             {
                 getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), 2);
-                return false;
+                return nullptr;
             }
             CapabilityName capName;
             if (!checkCapabilityName(attr->args[0], capName))
             {
-                return false;
+                return nullptr;
             }
             requirePreludeAttr->capabilitySet = CapabilitySet(capName);
             if (auto stringLitExpr = as<StringLiteralExpr>(attr->args[1]))
@@ -1000,9 +985,9 @@ namespace Slang
             else
             {
                 getSink()->diagnose(attr->args[1], Diagnostics::expectedAStringLiteral);
-                return false;
+                return nullptr;
             }
-            return true;
+            return attr;
         }
         else
         {
@@ -1016,11 +1001,11 @@ namespace Slang
                 // We should be special-casing the checking of any attribute
                 // with a non-zero number of arguments.
                 getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), 0);
-                return false;
+                return nullptr;
             }
         }
 
-        return true;
+        return attr;
     }
 
     AttributeBase* SemanticsVisitor::checkAttribute(
@@ -1156,7 +1141,6 @@ namespace Slang
             // Modifiers that are their own exclusive group.
         case ASTNodeType::GLSLLayoutModifier:
         case ASTNodeType::GLSLParsedLayoutModifier:
-        case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
         case ASTNodeType::GLSLInputAttachmentIndexLayoutAttribute:
         case ASTNodeType::GLSLOffsetLayoutAttribute:
@@ -1236,7 +1220,6 @@ namespace Slang
         case ASTNodeType::OutModifier:
         case ASTNodeType::GLSLLayoutModifier:
         case ASTNodeType::GLSLParsedLayoutModifier:
-        case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
         case ASTNodeType::GLSLInputAttachmentIndexLayoutAttribute:
         case ASTNodeType::GLSLOffsetLayoutAttribute:

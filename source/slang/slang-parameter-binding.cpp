@@ -704,7 +704,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     }
 
     if (varDecl->hasModifier<SpecializationConstantAttribute>() ||
-        varDecl->hasModifier<GLSLConstantIDLayoutModifier>())
+        varDecl->hasModifier<VkConstantIdAttribute>())
     {
         auto specializationConstantRule = rules->getSpecializationConstantRules();
         if (!specializationConstantRule)
@@ -1146,11 +1146,16 @@ static void addExplicitParameterBindings_GLSL(
         info[kResInfo].resInfo = foundSpecializationConstant;
         DeclRef<Decl> varDecl2(varDecl);
 
-        if (auto glslLocationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
+        if (auto layoutAttr = varDecl.getDecl()->findModifier<VkConstantIdAttribute>())
+        {
+            if (auto constVal = as<ConstantIntVal>(layoutAttr->intArgVals[0]))
+                info[kResInfo].semanticInfo.index = constVal->getValue();
+        }
+        else if (auto glslLocationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
         {
             info[kResInfo].semanticInfo.index = glslLocationAttr->value;
         }
-        else if (!findLayoutArg<GLSLConstantIDLayoutModifier>(varDecl2, &info[kResInfo].semanticInfo.index))
+        else
         {
             return;
         }

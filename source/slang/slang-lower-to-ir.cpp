@@ -8030,7 +8030,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 hasLayoutSemantic = true;
             }
-            else if (as<SpecializationConstantAttribute>(modifier) || as<GLSLConstantIDLayoutModifier>(modifier))
+            else if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
             {
                 isSpecializationConstant = true;
             }

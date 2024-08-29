@@ -28,11 +28,10 @@
 [vk::specialization_constant]
 const int constValue0 = 1;
 
-[vk::specialization_constant]
-[vk::location(7)]
+[vk::constant_id(7)]
 const float constValue1 = 3.0f;
 
-[vk::specialization_constant]
+[SpecializationConstant]
 const bool constValue2 = true;
 
 layout(constant_id = 9) const int constValue3 = 111;

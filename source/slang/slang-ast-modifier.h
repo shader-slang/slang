@@ -235,10 +235,6 @@ class GLSLUnparsedLayoutModifier : public GLSLLayoutModifier
 
 
 // Specific cases for known GLSL `layout` modifiers that we need to work with
-class GLSLConstantIDLayoutModifier : public GLSLParsedLayoutModifier 
-{
-    SLANG_AST_CLASS(GLSLConstantIDLayoutModifier)
-};
 
 class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier 
 {
@@ -726,21 +722,22 @@ class FlagsAttribute : public Attribute
     SLANG_AST_CLASS(FlagsAttribute);
 };
 
-class VkSpecialConstantAttributeBase : public Attribute
-{
-    SLANG_AST_CLASS(VkSpecialConstantAttributeBase);
-};
-
 // [[vk_push_constant]] [[push_constant]]
-class PushConstantAttribute : public VkSpecialConstantAttributeBase
+class PushConstantAttribute : public Attribute
 {
     SLANG_AST_CLASS(PushConstantAttribute)
 };
 
 // [[vk_specialization_constant]] [[specialization_constant]]
-class SpecializationConstantAttribute : public VkSpecialConstantAttributeBase
+class SpecializationConstantAttribute : public Attribute
 {
     SLANG_AST_CLASS(SpecializationConstantAttribute)
+};
+
+// [[vk_constant_id]]
+class VkConstantIdAttribute : public Attribute
+{
+    SLANG_AST_CLASS(VkConstantIdAttribute)
 };
 
 // [[vk_shader_record]] [[shader_record]]

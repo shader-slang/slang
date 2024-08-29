@@ -2699,15 +2699,17 @@ attribute_syntax [vk_shader_record]			                        : ShaderRecordAttr
 __attributeTarget(VarDeclBase)
 attribute_syntax [shader_record]			                        : ShaderRecordAttribute;
 
-__attributeTarget(DeclBase)
+__attributeTarget(VarDeclBase)
 attribute_syntax [vk_push_constant]									: PushConstantAttribute;
-__attributeTarget(DeclBase)
+__attributeTarget(VarDeclBase)
 attribute_syntax [push_constant]									: PushConstantAttribute;
 
-__attributeTarget(DeclBase)
+__attributeTarget(VarDeclBase)
 attribute_syntax[vk_specialization_constant] : SpecializationConstantAttribute;
-__attributeTarget(DeclBase)
-attribute_syntax[specialization_constant] : SpecializationConstantAttribute;
+__attributeTarget(VarDeclBase)
+attribute_syntax[SpecializationConstant] : SpecializationConstantAttribute;
+__attributeTarget(VarDeclBase)
+attribute_syntax[vk_constant_id(location: int)] : VkConstantIdAttribute;
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
