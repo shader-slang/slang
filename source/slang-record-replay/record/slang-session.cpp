@@ -451,7 +451,8 @@ namespace SlangRecord
             {
                 SLANG_RECORD_ASSERT(!"Module not found in mapModuleToRecord");
             }
-            return static_cast<slang::IModule*>(moduleRecord);
+            ComPtr<slang::IModule> result(static_cast<slang::IModule*>(moduleRecord));
+            return result.detach();
         }
 
         return pModule;
@@ -476,6 +477,12 @@ namespace SlangRecord
             m_moduleRecordersAlloation.add(result);
             m_mapModuleToRecord.add(module, result.detach());
         }
+        else
+        {
+            ComPtr<IModuleRecorder> result(moduleRecord);
+            return result.detach();
+        }
+
         return moduleRecord;
     }
 

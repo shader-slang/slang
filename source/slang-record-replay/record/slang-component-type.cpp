@@ -339,7 +339,8 @@ namespace SlangRecord
         {
             if (m_mapComponentTypeToRecorder.tryGetValue(componentTypes, recorder))
             {
-                return recorder;
+                ComPtr<IComponentTypeRecorder> result(recorder);
+                return result.detach();
             }
 
             recorder = new CompositeComponentTypeRecorder(getSessionRecorder(), componentTypes, m_recordManager);

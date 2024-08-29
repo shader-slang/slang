@@ -97,7 +97,8 @@ namespace SlangRecord
             {
                 SLANG_RECORD_ASSERT(!"Entrypoint not found in mapEntryPointToRecord");
             }
-            *outEntryPoint = static_cast<slang::IEntryPoint*>(entryPointRecord);
+            ComPtr<slang::IEntryPoint> result(static_cast<slang::IEntryPoint*>(entryPointRecord));
+            *outEntryPoint = result.detach();
         }
         else
             *outEntryPoint = nullptr;
@@ -234,7 +235,12 @@ namespace SlangRecord
 
             m_entryPointsRecordAllocation.add(result);
             m_mapEntryPointToRecord.add(entryPoint, result.detach());
+            return entryPointRecord;
         }
-        return entryPointRecord;
+        else
+        {
+            Slang::ComPtr<IEntryPointRecorder> result(entryPointRecord);
+            return result.detach();
+        }
     }
 }
