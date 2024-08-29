@@ -2515,6 +2515,8 @@ struct SPIRVEmitContext
             nullptr,
             result,
             SpvLiteralInteger::from32((uint32_t)offset->getOffset()));
+
+        maybeEmitName(result, param);
         return result;
     }
 
