@@ -968,6 +968,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         /// Decorates a auto-diff transcribed value with the original value that the inst is transcribed from.
     INST(AutoDiffOriginalValueDecoration, AutoDiffOriginalValueDecoration, 1, 0)
 
+        /// Decorates a type as auto-diff builtin type.
+    INST(AutoDiffBuiltinDecoration, AutoDiffBuiltinDecoration, 0, 0)
+
         /// Used by the auto-diff pass to hold a reference to the
         /// generated derivative function.
     INST(ForwardDerivativeDecoration, fwdDerivative, 1, 0)
