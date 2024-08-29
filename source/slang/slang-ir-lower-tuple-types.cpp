@@ -262,6 +262,71 @@ namespace Slang
             inst->removeAndDeallocate();
         }
 
+        void processUpdateElement(IRUpdateElement* inst)
+        {
+            // For UpdateElement insts, we need to figure out all the intermediate types on the access chain,
+            // and if any of them are lowered tuples, we need to replace the access key with the new struct
+            // key for the lowered tuple struct.
+            //
+            ShortList<IRInst*> newAccessChain;
+            bool accessChainChanged = false;
+            auto baseType = inst->getOldValue()->getDataType();
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+
+            for (UInt i = 0; i < inst->getAccessKeyCount(); i++)
+            {
+                auto key = inst->getAccessKey(i);
+                if (auto structKey = as<IRStructKey>(key))
+                {
+                    if (auto structType = as<IRStructType>(baseType))
+                    {
+                        auto field = findStructField(structType, structKey);
+                        baseType = field->getFieldType();
+                        newAccessChain.add(structKey);
+                    }
+                    else
+                    {
+                        // If we see anything not supported, just bail out.
+                        return;
+                    }
+                }
+                else if (auto arrayType = as<IRArrayTypeBase>(baseType))
+                {
+                    baseType = arrayType->getElementType();
+                    newAccessChain.add(key);
+                }
+                else if (auto loweredTupleInfo = getLoweredTupleType(&builder, baseType))
+                {
+                    auto fieldIndex = getIntVal(key);
+                    if (fieldIndex >= 0 && (Index)fieldIndex < loweredTupleInfo->fields.getCount())
+                    {
+                        auto field = loweredTupleInfo->fields[fieldIndex];
+                        baseType = field->getFieldType();
+                        newAccessChain.add(field->getKey());
+                        accessChainChanged = true;
+                    }
+                    else
+                    {
+                        // If we see anything not supported, just bail out.
+                        break;
+                    }
+                }
+                else
+                {
+                    // If we see anything not supported, just bail out.
+                    break;
+                }
+            }
+
+            if (accessChainChanged)
+            {
+                auto newInst = builder.emitUpdateElement(inst->getOldValue(), newAccessChain.getArrayView().arrayView, inst->getElementValue());
+                inst->replaceUsesWith(newInst);
+                inst->removeAndDeallocate();
+            }
+        }
+
         void processInst(IRInst* inst)
         {
             switch (inst->getOp())
@@ -290,6 +355,9 @@ namespace Slang
                 break;
             case kIROp_IndexedFieldKey:
                 processIndexedFieldKey((IRIndexedFieldKey*)inst);
+                break;
+            case kIROp_UpdateElement:
+                processUpdateElement((IRUpdateElement*)inst);
                 break;
             default:
                 break;

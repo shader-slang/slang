@@ -15881,6 +15881,20 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
     }
 }
 
+__generic<each T : __BuiltinIntegerType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, raytracing_intersection)]
+bool ReportHitOptix(float tHit, uint hitKind, expand each T attribs)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "optixReportIntersection";
+    default:
+        return ReportHit(tHit, hitKind, makeTuple(expand each attribs));
+    }
+}
+
 // 10.3.4
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void IgnoreHit()
@@ -16288,7 +16302,8 @@ float dot2add(float2 left, float2 right, float acc);
 // Set the number of output vertices and primitives for a mesh shader invocation.
 __glsl_extension(GL_EXT_mesh_shader)
 __glsl_version(450)
-[require(glsl_hlsl_spirv, meshshading)]
+[require(glsl_hlsl_metal_spirv, meshshading)]
+[noRefInline]
 void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 {
     __target_switch
@@ -16297,6 +16312,8 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
         __intrinsic_asm "SetMeshOutputCounts";
     case glsl:
         __intrinsic_asm "SetMeshOutputsEXT";
+    case metal:
+        __intrinsic_asm "_slang_mesh.set_primitive_count($1)";
     case spirv:
         return spirv_asm
         {
@@ -16328,7 +16345,7 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
         // is dealt with separately by 'legalizeDispatchMeshPayloadForGLSL'.
         __intrinsic_asm "EmitMeshTasksEXT($0, $1, $2)";
     case metal:
-        __intrinsic_asm "_slang_mesh_payload = *$3; _slang_mgp.set_threadgroups_per_grid(uint3($0, $1, $2)); return;";
+        __intrinsic_asm "*_slang_mesh_payload = *$3; _slang_mgp.set_threadgroups_per_grid(uint3($0, $1, $2)); return;";
     case spirv:
         return spirv_asm
         {

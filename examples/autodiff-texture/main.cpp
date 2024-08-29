@@ -78,6 +78,11 @@ struct AutoDiffTexture : public WindowedAppBase
         diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
 
+        if (isTestMode())
+        {
+            printEntrypointHashes(componentTypes.getCount() - 1, 1, linkedProgram);
+        }
+
         gfx::IShaderProgram::Desc programDesc = {};
         programDesc.slangGlobalScope = linkedProgram;
         SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
@@ -113,6 +118,11 @@ struct AutoDiffTexture : public WindowedAppBase
             diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
+
+        if (isTestMode())
+        {
+            printEntrypointHashes(componentTypes.getCount() - 1, 1, linkedProgram);
+        }
 
         gfx::IShaderProgram::Desc programDesc = {};
         programDesc.slangGlobalScope = linkedProgram;
@@ -266,18 +276,31 @@ struct AutoDiffTexture : public WindowedAppBase
         initializeBase("autodiff-texture", 1024, 768);
         srand(20421);
 
-        gWindow->events.keyPress = [this](platform::KeyEventArgs& e)
+        if (!isTestMode())
         {
-            if (e.keyChar == 'R' || e.keyChar == 'r')
-                resetLearntTexture = true;
-        };
+            gWindow->events.keyPress = [this](platform::KeyEventArgs& e)
+            {
+                if (e.keyChar == 'R' || e.keyChar == 'r')
+                    resetLearntTexture = true;
+            };
+        }
 
         kClearValue.color.floatValues[0] = 0.3f;
         kClearValue.color.floatValues[1] = 0.5f;
         kClearValue.color.floatValues[2] = 0.7f;
         kClearValue.color.floatValues[3] = 1.0f;
 
-        auto clientRect = gWindow->getClientRect();
+        platform::Rect clientRect{};
+        if (isTestMode())
+        {
+            clientRect.width = 1024;
+            clientRect.height = 768;
+        }
+        else
+        {
+            clientRect = getWindow()->getClientRect();
+        }
+
         windowWidth = clientRect.width;
         windowHeight = clientRect.height;
 
@@ -321,7 +344,7 @@ struct AutoDiffTexture : public WindowedAppBase
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
-            SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "convert", shaderProgram.writeRef()));
+            SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "convert.slang", shaderProgram.writeRef()));
             gConvertPipelineState = createComputePipelineState(shaderProgram);
         }
         {
@@ -619,7 +642,7 @@ struct AutoDiffTexture : public WindowedAppBase
             commandBuffer->close();
             gQueue->executeCommandBuffer(commandBuffer);
         }
-        
+
         // Draw currently learnt texture.
         {
             ComPtr<ICommandBuffer> commandBuffer =
@@ -635,7 +658,10 @@ struct AutoDiffTexture : public WindowedAppBase
             gQueue->executeCommandBuffer(commandBuffer);
         }
 
-        gSwapchain->present();
+        if (!isTestMode())
+        {
+            gSwapchain->present();
+        }
     }
 
     void drawTexturedQuad(IRenderCommandEncoder* renderEncoder, int x, int y, int w, int h, IResourceView* srv)

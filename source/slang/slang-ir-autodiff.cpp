@@ -448,25 +448,25 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
                 IRBuilder subBuilder(item->getConcreteType());
                 if (as<IRTypePack>(concreteType) || as<IRTupleType>(concreteType))
                 {
-                    // For tuple types, register the differential type for each element, but don't register for the
+                    // For tuple types with concrete element types,
+                    // register the differential type for each element, but don't register for the
                     // tuple/typepack itself.
-                    auto witnessPack = as<IRMakeWitnessPack>(witness);
-                    SLANG_ASSERT(witnessPack);
-
-                    for (UInt i = 0; i < concreteType->getOperandCount(); i++)
+                    if (auto witnessPack = as<IRMakeWitnessPack>(witness))
                     {
-                        auto element = concreteType->getOperand(i);
-                        auto elementWitness = witnessPack->getOperand(i);
-                        differentiableWitnessDictionary.addIfNotExists(
-                            (IRType*)element,
-                            _lookupWitness(&subBuilder, elementWitness, sharedContext->differentialAssocTypeStructKey));
+
+                        for (UInt i = 0; i < concreteType->getOperandCount(); i++)
+                        {
+                            auto element = concreteType->getOperand(i);
+                            auto elementWitness = witnessPack->getOperand(i);
+                            differentiableWitnessDictionary.addIfNotExists(
+                                (IRType*)element,
+                                _lookupWitness(&subBuilder, elementWitness, sharedContext->differentialAssocTypeStructKey));
+                        }
+                        return;
                     }
-                    return;
                 }
-                else
-                {
-                    differentiableWitnessDictionary.add((IRType*)item->getConcreteType(), item->getWitness());
-                }
+
+                differentiableWitnessDictionary.add((IRType*)item->getConcreteType(), item->getWitness());
 
                 if (!as<IRInterfaceType>(item->getConcreteType()))
                 {
@@ -1179,6 +1179,7 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
 {
     for (auto inst : parent->getChildren())
     {
+        bool shouldRemoveKeepAliveDecorations = false;
         for (auto decor = inst->getFirstDecoration(); decor; )
         {
             auto next = decor->getNextDecoration();
@@ -1204,10 +1205,32 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_IntermediateContextFieldDifferentialTypeDecoration:
                 decor->removeAndDeallocate();
                 break;
+            case kIROp_AutoDiffBuiltinDecoration:
+                // Remove the builtin decoration, and also remove any export/keep-alive
+                // decorations.
+                shouldRemoveKeepAliveDecorations = true;
+                decor->removeAndDeallocate();
             default:
                 break;
             }
             decor = next;
+        }
+
+        if (shouldRemoveKeepAliveDecorations)
+        {
+            for (auto decor = inst->getFirstDecoration(); decor; )
+            {
+                auto next = decor->getNextDecoration();
+                switch (decor->getOp())
+                {
+                case kIROp_ExportDecoration:
+                case kIROp_HLSLExportDecoration:
+                case kIROp_KeepAliveDecoration:
+                    decor->removeAndDeallocate();
+                    break;
+                }
+                decor = next;
+            }
         }
 
         if (inst->getFirstChild() != nullptr)
@@ -2241,12 +2264,16 @@ void releaseNullDifferentialType(AutoDiffSharedContext* context)
     {
         if (auto keepAliveDecoration = nullStruct->findDecoration<IRKeepAliveDecoration>())
             keepAliveDecoration->removeAndDeallocate();
+        if (auto exportDecoration = nullStruct->findDecoration<IRHLSLExportDecoration>())
+            exportDecoration->removeAndDeallocate();
     }
 
     if (auto nullWitness = context->nullDifferentialWitness)
     {
         if (auto keepAliveDecoration = nullWitness->findDecoration<IRKeepAliveDecoration>())
             keepAliveDecoration->removeAndDeallocate();
+        if (auto exportDecoration = nullWitness->findDecoration<IRHLSLExportDecoration>())
+            exportDecoration->removeAndDeallocate();
     }
 }
 
@@ -2269,11 +2296,6 @@ bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
     lowerNullCheckInsts(module, &autodiffContext);
 
     stripNoDiffTypeAttribute(module);
-
-    // Remove keep-alive decorations from null-differential type
-    // so it can be DCE'd if unused.
-    // 
-    releaseNullDifferentialType(&autodiffContext);
 
     return modified;
 }

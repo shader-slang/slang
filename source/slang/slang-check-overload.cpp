@@ -466,8 +466,22 @@ namespace Slang
                 Val* val = nullptr;
                 if (aa >= matchedArgs.getCount())
                 {
-                    // If we run out of matched args, we will just create an empty pack.
-                    val = m_astBuilder->getTypePack(ArrayView<Type*>());
+                    if (allowPartialGenericApp)
+                    {
+                        // If we have run out of arguments and the decl allows
+                        // partial specialization, then we don't apply any more
+                        // checks at this step. We will instead attempt to
+                        // *infer* an argument at this position at a later
+                        // stage.
+                        //
+                        candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
+                        break;
+                    }
+                    else
+                    {
+                        // Otherwise, we will just create an empty pack.
+                        val = m_astBuilder->getTypePack(ArrayView<Type*>());
+                    }
                 }
                 else
                 {

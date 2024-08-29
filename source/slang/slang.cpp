@@ -1749,7 +1749,7 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     // If the user specified a explicit profile, we should pull
     // a corresponding atom representing the target version from the profile.
-    CapabilitySet profileCaps = CapabilitySet(optionSet.getProfile().getCapabilityName());
+    CapabilitySet profileCaps = optionSet.getProfile().getCapabilityName();
 
     bool isGLSLTarget = false;
     switch(getTarget())

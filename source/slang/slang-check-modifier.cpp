@@ -548,19 +548,47 @@ namespace Slang
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
 
-            String stageName;
-            if (!checkLiteralStringVal(attr->args[0], &stageName))
+            String capNameString;
+            if (!checkLiteralStringVal(attr->args[0], &capNameString))
             {
                 return false;
             }
 
-            auto stage = findStageByName(stageName);
-            if (stage == Stage::Unknown)
+            CapabilityName capName = findCapabilityName(capNameString.getUnownedSlice());
+            if (capName != CapabilityName::Invalid)
             {
-                getSink()->diagnose(attr->args[0], Diagnostics::unknownStageName, stageName);
-            }
+                if (isInternalCapabilityName(capName))
+                    maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, attr, Diagnostics::usingInternalCapabilityName, attr, capName);
+                
+                // Ensure this capability only defines 1 stage per target, else diagnose an error.
+                // This is a fatal error, do not allow toggling this error off.
+                entryPointAttr->capabilitySet = CapabilitySet(capName);
+                HashSet<CapabilityAtom> stageToBeUsed;
+                for (auto& targetSet : entryPointAttr->capabilitySet.getCapabilityTargetSets())
+                {
+                    for(auto& stageSet : targetSet.second.shaderStageSets)
+                        stageToBeUsed.add(stageSet.first);
+                }
 
-            entryPointAttr->stage = stage;
+                // TODO: Once profiles are removed in favor for `CapabilitySet`s we will beable to use more complex relationships,
+                // Until then we have an artificial limit that any capabilites used inside '[shader(...)]' must only specify 1 stage type 
+                // uniformly across targets.
+                if (stageToBeUsed.getCount() > 1)
+                {
+                    List<CapabilityAtom> atomsToPrint;
+                    atomsToPrint.reserve(stageToBeUsed.getCount());
+                    for (auto i : stageToBeUsed)
+                        atomsToPrint.add(i);
+                    getSink()->diagnose(attr, Diagnostics::capabilityHasMultipleStages, capNameString, atomsToPrint);
+                }
+                return entryPointAttr;
+            }
+            else
+            {
+                // always diagnose this error since nothing can compile with an invalid capability
+                getSink()->diagnose(attr, Diagnostics::unknownCapability, capNameString);
+                return false;
+            }
         }
         else if ((as<DomainAttribute>(attr)) ||
             (as<MaxTessFactorAttribute>(attr)) ||
