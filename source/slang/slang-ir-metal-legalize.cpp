@@ -494,7 +494,7 @@ namespace Slang
                 result.permittedTypes.add(builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3)));
                 break;
             }
-            case SystemValueSemanticName::DomainLsocation:
+            case SystemValueSemanticName::DomainLocation:
             {
                 result.metalSystemValueName = toSlice("position_in_patch");
                 result.permittedTypes.add(builder.getVectorType(builder.getBasicType(BaseType::Float), builder.getIntValue(builder.getIntType(), 3)));
