@@ -718,23 +718,6 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
             specializationConstantRule,
             type);
     }
-#if 0
-
-    // TODO: The cases below for detecting globals that aren't actually
-    // shader parameters should be redundant now that the semantic
-    // checking logic is responsible for populating the list of
-    // parameters on a `Program`. We should be able to clean up
-    // the code by removing these two cases, and the related null
-    // pointer checks in the code that calls this.
-
-    // HLSL `static` modifier indicates "thread local"
-    if(varDecl->hasModifier<HLSLStaticModifier>())
-        return nullptr;
-
-    // HLSL `groupshared` modifier indicates "thread-group local"
-    if(varDecl->hasModifier<HLSLGroupSharedModifier>())
-        return nullptr;
-#endif
 
     // TODO(tfoley): there may be other cases that we need to handle here
 

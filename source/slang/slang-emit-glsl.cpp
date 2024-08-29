@@ -754,6 +754,9 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifierWithBindingKinds(LayoutResourceK
             m_writer->emit(")\n");
             break;
 
+        case LayoutResourceKind::PushConstantBuffer:
+            m_writer->emit("layout(push_constant)\n");
+            break;
         case LayoutResourceKind::ShaderRecord:
             m_writer->emit("layout(shaderRecordEXT)\n");
             break;
