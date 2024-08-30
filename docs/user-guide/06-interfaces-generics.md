@@ -626,6 +626,52 @@ extension MyObject : IBar, IBar2
 }
 ```
 
+Note that `interface` types cannot be extended, because extending an `interface` with new requirements would make all existing types that conforms
+to the interface no longer valid. However, Slang allows generic extensions, so the following is valid:
+
+```
+// Provide additional methods for all types that conforms to `IFoo`,
+// so that they also conform to 'IBar'.
+extension<T:IFoo> T : IBar {...}
+```
+
+In the presence of extensions, it is possible for a type to have multiple ways to 
+conform to an interface. In this case, Slang will always prefer the more specific conformance
+over the generic one. For example, the following code illustrates this behavior:
+
+```csharp
+interface IBase{}
+interface IFoo
+{
+    int foo();
+}
+
+// Direct extension on MyObject:
+struct MyObject : IBase
+{
+}
+
+// Generic extension that applies to all types that conforms to `IBase`:
+extension<T:IBase> T : IFoo
+{
+    int foo() { return 1; }
+}
+
+int helper<T:IFoo>(T obj)
+{
+    return obj.foo();
+}
+
+int test()
+{
+    MyObject obj;
+
+    // Returns 0, the conformance defined by the direct extension
+    // is preferred.
+    return helper(obj);
+}
+```
+
 `is` and `as` Operator
 ----------------------------
 
