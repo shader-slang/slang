@@ -611,13 +611,6 @@ This feature is similar to extensions in Swift and partial classes in C#.
 > #### Note:
 > You can only extend a type with additional methods. Extending with additional data fields is not allowed.
 
-Note that `interface` types cannot be extended, because extending an `interface` with new requirements would make all existing types that conforms
-to the interface no longer valid. However, Slang allows generic extensions, so the following is valid:
-```
-// Provide additional methods for all types that conforms to `IFoo`.
-extension<T:IFoo> T {...}
-```
-
 Multi-level break
 -------------------
 
