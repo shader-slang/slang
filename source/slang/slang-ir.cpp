@@ -5108,6 +5108,11 @@ namespace Slang
         {
             type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
         }
+        else if (auto tupleType = as<IRTupleType>(base->getDataType()))
+        {
+            type = (IRType*)tupleType->getOperand(getIntVal(index));
+            return emitGetTupleElement(type, base, index);
+        }
         SLANG_RELEASE_ASSERT(type);
 
         return emitElementExtract(type, base, index);
@@ -5211,6 +5216,11 @@ namespace Slang
             // HLSL support things like float.x, in which case we just return the base pointer.
             return basePtr;
         }
+        else if (const auto tupleType = as<IRTupleType>(valueType))
+        {
+            SLANG_ASSERT(as<IRIntLit>(index));
+            type = (IRType*)tupleType->getOperand(getIntVal(index));
+        }
         SLANG_RELEASE_ASSERT(type);
         auto inst = createInst<IRGetElementPtr>(
             this,
@@ -5281,7 +5291,7 @@ namespace Slang
         return emitUpdateElement(base, getIntValue(getIntType(), index), newElement);
     }
 
-    IRInst* IRBuilder::emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement)
+    IRInst* IRBuilder::emitUpdateElement(IRInst* base, ArrayView<IRInst*> accessChain, IRInst* newElement)
     {
         List<IRInst*> args;
         args.add(base);
@@ -5370,6 +5380,32 @@ namespace Slang
         return emitSwizzle(type, base, elementCount, irElementIndices);
     }
 
+    IRMetalSetVertex* IRBuilder::emitMetalSetVertex(
+        IRInst* index,
+        IRInst* vertex)
+    {
+        auto inst = createInst<IRMetalSetVertex>(this, kIROp_MetalSetVertex, getVoidType(), index, vertex);
+        addInst(inst);
+        return inst;
+    }
+
+    IRMetalSetPrimitive* IRBuilder::emitMetalSetPrimitive(
+        IRInst* index,
+        IRInst* primitive)
+    {
+        auto inst = createInst<IRMetalSetPrimitive>(this, kIROp_MetalSetVertex, getVoidType(), index, primitive);
+        addInst(inst);
+        return inst;
+    }
+
+    IRMetalSetIndices* IRBuilder::emitMetalSetIndices(
+        IRInst* index,
+        IRInst* indices)
+    {
+        auto inst = createInst<IRMetalSetIndices>(this, kIROp_MetalSetVertex, getVoidType(), index, indices);
+        addInst(inst);
+        return inst;
+    }
 
     IRInst* IRBuilder::emitSwizzleSet(
         IRType*         type,

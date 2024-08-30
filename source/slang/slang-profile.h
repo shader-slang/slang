@@ -113,7 +113,9 @@ namespace Slang
         static Profile lookUp(char const* name);
         char const* getName();
 
-        List<CapabilityName> getCapabilityName();
+        CapabilitySet getCapabilityName();
+
+        List<CapabilitySet> additionalCapabilities;
 
         RawVal raw = Unknown;
     };

@@ -557,7 +557,7 @@ namespace Slang
         for (auto target : linkage->targets)
         {
             auto targetCaps = target->getTargetCaps();
-            auto stageCapabilitySet = CapabilitySet(entryPoint->getProfile().getCapabilityName());
+            auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
             targetCaps.join(stageCapabilitySet);
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
@@ -613,20 +613,23 @@ namespace Slang
         if (auto entryPointAttr = entryPointFuncDecl->findModifier<EntryPointAttribute>())
         {
             auto entryPointProfileStage = entryPointProfile.getStage();
-            // Ensure every target is specifying the same stage as an entry` point
+            auto entryPointStage = getStageFromAtom(entryPointAttr->capabilitySet.getTargetStage());
+
+            // Ensure every target is specifying the same stage as an entry-point
             // if a profile+stage was set, else user will not be aware that their
             // code is requiring `fragment` on a `vertex` shader
             for (auto target : targets)
             {
                 auto targetProfile = target->getOptionSet().getProfile();
                 auto profileStage = targetProfile.getStage();
-                if (profileStage != Stage::Unknown && profileStage != entryPointAttr->stage)
-                    maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointAttr, Diagnostics::entryPointAndProfileAreIncompatible, entryPointFuncDecl, entryPointAttr->stage, targetProfile.getName());
+                if (profileStage != Stage::Unknown && profileStage != entryPointStage)
+                    maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointAttr, Diagnostics::entryPointAndProfileAreIncompatible, entryPointFuncDecl, entryPointStage, targetProfile.getName());
             }
             if (entryPointProfileStage == Stage::Unknown)
-                entryPointProfile.setStage(entryPointAttr->stage);
-            else if (entryPointProfileStage != Stage::Unknown && entryPointProfileStage != entryPointAttr->stage)
-                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::specifiedStageDoesntMatchAttribute, entryPointFuncDecl->getName(), entryPointProfileStage, entryPointAttr->stage);
+                entryPointProfile = Profile(entryPointStage);
+            else if (entryPointProfileStage != Stage::Unknown && entryPointProfileStage != entryPointStage)
+                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::specifiedStageDoesntMatchAttribute, entryPointFuncDecl->getName(), entryPointProfileStage, entryPointStage);
+            entryPointProfile.additionalCapabilities.add(entryPointAttr->capabilitySet);
             return true;
         }
         return false;

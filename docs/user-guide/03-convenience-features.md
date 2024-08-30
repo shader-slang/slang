@@ -331,6 +331,22 @@ int test()
 ```
 Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~` and `!`. Please note that the `&&` and `||` operators are not supported.
 
+In addition, you can overload operator `()` as a member method:
+```csharp
+struct MyFunctor
+{
+    int operator()(float v)
+    {
+        // ...
+    }
+}
+void test()
+{
+    MyFunctor f;
+    int x = f(1.0f); // calls MyFunctor::operator().
+    int y = f.operator()(1.0f); // explicitly calling operator().
+}
+```
 
 ## Subscript Operator
 

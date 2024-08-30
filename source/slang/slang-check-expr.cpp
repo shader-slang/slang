@@ -2693,6 +2693,42 @@ namespace Slang
             return newExpr;
 
         expr->functionExpr = CheckTerm(expr->functionExpr);
+
+        if (auto baseType = as<DeclRefType>(expr->functionExpr->type))
+        {
+            // If callee is a value of DeclRefType, then it is a functor.
+            // We need to look for `operator()` member within the type and
+            // call that instead.
+            auto operatorName = getName("()");
+
+            bool needDeref = false;
+            expr->functionExpr = maybeInsertImplicitOpForMemberBase(expr->functionExpr, needDeref);
+
+            LookupResult lookupResult = lookUpMember(
+                m_astBuilder,
+                this,
+                operatorName,
+                expr->functionExpr->type,
+                m_outerScope,
+                LookupMask::Default,
+                LookupOptions::NoDeref);
+            bool diagnosed = false;
+            lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
+            if (!lookupResult.isValid())
+            {
+                if (!diagnosed)
+                    getSink()->diagnose(expr, Diagnostics::callOperatorNotFound, baseType);
+                return CreateErrorExpr(expr);
+            }
+            auto callFuncExpr = createLookupResultExpr(
+                operatorName,
+                lookupResult,
+                expr->functionExpr,
+                expr->loc,
+                expr->functionExpr);
+            expr->functionExpr = callFuncExpr;
+        }
+
         m_treatAsDifferentiableExpr = treatAsDifferentiableExpr;
 
         // If we are in a differentiable function, register differential witness tables involved in
@@ -4019,7 +4055,7 @@ namespace Slang
             {
                 types.add(baseTupleType->getMember(index));
             }
-            swizExpr->type = QualType(m_astBuilder->getTupleType(types));
+            swizExpr->type = QualType(m_astBuilder->getTupleType(types.getArrayView()));
         }
 
         // A swizzle can be used as an l-value as long as there
@@ -4400,12 +4436,8 @@ namespace Slang
         return expr;
     }
 
-    Expr* SemanticsVisitor::checkBaseForMemberExpr(Expr* inBaseExpr, bool& outNeedDeref)
+    Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(Expr* baseExpr, bool& outNeedDeref)
     {
-        auto baseExpr = inBaseExpr;
-
-        baseExpr = CheckTerm(baseExpr);
-
         auto derefExpr = MaybeDereference(baseExpr);
 
         if (derefExpr != baseExpr)
@@ -4457,6 +4489,13 @@ namespace Slang
         }
 
         return baseExpr;
+    }
+
+    Expr* SemanticsVisitor::checkBaseForMemberExpr(Expr* inBaseExpr, bool& outNeedDeref)
+    {
+        auto baseExpr = inBaseExpr;
+        baseExpr = CheckTerm(baseExpr);
+        return maybeInsertImplicitOpForMemberBase(baseExpr, outNeedDeref);
     }
 
     Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType)
@@ -4869,7 +4908,7 @@ namespace Slang
         types.reserve(expr->members.getCount());
         for(auto t : expr->members)
             types.add(t.type);
-        auto tupleType = m_astBuilder->getTupleType(types);
+        auto tupleType = m_astBuilder->getTupleType(types.getArrayView());
         expr->type = m_astBuilder->getTypeType(tupleType);
 
         return expr;

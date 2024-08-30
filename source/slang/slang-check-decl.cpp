@@ -7881,7 +7881,7 @@ namespace Slang
                 ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
                 ctorToInvoke->name = declInfo.defaultCtor->getName();
                 ctorToInvoke->loc = declInfo.defaultCtor->loc;
-                ctorToInvoke->type = structDeclInfo.defaultCtor->returnType.type;
+                ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), structDeclInfo.defaultCtor->returnType.type);
 
                 auto invoke = m_astBuilder->create<InvokeExpr>();
                 invoke->functionExpr = ctorToInvoke;
@@ -10644,6 +10644,7 @@ namespace Slang
 
     void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
     {
+        // If the function is an entrypoint and specifies a target stage, add the capabilities to our function capabilities.
         _dispatchCapabilitiesVisitorOfFunctionDecl(this, funcDecl, 
                 [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
                 {
@@ -10657,30 +10658,12 @@ namespace Slang
 
         auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
 
-        if (!declaredCaps.isEmpty())
-        {
-            // If the function is an entrypoint, add the stage to declaredCaps.
-            if (auto entryPointAttr = funcDecl->findModifier<EntryPointAttribute>())
-            {
-                auto stageCaps = CapabilitySet(Profile(entryPointAttr->stage).getCapabilityName());
-                if (declaredCaps.isIncompatibleWith(stageCaps))
-                {
-                    maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, funcDecl->loc, Diagnostics::stageIsIncompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
-                }
-                else
-                {
-                    declaredCaps.join(stageCaps);
-                }
-            }
-        }
-
         auto vis = getDeclVisibility(funcDecl);
 
         // If 0 capabilities were annotated on a function, capabilities are inferred from the function body
         if (declaredCaps.isEmpty())
         {
             declaredCaps = funcDecl->inferredCapabilityRequirements;
-            return;
         }
         else
         {
