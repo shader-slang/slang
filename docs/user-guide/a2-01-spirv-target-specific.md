@@ -31,8 +31,6 @@ System-Value semantics
 
 The system-value semantics are translated to the following SPIR-V code.
 
-TODO: Found a similar page on [DXC document](https://github.com/microsoft/DirectXShaderCompiler/blob/b766b432678cf5f7a93567d253bb5f7fd8a0b2c7/docs/SPIR-V.rst#implicit-location-number-assignment)
-
 | SV semantic name | SPIR-V code |
 |--|--|
 | SV_Barycentrics | BuiltIn BaryCoordKHR |
@@ -70,7 +68,7 @@ TODO: Found a similar page on [DXC document](https://github.com/microsoft/Direct
 | SV_ViewID | BuiltIn ViewIndex |
 | SV_ViewportArrayIndex | BuiltIn ViewportIndex |
 
-*Note* that most of the SV semantics are identical to HLSL but `SV_PointSize` is a unique keyword that HLSL doesn't have.
+*Note* that `SV_PointSize` is a unique keyword that HLSL doesn't have.
 
 
 Behavior of `discard` after SPIR-V 1.6
