@@ -626,51 +626,6 @@ extension MyObject : IBar, IBar2
 }
 ```
 
-Note that `interface` types cannot be extended, because extending an `interface` with new requirements would make all existing types that conforms
-to the interface no longer valid. However, Slang allows generic extensions, so the following is valid:
-
-```
-// Provide additional methods for all types that conforms to `IFoo`,
-// so that they also conform to 'IBar'.
-extension<T:IFoo> T : IBar {...}
-```
-
-In the presence of extensions, it is possible for a type to have multiple ways to 
-conform to an interface. In this case, Slang will always prefer the more specific conformance
-over the generic one. For example, the following code illustrates this behavior:
-
-```csharp
-interface IBase{}
-interface IFoo
-{
-    int foo();
-}
-
-// Direct extension on MyObject:
-struct MyObject : IBase
-{
-}
-
-// Generic extension that applies to all types that conforms to `IBase`:
-extension<T:IBase> T : IFoo
-{
-    int foo() { return 1; }
-}
-
-int helper<T:IFoo>(T obj)
-{
-    return obj.foo();
-}
-
-int test()
-{
-    MyObject obj;
-
-    // Returns 0, the conformance defined by the direct extension
-    // is preferred.
-    return helper(obj);
-}
-```
 
 `is` and `as` Operator
 ----------------------------
@@ -788,7 +743,8 @@ See  [if-let syntax](convenience-features.html#if_let-syntax) for more details.
 Extensions to Interfaces
 -----------------------------
 
-In addition to extending ordinary types, you can define extensions on interfaces as well:
+In addition to extending ordinary types, you can define extensions on all types that conforms to some interface:
+
 ```csharp
 // An example interface.
 interface IFoo
@@ -796,9 +752,8 @@ interface IFoo
     int foo();
 }
 
-// Extending `IFoo` with a new method requirement
-// with a default implementation.
-extension IFoo
+// Extend any type `T` that conforms to `IFoo` with a `bar` method.
+extension<T:IFoo> T
 {
     int bar() { return 0; }
 }
@@ -811,42 +766,46 @@ int use(IFoo foo)
 }
 ```
 
-Although the syntax of above listing suggests that we are extending an interface with additional requirements, this interpretation does not make logical sense in many ways. Consider a type `MyType` that exists before the extension is defined:
-```csharp
-struct MyType : IFoo
-{
-    int foo() { return 0; }
-}
-```
+Note that `interface` types cannot be extended, because extending an `interface` with new requirements would make all existing types that conforms
+to the interface no longer valid.
 
-If we extend the `IFoo` with new requirements, the existing `MyType` definition would become invalid since `MyType` no longer provides implementations to all interface requirements. Instead, what an `extension` on an interface `IFoo` means is that for all types that conforms to the `IFoo` interface and does not have a `bar` method defined, add a `bar` method defined in this extension to that type so that all `IFoo` typed values have a `bar` method defined. If a type already defines a matching `bar` method, then the existing method will always override the default method provided in the extension:
+In the presence of extensions, it is possible for a type to have multiple ways to 
+conform to an interface. In this case, Slang will always prefer the more specific conformance
+over the generic one. For example, the following code illustrates this behavior:
 
 ```csharp
+interface IBase{}
 interface IFoo
 {
     int foo();
 }
-struct MyFoo1 : IFoo
+
+// Direct extension on MyObject:
+struct MyObject : IBase
 {
-    int foo() { return 0; }
 }
-extension IFoo
+
+// Generic extension that applies to all types that conforms to `IBase`:
+extension<T:IBase> T : IFoo
 {
-    int bar() { return 0; }
+    int foo() { return 1; }
 }
-struct MyFoo2 : IFoo
+
+int helper<T:IFoo>(T obj)
 {
-    int foo() { return 0; }
-    int bar() { return 1; }
+    return obj.foo();
 }
-void test()
+
+int test()
 {
-    MyFoo1 f1;
-    MyFoo2 f2;
-    int a = f1.bar(); // a == 0, calling the method in the extension.
-    int b = f2.bar(); // b == 1, calling the existing method in `MyFoo2`.
+    MyObject obj;
+
+    // Returns 0, the conformance defined by the direct extension
+    // is preferred.
+    return helper(obj);
 }
 ```
+
 This feature is similar to extension traits in Rust.
 
 
