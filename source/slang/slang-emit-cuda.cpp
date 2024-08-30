@@ -142,7 +142,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
     SLANG_UNUSED(target);
 
     // The names CUDA produces are all compatible with 'C' (ie they aren't templated types)
-    SLANG_ASSERT(target == CodeGenTarget::CUDASource || target == CodeGenTarget::CSource);
+    SLANG_ASSERT(target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader || target == CodeGenTarget::CSource);
 
     switch (type->getOp())
     {
@@ -792,6 +792,14 @@ void CUDASourceEmitter::emitSimpleValueImpl(IRInst* inst)
         }
     }
     Super::emitSimpleValueImpl(inst);
+}
+
+void CUDASourceEmitter::emitFrontMatterImpl(TargetRequest*)
+{
+    if (shouldEmitOnlyHeader())
+    {
+        m_writer->emit("#pragma once\n\n");
+    }
 }
 
 

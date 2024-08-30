@@ -82,16 +82,19 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
             return SourceLanguage::C;
         }
         case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CPPHeader:
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::PyTorchCppBinding:
         {
             return SourceLanguage::CPP;
         }
         case CodeGenTarget::CUDASource:
+        case CodeGenTarget::CUDAHeader:
         {
             return SourceLanguage::CUDA;
         }
         case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalHeader:
         {
             return SourceLanguage::Metal;
         }
@@ -1150,7 +1153,20 @@ String CLikeSourceEmitter::getName(IRInst* inst)
     String name;
     if(!m_mapInstToName.tryGetValue(inst, name))
     {
-        name = generateName(inst);
+        // unmangle names, when emitting header
+        if (shouldEmitOnlyHeader())
+        {
+            if (auto nameHintDecor = inst->findDecoration<IRNameHintDecoration>())
+            {
+                StringBuilder sb;
+                appendScrubbedName(nameHintDecor->getName(), sb);
+                name = sb.produceString();
+            }
+        }
+        else
+        {
+            name = generateName(inst);
+        }
         m_mapInstToName.add(inst, name);
     }
     return name;
@@ -3476,7 +3492,7 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     emitSemantics(func);
 
     // TODO: encode declaration vs. definition
-    if(isDefinition(func))
+    if(!shouldEmitOnlyHeader() && isDefinition(func))
     {
         m_writer->emit("\n{\n");
         m_writer->indent();
@@ -3622,6 +3638,11 @@ bool shouldWrapInExternCBlock(IRFunc* func)
 
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
 {
+    if (shouldEmitOnlyHeader() && !func->findDecoration<IRExternCppDecoration>())
+    {
+        return;
+    }
+
     // Target-intrinsic functions should never be emitted
     // even if they happen to have a body.
     //
@@ -3669,6 +3690,11 @@ void CLikeSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
+    if (shouldEmitOnlyHeader() && !structType->findDecoration<IRExternCppDecoration>())
+    {
+        return;
+    }
+
     ensureTypePrelude(structType);
 
     // If the selected `struct` type is actually an intrinsic
@@ -4064,11 +4090,20 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
 
             m_writer->emit("\n");
             emitType(varType, initFuncName);
-            m_writer->emit("()\n{\n");
-            m_writer->indent();
-            emitFunctionBody(varDecl);
-            m_writer->dedent();
-            m_writer->emit("}\n");
+            
+            // When emiting header, emit only declaration.
+            if (shouldEmitOnlyHeader())
+            {
+                m_writer->emit(";\n");
+            }
+            else
+            {
+                m_writer->emit("()\n{\n");
+                m_writer->indent();
+                emitFunctionBody(varDecl);
+                m_writer->dedent();
+                m_writer->emit("}\n");
+            }
         }
     }
 

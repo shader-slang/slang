@@ -1816,6 +1816,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CSource:
     {
         // For now lets use some fairly simple CPU binding rules
@@ -1829,12 +1830,14 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
         return &kCPULayoutRulesFamilyImpl;
     }
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         return &kMetalLayoutRulesFamilyImpl;
 
     case CodeGenTarget::PTX:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     {
         return &kCUDALayoutRulesFamilyImpl;
     }
@@ -2048,6 +2051,7 @@ bool isMetalTarget(TargetRequest* targetReq)
         return false;
 
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         return true;
@@ -2081,6 +2085,7 @@ bool isCUDATarget(TargetRequest* targetReq)
         return false;
 
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
         return true;
     }
@@ -2113,6 +2118,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
             return SourceLanguage::HLSL;
         }
         case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalHeader:
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
         {
@@ -2129,6 +2135,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
         case CodeGenTarget::HostHostCallable:
         case CodeGenTarget::ShaderHostCallable:
         case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CPPHeader:
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::PyTorchCppBinding:
         {
@@ -2137,6 +2144,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
         }
         case CodeGenTarget::CUDAObjectCode:
         case CodeGenTarget::CUDASource:
+        case CodeGenTarget::CUDAHeader:
         case CodeGenTarget::PTX:
         {
             return SourceLanguage::CUDA;
