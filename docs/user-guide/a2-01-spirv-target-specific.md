@@ -35,9 +35,9 @@ TODO: Found a similar page on [DXC document](https://github.com/microsoft/Direct
 
 | SV semantic name | SPIR-V code |
 |--|--|
-| SV_Barycentrics | BuiltIn BaryCoord..KHR ??TODO?? |
-| SV_ClipDistance<N> | BuiltIn ClipDistance ??TODO?? |
-| SV_CullDistance<N> | BuiltIn CullDistance ??TODO?? |
+| SV_Barycentrics | BuiltIn BaryCoordKHR |
+| SV_ClipDistance<N> | BuiltIn ClipDistance |
+| SV_CullDistance<N> | BuiltIn CullDistance |
 | SV_Coverage | BuiltIn SampleMask |
 | SV_CullPrimitive | BuiltIn CullPrimitiveEXT |
 | SV_Depth | BuiltIn FragDepth |
@@ -51,24 +51,26 @@ TODO: Found a similar page on [DXC document](https://github.com/microsoft/Direct
 | SV_GroupThreadID | BuiltIn LocalInvocationId |
 | SV_InnerCoverage | BuiltIn FullyCoveredEXT |
 | SV_InsideTessFactor | BuiltIn TessLevelInner |
-| SV_InstanceID | BuiltIn ??TODO?? |
-| SV_IntersectionAttributes | ??TODO?? |
+| SV_InstanceID | BuiltIn InstanceIndex |
+| SV_IntersectionAttributes | *Not supported* |
 | SV_IsFrontFace | BuiltIn FrontFacing |
 | SV_OutputControlPointID | BuiltIn InvocationId |
-| SV_PointSize | ??TODO?? |
+| SV_PointSize<sup>note</sup> | BuiltIn PointSize |
 | SV_Position | BuiltIn Position/FragCoord |
 | SV_PrimitiveID | BuiltIn PrimitiveId |
 | SV_RenderTargetArrayIndex | BuiltIn Layer |
 | SV_SampleIndex | BuiltIn SampleId |
 | SV_ShadingRate | BuiltIn PrimitiveShadingRateKHR |
-| SV_StartVertexLocation | Not supported |
-| SV_StartInstanceLocation | Not suported |
+| SV_StartVertexLocation | *Not supported* |
+| SV_StartInstanceLocation | *Not suported* |
 | SV_StencilRef | BuiltIn FragStencilRefEXT |
-| SV_Target<N> | ??TODO?? Location |
+| SV_Target<N> | Location |
 | SV_TessFactor | BuiltIn TessLevelOuter |
 | SV_VertexID | BuiltIn VertexIndex |
 | SV_ViewID | BuiltIn ViewIndex |
-| SV_ViewportArrayIndex | BuiltIn ViewportIndex
+| SV_ViewportArrayIndex | BuiltIn ViewportIndex |
+
+*Note* that most of the SV semantics are identical to HLSL but `SV_PointSize` is a unique keyword that HLSL doesn't have.
 
 
 Behavior of `discard` after SPIR-V 1.6
@@ -202,6 +204,9 @@ Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, Byt
 ### -fvk-use-gl-layout
 Use std430 layout instead of D3D buffer layout for raw buffer load/stores.
 
+### -fvk-use-dx-layout
+Pack members using FXCs member packing rules when targeting GLSL or SPIRV.
+
 ### -fvk-use-entrypoint-name
 Uses the entrypoint name from the source instead of 'main' in the spirv output.
 
@@ -325,13 +330,13 @@ Legalization
 Legalization is a process where Slang applies slightly different approach to translate the input Slang shader to the target.
 This process allows Slang shaders to be written in a syntax that SPIR-V may not be able to achieve natively.
 
-Slang allows to use opaque resource types as members of a struct.
+Slang allows to use opaque resource types as members of a struct. These members will be hoisted out of struct types and become global variables.
 
 Slang allows functions that return any resource types as return type or `out` parameter as long as things are statically resolvable.
 
-Slang allows functions that return arrays.
+Slang allows functions that return arrays. These functions will be converted to return the array via an out parameter in SPIRV.
 
-Slang allows putting scalar/vector/matrix/array types directly as element type of a constant buffer or structured buffers.
+Slang allows putting scalar/vector/matrix/array types directly as element type of a constant buffer or structured buffers. Such element types will be wrapped in a struct type when emitting to SPIRV.
 
 When RasterizerOrder resources are used, the order of the rasterization is guaranteed by the instructions from `SPV_EXT_fragment_shader_interlock` extension.
 
