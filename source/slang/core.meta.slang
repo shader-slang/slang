@@ -285,6 +285,13 @@ interface IDifferentiable
     static Differential dmul(T, Differential);
 };
 
+__magic_type(DifferentiableRefType)
+interface IDifferentiableRefType
+{
+    __builtin_requirement($((int)BuiltinRequirementKind::DifferentialRefType))
+    associatedtype Differential : IDifferentiableRefType;
+}
+
 
 /// Pair type that serves to wrap the primal and
 /// differential types of an arbitrary type T.
@@ -356,6 +363,36 @@ struct DifferentialPair : IDifferentiable
             T.Differential.dmul<U>(a, b.d));
     }
 };
+
+__generic<T : IDifferentiableRefType>
+__magic_type(DifferentialRefPairType)
+__intrinsic_type($(kIROp_DifferentialRefPairType))
+struct DifferentialRefPair : IDifferentiableRefType
+{
+    typedef DifferentialRefPair<T.Differential> Differential;
+    typedef T.Differential DifferentialElementType;
+
+    __intrinsic_op($(kIROp_MakeDifferentialRefPairUserCode))
+    __init(T _primal, T.Differential _differential);
+
+    property p : T
+    {
+        __intrinsic_op($(kIROp_DifferentialRefPairGetPrimalUserCode))
+        get;
+    }
+
+    property v : T
+    {
+        __intrinsic_op($(kIROp_DifferentialRefPairGetPrimalUserCode))
+        get;
+    }
+
+    property d : T.Differential
+    {
+        __intrinsic_op($(kIROp_DifferentialRefPairGetDifferentialUserCode))
+        get;
+    }
+}
 
 
 /// A type that uses a floating-point representation
