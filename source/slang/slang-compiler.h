@@ -2733,11 +2733,14 @@ namespace Slang
 
         SlangResult emitPrecompiledDXIL(ComPtr<IArtifact>& outArtifact);
 
+        SlangResult emitPrecompiledSPIRV(ComPtr<IArtifact>& outArtifact);
+
         void maybeDumpIntermediate(IArtifact* artifact);
 
-        // Used to cause instructions available in precompiled DXIL to be
+        // Used to cause instructions available in precompiled blobs to be
         // removed between IR linking and target source generation.
         bool removeAvailableInDXIL = false;
+        bool removeAvailableInSPIRV = false;
 
     protected:
         CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
@@ -2815,6 +2818,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setEmbedDXIL(bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setEmbedSPIRV(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;

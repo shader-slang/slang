@@ -3870,6 +3870,13 @@ namespace Slang
         return emitIntrinsicInst(getVoidType(), kIROp_EmbeddedDXIL, 1, args);
     }
 
+    IRInst* IRBuilder::emitEmbeddedSPIRV(ISlangBlob* blob)
+    {
+        IRInst* args[] = { getBlobValue(blob) };
+
+        return emitIntrinsicInst(getVoidType(), kIROp_EmbeddedSPIRV, 1, args);
+    }
+
     enum class TypeCastStyle
     {
         Unknown = -1, 

@@ -772,6 +772,11 @@ namespace Slang
         return emitWithDownstreamForEntryPoints(outArtifact);
     }
 
+    SlangResult CodeGenContext::emitPrecompiledSPIRV(ComPtr<IArtifact>& outArtifact)
+    {
+        return _emitEntryPoints(outArtifact);
+    }
+
     String GetHLSLProfileName(Profile profile)
     {
         switch( profile.getFamily() )
@@ -1260,6 +1265,11 @@ namespace Slang
             if (target == CodeGenTarget::DXILAssembly || target == CodeGenTarget::DXIL)
             {
                 sourceCodeGenContext.removeAvailableInDXIL = true;
+            }
+
+            if (target == CodeGenTarget::SPIRVAssembly || target == CodeGenTarget::SPIRV)
+            {
+                sourceCodeGenContext.removeAvailableInSPIRV = true;
             }
 
             SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));

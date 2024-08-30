@@ -3298,17 +3298,26 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         return SLANG_OK;
     }
 
-    // If requested, attempt to compile the translation unit all the way down to the target language
-    // and stash the result blob in an IR op.
+    // If requested, attempt to compile the translation unit all the way down to the target language(s)
+    // and stash the result blobs in IR.
+    List<SlangCompileTarget> precompileTargets;
     if (getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+    {
+        precompileTargets.add(SlangCompileTarget::SLANG_DXIL);
+    }
+    if (getOptionSet().getBoolOption(CompilerOptionName::EmbedSPIRV))
+    {
+        precompileTargets.add(SlangCompileTarget::SLANG_SPIRV);
+    }
+
+    for (auto precompileTarget : precompileTargets)
     {
         auto frontEndReq = getFrontEndReq();
 
         for (auto translationUnit : frontEndReq->translationUnits)
         {
-            SlangCompileTarget target = SlangCompileTarget(SlangCompileTarget::SLANG_DXIL);
             SLANG_RETURN_ON_FAIL(translationUnit->getModule()->precompileForTarget(
-                target,
+                precompileTarget,
                 nullptr));
         }
     }
@@ -5935,6 +5944,11 @@ void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool
 void EndToEndCompileRequest::setEmbedDXIL(bool value)
 {
     getOptionSet().set(CompilerOptionName::EmbedDXIL, value);
+}
+
+void EndToEndCompileRequest::setEmbedSPIRV(bool value)
+{
+    getOptionSet().set(CompilerOptionName::EmbedSPIRV, value);
 }
 
 void EndToEndCompileRequest::setTargetLineDirectiveMode(

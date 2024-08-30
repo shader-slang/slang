@@ -354,8 +354,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::DisableShortCircuit, "-disable-short-circuit", nullptr, "Disable short-circuiting for \"&&\" and \"||\" operations" },
         { OptionKind::UnscopedEnum, "-unscoped-enum", nullptr, "Treat enums types as unscoped by default."},
         { OptionKind::PreserveParameters, "-preserve-params", nullptr, "Preserve all resource parameters in the output code, even if they are not used by the shader."},
-        { OptionKind::EmbedDXIL, "-embed-dxil", nullptr,
-        "Embed DXIL into emitted slang-modules for faster linking" },
+        { OptionKind::EmbedDXIL, "-embed-dxil", nullptr, "Embed DXIL into emitted slang-modules for faster linking" },
+        { OptionKind::EmbedSPIRV, "-embed-spirv", nullptr, "Embed SPIR-V into emitted slang-modules for faster linking" },
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
@@ -1930,6 +1930,7 @@ SlangResult OptionsParser::_parse(
                 break;
             }
             case OptionKind::EmbedDXIL: m_compileRequest->setEmbedDXIL(true); break;
+            case OptionKind::EmbedSPIRV: m_compileRequest->setEmbedSPIRV(true); break;
             case OptionKind::Target:
             {
                 CommandLineArg name;

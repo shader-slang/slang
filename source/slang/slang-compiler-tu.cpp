@@ -54,7 +54,7 @@ namespace Slang
     * Precompile the module for the given target.
     *
     * This function creates a target program and emits the precompiled blob as
-    * an embedded blob in the module IR, e.g. DXIL.
+    * an embedded blob in the module IR, e.g. DXIL, SPIR-V.
     * Because the IR for the Slang Module may violate the restrictions of the
     * target language, the emitted target blob may not be able to include the
     * full module, but rather only the subset that can be precompiled. For
@@ -93,10 +93,6 @@ namespace Slang
         SlangCompileTarget target,
         slang::IBlob** outDiagnostics)
     {
-        if (target != SLANG_DXIL)
-        {
-            return SLANG_FAIL;
-        }
         CodeGenTarget targetEnum = CodeGenTarget(target);
 
         auto module = getIRModule();
@@ -132,6 +128,11 @@ namespace Slang
             tp.getOptionSet().add(CompilerOptionName::Profile, Profile::RawEnum::DX_Lib_6_6);
             tp.getOptionSet().add(CompilerOptionName::EmbedDXIL, true);
             break;
+        case CodeGenTarget::SPIRV:
+            tp.getOptionSet().add(CompilerOptionName::EmbedSPIRV, true);
+            break;
+        default:
+            return SLANG_FAIL;
         }
 
         CodeGenContext::EntryPointIndices entryPointIndices;
@@ -166,7 +167,18 @@ namespace Slang
         }
 
         ComPtr<IArtifact> outArtifact;
-        SlangResult res = codeGenContext.emitPrecompiledDXIL(outArtifact);
+        SlangResult res;
+        switch (targetReq->getTarget())
+        {
+        case CodeGenTarget::DXIL:
+            res = codeGenContext.emitPrecompiledDXIL(outArtifact);
+            break;
+        case CodeGenTarget::SPIRV:
+            res = codeGenContext.emitPrecompiledSPIRV(outArtifact);
+            break;
+        default:
+            return SLANG_FAIL;
+        }
 
         sink.getBlobIfNeeded(outDiagnostics);
         if (res != SLANG_OK)
@@ -183,7 +195,15 @@ namespace Slang
         for (const auto& mangledName : metadata->getExportedFunctionMangledNames())
         {
             auto moduleInst = nameToFunction[mangledName];
-            builder.addDecoration(moduleInst, kIROp_AvailableInDXILDecoration);
+            switch (targetReq->getTarget())
+            {
+            case CodeGenTarget::DXIL:
+                builder.addDecoration(moduleInst, kIROp_AvailableInDXILDecoration);
+                break;
+            case CodeGenTarget::SPIRV:
+                builder.addDecoration(moduleInst, kIROp_AvailableInSPIRVDecoration);
+                break;
+            }
             auto moduleDec = moduleInst->findDecoration<IRDownstreamModuleExportDecoration>();
             moduleDec->removeAndDeallocate();
         }
@@ -211,6 +231,9 @@ namespace Slang
         {
         case CodeGenTarget::DXIL:
             builder.emitEmbeddedDXIL(blob);
+            break;
+        case CodeGenTarget::SPIRV:
+            builder.emitEmbeddedSPIRV(blob);
             break;
         }
 

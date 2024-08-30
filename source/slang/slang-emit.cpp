@@ -447,6 +447,11 @@ static void unexportNonEmbeddableDXIL(IRModule* irModule)
     }
 }
 
+static void unexportNonEmbeddableSPIRV(IRModule* irModule)
+{
+    return;
+}
+
 Result linkAndOptimizeIR(
     CodeGenContext*                         codeGenContext,
     LinkingAndOptimizationOptions const&    options,
@@ -1495,6 +1500,11 @@ Result linkAndOptimizeIR(
         // We need to make sure that we don't try to export any functions that can't
         // be part of a DXIL library interface, eg. with resources.
         unexportNonEmbeddableDXIL(irModule);
+    }
+    else if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedSPIRV))
+    {
+        // TBD what limitation SPIRV has.
+        unexportNonEmbeddableSPIRV(irModule);
     }
 
     collectMetadata(irModule, *metadata);

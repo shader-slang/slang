@@ -4052,6 +4052,7 @@ public:
     IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* alignment, IRInst* value);
 
     IRInst* emitEmbeddedDXIL(ISlangBlob* blob);
+    IRInst* emitEmbeddedSPIRV(ISlangBlob* blob);
 
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
