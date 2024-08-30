@@ -1096,12 +1096,6 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
                 passThru = SLANG_PASS_THROUGH_DXC;
             }
             break;
-
-        case RenderApiType::OpenGl:
-            target = SLANG_GLSL;
-            nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
-            passThru = SLANG_PASS_THROUGH_GLSLANG;
-            break;
         case RenderApiType::Vulkan:
             target = SLANG_SPIRV;
             nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;

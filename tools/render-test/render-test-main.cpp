@@ -3,8 +3,8 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "options.h"
-#include "slang-gfx.h"
-#include "tools/gfx-util/shader-cursor.h"
+#include <slang-rhi.h>
+#include <slang-rhi/shader-cursor.h>
 #include "slang-support.h"
 #include "png-serialize-util.h"
 
@@ -670,7 +670,7 @@ void RenderTestApp::_initializeRenderPass()
     m_queue = m_device->createCommandQueue(queueDesc);
     SLANG_ASSERT(m_queue);
     
-    gfx::ITextureResource::Desc depthBufferDesc;
+    rhi::ITextureResource::Desc depthBufferDesc;
     depthBufferDesc.type = IResource::Type::Texture2D;
     depthBufferDesc.size.width = gWindowWidth;
     depthBufferDesc.size.height = gWindowHeight;
@@ -680,11 +680,11 @@ void RenderTestApp::_initializeRenderPass()
     depthBufferDesc.defaultState = ResourceState::DepthWrite;
     depthBufferDesc.allowedStates = ResourceState::DepthWrite;
 
-    ComPtr<gfx::ITextureResource> depthBufferResource =
+    ComPtr<rhi::ITextureResource> depthBufferResource =
         m_device->createTextureResource(depthBufferDesc, nullptr);
     SLANG_ASSERT(depthBufferResource);
 
-    gfx::ITextureResource::Desc colorBufferDesc;
+    rhi::ITextureResource::Desc colorBufferDesc;
     colorBufferDesc.type = IResource::Type::Texture2D;
     colorBufferDesc.size.width = gWindowWidth;
     colorBufferDesc.size.height = gWindowHeight;
@@ -696,33 +696,33 @@ void RenderTestApp::_initializeRenderPass()
     m_colorBuffer = m_device->createTextureResource(colorBufferDesc, nullptr);
     SLANG_ASSERT(m_colorBuffer);
 
-    gfx::IResourceView::Desc colorBufferViewDesc = {};
+    rhi::IResourceView::Desc colorBufferViewDesc = {};
     memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
-    colorBufferViewDesc.format = gfx::Format::R8G8B8A8_UNORM;
-    colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
-    colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
-    ComPtr<gfx::IResourceView> rtv =
+    colorBufferViewDesc.format = rhi::Format::R8G8B8A8_UNORM;
+    colorBufferViewDesc.renderTarget.shape = rhi::IResource::Type::Texture2D;
+    colorBufferViewDesc.type = rhi::IResourceView::Type::RenderTarget;
+    ComPtr<rhi::IResourceView> rtv =
         m_device->createTextureView(m_colorBuffer.get(), colorBufferViewDesc);
     SLANG_ASSERT(rtv);
 
-    gfx::IResourceView::Desc depthBufferViewDesc = {};
+    rhi::IResourceView::Desc depthBufferViewDesc = {};
     memset(&depthBufferViewDesc, 0, sizeof(depthBufferViewDesc));
-    depthBufferViewDesc.format = gfx::Format::D32_FLOAT;
-    depthBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
-    depthBufferViewDesc.type = gfx::IResourceView::Type::DepthStencil;
-    ComPtr<gfx::IResourceView> dsv =
+    depthBufferViewDesc.format = rhi::Format::D32_FLOAT;
+    depthBufferViewDesc.renderTarget.shape = rhi::IResource::Type::Texture2D;
+    depthBufferViewDesc.type = rhi::IResourceView::Type::DepthStencil;
+    ComPtr<rhi::IResourceView> dsv =
         m_device->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
     SLANG_ASSERT(dsv);
 
-    IFramebufferLayout::TargetLayout colorTarget = {gfx::Format::R8G8B8A8_UNORM, 1};
-    IFramebufferLayout::TargetLayout depthTarget = {gfx::Format::D32_FLOAT, 1};
-    gfx::IFramebufferLayout::Desc framebufferLayoutDesc;
+    IFramebufferLayout::TargetLayout colorTarget = {rhi::Format::R8G8B8A8_UNORM, 1};
+    IFramebufferLayout::TargetLayout depthTarget = {rhi::Format::D32_FLOAT, 1};
+    rhi::IFramebufferLayout::Desc framebufferLayoutDesc;
     framebufferLayoutDesc.renderTargetCount = 1;
     framebufferLayoutDesc.renderTargets = &colorTarget;
     framebufferLayoutDesc.depthStencil = &depthTarget;
     m_device->createFramebufferLayout(framebufferLayoutDesc, m_framebufferLayout.writeRef());
 
-    gfx::IFramebuffer::Desc framebufferDesc;
+    rhi::IFramebuffer::Desc framebufferDesc;
     framebufferDesc.renderTargetCount = 1;
     framebufferDesc.depthStencilView = dsv.get();
     framebufferDesc.renderTargetViews = rtv.readRef();
@@ -1074,7 +1074,7 @@ Result RenderTestApp::update()
     else
     {
         auto encoder = commandBuffer->encodeRenderCommands(m_renderPass, m_framebuffer);
-        gfx::Viewport viewport = {};
+        rhi::Viewport viewport = {};
         viewport.maxZ = 1.0f;
         viewport.extentX = (float)gWindowWidth;
         viewport.extentY = (float)gWindowHeight;
@@ -1222,17 +1222,17 @@ static void renderDocBeginFrame(){}
 static void renderDocEndFrame(){}
 #endif
 
-class StdWritersDebugCallback : public gfx::IDebugCallback
+class StdWritersDebugCallback : public rhi::IDebugCallback
 {
 public:
     Slang::StdWriters* writers;
     virtual SLANG_NO_THROW void SLANG_MCALL handleMessage(
-        gfx::DebugMessageType type,
-        gfx::DebugMessageSource source,
+        rhi::DebugMessageType type,
+        rhi::DebugMessageSource source,
         const char* message) override
     {
         SLANG_UNUSED(source);
-        if (type == gfx::DebugMessageType::Error)
+        if (type == rhi::DebugMessageType::Error)
         {
             writers->getOut().print("%s\n", message);
         }
@@ -1252,6 +1252,10 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
 	// Parse command-line options
 	SLANG_RETURN_ON_FAIL(Options::parse(argcIn, argvIn, StdWriters::getError(), options));
+    if (options.deviceType == DeviceType::Unknown)
+    {
+        return SLANG_OK;
+    }
 
     ShaderCompilerUtil::Input input;
     
@@ -1263,7 +1267,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     char const* profileName = "";
 	switch (options.deviceType)
 	{
-		case DeviceType::DirectX11:
+		case DeviceType::D3D11:
 			input.target = SLANG_DXBC;
             input.profile = "sm_5_0";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
@@ -1271,7 +1275,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             
 			break;
 
-		case DeviceType::DirectX12:
+		case DeviceType::D3D12:
 			input.target = SLANG_DXBC;
             input.profile = "sm_5_0";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
@@ -1283,13 +1287,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
                 input.profile = "sm_6_5";
                 slangPassThrough = SLANG_PASS_THROUGH_DXC;
             }
-			break;
-
-		case DeviceType::OpenGl:
-			input.target = SLANG_GLSL;
-            input.profile = "";
-			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
-            slangPassThrough = SLANG_PASS_THROUGH_GLSLANG;
 			break;
 
 		case DeviceType::Vulkan:
@@ -1349,16 +1346,16 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     }
 
 #ifdef _DEBUG
-    gfxEnableDebugLayer();
+    rhiEnableDebugLayer();
 #endif
     StdWritersDebugCallback debugCallback;
     debugCallback.writers = stdWriters;
-    gfxSetDebugCallback(&debugCallback);
+    rhiSetDebugCallback(&debugCallback);
     struct ResetDebugCallbackRAII
     {
         ~ResetDebugCallbackRAII()
         {
-            gfxSetDebugCallback(nullptr);
+            rhiSetDebugCallback(nullptr);
         }
     } resetDebugCallbackRAII;
 
@@ -1367,7 +1364,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
     StringBuilder rendererName;
     auto info = 
-    rendererName << "[" << gfxGetDeviceTypeName(options.deviceType) << "] ";
+    rendererName << "[" << rhiGetDeviceTypeName(options.deviceType) << "] ";
 
     if (options.onlyStartup)
     {
@@ -1447,7 +1444,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         desc.slang.slangGlobalSession = session;
         desc.slang.targetProfile = options.profileName.getBuffer();
         {
-            SlangResult res = gfxCreateDevice(&desc, device.writeRef());
+            SlangResult res = rhiCreateDevice(&desc, device.writeRef());
             if (SLANG_FAILED(res))
             {
                 // We need to be careful here about SLANG_E_NOT_AVAILABLE. This return value means that the renderer couldn't

@@ -4929,9 +4929,7 @@ namespace slang
             int                     targetIndex,
             bool                    value) = 0;
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDXIL(
-            int                     targetIndex,
-            bool                    value) = 0;
+        virtual SLANG_NO_THROW void SLANG_MCALL setEmbedDXIL(bool value) = 0;
 
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) = 0;
     };
