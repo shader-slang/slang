@@ -1829,16 +1829,6 @@ namespace Slang
     {
         VarDeclBase* m_argToCopy;
         Expr* m_initExpr = nullptr;
-
-        // Do not add initExpr to list since other-wise we will have more than 1 'default ctor'
-        // which Slang disallows.
-        static void addArgToList(List<CreateCtorArg>& argList, VarDeclBase* argToCopy, Expr* initExpr)
-        {
-            if(argList.getCount() == 0)
-                argList.add({ argToCopy, nullptr });
-            else
-                argList.add({ argToCopy, initExpr });
-        }
     };
     static ConstructorDecl* _createCtor(
         SemanticsDeclVisitorBase* visitor,
@@ -10588,8 +10578,6 @@ namespace Slang
             structDecl->addMember(zeroInitFunc);
         }
 
-        bool isCStyleStruct = checkIfCStyleStruct(this, structDecl);
-
         // Add an empty constructor for all combinations of visibility and access
         // which is possible:
         // 1. public constructor - usable *outside class scope* in a *different module*
@@ -10597,7 +10585,7 @@ namespace Slang
         // 2. public-internal constructor - usable *outside class scope* in the *same module*
         List<CreateCtorArg> publicInternalCtorArgs;
         // 3. public-private-internal constructor - usable *inside class scope* in the *same module*
-        List<CreateCtorArg> publicPrivateInternalCtorArgs;
+        List<CreateCtorArg> publicInternalPrivateCtorArgs;
  
         // Harvest parameters which map to the base type ctor.
         // Note: assumes 1 structDecl, N number inheritance decl
@@ -10637,20 +10625,12 @@ namespace Slang
             {
                 for (auto i : ctorForPublic->getParameters())
                 {
-                    Expr* initExpr = nullptr;
-                    if (isCStyleStruct)
-                        initExpr = createDefaultConstructExprForType(m_astBuilder, QualType(i->type), {});
-
-                    CreateCtorArg::addArgToList(publicCtorArgs, i, initExpr);
+                    publicCtorArgs.add({ i,nullptr });
                 }
                 for (auto i : ctorForInternal->getParameters())
                 {
-                    Expr* initExpr = nullptr;
-                    if (isCStyleStruct)
-                        initExpr = createDefaultConstructExprForType(m_astBuilder, QualType(i->type), {});
-
-                    CreateCtorArg::addArgToList(publicInternalCtorArgs, i, initExpr);
-                    CreateCtorArg::addArgToList(publicPrivateInternalCtorArgs, i, initExpr);
+                    publicInternalCtorArgs.add({ i,nullptr });
+                    publicInternalPrivateCtorArgs.add({ i,nullptr });
                 }
             }
         }
@@ -10668,29 +10648,25 @@ namespace Slang
             // Do not map a read-only variable for default-init
             if (!getTypeForDeclRef(m_astBuilder, varDeclRef, varDeclRef.getLoc()).isLeftValue)
                 continue;
-
-            Expr* initExpr = nullptr;
-            if (isCStyleStruct)
-                initExpr = createDefaultConstructExprForType(m_astBuilder, QualType(varDecl->type), {});
-
+            
             auto declVisibility = getDeclVisibility(varDecl);
             switch (declVisibility)
             {
             case DeclVisibility::Private:
-                CreateCtorArg::addArgToList(publicPrivateInternalCtorArgs, varDecl, initExpr);
+                publicInternalPrivateCtorArgs.add({ varDecl, nullptr });
                 if(!varDecl->initExpr)
                     maxVisibilityCtorToGenerate = DeclVisibility::Private;
                 break;
             case DeclVisibility::Internal:
-                CreateCtorArg::addArgToList(publicPrivateInternalCtorArgs, varDecl, initExpr);
-                CreateCtorArg::addArgToList(publicInternalCtorArgs, varDecl, initExpr);
+                publicInternalPrivateCtorArgs.add({ varDecl, nullptr });
+                publicInternalCtorArgs.add({ varDecl, nullptr });
                 if (!varDecl->initExpr)
                     maxVisibilityCtorToGenerate = DeclVisibility::Internal;
                 break;
             case DeclVisibility::Public:
-                CreateCtorArg::addArgToList(publicPrivateInternalCtorArgs, varDecl, initExpr);
-                CreateCtorArg::addArgToList(publicInternalCtorArgs, varDecl, initExpr);
-                CreateCtorArg::addArgToList(publicCtorArgs, varDecl, initExpr);
+                publicInternalPrivateCtorArgs.add({ varDecl, nullptr });
+                publicInternalCtorArgs.add({ varDecl, nullptr });
+                publicCtorArgs.add({ varDecl, nullptr });
                 break;
             default:
                 // Unknown visibility
@@ -10699,12 +10675,37 @@ namespace Slang
             }
         }
 
+        List<ConstructorDecl*> generatedMemberwiseCtors;
         if (maxVisibilityCtorToGenerate >= DeclVisibility::Public)
-            _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicCtorArgs), ctorList, structDecl, DeclVisibility::Public);
+            if (auto generatedCtor = _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicCtorArgs), ctorList, structDecl, DeclVisibility::Public))
+                generatedMemberwiseCtors.add(generatedCtor);
         if (maxVisibilityCtorToGenerate >= DeclVisibility::Internal)
-            _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicInternalCtorArgs), ctorList, structDecl, DeclVisibility::Internal);
+            if (auto generatedCtor = _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicInternalCtorArgs), ctorList, structDecl, DeclVisibility::Internal))
+                generatedMemberwiseCtors.add(generatedCtor);
         if (maxVisibilityCtorToGenerate >= DeclVisibility::Private)
-            _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicPrivateInternalCtorArgs), ctorList, structDecl, DeclVisibility::Private);
+            if (auto generatedCtor = _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicInternalPrivateCtorArgs), ctorList, structDecl, DeclVisibility::Private))
+                generatedMemberwiseCtors.add(generatedCtor);
+
+        // `checkIfCStyleStruct` must check after we add all possible Ctors.
+        // If we are a CStyleStruct add DefaultConstructExpr to all params (excluding arg 0)
+        bool isCStyleStruct = checkIfCStyleStruct(this, structDecl);
+        if (isCStyleStruct && generatedMemberwiseCtors.getCount() > 0)
+        {
+            // We know the user provided 0 non-default ctor's, we only had a chance to generate non default Ctors above in this AST pass.
+            SLANG_ASSERT(generatedMemberwiseCtors.getCount() == 1);
+            for (auto generatedCtor : generatedMemberwiseCtors)
+            {
+                Index paramIndex = 0;
+                for (ParamDecl* i : generatedCtor->getParameters())
+                {
+                    // Never annotate the first parameter to prevent conflict with "DefaultCtor"
+                    if (paramIndex == 0)
+                        continue;
+
+                    i->initExpr = createDefaultConstructExprForType(this->getASTBuilder(), (QualType)i->type, i->loc);
+                }
+            }
+        }
 
         int backingWidth = 0;
         [[maybe_unused]]

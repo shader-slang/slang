@@ -275,23 +275,6 @@ namespace Slang
                 return false;
             }
         }
-
-        // We need this additional check if we did not resolve all ctor's based on visibility yet
-        if (!structDecl->isChecked(DeclCheckState::AttributesChecked))
-        {
-            HashSet<DeclVisibility> visibilities;
-            for (auto i : getMembersOfType<VarDeclBase>(visitor->getASTBuilder(), structDecl, MemberFilterStyle::Instance))
-            {
-                visibilities.add(getDeclVisibility(i.getDecl()));
-                if (visibilities.getCount() != 1)
-                {
-                    visitor->getShared()->cacheIsCStyleStruct(structDecl, false);
-                    return false;
-                }
-            }
-        }
-        
-        visitor->getShared()->cacheIsCStyleStruct(structDecl, true);
         return true;
     }
 }
