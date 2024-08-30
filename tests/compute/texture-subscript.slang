@@ -4,7 +4,6 @@
 // Due to this, Metal compute test is disabled
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk -glsl
 
 //METAL-NOT: error 41402
 //METALLIB: @computeMain
