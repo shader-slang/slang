@@ -66,6 +66,12 @@ endif()
 add_library(imgui INTERFACE)
 target_include_directories(imgui INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui")
 
+# slang-rhi
+set(SLANG_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
+set(SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
+set(SLANG_RHI_BUILD_TESTS OFF)
+add_subdirectory(slang-rhi)
+
 # Tidy things up:
 
 # Restore log level if we set it

@@ -555,7 +555,6 @@ namespace Slang
             /// and parsing via Slang reflection, and is not recommended for future APIs to use.
             ///
         Scope* _getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder);
-
     protected:
         ComponentType(Linkage* linkage);
 
@@ -2732,9 +2731,13 @@ namespace Slang
 
         SlangResult emitEntryPoints(ComPtr<IArtifact>& outArtifact);
 
-        SlangResult emitTranslationUnit(ComPtr<IArtifact>& outArtifact);
+        SlangResult emitPrecompiledDXIL(ComPtr<IArtifact>& outArtifact);
 
         void maybeDumpIntermediate(IArtifact* artifact);
+
+        // Used to cause instructions available in precompiled DXIL to be
+        // removed between IR linking and target source generation.
+        bool removeAvailableInDXIL = false;
 
     protected:
         CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
@@ -2772,11 +2775,6 @@ namespace Slang
 
 
         SlangResult _emitEntryPoints(ComPtr<IArtifact>& outArtifact);
-
-	/* Checks if all modules in the target program are already compiled to the
-        target language, indicating that a pass-through linking using the
-        downstream compiler is viable.*/
-        bool isPrecompiled();
     private:
         Shared* m_shared = nullptr;
     };
@@ -2816,7 +2814,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(int targetIndex, bool value) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDXIL(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setEmbedDXIL(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;
