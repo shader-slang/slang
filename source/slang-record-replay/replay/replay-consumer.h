@@ -27,8 +27,7 @@ namespace SlangRecord
         SlangResult getResultAsFileSystem(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outFileSystemId);
         SlangResult getEntryPointHash(ObjectID objectId, SlangInt entryPointIndex, SlangInt targetIndex, ObjectID outHashId);
         SlangResult specialize(ObjectID objectId, slang::SpecializationArg const* specializationArgs,
-                                        SlangInt specializationArgCount, ObjectID outSpecializedComponentTypeId, ObjectID outDiagnosticsId)
-        {return SLANG_FAIL;}
+                                        SlangInt specializationArgCount, ObjectID outSpecializedComponentTypeId, ObjectID outDiagnosticsId);
         SlangResult link(ObjectID objectId, ObjectID outLinkedComponentTypeId, ObjectID outDiagnosticsId);
         SlangResult getEntryPointHostCallable(ObjectID objectId, int entryPointIndex, int targetIndex, ObjectID outSharedLibraryId,
                                         ObjectID outDiagnosticsId);
@@ -55,7 +54,7 @@ namespace SlangRecord
         uint32_t    m_globalCounter = 0;
     };
 
-    class ReplayConsumer : public IDecoderConsumer
+    class ReplayConsumer : public IDecoderConsumer, public Slang::RefObject
     {
     public:
         virtual void CreateGlobalSession(ObjectID outGlobalSessionId) override;
