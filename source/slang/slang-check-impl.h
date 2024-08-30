@@ -1615,7 +1615,9 @@ namespace Slang
 
         bool getAttributeTargetSyntaxClasses(SyntaxClass<NodeBase> & cls, uint32_t typeFlags);
 
-        bool validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl, ModifiableSyntaxNode* attrTarget);
+        // Check an attribute, and return a checked modifier that represents it.
+        //
+        Modifier* validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl, ModifiableSyntaxNode* attrTarget);
 
         AttributeBase* checkAttribute(
             UncheckedAttribute*     uncheckedAttr,

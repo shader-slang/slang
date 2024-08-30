@@ -568,6 +568,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
             }
 
+            // Don't do any processing for specialization constants.
+            if (addressSpace == AddressSpace::SpecializationConstant)
+            {
+                return;
+            }
+
             // Opaque resource handles can't be in Uniform for Vulkan, if they are
             // placed here then put them in UniformConstant instead
             if (isSpirvUniformConstantType(inst->getDataType()))
@@ -727,6 +733,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             break;
         case LayoutResourceKind::PushConstantBuffer:
             addressSpace = AddressSpace::PushConstant;
+            break;
+        case LayoutResourceKind::SpecializationConstant:
+            addressSpace = AddressSpace::SpecializationConstant;
             break;
         case LayoutResourceKind::RayPayload:
             addressSpace = AddressSpace::IncomingRayPayload;

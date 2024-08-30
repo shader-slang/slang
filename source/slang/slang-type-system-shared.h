@@ -101,6 +101,8 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
         UniformConstant,
         // Corresponds to SPIR-V's SpvStorageClassImage
         Image,
+        // Represents a SPIR-V specialization constant
+        SpecializationConstant,
 
         // Default address space for a user-defined pointer
         UserPointer = 0x100000001ULL,
