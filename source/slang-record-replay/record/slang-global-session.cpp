@@ -13,7 +13,7 @@ namespace SlangRecord
         SLANG_RECORD_ASSERT(m_actualGlobalSession != nullptr);
 
         m_globalSessionHandle = reinterpret_cast<SlangRecord::AddressFormat>(m_actualGlobalSession.get());
-        m_recordManager = std::make_unique<RecordManager>(m_globalSessionHandle);
+        m_recordManager = new RecordManager(m_globalSessionHandle);
 
         // We will use the address of the global session as the filename for the record manager
         // to make it unique for each global session.
