@@ -48,7 +48,7 @@ IRInst* emitCalcGroupIndex(
     M(DepthGreaterEqual,    SV_DepthGreaterEqual)   \
     M(DepthLessEqual,       SV_DepthLessEqual)      \
     M(DispatchThreadID,     SV_DispatchThreadID)    \
-    M(DomainLsocation,      SV_DomainLsocation)     \
+    M(DomainLocation,       SV_DomainLocation)      \
     M(GroupID,              SV_GroupID)             \
     M(GroupIndex,           SV_GroupIndex)          \
     M(GroupThreadID,        SV_GroupThreadID)       \

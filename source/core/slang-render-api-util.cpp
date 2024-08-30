@@ -13,7 +13,6 @@ namespace Slang {
 // NOTE! Must keep in same order as RenderApiType and have same amount of entries
 /* static */const RenderApiUtil::Info RenderApiUtil::s_infos[] =
 {
-    { RenderApiType::OpenGl, "gl,ogl,opengl",   "glsl,glsl-rewrite,glsl-cross"},
     { RenderApiType::Vulkan, "vk,vulkan",       ""},
     { RenderApiType::D3D12,  "dx12,d3d12",      ""},
     { RenderApiType::D3D11,  "dx11,d3d11",      "hlsl,hlsl-rewrite,slang"},
@@ -265,13 +264,11 @@ static bool _canLoadSharedLibrary(const char* libName)
     switch (type)
     {
 #if SLANG_WINDOWS_FAMILY
-        case RenderApiType::OpenGl: return _canLoadSharedLibrary("opengl32");
         case RenderApiType::Vulkan: return _canLoadSharedLibrary("vulkan-1") || _canLoadSharedLibrary("vk_swiftshader");
 #elif SLANG_APPLE_FAMILY
         case RenderApiType::Vulkan: return true;
         case RenderApiType::Metal:  return true;
 #elif SLANG_UNIX_FAMILY
-        case RenderApiType::OpenGl: return true;
         case RenderApiType::Vulkan: return true;
 #endif
 
