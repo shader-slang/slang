@@ -20,10 +20,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         && test[0].a == 1
         && test[0].b == 2
 
-        && test[1].a == 1
-        && test[1].b == 2
+        && test[1].a == 3
+        && test[1].b == 4
 
-        && test[2].a == 1
-        && test[2].b == 2
+        && test[2].a == 5
+        && test[2].b == 6
         ;
 }

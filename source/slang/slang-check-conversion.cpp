@@ -537,22 +537,19 @@ namespace Slang
                         for (auto i : maybeArgList)
                             coercedArgs.add(i);
 
-                        // We want lookup to resolve our init function as a generic using Slang's
-                        // builtin 'lookup' logic.
-                        // Note, we need to also ensure we can infer the generic based on the target type
-                        auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-                        ctorToInvoke->scope = toStructDecl->ownedScope;
-                        ctorToInvoke->name = getName(String(toStructDecl->getName()->text));
-                        ctorToInvoke->type = toType;
-                        Expr* callee = CheckExpr(ctorToInvoke);
+                        List<Type*> argTypes;
+                        for (auto i : coercedArgs)
+                            argTypes.add(i->type);
 
-                        InvokeExpr* constructorExpr = m_astBuilder->create<InvokeExpr>();
-                        constructorExpr->loc = fromInitializerListExpr->loc;
-                        constructorExpr->functionExpr = callee;
+                        auto* varExpr = getASTBuilder()->create<VarExpr>();
+                        varExpr->type = (QualType)getASTBuilder()->getTypeType(toType);
+                        varExpr->declRef = isDeclRefTypeOf<Decl>(toType);
+                        auto* constructorExpr = getASTBuilder()->create<InvokeExpr>();
+                        constructorExpr->functionExpr = varExpr;
                         constructorExpr->arguments.addRange(coercedArgs);
-                        constructorExpr->type = toType;
+                        auto resolvedConstructorExpr = CheckExpr(constructorExpr);
 
-                        *outToExpr = CheckInvokeExprWithCheckedOperands(constructorExpr);
+                        *outToExpr = resolvedConstructorExpr;
                     }
                     return true;
                 }

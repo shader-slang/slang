@@ -179,7 +179,7 @@ namespace Slang
     {
         SLANG_ASSERT(structDecl);
 
-        // 1. Prefer non-synth default-ctor 
+        // 1. Prefer non-synth default-ctor
         //  * Skip this option if `ConstructZeroInitListOptions::PreferZeroInitFunc` is true
         //  * Skip this option if `ConstructZeroInitListOptions::CheckToAvoidRecursion` detects recursion
         //      * Only user-defined ctor will try and have recursion of `{}`
