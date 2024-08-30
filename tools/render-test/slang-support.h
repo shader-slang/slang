@@ -1,7 +1,7 @@
 // slang-support.h
 #pragma once
 
-#include "slang-gfx.h"
+#include <slang-rhi.h>
 
 #include "slang.h"
 
@@ -10,7 +10,7 @@
 
 namespace renderer_test {
 
-gfx::StageType translateStage(SlangStage slangStage);
+rhi::StageType translateStage(SlangStage slangStage);
 
 struct ShaderCompileRequest
 {
