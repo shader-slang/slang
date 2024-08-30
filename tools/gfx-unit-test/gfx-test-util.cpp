@@ -263,9 +263,6 @@ namespace gfx_test
         case Slang::RenderApiFlag::CUDA:
             deviceDesc.deviceType = gfx::DeviceType::CUDA;
             break;
-        case Slang::RenderApiFlag::OpenGl:
-            deviceDesc.deviceType = gfx::DeviceType::OpenGl;
-            break;
         default:
             SLANG_IGNORE_TEST
         }

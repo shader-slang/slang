@@ -42,8 +42,18 @@ static void _insertBinding(List<ShaderBindingRange>& ranges, LayoutResourceKind 
 void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMetadata)
 {
     // Scan the instructions looking for global resource declarations
+    // and exported functions.
     for (const auto& inst : irModule->getGlobalInsts())
     {
+        if (auto func = as<IRFunc>(inst))
+        {
+            if (func->findDecoration<IRDownstreamModuleExportDecoration>())
+            {
+                auto name = func->findDecoration<IRExportDecoration>()->getMangledName();
+                outMetadata.m_exportedFunctionMangledNames.add(name);
+            }
+        }
+
         auto param = as<IRGlobalParam>(inst);
         if (!param) continue;
         
