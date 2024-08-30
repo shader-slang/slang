@@ -45,20 +45,20 @@ jobs:
           pip install prettytable argparse
           Copy-Item -Path C:\slang-benchmarks -Destination . -Recurse
           python compile.py --samples 16 --target dxil --ci
+      - uses: actions/checkout@v3
+        with:
+          repository: 'shader-slang/slang-material-modules-benchmark'
+          path: 'external/slang-material-modules-benchmark'
       - name: Push results
         run: |
-          git config pull.rebase true
-          git pull
-          git config --global --add safe.directory C:/slang-material-modules-benchmark
-          cp tools/benchmark/benchmarks.json C:\slang-material-modules-benchmark
-          ls
-          echo $(Invoke-Expression "git log -1 --pretty=%s") > C:\slang-material-modules-benchmark\commit
-          echo $(Invoke-Expression "git log -1 --pretty=%H") > C:\slang-material-modules-benchmark\commit-hash
-          echo $(Invoke-Expression "git log -1 --pretty=%s") > C:\slang-material-modules-benchmark\current
-          echo $(Invoke-Expression "git log -1 --pretty=%H") >> C:\slang-material-modules-benchmark\current
-          cd C:\slang-material-modules-benchmark
+          cp tools/benchmark/benchmarks.json external\slang-material-modules-benchmark
+          echo $(Invoke-Expression "git log -1 --pretty=%s") > external\slang-material-modules-benchmark\commit
+          echo $(Invoke-Expression "git log -1 --pretty=%H") > external\slang-material-modules-benchmark\commit-hash
+          echo $(Invoke-Expression "git log -1 --pretty=%s") > external\slang-material-modules-benchmark\current
+          echo $(Invoke-Expression "git log -1 --pretty=%H") >> external\slang-material-modules-benchmark\current
+          cd external\slang-material-modules-benchmark
           ls
           git add benchmarks.json current
           git commit -m "$(cat commit)" -m "https://github.com/shader-slang/slang/commit/$(cat commit-hash)"
           git log
-          git push
+          git push https://venkataram-nv:${{ secrets.SLANG_MDL_BENCHMARK_RESULTS_PAT }}@github.com/shader-slang/slang-material-modules-benchmark.git
