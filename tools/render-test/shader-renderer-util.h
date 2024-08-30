@@ -1,7 +1,7 @@
 // shader-renderer-util.h
 #pragma once
 
-#include "slang-gfx.h"
+#include <slang-rhi.h>
 #include "shader-input-layout.h"
 
 namespace renderer_test {

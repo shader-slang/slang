@@ -637,8 +637,7 @@ if(SLANG_ENABLE_TESTS)
                 core
                 compiler-core
                 slang
-                gfx
-                gfx-util
+                slang-rhi
                 platform
                 $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
             EXTRA_COMPILE_DEFINITIONS_PRIVATE
