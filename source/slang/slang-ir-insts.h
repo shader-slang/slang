@@ -330,6 +330,8 @@ IR_SIMPLE_DECORATION(PerVertexDecoration)
 
 IR_SIMPLE_DECORATION(SPIRVBlockDecoration)
 
+IR_SIMPLE_DECORATION(DefaultValueDecoration)
+
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLVersionDecoration };
@@ -430,6 +432,8 @@ IR_SIMPLE_DECORATION(NonCopyableTypeDecoration)
 IR_SIMPLE_DECORATION(HLSLMeshPayloadDecoration)
 IR_SIMPLE_DECORATION(GlobalInputDecoration)
 IR_SIMPLE_DECORATION(GlobalOutputDecoration)
+IR_SIMPLE_DECORATION(AvailableInDXILDecoration)
+IR_SIMPLE_DECORATION(DownstreamModuleExportDecoration)
 
 struct IRGLSLLocationDecoration : IRDecoration
 {
@@ -4971,6 +4975,10 @@ public:
     void addHasExplicitHLSLBindingDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_HasExplicitHLSLBindingDecoration);
+    }
+    void addDefaultValueDecoration(IRInst* value, IRInst* defaultValue)
+    {
+        addDecoration(value, kIROp_DefaultValueDecoration, defaultValue);
     }
     void addNVAPIMagicDecoration(IRInst* value, UnownedStringSlice const& name)
     {

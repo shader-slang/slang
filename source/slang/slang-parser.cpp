@@ -8193,7 +8193,7 @@ namespace Slang
                 CASE(push_constant, PushConstantAttribute) 
                 CASE(shaderRecordNV, ShaderRecordAttribute)
                 CASE(shaderRecordEXT, ShaderRecordAttribute)
-                CASE(constant_id,   GLSLConstantIDLayoutModifier)
+                CASE(constant_id,   VkConstantIdAttribute)
                 CASE(std140, GLSLStd140Modifier)
                 CASE(std430, GLSLStd430Modifier)
                 CASE(scalar, GLSLScalarModifier)
@@ -8230,6 +8230,11 @@ namespace Slang
                     { 
                         parser->diagnose(modifier->loc, Diagnostics::missingLayoutBindingModifier);
                     }
+                }
+                else if (auto specConstAttr = as<VkConstantIdAttribute>(modifier))
+                {
+                    parser->ReadToken(TokenType::OpAssign);
+                    specConstAttr->location = (int)getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral));
                 }
 
                 listBuilder.add(modifier);

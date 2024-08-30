@@ -6,11 +6,11 @@
 
 #include "source/core/slang-writer.h"
 
-#include "slang-gfx.h"
+#include <slang-rhi.h>
 
 namespace renderer_test {
 
-using namespace gfx;
+using namespace rhi;
 
 enum class ShaderInputType
 {
@@ -128,7 +128,7 @@ struct TextureData
         clearSlices();
 
         FormatInfo formatSizeInfo;
-        gfxGetFormatInfo(format, &formatSizeInfo);
+        rhiGetFormatInfo(format, &formatSizeInfo);
         m_formatSize = uint8_t(formatSizeInfo.blockSizeInBytes / formatSizeInfo.pixelsPerBlock);
         m_format = format;
     }
@@ -147,7 +147,7 @@ struct TextureData
         m_slices.clear();
     }
 
-    gfx::Format m_format = gfx::Format::Unknown;
+    rhi::Format m_format = rhi::Format::Unknown;
     uint8_t m_formatSize = 0;
 
     Slang::List<Slice> m_slices;
