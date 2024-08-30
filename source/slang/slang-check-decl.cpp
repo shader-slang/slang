@@ -10700,8 +10700,10 @@ namespace Slang
                 {
                     // Never annotate the first parameter to prevent conflict with "DefaultCtor"
                     if (paramIndex == 0)
+                    {
+                        paramIndex++;
                         continue;
-
+                    }
                     paramIndex++;
                     i->initExpr = createDefaultConstructExprForType(this->getASTBuilder(), (QualType)i->type, i->loc);
                 }
