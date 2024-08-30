@@ -4178,6 +4178,9 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
 
     emitLayoutSemantics(varDecl, "register");
 
+    // If the parameter has a default value, we may need to emit it.
+    emitGlobalParamDefaultVal(varDecl);
+
     // A shader parameter cannot have an initializer,
     // so we do need to consider emitting one here.
 
