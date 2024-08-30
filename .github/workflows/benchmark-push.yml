@@ -47,6 +47,8 @@ jobs:
           python compile.py --samples 16 --target dxil --ci
       - name: Push results
         run: |
+          git config pull.rebase true
+          git pull
           git config --global --add safe.directory C:/slang-material-modules-benchmark
           cp tools/benchmark/benchmarks.json C:\slang-material-modules-benchmark
           ls
