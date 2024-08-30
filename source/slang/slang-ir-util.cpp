@@ -244,6 +244,14 @@ bool isSimpleDataType(IRType* type)
     }
 }
 
+bool isSimpleHLSLDataType(IRInst* inst)
+{
+    // TODO: Add criteria
+    // https://github.com/shader-slang/slang/issues/4792
+    SLANG_UNUSED(inst);
+    return true;
+}
+
 SourceLoc findFirstUseLoc(IRInst* inst)
 {
     for (auto use = inst->firstUse; use; use = use->nextUse)

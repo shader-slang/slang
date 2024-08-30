@@ -790,6 +790,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(PreciseDecoration,                 precise,                0, 0)
     INST(PublicDecoration,                  public,                 0, 0)
     INST(HLSLExportDecoration,              hlslExport,             0, 0)
+    INST(DownstreamModuleExportDecoration,  downstreamModuleExport, 0, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
     INST(OutputControlPointsDecoration,     outputControlPoints,    1, 0)
     INST(OutputTopologyDecoration,          outputTopology,         1, 0)
@@ -799,6 +800,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(InstanceDecoration,                instance,               1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
     INST(WaveSizeDecoration,                waveSize,               1, 0)
+
+    INST(AvailableInDXILDecoration,         availableInDXIL,        0, 0)
 
         // Added to IRParam parameters to an entry point
     /* GeometryInputPrimitiveTypeDecoration */
