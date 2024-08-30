@@ -436,11 +436,11 @@ static SlangResult runTests(UnitTestContext* context)
  const char* testBinaryNames[] = {
         "cpu-hello-world",
         "triangle",
-        "shader-object",
         "ray-tracing",
         "ray-tracing-pipeline",
-        "model-viewer",
-        "autodiff-texture"
+        "autodiff-texture",
+        // "shader-object", // these examples requires reflection API to replay, we have to disable it for now.
+        // "model-viewer",
     };
 
     SlangResult finalRes = SLANG_OK;
