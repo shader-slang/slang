@@ -80,14 +80,14 @@ int main(int argc, char *argv[])
     SlangRecord::RecordFileProcessor recordFileProcessor(options.recordFileName);
 
     Slang::String jsonPath = Slang::Path::replaceExt(options.recordFileName, "json");
-    std::unique_ptr<SlangRecord::JsonConsumer> jsonConsumer;
+    Slang::RefPtr<SlangRecord::JsonConsumer> jsonConsumer;
     SlangRecord::ReplayConsumer replayConsumer;
 
     SlangRecord::SlangDecoder decoder;
 
     if (options.convertToJson)
     {
-        jsonConsumer = std::make_unique<SlangRecord::JsonConsumer>(jsonPath);
+        jsonConsumer = new SlangRecord::JsonConsumer(jsonPath);
         decoder.addConsumer(jsonConsumer.get());
     }
     else

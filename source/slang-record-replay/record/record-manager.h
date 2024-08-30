@@ -9,7 +9,7 @@
 
 namespace SlangRecord
 {
-    class RecordManager
+    class RecordManager: public Slang::RefObject
     {
     public:
         RecordManager(uint64_t globalSessionHandle);
@@ -29,7 +29,7 @@ namespace SlangRecord
         void clearWithTailer();
 
         MemoryStream m_memoryStream;
-        std::unique_ptr<FileOutputStream> m_fileStream;
+        Slang::RefPtr<FileOutputStream> m_fileStream;
         Slang::String m_recordFileDirectory = Slang::Path::getCurrentPath();
         ParameterRecorder m_recorder;
     };

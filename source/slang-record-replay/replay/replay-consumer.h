@@ -54,7 +54,7 @@ namespace SlangRecord
         uint32_t    m_globalCounter = 0;
     };
 
-    class ReplayConsumer : public IDecoderConsumer
+    class ReplayConsumer : public IDecoderConsumer, public Slang::RefObject
     {
     public:
         virtual void CreateGlobalSession(ObjectID outGlobalSessionId) override;

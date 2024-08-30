@@ -53,7 +53,7 @@ namespace SlangRecord
         Slang::FileStream& m_fileStream;
     };
 
-    class JsonConsumer : public IDecoderConsumer
+    class JsonConsumer : public IDecoderConsumer, public Slang::RefObject
     {
     public:
         JsonConsumer(const Slang::String& filePath);
