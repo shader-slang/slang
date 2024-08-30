@@ -3335,12 +3335,15 @@ namespace Slang
 
     static NodeBase* parseExtensionDecl(Parser* parser, void* /*userData*/)
     {
-        ExtensionDecl* decl = parser->astBuilder->create<ExtensionDecl>();
-        parser->FillPosition(decl);
-        decl->targetType = parser->ParseTypeExp();
-        parseOptionalInheritanceClause(parser, decl);
-        parseDeclBody(parser, decl);
-        return decl;
+        return parseOptGenericDecl(parser, [&](GenericDecl*)
+            {
+                ExtensionDecl* decl = parser->astBuilder->create<ExtensionDecl>();
+                parser->FillPosition(decl);
+                decl->targetType = parser->ParseTypeExp();
+                parseOptionalInheritanceClause(parser, decl);
+                parseDeclBody(parser, decl);
+                return decl;
+            });
     }
 
 
