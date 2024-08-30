@@ -10702,6 +10702,7 @@ namespace Slang
                     if (paramIndex == 0)
                         continue;
 
+                    paramIndex++;
                     i->initExpr = createDefaultConstructExprForType(this->getASTBuilder(), (QualType)i->type, i->loc);
                 }
             }
