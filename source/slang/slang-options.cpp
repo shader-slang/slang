@@ -412,7 +412,9 @@ void initCommandOptions(CommandOptions& options)
         "* [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)\n" 
         "* [GLSL wiki](https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ#auto-mapped-binding-numbers)\n" },
         { OptionKind::VulkanBindGlobals, "-fvk-bind-globals", "-fvk-bind-globals <N> <descriptor-set>",
-        "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>."},
+        "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>.\n"
+        "It lets you specify the descriptor for the source at a certain register.\n"
+        "* [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)\n" },
         { OptionKind::VulkanInvertY, "-fvk-invert-y", nullptr, "Negates (additively inverts) SV_Position.y before writing to stage output."},
         { OptionKind::VulkanUseDxPositionW, "-fvk-use-dx-position-w", nullptr, "Reciprocates (multiplicatively inverts) SV_Position.w after reading from stage input. For use in fragment shaders only."},
         { OptionKind::VulkanUseEntryPointName, "-fvk-use-entrypoint-name", nullptr, "Uses the entrypoint name from the source instead of 'main' in the spirv output."},
@@ -424,7 +426,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
         "Generate SPIR-V output by compiling generated GLSL with glslang" },
         { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
-        "Generate SPIR-V output direclty (default)" },
+        "Generate SPIR-V output directly (default)" },
         { OptionKind::SPIRVCoreGrammarJSON, "-spirv-core-grammar", nullptr,
         "A path to a specific spirv.core.grammar.json to use when generating SPIR-V output" },
         { OptionKind::IncompleteLibrary, "-incomplete-library", nullptr,

@@ -542,6 +542,7 @@ DIAGNOSTIC(30811, Error, baseOfStructMustBeStructOrInterface, "struct '$0' canno
 DIAGNOSTIC(30812, Error, baseOfEnumMustBeIntegerOrInterface, "enum '$0' cannot inherit from type '$1' that is neither an interface not a builtin integer type")
 DIAGNOSTIC(30813, Error, baseOfExtensionMustBeInterface, "extension cannot inherit from non-interface type '$1'")
 DIAGNOSTIC(30814, Error, baseOfClassMustBeClassOrInterface, "class '$0' cannot inherit from type '$1' that is neither a class nor an interface")
+DIAGNOSTIC(30815, Error, circularityInExtension, "circular extension is not allowed.")
 
 DIAGNOSTIC(30820, Error, baseStructMustBeListedFirst, "a struct type may only inherit from one other struct type, and that type must appear first in the list of bases")
 DIAGNOSTIC(30821, Error, tagTypeMustBeListedFirst, "an unum type may only have a single tag type, and that type must be listed first in the list of bases")
@@ -552,7 +553,7 @@ DIAGNOSTIC(30831, Error, cannotInheritFromImplicitlySealedDeclarationInAnotherMo
 DIAGNOSTIC(30832, Error, invalidTypeForInheritance, "type '$0' cannot be used for inheritance")
 
 DIAGNOSTIC(30850, Error, invalidExtensionOnType, "type '$0' cannot be extended. `extension` can only be used to extend a nominal type.")
-DIAGNOSTIC(30851, Error, invalidMemberTypeInExtension, "$0 cannot be apart of an `extension`")
+DIAGNOSTIC(30851, Error, invalidMemberTypeInExtension, "$0 cannot be a part of an `extension`")
 
 // 309xx: subscripts
 DIAGNOSTIC(30900, Error, multiDimensionalArrayNotSupported, "multi-dimensional array is not supported.")
