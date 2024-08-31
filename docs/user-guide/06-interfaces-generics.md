@@ -626,7 +626,6 @@ extension MyObject : IBar, IBar2
 }
 ```
 
-
 `is` and `as` Operator
 ----------------------------
 
@@ -780,9 +779,10 @@ interface IFoo
     int foo();
 }
 
-// Direct extension on MyObject:
-struct MyObject : IBase
+// MyObject directly implements IBase:
+struct MyObject : IBase, IFoo
 {
+    int foo() { return 0; }
 }
 
 // Generic extension that applies to all types that conforms to `IBase`:
@@ -800,7 +800,7 @@ int test()
 {
     MyObject obj;
 
-    // Returns 0, the conformance defined by the direct extension
+    // Returns 0, the conformance defined directly by the type
     // is preferred.
     return helper(obj);
 }
