@@ -704,8 +704,6 @@ struct OptionsParser
     void setProfile(RawTarget* rawTarget, Profile profile);
     void addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom);
 
-    SlangResult addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option);
-    
     void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode);
     
     SlangResult parse(
@@ -1642,23 +1640,6 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
     return SLANG_OK;
 }
 
-// Creates a target of the specified type whose output will be embedded as IR metadata
-SlangResult OptionsParser::addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option)
-{
-    RawTarget rawTarget;
-    rawTarget.format = format;
-    // Silently allow redundant targets if it is the same as the last specified target.
-    if (m_rawTargets.getCount() == 0 || m_rawTargets.getLast().format != rawTarget.format)
-    {
-        m_rawTargets.add(rawTarget);
-    }
-
-    getCurrentTarget()->optionSet.add(option, true);
-    getCurrentTarget()->optionSet.add(CompilerOptionName::GenerateWholeProgram, true);
-
-    return SLANG_OK;
-}
-
 SlangResult OptionsParser::_parse(
     int             argc,
     char const* const* argv)
@@ -1950,7 +1931,7 @@ SlangResult OptionsParser::_parse(
                 linkage->m_optionSet.set(optionKind, compressionType);
                 break;
             }
-            case OptionKind::EmbedDXIL: SLANG_RETURN_ON_FAIL(addEmbeddedLibrary(CodeGenTarget::DXIL, CompilerOptionName::EmbedDXIL)); break;
+            case OptionKind::EmbedDXIL: m_compileRequest->setEmbedDXIL(true); break;
             case OptionKind::Target:
             {
                 CommandLineArg name;
@@ -2796,11 +2777,6 @@ SlangResult OptionsParser::_parse(
             if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))
             {
                 m_compileRequest->setTargetGenerateWholeProgram(targetID, true);
-            }
-
-            if (rawTarget.optionSet.getBoolOption(CompilerOptionName::EmbedDXIL))
-            {
-                m_compileRequest->setTargetEmbedDXIL(targetID, true);
             }
         }
 

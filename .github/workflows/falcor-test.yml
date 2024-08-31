@@ -42,7 +42,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        submodules: 'true'
+        submodules: 'recursive'
         fetch-depth: '0'
     - name: Setup
       uses: ./.github/actions/common-setup

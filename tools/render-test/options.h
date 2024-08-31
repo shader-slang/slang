@@ -14,11 +14,11 @@
 
 #include "../../source/compiler-core/slang-command-line-args.h"
 
-#include "slang-gfx.h"
+#include <slang-rhi.h>
 
 namespace renderer_test {
 
-using namespace gfx;
+using namespace rhi;
 
 struct Options
 {
