@@ -449,6 +449,7 @@ static void unexportNonEmbeddableDXIL(IRModule* irModule)
 
 static void unexportNonEmbeddableSPIRV(IRModule* irModule)
 {
+    SLANG_UNUSED(irModule);
     return;
 }
 
