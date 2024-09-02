@@ -2266,6 +2266,7 @@ namespace Slang
         for (auto& arg : expr->arguments)
         {
             arg = maybeOpenRef(arg);
+            arg = maybeOpenExistential(arg);
         }
 
         context.originalExpr = expr;
@@ -2394,6 +2395,10 @@ namespace Slang
             // the user the most help we can.
             if (shouldAddToCache)
                 typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
+
+            // Now that we have resolved the overload candidate, we need to undo an `openExistential`
+            // operation that was applied to `out` arguments.
+            //
             auto funcType = context.bestCandidate->funcType;
             ShortList<ParameterDirection> paramDirections;
             if (funcType)
@@ -2421,12 +2426,13 @@ namespace Slang
                     case kParameterDirection_InOut:
                     case kParameterDirection_Ref:
                     case kParameterDirection_ConstRef:
-                        continue;
-                    default:
                         break;
+                    default:
+                        continue;
                     }
                 }
-                arg = maybeOpenExistential(arg);
+                if (auto extractExistentialExpr = as<ExtractExistentialValueExpr>(arg))
+                    arg = extractExistentialExpr->originalExpr;
             }
             return CompleteOverloadCandidate(context, *context.bestCandidate);
         }
