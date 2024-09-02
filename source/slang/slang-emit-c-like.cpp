@@ -3757,6 +3757,7 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, b
                 emitPackOffsetModifier(fieldKey, fieldType, packOffsetDecoration);
             }
         }
+        emitStructFieldAttributes(structType, ff);
         emitMemoryQualifiers(fieldKey);
         emitType(fieldType, getName(fieldKey));
         emitSemantics(fieldKey, allowOffsetLayout);
