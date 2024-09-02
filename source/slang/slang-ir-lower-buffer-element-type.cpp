@@ -888,16 +888,19 @@ namespace Slang
 
     IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType)
     {
-        if (!isKhronosTarget(target->getTargetReq()))
-            return IRTypeLayoutRules::getNatural();
+        if (target->getTargetReq()->getTarget() != CodeGenTarget::WGSL)
+        {
+            if (!isKhronosTarget(target->getTargetReq()))
+                return IRTypeLayoutRules::getNatural();
 
-        // If we are just emitting GLSL, we can just use the general layout rule.
-        if (!target->shouldEmitSPIRVDirectly())
-            return IRTypeLayoutRules::getNatural();
+            // If we are just emitting GLSL, we can just use the general layout rule.
+            if (!target->shouldEmitSPIRVDirectly())
+                return IRTypeLayoutRules::getNatural();
 
-        // If the user specified a scalar buffer layout, then just use that.
-        if (target->getOptionSet().shouldUseScalarLayout())
-            return IRTypeLayoutRules::getNatural();
+            // If the user specified a scalar buffer layout, then just use that.
+            if (target->getOptionSet().shouldUseScalarLayout())
+                return IRTypeLayoutRules::getNatural();
+        }
 
         if (target->getOptionSet().shouldUseDXLayout())
         {
