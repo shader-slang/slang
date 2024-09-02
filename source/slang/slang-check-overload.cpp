@@ -983,6 +983,7 @@ namespace Slang
         return ConstructDeclRefExpr(
             innerDeclRef,
             base,
+            innerDeclRef.getName(),
             originalExpr->loc,
             originalExpr);
     }
@@ -1037,6 +1038,7 @@ namespace Slang
                 baseExpr = ConstructLookupResultExpr(
                     candidate.item,
                     context.baseExpr,
+                    candidate.item.declRef.getName(),
                     context.funcLoc,
                     context.originalExpr);
                 break;
@@ -2173,7 +2175,7 @@ namespace Slang
                 if (lastInner)
                 {
                     auto baseExpr = GetBaseExpr(funcDeclRefExpr);
-                    lastInner->baseFunction = ConstructLookupResultExpr(candidate.item, baseExpr, funcDeclRefExpr->loc, funcDeclRefExpr);
+                    lastInner->baseFunction = ConstructLookupResultExpr(candidate.item, baseExpr, funcDeclRefExpr->name, funcDeclRefExpr->loc, funcDeclRefExpr);
                 }
                 candidate.exprVal = expr;
                 expr->type.type = diffFuncType;
