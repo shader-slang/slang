@@ -5,7 +5,7 @@ struct G
 
 extension G
 {
-    //HOVER:9,7
+//HOVER:9,7
     This my();
 }
 
