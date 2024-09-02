@@ -4226,7 +4226,7 @@ namespace Slang
         //
         DiagnosticSink tempSink(getSourceManager(), nullptr);
         ExprLocalScope localScope;
-        SemanticsVisitor subVisitor(withSink(&tempSink).withExprLocalScope(&localScope));
+        SemanticsVisitor subVisitor(withSink(&tempSink).withParentFunc(synFuncDecl).withExprLocalScope(&localScope));
 
         // With our temporary diagnostic sink soaking up any messages
         // from overload resolution, we can now try to resolve
