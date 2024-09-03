@@ -270,7 +270,7 @@ UnownedStringSlice getTabForTarget()
 // Assumes markdown
 UnownedStringSlice getLineBreakForTarget()
 {
-    return UnownedStringSlice("\<br\>\n");
+    return UnownedStringSlice("<br>\n");
 }
 
 struct CapabilityDefParser
@@ -924,7 +924,7 @@ List<StringBuilder> setupDocCommentHeaderStringBuilders()
     sbDocSections.setCount((UInt)AutoDocHeaderGroup::Count);
     for (UInt i = 0; i < (UInt)AutoDocHeaderGroup::Count; i++)
     {
-        sbDocSections[i] << "\n\<br\>\n\n" << getHeaderNameFromAutoDocHeaderGroup(i) << "\n----------------------\n";
+        sbDocSections[i] << "\n<br>\n\n" << getHeaderNameFromAutoDocHeaderGroup(i) << "\n----------------------\n";
     }
     return sbDocSections;
 }
