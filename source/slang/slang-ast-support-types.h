@@ -492,6 +492,7 @@ namespace Slang
         CanReadInterfaceRequirements = ReadyForLookup,
         CanUseZeroInit = SignatureChecked,
         DefaultConstructorReadyForUse = AttributesChecked,
+        VarInitExprAreChecked = DefinitionChecked,
     };
 
         /// A `DeclCheckState` plus a bit to track whether a declaration is currently being checked.

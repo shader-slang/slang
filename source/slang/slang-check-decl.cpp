@@ -7899,7 +7899,7 @@ namespace Slang
             auto varDeclBase = as<VarDeclBase>(m);
             if (!varDeclBase)
                 continue;
-            ensureDecl(m->getDefaultDeclRef(), DeclCheckState::DefaultConstructorReadyForUse);
+            ensureDecl(m->getDefaultDeclRef(), DeclCheckState::VarInitExprAreChecked);
             if (!isDefaultInitializableType
                 || varDeclBase->initExpr)
                 continue;
@@ -8028,7 +8028,7 @@ namespace Slang
         DeclAndCtorInfo* baseStructInfo = nullptr;
         for(auto& i : inheritanceInfoList)
         {
-            ensureDecl(i.m_inheritanceDecl, DeclCheckState::DefinitionChecked);
+            ensureDecl(i.m_inheritanceDecl, DeclCheckState::VarInitExprAreChecked);
             if(as<StructDecl>(i.m_inheritanceBaseDecl))
                 baseStructInfo = &i;
         }
@@ -8234,7 +8234,7 @@ namespace Slang
             structVarDecl->initExpr = defaultConstructExpr;
             structVarDecl->parentDecl = zeroInitListFunc;
             structVarDecl->loc = seqStmt->loc;
-            ensureDecl(structVarDecl, DeclCheckState::DefaultConstructorReadyForUse);
+            ensureDecl(structVarDecl, DeclCheckState::VarInitExprAreChecked);
 
             auto structVarDeclExpr = m_astBuilder->create<VarExpr>();
             structVarDeclExpr->declRef = structVarDecl->getDefaultDeclRef();
