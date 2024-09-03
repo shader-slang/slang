@@ -3738,7 +3738,7 @@ namespace Slang
 
     IRInst* IRBuilder::_emitDefaultConstruct(IRType* type, bool fallback, HashSet<IRType*> visitedTypes)
     {
-        if (visitedTypes.contains(type))
+        if (visitedTypes.contains(type) || isResourceType(type))
             return emitUndefined(type);
         visitedTypes.add(type);
         IRType* actualType = type;

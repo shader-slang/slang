@@ -248,7 +248,10 @@ struct ResourceOutputSpecializationPass
             newFunc->removeAndDeallocate();
             // Check if `oldFunc` is the reason for failing,
             // Otherwise don't add to 'unspecializableFuncs'
-            if(result == SpecializeFuncResult::ThisFuncFailed)
+            //
+            // Also ensure our func has uses, else we can just ignore specializing this function.
+            // Otherwise 'KeepAlive' will cause an infinite loop.
+            if(result == SpecializeFuncResult::ThisFuncFailed && oldFunc->hasUses())
                 unspecializableFuncs->add(oldFunc);
             return false;
         }
@@ -309,12 +312,15 @@ struct ResourceOutputSpecializationPass
         // There should be no conditions at call sites that can cause specialization to
         // fail, because specialization does not depend on what is passed *in* to each
         // call, but only on what gets passed *out*.
-        //
         for( auto oldCall : calls )
         {
             specializeCallSite(oldCall, newFunc, funcInfo);
         }
         specializedFuncs.add(oldFunc);
+
+        // Since we can no longer fail and we are replacing all `Func` uses, all 'KeepAlive's
+        // can be removed from the oldFunc so DCE can it clean-up.
+        oldFunc->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
         return true;
     }
 

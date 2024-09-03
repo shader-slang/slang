@@ -19962,8 +19962,9 @@ ${
 
         case hlsl:
             uint isSingleLod = 0;
+            int shapeDim = Shape.dimensions;
             Footprint footprint =  {__queryFootprint$(CoarseOrFine)NVAPI(
-                Shape.dimensions,
+                shapeDim,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
                 __vectorReshape<3>(coords), granularity, /* out */isSingleLod), false};
@@ -19995,8 +19996,9 @@ ${
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
+            int shapeDim = Shape.dimensions;
             Footprint footprint = {__queryFootprint$(CoarseOrFine)BiasNVAPI(
-                Shape.dimensions,
+                shapeDim,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
                 __vectorReshape<3>(coords), granularity, lodBias, /* out */isSingleLod), false}; 
@@ -20078,8 +20080,9 @@ ${
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
+            int shapeDim = Shape.dimensions;
             Footprint footprint = {__queryFootprint$(CoarseOrFine)LevelNVAPI(
-                Shape.dimensions,
+                shapeDim,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
                 __vectorReshape<3>(coords), granularity, lod, /* out */isSingleLod), false};
@@ -20117,8 +20120,9 @@ ${{{
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
+            int shapeDim = Shape.dimensions;
             Footprint footprint = {__queryFootprint$(CoarseOrFine)GradNVAPI(
-                Shape.dimensions,
+                shapeDim,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
                 __vectorReshape<3>(coords), granularity, __vectorReshape<3>(dx), __vectorReshape<3>(dy), /* out */isSingleLod), false};
