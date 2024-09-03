@@ -2493,7 +2493,7 @@ namespace Slang
         CheckConstraintSubType(decl->sub);
         decl->sub = TranslateTypeNodeForced(decl->sub);
         decl->sup = TranslateTypeNodeForced(decl->sup);
-        if (!isValidGenericConstraintType(decl->sup) && !as<ErrorType>(decl->sub.type))
+        if (!decl->isEqualityConstraint && !isValidGenericConstraintType(decl->sup) && !as<ErrorType>(decl->sub.type))
         {
             getSink()->diagnose(decl->sup.exp, Diagnostics::invalidTypeForConstraint, decl->sup);
         }
@@ -9655,7 +9655,8 @@ namespace Slang
                 ASTNodeType::DeclRefType);
             auto typeParamDecl = as<DeclRefType>(genericTypeConstraintDecl.getDecl()->sub.type)->getDeclRef().getDecl();
             List<Type*>* constraintTypes = genericConstraints.tryGetValue(typeParamDecl);
-            assert(constraintTypes);
+            if (!constraintTypes)
+                continue;
             constraintTypes->add(genericTypeConstraintDecl.getDecl()->getSup().type);
         }
 

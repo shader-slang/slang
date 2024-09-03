@@ -477,6 +477,11 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitDecl(DeclBase* decl)
     }
     else if (auto typeConstraint = as<TypeConstraintDecl>(decl))
     {
+        if (auto genericTypeConstraint = as<GenericTypeConstraintDecl>(typeConstraint))
+        {
+            if (genericTypeConstraint->whereTokenLoc.isValid())
+                visitExpr(genericTypeConstraint->sub.exp);
+        }
         visitExpr(typeConstraint->getSup().exp);
     }
     else if (auto typedefDecl = as<TypeDefDecl>(decl))

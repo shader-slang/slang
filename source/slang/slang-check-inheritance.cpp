@@ -97,6 +97,51 @@ namespace Slang
         return info;
     }
 
+    void SharedSemanticsContext::getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef)
+    {
+        auto mergeParent = [](DeclRef<GenericDecl>& currentParent, DeclRef<GenericDecl> newParent)
+            {
+                if (!currentParent)
+                {
+                    currentParent = newParent;
+                    return;
+                }
+                if (currentParent == newParent)
+                    return;
+                if (newParent.getDecl()->isChildOf(currentParent.getDecl()))
+                    currentParent = newParent;
+            };
+
+        if (declRef.as<GenericTypeParamDeclBase>())
+        {
+            if (!genericParent)
+                mergeParent(genericParent, declRef.getParent().as<GenericDecl>());
+            return;
+        }
+        else if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+        {
+            if (auto lookupSourceDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource()))
+                getDependentGenericParentImpl(genericParent, lookupSourceDeclRef);
+        }
+        else if (auto genericAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase))
+        {
+            for (Index i = 0; i < genericAppDeclRef->getArgCount(); i++)
+            {
+                if (auto argDeclRef = isDeclRefTypeOf<Decl>(genericAppDeclRef->getArg(i)))
+                {
+                    getDependentGenericParentImpl(genericParent, argDeclRef);
+                }
+            }
+        }
+    }
+
+    DeclRef<GenericDecl> SharedSemanticsContext::getDependentGenericParent(DeclRef<Decl> declRef)
+    {
+        DeclRef<GenericDecl> genericParent;
+        getDependentGenericParentImpl(genericParent, declRef);
+        return genericParent;
+    }
+
     InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* declRefType, InheritanceCircularityInfo* circularityInfo)
     {
         // This method is the main engine for computing linearized inheritance
@@ -337,7 +382,7 @@ namespace Slang
                 addDirectBaseType(baseType, satisfyingWitness);
             }
         }
-        else if (auto genericTypeParamDeclRef = declRef.as<GenericTypeParamDeclBase>())
+        if (auto genericDeclRef = getDependentGenericParent(declRef))
         {
             // The constraints placed on a generic type parameter are siblings of that
             // parameter in its parent `GenericDecl`, so we need to enumerate all of
@@ -349,13 +394,11 @@ namespace Slang
             // representation would need to take into account canonicalization of
             // constraints.
 
-            auto genericDeclRef = genericTypeParamDeclRef.getParent().as<GenericDecl>();
-            SLANG_ASSERT(genericDeclRef);
             ensureDecl(&visitor, genericDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
 
             if (auto extensionDecl = as<ExtensionDecl>(genericDeclRef.getDecl()->inner))
             {
-                if (isDeclRefTypeOf<GenericTypeParamDecl>(extensionDecl->targetType.type) == genericTypeParamDeclRef)
+                if (isDeclRefTypeOf<GenericTypeParamDecl>(extensionDecl->targetType.type) == declRef)
                 {
                     // If `T` is a generic parameter where the same generic is an extension on `T`,
                     // then we need to add the extension itself as a facet.
@@ -377,12 +420,9 @@ namespace Slang
                 auto superType = getSup(astBuilder, constraintDeclRef);
 
                 // We only consider constraints where the type represented
-                // by `genericTypeParamDeclRef` is the subtype, since those
+                // by `declRef` is the subtype, since those
                 // constraints are the ones that give us information about
                 // the declared supertypes.
-                //
-                // TODO: consider whether other kinds of constraints could
-                // also apply here.
                 //
                 auto subDeclRefType = as<DeclRefType>(subType);
                 if (!subDeclRefType)
@@ -394,7 +434,7 @@ namespace Slang
                     if (!subDeclRefType)
                         continue;
                 }
-                if (subDeclRefType->getDeclRef() != genericTypeParamDeclRef)
+                if (subDeclRefType->getDeclRef() != declRef)
                     continue;
 
                 // Because the constraint is a declared inheritance relationship,
@@ -402,9 +442,9 @@ namespace Slang
                 // as in all the preceding cases.
                 //
                 auto satisfyingWitness = _getASTBuilder()->getDeclaredSubtypeWitness(
-                    selfType,
-                    superType,
-                    constraintDeclRef);
+                        selfType,
+                        superType,
+                        constraintDeclRef);
                 addDirectBaseType(superType, satisfyingWitness);
             }
         }
