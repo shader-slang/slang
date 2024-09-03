@@ -315,6 +315,10 @@ struct ResourceOutputSpecializationPass
             specializeCallSite(oldCall, newFunc, funcInfo);
         }
         specializedFuncs.add(oldFunc);
+
+        // Since we can no longer fail and we are replacing all `Func` uses, 'KeepAlive'
+        // can be removed from the oldFunc so DCE can it clean-up.
+        oldFunc->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
         return true;
     }
 
