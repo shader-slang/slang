@@ -41,7 +41,7 @@ jobs:
           cd tools/benchmark
           cp ../../external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang .
           pip install prettytable argparse
-          python compile.py --samples 1 --target dxil
+          python compile.py --samples 16 --target dxil
       - uses: actions/checkout@v3
         with:
           repository: 'shader-slang/slang-material-modules-benchmark'
