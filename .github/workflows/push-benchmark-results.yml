@@ -2,7 +2,7 @@ name: Push MDL Benchmark Results
 
 on:
   push:
-    branches: [master, push-benchmark-results]
+    branches: [master]
     paths-ignore:
       - 'docs/**'
       - 'LICENCE'
