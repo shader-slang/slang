@@ -9,13 +9,6 @@
 
 #include "tools/unit-test/slang-unit-test.h"
 
-#ifdef _WIN32
-#include <windows.h>
-#include <shellapi.h>
-#else
-#include <ftw.h>
-#endif
-
 #include <chrono>
 #include <thread>
 
@@ -355,55 +348,13 @@ static SlangResult resultCompare(List<entryHashInfo> const& expectHashes, List<e
 
 static SlangResult cleanupRecordFiles()
 {
-    if (File::exists("slang-record") == false)
+    SlangResult res = Path::removeNonEmpty("slang-record");
+    if (SLANG_FAILED(res))
     {
-        return SLANG_OK;
+        getTestReporter()->message(TestMessageType::TestFailure, "Failed to remove 'slang-record' directory\n");
     }
 
-    StringBuilder msgBuilder;
-    // Path::remove() doesn't support remove a non-empty directory, so we need to implement
-    // a simple function to remove the directory recursively.
-#ifdef _WIN32
-    // https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationa
-    SHFILEOPSTRUCTA file_op = {
-        NULL,
-        FO_DELETE,
-        "slang-record",
-        "",
-        FOF_NOCONFIRMATION |
-        FOF_NOERRORUI |
-        FOF_SILENT,
-        false,
-        0,
-        "" };
-    int ret = SHFileOperationA(&file_op);
-    if (ret)
-    {
-        msgBuilder << "fail to remove 'slang-record' dir, error: " << ret << "\n";
-        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        return SLANG_FAIL;
-    }
-#else
-    auto unlink_cb = [](const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) -> int
-    {
-        int rv = ::remove(fpath);
-        if (rv)
-        {
-            perror(fpath);
-        }
-        return rv;
-    };
-    // https://linux.die.net/man/3/nftw
-    int ret = nftw("slang-record", unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
-    if (ret)
-    {
-        msgBuilder << "fail to remove 'slang-record' dir, error: " << ret << ", " << strerror(errno) << "\n";
-        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        return SLANG_FAIL;
-    }
-#endif
-
-    return SLANG_OK;
+    return res;
 }
 
 static SlangResult runTest(UnitTestContext* context, const char* testName)
@@ -427,7 +378,7 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
     }
 
 error:
-    cleanupRecordFiles();
+    res = cleanupRecordFiles();
     return res;
 }
 
