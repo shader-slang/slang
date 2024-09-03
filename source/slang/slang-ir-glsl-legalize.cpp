@@ -259,11 +259,20 @@ List<IRInst*> ScalarizedVal::leafAddresses()
 
 struct GLSLLegalizationContext
 {
-    Session*                session;
-    GLSLExtensionTracker*   glslExtensionTracker;
-    DiagnosticSink*         sink;
-    Stage                   stage;
-    IRFunc*                 entryPointFunc;
+    Session*                   session;
+    GLSLExtensionTracker*      glslExtensionTracker;
+    DiagnosticSink*            sink;
+    Stage                      stage;
+    IRFunc*                    entryPointFunc;
+    
+    /// This dictionary stores all bindings of 'VaryingIn/VaryingOut'. We assume 'space' is 0.
+    Dictionary<LayoutResourceKind, UIntSet> usedBindingIndex;
+
+    GLSLLegalizationContext()
+    {
+        // Reserve for VaryingInput VaryingOutput
+        usedBindingIndex.reserve(2);
+    }
 
     struct SystemSemanticGlobal
     {
@@ -846,6 +855,7 @@ struct OuterParamInfoLink
 };
 
 void createVarLayoutForLegalizedGlobalParam(
+    GLSLLegalizationContext* context,
     IRInst* globalParam,
     IRBuilder* builder,
     IRVarLayout* inVarLayout,
@@ -857,6 +867,8 @@ void createVarLayoutForLegalizedGlobalParam(
     OuterParamInfoLink* outerParamInfo,
     GLSLSystemValueInfo* systemValueInfo)
 {
+    context->usedBindingIndex[kind].add(bindingIndex);
+
     // We need to construct a fresh layout for the variable, even
     // if the original had its own layout, because it might be
     // an `inout` parameter, and we only want to deal with the case
@@ -953,7 +965,7 @@ IRInst* getOrCreateBuiltinParamForHullShader(GLSLLegalizationContext* context, U
     return outputControlPointIdParam;
 }
 
-IRTypeLayout* createPatchConstantFuncResultTypeLayout(IRBuilder& irBuilder, IRType* type)
+IRTypeLayout* createPatchConstantFuncResultTypeLayout(GLSLLegalizationContext* context, IRBuilder& irBuilder, IRType* type)
 {
     if (auto structType = as<IRStructType>(type))
     {
@@ -961,14 +973,24 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(IRBuilder& irBuilder, IRTy
         for (auto field : structType->getFields())
         {
             auto fieldType = field->getFieldType();
-
-            IRTypeLayout* fieldTypeLayout = createPatchConstantFuncResultTypeLayout(irBuilder, fieldType);
+            IRTypeLayout* fieldTypeLayout = createPatchConstantFuncResultTypeLayout(context, irBuilder, fieldType);
             IRVarLayout::Builder fieldVarLayoutBuilder(&irBuilder, fieldTypeLayout);
             auto decoration = field->getKey()->findDecoration<IRSemanticDecoration>();
             if (decoration)
             {
                 if (decoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
                     fieldVarLayoutBuilder.setSystemValueSemantic(decoration->getSemanticName(), 0);
+            }
+            else
+            {
+                auto varLayoutForKind = fieldVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
+                
+                UInt space = 0;
+                varLayoutForKind->space = space;
+
+                auto unusedBinding = context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
+                varLayoutForKind->offset = unusedBinding;
+                context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(unusedBinding);
             }
             builder.addField(field->getKey(), fieldVarLayoutBuilder.build());
         }
@@ -977,7 +999,7 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(IRBuilder& irBuilder, IRTy
     }
     else if (auto arrayType = as<IRArrayTypeBase>(type))
     {
-        auto elementTypeLayout = createPatchConstantFuncResultTypeLayout(irBuilder, arrayType->getElementType());
+        auto elementTypeLayout = createPatchConstantFuncResultTypeLayout(context, irBuilder, arrayType->getElementType());
         IRArrayTypeLayout::Builder builder(&irBuilder, elementTypeLayout);
         return builder.build();
     }
@@ -1102,7 +1124,7 @@ void invokePathConstantFuncInHullShader(GLSLLegalizationContext* context, CodeGe
     builder.setInsertBefore(constantFunc->getFirstBlock()->getFirstOrdinaryInst());
     
     auto constantOutputType = constantFunc->getResultType();
-    IRTypeLayout* constantOutputLayout = createPatchConstantFuncResultTypeLayout(builder, constantOutputType);
+    IRTypeLayout* constantOutputLayout = createPatchConstantFuncResultTypeLayout(context, builder, constantOutputType);
     IRVarLayout::Builder resultVarLayoutBuilder(&builder, constantOutputLayout);
     if (auto semanticDecor = constantFunc->findDecoration<IRSemanticDecoration>())
         resultVarLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), 0);
@@ -1246,7 +1268,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             builder->addImportDecoration(globalParam, systemValueName);
 
             createVarLayoutForLegalizedGlobalParam(
-                globalParam, builder, inVarLayout, inTypeLayout, kind, bindingIndex, bindingSpace, declarator, outerParamInfo, systemValueInfo);
+                context, globalParam, builder, inVarLayout, inTypeLayout, kind, bindingIndex, bindingSpace, declarator, outerParamInfo, systemValueInfo);
 
             semanticGlobalTmp.globalParam = globalParam;
 
@@ -1382,7 +1404,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     }
 
     createVarLayoutForLegalizedGlobalParam(
-        globalParam, builder, inVarLayout, typeLayout, kind, bindingIndex, bindingSpace, declarator, outerParamInfo, systemValueInfo);
+        context, globalParam, builder, inVarLayout, typeLayout, kind, bindingIndex, bindingSpace, declarator, outerParamInfo, systemValueInfo);
     return val;
 }
 
@@ -2350,9 +2372,8 @@ static void legalizeMeshOutputParam(
             else if(auto set = as<IRMeshOutputSet>(s))
             {
                 auto elemType = composeGetters<IRType>(
-                    set,
-                    &IRInst::getFullType,
-                    &IRPtrTypeBase::getValueType);
+                    set->getElementValue(),
+                    &IRInst::getFullType);
                 auto d_ = getSubscriptVal(builder, elemType, d, set->getIndex());
                 assign(builder, d_, ScalarizedVal::value(set->getElementValue()));
                 set->removeAndDeallocate();

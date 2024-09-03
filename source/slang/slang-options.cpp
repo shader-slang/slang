@@ -412,7 +412,9 @@ void initCommandOptions(CommandOptions& options)
         "* [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)\n" 
         "* [GLSL wiki](https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ#auto-mapped-binding-numbers)\n" },
         { OptionKind::VulkanBindGlobals, "-fvk-bind-globals", "-fvk-bind-globals <N> <descriptor-set>",
-        "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>."},
+        "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>.\n"
+        "It lets you specify the descriptor for the source at a certain register.\n"
+        "* [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)\n" },
         { OptionKind::VulkanInvertY, "-fvk-invert-y", nullptr, "Negates (additively inverts) SV_Position.y before writing to stage output."},
         { OptionKind::VulkanUseDxPositionW, "-fvk-use-dx-position-w", nullptr, "Reciprocates (multiplicatively inverts) SV_Position.w after reading from stage input. For use in fragment shaders only."},
         { OptionKind::VulkanUseEntryPointName, "-fvk-use-entrypoint-name", nullptr, "Uses the entrypoint name from the source instead of 'main' in the spirv output."},
@@ -424,7 +426,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
         "Generate SPIR-V output by compiling generated GLSL with glslang" },
         { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
-        "Generate SPIR-V output direclty (default)" },
+        "Generate SPIR-V output directly (default)" },
         { OptionKind::SPIRVCoreGrammarJSON, "-spirv-core-grammar", nullptr,
         "A path to a specific spirv.core.grammar.json to use when generating SPIR-V output" },
         { OptionKind::IncompleteLibrary, "-incomplete-library", nullptr,
@@ -702,8 +704,6 @@ struct OptionsParser
     void setProfile(RawTarget* rawTarget, Profile profile);
     void addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom);
 
-    SlangResult addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option);
-    
     void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode);
     
     SlangResult parse(
@@ -1640,23 +1640,6 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
     return SLANG_OK;
 }
 
-// Creates a target of the specified type whose output will be embedded as IR metadata
-SlangResult OptionsParser::addEmbeddedLibrary(const CodeGenTarget format, CompilerOptionName option)
-{
-    RawTarget rawTarget;
-    rawTarget.format = format;
-    // Silently allow redundant targets if it is the same as the last specified target.
-    if (m_rawTargets.getCount() == 0 || m_rawTargets.getLast().format != rawTarget.format)
-    {
-        m_rawTargets.add(rawTarget);
-    }
-
-    getCurrentTarget()->optionSet.add(option, true);
-    getCurrentTarget()->optionSet.add(CompilerOptionName::GenerateWholeProgram, true);
-
-    return SLANG_OK;
-}
-
 SlangResult OptionsParser::_parse(
     int             argc,
     char const* const* argv)
@@ -1948,7 +1931,7 @@ SlangResult OptionsParser::_parse(
                 linkage->m_optionSet.set(optionKind, compressionType);
                 break;
             }
-            case OptionKind::EmbedDXIL: SLANG_RETURN_ON_FAIL(addEmbeddedLibrary(CodeGenTarget::DXIL, CompilerOptionName::EmbedDXIL)); break;
+            case OptionKind::EmbedDXIL: m_compileRequest->setEmbedDXIL(true); break;
             case OptionKind::Target:
             {
                 CommandLineArg name;
@@ -2794,11 +2777,6 @@ SlangResult OptionsParser::_parse(
             if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))
             {
                 m_compileRequest->setTargetGenerateWholeProgram(targetID, true);
-            }
-
-            if (rawTarget.optionSet.getBoolOption(CompilerOptionName::EmbedDXIL))
-            {
-                m_compileRequest->setTargetEmbedDXIL(targetID, true);
             }
         }
 

@@ -58,6 +58,7 @@
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
+#include "slang-ir-redundancy-removal.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-sccp.h"
@@ -415,6 +416,37 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
     return false;
 }
 
+static void unexportNonEmbeddableDXIL(IRModule* irModule)
+{
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (inst->getOp() == kIROp_Func)
+        {
+            // DXIL does not permit HLSLStructureBufferType in exported functions
+            // or sadly Matrices (https://github.com/shader-slang/slang/issues/4880)
+            auto type = as<IRFuncType>(inst->getFullType());
+            auto argCount = type->getOperandCount();
+            for (UInt aa = 0; aa < argCount; ++aa)
+            {
+                auto operand = type->getOperand(aa);
+                if (operand->getOp() == kIROp_HLSLStructuredBufferType ||
+                    operand->getOp() == kIROp_MatrixType)
+                {
+                    if (auto dec = inst->findDecoration<IRPublicDecoration>())
+                    {
+                        dec->removeAndDeallocate();
+                    }
+                    if (auto dec = inst->findDecoration<IRDownstreamModuleExportDecoration>())
+                    {
+                        dec->removeAndDeallocate();
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
+
 Result linkAndOptimizeIR(
     CodeGenContext*                         codeGenContext,
     LinkingAndOptimizationOptions const&    options,
@@ -637,6 +669,13 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
+
+    if (requiredLoweringPassSet.autodiff)
+    {
+        // Generate warnings for potentially incorrect or badly-performing autodiff patterns.
+        checkAutodiffPatterns(targetProgram, irModule, sink);
+    }
+    
     // Next, we need to ensure that the code we emit for
     // the target doesn't contain any operations that would
     // be illegal on the target platform. For example,
@@ -737,6 +776,11 @@ Result linkAndOptimizeIR(
         break;
     default:
         break;
+    }
+
+    if (codeGenContext->removeAvailableInDXIL)
+    {
+        removeAvailableInDownstreamModuleDecorations(irModule);
     }
 
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
@@ -1137,6 +1181,10 @@ Result linkAndOptimizeIR(
             ? as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker())
             : &glslExtensionTracker;
 
+#if 0
+            dumpIRIfEnabled(codeGenContext, irModule, "PRE GLSL LEGALIZED");
+#endif
+
         legalizeEntryPointsForGLSL(
             session,
             irModule,
@@ -1441,6 +1489,13 @@ Result linkAndOptimizeIR(
 
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
+
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+    {
+        // We need to make sure that we don't try to export any functions that can't
+        // be part of a DXIL library interface, eg. with resources.
+        unexportNonEmbeddableDXIL(irModule);
+    }
 
     collectMetadata(irModule, *metadata);
 

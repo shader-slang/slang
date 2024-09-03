@@ -1,10 +1,13 @@
 #include "../util/record-utility.h"
 #include "slang-module.h"
+#include "slang-session.h"
 
 namespace SlangRecord
 {
-    ModuleRecorder::ModuleRecorder(slang::IModule* module, RecordManager* recordManager)
-        : m_actualModule(module),
+    ModuleRecorder::ModuleRecorder(SessionRecorder* sessionRecorder, slang::IModule* module, RecordManager* recordManager)
+        : IComponentTypeRecorder(module, recordManager),
+          m_sessionRecorder(sessionRecorder),
+          m_actualModule(module),
           m_recordManager(recordManager)
     {
         SLANG_RECORD_ASSERT(m_actualModule != nullptr);
@@ -16,8 +19,8 @@ namespace SlangRecord
 
     ISlangUnknown* ModuleRecorder::getInterface(const Guid& guid)
     {
-        if(guid == ModuleRecorder::getTypeGuid())
-            return static_cast<ISlangUnknown*>(this);
+        if(guid == IModuleRecorder::getTypeGuid())
+            return static_cast<IModuleRecorder*>(this);
         else
             return nullptr;
     }
@@ -52,7 +55,7 @@ namespace SlangRecord
 
         if (SLANG_OK == res)
         {
-            EntryPointRecorder* entryPointRecord = getEntryPointRecorder(*outEntryPoint);
+            IEntryPointRecorder* entryPointRecord = getEntryPointRecorder(*outEntryPoint);
             *outEntryPoint = static_cast<slang::IEntryPoint*>(entryPointRecord);
         }
         return res;
@@ -88,12 +91,14 @@ namespace SlangRecord
 
         if (*outEntryPoint)
         {
-            EntryPointRecorder* entryPointRecord = m_mapEntryPointToRecord.tryGetValue(*outEntryPoint);
-            if (!entryPointRecord)
+            IEntryPointRecorder* entryPointRecord = nullptr;
+            bool ret = m_mapEntryPointToRecord.tryGetValue(*outEntryPoint, entryPointRecord);
+            if (!ret)
             {
                 SLANG_RECORD_ASSERT(!"Entrypoint not found in mapEntryPointToRecord");
             }
-            *outEntryPoint = static_cast<slang::IEntryPoint*>(entryPointRecord);
+            ComPtr<slang::IEntryPoint> result(static_cast<slang::IEntryPoint*>(entryPointRecord));
+            *outEntryPoint = result.detach();
         }
         else
             *outEntryPoint = nullptr;
@@ -186,7 +191,7 @@ namespace SlangRecord
 
         if (SLANG_OK == res)
         {
-            EntryPointRecorder* entryPointRecord = getEntryPointRecorder(*outEntryPoint);
+            IEntryPointRecorder* entryPointRecord = getEntryPointRecorder(*outEntryPoint);
             *outEntryPoint = static_cast<slang::IEntryPoint*>(entryPointRecord);
         }
         return res;
@@ -219,284 +224,23 @@ namespace SlangRecord
         return res;
     }
 
-    SLANG_NO_THROW slang::ISession* ModuleRecorder::getSession()
+    IEntryPointRecorder* ModuleRecorder::getEntryPointRecorder(slang::IEntryPoint* entryPoint)
     {
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-        slang::ISession* session = m_actualModule->getSession();
-
-        return session;
-    }
-
-    SLANG_NO_THROW slang::ProgramLayout* ModuleRecorder::getLayout(
-        SlangInt    targetIndex,
-        slang::IBlob**     outDiagnostics)
-    {
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-        ParameterRecorder* recorder {};
+        IEntryPointRecorder* entryPointRecord = nullptr;
+        bool ret = m_mapEntryPointToRecord.tryGetValue(entryPoint, entryPointRecord);
+        if (!ret)
         {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IModule_getLayout, m_moduleHandle);
-            recorder->recordInt64(targetIndex);
-            recorder = m_recordManager->endMethodRecord();
+            entryPointRecord = new EntryPointRecorder(m_sessionRecorder, entryPoint, m_recordManager);
+            Slang::ComPtr<IEntryPointRecorder> result(entryPointRecord);
+
+            m_entryPointsRecordAllocation.add(result);
+            m_mapEntryPointToRecord.add(entryPoint, result.detach());
+            return entryPointRecord;
         }
-
-        slang::ProgramLayout* programLayout = m_actualModule->getLayout(targetIndex, outDiagnostics);
-
+        else
         {
-            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
-            recorder->recordAddress(programLayout);
-            m_recordManager->apendOutput();
+            Slang::ComPtr<IEntryPointRecorder> result(entryPointRecord);
+            return result.detach();
         }
-
-        return programLayout;
-    }
-
-    SLANG_NO_THROW SlangInt ModuleRecorder::getSpecializationParamCount()
-    {
-        // No need to record this call as it is just a query.
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-        SlangInt res = m_actualModule->getSpecializationParamCount();
-        return res;
-    }
-
-    SLANG_NO_THROW SlangResult ModuleRecorder::getEntryPointCode(
-        SlangInt    entryPointIndex,
-        SlangInt    targetIndex,
-        slang::IBlob**     outCode,
-        slang::IBlob**     outDiagnostics)
-    {
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-        ParameterRecorder* recorder {};
-        {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IModule_getEntryPointCode, m_moduleHandle);
-            recorder->recordInt64(entryPointIndex);
-            recorder->recordInt64(targetIndex);
-            recorder = m_recordManager->endMethodRecord();
-        }
-
-        SlangResult res = m_actualModule->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
-
-        {
-            recorder->recordAddress(*outCode);
-            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
-            m_recordManager->apendOutput();
-        }
-
-        return res;
-    }
-
-    SLANG_NO_THROW SlangResult ModuleRecorder::getTargetCode(
-        SlangInt    targetIndex,
-        slang::IBlob** outCode,
-        slang::IBlob** outDiagnostics)
-    {
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-        ParameterRecorder* recorder {};
-        {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IModule_getTargetCode, m_moduleHandle);
-            recorder->recordInt64(targetIndex);
-            recorder = m_recordManager->endMethodRecord();
-        }
-
-        SlangResult res = m_actualModule->getTargetCode(targetIndex, outCode, outDiagnostics);
-
-        {
-            recorder->recordAddress(*outCode);
-            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
-            m_recordManager->apendOutput();
-        }
-
-        return res;
-    }
-
-    SLANG_NO_THROW SlangResult ModuleRecorder::getResultAsFileSystem(
-        SlangInt    entryPointIndex,
-        SlangInt    targetIndex,
-        ISlangMutableFileSystem** outFileSystem)
-    {
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-        ParameterRecorder* recorder {};
-        {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IModule_getResultAsFileSystem, m_moduleHandle);
-            recorder->recordInt64(entryPointIndex);
-            recorder->recordInt64(targetIndex);
-            recorder = m_recordManager->endMethodRecord();
-        }
-
-        SlangResult res = m_actualModule->getResultAsFileSystem(entryPointIndex, targetIndex, outFileSystem);
-
-        {
-            recorder->recordAddress(*outFileSystem);
-            m_recordManager->apendOutput();
-        }
-
-        // TODO: We might need to wrap the file system object.
-        return res;
-    }
-
-    SLANG_NO_THROW void ModuleRecorder::getEntryPointHash(
-        SlangInt    entryPointIndex,
-        SlangInt    targetIndex,
-        slang::IBlob**     outHash)
-    {
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-        ParameterRecorder* recorder {};
-        {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IModule_getEntryPointHash, m_moduleHandle);
-            recorder->recordInt64(entryPointIndex);
-            recorder->recordInt64(targetIndex);
-            recorder = m_recordManager->endMethodRecord();
-        }
-
-        m_actualModule->getEntryPointHash(entryPointIndex, targetIndex, outHash);
-
-        {
-            recorder->recordAddress(*outHash);
-            m_recordManager->apendOutput();
-        }
-    }
-
-    SLANG_NO_THROW SlangResult ModuleRecorder::specialize(
-        slang::SpecializationArg const*    specializationArgs,
-        SlangInt                    specializationArgCount,
-        slang::IComponentType**            outSpecializedComponentType,
-        ISlangBlob**                outDiagnostics)
-    {
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-        ParameterRecorder* recorder {};
-        {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IModule_specialize, m_moduleHandle);
-            recorder->recordInt64(specializationArgCount);
-            recorder->recordStructArray(specializationArgs, specializationArgCount);
-            recorder = m_recordManager->endMethodRecord();
-        }
-
-        SlangResult res = m_actualModule->specialize(specializationArgs, specializationArgCount, outSpecializedComponentType, outDiagnostics);
-
-        {
-            recorder->recordAddress(*outSpecializedComponentType);
-            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
-            m_recordManager->apendOutput();
-        }
-
-        return res;
-    }
-
-    SLANG_NO_THROW SlangResult ModuleRecorder::link(
-        IComponentType**            outLinkedComponentType,
-        ISlangBlob**                outDiagnostics)
-    {
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-        ParameterRecorder* recorder {};
-        {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IModule_link, m_moduleHandle);
-            recorder = m_recordManager->endMethodRecord();
-        }
-
-        SlangResult res = m_actualModule->link(outLinkedComponentType, outDiagnostics);
-
-        {
-            recorder->recordAddress(*outLinkedComponentType);
-            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
-            m_recordManager->apendOutput();
-        }
-
-        return res;
-    }
-
-    SLANG_NO_THROW SlangResult ModuleRecorder::getEntryPointHostCallable(
-        int                     entryPointIndex,
-        int                     targetIndex,
-        ISlangSharedLibrary**   outSharedLibrary,
-        slang::IBlob**          outDiagnostics)
-    {
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-        ParameterRecorder* recorder {};
-        {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IModule_getEntryPointHostCallable, m_moduleHandle);
-            recorder->recordInt32(entryPointIndex);
-            recorder->recordInt32(targetIndex);
-            recorder = m_recordManager->endMethodRecord();
-        }
-
-        SlangResult res = m_actualModule->getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
-
-        {
-            recorder->recordAddress(*outSharedLibrary);
-            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
-            m_recordManager->apendOutput();
-        }
-
-        return res;
-    }
-
-    SLANG_NO_THROW SlangResult ModuleRecorder::renameEntryPoint(
-        const char* newName, IComponentType** outEntryPoint)
-    {
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-        ParameterRecorder* recorder {};
-        {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IModule_renameEntryPoint, m_moduleHandle);
-            recorder->recordString(newName);
-            recorder = m_recordManager->endMethodRecord();
-        }
-
-        SlangResult res = m_actualModule->renameEntryPoint(newName, outEntryPoint);
-
-        {
-            recorder->recordAddress(*outEntryPoint);
-            m_recordManager->apendOutput();
-        }
-
-        return res;
-    }
-
-    SLANG_NO_THROW SlangResult ModuleRecorder::linkWithOptions(
-        IComponentType** outLinkedComponentType,
-        uint32_t compilerOptionEntryCount,
-        slang::CompilerOptionEntry* compilerOptionEntries,
-        ISlangBlob** outDiagnostics)
-    {
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-        ParameterRecorder* recorder {};
-        {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IModule_linkWithOptions, m_moduleHandle);
-            recorder->recordUint32(compilerOptionEntryCount);
-            recorder->recordStructArray(compilerOptionEntries, compilerOptionEntryCount);
-            recorder = m_recordManager->endMethodRecord();
-        }
-
-        SlangResult res = m_actualModule->linkWithOptions(outLinkedComponentType, compilerOptionEntryCount, compilerOptionEntries, outDiagnostics);
-
-        {
-            recorder->recordAddress(*outLinkedComponentType);
-            recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
-            m_recordManager->apendOutput();
-        }
-
-        return res;
-    }
-
-    EntryPointRecorder* ModuleRecorder::getEntryPointRecorder(slang::IEntryPoint* entryPoint)
-    {
-        EntryPointRecorder* entryPointRecord = nullptr;
-        entryPointRecord = m_mapEntryPointToRecord.tryGetValue(entryPoint);
-        if (!entryPointRecord)
-        {
-            entryPointRecord = new EntryPointRecorder(entryPoint, m_recordManager);
-            Slang::ComPtr<EntryPointRecorder> result(entryPointRecord);
-            m_mapEntryPointToRecord.add(entryPoint, *result.detach());
-        }
-        return entryPointRecord;
     }
 }

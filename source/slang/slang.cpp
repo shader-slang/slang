@@ -1348,6 +1348,43 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     return asExternal(specializedType);
 }
 
+
+DeclRef<Decl> Linkage::specializeGeneric(
+        DeclRef<Decl>                       declRef,
+        List<Expr*>                         argExprs,
+        DiagnosticSink*                     sink)
+{
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+    SLANG_ASSERT(declRef);
+
+    SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
+    SemanticsVisitor visitor(&sharedSemanticsContext);
+
+    // Create substituted parent decl ref.
+    auto decl = declRef.getDecl();
+
+    while (!as<GenericDecl>(decl))
+    {
+        decl = decl->parentDecl;
+    }
+
+    auto genericDecl = as<GenericDecl>(decl);
+    auto genericDeclRef = createDefaultSubstitutionsIfNeeded(getASTBuilder(), &visitor, DeclRef(genericDecl)).as<GenericDecl>();
+    genericDeclRef = substituteDeclRef(SubstitutionSet(declRef), getASTBuilder(), genericDeclRef).as<GenericDecl>();
+
+
+    DeclRefExpr* declRefExpr = getASTBuilder()->create<DeclRefExpr>();
+    declRefExpr->declRef = genericDeclRef;
+
+    GenericAppExpr* genericAppExpr = getASTBuilder()->create<GenericAppExpr>();
+    genericAppExpr->functionExpr = declRefExpr;
+    genericAppExpr->arguments = argExprs;
+
+    auto specializedDeclRef = as<DeclRefExpr>(visitor.checkGenericAppWithCheckedArgs(genericAppExpr))->declRef;
+
+    return specializedDeclRef;
+}
+
 SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     slang::TypeReflection*  inType,
     SlangInt                targetIndex,
@@ -1712,7 +1749,7 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     // If the user specified a explicit profile, we should pull
     // a corresponding atom representing the target version from the profile.
-    CapabilitySet profileCaps = CapabilitySet(optionSet.getProfile().getCapabilityName());
+    CapabilitySet profileCaps = optionSet.getProfile().getCapabilityName();
 
     bool isGLSLTarget = false;
     switch(getTarget())
@@ -2373,7 +2410,26 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
         result = declRefExpr->declRef;
     }
 
+    if (auto genericDeclRef = result.as<GenericDecl>())
+    {   
+        result = createDefaultSubstitutionsIfNeeded(
+            astBuilder, &visitor, DeclRef(genericDeclRef.getDecl()->inner));
+        result = substituteDeclRef(SubstitutionSet(genericDeclRef), astBuilder, result);
+    }
+
     return result;
+}
+
+bool ComponentType::isSubType(Type* subType, Type* superType)
+{
+    SharedSemanticsContext sharedSemanticsContext(
+        getLinkage(),
+        nullptr,
+        nullptr);
+    SemanticsContext context(&sharedSemanticsContext);
+    SemanticsVisitor visitor(context);
+
+    return (visitor.isSubtype(subType, superType, IsSubTypeOptions::None) != nullptr);
 }
 
 static void collectExportedConstantInContainer(
@@ -3244,19 +3300,16 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
 
     // If requested, attempt to compile the translation unit all the way down to the target language
     // and stash the result blob in an IR op.
-    for (auto targetReq : getLinkage()->targets)
+    if (getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
     {
-        if (targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
-        {
-            auto frontEndReq = getFrontEndReq();
+        auto frontEndReq = getFrontEndReq();
 
-            for (auto translationUnit : frontEndReq->translationUnits)
-            {
-                SlangCompileTarget target = SlangCompileTarget(targetReq->getTarget());
-                translationUnit->getModule()->precompileForTarget(
-                    target,
-                    nullptr);
-            }
+        for (auto translationUnit : frontEndReq->translationUnits)
+        {
+            SlangCompileTarget target = SlangCompileTarget(SlangCompileTarget::SLANG_DXIL);
+            SLANG_RETURN_ON_FAIL(translationUnit->getModule()->precompileForTarget(
+                target,
+                nullptr));
         }
     }
 
@@ -5879,9 +5932,9 @@ void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool
     getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
 }
 
-void EndToEndCompileRequest::setTargetEmbedDXIL(int targetIndex, bool value)
+void EndToEndCompileRequest::setEmbedDXIL(bool value)
 {
-    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDXIL, value);
+    getOptionSet().set(CompilerOptionName::EmbedDXIL, value);
 }
 
 void EndToEndCompileRequest::setTargetLineDirectiveMode(

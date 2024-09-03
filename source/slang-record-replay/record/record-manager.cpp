@@ -23,7 +23,7 @@ namespace SlangRecord
         }
 
         Slang::String recordFilePath = Slang::Path::combine(m_recordFileDirectory, Slang::String(ss.str().c_str()));
-        m_fileStream = std::make_unique<FileOutputStream>(recordFilePath);
+        m_fileStream = new FileOutputStream(recordFilePath);
     }
 
     void RecordManager::clearWithHeader(const ApiCallId& callId, uint64_t handleId)

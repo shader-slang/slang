@@ -235,10 +235,6 @@ class GLSLUnparsedLayoutModifier : public GLSLLayoutModifier
 
 
 // Specific cases for known GLSL `layout` modifiers that we need to work with
-class GLSLConstantIDLayoutModifier : public GLSLParsedLayoutModifier 
-{
-    SLANG_AST_CLASS(GLSLConstantIDLayoutModifier)
-};
 
 class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier 
 {
@@ -727,11 +723,23 @@ class FlagsAttribute : public Attribute
 };
 
 // [[vk_push_constant]] [[push_constant]]
-class PushConstantAttribute : public Attribute 
+class PushConstantAttribute : public Attribute
 {
     SLANG_AST_CLASS(PushConstantAttribute)
 };
 
+// [[vk_specialization_constant]] [[specialization_constant]]
+class SpecializationConstantAttribute : public Attribute
+{
+    SLANG_AST_CLASS(SpecializationConstantAttribute)
+};
+
+// [[vk_constant_id]]
+class VkConstantIdAttribute : public Attribute
+{
+    SLANG_AST_CLASS(VkConstantIdAttribute)
+    int location;
+};
 
 // [[vk_shader_record]] [[shader_record]]
 class ShaderRecordAttribute : public Attribute 
@@ -924,17 +932,15 @@ class InstanceAttribute : public Attribute
     int32_t value;
 };
 
-// A `[shader("stageName")]` attribute, which marks an entry point
-// to be compiled, and specifies the stage for that entry point
-class EntryPointAttribute : public Attribute 
+// A `[shader("stageName")]`/`[shader("capability")]` attribute which
+// marks an entry point for compiling. This attribute also specifies 
+// the 'capabilities' implicitly supported by an entry point
+class EntryPointAttribute : public Attribute
 {
     SLANG_AST_CLASS(EntryPointAttribute)
- 
-    // The resolved stage that the entry point is targetting.
-    //
-    // TODO: This should be an accessor that uses the
-    // ordinary `args` list, rather than side data.
-    Stage stage;
+
+    // The resolved capailities for our entry point.
+    CapabilitySet capabilitySet;
 };
 
 // A `[__vulkanRayPayload(location)]` attribute, which is used in the
@@ -1173,6 +1179,12 @@ class BuiltinAttribute : public Attribute
 {
     SLANG_AST_CLASS(BuiltinAttribute)
 };
+    
+    /// An attribute that marks a decl as a compiler built-in object for the autodiff system.
+class AutoDiffBuiltinAttribute : public Attribute
+{
+    SLANG_AST_CLASS(AutoDiffBuiltinAttribute)
+};
 
     /// An attribute that defines the size of `AnyValue` type to represent a polymoprhic value that conforms to
     /// the decorated interface type.
@@ -1275,6 +1287,14 @@ class PyExportAttribute : public Attribute
 class PreferRecomputeAttribute : public Attribute
 {
     SLANG_AST_CLASS(PreferRecomputeAttribute)
+    
+    enum SideEffectBehavior
+    {
+        Warn = 0,
+        Allow = 1
+    };
+
+    SideEffectBehavior sideEffectBehavior;
 };
 
 class PreferCheckpointAttribute : public Attribute

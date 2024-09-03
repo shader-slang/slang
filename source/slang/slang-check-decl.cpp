@@ -1075,12 +1075,13 @@ namespace Slang
     DeclRef<ExtensionDecl> applyExtensionToType(
         SemanticsVisitor*       semantics,
         ExtensionDecl*          extDecl,
-        Type*  type)
+        Type*  type,
+        Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitness)
     {
         if(!semantics)
             return DeclRef<ExtensionDecl>();
 
-        return semantics->applyExtensionToType(extDecl, type);
+        return semantics->applyExtensionToType(extDecl, type, additionalSubtypeWitness);
     }
 
     bool SemanticsVisitor::isDeclUsableAsStaticMember(
@@ -6320,7 +6321,7 @@ namespace Slang
             {
                 // Force add IDefaultInitializable to any struct missing (transitively) `IDefaultInitializable`.
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
-                if(!isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType, IsSubTypeOptions::NotReadyForLookup))
+                if(!isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType, IsSubTypeOptions::NoCaching))
                 {
                     InheritanceDecl* conformanceDecl = m_astBuilder->create<InheritanceDecl>();
                     conformanceDecl->parentDecl = decl;
@@ -7881,7 +7882,7 @@ namespace Slang
                 ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
                 ctorToInvoke->name = declInfo.defaultCtor->getName();
                 ctorToInvoke->loc = declInfo.defaultCtor->loc;
-                ctorToInvoke->type = structDeclInfo.defaultCtor->returnType.type;
+                ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), structDeclInfo.defaultCtor->returnType.type);
 
                 auto invoke = m_astBuilder->create<InvokeExpr>();
                 invoke->functionExpr = ctorToInvoke;
@@ -8253,7 +8254,31 @@ namespace Slang
 
                 return;
             }
+            else if (auto genericTypeParamDecl = targetDeclRefType->getDeclRef().as<GenericTypeParamDecl>())
+            {
+                // If we are extending a generic type parameter as in `extension<T:IFoo> T`,
+                // we want to register the extension with the interface type `IFoo` instead.
+                auto genericDecl = as<GenericDecl>(genericTypeParamDecl.getDecl()->parentDecl);
+                if (!genericDecl)
+                    goto error;
+                if (genericDecl != decl->parentDecl)
+                    goto error;
+                bool isTypeConstrained = false;
+                for (auto constraintDecl : genericDecl->getMembersOfType<GenericTypeConstraintDecl>())
+                {
+                    ensureDecl(constraintDecl, DeclCheckState::ReadyForReference);
+                    if (targetDeclRefType == constraintDecl->sub.type)
+                    {
+                        auto supTypeDeclRef = isDeclRefTypeOf<AggTypeDecl>(constraintDecl->sup.type);
+                        getShared()->registerCandidateExtension(supTypeDeclRef.getDecl(), decl);
+                        isTypeConstrained = true;
+                    }
+                }
+                if (isTypeConstrained)
+                    return;
+            }
         }
+    error:;
         if (!as<ErrorType>(decl->targetType.type))
         {
             getSink()->diagnose(decl->targetType.exp, Diagnostics::invalidExtensionOnType, decl->targetType);
@@ -8356,6 +8381,15 @@ namespace Slang
             // type, much like the `interface` case above.
             //
             return DeclRefType::create(m_astBuilder, aggTypeDeclRef);
+        }
+        else if (auto genTypeParam = declRef.as<GenericTypeParamDecl>())
+        {
+            // We will reach here when we are checking `extension<T> T {...}`,
+            // where inside the extension, `This` type is the target type
+            // of the extension, in this case this is a DeclRefType to
+            // a GenericTypeParamDecl.
+            //
+            return DeclRefType::create(m_astBuilder, declRef);
         }
         else if (auto extDeclRef = declRef.as<ExtensionDecl>())
         {
@@ -8661,7 +8695,8 @@ namespace Slang
 
     DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
         ExtensionDecl*  extDecl,
-        Type*    type)
+        Type*    type,
+        Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnessesForType)
     {
         DeclRef<ExtensionDecl> extDeclRef = makeDeclRef(extDecl);
 
@@ -8674,6 +8709,11 @@ namespace Slang
             ConstraintSystem constraints;
             constraints.loc = extDecl->loc;
             constraints.genericDecl = extGenericDecl;
+            if (additionalSubtypeWitnessesForType)
+            {
+                constraints.subTypeForAdditionalWitnesses = type;
+                constraints.additionalSubtypeWitnesses = additionalSubtypeWitnessesForType;
+            }
 
             // Inside the body of an extension declaration, we may end up trying to apply that
             // extension to its own target type.
@@ -8681,13 +8721,6 @@ namespace Slang
             // without any additional substitutions.
             if (extDecl->targetType->equals(type))
             {
-                /*
-                auto subst = trySolveConstraintSystem(
-                    &constraints,
-                    DeclRef<Decl>(extGenericDecl, nullptr).as<GenericDecl>(),
-                    as<GenericSubstitution>(as<DeclRefType>(type)->declRef.substitutions.substitutions));
-                return DeclRef<Decl>(extDecl, subst).as<ExtensionDecl>();
-                */
                 return createDefaultSubstitutionsIfNeeded(m_astBuilder, this, extDeclRef).as<ExtensionDecl>();
             }
 
@@ -10644,6 +10677,7 @@ namespace Slang
 
     void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
     {
+        // If the function is an entrypoint and specifies a target stage, add the capabilities to our function capabilities.
         _dispatchCapabilitiesVisitorOfFunctionDecl(this, funcDecl, 
                 [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
                 {
@@ -10657,30 +10691,12 @@ namespace Slang
 
         auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
 
-        if (!declaredCaps.isEmpty())
-        {
-            // If the function is an entrypoint, add the stage to declaredCaps.
-            if (auto entryPointAttr = funcDecl->findModifier<EntryPointAttribute>())
-            {
-                auto stageCaps = CapabilitySet(Profile(entryPointAttr->stage).getCapabilityName());
-                if (declaredCaps.isIncompatibleWith(stageCaps))
-                {
-                    maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, funcDecl->loc, Diagnostics::stageIsIncompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
-                }
-                else
-                {
-                    declaredCaps.join(stageCaps);
-                }
-            }
-        }
-
         auto vis = getDeclVisibility(funcDecl);
 
         // If 0 capabilities were annotated on a function, capabilities are inferred from the function body
         if (declaredCaps.isEmpty())
         {
             declaredCaps = funcDecl->inferredCapabilityRequirements;
-            return;
         }
         else
         {

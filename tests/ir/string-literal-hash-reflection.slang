@@ -10,7 +10,7 @@ RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
 void computeMain(
-    uint tid   : SV_DispatchThreadIndex)
+    uint tid   : SV_DispatchThreadID)
 {
     int value = doSomethingElse() + getStringHash("Hello \t\n\0x083 World");   
     outputBuffer[tid] = value;

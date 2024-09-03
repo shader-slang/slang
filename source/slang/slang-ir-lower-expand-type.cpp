@@ -21,8 +21,9 @@ namespace Slang
         {
             auto eachInst = as<IREach>(val);
             auto packInst = eachInst->getElement();
+            auto type = (IRType*)clonePatternVal(cloneEnv, builder, packInst->getFullType(), eachIndex);
             packInst = clonePatternValImpl(cloneEnv, builder, packInst, eachIndex);
-            auto result = builder->emitGetTupleElement(val->getFullType(), packInst, eachIndex);
+            auto result = builder->emitGetTupleElement(type, packInst, eachIndex);
             return result;
         }
         case kIROp_Specialize:

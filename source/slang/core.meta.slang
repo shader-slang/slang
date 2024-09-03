@@ -156,6 +156,8 @@ interface IInteger : IArithmetic, ILogical
     int64_t toInt64();
     uint toUInt();
     uint64_t toUInt64();
+    __init(int val);
+    __init(int64_t val);
 }
 
 interface IFloat : IArithmetic, IDifferentiable
@@ -220,7 +222,7 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 /// A type that can represent integers
 [sealed]
 [builtin]
-interface __BuiltinIntegerType : __BuiltinArithmeticType
+interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger
 {}
 
 /// A type that can represent non-integers
@@ -697,6 +699,7 @@ struct Ptr
     __generic<TInt : __BuiltinIntegerType>
     __subscript(TInt index) -> T
     {
+        // If a 'Ptr[index]' is referred to by a '__ref', call 'kIROp_GetOffsetPtr(index)'
         __intrinsic_op($(kIROp_GetOffsetPtr))
         ref;
     }
@@ -956,25 +959,25 @@ extension Tuple<T> : IComparable
 interface IMutatingFunc<TR, each TP>
 {
     [mutating]
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 interface IFunc<TR, each TP> : IMutatingFunc<TR, expand each TP>
 {
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 interface IDifferentiableMutatingFunc<TR : IDifferentiable, each TP : IDifferentiable> : IMutatingFunc<TR, expand each TP>
 {
     [Differentiable]
     [mutating]
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 interface IDifferentiableFunc<TR : IDifferentiable, each TP : IDifferentiable> : IFunc<TR, expand each TP>, IDifferentiableMutatingFunc<TR, expand each TP>
 {
     [Differentiable]
-    TR __call(expand each TP p);
+    TR operator()(expand each TP p);
 }
 
 __generic<T>
@@ -1434,11 +1437,34 @@ __intrinsic_type($(kIROp_VerticesType))
 [__NonCopyableType]
 struct OutputVertices
 {
+    __intrinsic_op($(kIROp_MetalSetVertex))
+    static void _metalSetVertex(uint index, T val);
+
+    __intrinsic_op($(kIROp_MeshOutputSet))
+    static void _setVertex(This v, uint index, T val);
+
     __subscript(uint index) -> T
     {
         // TODO: Make sure this remains write only, we can't do this with just
         // a 'set' operation as it's legal to only write to part of the output
         // buffer, or part of the output buffer at a time.
+
+        [mutating]
+        [require(glsl_hlsl_metal_spirv, meshshading)]
+        set
+        {
+            __target_switch
+            {
+            case metal: _metalSetVertex(index, newValue);
+            case glsl: _setVertex(this, index, newValue);
+            case hlsl: _setVertex(this, index, newValue);
+            case spirv: _setVertex(this, index, newValue);
+            }
+        }
+        
+        //
+        // If a 'OutputVertices[index]' is referred to by a '__ref', call 'kIROp_MeshOutputRef(index)'
+        [require(glsl_hlsl_spirv, meshshading)]
         __intrinsic_op($(kIROp_MeshOutputRef))
         ref;
     }
@@ -1450,13 +1476,29 @@ __intrinsic_type($(kIROp_IndicesType))
 [__NonCopyableType]
 struct OutputIndices
 {
+    __intrinsic_op($(kIROp_MetalSetIndices))
+    static void __metalSetIndices(uint index, T val);
+
+    // for some reason only here in the indices array it uses the return value as an actual
+    // operand, while the others use the value of the instruction (the return value) to access
+    // the type of the vertex, as when using the ref there is no third operand
+    __intrinsic_op($(kIROp_MeshOutputSet))
+    static void __setIndices(This v, uint index, T val);
+
     __subscript(uint index) -> T
     {
-        // It's illegal to not write out the entire primitive at once, so limit
-        // this to set
         [mutating]
-        __intrinsic_op($(kIROp_MeshOutputSet))
-        set;
+        [require(glsl_hlsl_metal_spirv, meshshading)]
+        set
+        {
+            __target_switch
+            {
+            case metal: __metalSetIndices(index, newValue);
+            case glsl: __setIndices(this, index, newValue);
+            case hlsl: __setIndices(this, index, newValue);
+            case spirv: __setIndices(this, index, newValue);
+            }
+        }
     }
 };
 
@@ -1466,8 +1508,29 @@ __intrinsic_type($(kIROp_PrimitivesType))
 [__NonCopyableType]
 struct OutputPrimitives
 {
-    __subscript(uint index) -> T
+    __intrinsic_op($(kIROp_MetalSetPrimitive))
+    static void __metalSetPrimitive(uint index, T val);
+
+    __intrinsic_op($(kIROp_MeshOutputSet))
+    static void __setPrimitive(This v, uint index, T val);
+
+    __subscript(uint index)->T
     {
+        [mutating]
+        [require(glsl_hlsl_metal_spirv, meshshading)]
+        set
+        {
+            __target_switch
+            {
+            case metal: __metalSetPrimitive(index, newValue);
+            case glsl: __setPrimitive(this, index, newValue);
+            case hlsl: __setPrimitive(this, index, newValue);
+            case spirv: __setPrimitive(this, index, newValue);
+            }
+        }
+
+        // If a 'OutputPrimitives[index]' is referred to by a '__ref', call 'kIROp_MeshOutputRef(index)'
+        [require(glsl_hlsl_spirv, meshshading)]
         __intrinsic_op($(kIROp_MeshOutputRef))
         ref;
     }
@@ -2636,10 +2699,17 @@ attribute_syntax [vk_shader_record]			                        : ShaderRecordAttr
 __attributeTarget(VarDeclBase)
 attribute_syntax [shader_record]			                        : ShaderRecordAttribute;
 
-__attributeTarget(DeclBase)
+__attributeTarget(VarDeclBase)
 attribute_syntax [vk_push_constant]									: PushConstantAttribute;
-__attributeTarget(DeclBase)
+__attributeTarget(VarDeclBase)
 attribute_syntax [push_constant]									: PushConstantAttribute;
+
+__attributeTarget(VarDeclBase)
+attribute_syntax[vk_specialization_constant] : SpecializationConstantAttribute;
+__attributeTarget(VarDeclBase)
+attribute_syntax[SpecializationConstant] : SpecializationConstantAttribute;
+__attributeTarget(VarDeclBase)
+attribute_syntax[vk_constant_id(location: int)] : VkConstantIdAttribute;
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
@@ -2867,6 +2937,9 @@ __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;
 
 __attributeTarget(DeclBase)
+attribute_syntax[__AutoDiffBuiltin] : AutoDiffBuiltinAttribute;
+
+__attributeTarget(DeclBase)
 attribute_syntax [__requiresNVAPI] : RequiresNVAPIAttribute;
 
 __attributeTarget(AggTypeDecl)
@@ -2884,8 +2957,16 @@ attribute_syntax [payload] : PayloadAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
 
+enum SideEffectBehavior
+{
+    /// Causes a warning if the method is detected to have side-effects
+    Warn = 0,
+
+    /// Suppresses the warning
+    Allow = 1
+};
 __attributeTarget(FunctionDeclBase)
-attribute_syntax [PreferRecompute] : PreferRecomputeAttribute;
+attribute_syntax[PreferRecompute(behavior: SideEffectBehavior = SideEffectBehavior.Warn)] : PreferRecomputeAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;

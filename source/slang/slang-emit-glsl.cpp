@@ -385,6 +385,15 @@ void GLSLSourceEmitter::_emitGLSLSSBO(IRGlobalParam* varDecl, IRGLSLShaderStorag
     m_writer->emit(";\n");
 }
 
+void GLSLSourceEmitter::emitGlobalParamDefaultVal(IRGlobalParam* param)
+{
+    if (auto defaultValDecor = param->findDecoration<IRDefaultValueDecoration>())
+    {
+        m_writer->emit(" = ");
+        emitInstExpr(defaultValDecor->getOperand(0), EmitOpInfo());
+    }
+}
+
 void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     auto varLayout = getVarLayout(varDecl);
@@ -418,6 +427,8 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     }
 
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
+    _emitGLSLLayoutQualifier(LayoutResourceKind::SpecializationConstant, &containerChain);
+
     bool isShaderRecord = _emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
     if (isShaderRecord)
@@ -1727,6 +1738,11 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
+        case kIROp_ControlBarrier:
+        {
+            m_writer->emit("barrier();\n");
+            return true;
+        }
         case kIROp_MakeVectorFromScalar:
         case kIROp_MatrixReshape:
         {

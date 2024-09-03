@@ -494,7 +494,7 @@ namespace Slang
                 result.permittedTypes.add(builder.getVectorType(builder.getBasicType(BaseType::UInt), builder.getIntValue(builder.getIntType(), 3)));
                 break;
             }
-            case SystemValueSemanticName::DomainLsocation:
+            case SystemValueSemanticName::DomainLocation:
             {
                 result.metalSystemValueName = toSlice("position_in_patch");
                 result.permittedTypes.add(builder.getVectorType(builder.getBasicType(BaseType::Float), builder.getIntValue(builder.getIntType(), 3)));
@@ -549,7 +549,7 @@ namespace Slang
             }
             case SystemValueSemanticName::PrimitiveID:
             {
-                result.metalSystemValueName = toSlice("patch_id");
+                result.metalSystemValueName = toSlice("primitive_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt16));
                 break;
@@ -1269,12 +1269,68 @@ namespace Slang
         {
             auto func = entryPoint.entryPointFunc;
 
-            if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Mesh)
+            IRBuilder builder{ func->getModule() };
+            for (auto param : func->getParams())
             {
+                if(param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
+                {
+                    IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+                    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+                    auto paramVarLayout = varLayoutBuilder.build();
+                    builder.addLayoutDecoration(param, paramVarLayout);
+
+                    IRPtrTypeBase* type = as<IRPtrTypeBase>(param->getDataType());
+                    
+                    const auto annotatedPayloadType =
+                        builder.getPtrType(
+                            kIROp_ConstRefType,
+                            type->getValueType(),
+                            AddressSpace::MetalObjectData
+                        );
+
+                    param->setFullType(annotatedPayloadType);
+                }
+            }
+            IROutputTopologyDecoration* outputDeco = entryPoint.entryPointFunc->findDecoration<IROutputTopologyDecoration>();
+            if(outputDeco == nullptr)
+            {
+                SLANG_UNEXPECTED("Mesh shader output decoration missing");
+                return;
+            }
+            const auto topology = outputDeco->getTopology();
+            const auto topStr = topology->getStringSlice();
+            UInt topologyEnum = 0;
+            if(topStr.caseInsensitiveEquals(toSlice("point")))
+            {
+                topologyEnum = 1;
+            } 
+            else if(topStr.caseInsensitiveEquals(toSlice("line"))) 
+            {
+                topologyEnum = 2;
+            } 
+            else if(topStr.caseInsensitiveEquals(toSlice("triangle"))) 
+            {
+                topologyEnum = 3;
+            } 
+            else 
+            {
+                SLANG_UNEXPECTED("unknown topology");
                 return;
             }
 
-            IRBuilder builder{ entryPoint.entryPointFunc->getModule() };
+            IRInst* topologyConst = builder.getIntValue(builder.getIntType(), topologyEnum);
+
+            IRType* vertexType = nullptr;
+            IRType* indicesType = nullptr;
+            IRType* primitiveType = nullptr;
+
+            IRInst* maxVertices = nullptr;
+            IRInst* maxPrimitives = nullptr;
+            
+            IRInst* verticesParam = nullptr;
+            IRInst* indicesParam = nullptr;
+            IRInst* primitivesParam = nullptr;
             for (auto param : func->getParams())
             {
                 if(param->findDecorationImpl(kIROp_HLSLMeshPayloadDecoration))
@@ -1285,16 +1341,85 @@ namespace Slang
                     auto paramVarLayout = varLayoutBuilder.build();
                     builder.addLayoutDecoration(param, paramVarLayout);
                 }
-            }
+                if(param->findDecorationImpl(kIROp_VerticesDecoration))
+                {
+                    auto vertexRefType = as<IRPtrTypeBase>(param->getDataType());
+                    auto vertexOutputType = as<IRVerticesType>(vertexRefType->getValueType());
+                    vertexType = vertexOutputType->getElementType();
+                    maxVertices = vertexOutputType->getMaxElementCount();
+                    SLANG_ASSERT(vertexType);
 
+                    verticesParam = param;
+                    auto vertStruct = as<IRStructType>(vertexType);
+                    for(auto field : vertStruct->getFields())
+                    {
+                        auto key = field->getKey();
+                        if(auto deco = key->findDecoration<IRSemanticDecoration>())
+                        {
+                            if(deco->getSemanticName().caseInsensitiveEquals(toSlice("sv_position")))
+                            {
+                                builder.addTargetSystemValueDecoration(key, toSlice("position"));
+                            }
+                        }
+                    }
+                }
+                if(param->findDecorationImpl(kIROp_IndicesDecoration))
+                {
+                    auto indicesRefType = (IRConstRefType*)param->getDataType();
+                    auto indicesOutputType = (IRIndicesType*)indicesRefType->getValueType();
+                    indicesType = indicesOutputType->getElementType();
+                    maxPrimitives = indicesOutputType->getMaxElementCount();
+                    SLANG_ASSERT(indicesType);
+
+                    indicesParam = param;
+                }
+                if(param->findDecorationImpl(kIROp_PrimitivesDecoration))
+                {
+                    auto primitivesRefType = (IRConstRefType*)param->getDataType();
+                    auto primitivesOutputType = (IRPrimitivesType*)primitivesRefType->getValueType();
+                    primitiveType = primitivesOutputType->getElementType();
+                    SLANG_ASSERT(primitiveType);
+
+                    primitivesParam = param;
+                    auto primStruct = as<IRStructType>(primitiveType);
+                    for(auto field : primStruct->getFields())
+                    {
+                        auto key = field->getKey();
+                        if(auto deco = key->findDecoration<IRSemanticDecoration>())
+                        {
+                            if(deco->getSemanticName().caseInsensitiveEquals(toSlice("sv_primitiveid")))
+                            {
+                                builder.addTargetSystemValueDecoration(key, toSlice("primitive_id"));
+                            }
+                        }
+                    }
+                }
+            }
+            if(primitiveType == nullptr)
+            {
+                primitiveType = builder.getVoidType();
+            }
+            builder.setInsertBefore(entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+            
+            auto meshParam = builder.emitParam(builder.getMetalMeshType(vertexType, primitiveType, maxVertices, maxPrimitives, topologyConst));
+            builder.addExternCppDecoration(meshParam, toSlice("_slang_mesh"));
+
+
+            verticesParam->removeFromParent();
+            verticesParam->removeAndDeallocate();
+            
+            indicesParam->removeFromParent();
+            indicesParam->removeAndDeallocate();
+
+            if(primitivesParam != nullptr)
+            {
+                primitivesParam->removeFromParent();
+                primitivesParam->removeAndDeallocate();
+            }
         }
 
         void legalizeDispatchMeshPayloadForMetal(EntryPointInfo entryPoint)
         {
-            if (entryPoint.entryPointDecor->getProfile().getStage() != Stage::Amplification)
-            {
-                return;
-            }
             // Find out DispatchMesh function
             IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
             for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
@@ -1353,8 +1478,8 @@ namespace Slang
                     const auto meshGridPropertiesType = builder.getMetalMeshGridPropertiesType();
                     auto mgp = builder.emitParam(meshGridPropertiesType);
                     builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
-                    }
-                });
+                }
+            });
         }
 
         IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType)
@@ -1601,8 +1726,17 @@ namespace Slang
             wrapReturnValueInStruct(entryPoint);
 
             //Other Legalize
-            legalizeMeshEntryPoint(entryPoint);
-            legalizeDispatchMeshPayloadForMetal(entryPoint);
+            switch(entryPoint.entryPointDecor->getProfile().getStage()) 
+            {
+            case Stage::Amplification:
+                legalizeDispatchMeshPayloadForMetal(entryPoint);
+                break;
+            case Stage::Mesh:
+                legalizeMeshEntryPoint(entryPoint);
+                break;
+            default:
+                break;
+            }
         }
     };
 

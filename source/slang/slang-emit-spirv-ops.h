@@ -455,6 +455,30 @@ SpvInst* emitOpVariable(
     );
 }
 
+template<typename T, typename TOperand>
+SpvInst* emitOpSpecConstant(SpvInstParent* parent, IRInst* inst, const T& idResultType, TOperand operand)
+{
+    return emitInst(parent, inst, SpvOpSpecConstant, idResultType, kResultID, operand);
+}
+
+template<typename T, typename Ts>
+SpvInst* emitOpSpecConstantComposite(SpvInstParent* parent, IRInst* inst, const T& idResultType, const Ts& constituents)
+{
+    return emitInst(parent, inst, SpvOpSpecConstantComposite, idResultType, kResultID, constituents);
+}
+
+template<typename T>
+SpvInst* emitOpSpecConstantTrue(SpvInstParent* parent, IRInst* inst, const T& idResultType)
+{
+    return emitInst(parent, inst, SpvOpSpecConstantTrue, idResultType, kResultID);
+}
+
+template<typename T>
+SpvInst* emitOpSpecConstantFalse(SpvInstParent* parent, IRInst* inst, const T& idResultType)
+{
+    return emitInst(parent, inst, SpvOpSpecConstantFalse, idResultType, kResultID);
+}
+
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoad
 template<typename T1, typename T2>
 SpvInst* emitOpLoad(

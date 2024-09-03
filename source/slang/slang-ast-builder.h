@@ -72,6 +72,14 @@ public:
 
     ASTBuilder* getInnerASTBuilder() { return m_astBuilder; }
 
+    Name* getThisTypeName()
+    {
+        if (!m_thisTypeName)
+        {
+            m_thisTypeName = getNamePool()->getName("This");
+        }
+        return m_thisTypeName;
+    }
 protected:
     // State shared between ASTBuilders
 
@@ -104,6 +112,8 @@ protected:
     Dictionary<Name*, const ReflectClassInfo*> m_nameToTypeMap;
     
     NamePool* m_namePool = nullptr;
+
+    Name* m_thisTypeName = nullptr;
 
     // This is a private builder used for these shared types
     ASTBuilder* m_astBuilder = nullptr;
@@ -289,7 +299,7 @@ public:
         auto interfaceDecl = create<InterfaceDecl>();
         // Always include a `This` member and a `This:IThisInterface` member.
         auto thisDecl = create<ThisTypeDecl>();
-        thisDecl->nameAndLoc.name = m_sharedASTBuilder->getNamePool()->getName(UnownedStringSlice("This", 4));
+        thisDecl->nameAndLoc.name = getSharedASTBuilder()->getThisTypeName();
         thisDecl->nameAndLoc.loc = loc;
         interfaceDecl->addMember(thisDecl);
         auto thisConstraint = create<ThisTypeConstraintDecl>();
@@ -508,7 +518,7 @@ public:
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
 
-    TupleType* getTupleType(List<Type*>& types);
+    TupleType* getTupleType(ArrayView<Type*> types);
 
     FuncType* getFuncType(ArrayView<Type*> parameters, Type* result, Type* errorType = nullptr);
 

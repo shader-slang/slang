@@ -1367,6 +1367,9 @@ namespace Slang
             case TokenType::Comma:
             case TokenType::OpAssign:
                 break;
+            case TokenType::LParent:
+                parser->ReadToken(TokenType::RParent);
+                break;
 
             // Note(tfoley): Even more of a hack!
             case TokenType::QuestionMark:
@@ -1381,6 +1384,9 @@ namespace Slang
                 parser->sink->diagnose(nameToken.loc, Diagnostics::invalidOperator, nameToken);
                 break;
             }
+
+            if (nameToken.type == TokenType::LParent)
+                return NameLoc(getName(parser, "()"), nameToken.loc);
 
             return NameLoc(
                 getName(parser, nameToken.getContent()),
@@ -3329,12 +3335,15 @@ namespace Slang
 
     static NodeBase* parseExtensionDecl(Parser* parser, void* /*userData*/)
     {
-        ExtensionDecl* decl = parser->astBuilder->create<ExtensionDecl>();
-        parser->FillPosition(decl);
-        decl->targetType = parser->ParseTypeExp();
-        parseOptionalInheritanceClause(parser, decl);
-        parseDeclBody(parser, decl);
-        return decl;
+        return parseOptGenericDecl(parser, [&](GenericDecl*)
+            {
+                ExtensionDecl* decl = parser->astBuilder->create<ExtensionDecl>();
+                parser->FillPosition(decl);
+                decl->targetType = parser->ParseTypeExp();
+                parseOptionalInheritanceClause(parser, decl);
+                parseDeclBody(parser, decl);
+                return decl;
+            });
     }
 
 
@@ -7051,7 +7060,7 @@ namespace Slang
                 varExpr->scope = parser->currentScope;
                 parser->FillPosition(varExpr);
 
-                auto nameAndLoc = NameLoc(parser->ReadToken());
+                auto nameAndLoc = ParseDeclName(parser);
                 varExpr->name = nameAndLoc.name;
 
                 if(peekTokenType(parser) == TokenType::OpLess)
@@ -7177,7 +7186,7 @@ namespace Slang
                     memberExpr->baseExpression = expr;
                     parser->ReadToken(nextTokenType);
                     parser->FillPosition(memberExpr);
-                    memberExpr->name = expectIdentifier(parser).name;
+                    memberExpr->name = ParseDeclName(parser).name;
                     
                     if (peekTokenType(parser) == TokenType::OpLess)
                         expr = maybeParseGenericApp(parser, memberExpr);
@@ -8184,7 +8193,7 @@ namespace Slang
                 CASE(push_constant, PushConstantAttribute) 
                 CASE(shaderRecordNV, ShaderRecordAttribute)
                 CASE(shaderRecordEXT, ShaderRecordAttribute)
-                CASE(constant_id,   GLSLConstantIDLayoutModifier)
+                CASE(constant_id,   VkConstantIdAttribute)
                 CASE(std140, GLSLStd140Modifier)
                 CASE(std430, GLSLStd430Modifier)
                 CASE(scalar, GLSLScalarModifier)
@@ -8221,6 +8230,11 @@ namespace Slang
                     { 
                         parser->diagnose(modifier->loc, Diagnostics::missingLayoutBindingModifier);
                     }
+                }
+                else if (auto specConstAttr = as<VkConstantIdAttribute>(modifier))
+                {
+                    parser->ReadToken(TokenType::OpAssign);
+                    specConstAttr->location = (int)getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral));
                 }
 
                 listBuilder.add(modifier);

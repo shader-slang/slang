@@ -193,6 +193,8 @@ INST(Nop, nop, 0, 0)
             INST(PrimitivesType, Primitives, 2, HOISTABLE)
         INST_RANGE(MeshOutputType, VerticesType, PrimitivesType)
 
+        /* Metal Mesh Type */
+            INST(MetalMeshType, metal::mesh, 5, HOISTABLE)
         /* Metal Mesh Grid Properties */
             INST(MetalMeshGridPropertiesType, mesh_grid_properties, 0, HOISTABLE)
 
@@ -513,6 +515,12 @@ INST(GetNaturalStride, getNaturalStride, 1, 0)
 INST(MeshOutputRef, meshOutputRef, 2, 0)
 INST(MeshOutputSet, meshOutputSet, 3, 0)
 
+// only two parameters as they are effectively static
+// TODO: make them reference the _slang_mesh object directly
+INST(MetalSetVertex, metalSetVertex, 2, 0)
+INST(MetalSetPrimitive, metalSetPrimitive, 2, 0)
+INST(MetalSetIndices, metalSetIndices, 2, 0)
+
 // Construct a vector from a scalar
 //
 // %dst = MakeVectorFromScalar %T %N %val
@@ -775,6 +783,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
     INST(HasExplicitHLSLBindingDecoration, HasExplicitHLSLBinding, 0, 0)
 
+    INST(DefaultValueDecoration,            DefaultValue,           1, 0)
     INST(ReadNoneDecoration,                readNone,               0, 0)
     INST(VulkanCallablePayloadDecoration,   vulkanCallablePayload,  0, 0)
     INST(VulkanCallablePayloadInDecoration, vulkanCallablePayloadIn,  0, 0)
@@ -782,6 +791,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(PreciseDecoration,                 precise,                0, 0)
     INST(PublicDecoration,                  public,                 0, 0)
     INST(HLSLExportDecoration,              hlslExport,             0, 0)
+    INST(DownstreamModuleExportDecoration,  downstreamModuleExport, 0, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
     INST(OutputControlPointsDecoration,     outputControlPoints,    1, 0)
     INST(OutputTopologyDecoration,          outputTopology,         1, 0)
@@ -791,6 +801,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(InstanceDecoration,                instance,               1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
     INST(WaveSizeDecoration,                waveSize,               1, 0)
+
+    INST(AvailableInDXILDecoration,         availableInDXIL,        0, 0)
 
         // Added to IRParam parameters to an entry point
     /* GeometryInputPrimitiveTypeDecoration */
@@ -945,6 +957,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(ConstructorDecoration, constructor, 1, 0)
     INST(MethodDecoration, method, 0, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
+    INST(SpecializationConstantDecoration, SpecializationConstantDecoration, 1, 0)
 
         // Reflection metadata for a shader parameter that provides the original type name.
     INST(UserTypeNameDecoration, UserTypeName, 1, 0)
@@ -959,6 +972,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
         /// Decorates a auto-diff transcribed value with the original value that the inst is transcribed from.
     INST(AutoDiffOriginalValueDecoration, AutoDiffOriginalValueDecoration, 1, 0)
+
+        /// Decorates a type as auto-diff builtin type.
+    INST(AutoDiffBuiltinDecoration, AutoDiffBuiltinDecoration, 0, 0)
 
         /// Used by the auto-diff pass to hold a reference to the
         /// generated derivative function.

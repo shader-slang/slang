@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_HTTP_H
 #define SLANG_CORE_HTTP_H
 
-#include "slang.h"
+#include "../../include/slang.h"
 
 #include "slang-string.h"
 #include "slang-list.h"

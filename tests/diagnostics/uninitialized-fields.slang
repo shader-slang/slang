@@ -86,23 +86,5 @@ struct Pass
     int y = 0;
 }
 
-struct Impl
-{
-    float x;
-
-    __init(float val)
-    {
-        x = val;
-    }
-
-    __init()
-    {
-        float val = 2.0;
-
-        // Shouldn't trigger a warning here
-        return Impl(val);
-    }
-}
-
 //CHK-NOT: warning 41020
 //CHK-NOT: warning 41021

@@ -426,6 +426,8 @@ namespace Slang
             String const& name,
             LookupMask mask,
             DiagnosticSink* sink);
+        
+        bool isSubType(Type* subType, Type* superType);
 
         Dictionary<String, IntVal*>& getMangledNameToIntValMap();
         ConstantIntVal* tryFoldIntVal(IntVal* intVal);
@@ -553,7 +555,6 @@ namespace Slang
             /// and parsing via Slang reflection, and is not recommended for future APIs to use.
             ///
         Scope* _getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder);
-
     protected:
         ComponentType(Linkage* linkage);
 
@@ -2162,6 +2163,11 @@ namespace Slang
 
         void setFileSystem(ISlangFileSystem* fileSystem);
 
+        DeclRef<Decl> specializeGeneric(
+            DeclRef<Decl>                       declRef,
+            List<Expr*>                         argExprs,
+            DiagnosticSink*                     sink);
+
         DiagnosticSink::Flags diagnosticSinkFlags = 0;
 
         bool m_requireCacheFileSystem = false;
@@ -2725,9 +2731,13 @@ namespace Slang
 
         SlangResult emitEntryPoints(ComPtr<IArtifact>& outArtifact);
 
-        SlangResult emitTranslationUnit(ComPtr<IArtifact>& outArtifact);
+        SlangResult emitPrecompiledDXIL(ComPtr<IArtifact>& outArtifact);
 
         void maybeDumpIntermediate(IArtifact* artifact);
+
+        // Used to cause instructions available in precompiled DXIL to be
+        // removed between IR linking and target source generation.
+        bool removeAvailableInDXIL = false;
 
     protected:
         CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
@@ -2765,11 +2775,6 @@ namespace Slang
 
 
         SlangResult _emitEntryPoints(ComPtr<IArtifact>& outArtifact);
-
-	/* Checks if all modules in the target program are already compiled to the
-        target language, indicating that a pass-through linking using the
-        downstream compiler is viable.*/
-        bool isPrecompiled();
     private:
         Shared* m_shared = nullptr;
     };
@@ -2809,7 +2814,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(int targetIndex, bool value) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDXIL(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setEmbedDXIL(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;
@@ -3372,6 +3377,16 @@ SLANG_FORCE_INLINE Type* asInternal(slang::TypeReflection* type)
 SLANG_FORCE_INLINE slang::TypeReflection* asExternal(Type* type)
 {
     return reinterpret_cast<slang::TypeReflection*>(type);
+}
+
+SLANG_FORCE_INLINE DeclRef<Decl> asInternal(slang::GenericReflection* generic)
+{
+    return DeclRef<Decl>(reinterpret_cast<DeclRefBase*>(generic));
+}
+
+SLANG_FORCE_INLINE slang::GenericReflection* asExternal(DeclRef<Decl> generic)
+{
+    return reinterpret_cast<slang::GenericReflection*>(generic.declRefBase);
 }
 
 SLANG_FORCE_INLINE TypeLayout* asInternal(slang::TypeLayoutReflection* type)

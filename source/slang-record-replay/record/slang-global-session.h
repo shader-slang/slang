@@ -76,8 +76,8 @@ namespace SlangRecord
             // be executed in different threads. But it's not a big problem, because slang doesn't allow multiple threads to access the same
             // session at the same time. So even if there is one session used by multiple threads, those threads will execute the compile jobs
             // sequentially.
-            std::unique_ptr<RecordManager>      m_recordManager;
-            uint64_t                             m_globalSessionHandle = 0;
+            Slang::RefPtr<RecordManager>        m_recordManager;
+            uint64_t                            m_globalSessionHandle = 0;
     };
 } // namespace Slang
 

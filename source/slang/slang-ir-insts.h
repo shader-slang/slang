@@ -330,6 +330,8 @@ IR_SIMPLE_DECORATION(PerVertexDecoration)
 
 IR_SIMPLE_DECORATION(SPIRVBlockDecoration)
 
+IR_SIMPLE_DECORATION(DefaultValueDecoration)
+
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLVersionDecoration };
@@ -430,6 +432,8 @@ IR_SIMPLE_DECORATION(NonCopyableTypeDecoration)
 IR_SIMPLE_DECORATION(HLSLMeshPayloadDecoration)
 IR_SIMPLE_DECORATION(GlobalInputDecoration)
 IR_SIMPLE_DECORATION(GlobalOutputDecoration)
+IR_SIMPLE_DECORATION(AvailableInDXILDecoration)
+IR_SIMPLE_DECORATION(DownstreamModuleExportDecoration)
 
 struct IRGLSLLocationDecoration : IRDecoration
 {
@@ -1475,6 +1479,27 @@ struct IRMeshOutputSet : public IRInst
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
     IRInst* getElementValue() { return getOperand(2); }
+};
+
+struct IRMetalSetVertex : public IRInst
+{
+    IR_LEAF_ISA(MetalSetVertex)
+    IRInst* getIndex() { return getOperand(0); }
+    IRInst* getElementValue() { return getOperand(1); }
+};
+
+struct IRMetalSetPrimitive : public IRInst
+{
+    IR_LEAF_ISA(MetalSetPrimitive)
+    IRInst* getIndex() { return getOperand(0); }
+    IRInst* getElementValue() { return getOperand(1); }
+};
+
+struct IRMetalSetIndices : public IRInst
+{
+    IR_LEAF_ISA(MetalSetIndices)
+    IRInst* getIndex() { return getOperand(0); }
+    IRInst* getElementValue() { return getOperand(1); }
 };
 
     /// An attribute that can be attached to another instruction as an operand.
@@ -3689,6 +3714,12 @@ public:
         return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
     }
 
+    IRMetalMeshType* getMetalMeshType(IRType* vertexType, IRType* primitiveType, IRInst* numVertices, IRInst* numPrimitives, IRInst* topology)
+    {
+        IRInst* ops[5] = {vertexType, primitiveType, numVertices, numPrimitives, topology};
+        return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
+    }
+
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
     IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex = nullptr);
@@ -4209,7 +4240,7 @@ public:
 
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, IRIntegerValue index, IRInst* newElement);
-    IRInst* emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement);
+    IRInst* emitUpdateElement(IRInst* base, ArrayView<IRInst*> accessChain, IRInst* newElement);
 
     IRInst* emitGetAddress(
         IRType* type,
@@ -4441,6 +4472,11 @@ public:
     IRInst* emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index);
 
     IRInst* emitNonUniformResourceIndexInst(IRInst* val);
+
+    IRMetalSetVertex* emitMetalSetVertex(IRInst* index, IRInst* vertex);
+    IRMetalSetPrimitive* emitMetalSetPrimitive(IRInst* index, IRInst* primitive);
+    IRMetalSetIndices* emitMetalSetIndices(IRInst* index, IRInst* indices);
+
     //
     // Decorations
     //
@@ -4940,6 +4976,10 @@ public:
     {
         addDecoration(value, kIROp_HasExplicitHLSLBindingDecoration);
     }
+    void addDefaultValueDecoration(IRInst* value, IRInst* defaultValue)
+    {
+        addDecoration(value, kIROp_DefaultValueDecoration, defaultValue);
+    }
     void addNVAPIMagicDecoration(IRInst* value, UnownedStringSlice const& name)
     {
         addDecoration(value, kIROp_NVAPIMagicDecoration, getStringValue(name));
@@ -4958,6 +4998,11 @@ public:
     void addDynamicUniformDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_DynamicUniformDecoration);
+    }
+
+    void addAutoDiffBuiltinDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_AutoDiffBuiltinDecoration);
     }
 
         /// Add a decoration that indicates that the given `inst` depends on the given `dependency`.
