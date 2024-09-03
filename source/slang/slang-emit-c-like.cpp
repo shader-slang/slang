@@ -4221,7 +4221,7 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
 
     emitRateQualifiersAndAddressSpace(varDecl);
     emitVarKeyword(varType, /* isConstant */ false);
-    emitType(varType, getName(varDecl));
+    emitGlobalParamType(varType, getName(varDecl));
 
     emitSemantics(varDecl);
 

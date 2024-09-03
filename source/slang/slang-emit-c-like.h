@@ -257,6 +257,7 @@ public:
     void emitType(IRType* type);
     void emitType(IRType* type, Name* name, SourceLoc const& nameLoc);
     void emitType(IRType* type, NameLoc const& nameAndLoc);
+    virtual void emitGlobalParamType(IRType* type, String const& name) {emitType(type, name);}
     bool hasExplicitConstantBufferOffset(IRInst* cbufferType);
     bool isSingleElementConstantBuffer(IRInst* cbufferType);
     bool shouldForceUnpackConstantBufferElements(IRInst* cbufferType);
