@@ -248,10 +248,7 @@ struct ResourceOutputSpecializationPass
             newFunc->removeAndDeallocate();
             // Check if `oldFunc` is the reason for failing,
             // Otherwise don't add to 'unspecializableFuncs'
-            //
-            // Also ensure our func has uses, else we can just ignore specializing this function.
-            // Otherwise 'KeepAlive' will cause an infinite loop.
-            if(result == SpecializeFuncResult::ThisFuncFailed && oldFunc->hasUses())
+            if(result == SpecializeFuncResult::ThisFuncFailed)
                 unspecializableFuncs->add(oldFunc);
             return false;
         }
