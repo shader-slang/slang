@@ -53,6 +53,7 @@ jobs:
         with:
           repository: 'shader-slang/slang-material-modules-benchmark'
           path: 'external/slang-material-modules-benchmark'
+          token: ${{ secrets.SLANG_MDL_BENCHMARK_RESULTS_PAT }}
       - name: Push results
         run: |
           cp tools/benchmark/benchmarks.json external\slang-material-modules-benchmark
@@ -65,4 +66,4 @@ jobs:
           git add benchmarks.json current
           git commit -m "$(cat commit)" -m "https://github.com/shader-slang/slang/commit/$(cat commit-hash)"
           git log
-          git push https://venkataram-nv:${{ secrets.SLANG_MDL_BENCHMARK_RESULTS_PAT }}@github.com/shader-slang/slang-material-modules-benchmark.git
+          git push
