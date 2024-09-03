@@ -476,68 +476,131 @@ def SPV_GOOGLE_user_type : _spirv_1_0;
 
 // SPIRV Capabilities.
 
+/// Represents the SPIR-V capability for atomic float 32 add operations.
 /// [EXT]
 def spvAtomicFloat32AddEXT : SPV_EXT_shader_atomic_float_add;
+
+/// Represents the SPIR-V capability for atomic float 16 add operations.
 /// [EXT]
 def spvAtomicFloat16AddEXT : SPV_EXT_shader_atomic_float16_add;
+
+/// Represents the SPIR-V capability for 64-bit integer atomics.
 /// [EXT]
 def spvInt64Atomics : _spirv_1_0;
+
+/// Represents the SPIR-V capability for atomic float 32 min/max operations.
 /// [EXT]
 def spvAtomicFloat32MinMaxEXT : SPV_EXT_shader_atomic_float_min_max;
+
+/// Represents the SPIR-V capability for atomic float 16 min/max operations.
 /// [EXT]
 def spvAtomicFloat16MinMaxEXT : SPV_EXT_shader_atomic_float_min_max;
+
+/// Represents the SPIR-V capability for 'derivative control' operations.
 /// [EXT]
 def spvDerivativeControl : _spirv_1_0;
+
+/// Represents the SPIR-V capability for image query operations.
 /// [EXT]
 def spvImageQuery : _spirv_1_0;
+
+/// Represents the SPIR-V capability for extended image gather operations.
 /// [EXT]
 def spvImageGatherExtended : _spirv_1_0;
+
+/// Represents the SPIR-V capability for sparse residency.
 /// [EXT]
 def spvSparseResidency : _spirv_1_0;
+
+/// Represents the SPIR-V capability for image footprint.
 /// [EXT]
 def spvImageFootprintNV : SPV_NV_shader_image_footprint;
+
+/// Represents the SPIR-V capability for using minimum LOD operations.
 /// [EXT]
 def spvMinLod : _spirv_1_0;
+
+/// Represents the SPIR-V capability for using SPV_EXT_fragment_shader_interlock.
 /// [EXT]
 def spvFragmentShaderPixelInterlockEXT : SPV_EXT_fragment_shader_interlock;
+
+/// Represents the SPIR-V capability for using SPV_KHR_fragment_shader_barycentric.
 /// [EXT]
 def spvFragmentBarycentricKHR : SPV_KHR_fragment_shader_barycentric;
+
+/// Represents the SPIR-V capability for using SPV_EXT_fragment_fully_covered functionality.
 /// [EXT]
 def spvFragmentFullyCoveredEXT : SPV_EXT_fragment_fully_covered;
+
+/// Represents the SPIR-V capability for group non-uniform ballot operations.
 /// [EXT]
 def spvGroupNonUniformBallot : _spirv_1_3;
+
+/// Represents the SPIR-V capability for group non-uniform shuffle operations.
 /// [EXT]
 def spvGroupNonUniformShuffle : _spirv_1_3;
+
+/// Represents the SPIR-V capability for group non-uniform arithmetic operations.
 /// [EXT]
 def spvGroupNonUniformArithmetic : _spirv_1_3;
+
+/// Represents the SPIR-V capability for group non-uniform quad operations.
 /// [EXT]
 def spvGroupNonUniformQuad : _spirv_1_3;
+
+/// Represents the SPIR-V capability for group non-uniform vote operations.
 /// [EXT]
 def spvGroupNonUniformVote : _spirv_1_3;
+
+/// Represents the SPIR-V capability for group non-uniform partitioned operations.
 /// [EXT]
 def spvGroupNonUniformPartitionedNV : _spirv_1_3 + SPV_NV_shader_subgroup_partitioned;
+
+/// Represents the SPIR-V capability for ray tracing motion blur.
 /// [EXT]
 def spvRayTracingMotionBlurNV : SPV_NV_ray_tracing_motion_blur;
+
+/// Represents the SPIR-V capability for mesh shading.
 /// [EXT]
 def spvMeshShadingEXT : SPV_EXT_mesh_shader;
+
+/// Represents the SPIR-V capability for ray tracing.
 /// [EXT]
 def spvRayTracingKHR : SPV_KHR_ray_tracing;
+
+/// Represents the SPIR-V capability for ray tracing position fetch.
 /// [EXT]
 def spvRayTracingPositionFetchKHR : SPV_KHR_ray_tracing_position_fetch + spvRayTracingKHR;
+
+/// Represents the SPIR-V capability for ray query.
 /// [EXT]
 def spvRayQueryKHR : SPV_KHR_ray_query;
+
+/// Represents the SPIR-V capability for ray query position fetch.
 /// [EXT]
 def spvRayQueryPositionFetchKHR : SPV_KHR_ray_tracing_position_fetch + spvRayQueryKHR;
+
+/// Represents the SPIR-V capability for shader invocation reorder.
 /// [EXT]
 def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
+
+/// Represents the SPIR-V capability for shader clock.
 /// [EXT]
 def spvShaderClockKHR : SPV_KHR_shader_clock;
+
+/// Represents the SPIR-V capability for non-uniform resource indexing.
 /// [EXT]
 def spvShaderNonUniformEXT : SPV_EXT_descriptor_indexing;
+
+/// Represents the SPIR-V capability for non-uniform resource indexing.
 /// [EXT]
 def spvShaderNonUniform : spvShaderNonUniformEXT;
+
+/// Represents the SPIR-V capability for demoting to helper invocation.
 /// [EXT]
 def spvDemoteToHelperInvocationEXT : SPV_EXT_demote_to_helper_invocation;
+
+/// Represents the SPIR-V capability for demoting to helper invocation.
 /// [EXT]
 def spvDemoteToHelperInvocation : spvDemoteToHelperInvocationEXT;
 
