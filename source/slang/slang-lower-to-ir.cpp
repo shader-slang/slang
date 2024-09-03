@@ -1700,8 +1700,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitTypePackSubtypeWitness(TypePackSubtypeWitness* witnessPack)
     {
-        if (isTypeEqualityWitness(witnessPack))
-            return LoweredValInfo();
         auto irBuilder = getBuilder();
         ShortList<IRInst*> witnesses;
         ShortList<IRType*> elementTypes;
@@ -1738,8 +1736,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitEachSubtypeWitness(EachSubtypeWitness* witness)
     {
-        if (isTypeEqualityWitness(witness))
-            return LoweredValInfo();
         auto elementWitness = lowerVal(context, witness->getPatternTypeWitness());
         auto irBuilder = getBuilder();
         auto subType = lowerType(context, witness->getSub());
@@ -1749,9 +1745,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
     {
-        if (isTypeEqualityWitness(val))
-            return LoweredValInfo();
-
         if (as<ThisTypeConstraintDecl>(val->getDeclRef()))
             return LoweredValInfo::simple(context->thisTypeWitness);
 
@@ -1760,9 +1753,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 lowerType(context, val->getSup())));
     }
 
-    LoweredValInfo visitTypeEqualityWitness(TypeEqualityWitness*)
+    LoweredValInfo visitTypeEqualityWitness(TypeEqualityWitness* val)
     {
-        return LoweredValInfo();
+        auto subType = lowerType(context, val->getSub());
+        auto supType = lowerType(context, val->getSup());
+        auto witnessType = context->irBuilder->getWitnessTableType(
+            lowerType(context, val->getSup()));
+        return LoweredValInfo::simple(context->irBuilder->getTypeEqualityWitness(witnessType, subType, supType));
     }
 
     LoweredValInfo visitTransitiveSubtypeWitness(
@@ -9139,12 +9136,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGenContext*               subContext,
         GenericTypeConstraintDecl*  constraintDecl)
     {
-        if (constraintDecl->isEqualityConstraint)
-        {
-            subContext->setValue(constraintDecl, LoweredValInfo());
-            return;
-        }
-
         auto supType = lowerType(subContext, constraintDecl->sup.type);
         auto value = emitGenericConstraintValue(subContext, constraintDecl, supType);
         subContext->setValue(constraintDecl, LoweredValInfo::simple(value));
