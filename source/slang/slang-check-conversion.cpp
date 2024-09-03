@@ -451,11 +451,7 @@ namespace Slang
             {
                 auto toStructDecl = toStructDeclRef.getDecl();
 
-                // Note: Since $ZeroInit gets generated at `DeclCheckState::CanUseFuncSignature`
-                // we can safely assume that if this logic runs before constructors are
-                // synthisized in `SemanticsAttributesVisitor`, this is fallback default-ctor
-                // logic.
-                ensureDecl(toStructDecl, DeclCheckState::CanUseZeroInit);
+                ensureDecl(toStructDecl, DeclCheckState::DefaultConstructorReadyForUse);
 
                 // Easy case of default constructor or equivalent
                 if (argCount == 0)

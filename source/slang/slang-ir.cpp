@@ -3820,8 +3820,6 @@ namespace Slang
                     return nullptr;
                 elements.add(inner);
             }
-            if(elements.getCount() == 0)
-                return emitUndefined(type);
             return emitMakeStruct(type, elements);
         }
         case kIROp_ArrayType:

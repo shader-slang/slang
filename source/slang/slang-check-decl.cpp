@@ -1924,7 +1924,7 @@ namespace Slang
 
         // Generate $ZeroInit. Since this is a place-holder non-ctor, we can pre-generate this function early.
         // Note: some modfiers cannot be added at this stage, these will be added later in our AST passes.
-        if (getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance).getCount() != 0)
+        if (getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance).getFirstOrNull())
         {
             // $ZeroInit is a synthisized static-function only used In 2 cases:
             //     1. if `{}` is used inside a `__init()`
@@ -8257,20 +8257,24 @@ namespace Slang
             {
                 if (auto baseStructDecl = as<StructDecl>(baseStructInfo->m_inheritanceBaseDecl))
                 {
-                    Expr* zeroInitFunc = constructZeroInitListFunc(this, baseStructDecl, baseStructInfo->m_inheritanceDecl->base.type, ConstructZeroInitListOptions::PreferZeroInitFunc);
-                    auto assign = m_astBuilder->create<AssignExpr>();
-                    assign->left = coerce(CoercionSite::Initializer, zeroInitFunc->type, structVarDeclExpr);
-                    assign->right = zeroInitFunc;
-                    auto stmt = m_astBuilder->create<ExpressionStmt>();
-                    stmt->expression = assign;
-                    stmt->loc = seqStmt->loc;
-                    seqStmt->stmts.add(stmt);
+                    if (getMembersOfType<VarDeclBase>(m_astBuilder, baseStructDecl, MemberFilterStyle::Instance).getFirstOrNull())
+                    {
+                        Expr* zeroInitFunc = constructZeroInitListFunc(this, baseStructDecl, baseStructInfo->m_inheritanceDecl->base.type, ConstructZeroInitListOptions::PreferZeroInitFunc);
+                        auto assign = m_astBuilder->create<AssignExpr>();
+                        assign->left = coerce(CoercionSite::Initializer, zeroInitFunc->type, structVarDeclExpr);
+                        assign->right = zeroInitFunc;
+                        auto stmt = m_astBuilder->create<ExpressionStmt>();
+                        stmt->expression = assign;
+                        stmt->loc = seqStmt->loc;
+                        seqStmt->stmts.add(stmt);
+                    }
                 }
             }
 
             // Assign initExpr to all members
             for (auto memberRef : membersOfStructDeclInstance)
             {
+
                 auto member = memberRef.getDecl();
                 addCudaHostModifierIfRequired(zeroInitListFunc, member, foundCudaHostModifier);
 
@@ -10617,7 +10621,7 @@ namespace Slang
         {
             // Since we are zero-initializing, we are effectively `TreatAsDifferentiableAttribute`.
             // This is important since some prior use-cases have no_diff on our `$ZeroInit` use-cases.
-            addModifier(zeroInitFunc, m_astBuilder->create<TreatAsDifferentiableAttribute>());
+            addAutoDiffModifiersToFunc(this, m_astBuilder, zeroInitFunc);
             addModifier(zeroInitFunc, m_astBuilder->create<SynthesizedModifier>());
         }
 
