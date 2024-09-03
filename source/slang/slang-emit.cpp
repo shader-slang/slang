@@ -449,8 +449,24 @@ static void unexportNonEmbeddableDXIL(IRModule* irModule)
 
 static void unexportNonEmbeddableSPIRV(IRModule* irModule)
 {
-    SLANG_UNUSED(irModule);
-    return;
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (inst->getOp() == kIROp_Func)
+        {
+            // SPIR-V does not allow exporting entry points
+            if (inst->findDecoration<IREntryPointDecoration>())
+            {
+                if (auto dec = inst->findDecoration<IRPublicDecoration>())
+                {
+                    dec->removeAndDeallocate();
+                }
+                if (auto dec = inst->findDecoration<IRDownstreamModuleExportDecoration>())
+                {
+                    dec->removeAndDeallocate();
+                }
+            }
+        }
+    }
 }
 
 Result linkAndOptimizeIR(
@@ -1504,7 +1520,8 @@ Result linkAndOptimizeIR(
     }
     else if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedSPIRV))
     {
-        // TBD what limitation SPIRV has.
+        // Honor SPIR-V library restrictions for embedded precompilation, such as
+	// not exporting entrypoints.
         unexportNonEmbeddableSPIRV(irModule);
     }
 
