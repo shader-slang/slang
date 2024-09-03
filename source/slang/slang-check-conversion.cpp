@@ -450,10 +450,12 @@ namespace Slang
             if(auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
             {
                 auto toStructDecl = toStructDeclRef.getDecl();
-                ensureDecl(toStructDecl, DeclCheckState::DefaultConstructorReadyForUse);
 
-                List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, toStructDecl, nullptr);
-                bool allowCStyleInitList = checkIfCStyleStruct(this, toStructDecl);
+                // Note: Since $ZeroInit gets generated at `DeclCheckState::CanUseFuncSignature`
+                // we can safely assume that if this logic runs before constructors are
+                // synthisized in `SemanticsAttributesVisitor`, this is fallback default-ctor
+                // logic.
+                ensureDecl(toStructDecl, DeclCheckState::CanUseZeroInit);
 
                 // Easy case of default constructor or equivalent
                 if (argCount == 0)
@@ -465,6 +467,9 @@ namespace Slang
                     }
                     return true;
                 }
+
+                List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, toStructDecl, nullptr);
+                bool allowCStyleInitList = checkIfCStyleStruct(this, toStructDecl);
 
                 // Non-default constructor case
                 List<Expr*> maybeArgList;

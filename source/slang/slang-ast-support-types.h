@@ -491,6 +491,7 @@ namespace Slang
         CanUseFuncSignature = ReadyForReference,
         CanSpecializeGeneric = ReadyForReference,
         CanReadInterfaceRequirements = ReadyForLookup,
+        CanUseZeroInit = SignatureChecked,
     };
 
         /// A `DeclCheckState` plus a bit to track whether a declaration is currently being checked.
