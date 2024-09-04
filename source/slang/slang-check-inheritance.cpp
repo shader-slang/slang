@@ -353,7 +353,6 @@ namespace Slang
         auto currentDeclRef = declRef;
         for (; currentDeclRef;)
         {
-            DeclRef<Decl> nextDeclRef;
             if (auto aggTypeDeclBaseRef = currentDeclRef.as<AggTypeDeclBase>())
             {
                 // In the case where we have an aggregate type or `extension`
@@ -396,7 +395,10 @@ namespace Slang
                         if (subType != selfType)
                             continue;
                     }
-
+                    else if (currentDeclRef != declRef)
+                    {
+                        continue;
+                    }
                     // The base type and subtype witness can easily be determined
                     // using the `InheritanceDecl`.
                     //
@@ -408,15 +410,21 @@ namespace Slang
 
                     addDirectBaseType(baseType, satisfyingWitness);
                 }
-
+            }
+            if (currentDeclRef.as<AssocTypeDecl>())
+            {
                 // If the current type is an associated type, continue inspecting the base/parent of the
                 // associatedtype to discover additional constraints defined on the parent associatedtype decls.
                 //
                 if (auto lookupDeclRef = as<LookupDeclRef>(currentDeclRef.declRefBase))
-                    nextDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource());
+                {
+                    currentDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource()).as<AssocTypeDecl>();
+                    continue;
+                }
             }
-            currentDeclRef = nextDeclRef;
+            break;
         }
+
         if (auto genericDeclRef = getDependentGenericParent(declRef))
         {
             // The constraints placed on a generic type parameter are siblings of that

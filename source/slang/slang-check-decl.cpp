@@ -2274,13 +2274,17 @@ namespace Slang
             
             markSelfDifferentialMembersOfType(as<AggTypeDecl>(context->parentDecl), context->conformingType);
 
+            witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(context->conformingType));
             if (doesTypeSatisfyAssociatedTypeConstraintRequirement(context->conformingType, requirementDeclRef, witnessTable))
             {
-                witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(context->conformingType));
 
                 // Increase the epoch so that future calls to Type::getCanonicalType will return the up-to-date folded types.
                 m_astBuilder->incrementEpoch();
                 return true;
+            }
+            else
+            {
+                witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
             }
 
             // Something went wrong.
@@ -2467,19 +2471,16 @@ namespace Slang
         // conformance on the synthesized decl.
         checkAggTypeConformance(aggTypeDecl);
 
-        if (doesTypeSatisfyAssociatedTypeConstraintRequirement(satisfyingType, requirementDeclRef, witnessTable))
+        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(satisfyingType));
+        if (!doesTypeSatisfyAssociatedTypeConstraintRequirement(satisfyingType, requirementDeclRef, witnessTable))
         {
-            witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(satisfyingType));
-
-            // Incrase the epoch so that future calls to Type::getCanonicalType will return the up-to-date folded types.
-            m_astBuilder->incrementEpoch();
-            return true;
+            // Note: the call to `doesTypeSatisfyAssociatedTypeConstraintRequirement` should always succeed.
+            // If not, there is something wrong with the code synthesis logic. For now we just return false
+            // instead of crashing so the user can work around the issues.
+            witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
+            return false;
         }
-
-        // Note: the call to `doesTypeSatisfyAssociatedTypeConstraintRequirement` should always succeed.
-        // If not, there is something wrong with the code synthesis logic. For now we just return false
-        // instead of crashing so the user can work around the issues.
-        return false;
+        return true;
     }
 
     void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
@@ -3620,7 +3621,7 @@ namespace Slang
         {
             witnessTable->m_requirementDictionary.remove(requiredAssociatedTypeDeclRef.getDecl());
         }
-
+        
         return conformance;
     }
 
