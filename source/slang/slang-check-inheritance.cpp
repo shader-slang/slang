@@ -422,40 +422,42 @@ namespace Slang
         {
             considerExtension(directAggTypeDeclRef, nullptr);
         }
-        HashSet<Type*> supTypesConsideredForExtensionApplication;
-        Dictionary<Type*, SubtypeWitness*> additionalSubtypeWitnesses;
-        for (;;)
+        if (!declRef.as<ExtensionDecl>())
         {
-            // After we flatten the list of bases, we may discover additional opportunities
-            // to apply extensions.
-            List<DeclRef<AggTypeDecl>> supTypeWorkList;
-            for (auto curFacet : directBaseFacets)
+            HashSet<Type*> supTypesConsideredForExtensionApplication;
+            Dictionary<Type*, SubtypeWitness*> additionalSubtypeWitnesses;
+            for (;;)
             {
-                if (!curFacet->subtypeWitness)
-                    continue;
-                auto inheritanceInfo = getInheritanceInfo(curFacet->subtypeWitness->getSup(), circularityInfo);
-                for (auto facet : inheritanceInfo.facets)
+                // After we flatten the list of bases, we may discover additional opportunities
+                // to apply extensions.
+                List<DeclRef<AggTypeDecl>> supTypeWorkList;
+                auto base = directBases.begin();
+                for (auto baseFacet = directBaseFacets.getHead(); baseFacet.getImpl(); baseFacet = baseFacet->next)
                 {
-                    if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
+                    for (auto facet : (*base)->facets)
                     {
-                        SubtypeWitness* transitiveWitness = curFacet->subtypeWitness;
-                        transitiveWitness = astBuilder->getTransitiveSubtypeWitness(curFacet->subtypeWitness, facet->subtypeWitness);
-                        additionalSubtypeWitnesses.addIfNotExists(facet->origin.type, transitiveWitness);
-                        if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
+                        if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
                         {
-                            supTypeWorkList.add(interfaceDeclRef);
+                            SubtypeWitness* transitiveWitness = baseFacet->subtypeWitness;
+                            transitiveWitness = astBuilder->getTransitiveSubtypeWitness(baseFacet->subtypeWitness, facet->subtypeWitness);
+                            additionalSubtypeWitnesses.addIfNotExists(facet->origin.type, transitiveWitness);
+                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
+                            {
+                                supTypeWorkList.add(interfaceDeclRef);
+                            }
                         }
                     }
+                    ++base;
                 }
+                bool canExit = true;
+                for (auto baseItem : supTypeWorkList)
+                {
+                    if (considerExtension(baseItem, &additionalSubtypeWitnesses))
+                        canExit = false;
+                }
+                if (canExit)
+                    break;
             }
-            bool canExit = true;
-            for (auto baseItem : supTypeWorkList)
-            {
-                if (considerExtension(baseItem, &additionalSubtypeWitnesses))
-                    canExit = false;
-            }
-            if (canExit)
-                break;
         }
 
         // At this point, the list of direct bases (each with its own linearization)
