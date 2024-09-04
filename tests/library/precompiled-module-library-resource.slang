@@ -9,8 +9,10 @@ module "precompiled-module-library-resource";
 
 public struct ResourceStruct {
     public StructuredBuffer<int> buffer;
-    void funcInoutResource(out StructuredBuffer<int> bufferIn)
+    
+    __init(StructuredBuffer<int> bufferIn)
     {
+        buffer = bufferIn;
     }
 };
 
