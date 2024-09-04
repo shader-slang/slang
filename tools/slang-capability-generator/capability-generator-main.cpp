@@ -932,10 +932,9 @@ void printDocForCapabilityDef(StringBuilder& sbDoc, RefPtr<CapabilityDef> def, L
         return;
 
     auto& sbDocSection = sbDocSections[(UInt)def->docComment.headerGroup];
-    sbDocSection << "\n";
-    sbDocSection << "\n" << "`" << def->name << "`" << getLineBreakForTarget();
+    sbDocSection << "\n" << "`" << def->name << "`\n";
     sbDocSection << def->docComment.comment;
-    sbDocSection << "\n\n";
+    sbDocSection << "\n";
 }
 
 List<StringBuilder> setupDocCommentHeaderStringBuilders()
@@ -944,8 +943,8 @@ List<StringBuilder> setupDocCommentHeaderStringBuilders()
     sbDocSections.setCount((UInt)AutoDocHeaderGroup::Count);
     for (UInt i = 0; i < (UInt)AutoDocHeaderGroup::Count; i++)
     {
-        sbDocSections[i] << "\n<br>\n\n" << getHeaderNameFromAutoDocHeaderGroup(i) << "\n----------------------\n";
-        sbDocSections[i] << "*" << getHeaderDescriptionFromAutoDocHeaderGroup(i) << "*<br><br>\n\n";
+        sbDocSections[i] << "\n" << getHeaderNameFromAutoDocHeaderGroup(i) << "\n----------------------\n";
+        sbDocSections[i] << "*" << getHeaderDescriptionFromAutoDocHeaderGroup(i) << "*\n";
     }
     return sbDocSections;
 }
