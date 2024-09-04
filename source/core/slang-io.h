@@ -217,6 +217,11 @@ namespace Slang
             /// @return SLANG_OK if file or directory is removed
         static SlangResult remove(const String& path);
 
+            /// Remove a file or directory at specified path. The directory can be non-empty.
+            /// @param path
+            /// @return SLANG_OK if file or directory is removed
+        static SlangResult removeNonEmpty(const String& path);
+
         static bool equals(String path1, String path2);
 
             /// Turn `path` into a relative path from base.
