@@ -39,7 +39,7 @@ void main(int id : SV_DispatchThreadID)
     *pData1 = 3;
     *(int2*)pData = int2(1, 2);
     pData1[-1] = 2;
-    buffer[0].pNext[1] = {5, 0};
+    buffer[0].pNext[1] = {5};
     // CHECK: OpConvertPtrToU
     // CHECK: OpINotEqual
     if (pData1)

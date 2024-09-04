@@ -30,17 +30,17 @@ struct Vertex
 
 void everything<let N : uint>(OutputVertices<Vertex, N> vs)
 {
-    vs[0] = { float4(0), float3(1), {} };
+    vs[0] = {float4(0), float3(1)};
 }
 
 void just_one(out Vertex v)
 {
-    v = { float4(0), float3(1), {} };
+    v = {float4(0), float3(1)};
 }
 
 void just_two(out Vertex v, out Vertex w)
 {
-    v = { float4(0), float3(1), {} };
+    v = {float4(0), float3(1)};
     w = v;
 }
 

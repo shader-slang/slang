@@ -53,9 +53,7 @@ A f(A a, int i)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    A a = {};
-    a.x = 1;
-    a.y = 2;
+    A a = {1.0, 2.0};
 
     var dpa = diffPair(a);
 

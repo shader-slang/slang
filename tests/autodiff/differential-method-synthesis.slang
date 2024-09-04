@@ -39,7 +39,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     {
         A a = {1.0, 2.0};
-        A.Differential b = {0.2, 0};
+        A.Differential b = {0.2};
         dpA dpa = dpA(a, b);
         outputBuffer[0] = __fwd_diff(f)(dpa).d.b.x;         // Expect: 0
         outputBuffer[1] = A.dadd(b, b).b.x;                 // Expect: 0.4

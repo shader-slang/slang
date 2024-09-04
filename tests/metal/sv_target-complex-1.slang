@@ -30,5 +30,5 @@ struct Output
 [shader("fragment")]
 Output fragmentMain()
 {
-    return { float4(1), { float4(2) }, float4(3), {} };
+    return { float4(1), {float4(2)}, float4(3) };
 }

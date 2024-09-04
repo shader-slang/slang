@@ -309,6 +309,7 @@ struct ResourceOutputSpecializationPass
         // There should be no conditions at call sites that can cause specialization to
         // fail, because specialization does not depend on what is passed *in* to each
         // call, but only on what gets passed *out*.
+        //
         for( auto oldCall : calls )
         {
             specializeCallSite(oldCall, newFunc, funcInfo);
