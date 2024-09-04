@@ -1921,43 +1921,6 @@ namespace Slang
             structDecl->addMember(member);
         }
         checkVisibility(structDecl);
-
-        // Generate $ZeroInit. Since this is a place-holder non-ctor, we can pre-generate this function early.
-        // Note: some modfiers cannot be added at this stage, these will be added later in our AST passes.
-        if (getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance).getFirstOrNull())
-        {
-            // $ZeroInit is a synthisized static-function only used In 2 cases:
-            //     1. if `{}` is used inside a `__init()`
-            //     2. if `{}` is used and a user has a 'synthisized __init()` 
-            // Use of $ZeroInit is only for functionality of `{}` to avoid hacks.
-            auto zeroInitFunc = m_astBuilder->create<FuncDecl>();
-            auto ctorName = getName("$ZeroInit");
-            zeroInitFunc->ownedScope = m_astBuilder->create<Scope>();
-            zeroInitFunc->ownedScope->containerDecl = zeroInitFunc;
-            zeroInitFunc->ownedScope->parent = getScope(structDecl);
-            zeroInitFunc->parentDecl = structDecl;
-            zeroInitFunc->loc = structDecl->loc;
-            zeroInitFunc->closingSourceLoc = zeroInitFunc->loc;
-            zeroInitFunc->nameAndLoc.name = ctorName;
-            zeroInitFunc->nameAndLoc.loc = zeroInitFunc->loc;
-            zeroInitFunc->returnType.type = calcThisType(makeDeclRef(structDecl));
-            auto body = m_astBuilder->create<BlockStmt>();
-            body->scopeDecl = m_astBuilder->create<ScopeDecl>();
-            body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
-            body->scopeDecl->ownedScope->parent = getScope(zeroInitFunc);
-            body->scopeDecl->parentDecl = zeroInitFunc;
-            body->scopeDecl->loc = zeroInitFunc->loc;
-            body->scopeDecl->closingSourceLoc = zeroInitFunc->loc;
-            body->closingSourceLoc = zeroInitFunc->closingSourceLoc;
-            zeroInitFunc->body = body;
-            body->body = m_astBuilder->create<SeqStmt>();
-
-            addModifier(zeroInitFunc, m_astBuilder->create<HLSLStaticModifier>());
-            addVisibilityModifier(m_astBuilder, zeroInitFunc, getDeclVisibility(structDecl));
-            addModifier(zeroInitFunc, m_astBuilder->create<ZeroInitModifier>());
-            structDecl->addMember(zeroInitFunc);
-        }
-
     }
 
     void SemanticsDeclHeaderVisitor::visitClassDecl(ClassDecl* classDecl)
@@ -2629,13 +2592,43 @@ namespace Slang
                     ctorList.add(defaultCtor);
                 }
 
-                // Add auto-diff modifiers to $ZeroInit
-                if (auto zeroInitFunc = findZeroInitListFunc(structDecl))
+                // Generate $ZeroInit. Since this is a place-holder non-ctor, we can pre-generate this function early.
+                // Note: some modfiers cannot be added at this stage, these will be added later in our AST passes.
+                if (getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance).getFirstOrNull())
                 {
-                    // Since we are zero-initializing, we are effectively `TreatAsDifferentiableAttribute`.
-                    // This is important since some prior use-cases have no_diff on our `$ZeroInit` use-cases.
+                    // $ZeroInit is a synthisized static-function only used In 2 cases:
+                    //     1. if `{}` is used inside a `__init()`
+                    //     2. if `{}` is used and a user has a 'synthisized __init()` 
+                    // Use of $ZeroInit is only for functionality of `{}` to avoid hacks.
+                    auto zeroInitFunc = m_astBuilder->create<FuncDecl>();
+                    auto ctorName = getName("$ZeroInit");
+                    zeroInitFunc->ownedScope = m_astBuilder->create<Scope>();
+                    zeroInitFunc->ownedScope->containerDecl = zeroInitFunc;
+                    zeroInitFunc->ownedScope->parent = getScope(structDecl);
+                    zeroInitFunc->parentDecl = structDecl;
+                    zeroInitFunc->loc = structDecl->loc;
+                    zeroInitFunc->closingSourceLoc = zeroInitFunc->loc;
+                    zeroInitFunc->nameAndLoc.name = ctorName;
+                    zeroInitFunc->nameAndLoc.loc = zeroInitFunc->loc;
+                    zeroInitFunc->returnType.type = calcThisType(makeDeclRef(structDecl));
+                    auto body = m_astBuilder->create<BlockStmt>();
+                    body->scopeDecl = m_astBuilder->create<ScopeDecl>();
+                    body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
+                    body->scopeDecl->ownedScope->parent = getScope(zeroInitFunc);
+                    body->scopeDecl->parentDecl = zeroInitFunc;
+                    body->scopeDecl->loc = zeroInitFunc->loc;
+                    body->scopeDecl->closingSourceLoc = zeroInitFunc->loc;
+                    body->closingSourceLoc = zeroInitFunc->closingSourceLoc;
+                    zeroInitFunc->body = body;
+                    body->body = m_astBuilder->create<SeqStmt>();
+
                     addAutoDiffModifiersToFunc(this, m_astBuilder, zeroInitFunc);
                     addModifier(zeroInitFunc, m_astBuilder->create<SynthesizedModifier>());
+
+                    addModifier(zeroInitFunc, m_astBuilder->create<HLSLStaticModifier>());
+                    addVisibilityModifier(m_astBuilder, zeroInitFunc, getDeclVisibility(structDecl));
+                    addModifier(zeroInitFunc, m_astBuilder->create<ZeroInitModifier>());
+                    structDecl->addMember(zeroInitFunc);
                 }
 
                 // Add an empty constructor for all combinations of visibility and access
