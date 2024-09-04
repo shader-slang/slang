@@ -2410,7 +2410,7 @@ namespace Slang
             }
             else if (auto callableDeclRef = context.bestCandidate->item.declRef.as<CallableDecl>())
             {
-                for (auto param : callableDeclRef.getDecl()->getMembersOfType<ParamDecl>())
+                for (auto param : callableDeclRef.getDecl()->getParameters())
                 {
                     paramDirections.add(getParameterDirection(param));
                 }
