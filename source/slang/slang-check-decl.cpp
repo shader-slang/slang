@@ -2583,182 +2583,184 @@ namespace Slang
         {
             if (auto structDecl = as<StructDecl>(aggTypeDecl))
             {
-                // Add an empty default-ctor if missing a real default-ctor.
-                ConstructorDecl* defaultCtor = nullptr;
-                List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, structDecl, &defaultCtor);
-                if (!defaultCtor)
-                {
-                    defaultCtor = _createCtor(this, m_astBuilder, structDecl, {}, getDeclVisibility(structDecl));
-                    ctorList.add(defaultCtor);
-                }
-
-                // Generate $ZeroInit. Since this is a place-holder non-ctor, we can pre-generate this function early.
-                // Note: some modfiers cannot be added at this stage, these will be added later in our AST passes.
                 if (getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance).getFirstOrNull())
                 {
-                    // $ZeroInit is a synthisized static-function only used In 2 cases:
-                    //     1. if `{}` is used inside a `__init()`
-                    //     2. if `{}` is used and a user has a 'synthisized __init()` 
-                    // Use of $ZeroInit is only for functionality of `{}` to avoid hacks.
-                    auto zeroInitFunc = m_astBuilder->create<FuncDecl>();
-                    auto ctorName = getName("$ZeroInit");
-                    zeroInitFunc->ownedScope = m_astBuilder->create<Scope>();
-                    zeroInitFunc->ownedScope->containerDecl = zeroInitFunc;
-                    zeroInitFunc->ownedScope->parent = getScope(structDecl);
-                    zeroInitFunc->parentDecl = structDecl;
-                    zeroInitFunc->loc = structDecl->loc;
-                    zeroInitFunc->closingSourceLoc = zeroInitFunc->loc;
-                    zeroInitFunc->nameAndLoc.name = ctorName;
-                    zeroInitFunc->nameAndLoc.loc = zeroInitFunc->loc;
-                    zeroInitFunc->returnType.type = calcThisType(makeDeclRef(structDecl));
-                    auto body = m_astBuilder->create<BlockStmt>();
-                    body->scopeDecl = m_astBuilder->create<ScopeDecl>();
-                    body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
-                    body->scopeDecl->ownedScope->parent = getScope(zeroInitFunc);
-                    body->scopeDecl->parentDecl = zeroInitFunc;
-                    body->scopeDecl->loc = zeroInitFunc->loc;
-                    body->scopeDecl->closingSourceLoc = zeroInitFunc->loc;
-                    body->closingSourceLoc = zeroInitFunc->closingSourceLoc;
-                    zeroInitFunc->body = body;
-                    body->body = m_astBuilder->create<SeqStmt>();
-
-                    addAutoDiffModifiersToFunc(this, m_astBuilder, zeroInitFunc);
-                    addModifier(zeroInitFunc, m_astBuilder->create<SynthesizedModifier>());
-
-                    addModifier(zeroInitFunc, m_astBuilder->create<HLSLStaticModifier>());
-                    addVisibilityModifier(m_astBuilder, zeroInitFunc, getDeclVisibility(structDecl));
-                    addModifier(zeroInitFunc, m_astBuilder->create<ZeroInitModifier>());
-                    structDecl->addMember(zeroInitFunc);
-                }
-
-                // Add an empty constructor for all combinations of visibility and access
-                // which is possible:
-                // 1. public constructor - usable *outside class scope* in a *different module*
-                List<CreateCtorArg> publicCtorArgs;
-                // 2. public-internal constructor - usable *outside class scope* in the *same module*
-                List<CreateCtorArg> publicInternalCtorArgs;
-                // 3. public-private-internal constructor - usable *inside class scope* in the *same module*
-                List<CreateCtorArg> publicInternalPrivateCtorArgs;
-
-                // Harvest parameters which map to the base type ctor.
-                // Note: assumes 1 structDecl, N number inheritance decl
-                for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
-                {
-                    auto declRefType = as<DeclRefType>(inheritanceMember->base.type);
-                    if (!declRefType)
-                        continue;
-                    auto baseStruct = as<StructDecl>(declRefType->getDeclRef().getDecl());
-                    if (!baseStruct)
-                        continue;
-
-                    DeclVisibility baseVisibilityToDerived = (isVisibilityOfDeclVisibleInScope(baseStruct, DeclVisibility::Internal, structDecl->ownedScope)) ? DeclVisibility::Internal : DeclVisibility::Public;
-
-                    ConstructorDecl* ctorForPublic = nullptr;
-                    ConstructorDecl* ctorForInternal = nullptr;
-
-                    // From our synthisized ctor's find the publicMemberCtor and internalMemberCtor.
-                    List<ConstructorDecl*> baseCtorList = _getCtorList(this->getASTBuilder(), this, baseStruct, nullptr);
-                    for (auto i : baseCtorList)
+                    // Add an empty default-ctor if missing a real default-ctor.
+                    ConstructorDecl* defaultCtor = nullptr;
+                    List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, structDecl, &defaultCtor);
+                    if (!defaultCtor)
                     {
-                        if (i->containsOption(ConstructorTags::MemberwiseCtorForPublicVisibility))
-                            ctorForPublic = i;
-                        if (i->containsOption(ConstructorTags::MemberwiseCtorForInternalVisibility))
-                            ctorForInternal = i;
+                        defaultCtor = _createCtor(this, m_astBuilder, structDecl, {}, getDeclVisibility(structDecl));
+                        ctorList.add(defaultCtor);
                     }
 
-                    // If base is not defined in the same module (or if the internal ctor is missing)
-                    // set the parameter list to a base-type member-wise ctor.
-                    if (baseVisibilityToDerived == DeclVisibility::Public
-                        || !ctorForInternal)
+                    // Add auto-diff modifiers to $ZeroInit
+                    if (getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance).getFirstOrNull())
                     {
-                        ctorForInternal = ctorForPublic;
+                        // $ZeroInit is a synthisized static-function only used In 2 cases:
+                        //     1. if `{}` is used inside a `__init()`
+                        //     2. if `{}` is used and a user has a 'synthisized __init()` 
+                        // Use of $ZeroInit is only for functionality of `{}` to avoid hacks.
+                        auto zeroInitFunc = m_astBuilder->create<FuncDecl>();
+                        auto ctorName = getName("$ZeroInit");
+                        zeroInitFunc->ownedScope = m_astBuilder->create<Scope>();
+                        zeroInitFunc->ownedScope->containerDecl = zeroInitFunc;
+                        zeroInitFunc->ownedScope->parent = getScope(structDecl);
+                        zeroInitFunc->parentDecl = structDecl;
+                        zeroInitFunc->loc = structDecl->loc;
+                        zeroInitFunc->closingSourceLoc = zeroInitFunc->loc;
+                        zeroInitFunc->nameAndLoc.name = ctorName;
+                        zeroInitFunc->nameAndLoc.loc = zeroInitFunc->loc;
+                        zeroInitFunc->returnType.type = calcThisType(makeDeclRef(structDecl));
+                        auto body = m_astBuilder->create<BlockStmt>();
+                        body->scopeDecl = m_astBuilder->create<ScopeDecl>();
+                        body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
+                        body->scopeDecl->ownedScope->parent = getScope(zeroInitFunc);
+                        body->scopeDecl->parentDecl = zeroInitFunc;
+                        body->scopeDecl->loc = zeroInitFunc->loc;
+                        body->scopeDecl->closingSourceLoc = zeroInitFunc->loc;
+                        body->closingSourceLoc = zeroInitFunc->closingSourceLoc;
+                        zeroInitFunc->body = body;
+                        body->body = m_astBuilder->create<SeqStmt>();
+
+                        addAutoDiffModifiersToFunc(this, m_astBuilder, zeroInitFunc);
+                        addModifier(zeroInitFunc, m_astBuilder->create<SynthesizedModifier>());
+
+                        addModifier(zeroInitFunc, m_astBuilder->create<HLSLStaticModifier>());
+                        addVisibilityModifier(m_astBuilder, zeroInitFunc, getDeclVisibility(structDecl));
+                        addModifier(zeroInitFunc, m_astBuilder->create<ZeroInitModifier>());
+                        structDecl->addMember(zeroInitFunc);
                     }
 
-                    if (ctorForPublic)
+                    // Add an empty constructor for all combinations of visibility and access
+                    // which is possible:
+                    // 1. public constructor - usable *outside class scope* in a *different module*
+                    List<CreateCtorArg> publicCtorArgs;
+                    // 2. public-internal constructor - usable *outside class scope* in the *same module*
+                    List<CreateCtorArg> publicInternalCtorArgs;
+                    // 3. public-private-internal constructor - usable *inside class scope* in the *same module*
+                    List<CreateCtorArg> publicInternalPrivateCtorArgs;
+
+                    // Harvest parameters which map to the base type ctor.
+                    // Note: assumes 1 structDecl, N number inheritance decl
+                    for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
                     {
-                        for (auto i : ctorForPublic->getParameters())
+                        auto declRefType = as<DeclRefType>(inheritanceMember->base.type);
+                        if (!declRefType)
+                            continue;
+                        auto baseStruct = as<StructDecl>(declRefType->getDeclRef().getDecl());
+                        if (!baseStruct)
+                            continue;
+
+                        DeclVisibility baseVisibilityToDerived = (isVisibilityOfDeclVisibleInScope(baseStruct, DeclVisibility::Internal, structDecl->ownedScope)) ? DeclVisibility::Internal : DeclVisibility::Public;
+
+                        ConstructorDecl* ctorForPublic = nullptr;
+                        ConstructorDecl* ctorForInternal = nullptr;
+
+                        // From our synthisized ctor's find the publicMemberCtor and internalMemberCtor.
+                        List<ConstructorDecl*> baseCtorList = _getCtorList(this->getASTBuilder(), this, baseStruct, nullptr);
+                        for (auto i : baseCtorList)
                         {
-                            publicCtorArgs.add({ i,nullptr });
+                            if (i->containsOption(ConstructorTags::MemberwiseCtorForPublicVisibility))
+                                ctorForPublic = i;
+                            if (i->containsOption(ConstructorTags::MemberwiseCtorForInternalVisibility))
+                                ctorForInternal = i;
                         }
-                        for (auto i : ctorForInternal->getParameters())
+
+                        // If base is not defined in the same module (or if the internal ctor is missing)
+                        // set the parameter list to a base-type member-wise ctor.
+                        if (baseVisibilityToDerived == DeclVisibility::Public
+                            || !ctorForInternal)
                         {
-                            publicInternalCtorArgs.add({ i,nullptr });
-                            publicInternalPrivateCtorArgs.add({ i,nullptr });
+                            ctorForInternal = ctorForPublic;
                         }
-                    }
-                }
 
-
-                // If we have a internal field which is not default-initialized we cannot allow
-                // a (1:1 element) ctor for public members (public member-wise ctor) to synthesize.
-                // This principal also applies for private members and internal/public member-wise ctor synthisis.
-                DeclVisibility maxVisibilityCtorToGenerate = getDeclVisibility(structDecl);
-                for (auto varDeclRef : getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance))
-                {
-                    auto varDecl = varDeclRef.getDecl();
-                    ensureDecl(varDecl, DeclCheckState::TypesFullyResolved);
-
-                    // Do not map a read-only variable for default-init
-                    if (!getTypeForDeclRef(m_astBuilder, varDeclRef, varDeclRef.getLoc()).isLeftValue)
-                        continue;
-
-                    auto declVisibility = getDeclVisibility(varDecl);
-                    switch (declVisibility)
-                    {
-                    case DeclVisibility::Private:
-                        publicInternalPrivateCtorArgs.add({ varDecl, nullptr });
-                        if (!varDecl->initExpr)
-                            maxVisibilityCtorToGenerate = DeclVisibility::Private;
-                        break;
-                    case DeclVisibility::Internal:
-                        publicInternalPrivateCtorArgs.add({ varDecl, nullptr });
-                        publicInternalCtorArgs.add({ varDecl, nullptr });
-                        if (!varDecl->initExpr)
-                            maxVisibilityCtorToGenerate = DeclVisibility::Internal;
-                        break;
-                    case DeclVisibility::Public:
-                        publicInternalPrivateCtorArgs.add({ varDecl, nullptr });
-                        publicInternalCtorArgs.add({ varDecl, nullptr });
-                        publicCtorArgs.add({ varDecl, nullptr });
-                        break;
-                    default:
-                        // Unknown visibility
-                        SLANG_ASSERT(false);
-                        break;
-                    }
-                }
-
-                List<ConstructorDecl*> generatedMemberwiseCtors;
-                if (maxVisibilityCtorToGenerate >= DeclVisibility::Public)
-                    if (auto generatedCtor = _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicCtorArgs), ctorList, structDecl, DeclVisibility::Public))
-                        generatedMemberwiseCtors.add(generatedCtor);
-                if (maxVisibilityCtorToGenerate >= DeclVisibility::Internal)
-                    if (auto generatedCtor = _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicInternalCtorArgs), ctorList, structDecl, DeclVisibility::Internal))
-                        generatedMemberwiseCtors.add(generatedCtor);
-                if (maxVisibilityCtorToGenerate >= DeclVisibility::Private)
-                    if (auto generatedCtor = _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicInternalPrivateCtorArgs), ctorList, structDecl, DeclVisibility::Private))
-                        generatedMemberwiseCtors.add(generatedCtor);
-
-                // `checkIfCStyleStruct` must check after we add all possible Ctors.
-                // If we are a CStyleStruct add DefaultConstructExpr to all params (excluding arg 0)
-                bool isCStyleStruct = checkIfCStyleStruct(this, structDecl);
-                if (isCStyleStruct && generatedMemberwiseCtors.getCount() > 0)
-                {
-                    // We know the user provided 0 non-default ctor's, we only had a chance to generate non default Ctors above in this AST pass.
-                    SLANG_ASSERT(generatedMemberwiseCtors.getCount() == 1);
-                    for (auto generatedCtor : generatedMemberwiseCtors)
-                    {
-                        Index paramIndex = 0;
-                        for (ParamDecl* i : generatedCtor->getParameters())
+                        if (ctorForPublic)
                         {
-                            // Never annotate the first parameter to prevent conflict with "DefaultCtor"
-                            if (paramIndex == 0)
+                            for (auto i : ctorForPublic->getParameters())
                             {
-                                paramIndex++;
-                                continue;
+                                publicCtorArgs.add({ i,nullptr });
                             }
-                            paramIndex++;
-                            i->initExpr = createDefaultConstructExprForType(this->getASTBuilder(), (QualType)i->type, i->loc);
+                            for (auto i : ctorForInternal->getParameters())
+                            {
+                                publicInternalCtorArgs.add({ i,nullptr });
+                                publicInternalPrivateCtorArgs.add({ i,nullptr });
+                            }
+                        }
+                    }
+
+
+                    // If we have a internal field which is not default-initialized we cannot allow
+                    // a (1:1 element) ctor for public members (public member-wise ctor) to synthesize.
+                    // This principal also applies for private members and internal/public member-wise ctor synthisis.
+                    DeclVisibility maxVisibilityCtorToGenerate = getDeclVisibility(structDecl);
+                    for (auto varDeclRef : getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance))
+                    {
+                        auto varDecl = varDeclRef.getDecl();
+                        ensureDecl(varDecl, DeclCheckState::TypesFullyResolved);
+
+                        // Do not map a read-only variable for default-init
+                        if (!getTypeForDeclRef(m_astBuilder, varDeclRef, varDeclRef.getLoc()).isLeftValue)
+                            continue;
+
+                        auto declVisibility = getDeclVisibility(varDecl);
+                        switch (declVisibility)
+                        {
+                        case DeclVisibility::Private:
+                            publicInternalPrivateCtorArgs.add({ varDecl, nullptr });
+                            if (!varDecl->initExpr)
+                                maxVisibilityCtorToGenerate = DeclVisibility::Private;
+                            break;
+                        case DeclVisibility::Internal:
+                            publicInternalPrivateCtorArgs.add({ varDecl, nullptr });
+                            publicInternalCtorArgs.add({ varDecl, nullptr });
+                            if (!varDecl->initExpr)
+                                maxVisibilityCtorToGenerate = DeclVisibility::Internal;
+                            break;
+                        case DeclVisibility::Public:
+                            publicInternalPrivateCtorArgs.add({ varDecl, nullptr });
+                            publicInternalCtorArgs.add({ varDecl, nullptr });
+                            publicCtorArgs.add({ varDecl, nullptr });
+                            break;
+                        default:
+                            // Unknown visibility
+                            SLANG_ASSERT(false);
+                            break;
+                        }
+                    }
+
+                    List<ConstructorDecl*> generatedMemberwiseCtors;
+                    if (maxVisibilityCtorToGenerate >= DeclVisibility::Public)
+                        if (auto generatedCtor = _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicCtorArgs), ctorList, structDecl, DeclVisibility::Public))
+                            generatedMemberwiseCtors.add(generatedCtor);
+                    if (maxVisibilityCtorToGenerate >= DeclVisibility::Internal)
+                        if (auto generatedCtor = _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicInternalCtorArgs), ctorList, structDecl, DeclVisibility::Internal))
+                            generatedMemberwiseCtors.add(generatedCtor);
+                    if (maxVisibilityCtorToGenerate >= DeclVisibility::Private)
+                        if (auto generatedCtor = _tryToGenerateCtorWithArgList(this, this->getASTBuilder(), std::move(publicInternalPrivateCtorArgs), ctorList, structDecl, DeclVisibility::Private))
+                            generatedMemberwiseCtors.add(generatedCtor);
+
+                    // `checkIfCStyleStruct` must check after we add all possible Ctors.
+                    // If we are a CStyleStruct add DefaultConstructExpr to all params (excluding arg 0)
+                    bool isCStyleStruct = checkIfCStyleStruct(this, structDecl);
+                    if (isCStyleStruct && generatedMemberwiseCtors.getCount() > 0)
+                    {
+                        // We know the user provided 0 non-default ctor's, we only had a chance to generate non default Ctors above in this AST pass.
+                        SLANG_ASSERT(generatedMemberwiseCtors.getCount() == 1);
+                        for (auto generatedCtor : generatedMemberwiseCtors)
+                        {
+                            Index paramIndex = 0;
+                            for (ParamDecl* i : generatedCtor->getParameters())
+                            {
+                                // Never annotate the first parameter to prevent conflict with "DefaultCtor"
+                                if (paramIndex == 0)
+                                {
+                                    paramIndex++;
+                                    continue;
+                                }
+                                paramIndex++;
+                                i->initExpr = createDefaultConstructExprForType(this->getASTBuilder(), (QualType)i->type, i->loc);
+                            }
                         }
                     }
                 }

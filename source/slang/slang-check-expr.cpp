@@ -884,7 +884,6 @@ namespace Slang
         return DeclVisibility::Public;
     }
 
-
     bool SemanticsVisitor::isVisibilityOfDeclVisibleInScope(DeclRef<Decl> declRef, DeclVisibility visibility, Scope* scope)
     {
         if (visibility == DeclVisibility::Public)

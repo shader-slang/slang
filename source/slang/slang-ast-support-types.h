@@ -490,8 +490,7 @@ namespace Slang
         CanUseFuncSignature = ReadyForReference,
         CanSpecializeGeneric = ReadyForReference,
         CanReadInterfaceRequirements = ReadyForLookup,
-        CanUseZeroInit = SignatureChecked,
-        DefaultConstructorReadyForUse = AttributesChecked,
+        DefaultConstructorReadyForUse = ReadyForConformances,
         VarInitExprAreChecked = DefinitionChecked,
     };
 
