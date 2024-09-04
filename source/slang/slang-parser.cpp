@@ -1655,7 +1655,8 @@ namespace Slang
         }
         else
         {
-            return parseInner(nullptr);
+            auto genericParent = parser->currentScope ? as<GenericDecl>(parser->currentScope->containerDecl) : nullptr;
+            return parseInner(genericParent);
         }
     }
 
