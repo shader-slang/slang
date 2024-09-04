@@ -2535,13 +2535,22 @@ namespace Slang
     {
         if (m_entryPoints.getCount() > 0)
             return;
-
-        for (auto globalDecl : m_moduleDecl->members)
+        _discoverEntryPointsImpl(m_moduleDecl, sink, targets);
+    }
+    void Module::_discoverEntryPointsImpl(ContainerDecl* containerDecl, DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets)
+    {
+        for (auto globalDecl : containerDecl->members)
         {
             auto maybeFuncDecl = globalDecl;
             if (auto genericDecl = as<GenericDecl>(maybeFuncDecl))
             {
                 maybeFuncDecl = genericDecl->inner;
+            }
+
+            if (as<NamespaceDeclBase>(globalDecl) || as<FileDecl>(globalDecl) || as<StructDecl>(globalDecl))
+            {
+                _discoverEntryPointsImpl(as<ContainerDecl>(globalDecl), sink, targets);
+                continue;
             }
 
             auto funcDecl = as<FuncDecl>(maybeFuncDecl);
@@ -2550,7 +2559,7 @@ namespace Slang
 
             Profile profile;
             bool resolvedStageOfProfileWithEntryPoint = resolveStageOfProfileWithEntryPoint(profile, getLinkage()->m_optionSet, targets, funcDecl, sink);
-            if(!resolvedStageOfProfileWithEntryPoint)
+            if (!resolvedStageOfProfileWithEntryPoint)
             {
                 // If there isn't a [shader] attribute, look for a [numthreads] attribute
                 // since that implicitly means a compute shader. We'll not do this when compiling for
@@ -2560,7 +2569,7 @@ namespace Slang
                 bool allTargetsCUDARelated = true;
                 for (auto target : targets)
                 {
-                    if (!isCUDATarget(target) && 
+                    if (!isCUDATarget(target) &&
                         target->getTarget() != CodeGenTarget::PyTorchCppBinding)
                     {
                         allTargetsCUDARelated = false;
@@ -2614,6 +2623,5 @@ namespace Slang
             _addEntryPoint(entryPoint);
         }
     }
-
 }
 
