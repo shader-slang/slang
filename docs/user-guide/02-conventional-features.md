@@ -807,6 +807,9 @@ struct DontGenerateCtor
     int a;
     int b = 5;
 
+    // Since the user has explicitly defined a constructor
+    // here, Slang will not synthesize a conflicting 
+    // constructor.
     __init()
     {
         // b = 5;
@@ -820,7 +823,7 @@ struct GenerateCtor
     int a;
     int b = 5;
 
-    // Implicitly generate:
+    // Slang will automatically generate an implicit constructor:
     // __init()
     // {
     //     b = 5;
@@ -828,37 +831,13 @@ struct GenerateCtor
 };
 ```
 
-2. Auto-generate a 'member-wise constructor' if a conflicting `__init(...)` does not exist, **All members and inherited members have equal visibility**
+2. If all members have equal visibility, auto-generate a 'member-wise constructor' if not conflicting with a user defined constructor.
 ```c#
-struct DontGenerateCtor_Inner
-{
-    int a = 0;
-    __init(int in_a)
-    {
-        // a = 0;
-        a = in_a;
-    }
-}
-struct DontGenerateCtor : DontGenerateCtorInner
-{
-    int b;
-    int c = 5;
-    __init(int in_a, int in_b, int in_c)
-    {
-        // c = 5;
-
-        this = DontGenerateCtorInner(in_a);
-        
-        b = in_b;
-        c = in_c;
-    }
-};
-
 struct GenerateCtorInner
 {
     int a;
 
-    /// Implicitly generate:
+    // Slang will automatically generate an implicit
     // __init(int in_a)
     // {
     //     a = in_a;
@@ -869,7 +848,7 @@ struct GenerateCtor : GenerateCtorInner
     int b;
     int c = 5;
 
-    /// Implicitly generate:
+    // Slang will automatically generate an implicit
     // __init(int in_a, int in_b, int in_c)
     // {
     //     c = 5;
@@ -881,8 +860,8 @@ struct GenerateCtor : GenerateCtorInner
     // }
 };
 ```
-3. Auto-generate a 'member-wise constructor' if a conflicting `__init(...)` does not exist, **not all members and inherited members have equal visibility**
-    * We generate a 3 different visibilities of 'member-wise constructor' in order:
+3. If not all members have equal visibility, auto-generate a 'member-wise constructor' based on member visibility if not conflicting with a user defined constructor. 
+    * We generate 3 different visibilities of 'member-wise constructor's in order:
         1. `public` 'member-wise constructor'
             * Contains members of visibility: `public`
             * Do not generate if `internal` or `private` member lacks an init expression
@@ -896,7 +875,7 @@ struct GenerateCtorInner1
 {
     internal int a = 0;
     
-    /// Implicitly generate:
+    // Slang will automatically generate an implicit
     // internal __init(int in_a)
     // {
     //     a = 0;
@@ -909,7 +888,7 @@ struct GenerateCtor1 : GenerateCtorInner1
     internal int b = 0;
     public int c;
 
-    /// Implicitly generate:
+    // Slang will automatically generate an implicit
     // internal __init(int in_a, int in_b, int in_c)
     // {
     //     b = 0;
@@ -933,7 +912,7 @@ struct GenerateCtor1 : GenerateCtorInner1
 struct GenerateCtorInner2
 {
     internal int a;
-    /// Implicitly generate:
+    // Slang will automatically generate an implicit
     // internal __init(int in_a)
     // {
     //     a = in_a;
@@ -947,7 +926,7 @@ struct GenerateCtor2 : GenerateCtorInner2
     /// Note: `internal b` is missing init expression,
     // Do not generate a `public` 'member-wise' constructor.
 
-    /// Implicitly generate:
+    // Slang will automatically generate an implicit
     // internal __init(int in_a, int in_b, int in_c)
     // {
     //     this = GenerateCtorInner2(in_a);
@@ -962,13 +941,10 @@ Initializer Lists
 ----------
 Initializer List's are an expression of the form `{...}`.
 
-This form is **different** from declaring a new scope
 ```c#
 int myFunc()
 {
-    { // New Scope
-        int a = {}; // Initializer List
-    }
+    int a = {}; // Initializer List
 }
 ```
 
@@ -1001,7 +977,7 @@ int a[2] = {1, 2}
 // Equivlent to `float3 a[2]; a[0] = {1,2,3}; b[1] = {4,5,6};`
 float3 a[2] = {{1,2,3}, {4,5,6}};
 ```
-#### C-Style-Initializer-List
+#### Flattened Array Initializer
 
 ```c#
 // Equivalent to `float3 a[2] = {{1,2,3}, {4,5,6}};`
@@ -1010,15 +986,13 @@ float3 a[3] = {1,2,3, 4,5,6};
 
 ### Initializer Lists - Struct
 
-Slang has 2 seperate calling style for an Initializer List with `struct`'s:
-1. Initializer-list may call a constructor
-    * Can also call auto-generated constructors
+In most scenarios, using an initializer list to create a struct typed value is equivalent to calling the struct's constructor using the elements in the initilaizer list as arguments for the constructor, for example:
 ```c#
 struct GenerateCtorInner1
 {
     internal int a = 0;
     
-    /// Implicitly generate:
+    // Slang will automatically generate an implicit
     // internal __init(int in_a)
     // {
     //     a = 0;
@@ -1037,7 +1011,7 @@ struct GenerateCtor1 : GenerateCtorInner1
     internal int b = 0;
     public int c;
 
-    /// Implicitly generate:
+    // Slang will automatically generate an implicit
     // internal __init(int in_a, int in_b, int in_c)
     // {
     //     this = GenerateCtorInner1(in_a);
@@ -1074,19 +1048,13 @@ struct GenerateCtor1 : GenerateCtorInner1
 GenerateCtor1 val[2] = {{ 3 }, { 2 }};
 ```
 
-2. C-Style-Initializer-List
-    * Must be a C-Style `struct`
-    * Allows partial initializers.
-    * Allows C-Style-Initializers-Lists.
+In addition, Slang also provides compatbility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer List's](#Partial-Initializer-List's) and [Flattened Array Initializer With Struct's](#Flattened-Array-Initializer-With-Struct)
 
-#### What is a C-Style-Struct - Complex
-* User does not define any non-default constructor
-* User only auto-generates 1 member-wise constructor following rules of [Auto-Generated Constructors](###auto-generated-constructors---struct).
-> #### What is a C-Style-Struct - Simplified
-> * Never defines a custom `__init(...)`, custom `__init()` are allowed.
-> * All member variables in `struct` have the same visibiliity annotation.
+A struct is considered a C-style struct if:
+1. User never defines a custom constructor with **more than** 0 parameters
+2. All member variables in a `struct` have the same visibiliity (`public` or `internal` or `private`).
 
-#### Partial Initializers
+#### Partial Initializer List's
 
 ```c#
 struct Foo
@@ -1105,7 +1073,7 @@ Foo val = {1};
 Foo val = {2, 3};
 ```
 
-#### 'C-Style-Initializer' of array with struct
+#### Flattened Array Initializer With Struct's
 
 ```c#
 struct Foo
