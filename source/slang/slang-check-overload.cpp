@@ -1191,10 +1191,6 @@ namespace Slang
         LookupResultItem const& left,
         LookupResultItem const& right)
     {
-        // Equal lookup-items, choose the left one.
-        if (left.declRef == right.declRef)
-            return 1;
-
         // It is possible for lookup to return both an interface requirement
         // and the concrete function that satisfies that requirement.
         // We always want to favor a concrete method over an interface
@@ -1455,10 +1451,7 @@ namespace Slang
                 return overloadRankDiff;
         }
 
-        // Since some overload logic requires a simplified overload item list
-        // we require some comparison to remove clearly invalid overload candidates
-        // to avoid errors.
-        return CompareLookupResultItems(left->item, right->item);
+        return 0;
     }
 
     void SemanticsVisitor::AddOverloadCandidateInner(
