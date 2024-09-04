@@ -1521,7 +1521,7 @@ Result linkAndOptimizeIR(
     else if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedSPIRV))
     {
         // Honor SPIR-V library restrictions for embedded precompilation, such as
-	// not exporting entrypoints.
+        // not exporting entrypoints.
         unexportNonEmbeddableSPIRV(irModule);
     }
 

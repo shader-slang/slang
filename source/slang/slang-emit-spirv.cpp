@@ -6727,7 +6727,6 @@ SlangResult emitSPIRVFromIR(
         if (as<IRDebugSource>(inst))
         {
             context.ensureInst(inst);
-
         }
         if (shouldPreserveParams && as<IRGlobalParam>(inst))
         {
