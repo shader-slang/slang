@@ -6,22 +6,28 @@
 
 interface IFoo
 {
-    static const This identity;
+    static const This identityZero;   
+    static const This identityFive;
 }
 
 __generic<T:IFoo>
 extension T
 {
-    This getIdentity()
+    This getIdentityZero()
     {
-        return identity;
+        return identityZero;
+    }
+    This getIdentityFive()
+    {
+        return identityFive;
     }
 }
 
 struct FooImpl : IFoo
 {
     int v = 1;
-    static const This identity = This();   
+    static const This identityZero = This();   
+    static const This identityFive = This(5);
 }
 
 
@@ -32,7 +38,10 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     FooImpl foo;
-    var ident = foo.getIdentity();
+    var i0 = foo.getIdentityZero();
+    var i5 = foo.getIdentityFive();
     // CHECK: 1
-    outputBuffer[0] = ident.v;
+    outputBuffer[0] = i0.v;
+    // CHECK: 5
+    outputBuffer[0] = i5.v;
 }
