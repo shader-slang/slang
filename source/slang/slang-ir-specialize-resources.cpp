@@ -248,8 +248,6 @@ struct ResourceOutputSpecializationPass
             newFunc->removeAndDeallocate();
             // Check if `oldFunc` is the reason for failing,
             // Otherwise don't add to 'unspecializableFuncs'
-            //
-            // Don't continue to try and specialize unused functions, these won't emit in IR
             if(result == SpecializeFuncResult::ThisFuncFailed)
                 unspecializableFuncs->add(oldFunc);
             return false;
