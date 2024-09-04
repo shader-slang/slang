@@ -13,7 +13,8 @@ struct FooImpl : IFoo
     typealias TA = int;
 }
 
-T.TA process<T>(T v)
+__generic<typename T>
+T.TA process(T v)
     where T : IFoo
     where T.TA == int
 {
