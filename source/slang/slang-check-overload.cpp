@@ -2266,7 +2266,6 @@ namespace Slang
 
         // Look at the base expression for the call, and figure out how to invoke it.
         auto funcExpr = expr->functionExpr;
-        auto funcExprType = funcExpr->type;
 
         // If we are trying to apply an erroneous expression, then just bail out now.
         if(IsErrorExpr(funcExpr))
@@ -2295,25 +2294,6 @@ namespace Slang
         for (auto& arg : expr->arguments)
         {
             arg = maybeOpenRef(arg);
-        }
-
-        auto funcType = as<FuncType>(funcExprType);
-        for (Index i = 0; i < expr->arguments.getCount(); i++)
-        {
-            auto& arg = expr->arguments[i];
-            if (funcType && i < funcType->getParamCount())
-            {
-                switch (funcType->getParamDirection(i))
-                {
-                case kParameterDirection_Out:
-                case kParameterDirection_InOut:
-                case kParameterDirection_Ref:
-                case kParameterDirection_ConstRef:
-                    continue;
-                default:
-                    break;
-                }
-            }
             arg = maybeOpenExistential(arg);
         }
 
@@ -2443,6 +2423,45 @@ namespace Slang
             // the user the most help we can.
             if (shouldAddToCache)
                 typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
+
+            // Now that we have resolved the overload candidate, we need to undo an `openExistential`
+            // operation that was applied to `out` arguments.
+            //
+            auto funcType = context.bestCandidate->funcType;
+            ShortList<ParameterDirection> paramDirections;
+            if (funcType)
+            {
+                for (Index i = 0; i < funcType->getParamCount(); i++)
+                {
+                    paramDirections.add(funcType->getParamDirection(i));
+                }
+            }
+            else if (auto callableDeclRef = context.bestCandidate->item.declRef.as<CallableDecl>())
+            {
+                for (auto param : callableDeclRef.getDecl()->getParameters())
+                {
+                    paramDirections.add(getParameterDirection(param));
+                }
+            }
+            for (Index i = 0; i < expr->arguments.getCount(); i++)
+            {
+                auto& arg = expr->arguments[i];
+                if (i < paramDirections.getCount())
+                {
+                    switch (paramDirections[i])
+                    {
+                    case kParameterDirection_Out:
+                    case kParameterDirection_InOut:
+                    case kParameterDirection_Ref:
+                    case kParameterDirection_ConstRef:
+                        break;
+                    default:
+                        continue;
+                    }
+                }
+                if (auto extractExistentialExpr = as<ExtractExistentialValueExpr>(arg))
+                    arg = extractExistentialExpr->originalExpr;
+            }
             return CompleteOverloadCandidate(context, *context.bestCandidate);
         }
 
@@ -2475,7 +2494,7 @@ namespace Slang
 
         // Nothing at all was found that we could even consider invoking.
         // In all other cases, this is an error.
-        getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExprType);
+        getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExpr->type);
         expr->type = QualType(m_astBuilder->getErrorType());
         return expr;
     }
