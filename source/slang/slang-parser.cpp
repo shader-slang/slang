@@ -1660,7 +1660,7 @@ namespace Slang
         }
     }
 
-    static void maybeParseGenericConstraints(Parser* parser, GenericDecl* genericParent)
+    static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericParent)
     {
         if (!genericParent)
             return;
@@ -3455,16 +3455,27 @@ namespace Slang
                 parser->FillPosition(paramConstraint);
 
                 // substitution needs to be filled during check
-                Type* paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
+                Type* paramType = nullptr;
+                if (as<GenericTypeParamDeclBase>(decl))
+                {
+                    paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
 
-                SharedTypeExpr* paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
-                paramTypeExpr->loc = decl->loc;
-                paramTypeExpr->base.type = paramType;
-                paramTypeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
+                    SharedTypeExpr* paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
+                    paramTypeExpr->loc = decl->loc;
+                    paramTypeExpr->base.type = paramType;
+                    paramTypeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
 
-                paramConstraint->sub = TypeExp(paramTypeExpr);
+                    paramConstraint->sub = TypeExp(paramTypeExpr);
+                }
+                else if (as<AssocTypeDecl>(decl))
+                {
+                    auto varExpr = parser->astBuilder->create<VarExpr>();
+                    varExpr->scope = parser->currentScope;
+                    varExpr->name = decl->getName();
+                    paramConstraint->sub.exp = varExpr;
+                }
+
                 paramConstraint->sup = parser->ParseTypeExp();
-
                 AddMember(decl, paramConstraint);
             } while (AdvanceIf(parser, TokenType::Comma));
         }
@@ -3478,6 +3489,7 @@ namespace Slang
         assocTypeDecl->nameAndLoc = NameLoc(nameToken);
         assocTypeDecl->loc = nameToken.loc;
         parseOptionalGenericConstraints(parser, assocTypeDecl);
+        maybeParseGenericConstraints(parser, assocTypeDecl);
         parser->ReadToken(TokenType::Semicolon);
         return assocTypeDecl;
     }

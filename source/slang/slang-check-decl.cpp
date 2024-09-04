@@ -3544,18 +3544,28 @@ namespace Slang
 
     bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeConstraintRequirement(Type* satisfyingType, DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef, RefPtr<WitnessTable> witnessTable)
     {
+        SLANG_UNUSED(satisfyingType);
+
         // We will enumerate the type constraints placed on the
         // associated type and see if they can be satisfied.
         //
         bool conformance = true;
         Val* witness = nullptr;
-        for (auto requiredConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(m_astBuilder, requiredAssociatedTypeDeclRef))
+        for (auto requiredConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, requiredAssociatedTypeDeclRef))
         {
             // Grab the type we expect to conform to from the constraint.
             auto requiredSuperType = getSup(m_astBuilder, requiredConstraintDeclRef);
 
+            auto subType = getSub(m_astBuilder, requiredConstraintDeclRef);
+
             // Perform a search for a witness to the subtype relationship.
-            witness = tryGetSubtypeWitness(satisfyingType, requiredSuperType);
+            witness = tryGetSubtypeWitness(subType, requiredSuperType);
+            if (witness)
+            {
+                auto genConstraint = as<GenericTypeConstraintDecl>(requiredConstraintDeclRef.getDecl());
+                if (genConstraint && genConstraint->isEqualityConstraint && !isTypeEqualityWitness(witness))
+                    witness = nullptr;
+            }
             if (witness)
             {
                 // If a subtype witness was found, then the conformance
@@ -3584,6 +3594,15 @@ namespace Slang
             if (declRefType->getDeclRef().getDecl()->hasModifier<ToBeSynthesizedModifier>())
                 return false;
         }
+
+        // Register the satisfying type to the witness table
+        // before checking the constraints, since the subtype of
+        // the constraints maybe referencing the satisfying type via
+        // witness lookups.
+        auto requirementWitness = RequirementWitness(satisfyingType->getCanonicalType());
+        witnessTable->m_requirementDictionary[requiredAssociatedTypeDeclRef.getDecl()]
+            = requirementWitness;
+
         // We need to confirm that the chosen type `satisfyingType`,
         // meets all the constraints placed on the associated type
         // requirement `requiredAssociatedTypeDeclRef`.
@@ -3597,13 +3616,9 @@ namespace Slang
         // TODO: if any conformance check failed, we should probably include
         // that in an error message produced about not satisfying the requirement.
 
-        if(conformance)
+        if (!conformance)
         {
-            // If all the constraints were satisfied, then the chosen
-            // type can indeed satisfy the interface requirement.
-            witnessTable->add(
-                requiredAssociatedTypeDeclRef.getDecl(),
-                RequirementWitness(satisfyingType->getCanonicalType()));
+            witnessTable->m_requirementDictionary.remove(requiredAssociatedTypeDeclRef.getDecl());
         }
 
         return conformance;

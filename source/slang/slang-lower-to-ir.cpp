@@ -8416,8 +8416,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for (auto constraintDecl : decl->getMembersOfType<GenericTypeConstraintDecl>())
         {
             auto baseType = lowerType(context, constraintDecl->sup.type);
-            SLANG_ASSERT(baseType && baseType->getOp() == kIROp_InterfaceType);
-            constraintInterfaces.add((IRInterfaceType*)baseType);
+            if (baseType && baseType->getOp() == kIROp_InterfaceType)
+                constraintInterfaces.add((IRInterfaceType*)baseType);
         }
         auto assocType = context->irBuilder->getAssociatedType(
             constraintInterfaces.getArrayView().arrayView);
