@@ -1187,6 +1187,16 @@ namespace Slang
         return CountParameters(parentGeneric).required;
     }
 
+    DeclRef<Decl> getParentDeclRef(DeclRef<Decl> declRef)
+    {
+        auto parent = declRef.getParent();
+        while (parent.as<GenericDecl>())
+        {
+            parent = parent.getParent();
+        }
+        return parent;
+    }
+
     int SemanticsVisitor::CompareLookupResultItems(
         LookupResultItem const& left,
         LookupResultItem const& right)
@@ -1204,12 +1214,30 @@ namespace Slang
         // directly (it is only visible through the requirement witness
         // information for inheritance declarations).
         //
-        auto leftDeclRefParent = left.declRef.getParent();
-        auto rightDeclRefParent = right.declRef.getParent();
+        auto leftDeclRefParent = getParentDeclRef(left.declRef);
+        auto rightDeclRefParent = getParentDeclRef(right.declRef);
         bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
         bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
         if(leftIsInterfaceRequirement != rightIsInterfaceRequirement)
             return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
+
+        // Prefer non-extension declarations over extension declarations.
+        bool leftIsExtension = as<ExtensionDecl>(leftDeclRefParent.getDecl()) != nullptr;
+        bool rightIsExtension = as<ExtensionDecl>(rightDeclRefParent.getDecl()) != nullptr;
+        if (leftIsExtension != rightIsExtension)
+        {
+            return int(leftIsExtension) - int(rightIsExtension);
+        }
+        else if (leftIsExtension)
+        {
+            // If both are declared in extensions, prefer the one that is least generic.
+            bool leftIsGeneric = leftDeclRefParent.getParent().as<GenericDecl>() != nullptr;
+            bool rightIsGeneric = rightDeclRefParent.getParent().as<GenericDecl>() != nullptr;
+            if (leftIsGeneric != rightIsGeneric)
+            {
+                return int(leftIsGeneric) - int(rightIsGeneric);
+            }
+        }
 
         // Any decl is strictly better than a module decl.
         bool leftIsModule = (as<ModuleDeclarationDecl>(left.declRef) != nullptr);
