@@ -611,7 +611,7 @@ Extensions
 
 
 `SPV_EXT_fragment_shader_interlock`<br>
-> Represents the SPIR-V extension for fragment shader interlock.<br>
+> Represents the SPIR-V extension for fragment shader interlock operations.<br>
 
 ---
 
@@ -623,7 +623,7 @@ Extensions
 
 
 `SPV_EXT_fragment_fully_covered`<br>
-> Represents the SPIR-V extension for fragment fully covered.<br>
+> Represents the SPIR-V extension for SPV_EXT_fragment_fully_covered.<br>
 
 ---
 
@@ -739,161 +739,193 @@ Extensions
 
 
 `spvAtomicFloat32AddEXT`<br>
+> Represents the SPIR-V capability for atomic float 32 add operations.<br>
 
 ---
 
 
 `spvAtomicFloat16AddEXT`<br>
+> Represents the SPIR-V capability for atomic float 16 add operations.<br>
 
 ---
 
 
 `spvInt64Atomics`<br>
+> Represents the SPIR-V capability for 64-bit integer atomics.<br>
 
 ---
 
 
 `spvAtomicFloat32MinMaxEXT`<br>
+> Represents the SPIR-V capability for atomic float 32 min/max operations.<br>
 
 ---
 
 
 `spvAtomicFloat16MinMaxEXT`<br>
+> Represents the SPIR-V capability for atomic float 16 min/max operations.<br>
 
 ---
 
 
 `spvDerivativeControl`<br>
+> Represents the SPIR-V capability for 'derivative control' operations.<br>
 
 ---
 
 
 `spvImageQuery`<br>
+> Represents the SPIR-V capability for image query operations.<br>
 
 ---
 
 
 `spvImageGatherExtended`<br>
+> Represents the SPIR-V capability for extended image gather operations.<br>
 
 ---
 
 
 `spvSparseResidency`<br>
+> Represents the SPIR-V capability for sparse residency.<br>
 
 ---
 
 
 `spvImageFootprintNV`<br>
+> Represents the SPIR-V capability for image footprint.<br>
 
 ---
 
 
 `spvMinLod`<br>
+> Represents the SPIR-V capability for using minimum LOD operations.<br>
 
 ---
 
 
 `spvFragmentShaderPixelInterlockEXT`<br>
+> Represents the SPIR-V capability for using SPV_EXT_fragment_shader_interlock.<br>
 
 ---
 
 
 `spvFragmentBarycentricKHR`<br>
+> Represents the SPIR-V capability for using SPV_KHR_fragment_shader_barycentric.<br>
 
 ---
 
 
 `spvFragmentFullyCoveredEXT`<br>
+> Represents the SPIR-V capability for using SPV_EXT_fragment_fully_covered functionality.<br>
 
 ---
 
 
 `spvGroupNonUniformBallot`<br>
+> Represents the SPIR-V capability for group non-uniform ballot operations.<br>
 
 ---
 
 
 `spvGroupNonUniformShuffle`<br>
+> Represents the SPIR-V capability for group non-uniform shuffle operations.<br>
 
 ---
 
 
 `spvGroupNonUniformArithmetic`<br>
+> Represents the SPIR-V capability for group non-uniform arithmetic operations.<br>
 
 ---
 
 
 `spvGroupNonUniformQuad`<br>
+> Represents the SPIR-V capability for group non-uniform quad operations.<br>
 
 ---
 
 
 `spvGroupNonUniformVote`<br>
+> Represents the SPIR-V capability for group non-uniform vote operations.<br>
 
 ---
 
 
 `spvGroupNonUniformPartitionedNV`<br>
+> Represents the SPIR-V capability for group non-uniform partitioned operations.<br>
 
 ---
 
 
 `spvRayTracingMotionBlurNV`<br>
+> Represents the SPIR-V capability for ray tracing motion blur.<br>
 
 ---
 
 
 `spvMeshShadingEXT`<br>
+> Represents the SPIR-V capability for mesh shading.<br>
 
 ---
 
 
 `spvRayTracingKHR`<br>
+> Represents the SPIR-V capability for ray tracing.<br>
 
 ---
 
 
 `spvRayTracingPositionFetchKHR`<br>
+> Represents the SPIR-V capability for ray tracing position fetch.<br>
 
 ---
 
 
 `spvRayQueryKHR`<br>
+> Represents the SPIR-V capability for ray query.<br>
 
 ---
 
 
 `spvRayQueryPositionFetchKHR`<br>
+> Represents the SPIR-V capability for ray query position fetch.<br>
 
 ---
 
 
 `spvShaderInvocationReorderNV`<br>
+> Represents the SPIR-V capability for shader invocation reorder.<br>
 
 ---
 
 
 `spvShaderClockKHR`<br>
+> Represents the SPIR-V capability for shader clock.<br>
 
 ---
 
 
 `spvShaderNonUniformEXT`<br>
+> Represents the SPIR-V capability for non-uniform resource indexing.<br>
 
 ---
 
 
 `spvShaderNonUniform`<br>
+> Represents the SPIR-V capability for non-uniform resource indexing.<br>
 
 ---
 
 
 `spvDemoteToHelperInvocationEXT`<br>
+> Represents the SPIR-V capability for demoting to helper invocation.<br>
 
 ---
 
 
 `spvDemoteToHelperInvocation`<br>
+> Represents the SPIR-V capability for demoting to helper invocation.<br>
 
 ---
 
@@ -1992,96 +2024,115 @@ Compound Capabilities
 
 
 `raytracing_allstages`<br>
+> Collection of capabilities for raytracing with all raytracing stages.<br>
 
 ---
 
 
 `raytracing_anyhit`<br>
+> Collection of capabilities for raytracing with the shader stage of anyhit.<br>
 
 ---
 
 
 `raytracing_intersection`<br>
+> Collection of capabilities for raytracing with the shader stage of intersection.<br>
 
 ---
 
 
 `raytracing_anyhit_closesthit`<br>
+> Collection of capabilities for raytracing with the shader stages of anyhit and closesthit.<br>
 
 ---
 
 
 `raytracing_anyhit_closesthit_intersection`<br>
+> Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.<br>
 
 ---
 
 
 `raytracing_raygen_closesthit_miss`<br>
+> Collection of capabilities for raytracing with the shader stages of raygen, closesthit, and miss.<br>
 
 ---
 
 
 `raytracing_anyhit_closesthit_intersection_miss`<br>
+> Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, intersection, and miss.<br>
 
 ---
 
 
 `raytracing_raygen_closesthit_miss_callable`<br>
+> Collection of capabilities for raytracing the shader stages of raygen, closesthit, miss, and callable.<br>
 
 ---
 
 
 `raytracing_position`<br>
+> Collection of capabilities for raytracing + ray_tracing_position_fetch and the shader stages of anyhit and closesthit.<br>
 
 ---
 
 
 `raytracing_motionblur_anyhit_closesthit_intersection_miss`<br>
+> Collection of capabilities for raytracing + motion blur and the shader stages of anyhit, closesthit, intersection, and miss.<br>
 
 ---
 
 
 `raytracing_motionblur_raygen_closesthit_miss`<br>
+> Collection of capabilities for raytracing + motion blur and the shader stages of raygen, closesthit, and miss.<br>
 
 ---
 
 
 `rayquery_position`<br>
+> Collection of capabilities for rayquery + ray_tracing_position_fetch.<br>
 
 ---
 
 
 `ser_raygen`<br>
+> Collection of capabilities for raytracing + shader execution reordering and the shader stage of raygen.<br>
 
 ---
 
 
 `ser_raygen_closesthit_miss`<br>
+> Collection of capabilities for raytracing + shader execution reordering and the shader stages of raygen, closesthit, and miss.<br>
 
 ---
 
 
 `ser_any_closesthit_intersection_miss`<br>
+> Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, intersection, and miss.<br>
 
 ---
 
 
 `ser_anyhit_closesthit_intersection`<br>
+> Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, and intersection.<br>
 
 ---
 
 
 `ser_anyhit_closesthit`<br>
+> Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit and closesthit.<br>
 
 ---
 
 
 `ser_motion_raygen_closesthit_miss`<br>
+> Collection of capabilities for raytracing + motion blur + shader execution reordering and the shader stages of raygen, closesthit, and miss.<br>
 
 ---
 
 
 `ser_motion_raygen`<br>
+> Collection of capabilities for raytracing raytracing + motion blur + shader execution reordering and the shader stage of raygen.<br>
 
 ---
 

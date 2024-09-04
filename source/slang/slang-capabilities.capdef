@@ -1826,79 +1826,79 @@ alias helper_lane = _sm_6_0 + fragment
 /// [Compound]
 alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp;
 
-// Collection of capabilities for raytracing with all raytracing stages.
+/// Collection of capabilities for raytracing with all raytracing stages.
 /// [Compound]
 alias raytracing_allstages = raytracing_stages + raytracing;
 
-// Collection of capabilities for raytracing with the shader stage of anyhit.
+/// Collection of capabilities for raytracing with the shader stage of anyhit.
 /// [Compound]
 alias raytracing_anyhit = anyhit + raytracing;
 
-// Collection of capabilities for raytracing with the shader stage of intersection.
+/// Collection of capabilities for raytracing with the shader stage of intersection.
 /// [Compound]
 alias raytracing_intersection = intersection + raytracing;
 
-// Collection of capabilities for raytracing with the shader stages of anyhit and closesthit.
+/// Collection of capabilities for raytracing with the shader stages of anyhit and closesthit.
 /// [Compound]
 alias raytracing_anyhit_closesthit = anyhit_closesthit + raytracing;
 
-// Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
+/// Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 /// [Compound]
 alias raytracing_anyhit_closesthit_intersection = anyhit_closesthit_intersection + raytracing;
 
-// Collection of capabilities for raytracing with the shader stages of raygen, closesthit, and miss.
+/// Collection of capabilities for raytracing with the shader stages of raygen, closesthit, and miss.
 /// [Compound]
 alias raytracing_raygen_closesthit_miss = raygen_closesthit_miss + raytracing;
 
-// Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, intersection, and miss.
+/// Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, intersection, and miss.
 /// [Compound]
 alias raytracing_anyhit_closesthit_intersection_miss = anyhit_closesthit_intersection_miss + raytracing;
 
-// Collection of capabilities for raytracing the shader stages of raygen, closesthit, miss, and callable.
+/// Collection of capabilities for raytracing the shader stages of raygen, closesthit, miss, and callable.
 /// [Compound]
 alias raytracing_raygen_closesthit_miss_callable = raygen_closesthit_miss_callable + raytracing;
 
-// Collection of capabilities for raytracing + ray_tracing_position_fetch and the shader stages of anyhit and closesthit.
+/// Collection of capabilities for raytracing + ray_tracing_position_fetch and the shader stages of anyhit and closesthit.
 /// [Compound]
 alias raytracing_position = raytracing + GL_EXT_ray_tracing_position_fetch_ray_tracing + anyhit_closesthit;
 
-// Collection of capabilities for raytracing + motion blur and the shader stages of anyhit, closesthit, intersection, and miss.
+/// Collection of capabilities for raytracing + motion blur and the shader stages of anyhit, closesthit, intersection, and miss.
 /// [Compound]
 alias raytracing_motionblur_anyhit_closesthit_intersection_miss = anyhit_closesthit_intersection_miss + raytracing_motionblur;
 
-// Collection of capabilities for raytracing + motion blur and the shader stages of raygen, closesthit, and miss.
+/// Collection of capabilities for raytracing + motion blur and the shader stages of raygen, closesthit, and miss.
 /// [Compound]
 alias raytracing_motionblur_raygen_closesthit_miss = raygen_closesthit_miss + raytracing_motionblur;
 
-// Collection of capabilities for rayquery + ray_tracing_position_fetch.
+/// Collection of capabilities for rayquery + ray_tracing_position_fetch.
 /// [Compound]
 alias rayquery_position = rayquery + GL_EXT_ray_tracing_position_fetch_ray_query;
 
-// Collection of capabilities for raytracing + shader execution reordering and the shader stage of raygen.
+/// Collection of capabilities for raytracing + shader execution reordering and the shader stage of raygen.
 /// [Compound]
 alias ser_raygen = raygen + ser;
 
-// Collection of capabilities for raytracing + shader execution reordering and the shader stages of raygen, closesthit, and miss.
+/// Collection of capabilities for raytracing + shader execution reordering and the shader stages of raygen, closesthit, and miss.
 /// [Compound]
 alias ser_raygen_closesthit_miss = raygen_closesthit_miss + ser;
 
-// Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, intersection, and miss.
+/// Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, intersection, and miss.
 /// [Compound]
 alias ser_any_closesthit_intersection_miss = anyhit_closesthit_intersection_miss + ser;
 
-// Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, and intersection.
+/// Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, and intersection.
 /// [Compound]
 alias ser_anyhit_closesthit_intersection = anyhit_closesthit_intersection + ser;
 
-// Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit and closesthit.
+/// Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit and closesthit.
 /// [Compound]
 alias ser_anyhit_closesthit = anyhit_closesthit + ser;
 
-// Collection of capabilities for raytracing + motion blur + shader execution reordering and the shader stages of raygen, closesthit, and miss.
+/// Collection of capabilities for raytracing + motion blur + shader execution reordering and the shader stages of raygen, closesthit, and miss.
 /// [Compound]
 alias ser_motion_raygen_closesthit_miss = raygen_closesthit_miss + ser_motion;
 
-// Collection of capabilities for raytracing raytracing + motion blur + shader execution reordering and the shader stage of raygen.
+/// Collection of capabilities for raytracing raytracing + motion blur + shader execution reordering and the shader stage of raygen.
 /// [Compound]
 alias ser_motion_raygen = raygen + ser_motion;
 
