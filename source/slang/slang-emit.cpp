@@ -800,9 +800,9 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    if (codeGenContext->removeAvailableInDXIL)
+    if (codeGenContext->removeAvailableInDownstreamIR)
     {
-        removeAvailableInDownstreamModuleDecorations(irModule);
+        removeAvailableInDownstreamModuleDecorations(target, irModule);
     }
 
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())

@@ -1929,8 +1929,8 @@ SlangResult OptionsParser::_parse(
                 linkage->m_optionSet.set(optionKind, compressionType);
                 break;
             }
-            case OptionKind::EmbedDXIL: m_compileRequest->setEmbedDXIL(true); break;
-            case OptionKind::EmbedSPIRV: m_compileRequest->setEmbedSPIRV(true); break;
+            case OptionKind::EmbedDXIL:  m_compileRequest->embedDownstreamIR(SLANG_DXIL);  break;
+            case OptionKind::EmbedSPIRV: m_compileRequest->embedDownstreamIR(SLANG_SPIRV); break;
             case OptionKind::Target:
             {
                 CommandLineArg name;

@@ -4930,11 +4930,9 @@ namespace slang
             int                     targetIndex,
             bool                    value) = 0;
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setEmbedDXIL(bool value) = 0;
-
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) = 0;
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setEmbedSPIRV(bool value) = 0;
+        virtual SLANG_NO_THROW void SLANG_MCALL embedDownstreamIR(SlangCompileTarget target) = 0;
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()

@@ -5941,14 +5941,17 @@ void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool
     getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
 }
 
-void EndToEndCompileRequest::setEmbedDXIL(bool value)
+void EndToEndCompileRequest::embedDownstreamIR(SlangCompileTarget target)
 {
-    getOptionSet().set(CompilerOptionName::EmbedDXIL, value);
-}
-
-void EndToEndCompileRequest::setEmbedSPIRV(bool value)
-{
-    getOptionSet().set(CompilerOptionName::EmbedSPIRV, value);
+    switch (target)
+    {
+    case SLANG_DXIL:
+        getOptionSet().set(CompilerOptionName::EmbedDXIL, true);
+        break;
+    case SLANG_SPIRV:
+        getOptionSet().set(CompilerOptionName::EmbedSPIRV, true);
+        break;
+    }
 }
 
 void EndToEndCompileRequest::setTargetLineDirectiveMode(

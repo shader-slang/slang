@@ -1262,15 +1262,7 @@ namespace Slang
         {
             CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
 
-            if (target == CodeGenTarget::DXILAssembly || target == CodeGenTarget::DXIL)
-            {
-                sourceCodeGenContext.removeAvailableInDXIL = true;
-            }
-
-            if (target == CodeGenTarget::SPIRVAssembly || target == CodeGenTarget::SPIRV)
-            {
-                sourceCodeGenContext.removeAvailableInSPIRV = true;
-            }
+            sourceCodeGenContext.removeAvailableInDownstreamIR = true;
 
             SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
             sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
