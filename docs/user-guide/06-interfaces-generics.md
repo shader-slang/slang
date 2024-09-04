@@ -51,13 +51,13 @@ Generics
 Generics can be used to eliminate duplicate code for shared logic that operates on different types. The following example shows how to define a generic method in Slang.
 
 ```csharp
-int myGenericMethod<T: IFoo>(T arg)
+int myGenericMethod<T>(T arg) where T : IFoo
 {
     return arg.myMethod(1.0);
 }
 ```
 
-The above listing defines a generic method named `myGenericMethod`, which accepts an argument that can be of any type `T` as long as `T` conforms to the `IFoo` interface. The `T` here is called a _generic type parameter_, and it is associated with an _type constraint_ that any type represented by `T` must conform to the interface `IFoo`.
+The above listing defines a generic method named `myGenericMethod`, which accepts an argument that can be of any type `T` as long as `T` conforms to the `IFoo` interface. The `T` here is called a _generic type parameter_, and it is associated with an _type constraint_ in the following `where` clause to indicate that any type represented by `T` must conform to the interface `IFoo`.
 
 The following listing shows how to invoke a generic method:
 ```csharp
@@ -83,6 +83,27 @@ void g2<let e : MyEnum>() { ... }
 void g3<let b : bool>() { ... }
 ```
 
+### Alternative Syntax
+
+Alternatively, you can use `__generic` keyword to define generic parameters before the method:
+```csharp
+__generic<typename T> // `typename` is optional.
+int myGenericMethod(T arg) where T : IFoo
+{
+    return arg.myMethod(1.0);
+}
+```
+
+The same method can be defined in an alternative simplified syntax without the `where` clause:
+```csharp
+int myGenericMethod<T:IFoo>(T arg) { ... }
+```
+
+Generic value parameters can also be defined using the traditional C-style syntax:
+```csharp
+void g1<typename T, int n>() { ... }
+```
+
 Supported Constructs in Interface Definitions
 -----------------------------------------------------
 
@@ -103,7 +124,7 @@ The above listing declares that any conforming type must define a property named
 ```csharp
 interface IFoo
 {
-    int compute<T:IBar>(T val);
+    int compute<T>(T val) where T : IBar;
 }
 ```
 The above listing declares that any conforming type must define a generic method named `compute` that has one generic type parameter conforming to the `IBar` interface.
@@ -119,7 +140,7 @@ interface IFoo
 
 The above listing declares that any conforming type must define a static method named `compute`. This allows the following generic method to pass type-checking:
 ```csharp
-void f<T:IFoo>()
+void f<T>() where T : IFoo
 {
     T.compute(5); // OK, T has a static method `compute`.
 }
@@ -394,7 +415,8 @@ struct MultiArrayFloatContainer : IFloatContainer
 
 In summary, an `asssociatedtype` requirement in an interface is similar to other types of requirements: a method requirement means that an implementation must provide a method matching the interface signature, while an `associatedtype` requirement means that an implementation must provide a type in its scope with the matching name and interface constraint. In general, when defining an interface that is producing and consuming an object whose actual type is implementation-dependent, the type of this object can often be modeled as an associated type in the interface.
 
-### Comparison to the C++ Approach
+
+### Comparing Generics to C++ Templates
 Readers who are familiar with C++ could easily relate the `Iterator` example in previous subsection to the implementation of STL. In C++, the `sum` function can be easily written with templates:
 ```C++
 template<typename TContainer>
@@ -453,6 +475,38 @@ Note that the builtin `vector<float, N>` type also has an generic value paramete
 > expression are supported as long as they can be evaluated at compile time. For example,
 `vector<float, 1+1>` is allowed and considered equivalent to `vector<float, 2>`.
 
+
+Type Equality Constraints
+-------------------------
+
+In addition to type conformance constraints as in `where T : IFoo`, Slang also supports type equality constraints. This is mostly useful in specifying additional constraints for
+associated types. For example:
+```csharp
+interface IFoo { associatedtype A; }
+
+// Access all T that conforms to IFoo, and T.A is `int`.
+void foo<T>(T v)
+    where T : IFoo
+    where T.A == int
+{
+}
+
+struct X : IFoo
+{
+    typealias A = int;
+}
+
+struct Y : IFoo
+{
+    typealias A = float;
+}
+
+void test()
+{
+    foo<X>(X()); // OK
+    foo<Y>(Y()); // Error, `Y` cannot be used for `T`.
+}
+```
 
 Interface-typed Values
 -------------------------------
@@ -804,6 +858,96 @@ void test()
 This feature is similar to extension traits in Rust.
 
 
+Variadic Generics
+-------------------------
+
+Slang supports variadic generic type parameters:
+```csharp
+struct MyType<each T>
+{}
+```
+
+Here `each T` defines a generic type pack parameter that can be a list of zero or more types. Therefore, the following instantiation of `MyType` is valid:
+```
+MyType // OK
+MyType<int> // OK
+MyType<int, float, void> // OK
+```
+
+A common use of variadic generics is to define `printf`:
+```csharp
+void printf<each T>(String message, expand each T args) { ... }
+```
+
+The type syntax `expand each T` represents a expansion of the type pack `T`. Therefore, the type of `args` parameter is an expanded type pack.
+The `expand` expression can be thought of a map operation of a type pack. For example,
+give type pack `T = int, float, bool`, `expand each T` evaluates to the type pack of the same types, i.e. `expand each T ==> int, float, bool`.
+As a more interesting example, `expand S<each T>` will evaluate to `S<int>, S<float>, S<bool>`.
+
+You can use `expand` expression on tuple or type-pack values to compute an expression for each element of the tuple or type pack.
+For example:
+
+```csharp
+void printNumbers<each T>(expand each T args) where T == int
+{
+    // An single expression statement whose type will be `(void, void, ...)`.
+    // where each `void` is the result of evaluating expression `printf(...)` with
+    // each corresponding element in `args` passed as print operand.
+    //
+    expand printf("%d\n", each args);
+
+    // The above statement is equivalent to:
+    // ```
+    // (printf("%d\n", args[0]), printf("%d\n", args[1]), ..., printf("%d\n", args[n-1]));
+    // ```
+}
+void compute<each T>(expand each T args) where T == int
+{
+    // Maps every element in `args` to `elementValue + 1`, and forward the
+    // new values as arguments to `printNumber`.
+    printNumber(expand (each args) + 1);
+
+    // The above statement is equivalent to:
+    // ```
+    // printNumber(args[0] + 1, args[1] + 1, ..., args[n-1] + 1);
+    // ```
+}
+void test()
+{
+    compute(1,2,3);
+    // Prints:
+    // 2
+    // 3
+    // 4
+}
+```
+
+As another example, you can use `expand` expression to sum up elements in a variadic argument pack:
+```csharp
+void accumulateHelper(inout int dest, int value) { dest += value; }
+
+void sum<each T>(expand each T args) where T == int
+{
+    int result = 0;
+    expand accumulateHelper(result, each args);
+
+    // The above statement is equivalent to:
+    // ```
+    // (accumulateHelper(result, args[0]), accumulateHelper(result, args[1]), ..., accumulateHelper(result, args[n-1]));
+    // ```
+
+    return result;
+}
+
+void test()
+{
+    int x = sum(1,2,3); // x == 6
+}
+```
+
+Note that a variadic type pack parameter must appear at the end of a parameter list. If a generic type contains more than one
+type pack parameters, then each type pack must contain the same number of arguments at instantiation sites.
+
 Builtin Interfaces
 -----------------------------
 
@@ -817,6 +961,10 @@ Slang supports the following builtin interfaces:
 - `IDifferentiable`, represents a value that is differentiable.
 - `IFloat`, represents a logical float that supports both `IArithmetic`, `ILogical` and `IDifferentiable` operations. Also provides methods to convert to and from `float`. Implemented by all builtin floating-point scalar, vector and matrix types.
 - `IArray<T>`, represents a logical array that supports retrieving an element of type `T` from an index. Implemented by array types, vectors and matrices.
+- `IFunc<TResult, TParams...>` represent a callable object (with `operator()`) that returns `TResult` and takes `TParams...` as argument.
+- `IMutatingFunc<TResult, TParams...>`, similar to `IFunc`, but the `operator()` method is `[mutating]`.
+- `IDifferentiableFunc<TResult, TParams...>`, similar to `IFunc`, but the `operator()` method is `[Differentiable]`.
+- `IDifferentiableMutatingFunc<TResult, TParams...>`, similar to `IFunc,` but the `operator()` method is `[Differentiable]` and `[mutating]`.
 - `__EnumType`, implemented by all enum types.
 - `__BuiltinIntegerType`, implemented by all integer scalar types.
 - `__BuiltinFloatingPointType`, implemented by all floating-point scalar types.
