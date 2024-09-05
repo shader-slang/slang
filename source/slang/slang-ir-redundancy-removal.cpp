@@ -159,8 +159,9 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
     return result;
 }
 
-// Remove IR definitions from all e.g. [AvailableInDXIL] functions when compiling HLSL,
-// as these functions are already defined in the embedded precompiled library.
+// Remove IR definitions from all AvailableInDownstreamIR functions where the
+// languages match what we're currently targetting,  as these functions are
+// already defined in the embedded precompiled library.
 void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module)
 {
     List<IRInst*> toRemove;
@@ -168,15 +169,18 @@ void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule
     {
         if (auto funcInst = as<IRFunc>(globalInst))
         {
-            if ((target == CodeGenTarget::HLSL && globalInst->findDecoration<IRAvailableInDXILDecoration>()) ||
-                (target == CodeGenTarget::SPIRV && globalInst->findDecoration<IRAvailableInSPIRVDecoration>()))
+            if (auto dec = globalInst->findDecoration<IRAvailableInDownstreamIRDecoration>())
             {
-                // Gut the function definition, turning it into a declaration
-                for (auto inst : funcInst->getChildren())
+                if ((dec->getTarget()->getValue() == SLANG_DXIL && target == CodeGenTarget::HLSL) ||
+                    (dec->getTarget()->getValue() == SLANG_SPIRV && target == CodeGenTarget::SPIRV))
                 {
-                    if (inst->getOp() == kIROp_Block)
+                    // Gut the function definition, turning it into a declaration
+                    for (auto inst : funcInst->getChildren())
                     {
-                        toRemove.add(inst);
+                        if (inst->getOp() == kIROp_Block)
+                        {
+                            toRemove.add(inst);
+                        }
                     }
                 }
             }

@@ -801,8 +801,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
     INST(WaveSizeDecoration,                waveSize,               1, 0)
 
-    INST(AvailableInDXILDecoration,         availableInDXIL,        0, 0)
-    INST(AvailableInSPIRVDecoration,        availableInSPIRV,       0, 0)
+    INST(AvailableInDownstreamIRDecoration, availableInDownstreamIR, 1, 0)
 
         // Added to IRParam parameters to an entry point
     /* GeometryInputPrimitiveTypeDecoration */
@@ -1239,8 +1238,7 @@ INST(DebugVar, DebugVar, 4, 0)
 INST(DebugValue, DebugValue, 2, 0)
 
 /* Embedded Precompiled Libraries */
-INST(EmbeddedDXIL, EmbeddedDXIL, 1, 0)
-INST(EmbeddedSPIRV, EmbeddedSPIRV, 1, 0)
+INST(EmbeddedDownstreamIR, EmbeddedDownstreamIR, 2, 0)
 
 /* Inline assembly */
 

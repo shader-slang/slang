@@ -3300,25 +3300,19 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
 
     // If requested, attempt to compile the translation unit all the way down to the target language(s)
     // and stash the result blobs in IR.
-    List<SlangCompileTarget> precompileTargets;
-    if (getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+    for (auto target : getLinkage()->targets)
     {
-        precompileTargets.add(SlangCompileTarget::SLANG_DXIL);
-    }
-    if (getOptionSet().getBoolOption(CompilerOptionName::EmbedSPIRV))
-    {
-        precompileTargets.add(SlangCompileTarget::SLANG_SPIRV);
-    }
-
-    for (auto precompileTarget : precompileTargets)
-    {
-        auto frontEndReq = getFrontEndReq();
-
-        for (auto translationUnit : frontEndReq->translationUnits)
+        SlangCompileTarget targetEnum = SlangCompileTarget(target->getTarget());
+        if (target->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
         {
-            SLANG_RETURN_ON_FAIL(translationUnit->getModule()->precompileForTarget(
-                precompileTarget,
-                nullptr));
+            auto frontEndReq = getFrontEndReq();
+
+            for (auto translationUnit : frontEndReq->translationUnits)
+            {
+                SLANG_RETURN_ON_FAIL(translationUnit->getModule()->precompileForTarget(
+                    targetEnum,
+                    nullptr));
+            }
         }
     }
 
@@ -5941,17 +5935,9 @@ void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool
     getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
 }
 
-void EndToEndCompileRequest::embedDownstreamIR(SlangCompileTarget target)
+void EndToEndCompileRequest::setTargetEmbedDownstreamIR(int targetIndex, bool value)
 {
-    switch (target)
-    {
-    case SLANG_DXIL:
-        getOptionSet().set(CompilerOptionName::EmbedDXIL, true);
-        break;
-    case SLANG_SPIRV:
-        getOptionSet().set(CompilerOptionName::EmbedSPIRV, true);
-        break;
-    }
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDownstreamIR, value);
 }
 
 void EndToEndCompileRequest::setTargetLineDirectiveMode(

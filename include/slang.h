@@ -956,10 +956,8 @@ extern "C"
             GenerateWholeProgram,       // bool
             UseUpToDateBinaryModule,    // bool, when set, will only load
                                         // precompiled modules if it is up-to-date with its source.
-
-            EmbedDXIL,                  // bool
+            EmbedDownstreamIR,          // bool
             ForceDXLayout,              // bool
-            EmbedSPIRV,                 // bool
             CountOf,
         };
 
@@ -4932,7 +4930,7 @@ namespace slang
 
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) = 0;
 
-        virtual SLANG_NO_THROW void SLANG_MCALL embedDownstreamIR(SlangCompileTarget target) = 0;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDownstreamIR(int targetIndex, bool value) = 0;
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()

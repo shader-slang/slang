@@ -1,11 +1,11 @@
 // precompiled-module-library-resource.slang
 
-// Compile this library source with -embed-dxil and -embed-spirv options.
-// Tests that modules can be precompiled to dxil despite having resource
+// Compile this library source with embedded DXIL and SPIRV options.
+// Tests that modules can be precompiled to downstream IR despite having resource
 // parameters or return types.
 
-//TEST(windows):COMPILE: tests/library/precompiled-module-library-resource.slang -o tests/library/precompiled-module-library-resource-dxil.slang-module -embed-dxil -profile lib_6_6 -incomplete-library
-//TEST:COMPILE: tests/library/precompiled-module-library-resource.slang -o tests/library/precompiled-module-library-resource-spv.slang-module -embed-spirv -incomplete-library
+//TEST(windows):COMPILE: tests/library/precompiled-module-library-resource.slang -o tests/library/precompiled-module-library-resource-dxil.slang-module -target dxil -embed-downstream-ir -profile lib_6_6 -incomplete-library
+//TEST:COMPILE: tests/library/precompiled-module-library-resource.slang -o tests/library/precompiled-module-library-resource-spv.slang-module -target spirv -embed-downstream-ir -incomplete-library
 
 module "precompiled-module-library-resource";
 

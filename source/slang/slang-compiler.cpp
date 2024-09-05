@@ -767,12 +767,7 @@ namespace Slang
 #   pragma warning(pop)
 #endif
 
-    SlangResult CodeGenContext::emitPrecompiledDXIL(ComPtr<IArtifact>& outArtifact)
-    {
-        return emitWithDownstreamForEntryPoints(outArtifact);
-    }
-
-    SlangResult CodeGenContext::emitPrecompiledSPIRV(ComPtr<IArtifact>& outArtifact)
+    SlangResult CodeGenContext::emitPrecompiledDownstreamIR(ComPtr<IArtifact>& outArtifact)
     {
         return _emitEntryPoints(outArtifact);
     }
@@ -1563,20 +1558,23 @@ namespace Slang
         // Load embedded precompiled libraries from IR into library artifacts
         program->enumerateIRModules([&](IRModule* irModule)
         {
-            for (auto inst : irModule->getModuleInst()->getChildren())
+            for (auto globalInst : irModule->getModuleInst()->getChildren())
             {
                 if (target == CodeGenTarget::DXILAssembly || target == CodeGenTarget::DXIL)
                 {
-                    if (inst->getOp() == kIROp_EmbeddedDXIL)
+                    if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
                     {
-                        auto slice = static_cast<IRBlobLit*>(inst->getOperand(0))->getStringSlice();
-                        ArtifactDesc desc = ArtifactDescUtil::makeDescForCompileTarget(SLANG_DXIL);
-                        desc.kind = ArtifactKind::Library;
+                        if (inst->getTarget()->getValue() == SLANG_DXIL)
+                        {
+                            auto slice = inst->getBlob()->getStringSlice();
+                            ArtifactDesc desc = ArtifactDescUtil::makeDescForCompileTarget(SLANG_DXIL);
+                            desc.kind = ArtifactKind::Library;
 
-                        auto library = ArtifactUtil::createArtifact(desc);
+                            auto library = ArtifactUtil::createArtifact(desc);
 
-                        library->addRepresentationUnknown(StringBlob::create(slice));
-                        libraries.add(library);
+                            library->addRepresentationUnknown(StringBlob::create(slice));
+                            libraries.add(library);
+                        }
                     }
                 }
             }
@@ -2032,7 +2030,7 @@ namespace Slang
             {                
                 if (auto artifact = targetProgram->getExistingWholeProgramResult())
                 {
-                    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+                    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
                     {
                         artifacts.add(ComPtr<IArtifact>(artifact));
                     }
@@ -2287,6 +2285,9 @@ namespace Slang
         auto linkage = getLinkage();
         for (auto targetReq : linkage->targets)
         {
+            if (targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
+                continue;
+
             auto targetProgram = program->getTargetProgram(targetReq);
             generateOutput(targetProgram);
         }

@@ -3863,18 +3863,11 @@ namespace Slang
         return nullptr;
     }
 
-    IRInst* IRBuilder::emitEmbeddedDXIL(ISlangBlob *blob)
+    IRInst* IRBuilder::emitEmbeddedDownstreamIR(CodeGenTarget target, ISlangBlob *blob)
     {
-        IRInst* args[] = { getBlobValue(blob) };
+        IRInst* args[] = { getIntValue(getIntType(), (int)target), getBlobValue(blob) };
 
-        return emitIntrinsicInst(getVoidType(), kIROp_EmbeddedDXIL, 1, args);
-    }
-
-    IRInst* IRBuilder::emitEmbeddedSPIRV(ISlangBlob* blob)
-    {
-        IRInst* args[] = { getBlobValue(blob) };
-
-        return emitIntrinsicInst(getVoidType(), kIROp_EmbeddedSPIRV, 1, args);
+        return emitIntrinsicInst(getVoidType(), kIROp_EmbeddedDownstreamIR, 2, args);
     }
 
     enum class TypeCastStyle
