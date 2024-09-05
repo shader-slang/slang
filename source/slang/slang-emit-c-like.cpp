@@ -3520,7 +3520,7 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     {
         type = constRefType->getValueType();
     }
-
+    emitParamTypeModifier(type);
     emitType(type, name);
 }
 

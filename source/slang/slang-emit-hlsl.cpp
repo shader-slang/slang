@@ -959,21 +959,6 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_MatrixType:
         {
             auto matType = (IRMatrixType*)type;
-            auto matrixLayout = getIntVal(matType->getLayout());
-            if (getTargetProgram()->getOptionSet().getMatrixLayoutMode() != (MatrixLayoutMode)matrixLayout)
-            {
-                switch (matrixLayout)
-                {
-                case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
-                    m_writer->emit("column_major ");
-                    break;
-                case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
-                    m_writer->emit("row_major ");
-                    break;
-                default:
-                    break;
-                }
-            }
             bool canUseSugar = true;
             switch (matType->getElementType()->getOp())
             {
@@ -1345,8 +1330,24 @@ void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 
 void HLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRType* type)
 {
-    // For HLSL, matrix layout is emitted with type, so no work to do here.
-    SLANG_UNUSED(type);
+    auto matType = as<IRMatrixType>(type);
+    if (!matType)
+        return;
+    auto matrixLayout = getIntVal(matType->getLayout());
+    if (getTargetProgram()->getOptionSet().getMatrixLayoutMode() != (MatrixLayoutMode)matrixLayout)
+    {
+        switch (matrixLayout)
+        {
+        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+            m_writer->emit("column_major ");
+            break;
+        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+            m_writer->emit("row_major ");
+            break;
+        default:
+            break;
+        }
+    }
 }
 
 void HLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
