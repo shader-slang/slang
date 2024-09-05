@@ -717,6 +717,14 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             ASTLookupExprVisitor visitor(&context);
             if (visitor.dispatchIfNotNull(typeConstraint->getSup().exp))
                 return true;
+            if (auto genTypeConstraint = as<GenericTypeConstraintDecl>(node))
+            {
+                if (genTypeConstraint->whereTokenLoc.isValid())
+                {
+                    if (visitor.dispatchIfNotNull(genTypeConstraint->sub.exp))
+                        return true;
+                }
+            }
         }
         else if (auto typedefDecl = as<TypeDefDecl>(node))
         {

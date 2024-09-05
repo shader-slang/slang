@@ -148,6 +148,12 @@ namespace Slang
             resetLookupScope();
         }
 
+        void PushScope(Scope* newScope)
+        {
+            currentScope = newScope;
+            resetLookupScope();
+        }
+
         void pushScopeAndSetParent(ContainerDecl* containerDecl)
         {
             containerDecl->parentDecl = currentScope->containerDecl;
@@ -305,6 +311,8 @@ namespace Slang
     static TokenType peekTokenType(Parser* parser);
 
     static Expr* _parseGenericArg(Parser* parser);
+
+    static Expr* parsePrefixExpr(Parser* parser);
 
     //
 
@@ -716,6 +724,16 @@ namespace Slang
         if (parser->LookAheadToken(text))
         {
             parser->ReadToken();
+            return true;
+        }
+        return false;
+    }
+
+    bool AdvanceIf(Parser* parser, char const* text, Token* outToken)
+    {
+        if (parser->LookAheadToken(text))
+        {
+            *outToken = parser->ReadToken();
             return true;
         }
         return false;
@@ -1496,10 +1514,47 @@ namespace Slang
         }
         else
         {
-            // default case is a type parameter
-            paramDecl = parser->astBuilder->create<GenericTypeParamDecl>();
-            parser->FillPosition(paramDecl);
-            paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+            // Disambiguate between a type parameter and a value parameter.
+            // If next token is "typename", then it is a type parameter.
+            bool isTypeParam = AdvanceIf(parser, "typename");
+            if (!isTypeParam)
+            {
+                // Otherwise, if the next token is an identifier, followed by a colon, comma, '=' or '>', then it is a type parameter.
+                isTypeParam = parser->LookAheadToken(TokenType::Identifier);
+                auto nextNextTokenType = peekTokenType(parser, 1);
+                switch (nextNextTokenType)
+                {
+                case TokenType::Colon:
+                case TokenType::Comma:
+                case TokenType::OpGreater:
+                case TokenType::OpAssign:
+                    break;
+                default:
+                    isTypeParam = false;
+                    break;
+                }
+            }
+
+            if (isTypeParam)
+            {
+                // Parse as a type parameter.
+                paramDecl = parser->astBuilder->create<GenericTypeParamDecl>();
+                parser->FillPosition(paramDecl);
+                paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+            }
+            else
+            {
+                // Parse as a traditional syntax value parameter in the form of `type paramName`.
+                auto valueParamDecl = parser->astBuilder->create<GenericValueParamDecl>();
+                parser->FillPosition(valueParamDecl);
+                valueParamDecl->type = parser->ParseTypeExp();
+                valueParamDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+                if (AdvanceIf(parser, TokenType::OpAssign))
+                {
+                    valueParamDecl->initExpr = parser->ParseInitExpr();
+                }
+                return valueParamDecl;
+            }
         }
         if (AdvanceIf(parser, TokenType::Colon))
         {
@@ -1600,7 +1655,43 @@ namespace Slang
         }
         else
         {
-            return parseInner(nullptr);
+            auto genericParent = parser->currentScope ? as<GenericDecl>(parser->currentScope->containerDecl) : nullptr;
+            return parseInner(genericParent);
+        }
+    }
+
+    static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericParent)
+    {
+        if (!genericParent)
+            return;
+        Token whereToken;
+        while (AdvanceIf(parser, "where", &whereToken))
+        {
+            auto subType = parser->ParseTypeExp();
+            if (AdvanceIf(parser, TokenType::Colon))
+            {
+                for (;;)
+                {
+                    auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
+                    constraint->whereTokenLoc = whereToken.loc;
+                    parser->FillPosition(constraint);
+                    constraint->sub = subType;
+                    constraint->sup = parser->ParseTypeExp();
+                    AddMember(genericParent, constraint);
+                    if (!AdvanceIf(parser, TokenType::Comma))
+                        break;
+                }
+            }
+            else if (AdvanceIf(parser, TokenType::OpEql))
+            {
+                auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
+                constraint->whereTokenLoc = whereToken.loc;
+                constraint->isEqualityConstraint = true;
+                parser->FillPosition(constraint);
+                constraint->sub = subType;
+                constraint->sup = parser->ParseTypeExp();
+                AddMember(genericParent, constraint);
+            }
         }
     }
 
@@ -1702,7 +1793,7 @@ namespace Slang
         decl->loc = declaratorInfo.nameAndLoc.loc;
         decl->nameAndLoc = declaratorInfo.nameAndLoc;
 
-        return parseOptGenericDecl(parser, [&](GenericDecl*)
+        return parseOptGenericDecl(parser, [&](GenericDecl* genericParent)
         {
             // HACK: The return type of the function will already have been
             // parsed in a scope that didn't include the function's generic
@@ -1731,6 +1822,12 @@ namespace Slang
             }
 
             _parseOptSemantics(parser, decl);
+
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
+            maybeParseGenericConstraints(parser, genericParent);
+            parser->PushScope(funcScope);
+
             decl->body = parseOptBody(parser);
             if (auto block = as<BlockStmt>(decl->body))
             {
@@ -2597,7 +2694,7 @@ namespace Slang
         }
         else if (parser->LookAheadToken("expand") || parser->LookAheadToken("each"))
         {
-            typeSpec.expr = parser->ParseExpression();
+            typeSpec.expr = parsePrefixExpr(parser);
             return typeSpec;
         }
         // Uncomment should we decide to enable (a,b,c) tuple types
@@ -3335,12 +3432,13 @@ namespace Slang
 
     static NodeBase* parseExtensionDecl(Parser* parser, void* /*userData*/)
     {
-        return parseOptGenericDecl(parser, [&](GenericDecl*)
+        return parseOptGenericDecl(parser, [&](GenericDecl* genericParent)
             {
                 ExtensionDecl* decl = parser->astBuilder->create<ExtensionDecl>();
                 parser->FillPosition(decl);
                 decl->targetType = parser->ParseTypeExp();
                 parseOptionalInheritanceClause(parser, decl);
+                maybeParseGenericConstraints(parser, genericParent);
                 parseDeclBody(parser, decl);
                 return decl;
             });
@@ -3357,16 +3455,27 @@ namespace Slang
                 parser->FillPosition(paramConstraint);
 
                 // substitution needs to be filled during check
-                Type* paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
+                Type* paramType = nullptr;
+                if (as<GenericTypeParamDeclBase>(decl))
+                {
+                    paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
 
-                SharedTypeExpr* paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
-                paramTypeExpr->loc = decl->loc;
-                paramTypeExpr->base.type = paramType;
-                paramTypeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
+                    SharedTypeExpr* paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
+                    paramTypeExpr->loc = decl->loc;
+                    paramTypeExpr->base.type = paramType;
+                    paramTypeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
 
-                paramConstraint->sub = TypeExp(paramTypeExpr);
+                    paramConstraint->sub = TypeExp(paramTypeExpr);
+                }
+                else if (as<AssocTypeDecl>(decl))
+                {
+                    auto varExpr = parser->astBuilder->create<VarExpr>();
+                    varExpr->scope = parser->currentScope;
+                    varExpr->name = decl->getName();
+                    paramConstraint->sub.exp = varExpr;
+                }
+
                 paramConstraint->sup = parser->ParseTypeExp();
-
                 AddMember(decl, paramConstraint);
             } while (AdvanceIf(parser, TokenType::Comma));
         }
@@ -3380,6 +3489,7 @@ namespace Slang
         assocTypeDecl->nameAndLoc = NameLoc(nameToken);
         assocTypeDecl->loc = nameToken.loc;
         parseOptionalGenericConstraints(parser, assocTypeDecl);
+        maybeParseGenericConstraints(parser, assocTypeDecl);
         parser->ReadToken(TokenType::Semicolon);
         return assocTypeDecl;
     }
@@ -3424,11 +3534,12 @@ namespace Slang
         AdvanceIf(parser, TokenType::CompletionRequest);
 
         decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-        return parseOptGenericDecl(parser, [&](GenericDecl*)
+        return parseOptGenericDecl(parser, [&](GenericDecl* genericParent)
             {
                 // We allow for an inheritance clause on a `struct`
                 // so that it can conform to interfaces.
                 parseOptionalInheritanceClause(parser, decl);
+                maybeParseGenericConstraints(parser, genericParent);
                 parseDeclBody(parser, decl);
                 return decl;
             });
@@ -3661,7 +3772,7 @@ namespace Slang
     {
         ConstructorDecl* decl = parser->astBuilder->create<ConstructorDecl>();
 
-        return parseOptGenericDecl(parser, [&](GenericDecl*)
+        return parseOptGenericDecl(parser, [&](GenericDecl* genericParent)
             {
                 // Note: we leave the source location of this decl as invalid, to
                 // trigger the fallback logic that fills in the location of the
@@ -3680,6 +3791,10 @@ namespace Slang
                 decl->nameAndLoc.name = getName(parser, "$init");
 
                 parseParameterList(parser, decl);
+                auto funcScope = parser->currentScope;
+                parser->PopScope();
+                maybeParseGenericConstraints(parser, genericParent);
+                parser->PushScope(funcScope);
 
                 decl->body = parseOptBody(parser);
 
@@ -3997,7 +4112,7 @@ namespace Slang
         parser->FillPosition(decl);
         decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
 
-        return parseOptGenericDecl(parser, [&](GenericDecl*)
+        return parseOptGenericDecl(parser, [&](GenericDecl* genericParent)
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
@@ -4009,6 +4124,10 @@ namespace Slang
             {
                 decl->returnType = parser->ParseTypeExp();
             }
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
+            maybeParseGenericConstraints(parser, genericParent);
+            parser->PushScope(funcScope);
             decl->body = parseOptBody(parser);
             if (auto blockStmt = as<BlockStmt>(decl->body))
                 decl->closingSourceLoc = blockStmt->closingSourceLoc;
@@ -4025,8 +4144,9 @@ namespace Slang
         parser->FillPosition(decl);
         decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
 
-        return parseOptGenericDecl(parser, [&](GenericDecl*)
+        return parseOptGenericDecl(parser, [&](GenericDecl* genericParent)
         {
+            maybeParseGenericConstraints(parser, genericParent);
             if( expect(parser, TokenType::OpAssign) )
             {
                 decl->type = parser->ParseTypeExp();
@@ -4860,7 +4980,7 @@ namespace Slang
             rs->nameAndLoc.name = generateName(this);
             rs->nameAndLoc.loc = rs->loc;
         }
-        return parseOptGenericDecl(this, [&](GenericDecl*)
+        return parseOptGenericDecl(this, [&](GenericDecl* genericParent)
         {
             // We allow for an inheritance clause on a `struct`
             // so that it can conform to interfaces.
@@ -4878,6 +4998,7 @@ namespace Slang
                 rs->hasBody = false;
                 return rs;
             }
+            maybeParseGenericConstraints(this, genericParent);
             parseDeclBody(this, rs);
             return rs;
         });
@@ -4977,9 +5098,10 @@ namespace Slang
             addModifier(decl, parser->astBuilder->create<TransparentModifier>());
         }
 
-        return parseOptGenericDecl(parser, [&](GenericDecl*)
+        return parseOptGenericDecl(parser, [&](GenericDecl* genericParent)
         {
             parseOptionalInheritanceClause(parser, decl);
+            maybeParseGenericConstraints(parser, genericParent);
             parser->ReadToken(TokenType::LBrace);
             Token closingToken;
             parser->pushScopeAndSetParent(decl);
@@ -7583,7 +7705,7 @@ namespace Slang
     {
         EachExpr* eachExpr = parser->astBuilder->create<EachExpr>();
         eachExpr->loc = loc;
-        eachExpr->baseExpr = parser->ParseLeafExpression();
+        eachExpr->baseExpr = parsePostfixExpr(parser);
         return eachExpr;
     }
 
