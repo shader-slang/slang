@@ -2583,8 +2583,10 @@ namespace Slang
         for (auto i : getMembersOfType<InheritanceDecl>(m_astBuilder, structDecl, MemberFilterStyle::Instance))
         {
             if (auto memberStruct = as<StructDecl>(i.getDecl()->base.type))
-                _structHasMemberWithValue(m_astBuilder, memberStruct);
+                if (_structHasMemberWithValue(m_astBuilder, memberStruct))
+                    return true;
         }
+        return false;
     }
 
         // Concretize interface conformances so that we have witnesses as required for lookup.
