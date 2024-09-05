@@ -71,22 +71,6 @@ namespace Slang
         return ctorList;
     }
 
-    bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
-    {
-        if (!varDecl)
-            return true;
-
-        // find groupshared modifier
-        if (varDecl->findModifier<HLSLGroupSharedModifier>())
-        {
-            if (sink && varDecl->initExpr)
-                sink->diagnose(varDecl, Diagnostics::cannotHaveInitializer, varDecl, "groupshared");
-            return false;
-        }
-
-        return true;
-    }
-
     bool isDefaultInitializable(Type* varDeclType, VarDeclBase* associatedDecl)
     {
         if (!DiagnoseIsAllowedInitExpr(associatedDecl, nullptr))
@@ -146,7 +130,7 @@ namespace Slang
         {
             auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
             auto member = visitor->getASTBuilder()->getMemberDeclRef(declRefType->getDeclRef(), defaultCtor);
-            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->getName(), defaultCtor->loc, nullptr);
             invoke->type = varDeclType.type;
             return invoke;
         }
@@ -171,7 +155,7 @@ namespace Slang
     {
             auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
             auto member = visitor->getASTBuilder()->getMemberDeclRef(structDecl->getDefaultDeclRef(), defaultCtor);
-            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->getName(), defaultCtor->loc, nullptr);
             invoke->type = structDeclType;
             return invoke;
     }
@@ -222,7 +206,7 @@ namespace Slang
             else
                 member = visitor->getASTBuilder()->getMemberDeclRef(structDecl, zeroInitListFunc);
 
-            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, zeroInitListFunc->loc, nullptr);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, zeroInitListFunc->getName(), zeroInitListFunc->loc, nullptr);
             invoke->type = structDeclType;
             return invoke;
         }
